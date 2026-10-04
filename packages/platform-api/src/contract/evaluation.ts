@@ -9,7 +9,6 @@ import {
   EvalCaseSchema,
   EvalCaseSplitSchema,
   EvalDatasetVersionSchema,
-  EvalOptimisationSchema,
   EvalRunEstimateSchema,
   EvalRunReportSchema,
   EvalRunSchema,
@@ -38,11 +37,9 @@ import {
   StepFingerprintSchema,
   StepQualificationSchema,
   StepQualificationStatusSchema,
-  StepVariantPatchSchema,
   JudgeReviewDecisionSchema,
   hasPerturbationChange,
 } from '@mediforce/platform-core';
-import { RegistrationWarningSchema } from './workflows';
 
 /**
  * Contracts for the Evaluation domain (ADR-0023): Evaluation Briefs,
@@ -319,24 +316,16 @@ export const SetAcceptanceCriteriaInputSchema = EvaluatedStepSchema.extend({
 });
 export const SetAcceptanceCriteriaOutputSchema = z.object({ criteria: AcceptanceCriteriaVersionSchema });
 
-/** A challenger: the Step with a patch over it (D5), run beside the unpatched champion. */
-export const EvalChallengerSchema = z.object({
-  label: z.string().trim().min(1).max(120),
-  patch: StepVariantPatchSchema,
-});
-
 /**
  * Prepares an Eval Run (ADR-0023 D4, D5, D10): freezes the Dataset version (the
  * newest when none is named), the Step's live Evaluator versions, its MCP eval
- * policy, its Acceptance Criteria and Brief version, and the variants — the
- * champion and up to three challengers, each with its Step Fingerprint — and
- * estimates the cost. Nothing runs until `start`.
+ * policy, its Acceptance Criteria, and the Step with its Step Fingerprint —
+ * and estimates the cost. Nothing runs until `start`.
  */
 export const PrepareEvalRunInputSchema = EvaluatedStepSchema.extend({
   /** The Workflow Definition version whose step runs; its runnable version when absent. */
   definitionVersion: z.number().int().positive().optional(),
   datasetVersionId: z.uuid().optional(),
-  challengers: z.array(EvalChallengerSchema).max(3).default([]),
   trialsPerCase: z.number().int().min(1).max(10).default(3),
   concurrency: z.number().int().min(1).max(8).default(2),
   /** Spend cap; defaults to 1.5× the estimate, and is required when there is no estimate. */
@@ -510,105 +499,6 @@ export const GetEvalRunFailuresOutputSchema = z.object({
 });
 
 /**
- * Starts a GEPA optimisation of the Step's prompt (ADR-0023 D15): a container
- * job reflects on one variant's trials of the dev cases in a finished Eval Run
- * — the champion by default — and proposes up to `candidates` prompts, which
- * then run as challengers over the Step's newest Dataset, dev and holdout. The
- * job and that run together spend at most `budgetUsd`, which the person grants
- * with this request. Needs the workflow's `run` verb.
- */
-export const StartOptimisationInputSchema = EvaluatedStepSchema.extend({
-  evalRunId: z.uuid(),
-  variantId: z.string().min(1).optional(),
-  budgetUsd: z.number().positive().max(10_000),
-  candidates: z.number().int().min(1).max(3).default(3),
-  trialsPerCase: z.number().int().min(1).max(10).default(1),
-  /** The model GEPA reflects with; the Evaluation Assistant's default when absent. It must have a registry price. */
-  reflectionModel: z.string().min(1).optional(),
-});
-
-export const GetOptimisationInputSchema = z.object({ optimisationId: z.uuid() });
-export const ListOptimisationsInputSchema = EvaluatedStepSchema;
-export const ListOptimisationsOutputSchema = z.object({ optimisations: z.array(EvalOptimisationSchema) });
-
-/** One variant's trials of one split's cases: a trial passes when every counted Evaluator graded it and passed it. */
-export const OptimisationSplitResultSchema = z.object({
-  /** Cases of this split in the Eval Run. */
-  cases: z.number().int().nonnegative(),
-  /** Trials every counted Evaluator graded. */
-  graded: z.number().int().nonnegative(),
-  passes: z.number().int().nonnegative(),
-  passRate: z.number().min(0).max(1).nullable(),
-  wilsonLower: z.number().min(0).max(1).nullable(),
-  wilsonUpper: z.number().min(0).max(1).nullable(),
-});
-
-export const OptimisationVariantResultSchema = z.object({
-  variantId: z.string(),
-  label: z.string(),
-  /** The prompt it ran with; null for the Step as it is. */
-  prompt: z.string().nullable(),
-  dev: OptimisationSplitResultSchema,
-  holdout: OptimisationSplitResultSchema,
-  meanCostUsd: z.number().nonnegative().nullable(),
-});
-
-/**
- * An optimisation with its candidates' results, computed from the Scores of
- * its Eval Run when read: the Step as it is as the baseline, and the
- * candidates best first — by the Wilson lower bound of their holdout pass
- * rate, then dev pass rate, then mean cost.
- */
-export const EvalOptimisationOutputSchema = z.object({
-  optimisation: EvalOptimisationSchema,
-  evalRun: EvalRunSchema.pick({ id: true, status: true, budgetUsd: true, spentUsd: true }).nullable(),
-  /** The job and the Eval Run together; null while the job's cost is unknown — still proposing, or it died without saying. */
-  spentUsd: z.number().nonnegative().nullable(),
-  baseline: OptimisationVariantResultSchema.nullable(),
-  ranking: z.array(OptimisationVariantResultSchema.extend({ rank: z.number().int().positive() })),
-});
-
-/**
- * Applies a variant to the Step (D5): a challenger of one of its Eval Runs, or
- * a patch, over the Step as its runnable version has it, saved as a new
- * Workflow Definition version the way the workflow editor saves one —
- * `setAsDefault` as its save dialog offers. Needs the workflow's `edit` verb.
- */
-export const ApplyStepVariantInputSchema = EvaluatedStepSchema.extend({
-  evalRunId: z.uuid().optional(),
-  variantId: z.string().min(1).optional(),
-  patch: StepVariantPatchSchema.optional(),
-  setAsDefault: z.boolean().default(false),
-}).refine(
-  (input) => input.patch === undefined
-    ? input.evalRunId !== undefined && input.variantId !== undefined
-    : input.evalRunId === undefined && input.variantId === undefined,
-  { message: 'give either evalRunId and variantId (a challenger of an Eval Run) or patch' },
-);
-
-export const ApplyStepVariantOutputSchema = z.object({
-  definitionVersion: z.number().int().positive(),
-  /** Whether the new version is the one runs now use: the default, or the newest when none is set. */
-  runnable: z.boolean(),
-  /** The patched Step's Fingerprint in the new version. */
-  fingerprint: StepFingerprintSchema,
-  /** The Eval Run variant applied; null for a patch. */
-  variant: z.object({
-    evalRunId: z.uuid(),
-    variantId: z.string(),
-    label: z.string(),
-    /**
-     * The new Fingerprint equals the one frozen with the variant, so a Step
-     * Qualification of that variant holds for the new version.
-     */
-    matchesFingerprint: z.boolean(),
-    /** What differs from the variant's Fingerprint; empty when it matches. */
-    changed: z.array(StepFingerprintComponentSchema),
-  }).nullable(),
-  warnings: z.array(RegistrationWarningSchema).optional(),
-});
-
-/**
  * The Step's qualification badge (D11). By default for the Step as its
  * runnable version has it; with `definitionVersion`, as that version has it —
  * what a run of that version ran.
@@ -776,13 +666,10 @@ export type EvalTrialFailure = z.infer<typeof EvalTrialFailureSchema>;
 export type TrialEvaluatorFailure = z.infer<typeof TrialEvaluatorFailureSchema>;
 export type ReviewJudgeVerdictInput = z.infer<typeof ReviewJudgeVerdictInputSchema>;
 export type ReviewJudgeVerdictOutput = z.infer<typeof ReviewJudgeVerdictOutputSchema>;
-export type ApplyStepVariantInput = z.input<typeof ApplyStepVariantInputSchema>;
-export type ApplyStepVariantOutput = z.infer<typeof ApplyStepVariantOutputSchema>;
 export type GetAcceptanceCriteriaInput = z.infer<typeof GetAcceptanceCriteriaInputSchema>;
 export type GetAcceptanceCriteriaOutput = z.infer<typeof GetAcceptanceCriteriaOutputSchema>;
 export type SetAcceptanceCriteriaInput = z.input<typeof SetAcceptanceCriteriaInputSchema>;
 export type SetAcceptanceCriteriaOutput = z.infer<typeof SetAcceptanceCriteriaOutputSchema>;
-export type EvalChallenger = z.infer<typeof EvalChallengerSchema>;
 export type GetStepQualificationInput = z.input<typeof GetStepQualificationInputSchema>;
 export type GetStepQualificationOutput = z.infer<typeof GetStepQualificationOutputSchema>;
 export type StepValidation = z.infer<typeof StepValidationSchema>;
@@ -794,10 +681,3 @@ export type SignStepQualificationOutput = z.infer<typeof SignStepQualificationOu
 export type GetStepDriftInput = z.input<typeof GetStepDriftInputSchema>;
 export type GetStepDriftOutput = z.infer<typeof GetStepDriftOutputSchema>;
 export type EvaluatorDrift = z.infer<typeof EvaluatorDriftSchema>;
-export type StartOptimisationInput = z.input<typeof StartOptimisationInputSchema>;
-export type GetOptimisationInput = z.infer<typeof GetOptimisationInputSchema>;
-export type ListOptimisationsInput = z.infer<typeof ListOptimisationsInputSchema>;
-export type ListOptimisationsOutput = z.infer<typeof ListOptimisationsOutputSchema>;
-export type OptimisationSplitResult = z.infer<typeof OptimisationSplitResultSchema>;
-export type OptimisationVariantResult = z.infer<typeof OptimisationVariantResultSchema>;
-export type EvalOptimisationOutput = z.infer<typeof EvalOptimisationOutputSchema>;

@@ -183,7 +183,6 @@ export const evalRuns = pgTable(
     definitionVersion: integer('definition_version').notNull(),
     datasetVersionId: uuid('dataset_version_id').notNull().references(() => evalDatasetVersions.id),
     caseIds: jsonb('case_ids').notNull(),
-    exampleCaseIds: jsonb('example_case_ids').notNull().default([]),
     trialsPerCase: integer('trials_per_case').notNull(),
     concurrency: integer('concurrency').notNull(),
     evaluators: jsonb('evaluators').notNull(),
@@ -258,28 +257,6 @@ export const evalMcpRecordings = pgTable(
   (table) => ({
     caseIdx: index('eval_mcp_recordings_case_idx')
       .on(table.workspace, table.workflowName, table.stepId, table.caseId, table.server, table.recordedAt),
-  }),
-);
-
-/**
- * GEPA optimisations of a Step's prompt: the whole record is `record`; the
- * columns beside it are what it is looked up and swept by. It changes only by
- * a conditional update on `status`, so two writers cannot both move it on.
- */
-export const evalOptimisations = pgTable(
-  'eval_optimisations',
-  {
-    id: uuid('id').primaryKey(),
-    workspace: workspaceColumn(),
-    workflowName: text('workflow_name').notNull(),
-    stepId: text('step_id').notNull(),
-    status: text('status').notNull(),
-    record: jsonb('record').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
-  },
-  (table) => ({
-    stepIdx: index('eval_optimisations_step_idx').on(table.workspace, table.workflowName, table.stepId, table.createdAt.desc()),
-    statusIdx: index('eval_optimisations_status_idx').on(table.status, table.createdAt),
   }),
 );
 

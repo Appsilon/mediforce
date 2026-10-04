@@ -97,7 +97,7 @@ describe('reviewEvaluationProposal', () => {
       expectation: 'positive', expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null, split: 'dev', containsProductionData: false, origin: 'user',
     }, scope);
     await freezeEvalDataset(STEP, scope);
-    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 1 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 1 }, scope);
     const propose = (variantId: string, step: EvaluatedStep = STEP) => reviewEvaluationProposal('propose_control_settings', {
       evalRunId: evalRun.id, variantId, autonomyLevel: 'L3', rationale: 'Criteria missed.',
     }, scope, step, []);
@@ -107,7 +107,7 @@ describe('reviewEvaluationProposal', () => {
     expect(await propose('champion', { ...STEP, stepId: 'extract-aes' })).toEqual({ ok: false, error: expect.stringContaining('is not a run of this step') });
   });
 
-  describe('the fix loop', () => {
+  describe('a diagnosis', () => {
     async function preparedRun() {
       const scope = fixture.scope();
       await createEvaluator({ ...STEP, ...proposeEvaluator(findings), origin: 'user' }, scope);
@@ -117,7 +117,7 @@ describe('reviewEvaluationProposal', () => {
       }, scope);
       await freezeEvalDataset(STEP, scope);
       const { evalRun } = await prepareEvalRun({
-        ...STEP, challengers: [{ label: 'GPT-5', patch: { model: 'openai/gpt-5' } }], trialsPerCase: 1, concurrency: 1, budgetUsd: 1,
+        ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 1,
       }, scope);
       return { scope, evalRun, trials: await fixture.evaluationRepo.listTrials(evalRun.id) };
     }
@@ -129,12 +129,10 @@ describe('reviewEvaluationProposal', () => {
     it('offers a diagnosis only over trials of that run and variant', async () => {
       const { scope, evalRun, trials } = await preparedRun();
       const champion = trials.find((trial) => trial.variantId === 'champion')!;
-      const challenger = trials.find((trial) => trial.variantId === 'challenger-1')!;
       const diagnose = (variantId: string, trialIds: string[], step: EvaluatedStep = STEP) =>
         reviewEvaluationProposal('propose_diagnosis', { evalRunId: evalRun.id, variantId, clusters: [cluster(trialIds)] }, scope, step, []);
 
       expect(await diagnose('champion', [champion.id])).toEqual({ ok: true });
-      expect(await diagnose('champion', [champion.id, challenger.id])).toEqual({ ok: false, error: expect.stringContaining(challenger.id) });
       expect(await diagnose('champion', ['2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c'])).toMatchObject({ ok: false, error: expect.stringContaining('get_failures') });
       expect(await diagnose('challenger-9', [champion.id])).toEqual({ ok: false, error: expect.stringContaining("has no variant 'challenger-9'") });
       expect(await diagnose('champion', [champion.id], { ...STEP, stepId: 'extract-aes' })).toEqual({ ok: false, error: expect.stringContaining('is not a run of this step') });

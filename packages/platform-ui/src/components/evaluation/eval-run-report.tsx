@@ -9,7 +9,6 @@ import {
   type EvaluatedStep,
   type JudgeVerdict,
   type StepVariantPatch,
-  type VariantComparison,
 } from '@mediforce/platform-core';
 import type { EvalRunOutput } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
@@ -31,7 +30,6 @@ export function describePatch(patch: StepVariantPatch): string {
     patch.skillCommit !== undefined && `skills at ${patch.skillCommit.slice(0, 8)}`,
     patch.allowedTools !== undefined && `tools ${patch.allowedTools.length === 0 ? 'none extra' : patch.allowedTools.join(', ')}`,
     patch.mcpRestrictions !== undefined && `MCP narrowed: ${Object.keys(patch.mcpRestrictions).join(', ')}`,
-    patch.examples !== undefined && (patch.examples.length === 0 ? 'no examples' : `${patch.examples.length} example(s)`),
   ].filter((change) => change !== false);
   return changes.length === 0 ? 'the step as it is' : changes.join('; ');
 }
@@ -243,7 +241,6 @@ function VariantReport({ output, variant, step, mayEdit, editReason }: {
 }) {
   const [signing, setSigning] = React.useState(false);
   const blocked = signingBlocked(output, variant, mayEdit, editReason);
-  const comparison = output.report.comparison.find((candidate) => candidate.variantId === variant.id);
   return (
     <div className="space-y-5 border-t pt-4 first:border-t-0 first:pt-0" data-testid="variant-report">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -259,7 +256,6 @@ function VariantReport({ output, variant, step, mayEdit, editReason }: {
       </div>
       <EvaluatorTable variant={variant} k={output.report.k} />
       {variant.criteria.length > 0 && <CriteriaTable variant={variant} />}
-      {comparison !== undefined && <ComparisonTable comparison={comparison} />}
       <CalibrationSection verdicts={output.report.judgeVerdicts.filter((verdict) => verdict.variantId === variant.id)} />
       {signing ? (
         <SignQualificationForm
@@ -283,39 +279,10 @@ function VariantReport({ output, variant, step, mayEdit, editReason }: {
   );
 }
 
-/** A challenger against the champion: a difference counts only when the two 95% intervals do not overlap. */
-function ComparisonTable({ comparison }: { comparison: VariantComparison }) {
-  return (
-    <div className="space-y-1 text-xs" data-testid="variant-comparison">
-      <TableTitle>Against the step as it is</TableTitle>
-      <p className="text-muted-foreground">
-        {comparison.meanCostDeltaUsd !== null && `mean cost ${comparison.meanCostDeltaUsd >= 0 ? '+' : ''}$${comparison.meanCostDeltaUsd.toFixed(4)}`}
-        {comparison.meanDurationDeltaMs !== null && `${comparison.meanCostDeltaUsd !== null ? ' · ' : ''}mean time ${comparison.meanDurationDeltaMs >= 0 ? '+' : ''}${(comparison.meanDurationDeltaMs / 1000).toFixed(1)}s`}
-      </p>
-      <table>
-        <tbody>
-          {comparison.evaluators.map((evaluator) => (
-            <tr key={evaluator.evaluatorId}>
-              <td className="pr-4">{evaluator.name}</td>
-              <td className="pr-4">{percent(evaluator.championPassRate)} → {percent(evaluator.challengerPassRate)}</td>
-              <td className={cn(
-                evaluator.verdict === 'better' && 'text-green-700 dark:text-green-400',
-                evaluator.verdict === 'worse' && 'text-red-700 dark:text-red-400',
-                evaluator.verdict === 'no_clear_difference' && 'text-muted-foreground',
-              )}>{evaluator.verdict.replace(/_/g, ' ')}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 /**
  * An Eval Run's results (ADR-0023 D5, D10): per variant, every Evaluator's
  * pass rate with its Wilson 95% interval, pass@k, pass^k and flakiness, the
- * verdict on each Acceptance Criterion, a challenger against the champion,
- * and how well the grading models' confidence matches a person's review of
+ * verdict on each Acceptance Criterion, and how well the grading models' confidence matches a person's review of
  * their verdicts. A person signs a Step Qualification for a variant from here.
  */
 export function EvalRunSummary({ output, step, mayEdit, editReason }: {
@@ -329,11 +296,6 @@ export function EvalRunSummary({ output, step, mayEdit, editReason }: {
     <div className="space-y-4" data-testid="eval-run-report">
       <div className="space-y-1 text-xs text-muted-foreground">
         {evalRun.acceptanceCriteria === null && <p>No Acceptance Criteria were frozen into this run, so nothing is judged.</p>}
-        {evalRun.exampleCaseIds.length > 0 && (
-          <p data-testid="example-cases-left-out">
-            {evalRun.exampleCaseIds.length} case(s) left out — a variant&apos;s few-shot examples came from them.
-          </p>
-        )}
       </div>
       {report.variants.map((variant) => (
         <VariantReport key={variant.id} output={output} variant={variant} step={step} mayEdit={mayEdit} editReason={editReason} />

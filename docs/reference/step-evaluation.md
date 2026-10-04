@@ -10,9 +10,9 @@ How an author checks that one agent Workflow Step can be trusted for its
 context of use. The design and its reasons are
 [ADR-0023](../adr/0023-step-evaluation.md); the vocabulary is `CONTEXT.md`
 § Evaluation domain. This page is what exists today. Optimisation — challenger
-variants, applying them, fix variants and GEPA — is parked in [ADR-0024](../adr/0024-optimisation.md) (Proposed):
-its REST routes and CLI commands still exist but are outside the supported
-surface, and neither the tab nor the assistant offers them.
+variants, applying them, few-shot examples, fix variants and GEPA — is parked in
+[ADR-0024](../adr/0024-optimisation.md) (Proposed); its code was deleted and is
+pinned there for reuse.
 
 Everything below belongs to one agent Step, keyed by
 `(namespace, workflowName, stepId)`, and lives outside the Workflow
@@ -513,9 +513,7 @@ An Eval Run runs the Step, as its runnable Definition version has it — or the
 version named (`run-prepare --version N`, `definitionVersion`; the tab prepares
 for the version selected), never an archived one — over a frozen Dataset
 version: every case, `trialsPerCase` times. Starting, stopping and reviewing a
-run go by the version it was prepared for. A case cited by the
-step's few-shot `agent.examples` is left out of the run (`exampleCaseIds`;
-[ADR-0024](../adr/0024-optimisation.md) D5).
+run go by the version it was prepared for.
 
 0. **Estimate** (`run-estimate`, `POST /api/evaluation/runs/estimate`) returns
    what a run of the same input would cost and the budget cap prepare would
@@ -530,7 +528,7 @@ step's few-shot `agent.examples` is left out of the run (`exampleCaseIds`;
    plus one call per `llm_judge`. The budget cap
    defaults to 1.5× the estimate; with no estimate it must be given.
    A run whose trials the auto-runner would pause on a model — one the
-   registry does not list or has retired, in the version or a challenger — is
+   registry does not list or has retired — is
    refused, at prepare and again at start, naming the model.
 2. **Start** (`run-start --confirm-budget <usd>`) needs the budget echoed back —
    the person confirming what the run may spend. Without it the start is
@@ -640,8 +638,7 @@ model's verdict, so the list never rebuilds a report. **Details** opens the run 
 acceptance, Dataset, trials, cost, Cancel while it runs, Start while
 prepared) and five views, from the whole run to one trial:
 
-- **Summary** — the report per variant: Evaluators, criteria, a challenger
-  against the champion, verdict calibration, and **Approve step
+- **Summary** — the report: Evaluators, criteria, verdict calibration, and **Approve step
   configuration** (signs a Step Qualification). The criteria are a table per
   severity: the floor required, how many counted Evaluators met it, the trials
   they passed and failed, and the pass rate. Routing and the MCP line are not

@@ -23,7 +23,7 @@ describe('reviewJudgeVerdict', () => {
     fixture = await evaluationFixture();
     scope = fixture.scope();
     evalRun = {
-      ...STEP, id: randomUUID(), definitionVersion: 1, datasetVersionId: randomUUID(), caseIds: [CASE], exampleCaseIds: [],
+      ...STEP, id: randomUUID(), definitionVersion: 1, datasetVersionId: randomUUID(), caseIds: [CASE],
       trialsPerCase: 1, concurrency: 1,
       evaluators: [
         { evaluatorId: JUDGE, name: 'grades-justified', version: 1, kind: 'llm_judge', severity: 'critical', counted: true },

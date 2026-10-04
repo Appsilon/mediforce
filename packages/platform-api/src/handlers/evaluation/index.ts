@@ -38,5 +38,3 @@ export { computeStepFingerprint, changedFingerprintComponents } from './_lib/ste
 export { getEvalRunFailures } from './eval-run-failures';
 export { getEvalTrial } from './eval-trial';
 export { reviewJudgeVerdict } from './judge-reviews';
-export { applyVariantToStep } from './apply-step-variant';
-export { startOptimisation, getOptimisation, listOptimisations, failStaleOptimisations } from './optimisations';

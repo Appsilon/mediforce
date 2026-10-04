@@ -71,9 +71,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build custom Docker images for E2E tests
         run: docker build -t mediforce-node:latest -f packages/agent-runtime/container/Dockerfile.node .
-      # The GEPA job's L1 test runs the real `gepa` package on the host's python3 (local mode).
-      - name: Install the gepa package for the GEPA job tests
-        run: python3 -m pip install --user --break-system-packages gepa==0.1.4
       - run: pnpm test:unit
 
   postgres-repository-tests:
@@ -149,10 +146,6 @@ jobs:
 
       - name: Apply Postgres migrations
         run: pnpm db:migrate
-
-      # The optimisation journey runs the GEPA job as a local python3 process (ALLOW_LOCAL_AGENTS).
-      - name: Install the gepa package for the GEPA job
-        run: python3 -m pip install --user --break-system-packages gepa==0.1.4
 
       - name: Cache Playwright browsers
         id: playwright-cache

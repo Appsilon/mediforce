@@ -20,7 +20,6 @@ import {
 } from '@mediforce/agent-runtime';
 import {
   applyAgentModel,
-  applyStepVariant,
   inlineMcpServerNames,
   mcpEvalRestrictions,
   mergeMcpTapes,
@@ -56,7 +55,7 @@ export interface WorkflowAgentStepResult {
 export async function executeAgentStep(
   instanceId: string,
   stepId: string,
-  stepFromCaller: WorkflowStep,
+  workflowStep: WorkflowStep,
   appContext: Record<string, unknown>,
   triggeredBy: string,
   stepExecutionId?: string,
@@ -92,25 +91,22 @@ export async function executeAgentStep(
   }
 
   // Load the full WorkflowDefinition for WorkflowAgentContext
-  const storedDefinition: WorkflowDefinition | null = await processRepo.getWorkflowDefinition(
+  const workflowDefinition: WorkflowDefinition | null = await processRepo.getWorkflowDefinition(
     instance.namespace ?? '',
     instance.definitionName,
     Number(instance.definitionVersion),
   );
-  if (!storedDefinition) {
+  if (!workflowDefinition) {
     throw new Error(
       `WorkflowDefinition not found: ${instance.definitionName} v${instance.definitionVersion}`,
     );
   }
 
-  // An eval trial runs its variant of the step (ADR-0023 D5), and its MCP
-  // servers under the Eval Run's policy (D6). Everything below reads the
-  // step and definition from here.
+  // An eval trial runs the step its Eval Run froze, with its MCP servers
+  // under the run's policy (ADR-0023 D5, D6).
   const evalTrial = reapTimedOut || instance.evalRunId === undefined
     ? null
-    : await evalTrialConfig(storedDefinition, stepFromCaller, instanceId, instance.evalRunId, evaluationRepo, agentDefinitionRepo, toolCatalogRepo);
-  const workflowDefinition = evalTrial?.definition ?? storedDefinition;
-  const workflowStep = evalTrial?.step ?? stepFromCaller;
+    : await evalTrialConfig(workflowDefinition, workflowStep, instanceId, instance.evalRunId, evaluationRepo, agentDefinitionRepo, toolCatalogRepo);
 
   // Resolve plugin: use workflowStep.plugin when set, fall back to stepId
   const pluginId = workflowStep.plugin ?? stepId;
@@ -305,8 +301,7 @@ export async function executeAgentStep(
 }
 
 /**
- * An eval trial's step (ADR-0023 D4–D6): its variant's patch applied over the
- * pinned definition, and — for MCP resolution only — every server of the
+ * An eval trial's step for MCP resolution (ADR-0023 D4–D6): every server of the
  * step's agent under the Eval Run's frozen policy, denied unless the author
  * declared it live or replayed, on top of the step's own restrictions. A live
  * server's answers are recorded for the trial's Eval Case; a replayed one is
@@ -325,7 +320,7 @@ async function evalTrialConfig(
   evaluationRepo: EvaluationRepository,
   agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>,
   toolCatalogRepo: Pick<ToolCatalogRepository, 'getById'>,
-): Promise<{ definition: WorkflowDefinition; step: WorkflowStep; mcpStep: WorkflowStep; mcpTapes?: McpTapeContext }> {
+): Promise<{ mcpStep: WorkflowStep; mcpTapes?: McpTapeContext }> {
   const inlineServers = inlineMcpServerNames(step);
   if (inlineServers.length > 0) {
     throw new Error(
@@ -341,12 +336,11 @@ async function evalTrialConfig(
   if (trial === null) throw new Error(`Eval Run '${evalRunId}' has no trial for run '${instanceId}'`);
   const variant = evalRun.variants.find((candidate) => candidate.id === trial.variantId);
   if (variant === undefined) throw new Error(`Eval Run '${evalRunId}' has no variant for trial run '${instanceId}'`);
-  const patched = applyStepVariant(definition, step, variant.patch);
   if (variant.fingerprint !== null) {
     const current = await computeStepFingerprint(
       { agentDefinitions: agentDefinitionRepo, toolCatalog: toolCatalogRepo },
-      patched.definition,
-      patched.step,
+      definition,
+      step,
     );
     const changed = changedFingerprintComponents(variant.fingerprint, current);
     if (changed.length > 0) {
@@ -356,16 +350,16 @@ async function evalTrialConfig(
       );
     }
   }
-  if (patched.step.agentId === undefined) return { ...patched, mcpStep: patched.step };
-  const agent = await agentDefinitionRepo.getById(patched.step.agentId);
+  if (step.agentId === undefined) return { mcpStep: step };
+  const agent = await agentDefinitionRepo.getById(step.agentId);
   const servers = Object.keys(agent?.mcpServers ?? {});
   const mcpStep = {
-    ...patched.step,
-    mcpRestrictions: mcpEvalRestrictions(servers, evalRun.mcpPolicy, patched.step.mcpRestrictions),
+    ...step,
+    mcpRestrictions: mcpEvalRestrictions(servers, evalRun.mcpPolicy, step.mcpRestrictions),
   };
   const record = servers.filter((server) => evalRun.mcpPolicy[server]?.mode === 'live');
   const replayed = servers.filter((server) => evalRun.mcpPolicy[server]?.mode === 'replay');
-  if (record.length === 0 && replayed.length === 0) return { ...patched, mcpStep };
+  if (record.length === 0 && replayed.length === 0) return { mcpStep };
 
   const evaluatedStep = { namespace: evalRun.namespace, workflowName: evalRun.workflowName, stepId: evalRun.stepId };
   const replay: McpTapeContext['replay'] = {};
@@ -375,7 +369,6 @@ async function evalTrialConfig(
     else replay[server] = mergeMcpTapes(recordings.map((recording) => recording.tape));
   }
   return {
-    ...patched,
     mcpStep,
     mcpTapes: {
       replay,

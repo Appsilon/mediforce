@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AgentExampleSchema, AgentOutputSchemaSchema } from './workflow-definition';
+import { AgentOutputSchemaSchema } from './workflow-definition';
 import { CommitShaSchema } from './process-definition';
 import { StepMcpRestrictionSchema } from './agent-mcp-binding';
 
@@ -352,9 +352,8 @@ export const AcceptanceCriteriaVersionSchema = EvaluatedStepSchema.extend({
 });
 
 /**
- * A variant of the Step (D5): an override patch applied at trial time over
- * the pinned Definition version. `prompt`, `allowedTools` and `examples`
- * replace the step's own; `mcpRestrictions` narrow it further, never widen it;
+ * A variant of the Step (D5): an override patch over the pinned Definition
+ * version. `prompt` and `allowedTools` replace the step's own; `mcpRestrictions` narrow it further, never widen it;
  * `skillCommit` moves the workflow's external skills repository.
  */
 export const StepVariantPatchSchema = z.object({
@@ -363,7 +362,6 @@ export const StepVariantPatchSchema = z.object({
   skillCommit: CommitShaSchema.optional(),
   allowedTools: z.array(z.string().min(1)).max(50).optional(),
   mcpRestrictions: StepMcpRestrictionSchema.optional(),
-  examples: z.array(AgentExampleSchema).max(20).optional(),
 }).strict();
 
 export type EvaluatedStep = z.infer<typeof EvaluatedStepSchema>;

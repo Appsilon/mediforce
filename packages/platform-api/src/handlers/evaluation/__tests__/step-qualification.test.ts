@@ -70,10 +70,11 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
 
   /** Runs every trial of a fresh Eval Run to a scored result with findings — but the first `failing`, which end without an Agent Run. */
   async function finishedRun(failing = 0, definitionVersion?: number): Promise<string> {
+    // Each run is created a millisecond after the last, so "newest" is never a tie.
+    await new Promise((resolve) => setTimeout(resolve, 2));
     const kicksBefore = kicker.kicks.length;
     const { evalRun } = await prepareEvalRun({
       ...STEP, definitionVersion, trialsPerCase: 1, concurrency: 4, budgetUsd: 5,
-      challengers: [{ label: 'GPT-5', patch: { model: 'openai/gpt-5' } }],
     }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
     const kicked = kicker.kicks.slice(kicksBefore);
@@ -156,25 +157,6 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     expect(await getStepQualification({ ...STEP, definitionVersion: 1 }, scope)).toMatchObject({ status: 'qualified' });
   });
 
-  it('qualifies a challenger for the step it patched: once the step matches it, it is qualified', async () => {
-    const evalRunId = await finishedRun();
-    await signStepQualification({ evalRunId, variantId: 'challenger-1', deviations: [majorDeviation], password: PASSWORD }, scope);
-    expect((await getStepQualification(STEP, scope)).status).toBe('stale');
-
-    await fixture.processRepo.saveWorkflowDefinition(buildWorkflowDefinition({
-      name: WORKFLOW,
-      namespace: NAMESPACE,
-      version: 2,
-      steps: [
-        { id: 'extract-aes', name: 'Extract AEs', type: 'creation', executor: 'script', script: { runtime: 'python', inlineScript: 'print(1)' } },
-        { id: 'grade-aes', name: 'Grade AEs', type: 'creation', executor: 'agent', agentId: 'ae-grader', agent: { prompt: 'Grade each AE.', model: 'openai/gpt-5' } },
-        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
-      ],
-      transitions: [{ from: 'extract-aes', to: 'grade-aes' }, { from: 'grade-aes', to: 'done' }],
-    }));
-    expect(await getStepQualification(STEP, scope)).toMatchObject({ status: 'qualified', qualification: { variantId: 'challenger-1' } });
-  });
-
   it('needs a justification for each criterion missed or not judged, and none for one that was met', async () => {
     const evalRunId = await finishedRun();
     await expect(signStepQualification({ evalRunId, variantId: 'champion', deviations: [], password: PASSWORD }, scope))
@@ -221,13 +203,13 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
   });
 
   it('signs only a finished run', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await expect(signStepQualification({ evalRunId: evalRun.id, variantId: 'champion', deviations: [], password: PASSWORD }, scope))
       .rejects.toBeInstanceOf(ConflictError);
   });
 
   it('does not sign a cancelled run', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await cancelEvalRun({ evalRunId: evalRun.id }, scope);
     await expect(signStepQualification({ evalRunId: evalRun.id, variantId: 'champion', deviations: [majorDeviation], password: PASSWORD }, scope))
       .rejects.toThrow(/cancelled/);
@@ -366,7 +348,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     });
 
     it('says when a run is under way', async () => {
-      const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+      const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
       await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
       expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'not_verified', runInProgress: true });
     });

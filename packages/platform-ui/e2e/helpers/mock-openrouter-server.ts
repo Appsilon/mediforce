@@ -6,8 +6,9 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
  * LLM judges answer from a script instead of a model.
  *
  * A journey scripts its turns under a key — the first user message of the
- * conversation it will send, or a unique text the conversation contains (a GEPA
- * reflection prompt quotes the step's prompt) — so journeys running in
+ * conversation it will send, or a unique text the conversation contains (a judge
+ * prompt quotes the step's input; a case's instructions sit in its system
+ * message) — so journeys running in
  * parallel never draw from each other's script:
  *
  *   POST /__script   { key, turns: [{ content?, toolCalls?: [{ name, arguments }] }] }

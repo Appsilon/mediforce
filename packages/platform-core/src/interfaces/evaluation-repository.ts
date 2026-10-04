@@ -1,5 +1,4 @@
 import type { EvalRun, EvalRunAcceptance, EvalRunStatus, EvalTrial, EvalTrialStatus } from '../schemas/eval-run';
-import type { EvalOptimisation, EvalOptimisationStatus } from '../schemas/eval-optimisation';
 import type { StepQualification } from '../schemas/step-qualification';
 import type {
   AcceptanceCriteriaVersion,
@@ -32,7 +31,7 @@ export interface McpRecordedCase {
 /**
  * Storage for the Evaluation domain (ADR-0023): Briefs, Evaluators and their
  * versions, Eval Cases, frozen Eval Dataset versions, MCP eval policies and
- * recordings, Acceptance Criteria, Eval Runs, optimisations and Step Qualifications.
+ * recordings, Acceptance Criteria, Eval Runs and Step Qualifications.
  * Every row carries its Step's namespace, so the authorized wrapper gates each
  * call on the namespace it names or the row it returns.
  *
@@ -114,12 +113,4 @@ export interface EvaluationRepository {
   /** Takes over a `scoring` claim made before `staleBefore`, restamping it `now` and counting the attempt; true when it did. */
   renewScoringClaim(id: string, staleBefore: string, now: string): Promise<boolean>;
 
-  createOptimisation(optimisation: EvalOptimisation): Promise<void>;
-  getOptimisation(id: string): Promise<EvalOptimisation | null>;
-  /** Newest first. */
-  listOptimisations(step: EvaluatedStep): Promise<EvalOptimisation[]>;
-  /** Every optimisation still `proposing` before `createdBefore`, across workspaces — the heartbeat's sweep. */
-  listStaleProposingOptimisationIds(createdBefore: string): Promise<string[]>;
-  /** Replaces the optimisation with `next` only while it is in `from`; true when it did. */
-  transitionOptimisation(id: string, from: EvalOptimisationStatus, next: EvalOptimisation): Promise<boolean>;
 }

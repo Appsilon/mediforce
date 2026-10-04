@@ -661,26 +661,12 @@ import {
   GetEvalTrialOutputSchema,
   ReviewJudgeVerdictInputSchema,
   ReviewJudgeVerdictOutputSchema,
-  ApplyStepVariantInputSchema,
-  ApplyStepVariantOutputSchema,
-  StartOptimisationInputSchema,
-  GetOptimisationInputSchema,
-  ListOptimisationsInputSchema,
-  ListOptimisationsOutputSchema,
-  EvalOptimisationOutputSchema,
   type GetEvalRunFailuresInput,
   type GetEvalRunFailuresOutput,
   type GetEvalTrialInput,
   type GetEvalTrialOutput,
   type ReviewJudgeVerdictInput,
   type ReviewJudgeVerdictOutput,
-  type ApplyStepVariantInput,
-  type ApplyStepVariantOutput,
-  type StartOptimisationInput,
-  type GetOptimisationInput,
-  type ListOptimisationsInput,
-  type ListOptimisationsOutput,
-  type EvalOptimisationOutput,
 } from '../contract/evaluation';
 import {
   AskEvaluationAssistantInputSchema,
@@ -1105,10 +1091,6 @@ export class Mediforce {
     getTrial: (input: GetEvalTrialInput) => Promise<GetEvalTrialOutput>;
     /** A person accepts or denies one judge verdict of an Eval Run after reading its rationale. */
     reviewJudgeVerdict: (input: ReviewJudgeVerdictInput) => Promise<ReviewJudgeVerdictOutput>;
-    applyVariant: (input: ApplyStepVariantInput) => Promise<ApplyStepVariantOutput>;
-    startOptimisation: (input: StartOptimisationInput) => Promise<EvalOptimisationOutput>;
-    getOptimisation: (input: GetOptimisationInput) => Promise<EvalOptimisationOutput>;
-    listOptimisations: (input: ListOptimisationsInput) => Promise<ListOptimisationsOutput>;
     getAcceptanceCriteria: (input: GetAcceptanceCriteriaInput) => Promise<GetAcceptanceCriteriaOutput>;
     setAcceptanceCriteria: (input: SetAcceptanceCriteriaInput) => Promise<SetAcceptanceCriteriaOutput>;
     getQualification: (input: GetStepQualificationInput) => Promise<GetStepQualificationOutput>;
@@ -2651,24 +2633,6 @@ export class Mediforce {
         const { evalRunId, ...body } = ReviewJudgeVerdictInputSchema.parse(input);
         return this.sendJson('POST', `/api/evaluation/runs/${encodeURIComponent(evalRunId)}/judge-reviews`, body,
           ReviewJudgeVerdictOutputSchema, 'mediforce.evaluation.reviewJudgeVerdict');
-      },
-      applyVariant: async (input) => this.sendJson(
-        'POST', '/api/evaluation/variants/apply', ApplyStepVariantInputSchema.parse(input),
-        ApplyStepVariantOutputSchema, 'mediforce.evaluation.applyVariant',
-      ),
-      startOptimisation: async (input) => this.sendJson(
-        'POST', '/api/evaluation/optimisations', StartOptimisationInputSchema.parse(input),
-        EvalOptimisationOutputSchema, 'mediforce.evaluation.startOptimisation',
-      ),
-      getOptimisation: async (input) => {
-        const { optimisationId } = GetOptimisationInputSchema.parse(input);
-        return this.getJson(`/api/evaluation/optimisations/${encodeURIComponent(optimisationId)}`,
-          EvalOptimisationOutputSchema, 'mediforce.evaluation.getOptimisation');
-      },
-      listOptimisations: async (input) => {
-        const step = ListOptimisationsInputSchema.parse(input);
-        return this.getJson(`/api/evaluation/optimisations${toSearchParams(step)}`,
-          ListOptimisationsOutputSchema, 'mediforce.evaluation.listOptimisations');
       },
       getAcceptanceCriteria: async (input) => {
         const step = GetAcceptanceCriteriaInputSchema.parse(input);

@@ -29,6 +29,9 @@ last_reviewed: 2026-10-02
   exactly or by an agreement score, and a case names the Evaluators that grade
   it. Case notes are removed. The expectation is back from ADR-0024 with a
   meaning evaluation reads.
+- **Amended 2026-10-04:** the optimisation code parked in ADR-0024 —
+  challengers, applying a variant, few-shot examples (D12) and GEPA — is
+  deleted, not only out of the UI; ADR-0024 pins the commit that has it.
 - **Vocabulary:** Evaluation, Evaluation Assistant, Evaluation Brief, Evaluator, Eval Case, Eval Dataset, Eval Run,
   Agent Trajectory, Step Fingerprint, Acceptance Criteria, Step Qualification
   — all in [`CONTEXT.md`](../../CONTEXT.md) § Evaluation domain.

@@ -53,28 +53,12 @@ jobs only.
 `code-check.ts` runs a `code` Evaluator (ADR-0023) with the same runtime
 images and spawn strategy as an inline script, but it is not a step: no run
 worktree, no commit, `--network none`, no capabilities beyond `DAC_OVERRIDE`,
-`no-new-privileges`, a process limit, and the step's workspace commit exported
+`no-new-privileges`, process, memory and CPU limits, and the step's workspace commit exported
 read-only (`git archive`) at `/workspace`. The workspace sits beside the output
 directory, never inside it, because the queued strategy ships the output
 directory through Redis. A check that crashes or writes no
 valid `result.json` throws — an Evaluator's defect is never scored as the
 agent's.
-
-## GEPA job
-
-`gepa-job.ts` runs a Step Evaluation optimisation's GEPA job (ADR-0023 D15):
-the Python script it ships into `/output` calls the `gepa` package's reflective
-proposal step once per candidate, with the reflection model reached through
-OpenRouter on the workspace key. Unlike a code check it keeps the network, for
-that model, and mounts nothing but its `/output`; its image is
-`mediforce-gepa:latest` (`container/Dockerfile.gepa`), and under
-`ALLOW_LOCAL_AGENTS` it is the host's `python3`, which needs `gepa`. The script
-rewrites `result.json` after every call, so a job that dies part-way still says
-what it proposed and spent.
-
-Both share `sandbox-container.ts`: the hardening flags (capabilities, privileges,
-process, memory and CPU limits), unique container names, and the host
-environment a local process keeps.
 
 ## Shared machinery
 

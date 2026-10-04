@@ -14,7 +14,7 @@ const CASE_B = '5e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
 
 function run(overrides: Partial<EvalRun> = {}): EvalRun {
   return {
-    ...STEP, id: randomUUID(), definitionVersion: 1, datasetVersionId: randomUUID(), caseIds: [CASE_A, CASE_B], exampleCaseIds: [],
+    ...STEP, id: randomUUID(), definitionVersion: 1, datasetVersionId: randomUUID(), caseIds: [CASE_A, CASE_B],
     trialsPerCase: 2, concurrency: 2,
     evaluators: [{ evaluatorId: EVALUATOR, name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
     variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],
@@ -81,7 +81,7 @@ describe('buildEvalRunReport', () => {
     expect(report).toMatchObject({
       k: 2,
       trials: { total: 4, scored: 4, failed: 0, skipped: 0, inProgress: 0 },
-      inputTokens: 400, outputTokens: 40, comparison: [],
+      inputTokens: 400, outputTokens: 40,
     });
     expect(report.costUsd).toBeCloseTo(0.4, 10);
   });
@@ -147,38 +147,19 @@ describe('buildEvalRunReport', () => {
     expect(report.trials).toMatchObject({ scored: 1, failed: 1 });
   });
 
-  it('reports each variant on its own trials, judges the frozen criteria, and compares each challenger with the champion', async () => {
+  it('reports the step on its trials and judges the frozen criteria', async () => {
     const fixture = await evaluationFixture();
     const scope = fixture.scope();
-    const evalRun = run({
-      trialsPerCase: 10,
-      caseIds: [CASE_A],
-      variants: [
-        { id: 'champion', label: 'Current step', patch: {}, fingerprint: null },
-        { id: 'challenger-1', label: 'GPT-5', patch: { model: 'openai/gpt-5' }, fingerprint: null },
-      ],
-      acceptanceCriteria: { critical: { minPassRate: 0.6 } },
-    });
-    // The champion passes 2 of 10, the challenger all 10: their intervals do not overlap.
-    const trials = [
-      ...Array.from({ length: 10 }, (_unused, index) => trial(evalRun.id, CASE_A, index, { costUsd: 0.1 })),
-      ...Array.from({ length: 10 }, (_unused, index) => trial(evalRun.id, CASE_A, index, { variantId: 'challenger-1', costUsd: 0.3 })),
-    ];
-    for (const [index, scored] of trials.entries()) await score(scope, evalRun, scored, index < 10 ? Number(index < 2) : 1);
+    const evalRun = run({ trialsPerCase: 10, caseIds: [CASE_A], acceptanceCriteria: { critical: { minPassRate: 0.6 } } });
+    // The step passes 2 of 10.
+    const trials = Array.from({ length: 10 }, (_unused, index) => trial(evalRun.id, CASE_A, index, { costUsd: 0.1 }));
+    for (const [index, scored] of trials.entries()) await score(scope, evalRun, scored, Number(index < 2));
 
     const report = await buildEvalRunReport(scope, evalRun, trials);
 
-    expect(report.variants.map((variant) => [variant.id, variant.trials.scored, variant.evaluators[0]!.passRate])).toEqual([
-      ['champion', 10, 0.2], ['challenger-1', 10, 1],
-    ]);
-    expect(report.variants.map((variant) => variant.criteria[0]!.status)).toEqual(['missed', 'met']);
-    expect(report.comparison).toEqual([{
-      variantId: 'challenger-1',
-      evaluators: [{ evaluatorId: EVALUATOR, name: 'findings-present', championPassRate: 0.2, challengerPassRate: 1, delta: 0.8, verdict: 'better' }],
-      meanCostDeltaUsd: expect.closeTo(0.2, 10),
-      meanDurationDeltaMs: 0,
-    }]);
-    expect(report.costUsd).toBeCloseTo(4, 10);
+    expect(report.variants.map((variant) => [variant.id, variant.trials.scored, variant.evaluators[0]!.passRate])).toEqual([['champion', 10, 0.2]]);
+    expect(report.variants[0]!.criteria[0]!.status).toBe('missed');
+    expect(report.costUsd).toBeCloseTo(1, 10);
   });
 
   it('calibrates the agent\'s confidence against whether counted Evaluators passed, and recommends routing', async () => {

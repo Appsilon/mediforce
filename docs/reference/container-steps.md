@@ -119,7 +119,6 @@ A result that passes `outputSchema` is then checked by the step's production
 Evaluators, when it has any: a failing critical `schema` or `code` one goes to
 `fallbackBehavior` with `fallbackReason: production_evaluator`
 ([Step Evaluation](step-evaluation.md#production-evaluators), ADR-0023 D13).
-`agent.examples` renders as an `## Examples` section of the prompt.
 
 Every agent step's Agent Run also keeps an Agent Trajectory: the same entries
 its activity log gets (`agentLogEntries` for the plugin's `logFormat`, see

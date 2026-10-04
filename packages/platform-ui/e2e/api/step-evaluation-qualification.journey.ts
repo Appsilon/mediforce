@@ -17,9 +17,8 @@ import { sessionCookieHeaders, setupMultiNamespaceCallers, type MultiNamespaceFi
 
 /**
  * API E2E for Step Evaluation 3 (ADR-0023 D5, D10, D11): Acceptance Criteria
- * set before a run and frozen into it, a challenger run beside the step as it
- * is with its patch applied to its trials, criteria judged per variant, and a
- * Step Qualification a signed-in person signs with their password — refused
+ * set before a run and frozen into it, criteria judged on the step's trials,
+ * and a Step Qualification a signed-in person signs with their password — refused
  * for an API key, and stale once the step changes.
  *
  * MOCK_AGENT=true: the mock agent's result is `{ mock, summary }` at
@@ -46,7 +45,7 @@ test.describe('Step Evaluation qualification — API E2E', () => {
     callers = await setupMultiNamespaceCallers();
   });
 
-  test('criteria frozen into a run with a challenger, a signed qualification, and staleness', async ({ request }) => {
+  test('criteria frozen into a run, a signed qualification, and staleness', async ({ request }) => {
     test.setTimeout(150_000);
     const suffix = randomUUID().slice(0, 8);
 
@@ -93,21 +92,15 @@ test.describe('Step Evaluation qualification — API E2E', () => {
     const policyRes = await request.put('/api/evaluation/mcp-policy', { headers: JSON_HEADERS, data: { ...step, servers: { meddra: { mode: 'live' } } } });
     expect(policyRes.status(), await policyRes.text()).toBe(200);
 
-    // A challenger that changes nothing is refused; one that narrows MCP runs beside the step.
-    const idle = await request.post('/api/evaluation/runs', {
-      headers: JSON_HEADERS, data: { ...step, budgetUsd: 1, challengers: [{ label: 'Same', patch: {} }] },
-    });
-    expect(idle.status(), await idle.text()).toBe(400);
     const prepared = EvalRunOutputSchema.parse(await post(request, '/api/evaluation/runs', {
       ...step, trialsPerCase: 1, concurrency: 2, budgetUsd: 1,
-      challengers: [{ label: 'Without MedDRA', patch: { mcpRestrictions: { meddra: { disable: true } } } }],
     }, 201));
     expect(prepared.evalRun).toMatchObject({
       acceptanceCriteria: { critical: { minPassRate: 0.1, minPassHatK: 1 }, major: { minPassRate: 0.5 } },
     });
     expect(prepared.evalRun).not.toHaveProperty('briefVersion');
-    expect(prepared.evalRun.variants.map((variant) => variant.id)).toEqual(['champion', 'challenger-1']);
-    expect(prepared.trials).toHaveLength(2);
+    expect(prepared.evalRun.variants.map((variant) => variant.id)).toEqual(['champion']);
+    expect(prepared.trials).toHaveLength(1);
     await post(request, `/api/evaluation/runs/${prepared.evalRun.id}/start`, { confirmedBudgetUsd: 1 });
 
     const finished: EvalRunOutput = await pollUntil(
@@ -119,21 +112,14 @@ test.describe('Step Evaluation qualification — API E2E', () => {
       { description: `Eval Run ${prepared.evalRun.id} to complete`, timeoutMs: 120_000 },
     );
 
-    // Each trial ran its own variant: the challenger's patch took MedDRA away.
+    // The trial ran with the step's MCP server live.
     for (const trial of finished.trials) {
       expect(trial).toMatchObject({ status: 'scored', confidence: 1 });
-      expect(await trajectoryText(request, trial.agentRunId!)).toContain(
-        trial.variantId === 'champion' ? 'with MCP servers: meddra.' : 'with no MCP servers.',
-      );
+      expect(await trajectoryText(request, trial.agentRunId!)).toContain('with MCP servers: meddra.');
     }
-    const [champion, challenger] = finished.report.variants;
+    const [champion] = finished.report.variants;
     expect(champion!.criteria.map((verdict) => [verdict.severity, verdict.status])).toEqual([['critical', 'met'], ['major', 'missed']]);
-    expect(challenger!.criteria.map((verdict) => verdict.status)).toEqual(['met', 'missed']);
     expect(champion!.recommendation).toMatchObject({ autonomyLevel: 'L3' });
-    expect(finished.report.comparison).toEqual([expect.objectContaining({
-      variantId: 'challenger-1',
-      evaluators: expect.arrayContaining([expect.objectContaining({ name: 'summary-present', verdict: 'no_clear_difference' })]),
-    })]);
 
     const unsigned = GetStepQualificationOutputSchema.parse(await (await request.get(`/api/evaluation/qualification?${query}`, { headers: AUTH_HEADERS })).json());
     expect(unsigned).toMatchObject({ status: 'not_qualified', qualification: null, validation: { status: 'failed', evalRunId: finished.evalRun.id } });

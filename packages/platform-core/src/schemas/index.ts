@@ -225,7 +225,6 @@ export {
   ConfidenceCalibrationSchema,
   ControlRecommendationSchema,
   EvalRunVariantReportSchema,
-  VariantComparisonSchema,
   JudgeReviewDecisionSchema,
   JudgeVerdictSchema,
   EvalTrialOutcomeSchema,
@@ -241,7 +240,6 @@ export {
   type ConfidenceCalibration,
   type ControlRecommendation,
   type EvalRunVariantReport,
-  type VariantComparison,
   type JudgeReviewDecision,
   type JudgeVerdict,
   type EvalRunStatus,
@@ -256,14 +254,6 @@ export {
   type EvalRunMcpReport,
 } from './eval-run';
 
-export {
-  EvalOptimisationStatusSchema,
-  OptimisationCandidateSchema,
-  EvalOptimisationSchema,
-  type EvalOptimisationStatus,
-  type OptimisationCandidate,
-  type EvalOptimisation,
-} from './eval-optimisation';
 
 export {
   QualificationDeviationSchema,
@@ -398,7 +388,6 @@ export {
   ContainerSchema,
   WorkflowAgentConfigSchema,
   AgentOutputSchemaSchema,
-  AgentExampleSchema,
   OutputSchemaPropertyTypeSchema,
   ScriptStepConfigSchema,
   DatabricksJobConfigSchema,
@@ -441,7 +430,6 @@ export {
   STRANDED_STEP_GRACE_MS,
   type ContainerConfig,
   type WorkflowAgentConfig,
-  type AgentExample,
   type AgentOutputSchema,
   type OutputSchemaPropertyType,
   type ScriptStepConfig,

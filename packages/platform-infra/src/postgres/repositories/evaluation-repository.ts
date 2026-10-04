@@ -7,9 +7,6 @@ import {
   EvalRunAcceptanceSchema,
   EvalRunSchema,
   EvalTrialSchema,
-  EvalOptimisationSchema,
-  type EvalOptimisation,
-  type EvalOptimisationStatus,
   type EvalRun,
   type EvalRunAcceptance,
   type EvalRunStatus,
@@ -43,7 +40,6 @@ import {
   evalCases,
   evalDatasetVersions,
   evalMcpRecordings,
-  evalOptimisations,
   evalRuns,
   evalTrials,
   evaluationBriefs,
@@ -173,7 +169,6 @@ function toEvalRun(row: typeof evalRuns.$inferSelect): EvalRun {
     definitionVersion: row.definitionVersion,
     datasetVersionId: row.datasetVersionId,
     caseIds: row.caseIds,
-    exampleCaseIds: row.exampleCaseIds,
     trialsPerCase: row.trialsPerCase,
     concurrency: row.concurrency,
     evaluators: row.evaluators,
@@ -499,7 +494,6 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
         definitionVersion: parsed.definitionVersion,
         datasetVersionId: parsed.datasetVersionId,
         caseIds: parsed.caseIds,
-        exampleCaseIds: parsed.exampleCaseIds,
         trialsPerCase: parsed.trialsPerCase,
         concurrency: parsed.concurrency,
         evaluators: parsed.evaluators,
@@ -603,45 +597,6 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     return rows.length === 1;
   }
 
-  async createOptimisation(optimisation: EvalOptimisation): Promise<void> {
-    const parsed = EvalOptimisationSchema.parse(optimisation);
-    await this.db.insert(evalOptimisations).values({
-      id: parsed.id,
-      workspace: parsed.namespace,
-      workflowName: parsed.workflowName,
-      stepId: parsed.stepId,
-      status: parsed.status,
-      record: parsed,
-      createdAt: new Date(parsed.createdAt),
-    });
-  }
-
-  async getOptimisation(id: string): Promise<EvalOptimisation | null> {
-    const [row] = await this.db.select().from(evalOptimisations).where(eq(evalOptimisations.id, id)).limit(1);
-    return row === undefined ? null : EvalOptimisationSchema.parse(row.record);
-  }
-
-  async listOptimisations(step: EvaluatedStep): Promise<EvalOptimisation[]> {
-    const rows = await this.db.select().from(evalOptimisations)
-      .where(onStep(evalOptimisations, step))
-      .orderBy(desc(evalOptimisations.createdAt), desc(evalOptimisations.id));
-    return rows.map((row) => EvalOptimisationSchema.parse(row.record));
-  }
-
-  async listStaleProposingOptimisationIds(createdBefore: string): Promise<string[]> {
-    const rows = await this.db.select({ id: evalOptimisations.id }).from(evalOptimisations)
-      .where(and(eq(evalOptimisations.status, 'proposing'), lt(evalOptimisations.createdAt, new Date(createdBefore))));
-    return rows.map((row) => row.id);
-  }
-
-  async transitionOptimisation(id: string, from: EvalOptimisationStatus, next: EvalOptimisation): Promise<boolean> {
-    const parsed = EvalOptimisationSchema.parse(next);
-    const rows = await this.db.update(evalOptimisations)
-      .set({ status: parsed.status, record: parsed })
-      .where(and(eq(evalOptimisations.id, id), eq(evalOptimisations.status, from)))
-      .returning({ id: evalOptimisations.id });
-    return rows.length === 1;
-  }
 }
 
 function versionValues(version: EvaluatorVersion): typeof evaluatorVersions.$inferInsert {

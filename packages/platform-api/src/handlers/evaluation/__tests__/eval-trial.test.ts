@@ -46,7 +46,7 @@ describe('getEvalTrial (ADR-0023)', () => {
 
   /** The neutropenia case returns no findings, so the critical schema check fails it; sepsis passes. */
   async function finishedRun(): Promise<string> {
-    return finishEvalRun(fixture, scenario, { trialsPerCase: 1, budgetUsd: 5, challengers: [] }, (trial) =>
+    return finishEvalRun(fixture, scenario, { trialsPerCase: 1, budgetUsd: 5 }, (trial) =>
       trial.caseId === scenario.caseIds['Grade 4 neutropenia'] ? { summary: 'no findings' } : { findings: ['Grade 5 sepsis'] });
   }
 
@@ -111,7 +111,7 @@ describe('getEvalTrial (ADR-0023)', () => {
 
   it('lists each run with how its champion fared on the Acceptance Criteria, none while it is prepared', async () => {
     const evalRunId = await finishedRun();
-    const { evalRun: prepared } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scenario.scope);
+    const { evalRun: prepared } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scenario.scope);
 
     const { evalRuns } = await listEvalRuns(STEP, scenario.scope);
 

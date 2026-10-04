@@ -122,7 +122,7 @@ async function stepValidation(
   const evaluatorsChanged = evaluatorChanges(await rows.evaluators(), run.evaluators, 'run with');
   if (evaluatorsChanged.length > 0) return notVerified(`Evaluators changed ${since}: ${evaluatorsChanged.join('; ')}.`);
   const live = await rows.liveCaseIds();
-  const ran = new Set([...run.caseIds, ...run.exampleCaseIds]);
+  const ran = new Set(run.caseIds);
   if (live.length !== ran.size || live.some((caseId) => ran.has(caseId) === false)) {
     return notVerified(`Eval Cases were added, edited or archived ${since}.`);
   }

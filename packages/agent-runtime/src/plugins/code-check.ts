@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,10 +7,38 @@ import { promisify } from 'node:util';
 import { z } from 'zod';
 import { isLocalExecutionAllowed } from './base-container-agent-plugin';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy';
-import { localSandboxEnv, sandboxedDockerArgs, stderrDetail, uniqueContainerName } from './sandbox-container';
 import { RUNTIME_CONFIG } from './script-container-plugin';
 
 const execFileAsync = promisify(execFile);
+
+/** What a code check's container runs under. */
+function sandboxedDockerArgs(limits: { readonly memory: string }): string[] {
+  return [
+    // DAC_OVERRIDE is the one capability kept: `mkdtemp` directories are 0700
+    // and owned by whoever runs the platform, not by the container's root.
+    '--cap-drop', 'ALL',
+    '--cap-add', 'DAC_OVERRIDE',
+    '--security-opt', 'no-new-privileges',
+    '--pids-limit', '256',
+    '--memory', limits.memory,
+    '--cpus', '1',
+  ];
+}
+
+/** Unique per run: the same step can be checked twice at once, and the local strategy removes any container already holding the name. */
+function uniqueContainerName(prefix: string, label: string): string {
+  return `${prefix}-${label}`.replace(/[^a-zA-Z0-9_.-]/g, '-').slice(0, 50) + `-${randomUUID().slice(0, 12)}`;
+}
+
+/** The host environment a sandbox keeps when it runs as a local process (ALLOW_LOCAL_AGENTS, dev only). */
+function localSandboxEnv(): NodeJS.ProcessEnv {
+  return { NODE_ENV: process.env.NODE_ENV, PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR };
+}
+
+/** `: <stderr>`, clipped, for an error message; empty when there is none. */
+function stderrDetail(stderr: unknown): string {
+  return typeof stderr === 'string' && stderr.trim().length > 0 ? `: ${stderr.trim().slice(0, 2000)}` : '';
+}
 
 export interface CodeCheckRequest {
   readonly runtime: 'python' | 'javascript';

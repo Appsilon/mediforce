@@ -19,7 +19,6 @@ import {
   type EvalTrialResult,
   type EvalVariant,
   type JudgeVerdict,
-  type VariantComparison,
 } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import {
@@ -202,35 +201,6 @@ function variantReport(
   };
 }
 
-function difference(challenger: number | null, champion: number | null): number | null {
-  return challenger === null || champion === null ? null : challenger - champion;
-}
-
-/**
- * A challenger against the champion, Evaluator by Evaluator: `better` or
- * `worse` only when their Wilson 95% intervals do not overlap.
- */
-function compare(champion: EvalRunVariantReport, challenger: EvalRunVariantReport): VariantComparison {
-  return {
-    variantId: challenger.id,
-    evaluators: challenger.evaluators.map((result) => {
-      const baseline = champion.evaluators.find((candidate) => candidate.evaluatorId === result.evaluatorId)!;
-      const separated = result.wilsonLower !== null && baseline.wilsonUpper !== null && result.wilsonLower > baseline.wilsonUpper;
-      const behind = result.wilsonUpper !== null && baseline.wilsonLower !== null && result.wilsonUpper < baseline.wilsonLower;
-      return {
-        evaluatorId: result.evaluatorId,
-        name: result.name,
-        championPassRate: baseline.passRate,
-        challengerPassRate: result.passRate,
-        delta: difference(result.passRate, baseline.passRate),
-        verdict: separated ? 'better' : behind ? 'worse' : 'no_clear_difference',
-      };
-    }),
-    meanCostDeltaUsd: difference(challenger.meanCostUsd, champion.meanCostUsd),
-    meanDurationDeltaMs: difference(challenger.meanDurationMs, champion.meanDurationMs),
-  };
-}
-
 /**
  * Every model's verdict on the run's scored trials — a judge's, or an
  * expected-output agreement score — with its confidence, rationale and a
@@ -320,21 +290,19 @@ function trialResults(
  * received — so its numbers are the Scores' numbers by construction. Per
  * variant: every Evaluator's results, the verdict on each Acceptance
  * Criterion, how the agent's confidence matched its pass rate and what that
- * recommends for routing, and what the variant cost. Then every challenger
- * against the champion, and how the trials reached MCP servers.
+ * recommends for routing, and what the variant cost. Then how the trials
+ * reached MCP servers.
  */
 export async function buildEvalRunReport(scope: CallerScope, run: EvalRun, trials: readonly EvalTrial[]): Promise<EvalRunReport> {
   const scores = await scoresByTrial(scope, run, trials);
   const cases = await casesOfRun(scope, run);
   const variants = run.variants.map((variant) =>
     variantReport(run, variant, trials.filter((trial) => trial.variantId === variant.id), scores, cases));
-  const [champion, ...challengers] = variants;
   return {
     k: run.trialsPerCase,
     trials: trialCounts(trials),
     mcp: await mcpReport(scope, run, trials),
     variants,
-    comparison: champion === undefined ? [] : challengers.map((challenger) => compare(champion, challenger)),
     judgeVerdicts: judgeVerdicts(run, trials, scores, cases),
     trialResults: trialResults(run, trials, scores, cases),
     costUsd: trials.reduce((sum, trial) => sum + (trial.costUsd ?? 0), 0),

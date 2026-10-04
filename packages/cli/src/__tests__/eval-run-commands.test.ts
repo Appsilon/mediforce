@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { evalApplyVariantCommand, evalRunFailuresCommand, evalRunGetCommand, evalRunPrepareCommand, evalRunStartCommand, evalTrialCommand } from '../commands/eval-runs';
+import { evalRunFailuresCommand, evalRunGetCommand, evalRunPrepareCommand, evalRunStartCommand, evalTrialCommand } from '../commands/eval-runs';
 import { evalAskCommand } from '../commands/eval-ask';
 import { captureOutput, jsonResponse } from './test-helpers';
 
@@ -13,7 +10,7 @@ const RUN_ID = '0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
 const OUTPUT = {
   evalRun: {
     namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', id: RUN_ID, definitionVersion: 2,
-    datasetVersionId: '1e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', caseIds: ['2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c'], exampleCaseIds: [],
+    datasetVersionId: '1e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', caseIds: ['2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c'],
     trialsPerCase: 3, concurrency: 2,
     evaluators: [{ evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
     variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],
@@ -41,7 +38,6 @@ const OUTPUT = {
       confidence: null, recommendation: null,
       costUsd: 0, meanCostUsd: null, inputTokens: 0, outputTokens: 0, meanDurationMs: null, maxDurationMs: null,
     }],
-    comparison: [],
     judgeVerdicts: [],
     trialResults: [],
     costUsd: 0, inputTokens: 0, outputTokens: 0,
@@ -56,10 +52,8 @@ describe('mediforce eval runs', () => {
   it('run-prepare posts the step and trial count, and prints how to start with the budget', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(OUTPUT, 201));
     const output = captureOutput();
-    const challengers = join(mkdtempSync(join(tmpdir(), 'eval-cli-')), 'challengers.json');
-    writeFileSync(challengers, JSON.stringify([{ label: 'GPT-5', patch: { model: 'openai/gpt-5' } }]));
     const code = await evalRunPrepareCommand({
-      argv: ['--namespace', 'pharma-a', '--workflow', 'ae-grading', '--step', 'grade-aes', '--trials', '3', '--challengers', challengers, ...BASE],
+      argv: ['--namespace', 'pharma-a', '--workflow', 'ae-grading', '--step', 'grade-aes', '--trials', '3', ...BASE],
       env: ENV,
       output,
     });
@@ -69,13 +63,11 @@ describe('mediforce eval runs', () => {
     expect(url).toBe('http://localhost:5555/api/evaluation/runs');
     expect(JSON.parse(String(init?.body))).toMatchObject({
       namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', trialsPerCase: 3,
-      challengers: [{ label: 'GPT-5', patch: { model: 'openai/gpt-5' } }],
     });
     const printed = output.stdoutLines.join('\n');
     expect(printed).toContain('criterion critical: not evaluable — findings-present graded no trial');
     expect(printed).toContain('MCP servers: edc replayed. No trial made a live MCP call.');
     expect(printed).toContain(`mediforce eval run-start ${RUN_ID} --confirm-budget 0.9`);
-    expect(printed).not.toContain('left out');
   });
 
   it('run-prepare --version prepares that version\'s step, and refuses one that is not a positive integer', async () => {
@@ -89,8 +81,8 @@ describe('mediforce eval runs', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('run-start sends the confirmed budget, and says how many cases few-shot examples left out', async () => {
-    const running = { ...OUTPUT.evalRun, status: 'running', exampleCaseIds: ['6e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c'] };
+  it('run-start sends the confirmed budget', async () => {
+    const running = { ...OUTPUT.evalRun, status: 'running' };
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ ...OUTPUT, evalRun: running }));
     const output = captureOutput();
     const code = await evalRunStartCommand({ argv: [RUN_ID, '--confirm-budget', '0.9', ...BASE], env: ENV, output });
@@ -99,7 +91,6 @@ describe('mediforce eval runs', () => {
     const [url, init] = fetchSpy.mock.calls[0]!;
     expect(url).toBe(`http://localhost:5555/api/evaluation/runs/${RUN_ID}/start`);
     expect(JSON.parse(String(init?.body))).toEqual({ confirmedBudgetUsd: 0.9 });
-    expect(output.stdoutLines).toContain("1 case(s) left out: a variant's few-shot examples came from them");
   });
 
   it('report lists the model verdicts left out of the criteria and how to review them', async () => {
@@ -235,47 +226,6 @@ describe('mediforce eval trial', () => {
     await evalTrialCommand({ argv: [RUN_ID, TRIAL_ID, '--prompts', ...BASE], env: ENV, output: withPrompts });
     expect(withPrompts.stdoutLines.join('\n')).toContain('--- system ---\nRubric:\nA fatal AE is Grade 5.');
     expect(withPrompts.stdoutLines.join('\n')).toContain('--- assistant (anthropic/claude-haiku-4.5, 900 in / 60 out tokens, 1200 ms) ---\n{"rationale": "Grade 4 given for a fatal AE."');
-  });
-});
-
-describe('mediforce eval apply-variant', () => {
-  const applied = {
-    definitionVersion: 3, runnable: false,
-    fingerprint: { hash: HASH, components: { step: HASH, model: HASH, systemPrompt: HASH, skill: HASH, image: HASH, mcpServers: HASH, preamble: HASH } },
-    variant: { evalRunId: RUN_ID, variantId: 'challenger-1', label: 'GPT-5', matchesFingerprint: true, changed: [] },
-  };
-
-  it('applies a challenger of a run, and says the qualification carries over', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(applied, 201));
-    const output = captureOutput();
-    const code = await evalApplyVariantCommand({ argv: [...STEP_ARGV, '--run', RUN_ID, '--variant', 'challenger-1', '--set-default', ...BASE], env: ENV, output });
-
-    expect(code).toBe(0);
-    const [url, init] = fetchSpy.mock.calls[0]!;
-    expect(url).toBe('http://localhost:5555/api/evaluation/variants/apply');
-    expect(JSON.parse(String(init?.body))).toMatchObject({
-      namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', evalRunId: RUN_ID, variantId: 'challenger-1', setAsDefault: true,
-    });
-    const printed = output.stdoutLines.join('\n');
-    expect(printed).toContain('saved as v3');
-    expect(printed).toContain("matches challenger-1's fingerprint — a qualification of it carries over");
-  });
-
-  it('applies a patch from a file', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ ...applied, variant: null }, 201));
-    const file = join(mkdtempSync(join(tmpdir(), 'eval-cli-')), 'patch.json');
-    writeFileSync(file, JSON.stringify({ prompt: 'Fatal is grade 5.' }));
-    const output = captureOutput();
-
-    expect(await evalApplyVariantCommand({ argv: [...STEP_ARGV, '--patch', file, ...BASE], env: ENV, output })).toBe(0);
-    expect(JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body))).toMatchObject({ patch: { prompt: 'Fatal is grade 5.' } });
-  });
-
-  it('wants a run and variant, or a patch — not both, not neither', async () => {
-    const output = captureOutput();
-    expect(await evalApplyVariantCommand({ argv: [...STEP_ARGV, ...BASE], env: ENV, output })).toBe(2);
-    expect(await evalApplyVariantCommand({ argv: [...STEP_ARGV, '--run', RUN_ID, ...BASE], env: ENV, output })).toBe(2);
-    expect(await evalApplyVariantCommand({ argv: [...STEP_ARGV, '--run', RUN_ID, '--variant', 'challenger-1', '--patch', 'p.json', ...BASE], env: ENV, output })).toBe(2);
   });
 });
 

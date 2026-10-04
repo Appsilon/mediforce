@@ -132,25 +132,14 @@ with the verdict on each frozen Acceptance Criterion and the confidence
 calibration, from platform-core's pure rules. Which Scores count is one rule,
 `checkOutcome` in `_lib/trial-scores.ts`: a judge verdict below its
 `minConfidence` is left out unless a person accepted it, and a denied one — a
-judge's or an agreement score's — is always left out; the report, the failures list, optimisation results and GEPA's
-reflective dataset all read it. A variant is a patch the
-runtime applies to its trials (platform-ui's `execute-agent-step.ts` reads the
-trial's variant); the driver does not know variants exist. Applying a variant to the step
-(`apply-step-variant.ts`) saves it through `registerWorkflow`, not a second write path, so a
-qualification carries over exactly when the saved step's Fingerprint equals the variant's.
+judge's or an agreement score's — is always left out; the report and the failures list
+both read it. A trial runs the step as its Eval Run's definition version has it, and
+platform-ui's `execute-agent-step.ts` fails one whose step no longer matches the
+Fingerprint frozen with the run.
 `getEvalRunFailures` is the assistant's `get_failures` and `mediforce eval failures`.
 `getEvalTrial` is one trial with everything its Evaluators read and gave; a model judge's
 messages are rebuilt with agent-runtime's `llmJudgeMessages` / `outputAgreementMessages`, the
 functions that sent them, so nothing extra is stored on the Score.
-A GEPA optimisation (`optimisations.ts`) is the start handler's grant, a
-background job, then an ordinary Eval Run: `startOptimisation` validates and
-records it `proposing`, then answers; `proposeAndEvaluate` builds the reflective
-dataset from the source run's dev-case trials (`_lib/reflective-dataset.ts`),
-runs agent-runtime's `runGepaJob`, prices it, and prepares and starts the
-candidates' Eval Run with what is left of the budget through `prepareEvalRun`
-and `startEvalRun`, not a second path. Each move is a conditional transition, and
-the heartbeat fails one whose job outlived its timeout (`failStaleOptimisations`).
-The ranking (`_lib/optimisation-results.ts`) is computed from that run's Scores on read.
 
 **A Step Qualification binds a Step Fingerprint.** `_lib/step-fingerprint.ts`
 hashes each part of a step that shapes its behaviour on its own, so the badge
@@ -183,9 +172,8 @@ A request may grant the Evaluation Assistant an unattended budget
 (`unattendedBudgetUsd`): `start_eval_run` then starts prepared runs of the step
 that fit what is left of it, as a person confirming each run's budget
 (`UnattendedGrant` in `_lib/run-evaluation-tool.ts`); the grant is recorded on the
-request's prompt audit event. The assistant prepares runs of the step as it is
-only: challengers, fixes as variants and GEPA optimisations are the person's to
-start. A case it proposes may carry an expected output with its expectation;
+request's prompt audit event. The assistant prepares runs of the step as it is;
+changing the step is the person's, in the workflow editor. A case it proposes may carry an expected output with its expectation;
 one created without an `expectation` is positive.
 
 The Evaluation Assistant allows 32 model/tool rounds with an 8,000-token

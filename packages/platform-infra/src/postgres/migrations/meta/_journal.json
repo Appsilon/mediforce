@@ -505,6 +505,13 @@
       "when": 1789641801800,
       "tag": "0071_eval_trial_errored_judge_calls",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1789641801900,
+      "tag": "0072_drop_eval_optimisation",
+      "breakpoints": true
     }
   ]
 }

@@ -246,37 +246,6 @@ describe('executeAgentStep', () => {
     expect(mockAgentRunner.runWithWorkflowStep).not.toHaveBeenCalled();
   });
 
-  it('[DATA] runs an eval trial as its variant: the challenger\'s patch over the pinned step', async () => {
-    const evalRunId = '11111111-1111-4111-8111-111111111111';
-    const caseId = '22222222-2222-4222-8222-222222222222';
-    await evaluationRepo.createEvalRun({
-      namespace: 'test-namespace', workflowName: 'community-digest', stepId: 'gather-data',
-      id: evalRunId, definitionVersion: 1, datasetVersionId: '33333333-3333-4333-8333-333333333333', caseIds: [caseId], exampleCaseIds: [],
-      trialsPerCase: 1, concurrency: 1,
-      evaluators: [{ evaluatorId: '44444444-4444-4444-8444-444444444444', name: 'summary-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
-      variants: [
-        { id: 'champion', label: 'Current step', patch: {}, fingerprint: null },
-        { id: 'challenger-1', label: 'GPT-5', patch: { model: 'openai/gpt-5', prompt: 'Gather every source.' }, fingerprint: null },
-      ],
-      acceptanceCriteria: null, mcpPolicy: {},
-      estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
-      budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null, acceptance: null,
-    }, [{
-      id: '55555555-5555-4555-8555-555555555555', evalRunId, caseId, variantId: 'challenger-1', trialIndex: 0, status: 'running',
-      processInstanceId: 'inst-wf-001', agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null, durationMs: null,
-      confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
-    }]);
-    mockInstanceRepo.getById.mockResolvedValue({ ...defaultInstance, evalRunId });
-    mockEngine.finishEvalTrial.mockResolvedValue({ status: 'completed', currentStepId: null });
-
-    await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
-
-    const context = mockAgentRunner.runWithWorkflowStep.mock.calls[0]![1] as { step: WorkflowStep; workflowDefinition: WorkflowDefinition };
-    expect(context.step.agent).toMatchObject({ model: 'openai/gpt-5', prompt: 'Gather every source.' });
-    expect(context.workflowDefinition.steps[0]!.agent?.model).toBe('openai/gpt-5');
-    expect(firstStep.agent?.model).toBeUndefined();
-  });
-
   describe('an eval trial whose step changed since its Eval Run was prepared', () => {
     const agentStep: WorkflowStep = { ...firstStep, agentId: 'digest-agent' };
     const agentWithPrompt = (systemPrompt: string) => ({ id: 'digest-agent', systemPrompt, mcpServers: {} });
@@ -291,7 +260,7 @@ describe('executeAgentStep', () => {
       const caseId = '22222222-2222-4222-8222-222222222222';
       await evaluationRepo.createEvalRun({
         namespace: 'test-namespace', workflowName: 'community-digest', stepId: 'gather-data',
-        id: evalRunId, definitionVersion: 1, datasetVersionId: '33333333-3333-4333-8333-333333333333', caseIds: [caseId], exampleCaseIds: [],
+        id: evalRunId, definitionVersion: 1, datasetVersionId: '33333333-3333-4333-8333-333333333333', caseIds: [caseId],
         trialsPerCase: 1, concurrency: 1,
         evaluators: [{ evaluatorId: '44444444-4444-4444-8444-444444444444', name: 'summary-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
         variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint }],
@@ -351,7 +320,7 @@ describe('executeAgentStep', () => {
       });
       await evaluationRepo.createEvalRun({
         ...evaluatedStep,
-        id: evalRunId, definitionVersion: 1, datasetVersionId: '33333333-3333-4333-8333-333333333333', caseIds: [caseId], exampleCaseIds: [],
+        id: evalRunId, definitionVersion: 1, datasetVersionId: '33333333-3333-4333-8333-333333333333', caseIds: [caseId],
         trialsPerCase: 1, concurrency: 1,
         evaluators: [{ evaluatorId: '44444444-4444-4444-8444-444444444444', name: 'summary-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
         variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],

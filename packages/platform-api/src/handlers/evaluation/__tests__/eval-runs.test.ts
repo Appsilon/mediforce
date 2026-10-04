@@ -10,7 +10,6 @@ import { createEvalCase } from '../eval-cases';
 import { freezeEvalDataset } from '../eval-datasets';
 import { listStepAgentRuns } from '../step-agent-runs';
 import { advanceEvalRunOfInstance, cancelEvalRun, getEvalRun, listEvalRuns, prepareEvalRun, startEvalRun } from '../eval-runs';
-import { applyVariantToStep } from '../apply-step-variant';
 import { setEvaluationBrief } from '../briefs';
 import { setAcceptanceCriteria } from '../acceptance-criteria';
 import { evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, WORKFLOW, type EvaluationFixture } from './fixture';
@@ -78,9 +77,9 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   }
 
   it('freezes the Evaluators with whether they count, runs MCP live and needs 100% pass by default, and needs a budget without an estimate', async () => {
-    await expect(prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 2 }, scope)).rejects.toThrow(/set budgetUsd/);
+    await expect(prepareEvalRun({ ...STEP, trialsPerCase: 2, concurrency: 2 }, scope)).rejects.toThrow(/set budgetUsd/);
 
-    const { evalRun, trials, report } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 2, budgetUsd: 5 }, scope);
+    const { evalRun, trials, report } = await prepareEvalRun({ ...STEP, trialsPerCase: 2, concurrency: 2, budgetUsd: 5 }, scope);
 
     expect(evalRun).toMatchObject({ status: 'prepared', trialsPerCase: 2, budgetUsd: 5, definitionVersion: 1 });
     expect(evalRun.evaluators.map((evaluator) => [evaluator.name, evaluator.counted, evaluator.reason])).toEqual([
@@ -94,83 +93,22 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     expect(report.trials).toMatchObject({ total: 4, inProgress: 4 });
   });
 
-  it('runs the champion and each challenger over every case, freezing the criteria in force — and no Brief', async () => {
+  it('runs the step over every case with its Fingerprint, freezing the criteria in force — and no Brief', async () => {
     await setEvaluationBrief({ ...STEP, text: 'Grades AEs for the DSMB.', origin: 'user' }, scope);
     await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.9 } }, origin: 'user' }, scope);
 
-    const { evalRun, trials } = await prepareEvalRun({
-      ...STEP, trialsPerCase: 2, concurrency: 2, budgetUsd: 5,
-      challengers: [
-        { label: 'GPT-5', patch: { model: 'openai/gpt-5' } },
-        { label: 'No email', patch: { mcpRestrictions: { email: { disable: true } } } },
-      ],
-    }, scope);
+    const { evalRun, trials } = await prepareEvalRun({ ...STEP, trialsPerCase: 2, concurrency: 2, budgetUsd: 5 }, scope);
 
-    expect(evalRun.variants.map((variant) => [variant.id, variant.label])).toEqual([
-      ['champion', 'Current step'], ['challenger-1', 'GPT-5'], ['challenger-2', 'No email'],
-    ]);
-    const [champion, gpt, noEmail] = evalRun.variants;
-    expect(gpt!.fingerprint!.hash).not.toBe(champion!.fingerprint!.hash);
-    expect(noEmail!.fingerprint!.components.mcpServers).not.toBe(champion!.fingerprint!.components.mcpServers);
+    expect(evalRun.variants.map((variant) => [variant.id, variant.label])).toEqual([['champion', 'Current step']]);
+    expect(evalRun.variants[0]!.fingerprint).not.toBeNull();
     expect(evalRun).toMatchObject({ acceptanceCriteria: { critical: { minPassRate: 0.9 } } });
     expect(evalRun).not.toHaveProperty('briefVersion');
-    expect(trials).toHaveLength(2 * 3 * 2);
-    expect(new Set(trials.map((trial) => trial.variantId))).toEqual(new Set(['champion', 'challenger-1', 'challenger-2']));
-    expect(evalRun.estimate.variants?.map((variant) => variant.variantId)).toEqual(['champion', 'challenger-1', 'challenger-2']);
-  });
-
-  it('refuses a challenger that changes nothing, runs the champion again, or does not apply', async () => {
-    const prepare = (patch: Record<string, unknown>) => prepareEvalRun({
-      ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5, challengers: [{ label: 'Challenger', patch }],
-    }, scope);
-
-    await expect(prepare({})).rejects.toThrow(/changes nothing/);
-    // The agent's own model: the same step the champion runs.
-    await expect(prepare({ model: 'anthropic/claude-sonnet-4' })).rejects.toThrow(/runs the same step as 'Current step'/);
-    await expect(prepare({ skillCommit: 'abcdef1' })).rejects.toThrow(/has none/);
-    await expect(prepare({ mcpRestrictions: { slack: { disable: true } } })).rejects.toThrow(/does not bind: slack/);
-    expect(await fixture.evaluationRepo.listEvalRuns(STEP)).toEqual([]);
-  });
-
-  it('leaves out the cases a variant\'s few-shot examples came from, and refuses holdout ones (D12)', async () => {
-    const cases = await fixture.evaluationRepo.listCases(STEP);
-    const caseId = (name: string) => cases.find((evalCase) => evalCase.name === name)!.id;
-    const example = (fromCase: string) => ({ input: 'Sepsis, fatal', output: '{"grade": 5}', caseId: caseId(fromCase) });
-
-    const { evalRun, trials } = await prepareEvalRun({
-      ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5,
-      challengers: [{ label: 'Few-shot', patch: { examples: [example('Grade 5 sepsis')] } }],
-    }, scope);
-    expect(evalRun.caseIds).toEqual([caseId('Grade 4 neutropenia')]);
-    expect(evalRun.exampleCaseIds).toEqual([caseId('Grade 5 sepsis')]);
-    expect(trials.map((trial) => trial.caseId)).toEqual([caseId('Grade 4 neutropenia'), caseId('Grade 4 neutropenia')]);
-
-    const { evalCase: holdout } = await createEvalCase({
-      ...STEP, name: 'Grade 3 rash', input: { triggerPayload: {}, previousStepOutputs: {} }, workspaceSeedCommit: null,
-      expectation: 'positive', expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null, split: 'holdout', containsProductionData: false, origin: 'user',
-    }, scope);
-    await expect(prepareEvalRun({
-      ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5,
-      challengers: [{ label: 'Leaky', patch: { examples: [{ input: 'Rash', output: '{"grade": 3}', caseId: holdout.id }] } }],
-    }, scope)).rejects.toThrow(/Challenger 'Leaky': .*holdout cases are never offered as examples/);
-
-    // The champion's own examples count too: with both cases used as examples, nothing is left to score.
-    const [definition] = await fixture.processRepo.listWorkflowVersions(STEP.namespace, STEP.workflowName);
-    await fixture.processRepo.saveWorkflowDefinition({
-      ...definition!,
-      version: definition!.version + 1,
-      steps: definition!.steps.map((step) => step.id === STEP.stepId
-        ? { ...step, agent: { ...step.agent, examples: [example('Grade 5 sepsis')] } }
-        : step),
-    });
-    await expect(prepareEvalRun({
-      ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5,
-      challengers: [{ label: 'Few-shot', patch: { examples: [example('Grade 4 neutropenia')] } }],
-    }, scope)).rejects.toThrow(/no case left to score/);
+    expect(trials).toHaveLength(2 * 2);
+    expect(new Set(trials.map((trial) => trial.variantId))).toEqual(new Set(['champion']));
   });
 
   it('refuses to start without the person confirming the budget', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
 
     await expect(startEvalRun({ evalRunId: evalRun.id }, scope)).rejects.toBeInstanceOf(ValidationError);
     await expect(startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 4 }, scope)).rejects.toBeInstanceOf(ValidationError);
@@ -179,7 +117,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   });
 
   it('runs every trial as a single-step run, scores it, and reports the Scores', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 2, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 2, concurrency: 2, budgetUsd: 5 }, scope);
     const started = await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
 
     expect(started.evalRun.status).toBe('running');
@@ -224,7 +162,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   });
 
   it('stops starting trials once spend reaches the budget', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 1, budgetUsd: 1 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 2, concurrency: 1, budgetUsd: 1 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 1 }, scope);
 
     await finishTrial(kicker.kicks[0]!.instanceId, { findings: [] }, 0.6);
@@ -237,7 +175,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   });
 
   it('cancels: pending trials are skipped and a cancelled run cannot be cancelled again', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     const { evalRun: cancelled, report } = await cancelEvalRun({ evalRunId: evalRun.id }, scope);
 
     expect(cancelled.status).toBe('cancelled');
@@ -259,20 +197,19 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     }));
     await fixture.processRepo.setDefaultWorkflowVersion(NAMESPACE, WORKFLOW, 2);
 
-    await expect(prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope)).rejects.toBeInstanceOf(NotFoundError);
-    const { evalRun: prepared } = await prepareEvalRun({ ...STEP, definitionVersion: 1, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    await expect(prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope)).rejects.toBeInstanceOf(NotFoundError);
+    const { evalRun: prepared } = await prepareEvalRun({ ...STEP, definitionVersion: 1, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     const { evalRun: started } = await startEvalRun({ evalRunId: prepared.id, confirmedBudgetUsd: 5 }, scope);
     expect(started).toMatchObject({ definitionVersion: 1, status: 'running' });
     expect((await cancelEvalRun({ evalRunId: prepared.id }, scope)).evalRun.status).toBe('cancelled');
     expect((await listEvalRuns(STEP, scope)).evalRuns.map((run) => run.id)).toEqual([prepared.id]);
-    await expect(applyVariantToStep({ ...STEP, patch: { model: 'openai/gpt-5' }, setAsDefault: false }, scope)).rejects.toBeInstanceOf(NotFoundError);
 
     await fixture.processRepo.setVersionArchived(NAMESPACE, WORKFLOW, 1, true);
-    await expect(prepareEvalRun({ ...STEP, definitionVersion: 1, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope)).rejects.toThrow(/v1 is archived/);
+    await expect(prepareEvalRun({ ...STEP, definitionVersion: 1, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope)).rejects.toThrow(/v1 is archived/);
   });
 
   it('still scores and charges a trial that was running when the run was cancelled', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 2, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 2, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
     const storeAcceptance = vi.spyOn(fixture.evaluationRepo, 'setEvalRunAcceptance');
     const { evalRun: justCancelled } = await cancelEvalRun({ evalRunId: evalRun.id }, scope);
@@ -311,7 +248,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
 
   it('charges each LLM judge call to its trial and to the run\'s spend, and keeps it on the Score', async () => {
     await withJudge([{ id: 'anthropic/claude-haiku-4.5', pricing: { input: 0.000001, output: 0.000005 } }]);
-    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 2, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 2, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
 
     for (const kick of kicker.kicks) await finishTrial(kick.instanceId, { findings: [] }, 0.25);
@@ -330,7 +267,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
 
   it('says so on the trial when the judge\'s model has no registry price', async () => {
     await withJudge([]);
-    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
 
     await finishTrial(kicker.kicks[0]!.instanceId, { findings: [] }, 0.25);
@@ -341,7 +278,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   });
 
   it('keeps trial Agent Runs out of the step\'s production runs', async () => {
-    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
     await finishTrial(kicker.kicks[0]!.instanceId, { findings: [] }, 0.1);
 

@@ -22,11 +22,9 @@ describe('getEvalRunFailures (ADR-0023 D14)', () => {
     else process.env.ALLOW_LOCAL_AGENTS = previousAllowLocal;
   });
 
-  /** The champion fails on neutropenia; the challenger grades both. */
+  /** The step fails on neutropenia and grades sepsis. */
   async function runWithOneFailure(): Promise<string> {
-    return finishEvalRun(fixture, scenario, {
-      trialsPerCase: 1, budgetUsd: 5, challengers: [{ label: 'GPT-5', patch: { model: 'openai/gpt-5' } }],
-    }, (trial) => trial.variantId === 'champion' && trial.caseId === scenario.caseIds['Grade 4 neutropenia']
+    return finishEvalRun(fixture, scenario, { trialsPerCase: 1, budgetUsd: 5 }, (trial) => trial.caseId === scenario.caseIds['Grade 4 neutropenia']
       ? { summary: 'no findings' }
       : { findings: ['graded'] });
   }
@@ -54,16 +52,14 @@ describe('getEvalRunFailures (ADR-0023 D14)', () => {
     }]);
   });
 
-  it('reads another variant when asked, and finds nothing where it passed', async () => {
+  it('refuses a variant the run does not have', async () => {
     const evalRunId = await runWithOneFailure();
-    expect(await getEvalRunFailures({ evalRunId, variantId: 'challenger-1', limit: 50 }, scenario.scope))
-      .toMatchObject({ variantId: 'challenger-1', variantLabel: 'GPT-5', total: 0, failures: [] });
     await expect(getEvalRunFailures({ evalRunId, variantId: 'challenger-9', limit: 50 }, scenario.scope))
       .rejects.toThrow(NotFoundError);
   });
 
   it('caps the list at the limit and still reports the total', async () => {
-    const evalRunId = await finishEvalRun(fixture, scenario, { trialsPerCase: 1, budgetUsd: 5, challengers: [] }, () => ({ summary: 'none' }));
+    const evalRunId = await finishEvalRun(fixture, scenario, { trialsPerCase: 1, budgetUsd: 5 }, () => ({ summary: 'none' }));
     const result = await getEvalRunFailures({ evalRunId, limit: 1 }, scenario.scope);
     expect(result.total).toBe(2);
     expect(result.failures).toHaveLength(1);

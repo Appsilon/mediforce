@@ -1,7 +1,7 @@
 ---
 status: proposed
 audience: engineers
-last_reviewed: 2026-10-01
+last_reviewed: 2026-10-04
 ---
 
 # 0024 — Optimisation: challengers, fix variants, GEPA and case expectations
@@ -19,6 +19,8 @@ last_reviewed: 2026-10-01
   [`aa8ac636`](https://github.com/Appsilon/mediforce/tree/aa8ac636f773342f4fdbd90f5d9529ccdb92d651)
   on `feat/review-of-evaluation`. That commit is the reference implementation to
   reuse — read the code there, not the living docs, which no longer describe it.
+- **Amended 2026-10-04:** the parked backend is deleted (the open question
+  below); the pinned commit is now the only copy.
 
 ## Context
 
@@ -34,8 +36,17 @@ So the supported surface was cut back to evaluation: Evaluators, Eval Cases,
 Eval Runs of the step as it is, Acceptance Criteria and Step Qualification.
 Optimisation is parked here, as a proposal, until there is a reason to bring
 it back. Its backend (handlers, REST routes, client methods, CLI commands,
-tables, the GEPA job) was **kept** and still passes its tests; the web tab and
-the Evaluation Assistant no longer reach it.
+tables, the GEPA job) was at first kept, unreachable from the web tab and the
+Evaluation Assistant; on 2026-10-04 it was deleted, with migration
+`0072_drop_eval_optimisation.sql` dropping `eval_optimisations` and
+`eval_runs.example_case_ids` and stripping `examples` from the variant patches
+stored on Eval Runs and Step Qualifications, which the strict patch schema
+would otherwise refuse to read. That rewrite is a deliberate, one-time
+exception to Step Qualifications being insert-only (ADR-0023 D10): it removes
+a field nothing reads and the signature does not hash. A qualification signed
+from a run that left example cases out now reads not verified, since its run
+no longer covers every live case. A challenger trial still pending fails on
+its Step Fingerprint check rather than run unpatched.
 
 ## What is parked, and where it lives at `aa8ac636`
 
@@ -51,8 +62,8 @@ the Evaluation Assistant no longer reach it.
 | **Case expectation** | _Returned to ADR-0023 D17 on 2026-10-02._ Was: an Eval Case is `positive` (a correct output exists) or `negative` (no output should be accepted), used only as GEPA feedback. Now it says whether a case's expected output is one to match or to avoid. | `EvalCaseExpectationSchema` in `platform-core/src/schemas/evaluation.ts` |
 | **Web UI** | Challenger JSON on **Eval Runs → Prepare**, the comparison table and **Apply to step** in a run's report, the **Optimisations** section, the **Positive case / Negative case** buttons and the expectation selector on a case. | `platform-ui/src/components/evaluation/step-evaluation-sections.tsx` (`EvalRunsSection`, `OptimisationsSection`, `CasesSection`, `CaseForm`), `eval-run-report.tsx` (`Comparison`, `ApplyVariant`) |
 
-What stays today: an Eval Run's report still has one variant per challenger a CLI caller
-adds.
+What stays today: an Eval Run and its report still carry a `variants` list,
+which now only ever holds the step as it is (`champion`).
 
 ## Decisions (proposed)
 
@@ -94,13 +105,14 @@ reflective records read it with the expected output.
   tab of its own) and whether the assistant drives it or a form does.
 - Whether GEPA should stay one round per job (D6) or run a bounded multi-round
   loop with per-round checkpoints.
-- Whether to delete the parked backend instead of keeping it; the pinned
-  commit makes deletion recoverable.
+- ~~Whether to delete the parked backend instead of keeping it.~~ Deleted
+  2026-10-04; the pinned commit makes it recoverable.
 
 ## Considered options
 
 - **Leave optimisation in the Evaluation tab, collapsed.** Rejected: it kept
   every concept on the screen and in the assistant's tool list, and the
   assistant kept offering it.
-- **Delete the backend now.** Deferred to the open question above — the code
-  and its tests work, and reusing it is the reason this ADR pins a commit.
+- **Delete the backend now.** Deferred on 2026-10-01, then done on 2026-10-04:
+  code nothing reaches still has to be typechecked, migrated and read, and the
+  pinned commit keeps it reusable.

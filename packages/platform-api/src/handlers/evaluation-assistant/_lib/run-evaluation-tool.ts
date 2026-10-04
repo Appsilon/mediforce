@@ -345,7 +345,6 @@ export async function executeEvaluationTool(
         definitionVersion: definition.version,
         trialsPerCase: trialsPerCase ?? 3,
         concurrency: 2,
-        challengers: [],
         ...(budgetUsd === undefined ? {} : { budgetUsd }),
       }, scope);
       return {

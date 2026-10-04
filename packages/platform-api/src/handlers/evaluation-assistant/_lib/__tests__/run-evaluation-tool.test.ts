@@ -235,7 +235,7 @@ describe('executeEvaluationTool', () => {
       origin: 'user',
     }, scope);
     await freezeEvalDataset(STEP, scope);
-    const { evalRun } = await prepareEvalRun({ ...STEP, challengers: [], trialsPerCase: 1, concurrency: 1, budgetUsd: 1 }, scope);
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 1 }, scope);
 
     await expect(executeEvaluationTool('get_eval_run_report', { evalRunId: evalRun.id }, scope, {
       ...context, step: { ...STEP, namespace: 'pharma-b' },
@@ -303,7 +303,7 @@ describe('executeEvaluationTool', () => {
 
     it('reads a variant\'s failing trials with their cases, and only of this step\'s runs', async () => {
       const { fixture, scenario, scope, context } = await scenarioContext();
-      const evalRunId = await finishEvalRun(fixture, scenario, { trialsPerCase: 1, budgetUsd: 5, challengers: [] },
+      const evalRunId = await finishEvalRun(fixture, scenario, { trialsPerCase: 1, budgetUsd: 5 },
         (trial) => trial.caseId === scenario.caseIds['Grade 4 neutropenia'] ? { summary: 'none' } : { findings: ['ok'] });
 
       expect(await executeEvaluationTool('get_failures', { evalRunId }, scope, context)).toMatchObject({

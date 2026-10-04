@@ -42,24 +42,15 @@ export const EvalRunEvaluatorSchema = z.object({
 const EstimateBasisSchema = z.enum(['history', 'model_pricing', 'unknown']);
 
 export const EvalRunEstimateSchema = z.object({
-  /** Mean over all trials; null when neither the Step's history nor model pricing gives a number for every variant. */
+  /** Per trial; null when neither the Step's history nor model pricing gives a number. */
   perTrialUsd: z.number().nonnegative().nullable(),
   totalUsd: z.number().nonnegative().nullable(),
   /**
-   * The champion's: `history`, the mean cost of the Step's recent production
-   * runs; `model_pricing`, its model's registry price × a nominal token budget.
+   * `history`, the mean cost of the Step's recent production runs;
+   * `model_pricing`, its model's registry price × a nominal token budget.
    */
   basis: EstimateBasisSchema,
   sampleSize: z.number().int().nonnegative(),
-  /**
-   * Per variant. A challenger on another model is priced at that model for the
-   * tokens the Step's runs used. Absent on runs prepared before variants.
-   */
-  variants: z.array(z.object({
-    variantId: z.string(),
-    perTrialUsd: z.number().nonnegative().nullable(),
-    basis: EstimateBasisSchema,
-  })).optional(),
 });
 
 /** The variant every Eval Run has: the Step unpatched, the baseline challengers are compared against. */
@@ -113,8 +104,6 @@ export const EvalRunSchema = EvaluatedStepSchema.extend({
   definitionVersion: z.number().int().positive(),
   datasetVersionId: z.uuid(),
   caseIds: z.array(z.uuid()).min(1),
-  /** Cases of the Dataset version left out because a variant's few-shot examples came from them (D12). */
-  exampleCaseIds: z.array(z.uuid()),
   trialsPerCase: z.number().int().min(1).max(10),
   concurrency: z.number().int().min(1).max(8),
   evaluators: z.array(EvalRunEvaluatorSchema).min(1),
@@ -284,25 +273,6 @@ export const EvalRunVariantReportSchema = EvalVariantSchema.extend({
 });
 
 /**
- * One challenger against the champion. Per Evaluator, `better` or `worse` only
- * when the two Wilson 95% intervals do not overlap — at an Eval Run's small n,
- * anything less is no clear difference.
- */
-export const VariantComparisonSchema = z.object({
-  variantId: z.string(),
-  evaluators: z.array(z.object({
-    evaluatorId: z.uuid(),
-    name: z.string(),
-    championPassRate: z.number().min(0).max(1).nullable(),
-    challengerPassRate: z.number().min(0).max(1).nullable(),
-    delta: z.number().min(-1).max(1).nullable(),
-    verdict: z.enum(['better', 'worse', 'no_clear_difference']),
-  })),
-  meanCostDeltaUsd: z.number().nullable(),
-  meanDurationDeltaMs: z.number().nullable(),
-});
-
-/**
  * How the trials reached the Step's MCP servers (D6): each server by the mode
  * it ran in, how many cases a replayed server ran live to record because none
  * had a recording yet, and the calls to a replayed server no recording
@@ -391,8 +361,6 @@ export const EvalRunReportSchema = z.object({
   mcp: EvalRunMcpReportSchema,
   /** The champion first, then the challengers, as the run froze them. */
   variants: z.array(EvalRunVariantReportSchema),
-  /** Every challenger against the champion. */
-  comparison: z.array(VariantComparisonSchema),
   /** Every model's verdict on a scored trial — judges' and agreement scores — by variant, case and trial. */
   judgeVerdicts: z.array(JudgeVerdictSchema),
   /** Every trial's grades, by variant, case and trial. */
@@ -419,7 +387,6 @@ export type AcceptanceCriterionVerdict = z.infer<typeof AcceptanceCriterionVerdi
 export type ConfidenceCalibration = z.infer<typeof ConfidenceCalibrationSchema>;
 export type ControlRecommendation = z.infer<typeof ControlRecommendationSchema>;
 export type EvalRunVariantReport = z.infer<typeof EvalRunVariantReportSchema>;
-export type VariantComparison = z.infer<typeof VariantComparisonSchema>;
 export type JudgeReviewDecision = z.infer<typeof JudgeReviewDecisionSchema>;
 export type JudgeVerdict = z.infer<typeof JudgeVerdictSchema>;
 export type EvalTrialOutcome = z.infer<typeof EvalTrialOutcomeSchema>;

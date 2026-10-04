@@ -1,10 +1,8 @@
-import type { z } from 'zod';
 import { WorkflowEngine } from '@mediforce/workflow-engine';
 import type { EvalTrial } from '@mediforce/platform-core';
 import { buildAgentOutputEnvelope, buildAgentRun, buildStepExecution } from '@mediforce/platform-core/testing';
 import { noopRunKicker, type NoopRunKicker } from '../../../runtime/run-kicker';
 import type { CallerScope } from '../../../repositories/index';
-import type { PrepareEvalRunInputSchema } from '../../../contract/evaluation';
 import { createEvalCase } from '../eval-cases';
 import { createEvaluator } from '../evaluators';
 import { freezeEvalDataset } from '../eval-datasets';
@@ -55,7 +53,7 @@ export async function evalScenario(fixture: EvaluationFixture): Promise<EvalScen
 export async function finishEvalRun(
   fixture: EvaluationFixture,
   scenario: EvalScenario,
-  prepare: { trialsPerCase: number; budgetUsd: number; challengers: z.output<typeof PrepareEvalRunInputSchema>['challengers'] },
+  prepare: { trialsPerCase: number; budgetUsd: number },
   resultOf: (trial: EvalTrial) => Record<string, unknown>,
 ): Promise<string> {
   const { scope, kicker } = scenario;
