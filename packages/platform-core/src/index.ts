@@ -393,6 +393,7 @@ export {
   describeAcceptanceCriteria,
   evalRunAcceptance,
   calibrateConfidence,
+  calibrateJudgeReviews,
   recommendControl,
   type ConfidenceOutcome,
   DEFAULT_DRIFT_SETTINGS,

@@ -1264,7 +1264,7 @@ function describeThresholds(criteria: AcceptanceCriteria): string {
 function QualificationDetails({ status }: { status: GetStepQualificationOutput }) {
   const { qualification } = status;
   if (qualification === null) {
-    return <p className="text-muted-foreground">Not qualified. Run the step, then sign a Step Qualification from the run&apos;s report. It is informational: nothing is blocked without one.</p>;
+    return <p className="text-muted-foreground">Not qualified. Run the step, then use <span className="font-medium">Approve step configuration</span> in the run&apos;s report. It is informational: nothing is blocked without one.</p>;
   }
   return (
     <div className="space-y-1" data-testid="step-qualification">

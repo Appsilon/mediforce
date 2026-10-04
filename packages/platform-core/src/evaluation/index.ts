@@ -14,5 +14,5 @@ export {
 export { wilsonInterval, caseReliability, cohensKappa, type CaseReliability } from './statistics';
 export { applyStepVariant, isEmptyVariantPatch, variantPatchProblem } from './variant';
 export { DEFAULT_ACCEPTANCE_CRITERIA, describeAcceptanceCriteria, evalRunAcceptance, judgeAcceptanceCriteria } from './acceptance';
-export { calibrateConfidence, recommendControl, type ConfidenceOutcome } from './confidence-calibration';
+export { calibrateConfidence, calibrateJudgeReviews, recommendControl, type ConfidenceOutcome } from './confidence-calibration';
 export { DEFAULT_DRIFT_SETTINGS, detectDrift, parseDriftSettings, type DriftSettings, type DriftWindows } from './drift';

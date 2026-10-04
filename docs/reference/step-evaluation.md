@@ -604,7 +604,13 @@ the judge calls. Then:
   a pass: the pass rate in five confidence bins and the expected calibration
   error (the count-weighted gap between stated confidence and pass rate; 0 is
   a perfect match). It is what lets routing send only low-confidence outputs
-  to a person.
+  to a person. In the API and CLI report only (`report.variants[].confidence`);
+  the web report shows the verdict calibration below instead.
+- **Verdict calibration.** Web report only: the expected calibration error of
+  the model verdicts a person reviewed — each verdict's confidence against
+  whether the person accepted (holds) or denied (does not) it, with the
+  accepted and denied counts. Until a person reviews one it reads *Waiting for
+  model verdicts human validation*.
 - **Routing.** Once the trials are done, as the `autonomyLevel` to
   set: `L4` (Control Mode 4) with a `confidenceThreshold` — the lowest
   confidence at which the outputs at or above it (at least 5) passed every
@@ -632,8 +638,11 @@ acceptance, Dataset, trials, cost, Cancel while it runs, Start while
 prepared) and five views, from the whole run to one trial:
 
 - **Summary** — the report per variant: Evaluators, criteria, a challenger
-  against the champion, confidence calibration and routing, and **Sign Step
-  Qualification**.
+  against the champion, verdict calibration, and **Approve step
+  configuration** (signs a Step Qualification). The criteria are a table per
+  severity: the floor required, how many counted Evaluators met it, the trials
+  they passed and failed, and the pass rate. Routing and the MCP line are not
+  shown here; `mediforce eval report` still carries both.
 - **Trials** — every trial with each Evaluator's grade, the agent's
   confidence, cost and time; filters for failed trials and trials with
   problems.
@@ -711,7 +720,7 @@ matters.
 ## Step Qualification
 
 A person signs a Step Qualification from a finished Eval Run — not a cancelled one —
-with **Sign Step Qualification** in its report (web only; an API key
+with **Approve step configuration** in its report (web only; an API key
 cannot sign, so the CLI has no command for it). The run must have Acceptance
 Criteria frozen into it; the Evaluation Brief plays no part. The signer reads
 what the signature means ("Approved: I reviewed this Eval Run and qualify this

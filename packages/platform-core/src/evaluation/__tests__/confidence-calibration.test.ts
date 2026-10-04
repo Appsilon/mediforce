@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { AcceptanceCriterionVerdict } from '../../schemas/eval-run';
-import { calibrateConfidence, recommendControl, type ConfidenceOutcome } from '../confidence-calibration';
+import { calibrateConfidence, calibrateJudgeReviews, recommendControl, type ConfidenceOutcome } from '../confidence-calibration';
 
 function outcomes(confidence: number, passes: number, failures: number): ConfidenceOutcome[] {
   return [
@@ -27,6 +27,26 @@ describe('calibrateConfidence', () => {
   it('puts a confidence of 1 in the top bin, and has nothing to say without outcomes', () => {
     expect(calibrateConfidence(outcomes(1, 1, 0))!.bins[0]).toMatchObject({ lower: 0.8, upper: 1 });
     expect(calibrateConfidence([])).toBeNull();
+  });
+});
+
+describe('calibrateJudgeReviews', () => {
+  const review = (decision: 'accepted' | 'denied') => ({ decision, reviewedBy: null, reviewedAt: '2026-10-04T00:00:00.000Z', comment: null });
+
+  it('scores each reviewed verdict\'s confidence against whether a person accepted it', () => {
+    const calibration = calibrateJudgeReviews([
+      { confidence: 0.9, review: review('accepted') },
+      { confidence: 0.9, review: review('denied') },
+      { confidence: 0.9, review: null },
+      { confidence: null, review: review('accepted') },
+    ])!;
+    expect(calibration.count).toBe(2);
+    expect(calibration.bins).toEqual([{ lower: 0.8, upper: 1, count: 2, meanConfidence: 0.9, passRate: 0.5 }]);
+    expect(calibration.ece).toBeCloseTo(0.4, 10);
+  });
+
+  it('has nothing to say until a person reviews a verdict', () => {
+    expect(calibrateJudgeReviews([{ confidence: 0.9, review: null }])).toBeNull();
   });
 });
 
