@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { flushSync } from 'react-dom';
 import Link from 'next/link';
 import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import type { EvalCase, EvaluatedStep, EvaluatorCheck, JudgeVerdict, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
@@ -23,13 +24,10 @@ function json(value: unknown): string {
   return JSON.stringify(value ?? null, null, 2);
 }
 
-function Section({ id, title, description, children }: { id: string; title: string; description?: React.ReactNode; children: React.ReactNode }) {
+function Section({ id, title, children }: { id: string; title: React.ReactNode; children: React.ReactNode }) {
   return (
     <section id={id} className="scroll-mt-6 space-y-3">
-      <div>
-        <h2 className="text-base font-semibold">{title}</h2>
-        {description !== undefined && <p className="text-xs text-muted-foreground">{description}</p>}
-      </div>
+      <h2 className="text-base font-semibold">{title}</h2>
       {children}
     </section>
   );
@@ -44,11 +42,11 @@ function Panel({ title, children, className }: { title: React.ReactNode; childre
   );
 }
 
-/** A judge's text with every `[n]` that names an entry of the agent's log turned into a link to it. */
+/** A judge's text with every number in an `[n]` or `[n, m]` that names an entry of the agent's log turned into a link to it. */
 function withCitations(text: string, entries: ReadonlySet<number>): React.ReactNode[] {
   return citationParts(text, entries).map((part, index) => ('text' in part ? part.text : (
     <a key={index} href={`#log-entry-${part.seq}`} className="rounded bg-amber-500/15 px-0.5 font-mono text-amber-800 hover:underline dark:text-amber-300">
-      [{part.seq}]
+      {part.seq}
     </a>
   )));
 }
@@ -65,7 +63,7 @@ function readsOf(check: EvaluatorCheck, evalCase: EvalCase | null): string {
     case 'expected_output':
       return evalCase?.comparison === 'agreement'
         ? 'A model compares the output with the case\'s expected output, with the instructions below, and scores how far they agree.'
-        : 'Compares the output with the case\'s expected output field by field; any difference fails it.';
+        : 'Code compares the output with the case\'s expected output field by field, with no model; any difference fails it.';
   }
 }
 
@@ -184,7 +182,7 @@ function EvaluatorResult({ entry, context }: {
       {check !== null && (
         <details className="text-xs">
           <summary className="cursor-pointer text-muted-foreground">How it checks</summary>
-          <div className="mt-2"><CheckDetails check={check} /></div>
+          <div className="mt-2"><CheckDetails check={check} evalCase={context.output.evalCase} /></div>
         </details>
       )}
       {(entry.judgePrompt !== null || entry.judgeCalls !== null) && <EvaluatorLog entry={entry} />}
@@ -198,6 +196,8 @@ function entryBody(entry: StoredAgentTrajectoryEntry): string {
   if (typeof entry.content === 'string') return entry.content;
   return json(entry.content);
 }
+
+const LOG_ENTRY_HASH = '#log-entry-';
 
 /** The agent's log as the judges and code checks read it, numbered as a judge cites it; cited entries are marked. */
 function AgentLog({ entries, citedBy }: { entries: readonly StoredAgentTrajectoryEntry[]; citedBy: ReadonlyMap<number, string[]> }) {
@@ -227,11 +227,11 @@ function AgentLog({ entries, citedBy }: { entries: readonly StoredAgentTrajector
 
 /**
  * One trial of an Eval Run (ADR-0023), with everything its step and its
- * Evaluators read and gave: the Eval Case's input and expected output, the
- * output and the agent's own summary; per Evaluator what it looks for and
- * reads, its verdict and rationale — log entries a judge cites link to the
- * log — a model's Evaluator logs: what it was sent and answered, and a person's review; and
- * the agent's whole log, as the judges read it.
+ * Evaluators read and gave: the Eval Case's input and expected output and the
+ * output; per Evaluator what it looks for and reads, its verdict and
+ * rationale — log entries a judge cites link to the log — a model's Evaluator
+ * logs: what it was sent and answered, and a person's review; and the agent's
+ * whole log, as the judges read it, collapsed until opened or cited.
  */
 export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
   handle: string;
@@ -242,6 +242,18 @@ export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
   const trial = useEvalTrial(evalRunId, trialId);
   const run = useEvalRun(evalRunId);
   const { mayEdit, reason: editReason } = useWorkflowEditGate(handle, workflowName);
+  const [logOpen, setLogOpen] = React.useState(false);
+
+  // A link to a log entry — a judge's citation, or a shared URL — opens the log first, so the entry is there to scroll to.
+  React.useEffect(() => {
+    if (window.location.hash.startsWith(LOG_ENTRY_HASH) === false) return;
+    flushSync(() => setLogOpen(true));
+    document.getElementById(window.location.hash.slice(1))?.scrollIntoView();
+  }, []);
+  const openLogOnCitation = (event: React.MouseEvent) => {
+    const link = event.target instanceof Element ? event.target.closest('a') : null;
+    if (link?.getAttribute('href')?.startsWith(LOG_ENTRY_HASH) === true) flushSync(() => setLogOpen(true));
+  };
 
   const failed = trial.error ?? run.error;
   if (failed instanceof Error) return <p className="p-6 text-sm text-destructive">{failed.message}</p>;
@@ -265,7 +277,7 @@ export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
   const instanceId = evalTrial.processInstanceId;
 
   return (
-    <div className="space-y-8 p-6" data-testid="eval-trial-detail">
+    <div className="space-y-8 p-6" data-testid="eval-trial-detail" onClickCapture={openLogOnCitation}>
       <div className="space-y-3">
         <Link href={`${routes.workflowEvalRun(handle, workflowName, evalRunId)}?tab=trials`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-3 w-3" /> Eval Run {evalRunId.slice(0, 8)}
@@ -281,25 +293,10 @@ export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
           {evalTrial.durationMs !== null && ` · ${formatDuration(evalTrial.durationMs)}`}
           {evalTrial.inputTokens !== null && ` · ${evalTrial.inputTokens + (evalTrial.outputTokens ?? 0)} tokens`}
         </p>
-        <nav className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-          <a href="#trial-io" className="text-primary hover:underline">Input and output</a>
-          <a href="#trial-evaluators" className="text-primary hover:underline">Evaluators ({evaluators.length})</a>
-          <a href="#trial-log" className="text-primary hover:underline">Agent log ({output.trajectory.length})</a>
-          {instanceId !== null && (
-            <>
-              <Link href={routes.workflowRunStep(handle, workflowName, instanceId, evalRun.stepId)} className="inline-flex items-center gap-1 text-primary hover:underline">
-                Step execution and full agent log <ExternalLink className="h-3 w-3" />
-              </Link>
-              <Link href={routes.workflowRun(handle, workflowName, instanceId)} className="inline-flex items-center gap-1 text-primary hover:underline">
-                Trial&apos;s workflow run <ExternalLink className="h-3 w-3" />
-              </Link>
-            </>
-          )}
-        </nav>
         {evalTrial.error !== null && <p className="whitespace-pre-wrap text-xs text-amber-700 dark:text-amber-300">{evalTrial.error}</p>}
       </div>
 
-      <Section id="trial-io" title="Input and output" description="What the step was given, what the case expects of it, and what the agent returned.">
+      <Section id="trial-io" title="Input and output">
         <div className="grid gap-4 lg:grid-cols-3">
           <Panel title="Input">
             <pre className={preClass} data-testid="trial-input">{json(output.stepInput)}</pre>
@@ -308,32 +305,16 @@ export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
             {evalCase?.expectedOutput === null || evalCase === null ? (
               <p className="text-xs text-muted-foreground">{evalCase === null ? 'The case no longer exists.' : 'The case expects no particular output.'}</p>
             ) : (
-              <>
-                <pre className={preClass} data-testid="trial-expected-output">{json(evalCase.expectedOutput)}</pre>
-                <p className="text-xs text-muted-foreground">
-                  Compared {evalCase.comparison === 'exact' ? 'exactly' : 'by agreement'}
-                  {evalCase.agreementInstructions !== null && ` — ${evalCase.agreementInstructions}`}
-                </p>
-              </>
+              <pre className={preClass} data-testid="trial-expected-output">{json(evalCase.expectedOutput)}</pre>
             )}
           </Panel>
           <Panel title="Output">
             <pre className={preClass} data-testid="trial-output">{json(output.result)}</pre>
-            {evalTrial.confidence !== null && <p className="text-xs text-muted-foreground">The agent said it was {Math.round(evalTrial.confidence * 100)}% confident.</p>}
           </Panel>
         </div>
-        {output.reasoningSummary !== null && output.reasoningSummary !== '' && (
-          <Panel title="The agent's own summary">
-            <p className="whitespace-pre-wrap text-sm">{output.reasoningSummary}</p>
-          </Panel>
-        )}
       </Section>
 
-      <Section
-        id="trial-evaluators"
-        title="Evaluators"
-        description="Each Evaluator the case selects: what it looks for, what it reads, its verdict and why. A model's Evaluator logs show the exact messages it was sent and what it answered; log entries it cites are linked and marked in the log below."
-      >
+      <Section id="trial-evaluators" title="Evaluators">
         {evaluators.length === 0 ? (
           <p className="text-sm text-muted-foreground">No Evaluator grades this case.</p>
         ) : (
@@ -345,8 +326,28 @@ export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
         )}
       </Section>
 
-      <Section id="trial-log" title="Agent log" description="Everything the agent did — reasoning, tool calls and their results — numbered as the judges read and cite it.">
-        <AgentLog entries={output.trajectory} citedBy={citedBy} />
+      <Section
+        id="trial-log"
+        title={(
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <button type="button" className="inline-flex items-center gap-1" aria-expanded={logOpen} onClick={() => setLogOpen((current) => current === false)}>
+              {logOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              Agent log ({output.trajectory.length})
+            </button>
+            {instanceId !== null && (
+              <span className="flex flex-wrap gap-x-4 text-xs font-normal">
+                <Link href={routes.workflowRunStep(handle, workflowName, instanceId, evalRun.stepId)} className="inline-flex items-center gap-1 text-primary hover:underline">
+                  Step execution and full agent log <ExternalLink className="h-3 w-3" />
+                </Link>
+                <Link href={routes.workflowRun(handle, workflowName, instanceId)} className="inline-flex items-center gap-1 text-primary hover:underline">
+                  Trial&apos;s workflow run <ExternalLink className="h-3 w-3" />
+                </Link>
+              </span>
+            )}
+          </div>
+        )}
+      >
+        {logOpen && <AgentLog entries={output.trajectory} citedBy={citedBy} />}
       </Section>
     </div>
   );
