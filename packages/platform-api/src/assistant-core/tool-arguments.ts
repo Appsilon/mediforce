@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import { unfence } from '@mediforce/platform-core';
 import { toolParameters } from './tool-definitions';
 
 export type ParsedToolArguments<T> =
@@ -16,8 +17,6 @@ function valueAtPath(input: unknown, path: readonly PropertyKey[]): unknown {
   }
   return current;
 }
-
-const CODE_FENCE = /^```[a-z]*\s*([\s\S]*?)\s*```$/i;
 
 /** Escape the raw control characters (newlines in a script, tabs) a model leaves inside JSON strings. */
 function escapeControlCharactersInStrings(text: string): string {
@@ -38,8 +37,7 @@ function escapeControlCharactersInStrings(text: string): string {
 }
 
 function decodeObjectString(value: string): object | undefined {
-  const trimmed = value.trim();
-  const unfenced = CODE_FENCE.exec(trimmed)?.[1] ?? trimmed;
+  const unfenced = unfence(value);
   for (const candidate of [unfenced, escapeControlCharactersInStrings(unfenced)]) {
     try {
       const decoded: unknown = JSON.parse(candidate);

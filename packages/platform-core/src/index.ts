@@ -797,6 +797,7 @@ export { createLineStreamReader } from './utils/line-stream';
 export type { LineStreamReader } from './utils/line-stream';
 export { calculateEstimatedCost } from './utils/cost';
 export { formatBytes } from './utils/format';
+export { unfence } from './utils/code-fence';
 export { compact, parseRow } from './utils/compact';
 export { normaliseModelId } from './utils/normalise-model-id';
 export { emailLayout, escapeHtml } from './utils/email-layout';

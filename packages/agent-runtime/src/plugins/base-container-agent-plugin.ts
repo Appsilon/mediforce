@@ -11,7 +11,7 @@ import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepo
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
-import { agentLogEntries, createLineStreamReader, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
+import { agentLogEntries, createLineStreamReader, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes, unfence } from '@mediforce/platform-core';
 import { MCP_TAPE_DIR, MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from '../mcp/mcp-tape';
 import type { AgentLogFormat } from '@mediforce/platform-core';
 
@@ -1176,10 +1176,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       return streamEvent;
     }
 
-    let contract: AgentOutputContract;
-    try {
-      contract = JSON.parse(agentText) as AgentOutputContract;
-    } catch {
+    const contract = parseAgentContract(agentText);
+    if (contract === null) {
       // Agent text isn't JSON — try reading /output/result.json as fallback
       if (outputDirMapping) {
         try {
@@ -1792,4 +1790,16 @@ async function readPresentation(outputDir: string): Promise<Presentation | null>
       return null;
     }
   }
+}
+
+/** The agent's answer as JSON — as sent, or out of the markdown fence a model wraps it in. */
+function parseAgentContract(agentText: string): AgentOutputContract | null {
+  for (const candidate of [agentText, unfence(agentText)]) {
+    try {
+      return JSON.parse(candidate) as AgentOutputContract;
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }

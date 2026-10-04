@@ -272,6 +272,30 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(statusEvents[0].payload).toContain('trial-metadata-extractor');
     });
 
+    it('[DATA] parses an answer the agent wrapped in a ```json fence', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
+      mockSpawn(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({
+          type: 'result',
+          subtype: 'success',
+          result: '```json\n{\n  "ctcaeGrade": 3,\n  "confidence": 0.85\n}\n```',
+        }),
+        gitMetadata: null,
+        presentation: null,
+        outputDir: '/tmp/mock-output',
+        injectedEnvVars: [],
+      });
+
+      await plugin.run(emit);
+
+      const resultEvent = events.find((e) => e.type === 'result');
+      expect(resultEvent?.payload).toMatchObject({ confidence: 0.85, result: { ctcaeGrade: 3 } });
+    });
+
     it('[DATA] folds cache_creation into input tokens and captures cache_read for cost', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);
