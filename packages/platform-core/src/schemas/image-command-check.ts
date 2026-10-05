@@ -64,6 +64,9 @@ export function imageCommandProbeArgs(image: string, command: string): string[] 
 export function parseImageCommandCheck(stdout: string): ImageCommandCheck {
   const answer = stdout.split(/\r?\n/).map((line) => line.trim()).find((line) => line.length > 0);
   if (answer === undefined) return { status: 'unknown' };
-  if (answer === MISSING_MARKER) return { status: 'known', available: false };
+  // `command -v` also names shell built-ins and aliases (`cd`, `.`), which an
+  // MCP stdio server — spawned directly, not through a shell — cannot start.
+  // Only a resolution to a filesystem path counts as available.
+  if (answer === MISSING_MARKER || !answer.startsWith('/')) return { status: 'known', available: false };
   return { status: 'known', available: true, path: answer };
 }

@@ -4,6 +4,7 @@ import {
   createTestScope,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope';
+import { InMemoryImageCatalogRepository } from '@mediforce/platform-core/testing';
 import type { DaemonImageListing } from '../../system/_docker';
 import { builtImage, daemonWith, UNREACHABLE_DAEMON } from './fixtures';
 
@@ -13,11 +14,13 @@ const daemon = vi.hoisted(() => ({
 const probe = vi.hoisted(() => ({
   answer: { status: 'unknown' } as { status: string; available?: boolean; path?: string },
   calls: [] as Array<{ image: string; command: string }>,
+  onProbe: undefined as (() => Promise<void>) | undefined,
 }));
 vi.mock('../../system/_docker', () => ({
   fetchDaemonImages: async () => daemon.value,
   probeImageCommand: async (image: string, command: string) => {
     probe.calls.push({ image, command });
+    await probe.onProbe?.();
     return probe.answer;
   },
 }));
@@ -27,12 +30,26 @@ const { checkImageCommand, clearImageCommandChecks } = await import('../check-co
 const GOLDEN = builtImage({ repository: 'mediforce-golden-image', tag: 'latest', id: 'sha-golden' });
 
 describe('checkImageCommand handler', () => {
-  const scope = createTestScope({ caller: userCaller('u-member', ['alpha']) });
+  let repo: InMemoryImageCatalogRepository;
+  let scope: ReturnType<typeof createTestScope>;
 
-  beforeEach(() => {
+  const catalogue = (namespace: string, reference: string) =>
+    repo.upsert(namespace, {
+      id: `ref-${namespace}-${reference}`,
+      name: reference,
+      intent: 'test image',
+      source: { kind: 'referenced', reference },
+      capabilities: {},
+    });
+
+  beforeEach(async () => {
+    repo = new InMemoryImageCatalogRepository();
+    scope = createTestScope({ imageCatalogRepo: repo, caller: userCaller('u-member', ['alpha']) });
+    await catalogue('alpha', 'mediforce-golden-image');
     daemon.value = daemonWith([GOLDEN]);
     probe.answer = { status: 'known', available: false };
     probe.calls = [];
+    probe.onProbe = undefined;
     clearImageCommandChecks();
   });
 
@@ -98,6 +115,54 @@ describe('checkImageCommand handler', () => {
       checkImageCommand({ namespace: 'alpha', image: '--privileged', command: 'uvx' }, scope),
     ).resolves.toEqual({ status: 'unknown' });
     expect(probe.calls).toHaveLength(0);
+  });
+
+  it('answers unknown for an image only another workspace catalogues, so tenants cannot probe each other', async () => {
+    const other = builtImage({ repository: 'beta-private', tag: 'v1', id: 'sha-beta' });
+    daemon.value = daemonWith([GOLDEN, other]);
+    await catalogue('beta', 'beta-private');
+
+    await expect(
+      checkImageCommand({ namespace: 'alpha', image: 'beta-private:v1', command: 'uvx' }, scope),
+    ).resolves.toEqual({ status: 'unknown' });
+    expect(probe.calls).toHaveLength(0);
+  });
+
+  it('reads a registry port as part of the repository, so an untagged reference means :latest', async () => {
+    const registry = builtImage({ repository: 'localhost:5000/team/agent', tag: 'latest', id: 'sha-reg' });
+    daemon.value = daemonWith([GOLDEN, registry]);
+    await catalogue('alpha', 'localhost:5000/team/agent');
+
+    await checkImageCommand({ namespace: 'alpha', image: 'localhost:5000/team/agent', command: 'uvx' }, scope);
+
+    expect(probe.calls).toEqual([{ image: 'localhost:5000/team/agent:latest', command: 'uvx' }]);
+  });
+
+  it('starts one container at a time, however many distinct commands are asked', async () => {
+    let running = 0;
+    let peak = 0;
+    const input = (command: string) => ({ namespace: 'alpha', image: 'mediforce-golden-image', command });
+    probe.onProbe = async () => {
+      running += 1;
+      peak = Math.max(peak, running);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      running -= 1;
+    };
+
+    await Promise.all(['uvx', 'npx', 'node', 'uv'].map((command) => checkImageCommand(input(command), scope)));
+
+    expect(peak).toBe(1);
+    expect(probe.calls).toHaveLength(4);
+  });
+
+  it('forgets answers for images the daemon no longer holds', async () => {
+    await checkImageCommand({ namespace: 'alpha', image: 'mediforce-golden-image', command: 'uvx' }, scope);
+    daemon.value = daemonWith([builtImage({ repository: 'mediforce-golden-image', tag: 'latest', id: 'sha-rebuilt' })]);
+    await checkImageCommand({ namespace: 'alpha', image: 'mediforce-golden-image', command: 'uvx' }, scope);
+    daemon.value = daemonWith([GOLDEN]);
+    await checkImageCommand({ namespace: 'alpha', image: 'mediforce-golden-image', command: 'uvx' }, scope);
+
+    expect(probe.calls).toHaveLength(3);
   });
 
   it('refuses a caller outside the namespace', async () => {

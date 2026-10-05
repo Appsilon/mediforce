@@ -46,6 +46,11 @@ describe('parseImageCommandCheck', () => {
     expect(parseImageCommandCheck('__missing__\n')).toEqual({ status: 'known', available: false });
   });
 
+  it('does not count a shell built-in as available: an MCP server is spawned without a shell', () => {
+    expect(parseImageCommandCheck('cd\n')).toEqual({ status: 'known', available: false });
+    expect(parseImageCommandCheck('.\n')).toEqual({ status: 'known', available: false });
+  });
+
   it('treats an empty answer as unknown: the probe itself could not run', () => {
     expect(parseImageCommandCheck('')).toEqual({ status: 'unknown' });
   });

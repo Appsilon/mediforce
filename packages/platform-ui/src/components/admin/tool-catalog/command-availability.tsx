@@ -25,7 +25,11 @@ export function CommandAvailability({ namespace, command }: { namespace: string;
   const check = useImageCommandCheck(namespace, image, debouncedCommand);
   if (debouncedCommand === '') return null;
 
-  const message = check.data === undefined ? undefined : describeCommandCheck(check.data, debouncedCommand);
+  const message = check.data !== undefined
+    ? describeCommandCheck(check.data, debouncedCommand)
+    : check.error !== null
+      ? describeCommandCheck({ status: 'unknown' }, debouncedCommand)
+      : undefined;
 
   return (
     <div className="flex flex-col gap-1.5 text-xs" data-testid="command-availability">

@@ -272,9 +272,9 @@ export function usePullImageVersion(namespace: string) {
 /**
  * Whether `image` resolves `command`, asked on demand and only for something
  * that can be a command name — a half-typed `uv ` or an empty field starts no
- * container. A settled answer is kept: the daemon addresses an image by
- * content, so the same reference answers the same way. `unknown` is not kept
- * for long, since the next ask may reach a daemon that can answer.
+ * container. Every answer goes stale after a live interval: a deploy rebuilds
+ * a mutable tag like `:latest` into a new image, so an open form must ask
+ * again rather than keep reporting the previous image's answer.
  */
 export function useImageCommandCheck(namespace: string, image: string, command: string) {
   const isCommand = ImageCommandNameSchema.safeParse(command).success;
@@ -282,7 +282,7 @@ export function useImageCommandCheck(namespace: string, image: string, command: 
     queryKey: queryKeys.imageCommandCheck(namespace, image, command),
     queryFn: () => mediforce.imageCatalog.checkCommand({ namespace, image, command }),
     enabled: namespace !== '' && image !== '' && isCommand,
-    staleTime: (q) => (q.state.data?.status === 'known' ? Infinity : STANDARD_LIVE_INTERVAL_MS),
+    staleTime: STANDARD_LIVE_INTERVAL_MS,
     retry: stopRetryOn4xx,
   });
 }

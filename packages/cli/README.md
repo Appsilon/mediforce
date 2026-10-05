@@ -58,8 +58,10 @@ same `--dockerfile` and `--context`; `images create --workflow <name> --dockerfi
 versions `images show` prints with their content hash where a built one prints
 its commit. `images check-command --namespace <handle> --command <name> [--image <ref>]` asks whether an
 image (default: the golden image) provides a command — the `uvx` or `npx` an MCP
-catalog entry runs — and `tool-catalog add` warns when the default image lacks
-the entry's command; both are advisory.
+catalog entry runs, resolved against the workspace's own catalog — and
+`tool-catalog add` warns on stderr (so `--json` stdout stays one document) when
+the default image lacks the entry's command; both are advisory. A shell built-in
+is not counted as available: MCP servers are spawned without a shell.
 `images publish <entry-id> --version <image-tag> --reference <handle>/<name>
 [--tag] [--intent]` copies one version of a carried entry into a `referenced`
 one, so the image outlives its workflow: the platform rebuilds that version's

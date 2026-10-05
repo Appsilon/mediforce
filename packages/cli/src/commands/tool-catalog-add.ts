@@ -38,17 +38,18 @@ export const toolCatalogAddCommand = defineCommand({
     const result = await mediforce.toolCatalog.create(parsed.data);
     if (jsonMode) {
       printJson(output, result);
-      return 0;
+    } else {
+      output.stdout(`Added '${result.entry.id}' to the ${parsed.data.namespace} Tool Catalog.`);
     }
-    output.stdout(`Added '${result.entry.id}' to the ${parsed.data.namespace} Tool Catalog.`);
 
     // Advisory: a step runs this command in an image, and the default one may
     // not carry it. The add already succeeded, so a failed check says nothing.
+    // The warning goes to stderr, which keeps `--json` stdout a single document.
     const check = await mediforce.imageCatalog
       .checkCommand({ namespace: parsed.data.namespace, image: DEFAULT_AGENT_IMAGE, command: result.entry.command })
       .catch(() => undefined);
     if (check?.status === 'known' && check.available === false) {
-      output.stdout(
+      output.stderr(
         `Warning: \`${result.entry.command}\` is not available in the default agent image (${DEFAULT_AGENT_IMAGE}). ` +
           'A step using an agent bound to this server needs an image that provides it — ' +
           `\`mediforce images check-command --namespace ${parsed.data.namespace} --command ${result.entry.command} --image <image>\`.`,

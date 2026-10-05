@@ -17,7 +17,7 @@ function entryFile(command: string): string {
   return file;
 }
 
-async function add(command: string, commandCheck: Response | Error) {
+async function add(command: string, commandCheck: Response | Error, extraArgs: string[] = []) {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
     if (String(input).includes('/api/image-catalog/command-check')) {
       if (commandCheck instanceof Error) throw commandCheck;
@@ -27,33 +27,40 @@ async function add(command: string, commandCheck: Response | Error) {
   });
   const output = captureOutput();
   const code = await toolCatalogAddCommand({
-    argv: ['--file', entryFile(command), '--namespace', 'alpha', '--base-url', 'http://test:9000'],
+    argv: ['--file', entryFile(command), '--namespace', 'alpha', '--base-url', 'http://test:9000', ...extraArgs],
     env: BASE_ENV,
     output,
   });
-  return { code, text: output.stdoutLines.join('\n') };
+  return { code, text: output.stdoutLines.join('\n'), warnings: output.stderrLines.join('\n') };
 }
 
 describe('tool-catalog add', () => {
   it('warns when the default agent image does not provide the command', async () => {
-    const { code, text } = await add('uvx', jsonResponse({ status: 'known', available: false }));
+    const { code, text, warnings } = await add('uvx', jsonResponse({ status: 'known', available: false }));
 
     expect(code).toBe(0);
     expect(text).toContain("Added 'biomcp' to the alpha Tool Catalog.");
-    expect(text).toContain('Warning: `uvx` is not available in the default agent image (mediforce-golden-image)');
+    expect(warnings).toContain('Warning: `uvx` is not available in the default agent image (mediforce-golden-image)');
   });
 
   it('says nothing extra when the command is there', async () => {
-    const { text } = await add('npx', jsonResponse({ status: 'known', available: true, path: '/usr/bin/npx' }));
+    const { warnings } = await add('npx', jsonResponse({ status: 'known', available: true, path: '/usr/bin/npx' }));
 
-    expect(text).not.toContain('Warning');
+    expect(warnings).not.toContain('Warning');
   });
 
   it('never fails the add because the check could not run', async () => {
-    const { code, text } = await add('uvx', new Error('daemon down'));
+    const { code, text, warnings } = await add('uvx', new Error('daemon down'));
 
     expect(code).toBe(0);
     expect(text).toContain("Added 'biomcp'");
-    expect(text).not.toContain('Warning');
+    expect(warnings).not.toContain('Warning');
+  });
+
+  it('still warns under --json, on stderr, leaving stdout a single JSON document', async () => {
+    const { text, warnings } = await add('uvx', jsonResponse({ status: 'known', available: false }), ['--json']);
+
+    expect(JSON.parse(text)).toEqual({ entry: { id: 'biomcp', command: 'uvx', args: ['serve'] } });
+    expect(warnings).toContain('Warning: `uvx` is not available in the default agent image');
   });
 });
