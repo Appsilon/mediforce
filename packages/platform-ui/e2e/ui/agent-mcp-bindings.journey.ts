@@ -32,22 +32,20 @@ test.describe('Agent MCP Bindings Journey', () => {
     await page.getByRole('button', { name: /add server|add mcp server/i }).first().click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
-    // Default transport is stdio — fill server name + catalog id
-    await page.getByLabel(/server name/i).fill('fs');
+    // Default transport is stdio — pick the catalog entry; the binding is named after it
     await page.getByLabel(/catalog entry|catalog id/i).selectOption('filesystem');
 
     await page.getByRole('button', { name: /^save$|create binding/i }).last().click();
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
 
     // Binding shows up in the list
-    await expect(page.getByText('fs').first()).toBeVisible();
+    await expect(page.getByText('filesystem').first()).toBeVisible();
     await expect(page.getByText(/stdio/i).first()).toBeVisible();
 
     // ── Add HTTP binding ─────────────────────────────────────────────────
     await page.getByRole('button', { name: /add server|add mcp server/i }).first().click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
-    await page.getByLabel(/server name/i).fill('analytics');
     await page.getByRole('radio', { name: /^http$/i }).click();
     await page.getByLabel(/^url$/i).fill('https://api.example.com/mcp');
 
@@ -63,25 +61,25 @@ test.describe('Agent MCP Bindings Journey', () => {
     await page.getByRole('button', { name: /^save$|create binding/i }).last().click();
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
 
-    await expect(page.getByText('analytics').first()).toBeVisible();
+    await expect(page.getByText('api-example-com').first()).toBeVisible();
     await expect(page.getByText(/http/i).first()).toBeVisible();
 
     // ── Delete stdio binding ─────────────────────────────────────────────
-    await page.getByRole('button', { name: 'Remove fs' }).click();
+    await page.getByRole('button', { name: 'Remove filesystem' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByRole('button', { name: /^(delete|confirm|remove)/i }).last().click();
 
-    await expect(page.getByRole('button', { name: 'Remove fs' })).toHaveCount(0, { timeout: 10_000 });
-    await expect(page.getByRole('button', { name: 'Remove analytics' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Remove filesystem' })).toHaveCount(0, { timeout: 10_000 });
+    await expect(page.getByRole('button', { name: 'Remove api-example-com' })).toBeVisible();
 
     // ── Reload confirms http binding persists ─────────────────────────────
     await page.reload();
     await expect(page.getByRole('heading', { name: /mcp servers/i })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole('button', { name: 'Remove analytics' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Remove fs' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Remove api-example-com' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Remove filesystem' })).toHaveCount(0);
 
-    // ── Cleanup — remove the persisted analytics binding so the test is rerunnable ──
-    await page.getByRole('button', { name: 'Remove analytics' }).click();
+    // ── Cleanup — remove the persisted api-example-com binding so the test is rerunnable ──
+    await page.getByRole('button', { name: 'Remove api-example-com' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByRole('button', { name: /^(delete|confirm|remove)/i }).last().click();
   });

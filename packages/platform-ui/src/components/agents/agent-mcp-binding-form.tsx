@@ -13,7 +13,15 @@ import type {
 import { cn } from '@/lib/utils';
 import { mediforce } from '@/lib/mediforce';
 
-const nameRegex = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
+function deriveBindingName(binding: AgentMcpBinding, existingNames: string[]): string {
+  const source = binding.type === 'stdio' ? binding.catalogId : new URL(binding.url).hostname;
+  const base = source.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^[-_]+|[-_]+$/g, '') || 'mcp';
+  let candidate = base;
+  for (let suffix = 2; existingNames.includes(candidate); suffix += 1) {
+    candidate = `${base}-${suffix}`;
+  }
+  return candidate;
+}
 
 const StdioFormSchema = z.object({
   catalogId: z.string().min(1, 'Choose a catalog entry'),
@@ -85,38 +93,16 @@ export function AgentMcpBindingForm({
   onCancel,
 }: AgentMcpBindingFormProps) {
   const isEdit = existing !== null;
-  const [name, setName] = useState(existing?.name ?? '');
-  const [nameError, setNameError] = useState<string | null>(null);
   const [transport, setTransport] = useState<'stdio' | 'http'>(existing?.binding.type ?? 'stdio');
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  function validateName(value: string): string | null {
-    if (!nameRegex.test(value)) return 'Letters, numbers, dashes, underscores; must start with letter or digit.';
-    if (!isEdit && existingNames.includes(value)) return `"${value}" is already bound to this agent.`;
-    return null;
+  function submitBinding(payload: AgentMcpBinding): Promise<void> {
+    const name = existing?.name ?? deriveBindingName(payload, existingNames);
+    return onSubmit(name, payload);
   }
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Server name ------------------------------------------------------- */}
-      <Field label="Server name" error={nameError}>
-        <input
-          aria-label="Server name"
-          value={name}
-          onChange={(event) => {
-            setName(event.target.value);
-            setNameError(null);
-          }}
-          readOnly={isEdit}
-          placeholder="filesystem"
-          className={cn(
-            'rounded-md border bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-ring',
-            isEdit && 'bg-muted text-muted-foreground cursor-not-allowed',
-          )}
-          autoComplete="off"
-        />
-      </Field>
-
       {/* Transport -------------------------------------------------------- */}
       <fieldset className="flex flex-col gap-2" disabled={isEdit} aria-label="Transport">
         <legend className="text-sm font-medium">Transport</legend>
@@ -152,14 +138,9 @@ export function AgentMcpBindingForm({
           initial={existing?.binding.type === 'stdio' ? existing.binding : null}
           catalogEntries={catalogEntries}
           onSubmit={async (payload) => {
-            const err = validateName(name);
-            if (err !== null) {
-              setNameError(err);
-              throw new Error(err);
-            }
             setSubmitError(null);
             try {
-              await onSubmit(name, payload);
+              await submitBinding(payload);
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : 'Save failed.';
               setSubmitError(message);
@@ -178,14 +159,9 @@ export function AgentMcpBindingForm({
           namespace={namespace}
           existingServerName={existing?.name ?? null}
           onSubmit={async (payload) => {
-            const err = validateName(name);
-            if (err !== null) {
-              setNameError(err);
-              throw new Error(err);
-            }
             setSubmitError(null);
             try {
-              await onSubmit(name, payload);
+              await submitBinding(payload);
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : 'Save failed.';
               setSubmitError(message);
