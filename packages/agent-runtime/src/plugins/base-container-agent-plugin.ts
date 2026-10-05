@@ -107,6 +107,10 @@ export interface SpawnCliOptions {
 
 export interface SpawnDockerResult {
   cliOutput: string;
+  /** MCP servers the CLI reported as failed to start. Read from the raw
+   *  stream: `cliOutput` is only the final result event, which no longer
+   *  carries the `system/init` event naming them. */
+  failedMcpServers?: string[];
   gitMetadata: GitMetadata | null;
   presentation: Presentation | null;
   outputDir: string;
@@ -973,7 +977,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       // run will see it, rather than leaving "the agent ignored the tool" and
       // "the tool was never there" indistinguishable.
       if (this.logFormat === 'claude-stream-json') {
-        for (const server of failedMcpServers(spawnResult.cliOutput)) {
+        for (const server of spawnResult.failedMcpServers ?? []) {
           await emit({
             type: 'status',
             payload:
@@ -1480,6 +1484,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     // --- Spawn the agent CLI ---
     const commandSpec = this.getAgentCommand(promptFilePath, options);
 
+    let failedServers: string[] = [];
     const cliOutput = await new Promise<string>((resolve, reject) => {
       const child = spawn(commandSpec.args[0], commandSpec.args.slice(1), {
         cwd: workingDir,
@@ -1541,6 +1546,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
         const rawStdout = rawLines.join('\n');
         const finalResult = this.parseAgentOutput(rawStdout);
+        failedServers = failedMcpServers(rawStdout);
 
         if (code !== 0) {
           const exitInfo = signal
@@ -1578,7 +1584,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
     const localPresentation = await readPresentation(outputDir);
 
-    return { cliOutput, gitMetadata, presentation: localPresentation, outputDir, injectedEnvVars: [] };
+    return { cliOutput, failedMcpServers: failedServers, gitMetadata, presentation: localPresentation, outputDir, injectedEnvVars: [] };
   }
 
   protected async spawnDockerContainer(
@@ -1732,6 +1738,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
     const rawStdout = rawLines.join('\n');
     const finalResult = this.parseAgentOutput(rawStdout);
+    const failedServers = failedMcpServers(rawStdout);
     const timeoutMinutes = Math.round(timeoutMs / 60_000);
 
     if (spawnResult.exitCode !== 0) {
@@ -1762,7 +1769,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
     const presentation = await readPresentation(outputDir);
 
-    return { cliOutput, gitMetadata, presentation, outputDir, injectedEnvVars };
+    return { cliOutput, failedMcpServers: failedServers, gitMetadata, presentation, outputDir, injectedEnvVars };
   }
 }
 

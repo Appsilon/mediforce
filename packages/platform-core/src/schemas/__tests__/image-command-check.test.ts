@@ -6,15 +6,15 @@ import {
 } from '../image-command-check';
 
 describe('ImageCommandNameSchema', () => {
-  it.each(['uvx', 'npx', 'python3', 'biomcp-server', 'node.exe', 'my_tool+'])(
-    'accepts the bare command name %s',
+  it.each(['uvx', 'npx', 'python3', 'biomcp-server', 'node.exe', 'my_tool+', '/usr/local/bin/MyTool'])(
+    'accepts the command %s',
     (name) => {
       expect(ImageCommandNameSchema.safeParse(name).success).toBe(true);
     },
   );
 
-  it.each(['', '-rf', '--help', 'uvx serve', '/usr/bin/uvx', 'a;b', '$(id)', 'a`b`', 'a\nb', 'a'.repeat(129)])(
-    'refuses %j: a path, a flag or shell syntax is not a command name',
+  it.each(['', '-rf', '--help', 'uvx serve', 'a;b', '$(id)', 'a`b`', 'a\nb', 'a'.repeat(129)])(
+    'refuses %j: a flag or shell syntax is not a command',
     (name) => {
       expect(ImageCommandNameSchema.safeParse(name).success).toBe(false);
     },

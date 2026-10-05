@@ -7,7 +7,7 @@ import type { ProcessConfig } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 
-type DockerResult = { cliOutput: string; gitMetadata: null; presentation: string | null; outputDir: string; injectedEnvVars: string[] };
+type DockerResult = { cliOutput: string; failedMcpServers?: string[]; gitMetadata: null; presentation: string | null; outputDir: string; injectedEnvVars: string[] };
 type SpawnDockerTarget = { spawnDockerContainer: (prompt: string, options?: Record<string, unknown>) => Promise<DockerResult> };
 type SpawnLocalTarget = {
   spawnLocalProcess: (prompt: string, options: Record<string, unknown>, workingDir: string) => Promise<DockerResult>;
@@ -279,10 +279,8 @@ describe('ClaudeCodeAgentPlugin', () => {
       const { emit, events } = buildEmitSpy();
       mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
       mockSpawn(plugin).mockResolvedValue({
-        cliOutput: [
-          JSON.stringify({ type: 'system', subtype: 'init', mcp_servers: [{ name: 'biomcp', status: 'failed' }, { name: 'github', status: 'connected' }] }),
-          JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
-        ].join('\n'),
+        cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
+        failedMcpServers: ['biomcp'],
         gitMetadata: null,
         presentation: null,
         outputDir: '/tmp/mock-output',
@@ -310,10 +308,8 @@ describe('ClaudeCodeAgentPlugin', () => {
       const { emit, events } = buildEmitSpy();
       mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
       mockSpawnLocal(plugin).mockResolvedValue({
-        cliOutput: [
-          JSON.stringify({ type: 'system', subtype: 'init', mcp_servers: [{ name: 'biomcp', status: 'failed' }] }),
-          JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
-        ].join('\n'),
+        cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
+        failedMcpServers: ['biomcp'],
         gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [],
       });
 

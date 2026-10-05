@@ -2,15 +2,15 @@ import { z } from 'zod';
 import { IMAGE_CAPABILITY_PROBE_TIMEOUT_MS } from './image-capabilities';
 
 /**
- * A bare executable name — what an MCP catalog entry's `command` holds. The
- * first character is never `-`, so the value cannot be read as a flag, and no
- * path separator, space or shell metacharacter is allowed: the probe runs in a
- * container, and the name is the only caller-supplied part of it.
+ * An executable name or absolute path — what an MCP catalog entry's `command`
+ * holds. The first character is never `-`, so the value cannot be read as a
+ * flag, and no space or shell metacharacter is allowed: the probe runs in a
+ * container, and the command is the only caller-supplied part of it.
  */
 export const ImageCommandNameSchema = z
   .string()
   .max(128)
-  .regex(/^[A-Za-z0-9._][A-Za-z0-9._+-]*$/, 'Expected a bare command name, e.g. uvx');
+  .regex(/^[A-Za-z0-9._/][A-Za-z0-9._+/-]*$/, 'Expected a command name or path, e.g. uvx');
 
 export const KnownImageCommandCheckSchema = z.object({
   status: z.literal('known'),

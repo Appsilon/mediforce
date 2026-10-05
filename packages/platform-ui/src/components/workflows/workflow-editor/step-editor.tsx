@@ -393,8 +393,8 @@ export function StepEditor({
   const toolCatalog = useToolCatalogEntries(isAgent ? handle : undefined);
   const selectedAgent = agentDefinitions.find((agent) => agent.id === step.agentId);
   const mcpServerCommands = useMemo(
-    () => stdioServerCommands(selectedAgent?.mcpServers ?? {}, toolCatalog),
-    [selectedAgent, toolCatalog],
+    () => stdioServerCommands(selectedAgent?.mcpServers ?? {}, toolCatalog, step.mcpRestrictions),
+    [selectedAgent, toolCatalog, step.mcpRestrictions],
   );
   const stepBuildsItsImage = stepHasBuildSource(step.agent, imageSourceDefinition);
   const stepImage = step.agent?.image !== undefined && step.agent.image !== '' ? step.agent.image : DEFAULT_AGENT_IMAGE;

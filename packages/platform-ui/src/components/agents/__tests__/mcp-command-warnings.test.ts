@@ -33,6 +33,22 @@ describe('stdioServerCommands', () => {
 
     expect(stdioServerCommands(bindings, CATALOG)).toEqual([]);
   });
+
+  it('skips a server the step disables, or empties with denyTools — neither is started', () => {
+    const bindings: AgentMcpBindingMap = {
+      off: { type: 'stdio', catalogId: 'biomcp' },
+      emptied: { type: 'stdio', catalogId: 'github', allowedTools: ['search'] },
+      kept: { type: 'stdio', catalogId: 'github', allowedTools: ['search', 'read'] },
+    };
+
+    expect(
+      stdioServerCommands(bindings, CATALOG, {
+        off: { disable: true },
+        emptied: { denyTools: ['search'] },
+        kept: { denyTools: ['search'] },
+      }),
+    ).toEqual([{ server: 'kept', command: 'npx' }]);
+  });
 });
 
 describe('missingCommandWarnings', () => {
