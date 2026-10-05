@@ -300,10 +300,9 @@ test.describe('Step Evaluation tab', () => {
       data: agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade every AE by CTCAE v5.' } }),
     });
     expect(v2.status(), await v2.text()).toBe(201);
+    await post('/api/evaluation/runs', { ...step, definitionVersion: 1, trialsPerCase: 1, budgetUsd: 1 });
     await page.reload();
     await expect(page.getByTestId('evaluation-version-select')).toHaveValue('1', { timeout: 15_000 });
-    await page.getByLabel('Budget $').fill('1');
-    await page.getByRole('button', { name: 'Prepare', exact: true }).click();
     const startCard = page.getByTestId('start-eval-run-card');
     await expect(startCard).toBeVisible({ timeout: 10_000 });
     await expect(startCard).not.toContainText('on v1');
