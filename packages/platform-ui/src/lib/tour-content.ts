@@ -260,7 +260,7 @@ export const GUIDE_CHAPTERS: readonly TourChapter[] = [
   {
     id: 'agent-models',
     title: 'Models',
-    match: '/:handle/agents/models',
+    match: '/:handle/models',
     steps: [
       {
         id: 'what',

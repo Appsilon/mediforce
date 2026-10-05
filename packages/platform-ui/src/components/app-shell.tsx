@@ -99,11 +99,12 @@ export function buildBreadcrumbs(pathname: string, handle: string, prefix: strin
   if (s0 === 'catalog') return [workflows, { label: 'Catalog', href: null }];
   if (s0 === 'images') return [workflows, { label: 'Images', href: null }];
 
+  if (s0 === 'models') return [{ label: 'Models', href: null }];
+
   if (s0 === 'agents') {
     const agents: Crumb = { label: 'Agents', href: `${prefix}/agents` };
     if (!s1) return [{ ...agents, href: null }];
     if (s1 === 'new') return [agents, { label: 'New Agent', href: null }];
-    if (s1 === 'models') return [agents, { label: 'Models', href: null }];
     if (s1 === 'definitions') return [agents, { label: 'Configure Agent', href: null }];
     return [agents];
   }
@@ -340,13 +341,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 active={isActive}
               />
               {item.href === '/agents' && (
-                <div className="pl-4" data-tour="nav-models">
+                <div data-tour="nav-models">
                   <NavItem
-                    href={`${handlePrefix}/agents/models`}
+                    href={`${handlePrefix}/models`}
                     label="Models"
                     icon={Database}
                     badge={null}
-                    active={pathname.startsWith(`${handlePrefix}/agents/models`)}
+                    active={pathname.startsWith(`${handlePrefix}/models`)}
                   />
                 </div>
               )}
