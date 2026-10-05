@@ -1,17 +1,16 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
   Bot, Cpu, Terminal, BarChart3, Brain, Zap,
   Shield, Code, Database, Globe, Sparkles, Settings,
-  Check, ChevronDown,
 } from 'lucide-react';
 import { mediforce } from '@/lib/mediforce';
-import { FOUNDATION_MODELS } from '@/lib/agent-models';
+import { ModelPicker } from '@/components/agents/model-picker';
 import { cn } from '@/lib/utils';
 import { ConceptIntro } from '@/components/ui/concept-intro';
 import type { LucideIcon } from 'lucide-react';
@@ -43,14 +42,11 @@ export default function NewAgentPage() {
   const [inputDescription, setInputDescription] = useState('');
   const [outputDescription, setOutputDescription] = useState('');
   const [selectedModelId, setSelectedModelId] = useState('');
-  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const activeModel = FOUNDATION_MODELS.find((m) => m.id === selectedModelId);
   const canSave = name.trim().length > 0 && selectedModelId !== '' && !saving;
 
   async function handleSave() {
@@ -82,18 +78,6 @@ export default function NewAgentPage() {
       setSaving(false);
     }
   }
-
-  // Close dropdown on outside click
-  React.useEffect(() => {
-    if (!modelDropdownOpen) return;
-    function handleClick(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setModelDropdownOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [modelDropdownOpen]);
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6 max-w-2xl" data-tour="agent-new-form">
@@ -185,52 +169,7 @@ export default function NewAgentPage() {
         {/* 5. Foundation model */}
         <div className="space-y-1.5">
           <label className="text-sm font-medium">Foundation model</label>
-          <div className="relative" ref={dropdownRef}>
-            <button
-              type="button"
-              onClick={() => setModelDropdownOpen((prev) => !prev)}
-              data-tour="agent-new-model"
-              className={cn(
-                'flex w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm transition-colors',
-                'hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-ring',
-                modelDropdownOpen && 'ring-2 ring-ring border-ring',
-              )}
-            >
-              {activeModel ? (
-                <span className="flex items-center gap-2">
-                  <activeModel.Logo className="h-4 w-4 shrink-0" style={{ color: activeModel.logoColor }} />
-                  <span>{activeModel.name}</span>
-                  <span className="text-muted-foreground text-xs">— {activeModel.provider}</span>
-                </span>
-              ) : (
-                <span className="text-muted-foreground">Select a model…</span>
-              )}
-              <ChevronDown
-                className={cn('h-4 w-4 text-muted-foreground shrink-0 transition-transform', modelDropdownOpen && 'rotate-180')}
-              />
-            </button>
-
-            {modelDropdownOpen && (
-              <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow-md py-1">
-                {FOUNDATION_MODELS.map((model) => (
-                  <button
-                    key={model.id}
-                    type="button"
-                    onClick={() => { setSelectedModelId(model.id); setModelDropdownOpen(false); }}
-                    className={cn(
-                      'flex w-full items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-accent transition-colors',
-                      selectedModelId === model.id && 'bg-accent',
-                    )}
-                  >
-                    <model.Logo className="h-4 w-4 shrink-0" style={{ color: model.logoColor }} />
-                    <span className="flex-1">{model.name}</span>
-                    <span className="text-xs text-muted-foreground">{model.provider}</span>
-                    {selectedModelId === model.id && <Check className="h-3.5 w-3.5 text-primary" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <ModelPicker value={selectedModelId} onChange={setSelectedModelId} />
           <p className="text-xs text-muted-foreground">
             Used by every workflow step that calls this agent, unless the step sets its own model.
           </p>
