@@ -11,7 +11,6 @@ import { cn } from '@/lib/utils';
 import type { AgentDefinition } from '@mediforce/platform-core';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 import { AGENT_ICON_OPTIONS, RecognitionLabel } from '@/components/agents/agent-form-parts';
-import { ConceptIntro } from '@/components/ui/concept-intro';
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 
@@ -110,14 +109,6 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6 max-w-2xl">
-      <ConceptIntro>
-        <p>
-          <strong>An agent is a reusable configuration workflow steps call by id</strong> — its system prompt, its
-          foundation model and its MCP server bindings are the parts a run consumes. Agents are not versioned, so a change here applies to
-          every step that already references this one.
-        </p>
-      </ConceptIntro>
-
       {loadingDef ? (
         <FormSkeleton />
       ) : notFound ? (
