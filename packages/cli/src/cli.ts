@@ -69,6 +69,7 @@ import { systemCreditsCommand } from './commands/system-credits';
 import { agentListCommand } from './commands/agent-list';
 import { toolCatalogListCommand } from './commands/tool-catalog-list';
 import { toolCatalogAddCommand } from './commands/tool-catalog-add';
+import { toolCatalogDiscoverCommand } from './commands/tool-catalog-discover';
 import { agentGetCommand } from './commands/agent-get';
 import { agentDeleteCommand } from './commands/agent-delete';
 import { agentSetVisibilityCommand } from './commands/agent-set-visibility';
@@ -260,10 +261,11 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   'tool-catalog': {
-    description: 'MCP servers an agent can bind to (list, add)',
+    description: 'MCP servers an agent can bind to (list, add, discover)',
     leaves: {
       list: { description: 'List a workspace Tool Catalog', fn: toolCatalogListCommand },
       add: { description: 'Add an MCP server from a JSON file (admin)', fn: toolCatalogAddCommand },
+      discover: { description: 'List the tools an MCP server exposes (admin)', fn: toolCatalogDiscoverCommand },
     },
   },
   'agent-run': {

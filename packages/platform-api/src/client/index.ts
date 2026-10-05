@@ -196,6 +196,8 @@ import {
   UpdateToolCatalogEntryOutputSchema,
   DeleteToolCatalogEntryInputSchema,
   DeleteToolCatalogEntryOutputSchema,
+  DiscoverMcpToolsInputApiSchema,
+  DiscoverMcpToolsOutputSchema,
   ListImageCatalogEntriesInputSchema,
   ListImageCatalogEntriesOutputSchema,
   GetImageCatalogEntryInputSchema,
@@ -303,6 +305,8 @@ import {
   type UpdateToolCatalogEntryOutput,
   type DeleteToolCatalogEntryInput,
   type DeleteToolCatalogEntryOutput,
+  type DiscoverMcpToolsInputApi,
+  type DiscoverMcpToolsOutput,
   type ListImageCatalogEntriesInput,
   type ListImageCatalogEntriesOutput,
   type GetImageCatalogEntryInput,
@@ -979,6 +983,7 @@ export class Mediforce {
     create: (input: CreateToolCatalogEntryInputApi) => Promise<CreateToolCatalogEntryOutput>;
     update: (input: UpdateToolCatalogEntryInputApi) => Promise<UpdateToolCatalogEntryOutput>;
     delete: (input: DeleteToolCatalogEntryInput) => Promise<DeleteToolCatalogEntryOutput>;
+    discoverTools: (input: DiscoverMcpToolsInputApi) => Promise<DiscoverMcpToolsOutput>;
   };
 
   readonly imageCatalog: {
@@ -2309,6 +2314,18 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.delete');
         return DeleteToolCatalogEntryOutputSchema.parse(body);
+      },
+      discoverTools: async (input) => {
+        const validated = DiscoverMcpToolsInputApiSchema.parse(input);
+        const { namespace, ...probeBody } = validated;
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(`/api/admin/tool-catalog/discover${qs}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(probeBody),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.discoverTools');
+        return DiscoverMcpToolsOutputSchema.parse(body);
       },
     };
 

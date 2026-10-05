@@ -503,6 +503,13 @@ export {
 } from './tool-catalog';
 
 export {
+  DiscoverMcpToolsInputApiSchema,
+  DiscoverMcpToolsOutputSchema,
+  type DiscoverMcpToolsInputApi,
+  type DiscoverMcpToolsOutput,
+} from './mcp-tools';
+
+export {
   ImageCatalogVersionSchema,
   ImageCatalogAvailabilitySchema,
   ImageCatalogOriginSchema,

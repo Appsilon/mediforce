@@ -147,6 +147,7 @@ export { getToolCatalogEntry } from './tool-catalog/get-entry';
 export { createToolCatalogEntry } from './tool-catalog/create-entry';
 export { updateToolCatalogEntry } from './tool-catalog/update-entry';
 export { deleteToolCatalogEntry } from './tool-catalog/delete-entry';
+export { discoverMcpTools } from './mcp-tools/discover-tools';
 
 export { listImageCatalogEntries } from './image-catalog/list-entries';
 export { getImageCatalogEntry } from './image-catalog/get-entry';

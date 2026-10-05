@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Trash2 } from 'lucide-react';
+import { Info, Plus, Trash2 } from 'lucide-react';
 import type {
   AgentMcpBinding,
   OAuthProviderConfig,
@@ -12,6 +12,7 @@ import type {
 } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { mediforce } from '@/lib/mediforce';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
 
 function deriveBindingName(binding: AgentMcpBinding, existingNames: string[]): string {
   const source = binding.type === 'stdio' ? binding.catalogId : new URL(binding.url).hostname;
@@ -25,14 +26,14 @@ function deriveBindingName(binding: AgentMcpBinding, existingNames: string[]): s
 
 const StdioFormSchema = z.object({
   catalogId: z.string().min(1, 'Choose a catalog entry'),
-  allowedTools: z.array(z.object({ value: z.string() })),
+  allowedTools: z.array(z.string()),
 });
 type StdioFormValues = z.infer<typeof StdioFormSchema>;
 
 const HttpFormSchema = z
   .object({
     url: z.string().url('Must be a valid URL'),
-    allowedTools: z.array(z.object({ value: z.string() })),
+    allowedTools: z.array(z.string()),
     authMode: z.enum(['none', 'headers', 'oauth']),
     headers: z.array(
       z.object({
@@ -137,6 +138,7 @@ export function AgentMcpBindingForm({
           key="stdio-fields"
           initial={existing?.binding.type === 'stdio' ? existing.binding : null}
           catalogEntries={catalogEntries}
+          namespace={namespace}
           onSubmit={async (payload) => {
             setSubmitError(null);
             try {
@@ -182,6 +184,7 @@ export function AgentMcpBindingForm({
 function StdioFields({
   initial,
   catalogEntries,
+  namespace,
   onSubmit,
   onCancel,
   submitError,
@@ -189,6 +192,7 @@ function StdioFields({
 }: {
   initial: { type: 'stdio'; catalogId: string; allowedTools?: string[] } | null;
   catalogEntries: ToolCatalogEntry[];
+  namespace: string;
   onSubmit: (binding: AgentMcpBinding) => Promise<void>;
   onCancel: () => void;
   submitError: string | null;
@@ -198,13 +202,13 @@ function StdioFields({
     resolver: zodResolver(StdioFormSchema),
     defaultValues: {
       catalogId: initial?.catalogId ?? '',
-      allowedTools: (initial?.allowedTools ?? []).map((value) => ({ value })),
+      allowedTools: initial?.allowedTools ?? [],
     },
   });
-  const allowedArray = useFieldArray({ control: form.control, name: 'allowedTools' });
+  const catalogId = form.watch('catalogId');
 
   const handleSubmit = form.handleSubmit(async (values) => {
-    const allowed = values.allowedTools.map((tool) => tool.value).filter((value) => value !== '');
+    const allowed = values.allowedTools;
     const binding: AgentMcpBinding = {
       type: 'stdio',
       catalogId: values.catalogId,
@@ -237,10 +241,18 @@ function StdioFields({
       </Field>
 
       <AllowedToolsSection
-        fields={allowedArray.fields}
-        onAdd={() => allowedArray.append({ value: '' })}
-        onRemove={(index) => allowedArray.remove(index)}
-        registerInput={(index) => form.register(`allowedTools.${index}.value` as const)}
+        selected={form.watch('allowedTools')}
+        onChange={(tools) => form.setValue('allowedTools', tools)}
+        discoveryKey={catalogId}
+        discover={
+          catalogId === ''
+            ? { unavailableReason: 'Choose a catalog entry first.' }
+            : {
+                run: async () =>
+                  (await mediforce.toolCatalog.discoverTools({ namespace, type: 'stdio', catalogId }))
+                    .tools,
+              }
+        }
       />
 
       <FormFooter
@@ -289,7 +301,7 @@ function HttpFields({
     resolver: zodResolver(HttpFormSchema),
     defaultValues: {
       url: initial?.url ?? '',
-      allowedTools: (initial?.allowedTools ?? []).map((value) => ({ value })),
+      allowedTools: initial?.allowedTools ?? [],
       authMode: initialAuthMode,
       headers: initialHeaders,
       oauthProvider: initial?.auth?.type === 'oauth' ? initial.auth.provider : '',
@@ -299,10 +311,10 @@ function HttpFields({
         initial?.auth?.type === 'oauth' ? initial.auth.headerValueTemplate : 'Bearer {token}',
     },
   });
-  const allowedArray = useFieldArray({ control: form.control, name: 'allowedTools' });
   const headersArray = useFieldArray({ control: form.control, name: 'headers' });
   const authMode = form.watch('authMode');
   const oauthProviderId = form.watch('oauthProvider');
+  const serverUrl = form.watch('url');
 
   const [providers, setProviders] = useState<OAuthProviderConfig[]>([]);
   const [providersError, setProvidersError] = useState<string | null>(null);
@@ -330,7 +342,7 @@ function HttpFields({
   );
 
   const handleSubmit = form.handleSubmit(async (values) => {
-    const allowed = values.allowedTools.map((tool) => tool.value).filter((value) => value !== '');
+    const allowed = values.allowedTools;
     const headers = values.headers.filter((header) => header.key !== '');
 
     let auth: Extract<AgentMcpBinding, { type: 'http' }>['auth'];
@@ -524,10 +536,20 @@ function HttpFields({
       )}
 
       <AllowedToolsSection
-        fields={allowedArray.fields}
-        onAdd={() => allowedArray.append({ value: '' })}
-        onRemove={(index) => allowedArray.remove(index)}
-        registerInput={(index) => form.register(`allowedTools.${index}.value` as const)}
+        selected={form.watch('allowedTools')}
+        onChange={(tools) => form.setValue('allowedTools', tools)}
+        discoveryKey={serverUrl}
+        discover={
+          authMode !== 'none'
+            ? { unavailableReason: 'Tool discovery is only available for servers without authentication.' }
+            : !z.string().url().safeParse(serverUrl).success
+              ? { unavailableReason: 'Enter a valid URL first.' }
+              : {
+                  run: async () =>
+                    (await mediforce.toolCatalog.discoverTools({ namespace, type: 'http', url: serverUrl }))
+                      .tools,
+                }
+        }
       />
 
       <FormFooter
@@ -542,57 +564,156 @@ function HttpFields({
 
 // ── Shared bits ─────────────────────────────────────────────────────────────
 
-/** Transport-agnostic allowed-tools editor. Takes pre-resolved field array
- *  state + a register callback so the caller's specific RHF value type stays
- *  generic at this boundary. */
+interface DiscoveredTool {
+  name: string;
+  description?: string;
+}
+
+type ToolDiscovery =
+  | { run: () => Promise<DiscoveredTool[]> }
+  | { unavailableReason: string };
+
+const ALLOWED_TOOLS_HELP =
+  'Restrict which tools of this server the agent may call. By default every tool the server exposes is available. ' +
+  'Select tools to allow only a subset; steps can narrow it further via denyTools.';
+
+/** Transport-agnostic allowed-tools editor. An empty selection means "no
+ *  restriction"; unchecking tools in the discovered list stores the remaining
+ *  ones as the allowlist. `discoveryKey` resets the loaded list when the
+ *  target server changes. */
 function AllowedToolsSection({
-  fields,
-  onAdd,
-  onRemove,
-  registerInput,
+  selected,
+  onChange,
+  discover,
+  discoveryKey,
 }: {
-  fields: { id: string }[];
-  onAdd: () => void;
-  onRemove: (index: number) => void;
-  registerInput: (index: number) => ReturnType<ReturnType<typeof useForm>['register']>;
+  selected: string[];
+  onChange: (tools: string[]) => void;
+  discover: ToolDiscovery;
+  discoveryKey: string;
 }) {
+  const [tools, setTools] = useState<DiscoveredTool[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [discoverError, setDiscoverError] = useState<string | null>(null);
+  const [manualText, setManualText] = useState(selected.join(', '));
+
+  useEffect(() => {
+    setTools(null);
+    setDiscoverError(null);
+  }, [discoveryKey]);
+
+  async function handleSelectTools() {
+    if (!('run' in discover)) return;
+    setLoading(true);
+    setDiscoverError(null);
+    try {
+      setTools(await discover.run());
+    } catch (err: unknown) {
+      setDiscoverError(err instanceof Error ? err.message : 'Failed to load tools.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const unlisted = selected.filter((name) => tools?.some((tool) => tool.name === name) !== true);
+  const rows: DiscoveredTool[] = [...(tools ?? []), ...unlisted.map((name) => ({ name }))];
+  const checkedNames = selected.length === 0 ? rows.map((row) => row.name) : selected;
+
+  function toggle(name: string, checked: boolean) {
+    const next = rows
+      .map((row) => row.name)
+      .filter((rowName) => (rowName === name ? checked : checkedNames.includes(rowName)));
+    onChange(next.length === rows.length ? [] : next);
+  }
+
   return (
     <div className="flex flex-col gap-2 rounded-md border bg-card px-3 py-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium">Allowed tools</span>
-        <button
-          type="button"
-          onClick={onAdd}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <Plus className="h-3 w-3" />
-          Add tool
-        </button>
+        <span className="flex items-center gap-1.5 text-sm font-medium">
+          Allowed tools
+          <InstantTooltip label={ALLOWED_TOOLS_HELP}>
+            <button
+              type="button"
+              aria-label="About allowed tools"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Info className="h-3.5 w-3.5" />
+            </button>
+          </InstantTooltip>
+        </span>
+        <InstantTooltip label={'unavailableReason' in discover ? discover.unavailableReason : undefined}>
+          <span>
+            <button
+              type="button"
+              onClick={handleSelectTools}
+              disabled={loading || 'unavailableReason' in discover}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+            >
+              {loading ? 'Loading…' : 'Select tools'}
+            </button>
+          </span>
+        </InstantTooltip>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Optional. When empty, the agent may call any tool exposed by the server. When set, steps may
-        additionally narrow via <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">denyTools</code>.
-      </p>
-      {fields.length === 0 && <p className="text-xs text-muted-foreground">No allowlist.</p>}
-      {fields.map((field, index) => (
-        <div key={field.id} className="flex items-center gap-2">
+      {discoverError !== null && (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs text-muted-foreground" title={discoverError}>
+            Unable to list the tools for this MCP server. Enter the tool names manually instead.
+          </p>
           <input
-            aria-label={`Allowed tool ${index + 1}`}
-            {...registerInput(index)}
-            placeholder="query"
-            className="flex-1 rounded-md border bg-background px-3 py-1.5 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
+            aria-label="Allowed tool names"
+            value={manualText}
+            onChange={(event) => {
+              setManualText(event.target.value);
+              onChange(
+                event.target.value
+                  .split(',')
+                  .map((name) => name.trim())
+                  .filter((name) => name !== ''),
+              );
+            }}
+            placeholder="Enter tool names manually, comma-separated"
+            className="rounded-md border bg-background px-3 py-1.5 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
             autoComplete="off"
           />
-          <button
-            type="button"
-            onClick={() => onRemove(index)}
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
-            aria-label={`Remove allowed tool ${index + 1}`}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
         </div>
-      ))}
+      )}
+      {tools === null ? (
+        <p className="text-xs text-muted-foreground">
+          {selected.length === 0 ? 'All tools available' : `${String(selected.length)} allowed: ${selected.join(', ')}`}
+        </p>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground">
+            {selected.length === 0
+              ? 'All tools available'
+              : `${String(selected.length)} of ${String(rows.length)} tools allowed`}
+          </p>
+          {rows.length === 0 && (
+            <p className="text-xs text-muted-foreground">This server exposes no tools.</p>
+          )}
+          {rows.map((row) => {
+            const isChecked = checkedNames.includes(row.name);
+            return (
+              <label key={row.name} className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  aria-label={`Allow tool ${row.name}`}
+                  checked={isChecked}
+                  disabled={isChecked && checkedNames.length === 1}
+                  onChange={(event) => toggle(row.name, event.target.checked)}
+                  className="mt-0.5 h-3.5 w-3.5"
+                />
+                <span className="flex flex-col">
+                  <span className="font-mono">{row.name}</span>
+                  {row.description !== undefined && (
+                    <span className="text-xs text-muted-foreground">{row.description}</span>
+                  )}
+                </span>
+              </label>
+            );
+          })}
+        </>
+      )}
     </div>
   );
 }
