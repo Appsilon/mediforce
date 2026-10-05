@@ -109,16 +109,14 @@ export default function AdminToolCatalogPage() {
         if (mode.kind === 'edit') {
           const { id, ...patch } = entry;
           await mediforce.toolCatalog.update({ namespace: handle, id, ...patch });
-          if (focused) {
-            router.push(adminBackHref(handle, search.get('from')));
-            return;
-          }
         } else {
           await mediforce.toolCatalog.create({ namespace: handle, ...entry });
-          if (focused) {
-            router.push(adminBackHref(handle, search.get('from')));
-            return;
-          }
+        }
+        if (focused) {
+          router.push(adminBackHref(handle, search.get('from')));
+          return;
+        }
+        if (mode.kind !== 'edit') {
           const qs = new URLSearchParams(search.toString());
           qs.set('id', entry.id);
           qs.delete('new');

@@ -57,7 +57,9 @@ export async function discoverMcpTools(
     const definitions = await manager.connect();
     return {
       tools: definitions.map((definition) => ({
-        name: definition.function.name.slice(PROBE_PREFIX.length),
+        name: definition.function.name.startsWith(PROBE_PREFIX)
+          ? definition.function.name.slice(PROBE_PREFIX.length)
+          : definition.function.name,
         ...(definition.function.description !== ''
           ? { description: definition.function.description }
           : {}),
