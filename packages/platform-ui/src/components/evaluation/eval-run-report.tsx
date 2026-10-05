@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import {
-  calibrateJudgeReviews,
   qualificationSignatureMeaning,
   type AcceptanceCriterionVerdict,
   type EvalRunReport,
@@ -124,24 +123,22 @@ function EvaluatorTable({ report }: { report: EvalRunReport }) {
 }
 
 /**
- * Whether the models grading this run can be trusted: the confidence each
- * gave its verdict against whether a person accepted or denied that verdict.
+ * Whether the models grading this run can be trusted: how many of the
+ * verdicts a person reviewed they denied.
  */
-function CalibrationSection({ verdicts }: { verdicts: readonly JudgeVerdict[] }) {
-  const calibration = calibrateJudgeReviews(verdicts);
+function VerdictReviewSection({ verdicts }: { verdicts: readonly JudgeVerdict[] }) {
   const accepted = verdicts.filter((verdict) => verdict.review?.decision === 'accepted').length;
   const denied = verdicts.filter((verdict) => verdict.review?.decision === 'denied').length;
+  const reviewed = accepted + denied;
   return (
-    <p className="text-xs" data-testid="verdict-calibration">
-      <InstantTooltip label="Expected calibration error: the average gap between the confidence a model gave its verdict and the share of those verdicts a person accepted, weighted by how many verdicts each confidence bin holds. 0 means its confidence matches the reviews exactly; 0.2 means it is off by 20 points on average.">
-        <span className="font-medium underline decoration-dotted">Calibration error</span>
-      </InstantTooltip>{' '}
-      {calibration === null ? (
+    <p className="text-xs" data-testid="verdict-review">
+      <span className="font-medium">Model verdicts denied</span>{' '}
+      {reviewed === 0 ? (
         <span className="text-muted-foreground">Waiting for model verdicts human validation</span>
       ) : (
         <>
-          <span className="font-medium">{calibration.ece.toFixed(3)}</span>
-          <span className="text-muted-foreground"> over {calibration.count} reviewed model verdict(s) — {accepted} accepted, {denied} denied. 0 is a perfect match.</span>
+          <span className="font-medium">{percent(denied / reviewed)}</span>
+          <span className="text-muted-foreground"> — {denied} of {reviewed} reviewed model verdict(s) denied, {accepted} accepted. 0% means every review agreed with the model.</span>
         </>
       )}
     </p>
@@ -247,7 +244,7 @@ export function EvalRunSummary({ output, step, mayEdit, editReason }: {
       </div>
       <EvaluatorTable report={report} />
       {report.criteria.length > 0 && <CriteriaTable report={report} />}
-      <CalibrationSection verdicts={report.judgeVerdicts} />
+      <VerdictReviewSection verdicts={report.judgeVerdicts} />
       {signing ? (
         <SignQualificationForm step={step} evalRunId={evalRun.id} criteria={report.criteria} onDone={() => setSigning(false)} />
       ) : (
