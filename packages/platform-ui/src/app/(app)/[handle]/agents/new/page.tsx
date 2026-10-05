@@ -7,12 +7,14 @@ import Link from 'next/link';
 import {
   ArrowLeft,
   Bot, Cpu, Terminal, BarChart3, Brain, Zap,
-  Shield, Code, Database, Globe, Sparkles, Settings,
+  Shield, Code, Database, Globe, Sparkles, Settings, Info,
 } from 'lucide-react';
 import { mediforce } from '@/lib/mediforce';
+import type { AgentMcpBindingMap } from '@mediforce/platform-core';
 import { ModelPicker } from '@/components/agents/model-picker';
+import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 import { cn } from '@/lib/utils';
-import { ConceptIntro } from '@/components/ui/concept-intro';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import type { LucideIcon } from 'lucide-react';
 
 const ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [
@@ -30,6 +32,20 @@ const ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [
   { icon: Settings, label: 'Settings' },
 ];
 
+const RECOGNITION_ONLY_HINT =
+  'Not used by the model. This is for people to recognise the agent when wiring a step.';
+
+function RecognitionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <label className="flex items-center gap-1.5 text-sm font-medium">
+      {children}
+      <InstantTooltip label={RECOGNITION_ONLY_HINT}>
+        <Info className="h-3.5 w-3.5 text-muted-foreground" aria-label={RECOGNITION_ONLY_HINT} />
+      </InstantTooltip>
+    </label>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function NewAgentPage() {
@@ -43,6 +59,7 @@ export default function NewAgentPage() {
   const [outputDescription, setOutputDescription] = useState('');
   const [selectedModelId, setSelectedModelId] = useState('');
   const [prompt, setPrompt] = useState('');
+  const [mcpServers, setMcpServers] = useState<AgentMcpBindingMap>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,11 +79,11 @@ export default function NewAgentPage() {
         outputDescription,
         foundationModel: selectedModelId,
         systemPrompt: prompt,
+        mcpServers,
         namespace: handle,
         visibility: 'private',
       });
-      // Bindings need a persisted agent, so creation continues into the page
-      // that owns them rather than dead-ending on the catalog.
+      // Land on the Configure page so OAuth bindings can be connected now that the agent exists.
       router.push(`/${handle}/agents/definitions/${agent.id}`);
     } catch (err) {
       setError(
@@ -81,18 +98,6 @@ export default function NewAgentPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6 max-w-2xl" data-tour="agent-new-form">
-      <ConceptIntro>
-        <p>
-          <strong>An agent is a reusable configuration workflow steps call by id</strong> — its system prompt, its
-          foundation model and its MCP server bindings are the parts a run consumes. Name, description and input/output text are how people
-          recognise it when wiring a step.
-        </p>
-        <p>
-          Only the agent name and the foundation model are required. MCP servers are bound from this agent&apos;s
-          Configure page once it exists.
-        </p>
-      </ConceptIntro>
-
       <div className="space-y-6">
 
         {/* 1. Agent name */}
@@ -132,7 +137,7 @@ export default function NewAgentPage() {
 
         {/* 3. Description */}
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">Description (optional)</label>
+          <RecognitionLabel>Description (optional)</RecognitionLabel>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -145,7 +150,7 @@ export default function NewAgentPage() {
         {/* 4. Input / Output descriptions */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Input (optional)</label>
+            <RecognitionLabel>Input (optional)</RecognitionLabel>
             <input
               type="text"
               value={inputDescription}
@@ -155,7 +160,7 @@ export default function NewAgentPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Output (optional)</label>
+            <RecognitionLabel>Output (optional)</RecognitionLabel>
             <input
               type="text"
               value={outputDescription}
@@ -187,7 +192,13 @@ export default function NewAgentPage() {
           />
         </div>
 
-        {/* 7. Save */}
+        {/* 7. MCP servers */}
+        <AgentMcpSection
+          handle={handle}
+          draft={{ bindings: mcpServers, onChange: setMcpServers }}
+        />
+
+        {/* 8. Save */}
         <div className="flex flex-col items-start gap-1.5 pt-2 pb-6">
           <button
             type="button"

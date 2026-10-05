@@ -13,9 +13,17 @@ import { mediforce } from '@/lib/mediforce';
 import { AgentMcpBindingForm } from './agent-mcp-binding-form';
 import { OAuthConnectionStatus } from './oauth-connection-status';
 
+interface AgentMcpDraft {
+  bindings: AgentMcpBindingMap;
+  onChange: (bindings: AgentMcpBindingMap) => void;
+}
+
 interface AgentMcpSectionProps {
-  agentId: string;
+  /** Persisted agent to read and write bindings for. Omit together with `draft` while the agent is still being created. */
+  agentId?: string;
   handle: string;
+  /** Holds bindings in the parent's state until the agent exists. */
+  draft?: AgentMcpDraft;
 }
 
 type DialogState =
@@ -23,8 +31,19 @@ type DialogState =
   | { kind: 'create' }
   | { kind: 'edit'; name: string; binding: AgentMcpBinding };
 
-export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
-  const [bindings, setBindings] = useState<AgentMcpBindingMap>({});
+export function AgentMcpSection({ agentId, handle, draft }: AgentMcpSectionProps) {
+  const [persistedBindings, setPersistedBindings] = useState<AgentMcpBindingMap>({});
+  const bindings = draft !== undefined ? draft.bindings : persistedBindings;
+  const setBindings = useCallback(
+    (next: AgentMcpBindingMap) => {
+      if (draft !== undefined) {
+        draft.onChange(next);
+      } else {
+        setPersistedBindings(next);
+      }
+    },
+    [draft],
+  );
   const [catalog, setCatalog] = useState<ToolCatalogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,13 +55,13 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
     setError(null);
     try {
       const [serverBindings, catalogEntries] = await Promise.all([
-        listAgentBindings(agentId),
+        agentId !== undefined ? listAgentBindings(agentId) : Promise.resolve(null),
         mediforce.toolCatalog
           .list({ namespace: handle })
           .then((res) => res.entries)
           .catch(() => [] as ToolCatalogEntry[]),
       ]);
-      setBindings(serverBindings);
+      if (serverBindings !== null) setPersistedBindings(serverBindings);
       setCatalog(catalogEntries);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load MCP bindings.');
@@ -60,11 +79,14 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
   const handleSubmit = useCallback(
     async (name: string, binding: AgentMcpBinding) => {
       setError(null);
-      const updated = await putAgentBinding(agentId, name, binding);
+      const updated =
+        agentId !== undefined
+          ? await putAgentBinding(agentId, name, binding)
+          : { ...bindings, [name]: binding };
       setBindings(updated);
       setDialog({ kind: 'closed' });
     },
-    [agentId],
+    [agentId, bindings, setBindings],
   );
 
   const handleDeleteConfirm = useCallback(async () => {
@@ -75,12 +97,16 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
     // while the HTTP call is in flight (see Journey 1 learning).
     setDeleteTarget(null);
     try {
-      const updated = await deleteAgentBinding(agentId, target.name);
-      setBindings(updated);
+      if (agentId !== undefined) {
+        setBindings(await deleteAgentBinding(agentId, target.name));
+      } else {
+        const { [target.name]: _removed, ...remaining } = bindings;
+        setBindings(remaining);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Delete failed.');
     }
-  }, [deleteTarget, agentId]);
+  }, [deleteTarget, agentId, bindings, setBindings]);
 
   const entries = Object.entries(bindings);
 
@@ -173,7 +199,7 @@ export function AgentMcpSection({ agentId, handle }: AgentMcpSectionProps) {
                   existing={dialog.kind === 'edit' ? { name: dialog.name, binding: dialog.binding } : null}
                   existingNames={existingNames}
                   catalogEntries={catalog}
-                  agentId={agentId}
+                  agentId={agentId ?? ''}
                   namespace={handle}
                   onSubmit={handleSubmit}
                   onCancel={() => setDialog({ kind: 'closed' })}
@@ -248,7 +274,7 @@ function BindingRow({
 }: {
   name: string;
   binding: AgentMcpBinding;
-  agentId: string;
+  agentId: string | undefined;
   namespace: string;
   onEdit: () => void;
   onRemove: () => void;
@@ -300,7 +326,12 @@ function BindingRow({
           </button>
         </div>
       </div>
-      {oauthProvider !== null && (
+      {oauthProvider !== null && agentId === undefined && (
+        <p className="text-xs text-muted-foreground">
+          Save the agent first, then use Connect on this row to start the OAuth flow.
+        </p>
+      )}
+      {oauthProvider !== null && agentId !== undefined && (
         <OAuthConnectionStatus
           agentId={agentId}
           serverName={name}
