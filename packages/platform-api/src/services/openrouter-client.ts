@@ -44,6 +44,8 @@ export interface OpenRouterResponse {
    * truncated — callers building large artifacts must treat this as an error.
    */
   finishReason: string | null;
+  /** Token counts as OpenRouter reports them; zero when the response carries none. */
+  usage: { promptTokens: number; completionTokens: number };
 }
 
 export interface OpenRouterRequest {
@@ -55,6 +57,26 @@ export interface OpenRouterRequest {
   maxTokens?: number;
 }
 
+/** The connection to OpenRouter dropped or never completed (no HTTP response), even after one retry. */
+export class OpenRouterNetworkError extends Error {
+  constructor(cause: unknown) {
+    super(`Could not reach the model API: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+    this.name = 'OpenRouterNetworkError';
+  }
+}
+
+async function postChatCompletion(request: RequestInit): Promise<Response> {
+  try {
+    return await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, request);
+  } catch {
+    try {
+      return await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, request);
+    } catch (retryError) {
+      throw new OpenRouterNetworkError(retryError);
+    }
+  }
+}
+
 export async function callOpenRouter(req: OpenRouterRequest): Promise<OpenRouterResponse> {
   const body: Record<string, unknown> = {
     model: req.model,
@@ -64,7 +86,7 @@ export async function callOpenRouter(req: OpenRouterRequest): Promise<OpenRouter
   };
   if (req.tools !== undefined) body.tools = req.tools;
 
-  const response = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
+  const response = await postChatCompletion({
     method: 'POST',
     headers: {
       Authorization: `Bearer ${req.apiKey}`,
@@ -86,6 +108,7 @@ export async function callOpenRouter(req: OpenRouterRequest): Promise<OpenRouter
       };
       finish_reason?: string | null;
     }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
 
   const choice = data.choices?.[0];
@@ -93,5 +116,9 @@ export async function callOpenRouter(req: OpenRouterRequest): Promise<OpenRouter
     content: choice?.message?.content ?? '',
     toolCalls: choice?.message?.tool_calls ?? [],
     finishReason: choice?.finish_reason ?? null,
+    usage: {
+      promptTokens: data.usage?.prompt_tokens ?? 0,
+      completionTokens: data.usage?.completion_tokens ?? 0,
+    },
   };
 }

@@ -3,6 +3,7 @@
 // WorkflowStep, then dispatches to the right StepExecutor strategy:
 // AgentStepExecutor (autonomy, review, escalation) or ScriptStepExecutor (direct).
 
+import { randomUUID } from 'node:crypto';
 import { getPlatformServices } from './platform-services';
 import {
   resolveMcpForStep,
@@ -11,21 +12,32 @@ import {
   PluginNotFoundError,
   MockAgentPlugin,
   ensureStepImageBuilt,
+  type McpTapeContext,
   type StepExecutorPlugin,
   type ResolvedOAuthBinding,
   type WorkflowAgentContext,
   type StepExecutorServices,
 } from '@mediforce/agent-runtime';
 import {
+  applyAgentModel,
+  inlineMcpServerNames,
+  mcpEvalRestrictions,
+  mergeMcpTapes,
+  MCP_REPLAY_RECORDINGS,
+  type AgentDefinitionRepository,
   type AgentOAuthTokenRepository,
+  type EvaluationRepository,
   type OAuthProviderRepository,
   type ResolvedMcpConfig,
+  type ToolCatalogRepository,
   type WorkflowDefinition,
   type WorkflowStep,
 } from '@mediforce/platform-core';
+import { buildProductionOutputGate } from './production-output-gate';
+import { changedFingerprintComponents, computeStepFingerprint } from '@mediforce/platform-api/services';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '../app/actions/namespace-secrets';
-import { applyAgentModel, resolveAgentDefaults } from './resolve-agent-defaults';
+import { resolveAgentDefaults } from './resolve-agent-defaults';
 
 export interface WorkflowAgentStepResult {
   instanceId: string;
@@ -70,6 +82,7 @@ export async function executeAgentStep(
     oauthProviderRepo,
     agentOAuthTokenRepo,
     modelRegistryRepo,
+    evaluationRepo,
   } = getPlatformServices();
 
   const instance = await instanceRepo.getById(instanceId);
@@ -88,6 +101,12 @@ export async function executeAgentStep(
       `WorkflowDefinition not found: ${instance.definitionName} v${instance.definitionVersion}`,
     );
   }
+
+  // An eval trial runs the step its Eval Run froze, with its MCP servers
+  // under the run's policy (ADR-0023 D5, D6).
+  const evalTrial = reapTimedOut || instance.evalRunId === undefined
+    ? null
+    : await evalTrialConfig(workflowDefinition, workflowStep, instanceId, instance.evalRunId, evaluationRepo, agentDefinitionRepo, toolCatalogRepo);
 
   // Resolve plugin: use workflowStep.plugin when set, fall back to stepId
   const pluginId = workflowStep.plugin ?? stepId;
@@ -144,9 +163,11 @@ export async function executeAgentStep(
   // Pre-resolve MCP configuration from the agent definition + step restrictions
   // + tool catalog. undefined when step.agentId is unset. Namespace-scoped
   // catalog lookups use the workflow's namespace.
+  const mcpStep = evalTrial?.mcpStep ?? workflowStep;
+  const mcpTapes = evalTrial?.mcpTapes;
   const resolvedMcpConfig = reapTimedOut
     ? undefined
-    : (await resolveMcpForStep(workflowStep, {
+    : (await resolveMcpForStep(mcpStep, {
         agentDefinitionRepo,
         toolCatalogRepo,
         namespace: workflowDefinition.namespace,
@@ -156,12 +177,16 @@ export async function executeAgentStep(
   // requested OAuth auth. Done here, not in the runtime, so the runtime
   // stays decoupled from Firestore — queued-docker-spawn can serialize
   // the context over BullMQ once this is populated. Refresh failures
-  // bubble up with actionable errors ("Reconnect via UI").
+  // bubble up with actionable errors ("Reconnect via UI"). A replayed server
+  // is never reached, so it needs no token.
   const oauthTokens = !reapTimedOut && workflowStep.agentId !== undefined && resolvedMcpConfig !== undefined
     ? await loadOAuthTokens({
         namespace: workflowDefinition.namespace,
         agentId: workflowStep.agentId,
-        resolvedMcpConfig,
+        resolvedMcpConfig: mcpTapes === undefined ? resolvedMcpConfig : {
+          ...resolvedMcpConfig,
+          servers: Object.fromEntries(Object.entries(resolvedMcpConfig.servers).filter(([name]) => (name in mcpTapes.replay) === false)),
+        },
         oauthProviderRepo,
         agentOAuthTokenRepo,
       })
@@ -193,8 +218,12 @@ export async function executeAgentStep(
     ...(instance.previousRun !== undefined
       ? { previousRun: instance.previousRun }
       : {}),
+    ...(instance.workspaceStartCommit !== undefined
+      ? { workspaceStartCommit: instance.workspaceStartCommit }
+      : {}),
     oauthTokens,
     agentIdentityPrompt,
+    ...(mcpTapes === undefined ? {} : { mcpTapes }),
     getPreviousStepOutputs: async () => {
       const executions = await instanceRepo.getStepExecutions(instanceId);
       const result: Record<string, unknown> = {};
@@ -206,6 +235,22 @@ export async function executeAgentStep(
       return result;
     },
   };
+
+  // Production Evaluators (ADR-0023 D13) gate only a real agent run: never a dry run, never an eval trial.
+  const gatesOnProductionEvaluators = workflowStep.executor === 'agent'
+    && reapTimedOut === false
+    && instance.dryRun !== true
+    && instance.evalRunId === undefined;
+  if (gatesOnProductionEvaluators) {
+    const outputGate = await buildProductionOutputGate({
+      namespace: workflowDefinition.namespace,
+      workflowName: workflowDefinition.name,
+      stepId,
+    }, (error) => {
+      console.error(`[execute-agent-step] production Evaluators lookup failed for ${instanceId}/${stepId}; running ungated:`, error);
+    });
+    if (outputGate !== undefined) workflowAgentContext.outputGate = outputGate;
+  }
 
   const services: StepExecutorServices = {
     auditRepo,
@@ -252,6 +297,91 @@ export async function executeAgentStep(
     status: currentInstance?.status ?? executionResult.status,
     currentStepId: currentInstance?.currentStepId ?? null,
     agentRunStatus: executionResult.status,
+  };
+}
+
+/**
+ * An eval trial's step for MCP resolution (ADR-0023 D4–D6): every server of the
+ * step's agent under the Eval Run's frozen policy, denied unless the author
+ * declared it live or replayed, on top of the step's own restrictions. A live
+ * server's answers are recorded for the trial's Eval Case; a replayed one is
+ * answered from the newest recordings of that case, and runs live and records
+ * when there is none, so the case's next trial replays it. Inline servers
+ * bypass the agent's bindings, so no policy can deny them: the trial fails
+ * closed rather than run them. So does a trial whose step no longer matches
+ * the Fingerprint its variant was prepared with — its agent's model, prompt or
+ * tools edited since — as its Scores would describe a step no one froze.
+ */
+async function evalTrialConfig(
+  definition: WorkflowDefinition,
+  step: WorkflowStep,
+  instanceId: string,
+  evalRunId: string,
+  evaluationRepo: EvaluationRepository,
+  agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>,
+  toolCatalogRepo: Pick<ToolCatalogRepository, 'getById'>,
+): Promise<{ mcpStep: WorkflowStep; mcpTapes?: McpTapeContext }> {
+  const inlineServers = inlineMcpServerNames(step);
+  if (inlineServers.length > 0) {
+    throw new Error(
+      `Step '${step.id}' declares MCP servers inline (${inlineServers.join(', ')}); `
+      + 'an eval trial cannot run them under its MCP eval policy',
+    );
+  }
+  const [evalRun, trial] = await Promise.all([
+    evaluationRepo.getEvalRun(evalRunId),
+    evaluationRepo.getTrialByInstanceId(instanceId),
+  ]);
+  if (evalRun === null) throw new Error(`Eval Run '${evalRunId}' of this trial not found`);
+  if (trial === null) throw new Error(`Eval Run '${evalRunId}' has no trial for run '${instanceId}'`);
+  if (evalRun.fingerprint !== null) {
+    const current = await computeStepFingerprint(
+      { agentDefinitions: agentDefinitionRepo, toolCatalog: toolCatalogRepo },
+      definition,
+      step,
+    );
+    const changed = changedFingerprintComponents(evalRun.fingerprint, current);
+    if (changed.length > 0) {
+      throw new Error(
+        `Step '${step.id}' changed since Eval Run '${evalRunId}' was prepared (${changed.join(', ')}); `
+        + 'prepare a new Eval Run to evaluate it as it is now',
+      );
+    }
+  }
+  if (step.agentId === undefined) return { mcpStep: step };
+  const agent = await agentDefinitionRepo.getById(step.agentId);
+  const servers = Object.keys(agent?.mcpServers ?? {});
+  const mcpStep = {
+    ...step,
+    mcpRestrictions: mcpEvalRestrictions(servers, evalRun.mcpPolicy, step.mcpRestrictions),
+  };
+  const record = servers.filter((server) => evalRun.mcpPolicy[server]?.mode === 'live');
+  const replayed = servers.filter((server) => evalRun.mcpPolicy[server]?.mode === 'replay');
+  if (record.length === 0 && replayed.length === 0) return { mcpStep };
+
+  const evaluatedStep = { namespace: evalRun.namespace, workflowName: evalRun.workflowName, stepId: evalRun.stepId };
+  const replay: McpTapeContext['replay'] = {};
+  for (const server of replayed) {
+    const recordings = await evaluationRepo.listMcpRecordings(evaluatedStep, { caseId: trial.caseId, server, limit: MCP_REPLAY_RECORDINGS });
+    if (recordings.length === 0) record.push(server);
+    else replay[server] = mergeMcpTapes(recordings.map((recording) => recording.tape));
+  }
+  return {
+    mcpStep,
+    mcpTapes: {
+      replay,
+      record,
+      onRecorded: (server, tape) => evaluationRepo.appendMcpRecording({
+        ...evaluatedStep,
+        id: randomUUID(),
+        caseId: trial.caseId,
+        server,
+        tape,
+        evalRunId,
+        trialId: trial.id,
+        recordedAt: new Date().toISOString(),
+      }),
+    },
   };
 }
 

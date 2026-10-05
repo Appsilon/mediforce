@@ -1,0 +1,77 @@
+import type {
+  GetMcpEvalPolicyInput,
+  GetMcpEvalPolicyOutput,
+  SetMcpEvalPolicyInput,
+  SetMcpEvalPolicyOutput,
+} from '../../contract/evaluation';
+import type { AgentMcpBinding, McpEvalServerPolicy } from '@mediforce/platform-core';
+import type { CallerScope } from '../../repositories/index';
+import { ValidationError } from '../../errors';
+import { loadEvaluatedStep, stepRef, type LoadedStep } from './_lib/evaluated-step';
+import { appendEvaluationAudit, authorId } from './_lib/audit';
+
+/** What a server the Step's MCP eval policy does not name does in a trial. */
+export const DEFAULT_MCP_EVAL_SERVER_POLICY: McpEvalServerPolicy = { mode: 'live' };
+
+/** The MCP servers the Step's agent binds — what an eval policy speaks about. */
+async function agentBindings(scope: CallerScope, loaded: LoadedStep): Promise<Record<string, AgentMcpBinding>> {
+  if (loaded.step.agentId === undefined) return {};
+  const agent = await scope.agentDefinitions.getById(loaded.step.agentId);
+  return agent?.mcpServers ?? {};
+}
+
+/** The Step's MCP eval policy and what every server of its agent does in a trial (D6). */
+export async function getMcpEvalPolicy(input: GetMcpEvalPolicyInput, scope: CallerScope): Promise<GetMcpEvalPolicyOutput> {
+  const loaded = await loadEvaluatedStep(scope, input, 'read');
+  const policy = await scope.evaluation.getMcpPolicy(stepRef(input));
+  const recorded = await scope.evaluation.listMcpRecordedCases(stepRef(input));
+  const servers = Object.keys(await agentBindings(scope, loaded)).sort().map((name) => {
+    const serverPolicy = policy?.servers[name];
+    const recordedCaseIds = recorded.filter((entry) => entry.server === name).map((entry) => entry.caseId).sort();
+    return serverPolicy === undefined
+      ? { name, ...DEFAULT_MCP_EVAL_SERVER_POLICY, defaulted: true, recordedCaseIds }
+      : { name, ...serverPolicy, defaulted: false, recordedCaseIds };
+  });
+  return { policy, servers };
+}
+
+/**
+ * Replaces the Step's MCP eval policy. Only servers the agent binds may be
+ * named; `denyTools` on a server whose binding lists no `allowedTools` is
+ * refused, as it is for step restrictions — there is no allowlist to subtract
+ * from. A replayed server's `denyTools` hold while it runs live to record a
+ * case. A denied server keeps any `denyTools` it is sent, as it always has;
+ * they have no effect.
+ */
+export async function setMcpEvalPolicy(input: SetMcpEvalPolicyInput, scope: CallerScope): Promise<SetMcpEvalPolicyOutput> {
+  const step = stepRef(input);
+  const loaded = await loadEvaluatedStep(scope, step, 'edit');
+  const bindings = await agentBindings(scope, loaded);
+  const known = Object.keys(bindings).sort();
+  for (const [name, serverPolicy] of Object.entries(input.servers)) {
+    const binding = bindings[name];
+    if (binding === undefined) {
+      throw new ValidationError(`'${name}' is not an MCP server of this step's agent (${known.join(', ') || 'it has none'})`);
+    }
+    if ((serverPolicy.denyTools?.length ?? 0) > 0 && binding.allowedTools === undefined) {
+      throw new ValidationError(`'${name}' lists no allowedTools, so tools cannot be denied one by one — deny the server or list its tools on the agent`);
+    }
+  }
+
+  const policy = await scope.evaluation.putMcpPolicy({
+    ...step,
+    servers: input.servers,
+    updatedBy: authorId(scope),
+    updatedAt: new Date().toISOString(),
+  });
+  await appendEvaluationAudit(scope, {
+    action: 'mcp_eval_policy.updated',
+    description: `MCP eval policy for step '${step.stepId}' of '${step.workflowName}' updated`,
+    namespace: step.namespace,
+    entityType: 'mcp_eval_policy',
+    entityId: `${step.workflowName}/${step.stepId}`,
+    inputSnapshot: { ...step, servers: input.servers },
+    basis: 'MCP servers run live in eval trials unless declared replayed or denied (ADR-0023 D6)',
+  });
+  return { policy };
+}

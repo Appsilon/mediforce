@@ -12,6 +12,14 @@ import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { cn } from '@/lib/utils';
 import { formatStepName } from '@/lib/format';
 
+const FALLBACK_REASON_LABELS: Record<string, string> = {
+  timeout: 'timeout',
+  low_confidence: 'low confidence',
+  error: 'error',
+  output_schema: 'output does not match schema',
+  production_evaluator: 'failed a production Evaluator',
+};
+
 const STATUS_STYLES: Record<string, string> = {
   completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
   running: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
@@ -176,7 +184,7 @@ export function AgentRunDetail({
 
         {run.fallbackReason && (
           <div className="rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-            Fallback reason: {run.fallbackReason}
+            Fallback reason: {FALLBACK_REASON_LABELS[run.fallbackReason] ?? run.fallbackReason}
           </div>
         )}
       </div>

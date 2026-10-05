@@ -87,6 +87,121 @@ rather than resolving credentials that do not exist. Every other handler in
 through `CallerScope` — is intact; the one it suspends is that a caller was
 authenticated, and only these two may do that.
 
+**Every Score goes through `recordScore`** (`handlers/scores/record-score.ts`),
+which appends its `score.created` audit event. There is no generic Score write
+route: Scores arrive from task completion (Control Mode 3 verdicts), from
+Evaluators, and from a person accepting or denying a judge verdict or agreement
+score of an Eval Run (`reviewJudgeVerdict`, `judge-reviews.ts`). With
+`MEDIFORCE_SCORE_EXPORT` set, `services/score-export.ts` wraps the Score
+repository and also sends each Score of a traced Agent Run to Phoenix or
+Langfuse. It only writes, runs in the background, and never fails the Score
+write. Drift alerts (`handlers/evaluation/drift.ts`) are computed from
+production Scores when read, never stored.
+
+**Evaluation belongs to a Step, not a definition.** `handlers/evaluation/`
+([ADR-0023](../../docs/adr/0023-step-evaluation.md)) keys every Brief, Evaluator,
+Eval Case, Dataset version, MCP eval policy and MCP recording by `(namespace, workflowName,
+stepId)` and reaches it through the one `scope.evaluation` wrapper. Reads need
+only to see the workflow; writes need its `edit` verb (`_lib/evaluated-step.ts`).
+An Evaluator check that cannot run comes back as `error`, never as a failed
+output (`_lib/run-evaluator-check.ts`). Evaluators flagged `runInProduction`
+(`setEvaluatorProduction`) score live runs through `_lib/production-evaluators.ts`,
+the runner's output gate: counted `schema`/`code` ones run inline and a failing
+critical one sends the run to the step's fallback; `llm_judge` ones only write
+Scores, asynchronously (D13). Nothing here approves a `code` check's
+source or reviews a judge verdict on anyone's behalf: both record the person who did
+it, and an API key must name them. A synthesized Eval Case's file changes are the
+one write outside Postgres: a commit on the workflow's bare repo, kept by the
+ref `refs/mediforce/eval-seeds/<caseId>` (`_lib/workspace-seed.ts`); the
+workspace it changes is read with agent-runtime's `listCommitFiles` and
+`readCommitFile`, the same git reads as Output Files.
+
+An Eval Run is driven by `driveEvalRun` (`_lib/drive-eval-run.ts`), which is
+idempotent and moves trials only by conditional transitions — so the start
+handler, the auto-runner (when a trial's run ends or pauses) and the heartbeat can all
+call it without starting or scoring a trial twice. Claiming a trial names the
+Workflow Run it creates, and a claim held past its lease — a driver that died
+before creating that run, or mid-scoring — is taken over, skipping Evaluators
+that already scored it; after three attempts the trial fails instead. A
+cancelled Eval Run starts nothing more but is still driven until its in-flight
+trials are scored. A trial's cost is its Agent Run — charged to the budget when
+it is claimed for scoring — plus each LLM judge call, charged as it is made and
+kept on the Score it produced (`_lib/model-prices.ts` prices those). An Eval
+Run's report is computed from the Scores on read, never stored — with the verdict on each frozen Acceptance Criterion and the confidence
+calibration, from platform-core's pure rules. Which Scores count is one rule,
+`checkOutcome` in `_lib/trial-scores.ts`: a judge verdict below its
+`minConfidence` is left out unless a person accepted it, and a denied one — a
+judge's or an agreement score's — is always left out; the report and the failures list
+both read it. A trial runs the step as its Eval Run's definition version has it, and
+platform-ui's `execute-agent-step.ts` fails one whose step no longer matches the
+Fingerprint frozen with the run.
+`getEvalRunFailures` is the assistant's `get_failures` and `mediforce eval failures`.
+`getEvalTrial` is one trial with everything its Evaluators read and gave; a model judge's
+messages are rebuilt with agent-runtime's `llmJudgeMessages` / `outputAgreementMessages`, the
+functions that sent them, so nothing extra is stored on the Score.
+
+**A Step Qualification binds a Step Fingerprint.** `_lib/step-fingerprint.ts`
+hashes each part of a step that shapes its behaviour on its own, so the badge
+(`getStepQualification`) can say which part changed. `signStepQualification`
+re-authenticates with the same `users/_lib/check-password.ts` as
+`setPassword`, audits a wrong password, refuses an API key and a cancelled run,
+and the record it writes is never changed.
+
+**Assistants share building blocks.** `src/assistant-core/` holds the pieces
+the workflow editor assistant and the Evaluation Assistant both use
+([ADR-0023](../../docs/adr/0023-step-evaluation.md) D14): one prompt audit event
+per request, Zod registries turned into tool definitions, argument parsing that
+tells the model what it sent, and the platform-tool runner that executes a call
+as the caller and returns a refusal as a result (`needsAdmin`) instead of
+throwing. Tools that change what the person is editing are *proposals* the
+client applies; *platform* tools run here through `CallerScope`. The workspace
+`OPENROUTER_API_KEY` check is `services/openrouter-key.ts`, since non-assistant
+LLM calls need it too. `runProposalToolLoop` is the loop for an assistant whose
+changes are all proposals — the Evaluation Assistant
+(`handlers/evaluation-assistant/`) runs on it. Its `reviewProposal` hook checks
+each proposal against the platform before the person sees it: a refusal goes
+back to the model as a tool error, and what the review found (the Evaluation
+Assistant's self-test of a proposed check) travels with the proposal. The workflow assistant
+(`handlers/workflow-assistant/ask-workflow-assistant.ts`) keeps its own loop,
+interleaved with its graph-completeness gates and truncation salvage. The
+cowork chat (`handlers/cowork/`) is a separate OpenRouter loop and does not use
+the core.
+
+A request may grant the Evaluation Assistant an unattended budget
+(`unattendedBudgetUsd`): `start_eval_run` then starts prepared runs of the step
+that fit what is left of it, as a person confirming each run's budget
+(`UnattendedGrant` in `_lib/run-evaluation-tool.ts`); the grant is recorded on the
+request's prompt audit event. The assistant prepares runs of the step as it is;
+changing the step is the person's, in the workflow editor. A case it proposes may carry an expected output with its expectation;
+one created without an `expectation` is positive.
+
+The Evaluation Assistant allows 32 model/tool rounds with an 8,000-token
+completion budget per call, independent of the selected model's context window.
+A response truncated with no tool call in it is answered, once, with a note to
+continue in smaller pieces (`truncatedResponseNotice`; the Evaluation
+Assistant's says to work one check at a time); on round exhaustion or a second
+truncated response in a row, the proposal loop keeps all
+validated proposals and platform-call results and attempts one final no-tools
+summary (up to 2,000 tokens). If that call fails, the cards still return with an
+explicit partial-completion notice. Follow-up messages receive the summary,
+not a persisted tool transcript. Round logs include a request ID, model, tool
+names, token usage and finish reason; tool errors are logged separately.
+`runProposalToolLoop` reports each model round and each tool call (running,
+done or failed) to an optional `onProgress`; the Evaluation Assistant route
+streams those events to a client that asks for them. A proposal identical to
+one already made in the turn is returned once; the model is told it is a
+duplicate.
+Its `get_trajectory` tool returns complete stored entries using zero-based
+`offset` and `limit` (default 50, maximum 150), with `total` and `nextOffset`
+(`null` at the end); it never clips entry contents. The workflow assistant
+retains its separate 12-round, 8,000-token loop. Invalid tool arguments return
+`validationError` and the tool's `expectedArguments` JSON Schema (with examples);
+three consecutive rounds with an identical validation failure and no successful
+call stop the loop through the same partial-summary path.
+Each tool result sent back to the model is capped at 60,000 characters, with a
+truncation note that tells the model to ask for less; a dropped connection to
+OpenRouter is retried once and then ends the turn through the partial path.
+
 **`getPlatformServices()` is the only composition root.** It wires repositories,
 the workflow engine, the plugin registry and the action registry. It lives here —
 not in `platform-ui`, whose `src/lib/platform-services.ts` is a re-export shim

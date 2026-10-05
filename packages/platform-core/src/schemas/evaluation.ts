@@ -1,0 +1,379 @@
+import { z } from 'zod';
+import { AgentOutputSchemaSchema } from './workflow-definition';
+
+/**
+ * The Evaluation domain of ADR-0023: everything is owned by one agent Workflow
+ * Step, keyed by `(namespace, workflowName, stepId)` and kept outside the
+ * immutable Workflow Definition, so adding a check never mints a Definition
+ * version (D2).
+ */
+export const EvaluatedStepSchema = z.object({
+  namespace: z.string().min(1),
+  workflowName: z.string().min(1),
+  stepId: z.string().min(1),
+});
+
+/** Who put a thing there: a person, or the Evaluation Assistant's proposal a person accepted. */
+export const EvaluationOriginSchema = z.enum(['user', 'assistant']);
+
+/** A Step's context of use (D16). Every write is a new version. */
+export const EvaluationBriefSchema = EvaluatedStepSchema.extend({
+  version: z.number().int().positive(),
+  text: z.string().min(1).max(4000),
+  origin: EvaluationOriginSchema,
+  createdBy: z.string().min(1),
+  createdAt: z.iso.datetime(),
+});
+
+export const EvaluatorKindSchema = z.enum(['schema', 'code', 'llm_judge', 'expected_output']);
+export const EvaluatorSeveritySchema = z.enum(['critical', 'major', 'minor']);
+
+/** Checks the step's `result` against the structural JSON Schema subset `agent.outputSchema` uses. */
+export const SchemaCheckSchema = z.object({
+  kind: z.literal('schema'),
+  schema: AgentOutputSchemaSchema,
+});
+
+/**
+ * A script run in the `script-container` sandbox with the step's workspace
+ * commit read-only at `/workspace` and `/output/input.json` holding `result`,
+ * `stepInput`, `trajectory` and the Eval Case. It writes `/output/result.json` as
+ * `{ "passed": boolean, "comment"?: string }`.
+ */
+export const CodeCheckSchema = z.object({
+  kind: z.literal('code'),
+  runtime: z.enum(['python', 'javascript']),
+  source: z.string().min(1).max(64_000),
+});
+
+/** A new judge's floor: verdicts it is less confident of stay out of the Acceptance Criteria. */
+export const DEFAULT_JUDGE_MIN_CONFIDENCE = 0.8;
+
+/**
+ * An LLM judge: it reads the step's input, the agent's log and its output,
+ * explains what decided its verdict, then answers pass or fail with a
+ * confidence. A verdict below `minConfidence` is reported but does not count
+ * toward the Acceptance Criteria.
+ */
+export const LlmJudgeCheckSchema = z.object({
+  kind: z.literal('llm_judge'),
+  model: z.string().min(1),
+  rubric: z.string().min(1).max(8000),
+  minConfidence: z.number().min(0).max(1).default(DEFAULT_JUDGE_MIN_CONFIDENCE),
+});
+
+/** A new agreement judge's floor: an output that agrees less with a positive case's expected output fails. */
+export const DEFAULT_MIN_AGREEMENT = 0.9;
+/** A new agreement judge's ceiling: an output that agrees more with a negative case's expected output fails. */
+export const DEFAULT_MAX_AGREEMENT = 0.1;
+
+/**
+ * Compares the output with an Eval Case's expected output, the way the case
+ * says: `exact` fails on any difference; `agreement` asks `model` how far the
+ * two agree, 0–1, with `instructions` and the case's own instructions; a
+ * positive case passes at `minAgreement` or above, a negative case at
+ * `maxAgreement` or below. It grades only cases that have an expected output,
+ * never production.
+ */
+export const ExpectedOutputCheckSchema = z.object({
+  kind: z.literal('expected_output'),
+  model: z.string().min(1),
+  /** What the agreement judge should treat as trivial or decisive on every case. */
+  instructions: z.string().max(8000).optional(),
+  minAgreement: z.number().min(0).max(1).default(DEFAULT_MIN_AGREEMENT),
+  maxAgreement: z.number().min(0).max(1).default(DEFAULT_MAX_AGREEMENT),
+});
+
+export const EvaluatorCheckSchema = z.discriminatedUnion('kind', [
+  SchemaCheckSchema,
+  CodeCheckSchema,
+  LlmJudgeCheckSchema,
+  ExpectedOutputCheckSchema,
+]);
+
+export const JUDGE_PASS_VALUE = 0.5;
+
+/** A `code` check counts only after a person has approved its source (D9). */
+export const SourceApprovalSchema = z.object({
+  approvedBy: z.string().min(1),
+  approvedAt: z.iso.datetime(),
+});
+
+/** Evaluator identity. What it checks lives on its versions. */
+export const EvaluatorSchema = EvaluatedStepSchema.extend({
+  id: z.uuid(),
+  /** Stable handle, also the name of the Scores it writes. */
+  name: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/, 'lowercase letters, digits and dashes'),
+  archived: z.boolean(),
+  /**
+   * Also scores live production Agent Runs of the step (D13) — only while its
+   * latest version counts. A failing critical `schema` or `code` one sends the
+   * run to the step's `fallbackBehavior`; an `llm_judge` only writes Scores.
+   */
+  runInProduction: z.boolean(),
+  createdBy: z.string().min(1),
+  createdAt: z.iso.datetime(),
+});
+
+/**
+ * One immutable version of an Evaluator (D7). A change is a new version, so a
+ * version that produced a Score never changes under the Scores it produced.
+ * A `code` version's source approval attaches to it; it is not part of what it checks.
+ */
+export const EvaluatorVersionSchema = z.object({
+  evaluatorId: z.uuid(),
+  version: z.number().int().positive(),
+  /** The plain-language rule the check stands for. */
+  rule: z.string().min(1).max(2000),
+  severity: EvaluatorSeveritySchema,
+  check: EvaluatorCheckSchema,
+  origin: EvaluationOriginSchema,
+  sourceApproval: SourceApprovalSchema.nullable(),
+  createdBy: z.string().min(1),
+  createdAt: z.iso.datetime(),
+});
+
+/**
+ * What a trial seeds the step with: the trigger payload and the outputs of the
+ * steps before it (`instance.variables`), plus the run's carry-over when the
+ * workflow declares one. Together they rebuild the step's input exactly.
+ */
+export const EvalCaseInputSchema = z.object({
+  triggerPayload: z.record(z.string(), z.unknown()),
+  previousStepOutputs: z.record(z.string(), z.unknown()),
+  previousRun: z.record(z.string(), z.unknown()).optional(),
+});
+
+/**
+ * A positive case's expected output is what the step should return; a
+ * negative case's is an output it must not return. An approved production
+ * output is a positive case, a rejected one a negative case.
+ */
+export const EvalCaseExpectationSchema = z.enum(['positive', 'negative']);
+/** How an `expected_output` check compares the output with the case's expected output. */
+export const EvalCaseComparisonSchema = z.enum(['exact', 'agreement']);
+
+/**
+ * What a case expects of the output: an expected output (none when null), whether it is one
+ * to match or to avoid, how it is compared, and which Evaluators grade the case
+ * (every one of the step's when null, including ones added later).
+ */
+export const EvalCaseLabelSchema = z.object({
+  expectedOutput: z.unknown().nullable(),
+  expectation: EvalCaseExpectationSchema,
+  comparison: EvalCaseComparisonSchema,
+  /** For `agreement`: what to treat as trivial or decisive on this case. */
+  agreementInstructions: z.string().max(4000).nullable(),
+  evaluatorIds: z.array(z.uuid()).min(1).nullable(),
+});
+/** `synthesized`: a production run's input with a deliberate change — see `perturbation`. */
+export const EvalCaseSourceSchema = z.enum(['production', 'manual', 'synthesized']);
+
+/** The kinds of change a synthesized case makes to a real production input. */
+export const EvalCasePerturbationKindSchema = z.enum([
+  'missing_file',
+  'extra_file',
+  'renamed_columns',
+  'edge_values',
+  'injected_instruction',
+  /** A change that keeps the input's meaning, so the output must not change. */
+  'metamorphic',
+  'other',
+]);
+
+/** What a synthesized case changed, in words; the change itself is in its input and seed commit. */
+export const EvalCasePerturbationSchema = z.object({
+  kind: EvalCasePerturbationKindSchema,
+  description: z.string().min(1).max(1000),
+  /** An `injected_instruction` case: the marker the injected text tells the agent to output. */
+  canary: z.string().min(4).max(200).optional(),
+});
+
+/** Which part of an Eval Case input a change addresses. */
+export const EvalCaseInputPartSchema = z.enum(['triggerPayload', 'previousStepOutputs', 'previousRun']);
+
+/**
+ * One change to a case input. `path` walks keys (and array indexes, as
+ * digits) below `part`; `set` may add the last key, `remove` needs it to exist.
+ */
+export const EvalCaseInputChangeSchema = z.discriminatedUnion('op', [
+  z.object({ op: z.literal('set'), part: EvalCaseInputPartSchema, path: z.array(z.string().min(1)).min(1), value: z.unknown() }),
+  z.object({ op: z.literal('remove'), part: EvalCaseInputPartSchema, path: z.array(z.string().min(1)).min(1) }),
+]);
+
+/** A workspace-relative file path: no leading slash, no `.` or `..` segments, nothing under `.git`. */
+export const WorkspaceFilePathSchema = z.string().min(1).max(500).refine(
+  (path) => path.startsWith('/') === false
+    && path.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..')
+    && path.split('/')[0] !== '.git',
+  { message: 'a relative path inside the workspace, without . or .. segments, not under .git' },
+);
+
+/**
+ * One change to the workspace a case starts from. `replace` swaps the first
+ * occurrence of `search` in a text file and fails when there is none.
+ */
+export const WorkspaceFileChangeSchema = z.discriminatedUnion('op', [
+  z.object({ op: z.literal('write'), path: WorkspaceFilePathSchema, content: z.string().max(200_000) }),
+  z.object({ op: z.literal('delete'), path: WorkspaceFilePathSchema }),
+  z.object({ op: z.literal('replace'), path: WorkspaceFilePathSchema, search: z.string().min(1).max(10_000), replace: z.string().max(10_000) }),
+]);
+export const EvalCaseSplitSchema = z.enum(['dev', 'holdout']);
+
+/**
+ * A case synthesized from a production Agent Run: its input and the workspace
+ * it started from, with deliberate changes — a missing or extra file, renamed
+ * columns, edge values, an instruction injected into the data.
+ */
+export const PerturbedEvalCaseSpecSchema = z.object({
+  name: z.string().min(1).max(200),
+  baseAgentRunId: z.string().min(1),
+  perturbation: EvalCasePerturbationSchema,
+  inputChanges: z.array(EvalCaseInputChangeSchema).max(20).optional(),
+  fileChanges: z.array(WorkspaceFileChangeSchema).max(20).optional(),
+  expectedOutput: EvalCaseLabelSchema.shape.expectedOutput.optional(),
+  expectation: EvalCaseExpectationSchema.default('positive'),
+  comparison: EvalCaseComparisonSchema.optional(),
+  agreementInstructions: z.string().trim().max(4000).optional(),
+  split: EvalCaseSplitSchema.optional(),
+});
+
+export function hasPerturbationChange(spec: { inputChanges?: readonly unknown[]; fileChanges?: readonly unknown[] }): boolean {
+  return (spec.inputChanges?.length ?? 0) + (spec.fileChanges?.length ?? 0) > 0;
+}
+
+export const EvalCaseSchema = EvaluatedStepSchema.extend(EvalCaseLabelSchema.shape).extend({
+  id: z.uuid(),
+  name: z.string().min(1).max(200),
+  input: EvalCaseInputSchema,
+  /** Commit on the workflow's bare repo a trial's run branch starts from; null for an empty workspace. */
+  workspaceSeedCommit: z.string().regex(/^[0-9a-f]{7,64}$/).nullable(),
+  source: EvalCaseSourceSchema,
+  sourceAgentRunId: z.string().nullable(),
+  /** Set on a `synthesized` case: what it changed about its source run's input. */
+  perturbation: EvalCasePerturbationSchema.nullable(),
+  origin: EvaluationOriginSchema,
+  split: EvalCaseSplitSchema,
+  containsProductionData: z.boolean(),
+  archived: z.boolean(),
+  createdBy: z.string().min(1),
+  createdAt: z.iso.datetime(),
+});
+
+/** A frozen set of a Step's Eval Cases; an Eval Run runs one of these. */
+export const EvalDatasetVersionSchema = EvaluatedStepSchema.extend({
+  id: z.uuid(),
+  version: z.number().int().positive(),
+  caseIds: z.array(z.uuid()).min(1),
+  containsProductionData: z.boolean(),
+  createdBy: z.string().min(1),
+  createdAt: z.iso.datetime(),
+});
+
+/**
+ * What an eval trial may do with one MCP server (D6): `live`, optionally with
+ * named tools denied; `replay`, answered from the responses a live pass of the
+ * same Eval Case recorded — run live, with its denied tools, to record a case
+ * that has none; or `deny`. A server the policy does not name is denied.
+ */
+export const McpEvalServerPolicySchema = z.object({
+  mode: z.enum(['live', 'replay', 'deny']),
+  denyTools: z.array(z.string().min(1)).optional(),
+});
+
+/** One MCP tool call a live trial made, and the result the server gave it. */
+export const McpTapeCallSchema = z.object({
+  tool: z.string().min(1),
+  arguments: z.record(z.string(), z.unknown()),
+  result: z.record(z.string(), z.unknown()),
+});
+
+/** What one MCP server answered in one live trial: its tool list, then each call in order. */
+export const McpTapeSchema = z.object({
+  tools: z.array(z.record(z.string(), z.unknown())),
+  calls: z.array(McpTapeCallSchema),
+});
+
+/**
+ * One live trial's recording of one MCP server for one Eval Case (D6).
+ * Append-only; a replay merges every recording of the case, newest last.
+ */
+export const McpRecordingSchema = EvaluatedStepSchema.extend({
+  id: z.uuid(),
+  caseId: z.uuid(),
+  server: z.string().min(1),
+  tape: McpTapeSchema,
+  evalRunId: z.uuid(),
+  trialId: z.uuid(),
+  recordedAt: z.iso.datetime(),
+});
+
+/** A call a replayed trial made that no recording answered — it got an error instead. */
+export const McpReplayMissSchema = z.object({
+  server: z.string().min(1),
+  tool: z.string().min(1),
+  arguments: z.record(z.string(), z.unknown()),
+});
+
+export const McpEvalPolicySchema = EvaluatedStepSchema.extend({
+  servers: z.record(z.string().min(1), McpEvalServerPolicySchema),
+  updatedBy: z.string().min(1),
+  updatedAt: z.iso.datetime(),
+});
+
+/**
+ * One Acceptance Criterion (D10): what every counted Evaluator of a severity
+ * must reach — its pass rate, passes over graded trials, and optionally
+ * pass^k, the share of cases where every trial passed.
+ */
+export const AcceptanceCriterionSchema = z.object({
+  minPassRate: z.number().min(0).max(1),
+  minPassHatK: z.number().min(0).max(1).optional(),
+});
+
+/** Acceptance Criteria per severity; a severity without one is not judged. */
+export const AcceptanceCriteriaSchema = z.object({
+  critical: AcceptanceCriterionSchema.optional(),
+  major: AcceptanceCriterionSchema.optional(),
+  minor: AcceptanceCriterionSchema.optional(),
+}).refine((criteria) => criteria.critical !== undefined || criteria.major !== undefined || criteria.minor !== undefined, {
+  message: 'set a criterion for at least one severity',
+});
+
+/** A Step's Acceptance Criteria, set before an Eval Run and frozen into it. Every write is a new version. */
+export const AcceptanceCriteriaVersionSchema = EvaluatedStepSchema.extend({
+  version: z.number().int().positive(),
+  criteria: AcceptanceCriteriaSchema,
+  origin: EvaluationOriginSchema,
+  createdBy: z.string().min(1),
+  createdAt: z.iso.datetime(),
+});
+
+export type EvaluatedStep = z.infer<typeof EvaluatedStepSchema>;
+export type EvaluationOrigin = z.infer<typeof EvaluationOriginSchema>;
+export type EvaluationBrief = z.infer<typeof EvaluationBriefSchema>;
+export type EvaluatorKind = z.infer<typeof EvaluatorKindSchema>;
+export type EvaluatorSeverity = z.infer<typeof EvaluatorSeveritySchema>;
+export type EvaluatorCheck = z.infer<typeof EvaluatorCheckSchema>;
+export type SourceApproval = z.infer<typeof SourceApprovalSchema>;
+export type Evaluator = z.infer<typeof EvaluatorSchema>;
+export type EvaluatorVersion = z.infer<typeof EvaluatorVersionSchema>;
+export type EvalCaseInput = z.infer<typeof EvalCaseInputSchema>;
+export type EvalCaseExpectation = z.infer<typeof EvalCaseExpectationSchema>;
+export type EvalCaseComparison = z.infer<typeof EvalCaseComparisonSchema>;
+export type EvalCaseLabel = z.infer<typeof EvalCaseLabelSchema>;
+export type EvalCasePerturbation = z.infer<typeof EvalCasePerturbationSchema>;
+export type EvalCaseInputPart = z.infer<typeof EvalCaseInputPartSchema>;
+export type EvalCaseInputChange = z.infer<typeof EvalCaseInputChangeSchema>;
+export type WorkspaceFileChange = z.infer<typeof WorkspaceFileChangeSchema>;
+export type EvalCase = z.infer<typeof EvalCaseSchema>;
+export type EvalDatasetVersion = z.infer<typeof EvalDatasetVersionSchema>;
+export type McpEvalServerPolicy = z.infer<typeof McpEvalServerPolicySchema>;
+export type McpEvalPolicy = z.infer<typeof McpEvalPolicySchema>;
+export type McpTapeCall = z.infer<typeof McpTapeCallSchema>;
+export type McpTape = z.infer<typeof McpTapeSchema>;
+export type McpRecording = z.infer<typeof McpRecordingSchema>;
+export type McpReplayMiss = z.infer<typeof McpReplayMissSchema>;
+export type AcceptanceCriterion = z.infer<typeof AcceptanceCriterionSchema>;
+export type AcceptanceCriteria = z.infer<typeof AcceptanceCriteriaSchema>;
+export type AcceptanceCriteriaVersion = z.infer<typeof AcceptanceCriteriaVersionSchema>;

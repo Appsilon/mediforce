@@ -7,6 +7,9 @@ import {
   InMemoryAgentDefinitionRepository,
   InMemoryAgentEventRepository,
   InMemoryAgentRunRepository,
+  InMemoryAgentTrajectoryRepository,
+  InMemoryScoreRepository,
+  InMemoryEvaluationRepository,
   InMemoryAuditRepository,
   InMemoryCoworkSessionRepository,
   InMemoryHandoffRepository,
@@ -29,7 +32,11 @@ import {
 } from '@mediforce/platform-core/testing';
 import type {
   AgentRunRepository,
+  AgentTrajectoryRepository,
+  ScoreRepository,
+  EvaluationRepository,
   AutoJoinRule,
+  DriftSettings,
   BlobStore,
   EmailProviderInfo,
   HumanTaskRepository,
@@ -45,6 +52,7 @@ import type {
   CredentialsRepository,
   WorkflowSecretsRepository,
 } from '@mediforce/platform-core';
+import { DEFAULT_DRIFT_SETTINGS } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../../auth';
 import type { CallerScope } from '../caller-scope';
 import { createCallerScope, type CallerScopeServices } from '../create-caller-scope';
@@ -184,6 +192,9 @@ export interface TestScopeOverrides {
   readonly auditRepo?: InMemoryAuditRepository;
   readonly agentEventRepo?: InMemoryAgentEventRepository;
   readonly agentRunRepo?: AgentRunRepository;
+  readonly agentTrajectoryRepo?: AgentTrajectoryRepository;
+  readonly scoreRepo?: ScoreRepository;
+  readonly evaluationRepo?: EvaluationRepository;
   readonly handoffRepo?: InMemoryHandoffRepository;
   readonly agentDefinitionRepo?: InMemoryAgentDefinitionRepository;
   readonly coworkSessionRepo?: InMemoryCoworkSessionRepository;
@@ -203,6 +214,7 @@ export interface TestScopeOverrides {
   readonly dockerImages?: DockerImagesService | null;
   readonly namespaceRepo?: NamespaceRepository;
   readonly autoJoinWorkspaces?: readonly AutoJoinRule[];
+  readonly driftSettings?: DriftSettings;
   readonly userProfileRepo?: UserProfileRepository;
   readonly assistantInstructionsRepo?: WorkflowAssistantInstructionsRepository;
   readonly credentialsRepo?: CredentialsRepository;
@@ -231,13 +243,17 @@ const apiKeyCaller: CallerIdentity = { kind: 'apiKey', isSystemActor: true };
 export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope {
   const caller = overrides.caller ?? apiKeyCaller;
   const instanceRepo = overrides.instanceRepo ?? new InMemoryProcessInstanceRepository();
+  const agentRunRepo = overrides.agentRunRepo ?? new InMemoryAgentRunRepository(instanceRepo);
   const services: CallerScopeServices = {
     instanceRepo,
     processRepo: overrides.processRepo ?? new InMemoryProcessRepository(),
     auditRepo: overrides.auditRepo ?? new InMemoryAuditRepository(instanceRepo),
     agentEventRepo:
       overrides.agentEventRepo ?? new InMemoryAgentEventRepository(instanceRepo),
-    agentRunRepo: overrides.agentRunRepo ?? new InMemoryAgentRunRepository(instanceRepo),
+    agentRunRepo,
+    agentTrajectoryRepo: overrides.agentTrajectoryRepo ?? new InMemoryAgentTrajectoryRepository(agentRunRepo),
+    scoreRepo: overrides.scoreRepo ?? new InMemoryScoreRepository(),
+    evaluationRepo: overrides.evaluationRepo ?? new InMemoryEvaluationRepository(),
     humanTaskRepo: overrides.humanTaskRepo ?? new InMemoryHumanTaskRepository(instanceRepo),
     taskAttachmentRepo: overrides.taskAttachmentRepo ?? new InMemoryTaskAttachmentRepository(),
     blobStore: overrides.blobStore ?? new InMemoryBlobStore(),
@@ -272,6 +288,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     userDirectory: overrides.userDirectory ?? null,
     emailProviderInfo: overrides.emailProviderInfo ?? null,
     autoJoinWorkspaces: overrides.autoJoinWorkspaces ?? [],
+    driftSettings: overrides.driftSettings ?? DEFAULT_DRIFT_SETTINGS,
     passwordAuthEnabled: overrides.passwordAuthEnabled ?? true,
   };
   return createCallerScope(services, caller);

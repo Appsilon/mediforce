@@ -504,6 +504,14 @@ import {
   type GetAgentRunOutput,
   type GetAgentRunCardStatusCountsInput,
   type GetAgentRunCardStatusCountsOutput,
+  GetAgentTrajectoryInputSchema,
+  GetAgentTrajectoryOutputSchema,
+  type GetAgentTrajectoryInput,
+  type GetAgentTrajectoryOutput,
+  ListScoresInputSchema,
+  ListScoresOutputSchema,
+  type ListScoresInput,
+  type ListScoresOutput,
   MonitoringSummaryInputSchema,
   GetMonitoringSummaryOutputSchema,
   type MonitoringSummaryInput,
@@ -534,13 +542,147 @@ import {
   type RevokeJoinLinkInput,
   type RevokeJoinLinkOutput,
 } from '../contract/index';
+import {
+  AddEvaluatorVersionInputSchema,
+  ApproveEvaluatorSourceInputSchema,
+  ArchiveEvalCaseInputSchema,
+  UpdateEvalCaseInputSchema,
+  GetAgentRunIoInputSchema,
+  GetAgentRunIoOutputSchema,
+  ArchiveEvaluatorInputSchema,
+  SetEvaluatorProductionInputSchema,
+  CreateEvalCaseFromAgentRunInputSchema,
+  CreatePerturbedEvalCaseInputSchema,
+  CreateEvalCaseInputSchema,
+  CreateEvaluatorInputSchema,
+  EvalCaseOutputSchema,
+  EvaluatorOutputSchema,
+  FreezeEvalDatasetInputSchema,
+  FreezeEvalDatasetOutputSchema,
+  GetEvaluationBriefInputSchema,
+  GetEvaluationBriefOutputSchema,
+  GetAcceptanceCriteriaInputSchema,
+  GetAcceptanceCriteriaOutputSchema,
+  SetAcceptanceCriteriaInputSchema,
+  SetAcceptanceCriteriaOutputSchema,
+  GetStepQualificationInputSchema,
+  GetStepQualificationOutputSchema,
+  GetWorkflowValidationInputSchema,
+  GetWorkflowValidationOutputSchema,
+  SignStepQualificationInputSchema,
+  SignStepQualificationOutputSchema,
+  GetStepDriftInputSchema,
+  GetStepDriftOutputSchema,
+  GetEvaluatorInputSchema,
+  GetMcpEvalPolicyInputSchema,
+  GetMcpEvalPolicyOutputSchema,
+  ListEvalCasesInputSchema,
+  ListEvalCasesOutputSchema,
+  ListEvalDatasetsInputSchema,
+  ListEvalDatasetsOutputSchema,
+  ListEvaluatorsInputSchema,
+  ListEvaluatorsOutputSchema,
+  ListStepAgentRunsInputSchema,
+  ListStepAgentRunsOutputSchema,
+  PreviewEvaluatorInputSchema,
+  PreviewEvaluatorOutputSchema,
+  SetEvaluationBriefInputSchema,
+  SetEvaluationBriefOutputSchema,
+  SetMcpEvalPolicyInputSchema,
+  SetMcpEvalPolicyOutputSchema,
+  type AddEvaluatorVersionInput,
+  type ApproveEvaluatorSourceInput,
+  type ArchiveEvalCaseInput,
+  type UpdateEvalCaseInput,
+  type GetAgentRunIoInput,
+  type GetAgentRunIoOutput,
+  type ArchiveEvaluatorInput,
+  type SetEvaluatorProductionInput,
+  type CreateEvalCaseFromAgentRunInput,
+  type CreatePerturbedEvalCaseInput,
+  type CreateEvalCaseInput,
+  type CreateEvaluatorInput,
+  type EvalCaseOutput,
+  type EvaluatorOutput,
+  type FreezeEvalDatasetInput,
+  type FreezeEvalDatasetOutput,
+  type GetEvaluationBriefInput,
+  type GetEvaluationBriefOutput,
+  type GetAcceptanceCriteriaInput,
+  type GetAcceptanceCriteriaOutput,
+  type SetAcceptanceCriteriaInput,
+  type SetAcceptanceCriteriaOutput,
+  type GetStepQualificationInput,
+  type GetStepQualificationOutput,
+  type GetWorkflowValidationInput,
+  type GetWorkflowValidationOutput,
+  type SignStepQualificationInput,
+  type SignStepQualificationOutput,
+  type GetStepDriftInput,
+  type GetStepDriftOutput,
+  type GetEvaluatorInput,
+  type GetMcpEvalPolicyInput,
+  type GetMcpEvalPolicyOutput,
+  type ListEvalCasesInput,
+  type ListEvalCasesOutput,
+  type ListEvalDatasetsInput,
+  type ListEvalDatasetsOutput,
+  type ListEvaluatorsInput,
+  type ListEvaluatorsOutput,
+  type ListStepAgentRunsInput,
+  type ListStepAgentRunsOutput,
+  type PreviewEvaluatorInput,
+  type PreviewEvaluatorOutput,
+  type SetEvaluationBriefInput,
+  type SetEvaluationBriefOutput,
+  type SetMcpEvalPolicyInput,
+  type SetMcpEvalPolicyOutput,
+  EstimateEvalRunInputSchema,
+  EstimateEvalRunOutputSchema,
+  PrepareEvalRunInputSchema,
+  StartEvalRunInputSchema,
+  GetEvalRunInputSchema,
+  CancelEvalRunInputSchema,
+  EvalRunOutputSchema,
+  ListEvalRunsInputSchema,
+  ListEvalRunsOutputSchema,
+  type EstimateEvalRunInput,
+  type EstimateEvalRunOutput,
+  type PrepareEvalRunInput,
+  type StartEvalRunInput,
+  type GetEvalRunInput,
+  type CancelEvalRunInput,
+  type EvalRunOutput,
+  type ListEvalRunsInput,
+  type ListEvalRunsOutput,
+  GetEvalRunFailuresInputSchema,
+  GetEvalRunFailuresOutputSchema,
+  GetEvalTrialInputSchema,
+  GetEvalTrialOutputSchema,
+  ReviewJudgeVerdictInputSchema,
+  ReviewJudgeVerdictOutputSchema,
+  type GetEvalRunFailuresInput,
+  type GetEvalRunFailuresOutput,
+  type GetEvalTrialInput,
+  type GetEvalTrialOutput,
+  type ReviewJudgeVerdictInput,
+  type ReviewJudgeVerdictOutput,
+} from '../contract/evaluation';
+import {
+  AskEvaluationAssistantInputSchema,
+  AskEvaluationAssistantOutputSchema,
+  EvaluationAssistantProgressSchema,
+  type AskEvaluationAssistantInput,
+  type AskEvaluationAssistantOutput,
+  type EvaluationAssistantProgress,
+} from '../contract/evaluation-assistant';
 import { BUILD_CONTEXT_MEDIA_TYPE } from '@mediforce/platform-core';
 // SDK consumers reach for one path:
 //   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
 // Server-side handlers throw `HandlerError` (or subclasses) imported from
 // `@mediforce/platform-api/errors`; the wire envelope is the only shared
 // surface, so the client just exposes `code`/`details` on `ApiError` directly.
-import { ApiErrorEnvelopeSchema, type ApiErrorCode } from '../errors';
+import { ApiErrorCodeSchema, ApiErrorEnvelopeSchema, httpStatusForApiErrorCode, type ApiErrorCode } from '../errors';
 export type { ApiErrorCode };
 
 /**
@@ -902,6 +1044,66 @@ export class Mediforce {
     cardStatusCounts: (
       input?: GetAgentRunCardStatusCountsInput,
     ) => Promise<GetAgentRunCardStatusCountsOutput>;
+    trajectory: (input: GetAgentTrajectoryInput) => Promise<GetAgentTrajectoryOutput>;
+  };
+
+  readonly scores: {
+    list: (input?: ListScoresInput) => Promise<ListScoresOutput>;
+  };
+
+  /**
+   * The Evaluation domain (ADR-0023): Briefs, Evaluators, Eval Cases, Datasets,
+   * MCP eval policies, Acceptance Criteria, Eval Runs and Step Qualifications.
+   */
+  readonly evaluation: {
+    getBrief: (input: GetEvaluationBriefInput) => Promise<GetEvaluationBriefOutput>;
+    setBrief: (input: SetEvaluationBriefInput) => Promise<SetEvaluationBriefOutput>;
+    listEvaluators: (input: ListEvaluatorsInput) => Promise<ListEvaluatorsOutput>;
+    getEvaluator: (input: GetEvaluatorInput) => Promise<EvaluatorOutput>;
+    createEvaluator: (input: CreateEvaluatorInput) => Promise<EvaluatorOutput>;
+    addEvaluatorVersion: (input: AddEvaluatorVersionInput) => Promise<EvaluatorOutput>;
+    archiveEvaluator: (input: ArchiveEvaluatorInput) => Promise<EvaluatorOutput>;
+    setEvaluatorProduction: (input: SetEvaluatorProductionInput) => Promise<EvaluatorOutput>;
+    approveEvaluatorSource: (input: ApproveEvaluatorSourceInput) => Promise<EvaluatorOutput>;
+    previewEvaluator: (input: PreviewEvaluatorInput) => Promise<PreviewEvaluatorOutput>;
+    listStepAgentRuns: (input: ListStepAgentRunsInput) => Promise<ListStepAgentRunsOutput>;
+    /** What one Agent Run's step was given and what it returned. */
+    getAgentRunIo: (input: GetAgentRunIoInput) => Promise<GetAgentRunIoOutput>;
+    listCases: (input: ListEvalCasesInput) => Promise<ListEvalCasesOutput>;
+    createCase: (input: CreateEvalCaseInput) => Promise<EvalCaseOutput>;
+    createCaseFromAgentRun: (input: CreateEvalCaseFromAgentRunInput) => Promise<EvalCaseOutput>;
+    createPerturbedCase: (input: CreatePerturbedEvalCaseInput) => Promise<EvalCaseOutput>;
+    archiveCase: (input: ArchiveEvalCaseInput) => Promise<EvalCaseOutput>;
+    /** Edits a case as a new case that replaces it; the old one is archived, so frozen Datasets keep it. */
+    updateCase: (input: UpdateEvalCaseInput) => Promise<EvalCaseOutput>;
+    listDatasets: (input: ListEvalDatasetsInput) => Promise<ListEvalDatasetsOutput>;
+    freezeDataset: (input: FreezeEvalDatasetInput) => Promise<FreezeEvalDatasetOutput>;
+    getMcpPolicy: (input: GetMcpEvalPolicyInput) => Promise<GetMcpEvalPolicyOutput>;
+    setMcpPolicy: (input: SetMcpEvalPolicyInput) => Promise<SetMcpEvalPolicyOutput>;
+    estimateRun: (input: EstimateEvalRunInput) => Promise<EstimateEvalRunOutput>;
+    prepareRun: (input: PrepareEvalRunInput) => Promise<EvalRunOutput>;
+    startRun: (input: StartEvalRunInput) => Promise<EvalRunOutput>;
+    getRun: (input: GetEvalRunInput) => Promise<EvalRunOutput>;
+    listRuns: (input: ListEvalRunsInput) => Promise<ListEvalRunsOutput>;
+    cancelRun: (input: CancelEvalRunInput) => Promise<EvalRunOutput>;
+    getRunFailures: (input: GetEvalRunFailuresInput) => Promise<GetEvalRunFailuresOutput>;
+    /** One trial of an Eval Run with everything its Evaluators read and gave. */
+    getTrial: (input: GetEvalTrialInput) => Promise<GetEvalTrialOutput>;
+    /** A person accepts or denies one judge verdict of an Eval Run after reading its rationale. */
+    reviewJudgeVerdict: (input: ReviewJudgeVerdictInput) => Promise<ReviewJudgeVerdictOutput>;
+    getAcceptanceCriteria: (input: GetAcceptanceCriteriaInput) => Promise<GetAcceptanceCriteriaOutput>;
+    setAcceptanceCriteria: (input: SetAcceptanceCriteriaInput) => Promise<SetAcceptanceCriteriaOutput>;
+    getQualification: (input: GetStepQualificationInput) => Promise<GetStepQualificationOutput>;
+    /** Whether each version of a workflow is verified: every agent step's validation in it. */
+    getWorkflowValidation: (input: GetWorkflowValidationInput) => Promise<GetWorkflowValidationOutput>;
+    signQualification: (input: SignStepQualificationInput) => Promise<SignStepQualificationOutput>;
+    getDrift: (input: GetStepDriftInput) => Promise<GetStepDriftOutput>;
+    // `signal` aborts the request: an assistant turn is long enough that a person will want to stop it.
+    // `onProgress` streams the turn's model rounds and tool calls as they happen.
+    askAssistant: (
+      input: AskEvaluationAssistantInput,
+      options?: { signal?: AbortSignal; onProgress?: (event: EvaluationAssistantProgress) => void },
+    ) => Promise<AskEvaluationAssistantOutput>;
   };
 
   readonly monitoring: {
@@ -2264,6 +2466,238 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.cardStatusCounts');
         return GetAgentRunCardStatusCountsOutputSchema.parse(body);
       },
+      trajectory: async (input) => {
+        const validated = GetAgentTrajectoryInputSchema.parse(input);
+        const qs = toSearchParams({
+          afterSeq: validated.afterSeq === undefined ? undefined : String(validated.afterSeq),
+        });
+        const res = await this.request(
+          `/api/agent-runs/${encodeURIComponent(validated.agentRunId)}/trajectory${qs}`,
+        );
+        const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.trajectory');
+        return GetAgentTrajectoryOutputSchema.parse(body);
+      },
+    };
+
+    this.evaluation = {
+      getBrief: async (input) => {
+        const step = GetEvaluationBriefInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/briefs${toSearchParams(step)}`, GetEvaluationBriefOutputSchema, 'mediforce.evaluation.getBrief');
+      },
+      setBrief: async (input) => this.sendJson(
+        'POST', '/api/evaluation/briefs', SetEvaluationBriefInputSchema.parse(input),
+        SetEvaluationBriefOutputSchema, 'mediforce.evaluation.setBrief',
+      ),
+      listEvaluators: async (input) => {
+        const validated = ListEvaluatorsInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflowName: validated.workflowName,
+          stepId: validated.stepId,
+          includeArchived: validated.includeArchived === undefined ? undefined : String(validated.includeArchived),
+        });
+        return this.getJson(`/api/evaluation/evaluators${qs}`, ListEvaluatorsOutputSchema, 'mediforce.evaluation.listEvaluators');
+      },
+      getEvaluator: async (input) => {
+        const { evaluatorId } = GetEvaluatorInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}`, EvaluatorOutputSchema, 'mediforce.evaluation.getEvaluator');
+      },
+      createEvaluator: async (input) => this.sendJson(
+        'POST', '/api/evaluation/evaluators', CreateEvaluatorInputSchema.parse(input),
+        EvaluatorOutputSchema, 'mediforce.evaluation.createEvaluator',
+      ),
+      addEvaluatorVersion: async (input) => {
+        const { evaluatorId, ...body } = AddEvaluatorVersionInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/versions`, body,
+          EvaluatorOutputSchema, 'mediforce.evaluation.addEvaluatorVersion');
+      },
+      archiveEvaluator: async (input) => {
+        const { evaluatorId, ...body } = ArchiveEvaluatorInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/archive`, body,
+          EvaluatorOutputSchema, 'mediforce.evaluation.archiveEvaluator');
+      },
+      setEvaluatorProduction: async (input) => {
+        const { evaluatorId, ...body } = SetEvaluatorProductionInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/production`, body,
+          EvaluatorOutputSchema, 'mediforce.evaluation.setEvaluatorProduction');
+      },
+      approveEvaluatorSource: async (input) => {
+        const { evaluatorId, ...body } = ApproveEvaluatorSourceInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/evaluators/${encodeURIComponent(evaluatorId)}/approve`, body,
+          EvaluatorOutputSchema, 'mediforce.evaluation.approveEvaluatorSource');
+      },
+      previewEvaluator: async (input) => this.sendJson(
+        'POST', '/api/evaluation/evaluators/preview', PreviewEvaluatorInputSchema.parse(input),
+        PreviewEvaluatorOutputSchema, 'mediforce.evaluation.previewEvaluator',
+      ),
+      getAgentRunIo: async (input) => {
+        const { agentRunId } = GetAgentRunIoInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/agent-runs/${encodeURIComponent(agentRunId)}/io`, GetAgentRunIoOutputSchema, 'mediforce.evaluation.getAgentRunIo');
+      },
+      listStepAgentRuns: async (input) => {
+        const validated = ListStepAgentRunsInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflowName: validated.workflowName,
+          stepId: validated.stepId,
+          limit: String(validated.limit),
+          cursor: validated.cursor,
+        });
+        return this.getJson(`/api/evaluation/agent-runs${qs}`, ListStepAgentRunsOutputSchema, 'mediforce.evaluation.listStepAgentRuns');
+      },
+      listCases: async (input) => {
+        const validated = ListEvalCasesInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflowName: validated.workflowName,
+          stepId: validated.stepId,
+          includeArchived: validated.includeArchived === undefined ? undefined : String(validated.includeArchived),
+        });
+        return this.getJson(`/api/evaluation/cases${qs}`, ListEvalCasesOutputSchema, 'mediforce.evaluation.listCases');
+      },
+      createCase: async (input) => this.sendJson(
+        'POST', '/api/evaluation/cases', CreateEvalCaseInputSchema.parse(input),
+        EvalCaseOutputSchema, 'mediforce.evaluation.createCase',
+      ),
+      createCaseFromAgentRun: async (input) => this.sendJson(
+        'POST', '/api/evaluation/cases/from-agent-run', CreateEvalCaseFromAgentRunInputSchema.parse(input),
+        EvalCaseOutputSchema, 'mediforce.evaluation.createCaseFromAgentRun',
+      ),
+      createPerturbedCase: async (input) => this.sendJson(
+        'POST', '/api/evaluation/cases/perturbed', CreatePerturbedEvalCaseInputSchema.parse(input),
+        EvalCaseOutputSchema, 'mediforce.evaluation.createPerturbedCase',
+      ),
+      archiveCase: async (input) => {
+        const { caseId, ...body } = ArchiveEvalCaseInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/cases/${encodeURIComponent(caseId)}/archive`, body,
+          EvalCaseOutputSchema, 'mediforce.evaluation.archiveCase');
+      },
+      updateCase: async (input) => {
+        const { caseId, ...body } = UpdateEvalCaseInputSchema.parse(input);
+        return this.sendJson('PATCH', `/api/evaluation/cases/${encodeURIComponent(caseId)}`, body,
+          EvalCaseOutputSchema, 'mediforce.evaluation.updateCase');
+      },
+      listDatasets: async (input) => {
+        const step = ListEvalDatasetsInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/datasets${toSearchParams(step)}`, ListEvalDatasetsOutputSchema, 'mediforce.evaluation.listDatasets');
+      },
+      freezeDataset: async (input) => this.sendJson(
+        'POST', '/api/evaluation/datasets', FreezeEvalDatasetInputSchema.parse(input),
+        FreezeEvalDatasetOutputSchema, 'mediforce.evaluation.freezeDataset',
+      ),
+      getMcpPolicy: async (input) => {
+        const step = GetMcpEvalPolicyInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/mcp-policy${toSearchParams(step)}`, GetMcpEvalPolicyOutputSchema, 'mediforce.evaluation.getMcpPolicy');
+      },
+      setMcpPolicy: async (input) => this.sendJson(
+        'PUT', '/api/evaluation/mcp-policy', SetMcpEvalPolicyInputSchema.parse(input),
+        SetMcpEvalPolicyOutputSchema, 'mediforce.evaluation.setMcpPolicy',
+      ),
+      estimateRun: async (input) => this.sendJson(
+        'POST', '/api/evaluation/runs/estimate', EstimateEvalRunInputSchema.parse(input),
+        EstimateEvalRunOutputSchema, 'mediforce.evaluation.estimateRun',
+      ),
+      prepareRun: async (input) => this.sendJson(
+        'POST', '/api/evaluation/runs', PrepareEvalRunInputSchema.parse(input),
+        EvalRunOutputSchema, 'mediforce.evaluation.prepareRun',
+      ),
+      startRun: async (input) => {
+        const { evalRunId, ...body } = StartEvalRunInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/runs/${encodeURIComponent(evalRunId)}/start`, body,
+          EvalRunOutputSchema, 'mediforce.evaluation.startRun');
+      },
+      getRun: async (input) => {
+        const { evalRunId } = GetEvalRunInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/runs/${encodeURIComponent(evalRunId)}`, EvalRunOutputSchema, 'mediforce.evaluation.getRun');
+      },
+      listRuns: async (input) => {
+        const step = ListEvalRunsInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/runs${toSearchParams(step)}`, ListEvalRunsOutputSchema, 'mediforce.evaluation.listRuns');
+      },
+      cancelRun: async (input) => {
+        const { evalRunId } = CancelEvalRunInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/runs/${encodeURIComponent(evalRunId)}/cancel`, undefined,
+          EvalRunOutputSchema, 'mediforce.evaluation.cancelRun');
+      },
+      getRunFailures: async (input) => {
+        const { evalRunId, limit } = GetEvalRunFailuresInputSchema.parse(input);
+        const qs = toSearchParams({ limit: String(limit) });
+        return this.getJson(`/api/evaluation/runs/${encodeURIComponent(evalRunId)}/failures${qs}`, GetEvalRunFailuresOutputSchema, 'mediforce.evaluation.getRunFailures');
+      },
+      getTrial: async (input) => {
+        const { evalRunId, trialId } = GetEvalTrialInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/runs/${encodeURIComponent(evalRunId)}/trials/${encodeURIComponent(trialId)}`,
+          GetEvalTrialOutputSchema, 'mediforce.evaluation.getTrial');
+      },
+      reviewJudgeVerdict: async (input) => {
+        const { evalRunId, ...body } = ReviewJudgeVerdictInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/runs/${encodeURIComponent(evalRunId)}/judge-reviews`, body,
+          ReviewJudgeVerdictOutputSchema, 'mediforce.evaluation.reviewJudgeVerdict');
+      },
+      getAcceptanceCriteria: async (input) => {
+        const step = GetAcceptanceCriteriaInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/acceptance-criteria${toSearchParams(step)}`, GetAcceptanceCriteriaOutputSchema, 'mediforce.evaluation.getAcceptanceCriteria');
+      },
+      setAcceptanceCriteria: async (input) => this.sendJson(
+        'POST', '/api/evaluation/acceptance-criteria', SetAcceptanceCriteriaInputSchema.parse(input),
+        SetAcceptanceCriteriaOutputSchema, 'mediforce.evaluation.setAcceptanceCriteria',
+      ),
+      getQualification: async (input) => {
+        const validated = GetStepQualificationInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflowName: validated.workflowName,
+          stepId: validated.stepId,
+          definitionVersion: validated.definitionVersion === undefined ? undefined : String(validated.definitionVersion),
+        });
+        return this.getJson(`/api/evaluation/qualification${qs}`, GetStepQualificationOutputSchema, 'mediforce.evaluation.getQualification');
+      },
+      getWorkflowValidation: async (input) => {
+        const workflow = GetWorkflowValidationInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/workflow-validation${toSearchParams(workflow)}`,
+          GetWorkflowValidationOutputSchema, 'mediforce.evaluation.getWorkflowValidation');
+      },
+      signQualification: async (input) => this.sendJson(
+        'POST', '/api/evaluation/qualification', SignStepQualificationInputSchema.parse(input),
+        SignStepQualificationOutputSchema, 'mediforce.evaluation.signQualification',
+      ),
+      getDrift: async (input) => {
+        const validated = GetStepDriftInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflowName: validated.workflowName,
+          stepId: validated.stepId,
+          window: validated.window === undefined ? undefined : String(validated.window),
+          threshold: validated.threshold === undefined ? undefined : String(validated.threshold),
+        });
+        return this.getJson(`/api/evaluation/drift${qs}`, GetStepDriftOutputSchema, 'mediforce.evaluation.getDrift');
+      },
+      askAssistant: async (input, options) => {
+        const body = AskEvaluationAssistantInputSchema.parse(input);
+        const ctx = 'mediforce.evaluation.askAssistant';
+        if (options?.onProgress === undefined) {
+          return this.sendJson('POST', '/api/evaluation/assistant', body, AskEvaluationAssistantOutputSchema, ctx, options?.signal);
+        }
+        return this.sendWithProgress('/api/evaluation/assistant', body, AskEvaluationAssistantOutputSchema,
+          EvaluationAssistantProgressSchema, options.onProgress, ctx, options.signal);
+      },
+    };
+
+    this.scores = {
+      list: async (input) => {
+        const validated = ListScoresInputSchema.parse(input ?? {});
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          agentRunId: validated.agentRunId,
+          runId: validated.runId,
+          stepId: validated.stepId,
+          name: validated.name,
+          limit: validated.limit !== undefined ? String(validated.limit) : undefined,
+        });
+        const res = await this.request(`/api/scores${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.scores.list');
+        return ListScoresOutputSchema.parse(body);
+      },
     };
 
     this.monitoring = {
@@ -2534,6 +2968,68 @@ export class Mediforce {
       init.body = JSON.stringify(body);
     }
     const res = await this.request(path, init);
+    return outputSchema.parse(await parseJsonOrThrow(res, ctx));
+  }
+
+  /**
+   * POST to a route built with `createProgressRouteAdapter`, asking for its
+   * NDJSON stream: each `{ progress }` line goes to `onProgress`, the
+   * `{ result }` line is returned, and an `{ error }` line throws as the JSON
+   * route would. An error before the stream opens is an ordinary JSON error.
+   */
+  private async sendWithProgress<TOut, TProgress>(
+    path: string,
+    body: unknown,
+    outputSchema: { parse: (b: unknown) => TOut },
+    progressSchema: { parse: (b: unknown) => TProgress },
+    onProgress: (event: TProgress) => void,
+    ctx: string,
+    signal?: AbortSignal,
+  ): Promise<TOut> {
+    const init: RequestInit = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+      body: JSON.stringify(body),
+    };
+    if (signal !== undefined) init.signal = signal;
+    const res = await this.request(path, init);
+    if (res.ok === false || res.body === null || res.headers.get('Content-Type')?.startsWith('application/x-ndjson') !== true) {
+      return outputSchema.parse(await parseJsonOrThrow(res, ctx));
+    }
+
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffered = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      buffered += value ?? '';
+      const lines = buffered.split('\n');
+      buffered = done ? '' : lines.pop()!;
+      for (const line of lines) {
+        if (line.trim() === '') continue;
+        const message = JSON.parse(line) as Record<string, unknown>;
+        if ('progress' in message) {
+          onProgress(progressSchema.parse(message.progress));
+        } else if ('result' in message) {
+          return outputSchema.parse(message.result);
+        } else {
+          const extracted = extractErrorEnvelope(message);
+          const code = ApiErrorCodeSchema.safeParse(extracted.code);
+          throw new ApiError(
+            code.success ? httpStatusForApiErrorCode(code.data) : 500,
+            extracted.message ?? `${ctx} failed`,
+            message,
+            extracted.code,
+            extracted.details,
+          );
+        }
+      }
+      if (done) throw new ApiError(502, `${ctx} ended without a result`, null);
+    }
+  }
+
+  /** Query helper — `request(path)` → `parseJsonOrThrow` → `outputSchema.parse(body)`. */
+  private async getJson<TOut>(path: string, outputSchema: { parse: (b: unknown) => TOut }, ctx: string): Promise<TOut> {
+    const res = await this.request(path);
     return outputSchema.parse(await parseJsonOrThrow(res, ctx));
   }
 

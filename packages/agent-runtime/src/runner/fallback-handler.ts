@@ -3,6 +3,7 @@ import type {
   StepConfig,
   AgentEvent,
   AgentOutputEnvelope,
+  AgentFallbackReason,
 } from '@mediforce/platform-core';
 import type { AgentContext, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
 import type { AgentRunResult } from './agent-runner';
@@ -13,7 +14,7 @@ export class FallbackHandler {
   ) {}
 
   async handleWithWorkflowStep(
-    reason: 'timeout' | 'low_confidence' | 'error',
+    reason: AgentFallbackReason,
     context: WorkflowAgentContext,
     partialWork: AgentEvent[],
     originalEnvelope?: AgentOutputEnvelope | null,
@@ -26,7 +27,7 @@ export class FallbackHandler {
    * @deprecated Use handleWithWorkflowStep instead. This method relies on the legacy StepConfig model.
    */
   async handle(
-    reason: 'timeout' | 'low_confidence' | 'error',
+    reason: AgentFallbackReason,
     context: AgentContext,
     stepConfig: StepConfig,
     partialWork: AgentEvent[],
@@ -38,7 +39,7 @@ export class FallbackHandler {
 
   private async applyFallbackBehavior(
     behavior: string,
-    reason: 'timeout' | 'low_confidence' | 'error',
+    reason: AgentFallbackReason,
     processInstanceId: string,
     originalEnvelope?: AgentOutputEnvelope | null,
   ): Promise<AgentRunResult> {

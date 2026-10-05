@@ -69,8 +69,7 @@ table: [dev-quickref](docs/start/dev-quickref.md#which-dev-command).
 Steps with `"executor": "script"` run in images that are **built locally, never
 pulled** — `mediforce-golden-image:latest` (Node + tooling, the base for inline
 `runtime: javascript` scripts) and `mediforce-node:latest` (the fallback when a
-script step omits `script.image`). Build them plus the per-app agent images in
-one go:
+script step omits `script.image`). Build them plus the per-app agent images in one go:
 
 ```bash
 ./scripts/rebuild-docker-images.sh

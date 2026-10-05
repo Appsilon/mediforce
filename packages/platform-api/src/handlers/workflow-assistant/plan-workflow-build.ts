@@ -10,6 +10,7 @@ import { callOpenRouter } from '../../services/openrouter-client';
 import { buildPlanPrompt } from './_lib/plan-prompt';
 import { callerInstructionMessages } from './_lib/caller-instructions';
 import { parseModelJson } from './_lib/parse-model-json';
+import { requireOpenRouterApiKey } from '../../services/openrouter-key';
 
 interface PlanScopedInput extends PlanWorkflowBuildInput {
   namespace: string;
@@ -36,11 +37,7 @@ export async function planWorkflowBuild(
     throw new HandlerError('validation', 'Missing required query parameter: namespace');
   }
 
-  const secrets = await scope.workspaceSecrets.getSecrets(input.namespace);
-  const apiKey = secrets['OPENROUTER_API_KEY'];
-  if (!apiKey) {
-    throw new HandlerError('validation', 'OPENROUTER_API_KEY not configured in workspace secrets');
-  }
+  const apiKey = await requireOpenRouterApiKey(scope, input.namespace);
 
   const response = await callOpenRouter({
     model: input.model ?? WORKFLOW_ASSISTANT_DEFAULT_MODEL,

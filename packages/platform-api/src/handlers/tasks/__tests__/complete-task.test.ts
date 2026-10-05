@@ -1,13 +1,16 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
+  InMemoryAgentRunRepository,
   InMemoryAuditRepository,
   InMemoryHumanTaskRepository,
   InMemoryProcessInstanceRepository,
+  InMemoryScoreRepository,
+  buildAgentRun,
   buildHumanTask,
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
-import type { HumanTask, ProcessInstance, CompleteHumanTaskPayload } from '@mediforce/platform-core';
+import type { HumanTask, ProcessInstance, CompleteHumanTaskPayload, Score } from '@mediforce/platform-core';
 import { completeTask } from '../complete-task';
 import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../../errors';
 import {
@@ -275,3 +278,106 @@ describe('completeTask handler', () => {
     ).rejects.toBeInstanceOf(PreconditionFailedError);
   });
 });
+
+describe('completeTask human_verdict Score (ADR-0023 D13)', () => {
+  const AGENT_RUN_ID = '3d7e0c4a-5b1f-4e2a-8c9d-0a1b2c3d4e5f';
+  let humanTaskRepo: InMemoryHumanTaskRepository;
+  let instanceRepo: InMemoryProcessInstanceRepository;
+  let auditRepo: InMemoryAuditRepository;
+  let agentRunRepo: InMemoryAgentRunRepository;
+  let scoreRepo: InMemoryScoreRepository;
+  let processRepo: Awaited<ReturnType<typeof processRepoForFixtureRuns>>;
+
+  beforeEach(async () => {
+    resetFactorySequence();
+    processRepo = await processRepoForFixtureRuns(['team-alpha']);
+    instanceRepo = new InMemoryProcessInstanceRepository();
+    humanTaskRepo = new InMemoryHumanTaskRepository(instanceRepo);
+    auditRepo = new InMemoryAuditRepository(instanceRepo);
+    agentRunRepo = new InMemoryAgentRunRepository(instanceRepo);
+    scoreRepo = new InMemoryScoreRepository();
+    await instanceRepo.create(buildProcessInstance({ id: 'inst-a', namespace: 'team-alpha' }));
+  });
+
+  async function complete(task: HumanTask, payload: CompleteHumanTaskPayload) {
+    await humanTaskRepo.create(task);
+    const scope = createTestScope({
+      humanTaskRepo, processRepo, instanceRepo, auditRepo, agentRunRepo, scoreRepo,
+      caller: userCaller('u-1', ['team-alpha']),
+    });
+    const instance = (await instanceRepo.getById('inst-a'))!;
+    Object.assign(scope.system, {
+      engine: makeEngineStub({ task: { ...task, status: 'completed' as const }, instance }),
+    });
+    return completeTask({ taskId: task.id, payload }, scope);
+  }
+
+  function reviewTask(overrides: Partial<HumanTask> = {}): HumanTask {
+    return buildHumanTask({
+      id: 'review-1',
+      processInstanceId: 'inst-a',
+      stepId: 'grade-aes',
+      status: 'claimed',
+      assignedUserId: 'u-1',
+      creationReason: 'agent_review_l3',
+      completionData: {
+        reviewType: 'agent_output_review',
+        agentOutput: { result: { grade: 3 }, agentRunId: AGENT_RUN_ID },
+      },
+      ...overrides,
+    });
+  }
+
+  it('records the verdict on the reviewed Agent Run, with an audit event', async () => {
+    await complete(reviewTask(), { kind: 'verdict', verdict: 'approve', comment: ' CTCAE grade confirmed ' });
+
+    const [score] = await scoreRepo.list({ limit: 10 });
+    expect(score).toMatchObject({
+      subject: { type: 'agent_run', id: AGENT_RUN_ID },
+      name: 'human_verdict',
+      value: 1,
+      label: 'approve',
+      comment: 'CTCAE grade confirmed',
+      source: 'human',
+      createdBy: 'u-1',
+      namespace: 'team-alpha',
+      processInstanceId: 'inst-a',
+      stepId: 'grade-aes',
+      metadata: { verdictKey: 'approve', intent: 'success', taskId: 'review-1' },
+    });
+    const scoreAudit = (await auditRepo.getByProcess('inst-a')).find((event) => event.action === 'score.created');
+    expect(scoreAudit).toMatchObject({ actorId: 'u-1', actorType: 'user', entityType: 'score', entityId: score!.id });
+  });
+
+  it('still completes the task when the Score write fails, logging the failure', async () => {
+    class FailingScoreRepository extends InMemoryScoreRepository {
+      override async create(): Promise<Score> {
+        throw new Error('connection reset');
+      }
+    }
+    scoreRepo = new FailingScoreRepository();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const result = await complete(reviewTask(), { kind: 'verdict', verdict: 'approve' });
+
+    expect(result.task.status).toBe('completed');
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("human_verdict Score not recorded for task 'review-1'"),
+      expect.any(Error),
+    );
+    const actions = (await auditRepo.getByProcess('inst-a')).map((event) => event.action);
+    expect(actions).toContain('task.completed');
+    expect(actions).not.toContain('score.created');
+    consoleError.mockRestore();
+  });
+
+  it('records nothing for a task that is not a CM3 review', async () => {
+    await complete(
+      reviewTask({ creationReason: 'human_executor', completionData: null }),
+      { kind: 'verdict', verdict: 'approve' },
+    );
+
+    expect(await scoreRepo.list({ limit: 10 })).toEqual([]);
+  });
+});
+

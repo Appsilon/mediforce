@@ -343,6 +343,32 @@ function contract(
       expect(last?.id).not.toBe(tombstoned.id);
     });
 
+    it('keeps eval trials out of run lists, counts and carry-over (ADR-0023 D4)', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      const production = await repo.create(
+        instanceFor('ws-1', { status: 'completed', updatedAt: '2026-05-26T00:00:00.000Z' }),
+      );
+      const trial = await repo.create(
+        instanceFor('ws-1', {
+          status: 'completed',
+          updatedAt: '2026-05-27T00:00:00.000Z',
+          evalRunId: 'eval-run-1',
+          workspaceStartCommit: 'a1b2c3d4e5f6',
+        }),
+      );
+
+      expect(await repo.getById(trial.id)).toMatchObject({ evalRunId: 'eval-run-1', workspaceStartCommit: 'a1b2c3d4e5f6' });
+      expect((await repo.getById(production.id))?.evalRunId).toBeUndefined();
+      expect((await repo.getLastCompletedByDefinitionName('supply-chain-review'))?.id).toBe(production.id);
+      expect((await repo.listAll({ namespace: 'ws-1' })).map((row) => row.id)).toEqual([production.id]);
+      expect((await repo.listPage({ namespace: 'ws-1', limit: 20 })).items.map((row) => row.id)).toEqual([production.id]);
+      const counts = await repo.countByDisplayStatus({ namespace: 'ws-1' });
+      expect(Object.values(counts).reduce((sum, count) => sum + count, 0)).toBe(1);
+      const summary = await repo.summarizeRunsByWorkflow('ws-1', 'supply-chain-review', true);
+      expect({ total: summary.total, latest: summary.latest.map((row) => row.id) }).toEqual({ total: 1, latest: [production.id] });
+    });
+
     it('addStepExecution + getStepExecutions ordered by startedAt asc', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');
@@ -446,6 +472,16 @@ function contract(
       // behind a workflow delete must not tombstone a namesake elsewhere.
       expect((await repo.getById(mine.id))?.deleted).toBe(true);
       expect((await repo.getById(theirs.id))?.deleted).toBe(false);
+    });
+
+    it('getIdsByDefinitionName leaves out dry runs when asked', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-mine');
+      const production = await repo.create(instanceFor('ws-mine', { definitionName: 'graded' }));
+      const dry = await repo.create(instanceFor('ws-mine', { definitionName: 'graded', dryRun: true }));
+
+      expect((await repo.getIdsByDefinitionName('ws-mine', 'graded')).sort()).toEqual([production.id, dry.id].sort());
+      expect(await repo.getIdsByDefinitionName('ws-mine', 'graded', { excludeDryRuns: true })).toEqual([production.id]);
     });
 
     it('summarizeRunsByWorkflow counts active + scopes total/latest', async () => {

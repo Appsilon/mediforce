@@ -16,6 +16,9 @@ import {
   PostgresAgentOAuthTokenRepository,
   PostgresTriggerRepository,
   PostgresAgentRunRepository,
+  PostgresAgentTrajectoryRepository,
+  PostgresScoreRepository,
+  PostgresEvaluationRepository,
   PostgresHumanTaskRepository,
   PostgresTaskAttachmentRepository,
   FilesystemBlobStore,
@@ -39,6 +42,9 @@ import type {
   AgentEventRepository,
   AgentOAuthTokenRepository,
   AgentRunRepository,
+  AgentTrajectoryRepository,
+  ScoreRepository,
+  EvaluationRepository,
   AuditRepository,
   BlobStore,
   CoworkSessionRepository,
@@ -69,8 +75,8 @@ import {
   isLocalAgentMode,
   type DockerImagesService,
 } from './docker-images-service';
-import { isPasswordAuthEnabled, parseAutoJoinWorkspaces } from '@mediforce/platform-core';
-import type { AutoJoinRule } from '@mediforce/platform-core';
+import { isPasswordAuthEnabled, parseAutoJoinWorkspaces, parseDriftSettings } from '@mediforce/platform-core';
+import type { AutoJoinRule, DriftSettings } from '@mediforce/platform-core';
 import { sendWorkspaceNotificationEmail, sendInviteSetupEmail } from './invite-emails';
 import { normalizeBaseUrl, resolveInviteAppUrl } from '../contract/config';
 import type { JoinLinkService } from './join-link';
@@ -110,6 +116,7 @@ import { createHttpSelfFetchRunKicker } from '../runtime/run-kicker';
 import { WebhookRouter } from '@mediforce/workflow-engine';
 import { seedBuiltinAgentDefinitions } from './seed-agent-definitions';
 import { seedBuiltinToolCatalog } from './seed-tool-catalog';
+import { withScoreExport } from './score-export';
 import { syncRegistryIfStale } from '@mediforce/platform-infra';
 
 let services: PlatformServices | null = null;
@@ -131,6 +138,9 @@ export interface PlatformServices {
   auditRepo: AuditRepository;
   agentEventRepo: AgentEventRepository;
   agentRunRepo: AgentRunRepository;
+  agentTrajectoryRepo: AgentTrajectoryRepository;
+  scoreRepo: ScoreRepository;
+  evaluationRepo: EvaluationRepository;
   humanTaskRepo: HumanTaskRepository;
   taskAttachmentRepo: TaskAttachmentRepository;
   blobStore: BlobStore;
@@ -168,6 +178,9 @@ export interface PlatformServices {
   /** `parseAutoJoinWorkspaces(AUTO_JOIN_WORKSPACES)`, resolved once at wiring
    *  time. Empty = the feature is off, which is the default. */
   autoJoinWorkspaces: readonly AutoJoinRule[];
+  /** `MEDIFORCE_DRIFT_WINDOW` / `MEDIFORCE_DRIFT_THRESHOLD`, resolved once at
+   *  wiring time; unset = the defaults. */
+  driftSettings: DriftSettings;
 }
 
 /** Invite-activation links live for 7 days — long enough for a colleague to
@@ -259,6 +272,9 @@ export function getPlatformServices(): PlatformServices {
   const auditRepo: AuditRepository = new PostgresAuditRepository(pg, instanceRepo);
   const agentEventRepo: AgentEventRepository = new PostgresAgentEventRepository(instanceRepo);
   const agentRunRepo: AgentRunRepository = new PostgresAgentRunRepository(pg, instanceRepo);
+  const agentTrajectoryRepo: AgentTrajectoryRepository = new PostgresAgentTrajectoryRepository(pg);
+  const scoreRepo: ScoreRepository = withScoreExport(new PostgresScoreRepository(pg), agentRunRepo, process.env);
+  const evaluationRepo: EvaluationRepository = new PostgresEvaluationRepository(pg);
   const humanTaskRepo: HumanTaskRepository = new PostgresHumanTaskRepository(pg, instanceRepo);
   const taskAttachmentRepo: TaskAttachmentRepository = new PostgresTaskAttachmentRepository(pg);
   const blobStore: BlobStore = new FilesystemBlobStore();
@@ -292,12 +308,12 @@ export function getPlatformServices(): PlatformServices {
   }
   pluginRegistry.register(
     'claude-code-agent',
-    useMockAgent ? new MockAgentPlugin() : new ClaudeCodeAgentPlugin(),
+    () => (useMockAgent ? new MockAgentPlugin() : new ClaudeCodeAgentPlugin()),
   );
 
-  pluginRegistry.register('opencode-agent', new OpenCodeAgentPlugin());
-  pluginRegistry.register('script-container', new ScriptContainerPlugin());
-  pluginRegistry.register('databricks-job', new DatabricksJobPlugin());
+  pluginRegistry.register('opencode-agent', () => new OpenCodeAgentPlugin());
+  pluginRegistry.register('script-container', () => new ScriptContainerPlugin());
+  pluginRegistry.register('databricks-job', () => new DatabricksJobPlugin());
 
   const otelTracingOptions = {
     captureContent: process.env.MEDIFORCE_OTEL_CAPTURE_CONTENT === 'true',
@@ -335,6 +351,7 @@ export function getPlatformServices(): PlatformServices {
 
   const passwordAuthEnabled = isPasswordAuthEnabled(process.env.ENABLE_PASSWORD_AUTH);
   const autoJoinWorkspaces = parseAutoJoinWorkspaces(process.env.AUTO_JOIN_WORKSPACES);
+  const driftSettings = parseDriftSettings(process.env.MEDIFORCE_DRIFT_WINDOW, process.env.MEDIFORCE_DRIFT_THRESHOLD);
 
   const engine = new WorkflowEngine(
     processRepo,
@@ -355,6 +372,7 @@ export function getPlatformServices(): PlatformServices {
     eventLog,
     agentRunRepo,
     otelTracingOptions,
+    agentTrajectoryRepo,
   );
 
   const scriptStepExecutor = new ScriptStepExecutor(pluginRunner);
@@ -430,6 +448,9 @@ export function getPlatformServices(): PlatformServices {
     auditRepo,
     agentEventRepo,
     agentRunRepo,
+    agentTrajectoryRepo,
+    scoreRepo,
+    evaluationRepo,
     humanTaskRepo,
     taskAttachmentRepo,
     blobStore,
@@ -457,6 +478,7 @@ export function getPlatformServices(): PlatformServices {
     userDirectory: userDirectoryService,
     passwordAuthEnabled,
     autoJoinWorkspaces,
+    driftSettings,
   };
 
   if (!seedingStarted) {

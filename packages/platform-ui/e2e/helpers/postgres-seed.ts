@@ -47,8 +47,8 @@ export async function seedPostgresNamespace(
     // "FOREIGN KEY (workspace) REFERENCES workspaces(handle) ON DELETE CASCADE",
     // so one DELETE cascades the full fixture tree without touching workspaces
     // that belong to the developer (e.g. their personal namespace + registered
-    // workflows). model_registry_entries has no workspace FK; its seed inserts
-    // use ON CONFLICT DO NOTHING so it stays idempotent without a DELETE.
+    // workflows). model_registry_entries has no workspace FK; step 11 clears it
+    // and re-inserts the fixtures (see there).
     //
     // Handles covered:
     //   fixture    – test, tenant-a, tenant-b
@@ -458,6 +458,12 @@ export async function seedPostgresNamespace(
     }
 
     // ── 11. model_registry_entries ──────────────────────────────────────────
+    // A live OpenRouter catalogue left by a dev run outranks the seeded models
+    // (request_count) and pushes them off page one of the registry table and
+    // out of the model pickers. E2E servers run with ENABLE_MODEL_SYNC=false, so
+    // the registry is only ever the fixtures; the dev catalogue is a re-syncable
+    // cache, safe to drop.
+    await sql`DELETE FROM model_registry_entries`;
     for (const model of Object.values(data.modelRegistry)) {
       const pricing = model.pricing as Record<string, unknown> | undefined;
       await sql`

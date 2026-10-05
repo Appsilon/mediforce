@@ -6,7 +6,10 @@ export type {
   LlmClient,
   AgentContext,
   WorkflowAgentContext,
+  AgentOutputGate,
+  AgentOutputGateVerdict,
   ResolvedOAuthBinding,
+  McpTapeContext,
   EmitPayload,
   EmitFn,
   StepExecutorPlugin,
@@ -17,13 +20,15 @@ export type {
 } from './interfaces/index';
 
 // Plugins
-export { BaseContainerAgentPlugin, isLocalExecutionAllowed, OAuthTokenUnavailableError, validateOutputSchema } from './plugins/base-container-agent-plugin';
-export type { AgentCommandSpec, OutputSchema, SpawnCliOptions, SpawnDockerResult } from './plugins/base-container-agent-plugin';
+export { BaseContainerAgentPlugin, isLocalExecutionAllowed, OAuthTokenUnavailableError } from './plugins/base-container-agent-plugin';
+export { validateOutputSchema } from './runner/output-schema';
+export type { AgentCommandSpec, SpawnCliOptions, SpawnDockerResult } from './plugins/base-container-agent-plugin';
 export { ClaudeCodeAgentPlugin } from './plugins/claude-code-agent-plugin';
 export { MockAgentPlugin } from './plugins/mock-agent-plugin';
 export { ensureStepImageBuilt } from './plugins/dry-run-image';
 export { OpenCodeAgentPlugin } from './plugins/opencode-agent-plugin';
 export { ScriptContainerPlugin } from './plugins/script-container-plugin';
+export { runCodeCheck, type CodeCheckRequest, type CodeCheckOutcome } from './plugins/code-check';
 export { DatabricksJobPlugin } from './plugins/databricks/databricks-job-plugin';
 export type { DatabricksJobPluginInit } from './plugins/databricks/databricks-job-plugin';
 export { DatabricksClient } from './plugins/databricks/databricks-client';
@@ -36,6 +41,16 @@ export type { BuildSource } from './plugins/container-plugin';
 export type { AgentEventLog } from './runner/agent-event-log';
 export { PluginRegistry, PluginNotFoundError } from './runner/plugin-registry';
 export { OpenRouterLlmClient } from './runner/llm-client';
+export {
+  LlmJudgeReviewPlugin,
+  judgeOutputAgreement,
+  llmJudgeMessages,
+  outputAgreementMessages,
+  type LlmJudgeConfig,
+  type LlmJudgeResult,
+  type OutputAgreement,
+  type OutputAgreementConfig,
+} from './runner/llm-judge';
 export { PluginRunner } from './runner/plugin-runner';
 export type { PluginRunResult } from './runner/plugin-runner';
 export { AgentRunner } from './runner/agent-runner';
@@ -105,8 +120,8 @@ export type {
   CommitStepOptions,
   CommitStepResult,
 } from './workspace/workspace-manager';
-export { WorkspaceReader } from './workspace/workspace-reader';
-export type { OutputFileEntry, WorkspaceReaderInit } from './workspace/workspace-reader';
+export { WorkspaceReader, listCommitFiles, readCommitFile } from './workspace/workspace-reader';
+export type { CommitFileEntry, OutputFileEntry, WorkspaceReaderInit } from './workspace/workspace-reader';
 export {
   copyOutputFilesIntoWorkspace,
   INTERNAL_OUTPUT_FILE_NAMES,

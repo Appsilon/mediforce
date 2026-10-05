@@ -124,6 +124,9 @@ const primaryWebServer = {
     // address): a rule on that domain would silently enrol the whole suite's
     // users into the workspace and skew every roster assertion.
     AUTO_JOIN_WORKSPACES: 'autojoin.mediforce.dev:autojoin-journey-org',
+    // Assistant turns and LLM judges go to the scripted mock started in
+    // globalSetup (e2e/helpers/mock-openrouter-server.ts), never to OpenRouter.
+    OPENROUTER_BASE_URL: `http://127.0.0.1:${process.env.E2E_OPENROUTER_MOCK_PORT ?? 9019}/api/v1`,
     ...(process.env.DATABASE_URL ? { DATABASE_URL: process.env.DATABASE_URL } : {}),
   },
   port: testPort,

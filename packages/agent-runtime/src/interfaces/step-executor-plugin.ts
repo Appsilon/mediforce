@@ -1,5 +1,8 @@
 import type {
   AgentEvent,
+  AgentOutputEnvelope,
+  AgentTrajectoryEntry,
+  McpTape,
   ProcessConfig,
   PluginCapabilityMetadata,
   ResolvedMcpConfig,
@@ -59,6 +62,18 @@ export interface ResolvedOAuthBinding {
 }
 
 /**
+ * MCP record/replay of an eval trial (ADR-0023 D6). A server named in
+ * `replay` is answered from its tape instead of started; one named in `record`
+ * runs live behind a proxy that records what it answers.
+ */
+export interface McpTapeContext {
+  replay: Record<string, McpTape>;
+  record: readonly string[];
+  /** Receives each recorded server's tape once the agent has exited. */
+  onRecorded(server: string, tape: McpTape): Promise<void>;
+}
+
+/**
  * Agent execution context built from the unified WorkflowDefinition model.
  * Replaces AgentContext — plugins read agent config from step.agent,
  * env from step.env merged with workflowDefinition.env.
@@ -95,6 +110,8 @@ export interface WorkflowAgentContext {
    * or all previous failed). Undefined when the WD declares no carry-over.
    */
   previousRun?: Record<string, unknown>;
+  /** Commit the run branch starts from instead of the default branch (an eval trial's workspace seed). */
+  workspaceStartCommit?: string;
   /** Pre-loaded OAuth tokens keyed by MCP server name. Populated by
    *  platform-ui's executeAgentStep for every HTTP binding whose auth
    *  config is `{ type: 'oauth', ... }`. Consumed by writeMcpConfig to
@@ -105,7 +122,33 @@ export interface WorkflowAgentContext {
    *  buildPrompt() after the workflow preamble. Skills are step-level
    *  (agentConfig.skillsDir) and are resolved separately. */
   agentIdentityPrompt?: string;
+  /** Set by AgentRunner on the one retry after `result` broke
+   *  `step.agent.outputSchema`: the validation error, for the prompt. */
+  outputSchemaViolation?: string;
+  /** Where a plugin records its Agent Trajectory (ADR-0023 D8). Set by
+   *  AgentRunner, keyed to its Agent Run; absent for script steps and in tests. */
+  trajectory?: { record(entries: readonly AgentTrajectoryEntry[]): void };
+  /** Checks a result that passed `step.agent.outputSchema`, before autonomy
+   *  applies — production Evaluators (ADR-0023 D13). Set by platform-ui's
+   *  executeAgentStep only for a production run of a step that has them. */
+  outputGate?: AgentOutputGate;
+  /** Set by platform-ui's executeAgentStep for an eval trial only. */
+  mcpTapes?: McpTapeContext;
 }
+
+/** What an output gate made of a result. */
+export interface AgentOutputGateVerdict {
+  /** Why the result goes to the step's `fallbackBehavior`; null when it passes. */
+  failure: string | null;
+  /** Checks that could not run — recorded, never a failure. */
+  errors: string[];
+}
+
+export type AgentOutputGate = (input: {
+  agentRunId: string;
+  context: WorkflowAgentContext;
+  envelope: AgentOutputEnvelope;
+}) => Promise<AgentOutputGateVerdict>;
 
 // EmitFn: platform assigns id and sequence — plugin provides type, payload, timestamp
 export type EmitPayload = Omit<AgentEvent, 'id' | 'sequence' | 'processInstanceId' | 'stepId'>;

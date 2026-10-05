@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ForbiddenError } from '../../../../errors';
-import { runPlatformTool } from '../run-platform-tool';
+import { runWorkflowPlatformTool } from '../run-platform-tool';
 import type { CallerScope } from '../../../../repositories/index';
 
 /** Only the surfaces these tools touch; everything else stays absent so a tool
@@ -72,18 +72,18 @@ function buildScope(overrides: Record<string, unknown> = {}): CallerScope {
   } as unknown as CallerScope;
 }
 
-describe('runPlatformTool', () => {
+describe('runWorkflowPlatformTool', () => {
   it('lists secret names and never their values', async () => {
     // A secret in the conversation is a secret leaked to the model, the
     // provider, and the transcript. The assistant only needs to know which keys
     // exist so it can reference them and say which are missing.
-    const result = await runPlatformTool('list_secrets', {}, buildScope(), 'acme');
+    const result = await runWorkflowPlatformTool('list_secrets', {}, buildScope(), 'acme');
     expect(result).toEqual({ keys: ['OPENROUTER_API_KEY', 'STUDY_ID'] });
     expect(JSON.stringify(result)).not.toContain('sk-live-abc');
   });
 
   it('lists the agents a step could point at, with the MCP servers each is bound to', async () => {
-    const result = await runPlatformTool('list_agents', {}, buildScope(), 'acme');
+    const result = await runWorkflowPlatformTool('list_agents', {}, buildScope(), 'acme');
     expect(result).toEqual({
       agents: [
         { id: 'agent-1', name: 'Validator', description: 'Validates', foundationModel: 'anthropic/claude-sonnet-4.6' },
@@ -99,12 +99,12 @@ describe('runPlatformTool', () => {
   });
 
   it('lists the tool catalog an agent can bind to', async () => {
-    const result = await runPlatformTool('list_tool_catalog', {}, buildScope(), 'acme');
+    const result = await runWorkflowPlatformTool('list_tool_catalog', {}, buildScope(), 'acme');
     expect(result).toEqual({ servers: [{ id: 'github', description: 'GitHub MCP' }] });
   });
 
   it('lists the roles this workspace grants, with how many people hold each', async () => {
-    const result = await runPlatformTool('list_roles', {}, buildScope(), 'acme');
+    const result = await runWorkflowPlatformTool('list_roles', {}, buildScope(), 'acme');
     expect(result).toEqual({
       roles: [
         { role: 'data-manager', heldBy: 1 },
@@ -115,7 +115,7 @@ describe('runPlatformTool', () => {
 
   it('puts a saved workflow on a schedule', async () => {
     const scope = buildScope();
-    const result = await runPlatformTool(
+    const result = await runWorkflowPlatformTool(
       'create_cron_trigger',
       { schedule: '0 9 * * 1' },
       scope,
@@ -126,13 +126,13 @@ describe('runPlatformTool', () => {
   });
 
   it('says a schedule needs a saved workflow, rather than failing the turn', async () => {
-    const result = await runPlatformTool('create_cron_trigger', { schedule: '0 9 * * 1' }, buildScope(), 'acme');
+    const result = await runWorkflowPlatformTool('create_cron_trigger', { schedule: '0 9 * * 1' }, buildScope(), 'acme');
     expect(result).toMatchObject({ needsSave: true });
   });
 
   it('creates an agent in the workspace being worked in', async () => {
     const scope = buildScope();
-    const result = await runPlatformTool('create_agent', {
+    const result = await runWorkflowPlatformTool('create_agent', {
       name: 'Report writer',
       description: 'Writes the validation report',
       systemPrompt: 'You write reports.',
@@ -153,7 +153,7 @@ describe('runPlatformTool', () => {
     const scope = buildScope({
       agentDefinitions: { create: vi.fn().mockRejectedValue(new ForbiddenError('Only admins may create agents')) },
     });
-    const result = await runPlatformTool('create_agent', {
+    const result = await runWorkflowPlatformTool('create_agent', {
       name: 'X', description: 'X', systemPrompt: 'X',
       foundationModel: 'anthropic/claude-sonnet-4.6', inputDescription: 'X', outputDescription: 'X',
     }, scope, 'acme');
@@ -165,17 +165,17 @@ describe('runPlatformTool', () => {
   });
 
   it('refuses arguments that do not match the tool', async () => {
-    const result = await runPlatformTool('create_agent', { name: '' }, buildScope(), 'acme');
+    const result = await runWorkflowPlatformTool('create_agent', { name: '' }, buildScope(), 'acme');
     expect(result).toMatchObject({ error: expect.stringContaining('name') });
   });
 
   it('refuses a tool it does not have', async () => {
-    const result = await runPlatformTool('delete_everything', {}, buildScope(), 'acme');
+    const result = await runWorkflowPlatformTool('delete_everything', {}, buildScope(), 'acme');
     expect(result).toMatchObject({ error: expect.stringContaining('delete_everything') });
   });
 });
 
-describe('runPlatformTool — the Tool Catalog', () => {
+describe('runWorkflowPlatformTool — the Tool Catalog', () => {
   it('adds a server an agent can then bind to', async () => {
     const scope = buildScope({
       caller: { kind: 'user', userId: 'u1', email: 'admin@example.com', isSystemActor: false, namespaces: ['acme'], namespaceRoles: new Map([['acme', 'admin']]) },
@@ -187,7 +187,7 @@ describe('runPlatformTool — the Tool Catalog', () => {
       },
     });
 
-    const result = await runPlatformTool('create_tool_catalog_entry', {
+    const result = await runWorkflowPlatformTool('create_tool_catalog_entry', {
       command: 'npx -y @modelcontextprotocol/server-github',
       description: 'GitHub MCP',
     }, scope, 'acme');
@@ -203,7 +203,7 @@ describe('runPlatformTool — the Tool Catalog', () => {
       toolCatalog: { list: vi.fn(), getById: vi.fn(), upsert: vi.fn() },
     });
 
-    const result = await runPlatformTool('create_tool_catalog_entry', {
+    const result = await runWorkflowPlatformTool('create_tool_catalog_entry', {
       command: 'npx -y @modelcontextprotocol/server-github',
     }, scope, 'acme');
 

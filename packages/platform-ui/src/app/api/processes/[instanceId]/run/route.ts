@@ -2,10 +2,10 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
-import { resolveDefinitionModels } from '@/lib/resolve-agent-defaults';
-import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validateWorkflowModels, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
-import { checkRetiredModels } from '@mediforce/platform-api/handlers';
-import { resolveCoworkOutputSchema, resolveStepTimeoutMs, buildTaskVerdicts, type WorkflowStep, type ProcessInstanceRepository } from '@mediforce/platform-core';
+import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
+import { advanceEvalRunOfInstance, checkRetiredModels, checkUnknownModels } from '@mediforce/platform-api/handlers';
+import { defaultBuildScope } from '@/lib/route-adapter';
+import { resolveCoworkOutputSchema, resolveDefinitionModels, resolveStepTimeoutMs, buildTaskVerdicts, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -69,6 +69,20 @@ async function failRunIfStepAttemptsExceeded(
     updatedAt: new Date().toISOString(),
   });
   return true;
+}
+
+/**
+ * An eval trial's run ended or paused (ADR-0023 D4): score it and start the
+ * next trial of its Eval Run. As the system: the trial belongs to the Eval
+ * Run, not to whoever kicked this request. A no-op for any other run.
+ */
+async function advanceEvalRunOfTrial(instance: ProcessInstance): Promise<void> {
+  if (instance.evalRunId === undefined) return;
+  try {
+    await advanceEvalRunOfInstance(defaultBuildScope({ kind: 'apiKey', isSystemActor: true }), instance.id);
+  } catch (err) {
+    console.error(`[auto-runner] Failed to advance the Eval Run of trial '${instance.id}':`, err);
+  }
 }
 
 export async function POST(
@@ -189,6 +203,7 @@ export async function POST(
         });
         releaseRunLock(instanceId);
         runLockAcquired = false;
+        after(() => advanceEvalRunOfTrial(initialInstance));
         return NextResponse.json(
           { error: 'Missing environment variables', missing: allMissing, instanceId },
           { status: 422 },
@@ -210,24 +225,20 @@ export async function POST(
       // here would start 422-ing workflows that run fine today.
       const runnableDefinition = await resolveDefinitionModels(workflowDefinition, agentDefinitionRepo);
 
-      const knownIds = new Set(allModels.map((m) => m.id));
-      const unknownModels = validateWorkflowModels(workflowDefinition, knownIds);
-      if (unknownModels.length > 0) {
-        const detail = unknownModels
-          .map((u) => `model '${u.model}' in step(s) ${u.steps.map((s) => `'${s.stepId}'`).join(', ')}`)
-          .join('; ');
-        const message = `Unknown model(s): ${detail}. Check the model name or sync the model registry.`;
-        console.log(`[auto-runner] ${message}`);
+      const unknown = checkUnknownModels(workflowDefinition, allModels);
+      if (unknown !== null) {
+        console.log(`[auto-runner] ${unknown.message}`);
         await instanceRepo.update(instanceId, {
           status: 'paused',
           pauseReason: 'missing_env',
-          error: message,
+          error: unknown.message,
           updatedAt: new Date().toISOString(),
         });
         releaseRunLock(instanceId);
         runLockAcquired = false;
+        after(() => advanceEvalRunOfTrial(initialInstance));
         return NextResponse.json(
-          { error: message, unknownModels, instanceId },
+          { error: unknown.message, unknownModels: unknown.unknownModels, instanceId },
           { status: 422 },
         );
       }
@@ -243,6 +254,7 @@ export async function POST(
         });
         releaseRunLock(instanceId);
         runLockAcquired = false;
+        after(() => advanceEvalRunOfTrial(initialInstance));
         return NextResponse.json(
           { error: retired.message, retiredModels: retired.refs, instanceId },
           { status: 422 },
@@ -966,6 +978,8 @@ export async function POST(
       } finally {
         releaseRunLock(instanceId);
       }
+
+      await advanceEvalRunOfTrial(initialInstance);
     });
 
     return NextResponse.json(

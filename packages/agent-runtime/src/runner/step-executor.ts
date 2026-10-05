@@ -1,4 +1,4 @@
-import type { StepOutputEnvelope, AgentOutputEnvelope } from '@mediforce/platform-core';
+import type { StepOutputEnvelope, AgentOutputEnvelope, AgentFallbackReason } from '@mediforce/platform-core';
 import type { StepExecutorPlugin, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
 
 export type StepExecutionStatus = 'completed' | 'paused' | 'escalated' | 'failed';
@@ -9,7 +9,7 @@ export interface StepExecutionResult {
   status: StepExecutionStatus;
   envelope: StepOutputEnvelope | AgentOutputEnvelope | null;
   appliedToWorkflow: boolean;
-  fallbackReason: 'timeout' | 'low_confidence' | 'error' | null;
+  fallbackReason: AgentFallbackReason | null;
   errorMessage?: string | null;
   executorType: 'agent' | 'script';
   /** Instance status + currentStepId as known by the executor at return time.
@@ -31,7 +31,7 @@ export interface StepExecutorAuditRepo {
 }
 
 export interface StepExecutorInstanceRepo {
-  getById(id: string): Promise<{ status: string; currentStepId: string | null; definitionVersion: string; variables: Record<string, unknown>; totalCostUsd?: number } | null>;
+  getById(id: string): Promise<{ status: string; currentStepId: string | null; definitionVersion: string; variables: Record<string, unknown>; totalCostUsd?: number; evalRunId?: string } | null>;
   update(id: string, data: Record<string, unknown>): Promise<unknown>;
   updateStepExecution(instanceId: string, executionId: string, data: Record<string, unknown>): Promise<unknown>;
   getStepExecutions(instanceId: string): Promise<Array<{ stepId: string; output: unknown }>>;
@@ -51,6 +51,11 @@ export interface StepExecutorEngine {
     verdict: Record<string, unknown>,
     actor: { id: string; role: string },
   ): Promise<{ status: string; currentStepId: string | null; pauseReason?: string | null }>;
+  finishEvalTrial(
+    instanceId: string,
+    stepId: string,
+    outcome: { failed: boolean; error: string | null },
+  ): Promise<{ status: string; currentStepId: string | null }>;
 }
 
 export interface StepExecutorHumanTaskRepo {

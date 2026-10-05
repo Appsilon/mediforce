@@ -24,7 +24,9 @@ All four are registered in
 ## Writing one
 
 Subclass `BaseContainerAgentPlugin` and implement `getAgentCommand()`,
-`getMockDockerArgs()`, and `parseAgentOutput()`. The base class already handles
+`getMockDockerArgs()`, and `parseAgentOutput()`; set `logFormat` to name the
+CLI's stream format, which feeds both the activity log and the Agent Trajectory.
+The base class already handles
 spawning, mounts, git clone, MCP config assembly, environment resolution, and
 output extraction — roughly everything that is hard to get right and identical
 across plugins.
@@ -45,6 +47,18 @@ pipeline. `DATABRICKS_HOST` and `DATABRICKS_TOKEN` come from namespace secrets,
 and secrets are deliberately not an interpolation source — a token must never
 reach Databricks run parameters or an audit snapshot. v1 supports single-task
 jobs only.
+
+## Code checks
+
+`code-check.ts` runs a `code` Evaluator (ADR-0023) with the same runtime
+images and spawn strategy as an inline script, but it is not a step: no run
+worktree, no commit, `--network none`, no capabilities beyond `DAC_OVERRIDE`,
+`no-new-privileges`, process, memory and CPU limits, and the step's workspace commit exported
+read-only (`git archive`) at `/workspace`. The workspace sits beside the output
+directory, never inside it, because the queued strategy ships the output
+directory through Redis. A check that crashes or writes no
+valid `result.json` throws — an Evaluator's defect is never scored as the
+agent's.
 
 ## Shared machinery
 

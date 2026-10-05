@@ -84,43 +84,123 @@ export function createRouteAdapter<
   const successStatus = options.successStatus ?? 200;
 
   return async (req, ctx) => {
-    const callerOrResponse = await resolveCaller(req);
-    if (callerOrResponse instanceof NextResponse) return callerOrResponse;
-    const caller = callerOrResponse;
-
-    let raw: unknown;
+    const prepared = await prepareInvocation(req, ctx, inputSchema, inputFromRequest, resolveCaller, buildScope);
+    if (prepared instanceof NextResponse) return prepared;
     try {
-      raw = await inputFromRequest(req, ctx);
-    } catch (err) {
-      console.error('[route-adapter] inputFromRequest error:', err);
-      return jsonErrorResponse(new HandlerError('validation', 'Invalid input'));
-    }
-
-    const parsed = inputSchema.safeParse(raw);
-    if (!parsed.success) {
-      return jsonErrorResponse(
-        new HandlerError(
-          'validation',
-          parsed.error.issues[0]?.message ?? 'Invalid input',
-          parsed.error.issues,
-        ),
-      );
-    }
-
-    try {
-      const scope = buildScope(caller);
-      const result = await handler(parsed.data as NarrowInput, scope);
+      const result = await handler(prepared.input as NarrowInput, prepared.scope);
       return NextResponse.json(result, { status: successStatus });
     } catch (err) {
-      if (err instanceof HandlerError) return jsonErrorResponse(err);
-      if (err instanceof z.ZodError) {
-        console.error('[route-adapter] handler ZodError:', err.issues);
-        return jsonErrorResponse(new HandlerError('validation', 'Invalid input', err.issues));
-      }
-      console.error('[route-adapter] handler error:', err);
-      return jsonErrorResponse(new HandlerError('internal', 'Internal error'));
+      return jsonErrorResponse(toHandlerError(err));
     }
   };
+}
+
+export type ProgressRouteHandler<Input, Output, Progress> = (
+  input: Input,
+  scope: CallerScope,
+  onProgress: (event: Progress) => void,
+) => Promise<Output>;
+
+export const NDJSON_CONTENT_TYPE = 'application/x-ndjson';
+
+/**
+ * `createRouteAdapter` for a long-running handler that reports progress. A
+ * request that sends `Accept: application/x-ndjson` gets a stream of JSON lines
+ * — `{ progress }` as the handler reports it, then exactly one `{ result }` or
+ * the ADR-0005 `{ error }` envelope. Any other request gets the plain JSON
+ * response `createRouteAdapter` would give. Auth and input failures are
+ * ordinary JSON errors in both cases, since they happen before the stream opens.
+ */
+export function createProgressRouteAdapter<InputSchema extends z.ZodType, Output, Progress>(
+  inputSchema: InputSchema,
+  inputFromRequest: (req: NextRequest, ctx: unknown) => unknown | Promise<unknown>,
+  handler: ProgressRouteHandler<z.infer<InputSchema>, Output, Progress>,
+  options: Pick<RouteAdapterOptions, 'resolveCaller' | 'buildScope'> = {},
+): (req: NextRequest, ctx: unknown) => Promise<NextResponse> {
+  const resolveCaller = options.resolveCaller ?? defaultResolveCaller;
+  const buildScope = options.buildScope ?? defaultBuildScope;
+
+  return async (req, ctx) => {
+    const prepared = await prepareInvocation(req, ctx, inputSchema, inputFromRequest, resolveCaller, buildScope);
+    if (prepared instanceof NextResponse) return prepared;
+    if (req.headers.get('accept')?.includes(NDJSON_CONTENT_TYPE) !== true) {
+      try {
+        return NextResponse.json(await handler(prepared.input, prepared.scope, () => {}));
+      } catch (err) {
+        return jsonErrorResponse(toHandlerError(err));
+      }
+    }
+
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        let open = true;
+        const send = (line: unknown) => {
+          if (open === false) return;
+          try {
+            controller.enqueue(encoder.encode(`${JSON.stringify(line)}\n`));
+          } catch {
+            open = false;
+          }
+        };
+        try {
+          send({ result: await handler(prepared.input, prepared.scope, (progress) => send({ progress })) });
+        } catch (err) {
+          send(toHandlerError(err).toEnvelope());
+        }
+        if (open === true) controller.close();
+      },
+    });
+    return new NextResponse(stream, {
+      headers: { 'Content-Type': NDJSON_CONTENT_TYPE, 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' },
+    });
+  };
+}
+
+async function prepareInvocation<InputSchema extends z.ZodType, Ctx>(
+  req: NextRequest,
+  ctx: Ctx,
+  inputSchema: InputSchema,
+  inputFromRequest: (req: NextRequest, ctx: Ctx) => unknown | Promise<unknown>,
+  resolveCaller: (req: NextRequest) => Promise<CallerIdentity | NextResponse>,
+  buildScope: (caller: CallerIdentity) => CallerScope,
+): Promise<{ input: z.infer<InputSchema>; scope: CallerScope } | NextResponse> {
+  const callerOrResponse = await resolveCaller(req);
+  if (callerOrResponse instanceof NextResponse) return callerOrResponse;
+
+  let raw: unknown;
+  try {
+    raw = await inputFromRequest(req, ctx);
+  } catch (err) {
+    console.error('[route-adapter] inputFromRequest error:', err);
+    return jsonErrorResponse(new HandlerError('validation', 'Invalid input'));
+  }
+
+  const parsed = inputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return jsonErrorResponse(
+      new HandlerError(
+        'validation',
+        parsed.error.issues[0]?.message ?? 'Invalid input',
+        parsed.error.issues,
+      ),
+    );
+  }
+  try {
+    return { input: parsed.data, scope: buildScope(callerOrResponse) };
+  } catch (err) {
+    return jsonErrorResponse(toHandlerError(err));
+  }
+}
+
+function toHandlerError(err: unknown): HandlerError {
+  if (err instanceof HandlerError) return err;
+  if (err instanceof z.ZodError) {
+    console.error('[route-adapter] handler ZodError:', err.issues);
+    return new HandlerError('validation', 'Invalid input', err.issues);
+  }
+  console.error('[route-adapter] handler error:', err);
+  return new HandlerError('internal', 'Internal error');
 }
 
 export interface MultipartRouteAdapterOptions

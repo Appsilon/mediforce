@@ -12,6 +12,9 @@ export { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-de
 export { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository';
 export { AuthorizedCoworkSessionRepository } from './authorized-cowork-session-repository';
 export { AuthorizedAgentRunRepository } from './authorized-agent-run-repository';
+export { AuthorizedAgentTrajectoryRepository } from './authorized-agent-trajectory-repository';
+export { AuthorizedScoreRepository } from './authorized-score-repository';
+export { AuthorizedEvaluationRepository } from './authorized-evaluation-repository';
 export { AuthorizedAuditEventRepository } from './authorized-audit-event-repository';
 export { AuthorizedHandoffRepository } from './authorized-handoff-repository';
 export { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';

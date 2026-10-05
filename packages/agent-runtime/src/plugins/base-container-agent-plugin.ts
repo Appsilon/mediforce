@@ -4,14 +4,15 @@ import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, OutputSchemaShape } from '@mediforce/platform-core';
+import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, AgentTrajectoryEntry } from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
-import { createLineStreamReader, formatAgentLogLine, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
+import { agentLogEntries, createLineStreamReader, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes, unfence } from '@mediforce/platform-core';
+import { MCP_TAPE_DIR, MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from '../mcp/mcp-tape';
 import type { AgentLogFormat } from '@mediforce/platform-core';
 
 /** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`
@@ -205,6 +206,12 @@ export async function cleanupTempDir(tempDir: string | null): Promise<void> {
   }
 }
 
+/** A server name as a file name, distinct for distinct names: every character
+ *  outside [A-Za-z0-9-], `_` included, becomes `_<hex code point>_`. */
+function tapeFileStem(server: string): string {
+  return server.replace(/[^A-Za-z0-9-]/gu, (character) => `_${character.codePointAt(0)!.toString(16)}_`);
+}
+
 /** Build the `headers` map for an HTTP MCP entry based on the resolved
  *  binding's auth discriminator. Returns undefined when there's no auth
  *  to emit — the caller omits the `headers` key entirely in that case.
@@ -242,58 +249,6 @@ function buildHttpHeaders(
   }
   const headerValue = renderOAuthHeader(bundle.headerValueTemplate, bundle.accessToken);
   return { [bundle.headerName]: headerValue };
-}
-
-export type OutputSchema = OutputSchemaShape;
-
-export function validateOutputSchema(
-  output: Record<string, unknown>,
-  schema: OutputSchemaShape,
-): string | null {
-  let data = output;
-
-  if ('raw' in output && typeof output.raw === 'string' && Object.keys(output).length === 1) {
-    try {
-      const parsed = JSON.parse(output.raw);
-      if (Array.isArray(parsed)) return 'expected object, got array';
-      if (typeof parsed !== 'object' || parsed === null) return 'output is not valid JSON';
-      data = parsed as Record<string, unknown>;
-    } catch {
-      return 'output is not valid JSON';
-    }
-  }
-
-  if (Object.keys(data).length === 0
-    || (Object.keys(data).length === 1 && 'raw' in data && (data.raw === '' || data.raw == null))) {
-    return 'output is empty';
-  }
-
-  const required = schema.required ?? [];
-  const missing = required.filter((key) => !(key in data));
-  if (missing.length > 0) return `missing required keys: ${missing.join(', ')}`;
-
-  const properties = schema.properties ?? {};
-  for (const [key, spec] of Object.entries(properties)) {
-    if (!(key in data)) continue;
-    const value = data[key];
-    const expectedType = spec.type;
-    if (!expectedType) continue;
-
-    if (expectedType === 'array' && !Array.isArray(value)) {
-      return `property "${key}" expected array, got ${typeof value}`;
-    }
-    if (expectedType === 'object' && (typeof value !== 'object' || value === null || Array.isArray(value))) {
-      return `property "${key}" expected object, got ${Array.isArray(value) ? 'array' : typeof value}`;
-    }
-    if (expectedType === 'string' && typeof value !== 'string') {
-      return `property "${key}" expected string, got ${typeof value}`;
-    }
-    if (expectedType === 'number' && typeof value !== 'number') {
-      return `property "${key}" expected number, got ${typeof value}`;
-    }
-  }
-
-  return null;
 }
 
 /**
@@ -344,6 +299,14 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *  container can write activity-log entries as the lines arrive. Default:
    *  'none' (this agent streams nothing a reader of the log wants). */
   protected readonly logFormat: AgentLogFormat = 'none';
+
+  /** Record one stdout line in the run's Agent Trajectory (ADR-0023 D8), when
+   *  the runner set a recorder — the same entries the activity log gets. */
+  protected recordTrajectory(line: string): void {
+    if (!isWorkflowAgentContext(this.context) || this.context.trajectory === undefined) return;
+    const entries: AgentTrajectoryEntry[] = agentLogEntries(this.logFormat, line);
+    if (entries.length > 0) this.context.trajectory.record(entries);
+  }
 
   /** Extract a human-readable error detail from the final result/output.
    *  Default: null (no error extraction). */
@@ -456,33 +419,67 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     type HttpEntry = { type: 'http'; url: string; headers?: Record<string, string>; allowedTools?: string[] };
     const mcpConfig: Record<string, StdioEntry | HttpEntry> = {};
 
+    const tapes = isWorkflowAgentContext(this.context) ? this.context.mcpTapes : undefined;
+    const taped = entries.some(([name]) => tapes !== undefined && (name in tapes.replay || tapes.record.includes(name)));
+    // The path the agent sees the tape directory at: /output in a container.
+    const inContainer = this.agentConfig.image !== undefined && this.agentConfig.image !== '';
+    const tapeDir = inContainer ? `/output/${MCP_TAPE_DIR}` : join(outputDir, MCP_TAPE_DIR);
+    const tapeScript = `${tapeDir}/mcp-tape.mjs`;
+    if (taped) {
+      await mkdir(join(outputDir, MCP_TAPE_DIR), { recursive: true });
+      await writeFile(join(outputDir, MCP_TAPE_DIR, 'mcp-tape.mjs'), MCP_TAPE_SCRIPT, 'utf-8');
+    }
+
     for (const [name, server] of entries) {
       const allowedToolsPart = server.allowedTools && server.allowedTools.length > 0
         ? { allowedTools: server.allowedTools }
         : {};
+      const replayTape = tapes?.replay[name];
+      const recorded = tapes?.record.includes(name) === true;
+      const stem = tapeFileStem(name);
 
-      if (server.type === 'stdio') {
+      if (replayTape !== undefined) {
+        await writeFile(join(outputDir, MCP_TAPE_DIR, `${stem}.replay.json`), JSON.stringify(replayTape), 'utf-8');
+        mcpConfig[name] = {
+          type: 'stdio',
+          command: 'node',
+          args: [tapeScript, 'replay', `${tapeDir}/${stem}.replay.json`, `${tapeDir}/${stem}.misses.jsonl`],
+          ...allowedToolsPart,
+        };
+      } else if (server.type === 'stdio') {
         const resolvedEnv: Record<string, string> = {};
         if (server.env) {
           for (const [key, value] of Object.entries(server.env)) {
             resolvedEnv[key] = resolveValue(value, workflowSecrets);
           }
         }
+        const command = recorded ? 'node' : server.command;
+        const args = recorded
+          ? [tapeScript, 'record', `${tapeDir}/${stem}.tape.jsonl`, server.command, ...(server.args ?? [])]
+          : server.args;
         mcpConfig[name] = {
           type: 'stdio',
-          command: server.command,
-          ...(server.args !== undefined && server.args.length > 0 ? { args: server.args } : {}),
+          command,
+          ...(args !== undefined && args.length > 0 ? { args } : {}),
           ...(Object.keys(resolvedEnv).length > 0 ? { env: resolvedEnv } : {}),
           ...allowedToolsPart,
         };
       } else {
         const headers = buildHttpHeaders(name, server.auth, oauthTokens, workflowSecrets);
-        mcpConfig[name] = {
-          type: 'http',
-          url: server.url,
-          ...(headers !== undefined ? { headers } : {}),
-          ...allowedToolsPart,
-        };
+        mcpConfig[name] = recorded
+          ? {
+            type: 'stdio',
+            command: 'node',
+            args: [tapeScript, 'record-http', `${tapeDir}/${stem}.tape.jsonl`, server.url],
+            env: { MCP_TAPE_HEADERS: JSON.stringify(headers ?? {}) },
+            ...allowedToolsPart,
+          }
+          : {
+            type: 'http',
+            url: server.url,
+            ...(headers !== undefined ? { headers } : {}),
+            ...allowedToolsPart,
+          };
       }
     }
 
@@ -496,6 +493,51 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       stepId: this.context.stepId,
       servers: entries.map(([name]) => name),
     });
+  }
+
+  /** Once the agent has exited — finished, failed or timed out: hand each
+   *  recorded server's tape to the caller. Never throws — a tape that cannot
+   *  be read or stored is logged; recording is evidence for a later trial,
+   *  never a reason to fail this one. */
+  protected async storeMcpRecordings(outputDir: string): Promise<void> {
+    if (!isWorkflowAgentContext(this.context) || this.context.mcpTapes === undefined) return;
+    const tapes = this.context.mcpTapes;
+    for (const server of tapes.record) {
+      try {
+        const tape = await readRecordedTape(join(outputDir, MCP_TAPE_DIR, `${tapeFileStem(server)}.tape.jsonl`));
+        if (tape !== null) await tapes.onRecorded(server, tape);
+      } catch (error) {
+        console.warn(
+          `[mcp-tape] could not store the recording of '${server}' for step ${this.context.stepId}:`,
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
+  }
+
+  /** Once the agent has finished: put every call a replayed server could not
+   *  answer into the Agent Trajectory, where the Eval Run report counts them.
+   *  Throws when they cannot all be read or recorded — the trial then fails
+   *  rather than report fewer unanswered calls than it made. */
+  protected async recordMcpReplayMisses(outputDir: string): Promise<void> {
+    if (!isWorkflowAgentContext(this.context) || this.context.mcpTapes === undefined) return;
+    const { mcpTapes: tapes, trajectory } = this.context;
+    for (const server of Object.keys(tapes.replay)) {
+      let misses: Awaited<ReturnType<typeof readReplayMisses>>;
+      try {
+        misses = await readReplayMisses(join(outputDir, MCP_TAPE_DIR, `${tapeFileStem(server)}.misses.jsonl`), server);
+      } catch (error) {
+        throw new Error(
+          `Could not read the calls replayed MCP server '${server}' had no recording for: `
+          + `${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      if (misses.length === 0) continue;
+      if (trajectory === undefined) {
+        throw new Error(`Replayed MCP server '${server}' had no recording for ${misses.length} call(s), and this run keeps no Agent Trajectory to note them in`);
+      }
+      trajectory.record(misses.map(({ ts, miss }) => mcpReplayMissEntry(miss, ts)));
+    }
   }
 
   /** Pre-refactor path: serialize agentConfig.mcpServers (array) directly
@@ -777,6 +819,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     let tempDir: string | null = null;
     let dockerOutputDir: string | null = null;
     let succeeded = false;
+    let replayMissesRecorded = false;
 
     try {
       // Download remote files to local temp dir so the CLI can read them directly
@@ -1007,6 +1050,11 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       // Strip envelope-level fields from result to avoid duplication in UI
       const { confidence: _c, confidence_rationale: _cr, tokenUsage: _tu, ...cleanResult } = parsedResult;
 
+      if (dockerOutputDir !== null) {
+        replayMissesRecorded = true;
+        await this.recordMcpReplayMisses(dockerOutputDir);
+      }
+
       // Persist any deliverable file from the output dir before it gets cleaned up
       const deliverableFile = await this.persistDeliverableFile(
         dockerOutputDir ?? spawnResult.outputDir ?? '',
@@ -1085,6 +1133,15 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       // Re-throw so the agent runner's fallback handler deals with the error
       throw error;
     } finally {
+      if (dockerOutputDir !== null) {
+        // A failed trial is never scored, but its trajectory still shows what replay could not answer.
+        if (replayMissesRecorded === false) {
+          await this.recordMcpReplayMisses(dockerOutputDir).catch((error: unknown) => {
+            console.warn(`[mcp-tape] ${error instanceof Error ? error.message : String(error)}`);
+          });
+        }
+        await this.storeMcpRecordings(dockerOutputDir);
+      }
       if (succeeded) {
         await cleanupTempDir(tempDir);
       }
@@ -1112,10 +1169,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       return streamEvent;
     }
 
-    let contract: AgentOutputContract;
-    try {
-      contract = JSON.parse(agentText) as AgentOutputContract;
-    } catch {
+    const contract = parseAgentContract(agentText);
+    if (contract === null) {
       // Agent text isn't JSON — try reading /output/result.json as fallback
       if (outputDirMapping) {
         try {
@@ -1236,6 +1291,23 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         `Do NOT write deliverable files to ${outputDir} — they will not be committed.\n` +
         `The ${outputDir} directory is for the result contract and temporary/intermediate files only.`,
       );
+    }
+
+    // 4b. Output schema (ADR-0023 D13) — checked by AgentRunner after the run.
+    if (isWorkflowAgentContext(this.context) && this.context.step.agent?.outputSchema) {
+      parts.push(
+        `## Output Schema\n` +
+        `The result JSON must conform to this JSON Schema. It is validated after you finish; ` +
+        `a non-conforming result is rejected.\n` +
+        '```json\n' + JSON.stringify(this.context.step.agent.outputSchema, null, 2) + '\n```',
+      );
+      if (this.context.outputSchemaViolation !== undefined) {
+        parts.push(
+          `## Previous Attempt Rejected\n` +
+          `Your previous result did not match the Output Schema: ${this.context.outputSchemaViolation}\n` +
+          `Produce a result that conforms to the schema.`,
+        );
+      }
     }
 
     // 5. Input context
@@ -1415,6 +1487,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         const trimmed = line.trim();
         if (!trimmed) return;
         rawLines.push(trimmed);
+        this.recordTrajectory(trimmed);
 
         if (logFile) {
           const logEntries = formatAgentLogLine(this.logFormat, trimmed);
@@ -1625,6 +1698,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       logFile,
       imageBuild,
       lineFormat: this.logFormat,
+      // Live on the local strategy; replayed after exit on the queued one.
+      onStdoutLine: (line) => this.recordTrajectory(line),
     });
 
     // The log file is written live by whichever process watched the container
@@ -1691,4 +1766,16 @@ async function readPresentation(outputDir: string): Promise<Presentation | null>
       return null;
     }
   }
+}
+
+/** The agent's answer as JSON — as sent, or out of the markdown fence a model wraps it in. */
+function parseAgentContract(agentText: string): AgentOutputContract | null {
+  for (const candidate of [agentText, unfence(agentText)]) {
+    try {
+      return JSON.parse(candidate) as AgentOutputContract;
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }

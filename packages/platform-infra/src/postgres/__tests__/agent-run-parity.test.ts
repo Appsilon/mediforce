@@ -32,7 +32,10 @@ const skipPg = !DATABASE_URL;
  * namespace mapping registered in `nsByInstance`.
  */
 class StubProcessInstanceRepository implements ProcessInstanceRepository {
-  constructor(private readonly nsByInstance: Map<string, string>) {}
+  constructor(
+    private readonly nsByInstance: Map<string, string>,
+    private readonly evalRunByInstance: Map<string, string> = new Map(),
+  ) {}
 
   async getNamespaceById(instanceId: string): Promise<string | null> {
     return this.nsByInstance.get(instanceId) ?? null;
@@ -47,6 +50,7 @@ class StubProcessInstanceRepository implements ProcessInstanceRepository {
       definitionVersion: '1.0.0',
       status: 'completed',
       namespace,
+      ...(this.evalRunByInstance.has(instanceId) ? { evalRunId: this.evalRunByInstance.get(instanceId) } : {}),
       input: {},
       output: {},
       createdAt: '2026-05-27T00:00:00.000Z',
@@ -103,12 +107,12 @@ function contract(
   name: string,
   factory: () => Promise<{
     repo: AgentRunRepository;
-    registerInstance: (id: string, namespace: string) => Promise<void>;
+    registerInstance: (id: string, namespace: string, evalRunId?: string) => Promise<void>;
   }>,
 ) {
   describe(`${name} — AgentRunRepository contract`, () => {
     let repo: AgentRunRepository;
-    let registerInstance: (id: string, namespace: string) => Promise<void>;
+    let registerInstance: (id: string, namespace: string, evalRunId?: string) => Promise<void>;
 
     beforeEach(async () => {
       ({ repo, registerInstance } = await factory());
@@ -140,6 +144,17 @@ function contract(
       expect(fetched).not.toBeNull();
       expect(fetched?.envelope?.confidence).toBe(0.77);
       expect(fetched?.envelope?.result).toEqual({ ok: true });
+    });
+
+    it('round-trips the span the run was traced under, and none', async () => {
+      const instanceId = randomUUID();
+      await registerInstance(instanceId, 'ws-1');
+      const trace = { traceId: 'a'.repeat(32), spanId: 'b'.repeat(16) };
+      const traced = await repo.create(runFor(instanceId, { trace }));
+      const untraced = await repo.create(runFor(instanceId, { trace: null }));
+
+      expect((await repo.getById(traced.id))?.trace).toEqual(trace);
+      expect((await repo.getById(untraced.id))?.trace ?? null).toBeNull();
     });
 
     it('create supports a null envelope (e.g. running status)', async () => {
@@ -312,6 +327,22 @@ function contract(
       ).rejects.toThrow();
     });
 
+    it('leaves eval trials out of lists and counts (ADR-0023 D4)', async () => {
+      const production = randomUUID();
+      const trial = randomUUID();
+      await registerInstance(production, 'ws-1');
+      await registerInstance(trial, 'ws-1', 'eval-run-1');
+      const kept = await repo.create(runFor(production, { status: 'completed' }));
+      const trialRun = await repo.create(runFor(trial, { status: 'completed' }));
+
+      expect((await repo.list({ limit: 50 })).items.map((r) => r.id)).toEqual([kept.id]);
+      expect((await repo.list({ namespace: 'ws-1', limit: 50 })).items.map((r) => r.id)).toEqual([kept.id]);
+      expect((await repo.listInNamespaces(['ws-1'], { limit: 50 })).items.map((r) => r.id)).toEqual([kept.id]);
+      expect((await repo.countByCardStatus({})).total).toBe(1);
+      expect((await repo.countByCardStatusInNamespaces(['ws-1'], {})).total).toBe(1);
+      expect((await repo.getById(trialRun.id))?.id).toBe(trialRun.id);
+    });
+
     it('list filters by status and by processInstanceIds', async () => {
       const instanceA = randomUUID();
       const instanceB = randomUUID();
@@ -411,12 +442,14 @@ function contract(
 
 contract('InMemoryAgentRunRepository', async () => {
   const nsByInstance = new Map<string, string>();
-  const parents = new StubProcessInstanceRepository(nsByInstance);
+  const evalRunByInstance = new Map<string, string>();
+  const parents = new StubProcessInstanceRepository(nsByInstance, evalRunByInstance);
   const repo = new InMemoryAgentRunRepository(parents);
   return {
     repo,
-    registerInstance: async (id, namespace) => {
+    registerInstance: async (id, namespace, evalRunId) => {
       nsByInstance.set(id, namespace);
+      if (evalRunId !== undefined) evalRunByInstance.set(id, evalRunId);
     },
   };
 });
@@ -478,12 +511,14 @@ describe.skipIf(skipPg)('PostgresAgentRunRepository (parity)', () => {
         `"${schemaName}"."workspace_members", "${schemaName}"."workspaces" CASCADE`,
     );
     const nsByInstance = new Map<string, string>();
-    const parents = new StubProcessInstanceRepository(nsByInstance);
+    const evalRunByInstance = new Map<string, string>();
+    const parents = new StubProcessInstanceRepository(nsByInstance, evalRunByInstance);
     const repo = new PostgresAgentRunRepository(db, parents);
     return {
       repo,
-      registerInstance: async (id, namespace) => {
+      registerInstance: async (id, namespace, evalRunId) => {
         nsByInstance.set(id, namespace);
+        if (evalRunId !== undefined) evalRunByInstance.set(id, evalRunId);
         await setupRow(id, namespace);
       },
     };

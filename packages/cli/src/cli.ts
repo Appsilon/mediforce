@@ -96,6 +96,45 @@ import { namespaceListMembersCommand } from './commands/namespace-list-members';
 import { namespaceCreateCommand } from './commands/namespace-create';
 import { agentRunListCommand } from './commands/agent-run-list';
 import { agentRunGetCommand } from './commands/agent-run-get';
+import { agentRunTrajectoryCommand } from './commands/agent-run-trajectory';
+import { scoreListCommand } from './commands/score-list';
+import { evalBriefGetCommand, evalBriefSetCommand } from './commands/eval-brief';
+import {
+  evalEvaluatorApproveCommand,
+  evalEvaluatorArchiveCommand,
+  evalEvaluatorProductionCommand,
+  evalDriftCommand,
+  evalEvaluatorCreateCommand,
+  evalEvaluatorListCommand,
+  evalEvaluatorPreviewCommand,
+  evalEvaluatorVersionCommand,
+} from './commands/eval-evaluators';
+import {
+  evalCaseAddCommand,
+  evalCaseArchiveCommand,
+  evalCaseEditCommand,
+  evalRunIoCommand,
+  evalCaseFromRunCommand,
+  evalCaseListCommand,
+  evalCasePerturbCommand,
+  evalDatasetFreezeCommand,
+  evalDatasetListCommand,
+  evalMcpPolicyGetCommand,
+  evalMcpPolicySetCommand,
+} from './commands/eval-cases';
+import {
+  evalRunCancelCommand,
+  evalRunFailuresCommand,
+  evalJudgeReviewCommand,
+  evalRunGetCommand,
+  evalRunListCommand,
+  evalRunEstimateCommand,
+  evalRunPrepareCommand,
+  evalRunStartCommand,
+  evalTrialCommand,
+} from './commands/eval-runs';
+import { evalAskCommand } from './commands/eval-ask';
+import { evalCriteriaGetCommand, evalCriteriaSetCommand, evalQualificationCommand, evalValidationCommand } from './commands/eval-qualification';
 import { namespaceUpdateCommand } from './commands/namespace-update';
 import { namespaceDeleteCommand } from './commands/namespace-delete';
 import { namespaceResetCommand } from './commands/namespace-reset';
@@ -228,10 +267,57 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   'agent-run': {
-    description: 'Agent runs (list, get) — single agent invocations inside workflow runs',
+    description: 'Agent runs (list, get, trajectory) — single agent invocations inside workflow runs',
     leaves: {
       list: { description: 'List recent agent runs', fn: agentRunListCommand },
       get: { description: 'Fetch a single agent run', fn: agentRunGetCommand },
+      trajectory: { description: 'Print an agent run\'s tool calls and results', fn: agentRunTrajectoryCommand },
+    },
+  },
+  score: {
+    description: 'Scores — quality judgments on agent runs (list)',
+    leaves: {
+      list: { description: 'List Scores, newest first', fn: scoreListCommand },
+    },
+  },
+  eval: {
+    description: 'Step Evaluation (ADR-0023) — Briefs, Evaluators, Eval Cases, Datasets, MCP eval policy, Acceptance Criteria, Eval Runs, Step Qualification',
+    leaves: {
+      'brief-get': { description: 'Print a step\'s Evaluation Brief', fn: evalBriefGetCommand },
+      'brief-set': { description: 'Write a new Evaluation Brief version', fn: evalBriefSetCommand },
+      'evaluator-list': { description: 'List a step\'s Evaluators', fn: evalEvaluatorListCommand },
+      'evaluator-create': { description: 'Create an Evaluator from a JSON file', fn: evalEvaluatorCreateCommand },
+      'evaluator-version': { description: 'Add an Evaluator version from a JSON file', fn: evalEvaluatorVersionCommand },
+      'evaluator-approve': { description: 'Approve a code Evaluator\'s source', fn: evalEvaluatorApproveCommand },
+      'evaluator-preview': { description: 'Run a draft check against recent outputs', fn: evalEvaluatorPreviewCommand },
+      'evaluator-archive': { description: 'Archive or restore an Evaluator', fn: evalEvaluatorArchiveCommand },
+      'evaluator-production': { description: 'Run an Evaluator in production (--on) or stop (--off)', fn: evalEvaluatorProductionCommand },
+      'case-list': { description: 'List a step\'s Eval Cases', fn: evalCaseListCommand },
+      'case-add': { description: 'Add a hand-written Eval Case', fn: evalCaseAddCommand },
+      'case-from-run': { description: 'Add a production Agent Run to the eval set', fn: evalCaseFromRunCommand },
+      'case-perturb': { description: 'Synthesize a case from a run with deliberate changes', fn: evalCasePerturbCommand },
+      'case-archive': { description: 'Archive or restore an Eval Case', fn: evalCaseArchiveCommand },
+      'case-edit': { description: 'Edit an Eval Case (a new case replaces it)', fn: evalCaseEditCommand },
+      'run-io': { description: 'Show an Agent Run\'s input and output', fn: evalRunIoCommand },
+      'dataset-list': { description: 'List frozen Eval Dataset versions', fn: evalDatasetListCommand },
+      'dataset-freeze': { description: 'Freeze the live cases as a Dataset version', fn: evalDatasetFreezeCommand },
+      'mcp-policy-get': { description: 'Show the step\'s MCP eval policy', fn: evalMcpPolicyGetCommand },
+      'mcp-policy-set': { description: 'Replace the step\'s MCP eval policy', fn: evalMcpPolicySetCommand },
+      'run-estimate': { description: 'Print what an Eval Run would cost, without preparing it', fn: evalRunEstimateCommand },
+      'run-prepare': { description: 'Prepare an Eval Run and print its cost estimate', fn: evalRunPrepareCommand },
+      'run-start': { description: 'Start a prepared Eval Run, confirming its budget', fn: evalRunStartCommand },
+      'run-list': { description: 'List a step\'s Eval Runs', fn: evalRunListCommand },
+      'run-cancel': { description: 'Cancel an Eval Run', fn: evalRunCancelCommand },
+      report: { description: 'Print an Eval Run and its report', fn: evalRunGetCommand },
+      failures: { description: 'Print one variant\'s failing trials in an Eval Run', fn: evalRunFailuresCommand },
+      trial: { description: 'Print one trial of an Eval Run with every Evaluator\'s grade and what its judge read', fn: evalTrialCommand },
+      'judge-review': { description: 'Accept or deny one judge verdict in an Eval Run', fn: evalJudgeReviewCommand },
+      'criteria-get': { description: 'Print a step\'s Acceptance Criteria', fn: evalCriteriaGetCommand },
+      'criteria-set': { description: 'Set a step\'s Acceptance Criteria from a JSON file', fn: evalCriteriaSetCommand },
+      qualification: { description: 'Print a step\'s qualification: Qualified, Stale or Not qualified', fn: evalQualificationCommand },
+      validation: { description: 'Print whether each version of a workflow is verified, step by step', fn: evalValidationCommand },
+      drift: { description: 'Print drift alerts: production Evaluators whose rolling Score mean dropped', fn: evalDriftCommand },
+      ask: { description: 'Ask the step\'s Evaluation Assistant (proposals are printed, not applied)', fn: evalAskCommand },
     },
   },
   model: {

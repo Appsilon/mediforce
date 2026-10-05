@@ -1,5 +1,6 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
+import { pollUntil } from '../helpers/poll-until';
 
 /**
  * Full happy-path through the migrated `POST /api/tasks/:taskId/complete`
@@ -15,23 +16,7 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
  */
 
 const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
-
-async function pollUntil<T>(
-  fn: () => Promise<T | null>,
-  {
-    timeoutMs = 10_000,
-    intervalMs = 200,
-    description = 'condition',
-  }: { timeoutMs?: number; intervalMs?: number; description?: string } = {},
-): Promise<T> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const last = await fn();
-    if (last !== null) return last;
-    await new Promise((r) => setTimeout(r, intervalMs));
-  }
-  throw new Error(`Timed out waiting for ${description} (${timeoutMs}ms)`);
-}
+const POLL_OPTIONS = { timeoutMs: 10_000, intervalMs: 200 };
 
 test.describe('POST /api/tasks/[taskId]/complete — verdict variant', () => {
   test('drives a run to completion and emits the Phase 3 audit chain', async ({
@@ -86,7 +71,7 @@ test.describe('POST /api/tasks/[taskId]/complete — verdict variant', () => {
         };
         return body.tasks.find((t) => t.stepId === 'review') ?? null;
       },
-      { description: `review task for ${instanceId}` },
+      { ...POLL_OPTIONS, description: `review task for ${instanceId}` },
     );
 
     const completeRes = await request.post(`/api/tasks/${task.id}/complete`, {
@@ -110,7 +95,7 @@ test.describe('POST /api/tasks/[taskId]/complete — verdict variant', () => {
         const body = (await res.json()) as { status: string };
         return body.status === 'completed' ? body : null;
       },
-      { description: `instance ${instanceId} to complete` },
+      { ...POLL_OPTIONS, description: `instance ${instanceId} to complete` },
     );
 
     const auditRes = await request.get(`/api/processes/${instanceId}/audit`, {

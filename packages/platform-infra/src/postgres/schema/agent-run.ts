@@ -54,6 +54,9 @@ export const agentRuns = pgTable(
     autonomyLevel: text('autonomy_level').notNull(),
     status: text('status').notNull(),
     fallbackReason: text('fallback_reason'),
+    // Copied from the parent run at write time, like `workspace`, so the Agents
+    // history can leave eval trials out without a join (ADR-0023 D4).
+    evalRunId: text('eval_run_id'),
 
     // Envelope: extracted query columns
     confidence: numeric('confidence'),
@@ -69,6 +72,10 @@ export const agentRuns = pgTable(
     // For UI display
     executorType: text('executor_type'),
     reviewerType: text('reviewer_type'),
+
+    // The OTel span the run was traced under; null when tracing is off.
+    traceId: text('trace_id'),
+    spanId: text('span_id'),
 
     startedAt: timestamp('started_at', { withTimezone: true })
       .notNull()

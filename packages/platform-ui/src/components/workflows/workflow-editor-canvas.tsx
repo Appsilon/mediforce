@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { X, HelpCircle, Save, KeyRound, Code2, FileCode, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Bell, Check, AlertTriangle, Square } from 'lucide-react';
-import { WorkflowDiagram } from '@/components/workflows/workflow-diagram';
+import { WorkflowDiagram, type StepEvaluationMark } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
 import {
   WorkflowStepSchema,
@@ -77,6 +77,8 @@ export interface WorkflowEditorCanvasProps {
   ) => void;
   onDirtyChange?: (dirty: boolean) => void;
   stepErrors?: Record<string, Record<string, string>>;
+  /** Per agent step id, its evaluation in the version being edited — shown only while the step is as saved. */
+  stepEvaluation?: Map<string, StepEvaluationMark>;
 }
 
 /**
@@ -109,6 +111,7 @@ export function WorkflowEditorCanvas({
   onChange,
   onDirtyChange,
   stepErrors,
+  stepEvaluation,
 }: WorkflowEditorCanvasProps) {
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
   const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'settings' | 'notifications' | 'files' | 'add-block' | null>(null);
@@ -141,6 +144,12 @@ export function WorkflowEditorCanvas({
     }
     return map.size > 0 ? map : undefined;
   }, [dockerAvailable, dockerImages, editedSteps]);
+  const savedStepEvaluation = useMemo(() => {
+    if (stepEvaluation === undefined) return undefined;
+    const saved = new Map(initialSteps.map((step) => [step.id, JSON.stringify(step)]));
+    const unchanged = new Set(editedSteps.filter((step) => saved.get(step.id) === JSON.stringify(step)).map((step) => step.id));
+    return new Map([...stepEvaluation].filter(([stepId]) => unchanged.has(stepId)));
+  }, [stepEvaluation, initialSteps, editedSteps]);
 
   const editedStepsRef = useRef(editedSteps);
   const editedTransitionsRef = useRef(editedTransitions);
@@ -1015,6 +1024,7 @@ export function WorkflowEditorCanvas({
             selectedStepId={selectedStepId}
             errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
             warningStepIds={warningStepIds}
+            stepEvaluation={savedStepEvaluation}
             canMoveUp={canMoveUpSet}
             canMoveDown={canMoveDownSet}
             onUndo={undoEdit}

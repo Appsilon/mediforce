@@ -1,0 +1,248 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { evalCaseFromRunCommand, evalCasePerturbCommand, evalMcpPolicySetCommand } from '../commands/eval-cases';
+import { evalDriftCommand, evalEvaluatorProductionCommand } from '../commands/eval-evaluators';
+import { evalCriteriaSetCommand, evalQualificationCommand, evalValidationCommand } from '../commands/eval-qualification';
+import { evalJudgeReviewCommand } from '../commands/eval-runs';
+import { captureOutput, jsonResponse } from './test-helpers';
+
+const ENV = { MEDIFORCE_API_KEY: 'k' };
+const BASE = ['--base-url', 'http://localhost:5555'];
+const STEP = ['--namespace', 'pharma-a', '--workflow', 'ae-grading', '--step', 'grade-aes'];
+
+beforeEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe('mediforce eval', () => {
+  it('case-from-run posts the Agent Run with the chosen expectation', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      evalCase: {
+        namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes',
+        id: '0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'From run', input: { triggerPayload: {}, previousStepOutputs: {} },
+        workspaceSeedCommit: null, expectation: 'negative', expectedOutput: { summary: 'ungraded' }, comparison: 'agreement', agreementInstructions: null, evaluatorIds: null, source: 'production', sourceAgentRunId: 'ar-1', perturbation: null, origin: 'user',
+        split: 'holdout', containsProductionData: true, archived: false, createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
+      },
+    }, 201));
+    const output = captureOutput();
+    const code = await evalCaseFromRunCommand({ argv: ['ar-1', '--expectation', 'negative', '--comparison', 'agreement', '--split', 'holdout', ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe('http://localhost:5555/api/evaluation/cases/from-agent-run');
+    expect(JSON.parse(String(init?.body))).toEqual({
+      agentRunId: 'ar-1', expectation: 'negative', comparison: 'agreement', agreementInstructions: null, evaluatorIds: null, split: 'holdout', origin: 'user',
+    });
+    expect(output.stdoutLines.join('\n')).toContain('(negative, holdout)');
+  });
+
+  it('case-perturb posts the synthesized case from the file for the step', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'eval-cli-'));
+    const file = join(dir, 'case.json');
+    const spec = {
+      name: 'Demographics missing',
+      baseAgentRunId: 'ar-1',
+      perturbation: { kind: 'missing_file', description: 'dm.csv removed' },
+      fileChanges: [{ op: 'delete', path: 'data/dm.csv' }],
+      expectedOutput: { subjects: [] },
+      expectation: 'negative',
+    };
+    writeFileSync(file, JSON.stringify(spec));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      evalCase: {
+        namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes',
+        id: '0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'Demographics missing', input: { triggerPayload: {}, previousStepOutputs: {} },
+        workspaceSeedCommit: 'a1b2c3d4', expectation: 'negative', expectedOutput: { subjects: [] }, comparison: 'exact', agreementInstructions: null, evaluatorIds: null, source: 'synthesized', sourceAgentRunId: 'ar-1',
+        perturbation: spec.perturbation, origin: 'user', split: 'dev', containsProductionData: true, archived: false, createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
+      },
+    }, 201));
+    const output = captureOutput();
+    const code = await evalCasePerturbCommand({ argv: [...STEP, '--file', file, ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe('http://localhost:5555/api/evaluation/cases/perturbed');
+    expect(JSON.parse(String(init?.body))).toEqual({
+      ...spec, namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', inputChanges: [], split: 'dev', origin: 'user',
+      comparison: 'exact', agreementInstructions: null, evaluatorIds: null,
+    });
+    expect(output.stdoutLines.join('\n')).toContain('(missing_file, negative)');
+  });
+
+  it('judge-review posts the decision for one judge verdict on one trial', async () => {
+    const evalRunId = '0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
+    const trialId = '1e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
+    const evaluatorId = '2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      score: {
+        id: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', subject: { type: 'agent_run', id: 'ar-1' }, name: 'judge_review', value: 1, label: 'accepted',
+        comment: 'Rationale holds up', source: 'human', createdBy: 'u-1', metadata: { evalRunId, trialId, judgeReview: 'accepted' },
+        namespace: 'pharma-a', processInstanceId: null, stepId: 'grade-aes', evaluatorId, supersedes: null, createdAt: '2026-09-23T08:00:00.000Z',
+      },
+    }, 201));
+    const output = captureOutput();
+    const code = await evalJudgeReviewCommand({
+      argv: [evalRunId, '--trial', trialId, '--evaluator', evaluatorId, '--accept', '--comment', 'Rationale holds up', ...BASE], env: ENV, output,
+    });
+
+    expect(code).toBe(0);
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe(`http://localhost:5555/api/evaluation/runs/${evalRunId}/judge-reviews`);
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({ trialId, evaluatorId, decision: 'accepted', comment: 'Rationale holds up' });
+    expect(output.stdoutLines).toEqual([`Judge verdict on trial ${trialId} accepted`]);
+  });
+
+  it('judge-review refuses both or neither of --accept and --deny', async () => {
+    const output = captureOutput();
+    const ids = ['0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', '--trial', '1e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', '--evaluator', '2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c'];
+    expect(await evalJudgeReviewCommand({ argv: [...ids, ...BASE], env: ENV, output })).toBe(2);
+    expect(await evalJudgeReviewCommand({ argv: [...ids, '--accept', '--deny', ...BASE], env: ENV, output })).toBe(2);
+  });
+
+  it('evaluator-production --on posts the flag and prints that it waits until it counts', async () => {
+    const evaluatorId = '0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
+    const latest = {
+      evaluatorId, version: 1, rule: 'A fatal AE is graded 5.', severity: 'critical', check: { kind: 'code', runtime: 'python', source: 'print(1)' },
+      origin: 'user', sourceApproval: null, createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
+    };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      evaluator: {
+        namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', id: evaluatorId, name: 'grade-5-flagged', archived: false,
+        runInProduction: true, createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z', latest, versions: [latest],
+        trust: { trusted: false, reason: 'source not approved' },
+        production: { active: false, reason: 'in production once it counts (source not approved)' },
+      },
+    }));
+    const output = captureOutput();
+    const code = await evalEvaluatorProductionCommand({ argv: [evaluatorId, '--on', ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe(`http://localhost:5555/api/evaluation/evaluators/${evaluatorId}/production`);
+    expect(JSON.parse(String(init?.body))).toEqual({ runInProduction: true });
+    expect(output.stdoutLines.join('\n')).toContain('production: in production once it counts (source not approved)');
+  });
+
+  it('evaluator-production refuses both or neither of --on and --off', async () => {
+    const output = captureOutput();
+    expect(await evalEvaluatorProductionCommand({ argv: ['0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', ...BASE], env: ENV, output })).toBe(2);
+    expect(await evalEvaluatorProductionCommand({ argv: ['0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', '--on', '--off', ...BASE], env: ENV, output })).toBe(2);
+  });
+
+  it('drift passes the window and threshold and prints each production Evaluator, alerts first', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      window: 10,
+      threshold: 0.2,
+      evaluators: [
+        {
+          evaluatorId: 'e-1', name: 'grade-5-is-fatal', severity: 'critical', evaluatorVersion: 2,
+          recentMean: 0.6, baselineMean: 0.9, recentCount: 10, baselineCount: 10, drifting: true,
+        },
+        {
+          evaluatorId: 'e-2', name: 'no-phi', severity: 'major', evaluatorVersion: 1,
+          recentMean: 1, baselineMean: null, recentCount: 10, baselineCount: 3, drifting: false,
+        },
+      ],
+    }));
+    const output = captureOutput();
+    const code = await evalDriftCommand({ argv: [...STEP, '--window', '10', '--threshold', '0.2', ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    expect(String(fetchSpy.mock.calls[0]![0])).toBe(
+      'http://localhost:5555/api/evaluation/drift?namespace=pharma-a&workflowName=ae-grading&stepId=grade-aes&window=10&threshold=0.2',
+    );
+    expect(output.stdoutLines).toEqual([
+      'window 10, threshold 0.2',
+      'ALERT  grade-5-is-fatal v2 (critical)  recent 0.60, before 0.90',
+      'ok     no-phi v1 (major)  recent 1.00, before 3/10 Scores',
+    ]);
+  });
+
+  it('drift refuses a threshold outside 0–1', async () => {
+    const output = captureOutput();
+    expect(await evalDriftCommand({ argv: [...STEP, '--threshold', '1.5', ...BASE], env: ENV, output })).toBe(2);
+    expect(await evalDriftCommand({ argv: [...STEP, '--window', 'ten', ...BASE], env: ENV, output })).toBe(2);
+  });
+
+  it('mcp-policy-set sends the servers map from the file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'eval-cli-'));
+    const file = join(dir, 'policy.json');
+    writeFileSync(file, JSON.stringify({ edc: { mode: 'live', denyTools: ['write_record'] } }));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      policy: {
+        namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes',
+        servers: { edc: { mode: 'live', denyTools: ['write_record'] } }, updatedBy: 'u-1', updatedAt: '2026-09-23T08:00:00.000Z',
+      },
+    }));
+    const output = captureOutput();
+    const code = await evalMcpPolicySetCommand({ argv: [...STEP, '--file', file, ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe('http://localhost:5555/api/evaluation/mcp-policy');
+    expect(init?.method).toBe('PUT');
+    expect(JSON.parse(String(init?.body))).toEqual({
+      namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes',
+      servers: { edc: { mode: 'live', denyTools: ['write_record'] } },
+    });
+  });
+
+  it('criteria-set posts the criteria from the file for the step', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'eval-cli-'));
+    const file = join(dir, 'criteria.json');
+    const criteria = { critical: { minPassRate: 0.95, minPassHatK: 0.9 }, major: { minPassRate: 0.8 } };
+    writeFileSync(file, JSON.stringify(criteria));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      criteria: {
+        namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', version: 2, criteria,
+        origin: 'user', createdBy: 'u-1', createdAt: '2026-09-24T08:00:00.000Z',
+      },
+    }, 201));
+    const output = captureOutput();
+    const code = await evalCriteriaSetCommand({ argv: [...STEP, '--file', file, ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe('http://localhost:5555/api/evaluation/acceptance-criteria');
+    expect(JSON.parse(String(init?.body))).toEqual({ namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', criteria, origin: 'user' });
+    expect(output.stdoutLines).toEqual(['Acceptance Criteria v2 written: critical: pass rate ≥ 0.95, pass^k ≥ 0.9; major: pass rate ≥ 0.8']);
+  });
+
+  it('qualification asks for the version given and prints the badge', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      status: 'not_qualified', qualification: null, definitionVersion: 3,
+      validation: { status: 'not_verified', evalRunId: null, reason: 'No Eval Run of version 3 has finished yet.', runInProgress: false },
+      fingerprint: { hash: 'a'.repeat(64), components: Object.fromEntries(['step', 'model', 'systemPrompt', 'skill', 'image', 'mcpServers', 'preamble'].map((component) => [component, 'b'.repeat(64)])) },
+      changed: [], evaluatorsChanged: [], history: [],
+    }));
+    const output = captureOutput();
+    const code = await evalQualificationCommand({ argv: [...STEP, '--version', '3', ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    expect(fetchSpy.mock.calls[0]![0]).toBe('http://localhost:5555/api/evaluation/qualification?namespace=pharma-a&workflowName=ae-grading&stepId=grade-aes&definitionVersion=3');
+    expect(output.stdoutLines).toEqual(['validation not verified: No Eval Run of version 3 has finished yet.', `not qualified  (v3, fingerprint ${'a'.repeat(12)})`]);
+  });
+
+  it('validation prints each workflow version and its agent steps', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      versions: [
+        { definitionVersion: 2, status: 'passed', steps: [{ stepId: 'grade-aes', stepName: 'Grade AEs', validation: { status: 'passed', evalRunId: 'f7a1c2d3-0000-4000-8000-000000000001', reason: 'Eval Run f7a1c2d3 met every criterion.', runInProgress: false } }] },
+        { definitionVersion: 1, status: 'not_verified', steps: [{ stepId: 'grade-aes', stepName: 'Grade AEs', validation: { status: 'not_verified', evalRunId: null, reason: 'No Eval Run of version 1 has finished yet.', runInProgress: false } }] },
+      ],
+    }));
+    const output = captureOutput();
+    const code = await evalValidationCommand({ argv: ['--namespace', 'pharma-a', '--workflow', 'ae-grading', ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    expect(fetchSpy.mock.calls[0]![0]).toBe('http://localhost:5555/api/evaluation/workflow-validation?namespace=pharma-a&workflowName=ae-grading');
+    expect(output.stdoutLines).toEqual([
+      'v2  verified',
+      '  grade-aes  passed: Eval Run f7a1c2d3 met every criterion.',
+      'v1  not verified',
+      '  grade-aes  not verified: No Eval Run of version 1 has finished yet.',
+    ]);
+  });
+});

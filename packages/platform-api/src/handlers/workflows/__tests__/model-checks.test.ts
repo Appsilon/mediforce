@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkRetiredModels } from '../retired-model-check';
+import { checkRetiredModels } from '../model-checks';
 import type { ModelRegistryEntry } from '@mediforce/platform-core';
 
 const baseEntry: ModelRegistryEntry = {

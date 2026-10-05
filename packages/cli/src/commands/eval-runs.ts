@@ -1,0 +1,273 @@
+import { describeMcpReport } from '@mediforce/platform-core';
+import type { EvalRunOutput } from '@mediforce/platform-api/contract';
+import { defineCommand, parsePositiveIntArg } from '../define-command';
+import { printJson, type OutputSink } from '../output';
+import { STEP_ARGS, stepFrom } from './eval-step-args';
+
+function percent(value: number | null): string {
+  return value === null ? '   -' : `${(value * 100).toFixed(0).padStart(3)}%`;
+}
+
+function printRun(output: OutputSink, { evalRun, report }: EvalRunOutput): void {
+  const estimate = evalRun.estimate.totalUsd === null ? 'no estimate' : `est. $${evalRun.estimate.totalUsd} (${evalRun.estimate.basis})`;
+  output.stdout(`${evalRun.id}  ${evalRun.status}  ${evalRun.caseIds.length} case(s) × ${evalRun.trialsPerCase}  budget $${evalRun.budgetUsd}, spent $${evalRun.spentUsd.toFixed(4)}  ${estimate}`);
+  output.stdout(`trials: ${report.trials.scored} scored, ${report.trials.failed} failed, ${report.trials.skipped} skipped, ${report.trials.inProgress} in progress`);
+  if (evalRun.acceptanceCriteria === null) output.stdout('no Acceptance Criteria frozen into this run');
+  output.stdout(describeMcpReport(report.mcp));
+  output.stdout('\nevaluator                 pass   95% CI        pass@k pass^k flaky  errors');
+  for (const evaluator of report.evaluators) {
+    const interval = evaluator.wilsonLower === null ? '      -      ' : `[${percent(evaluator.wilsonLower)}, ${percent(evaluator.wilsonUpper)}]`;
+    const counted = evaluator.counted ? '' : `  not counted (${evaluator.reason})`;
+    const excluded = evaluator.excluded === 0 ? '' : `  ${evaluator.excluded} model verdict(s) left out`;
+    output.stdout(`${evaluator.name.padEnd(24)} ${percent(evaluator.passRate)}  ${interval}  ${percent(evaluator.passAtK)}  ${percent(evaluator.passHatK)} ${percent(evaluator.flakiness)}  ${String(evaluator.errors).padStart(3)}${counted}${excluded}`);
+  }
+  for (const verdict of report.criteria) {
+    output.stdout(`criterion ${verdict.severity}: ${verdict.status.replace('_', ' ')} — ${verdict.reason}`);
+  }
+  if (report.confidence !== null) output.stdout(`confidence: ECE ${report.confidence.ece.toFixed(3)} over ${report.confidence.count} trial(s)`);
+  if (report.recommendation !== null) {
+    const threshold = report.recommendation.confidenceThreshold === null ? '' : ` above confidence ${report.recommendation.confidenceThreshold}`;
+    output.stdout(`routing: ${report.recommendation.autonomyLevel}${threshold} — ${report.recommendation.reason}`);
+  }
+  const leftOut = report.judgeVerdicts.filter((verdict) => verdict.counts === false);
+  if (leftOut.length > 0) output.stdout(`\nmodel verdicts left out of the criteria (review with: mediforce eval judge-review ${evalRun.id} --trial <id> --evaluator <id> --accept|--deny):`);
+  for (const verdict of leftOut) {
+    const confidence = verdict.confidence === null ? 'no confidence' : `confidence ${verdict.confidence.toFixed(2)} < ${verdict.minConfidence ?? '-'}`;
+    const why = verdict.review?.decision === 'denied' ? 'denied' : confidence;
+    output.stdout(`  trial ${verdict.trialId}  ${verdict.name} (${verdict.evaluatorId})  ${verdict.passed ? 'pass' : 'fail'}, ${why}  "${verdict.caseName ?? verdict.caseId}"`);
+  }
+}
+
+export const evalRunEstimateCommand = defineCommand({
+  name: 'mediforce eval run-estimate',
+  description: 'Print what an Eval Run of a step would cost and the budget cap run-prepare would set. Prepares nothing.',
+  args: {
+    ...STEP_ARGS,
+    version: { type: 'string', description: 'Workflow Definition version whose step runs (default: the runnable one)' },
+    dataset: { type: 'string', description: 'Eval Dataset version id (default: the newest)' },
+    trials: { type: 'string', description: 'Trials per case (default: 3)' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const trials = parsePositiveIntArg(args.trials);
+    const version = parsePositiveIntArg(args.version);
+    if (trials === 'invalid' || version === 'invalid') {
+      output.stderr('--trials and --version must be positive integers');
+      return 2;
+    }
+    const result = await mediforce.evaluation.estimateRun({
+      ...stepFrom(args),
+      ...(version !== undefined ? { definitionVersion: version } : {}),
+      ...(args.dataset !== undefined ? { datasetVersionId: args.dataset } : {}),
+      ...(trials !== undefined ? { trialsPerCase: trials } : {}),
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    const estimate = result.estimate.totalUsd === null ? 'no estimate' : `est. $${result.estimate.totalUsd} (${result.estimate.basis})`;
+    const budget = result.suggestedBudgetUsd === null ? 'set --budget to cap it' : `default budget $${result.suggestedBudgetUsd}`;
+    output.stdout(`${result.caseCount} case(s), ${result.trialCount} trial(s)  ${estimate}  ${budget}`);
+    return 0;
+  },
+});
+
+export const evalRunPrepareCommand = defineCommand({
+  name: 'mediforce eval run-prepare',
+  description: 'Prepare an Eval Run of a step and print its cost estimate. Nothing runs until run-start.',
+  args: {
+    ...STEP_ARGS,
+    version: { type: 'string', description: 'Workflow Definition version whose step runs (default: the runnable one)' },
+    dataset: { type: 'string', description: 'Eval Dataset version id (default: the newest)' },
+    trials: { type: 'string', description: 'Trials per case (default: 3)' },
+    concurrency: { type: 'string', description: 'Trials at once (default: 2)' },
+    budget: { type: 'string', description: 'Spend cap in USD (default: 1.5× the estimate)' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const trials = parsePositiveIntArg(args.trials);
+    const concurrency = parsePositiveIntArg(args.concurrency);
+    const version = parsePositiveIntArg(args.version);
+    if (trials === 'invalid' || concurrency === 'invalid' || version === 'invalid') {
+      output.stderr('--trials, --concurrency and --version must be positive integers');
+      return 2;
+    }
+    const result = await mediforce.evaluation.prepareRun({
+      ...stepFrom(args),
+      ...(version !== undefined ? { definitionVersion: version } : {}),
+      ...(args.dataset !== undefined ? { datasetVersionId: args.dataset } : {}),
+      ...(trials !== undefined ? { trialsPerCase: trials } : {}),
+      ...(concurrency !== undefined ? { concurrency } : {}),
+      ...(args.budget !== undefined ? { budgetUsd: Number(args.budget) } : {}),
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    printRun(output, result);
+    output.stdout(`Start it with: mediforce eval run-start ${result.evalRun.id} --confirm-budget ${result.evalRun.budgetUsd}`);
+    return 0;
+  },
+});
+
+export const evalRunStartCommand = defineCommand({
+  name: 'mediforce eval run-start',
+  description: 'Start a prepared Eval Run, confirming the budget it may spend.',
+  args: {
+    evalRunId: { type: 'positional', required: true, description: 'Eval Run id' },
+    'confirm-budget': { type: 'string', required: true, description: 'The run\'s budget in USD, as run-prepare printed it' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.startRun({
+      evalRunId: args.evalRunId,
+      confirmedBudgetUsd: Number(args['confirm-budget']),
+    });
+    if (jsonMode) printJson(output, result);
+    else printRun(output, result);
+    return 0;
+  },
+});
+
+export const evalRunGetCommand = defineCommand({
+  name: 'mediforce eval report',
+  description: 'Print an Eval Run and its report: per Evaluator pass rate, Wilson 95% interval, pass@k, pass^k, flakiness; criteria verdicts and routing.',
+  args: { evalRunId: { type: 'positional', required: true, description: 'Eval Run id' } },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.getRun({ evalRunId: args.evalRunId });
+    if (jsonMode) printJson(output, result);
+    else printRun(output, result);
+    return 0;
+  },
+});
+
+export const evalRunListCommand = defineCommand({
+  name: 'mediforce eval run-list',
+  description: 'List a step\'s Eval Runs, newest first.',
+  args: { ...STEP_ARGS },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.listRuns(stepFrom(args));
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    if (result.evalRuns.length === 0) output.stdout('No Eval Runs.');
+    for (const run of result.evalRuns) {
+      const acceptance = run.acceptance === null ? '' : `  ${run.acceptance.status.replace('_', ' ')}: ${run.acceptance.reason}`;
+      output.stdout(`${run.id}  ${run.status.padEnd(15)} ${run.createdAt}  budget $${run.budgetUsd}, spent $${run.spentUsd.toFixed(4)}${acceptance}`);
+    }
+    return 0;
+  },
+});
+
+export const evalRunCancelCommand = defineCommand({
+  name: 'mediforce eval run-cancel',
+  description: 'Cancel an Eval Run: no new trials start; running ones finish and are scored.',
+  args: { evalRunId: { type: 'positional', required: true, description: 'Eval Run id' } },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.cancelRun({ evalRunId: args.evalRunId });
+    if (jsonMode) printJson(output, result);
+    else printRun(output, result);
+    return 0;
+  },
+});
+
+export const evalRunFailuresCommand = defineCommand({
+  name: 'mediforce eval failures',
+  description: 'Print an Eval Run\'s failing trials — the material a fix starts from: each trial\'s case, its error, and the Evaluators that failed or errored.',
+  args: {
+    evalRunId: { type: 'positional', required: true, description: 'Eval Run id' },
+    limit: { type: 'string', description: 'Most trials to list (default: 50)' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const limit = parsePositiveIntArg(args.limit);
+    if (limit === 'invalid') {
+      output.stderr('--limit must be a positive integer');
+      return 2;
+    }
+    const result = await mediforce.evaluation.getRunFailures({
+      evalRunId: args.evalRunId,
+      ...(limit !== undefined ? { limit } : {}),
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    output.stdout(`${result.total} failing trial(s)${result.total > result.failures.length ? `, showing ${result.failures.length}` : ''}`);
+    for (const failure of result.failures) {
+      output.stdout(`\ntrial ${failure.trialId}  case "${failure.caseName ?? failure.caseId}" (${failure.split ?? '?'}, ${failure.expectation ?? '?'})  ${failure.status}${failure.agentRunId === null ? '' : `  agent run ${failure.agentRunId}`}`);
+      if (failure.expectedOutput !== null) output.stdout(`  expected output (${failure.expectation === 'negative' ? 'to avoid' : 'to match'}): ${JSON.stringify(failure.expectedOutput)}`);
+      if (failure.error !== null) output.stdout(`  error: ${failure.error}`);
+      for (const evaluator of failure.evaluators) {
+        const counted = evaluator.counted ? 'counted' : 'not counted';
+        output.stdout(`  ${evaluator.outcome} ${evaluator.name} (${evaluator.severity} ${evaluator.kind}, ${counted}): ${evaluator.error ?? evaluator.comment ?? ''}`);
+      }
+    }
+    return 0;
+  },
+});
+
+export const evalTrialCommand = defineCommand({
+  name: 'mediforce eval trial',
+  description: 'Print one trial of an Eval Run: its case, the step\'s input and output, and per Evaluator its grade, comment or rationale; --prompts adds what each model judge was sent and answered.',
+  args: {
+    evalRunId: { type: 'positional', required: true, description: 'Eval Run id' },
+    trialId: { type: 'positional', required: true, description: 'Trial id' },
+    prompts: { type: 'boolean', description: 'Also print every message each model judge was sent, and its answers' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.getTrial({ evalRunId: args.evalRunId, trialId: args.trialId });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    const { trial, evalCase } = result;
+    output.stdout(`trial ${trial.id}  ${trial.status}  case "${evalCase?.name ?? trial.caseId}" trial ${trial.trialIndex + 1}${trial.agentRunId === null ? '' : `  agent run ${trial.agentRunId}`}`);
+    if (trial.error !== null) output.stdout(`error: ${trial.error}`);
+    output.stdout(`input: ${JSON.stringify(result.stepInput)}`);
+    if (evalCase?.expectedOutput != null) output.stdout(`expected output (${evalCase.expectation === 'negative' ? 'to avoid' : 'to match'}): ${JSON.stringify(evalCase.expectedOutput)}`);
+    output.stdout(`output: ${JSON.stringify(result.result)}`);
+    for (const entry of result.evaluators) {
+      const { evaluator, score } = entry;
+      const confidence = score?.confidence == null ? '' : `, confidence ${score.confidence}`;
+      output.stdout(`\n${entry.outcome ?? 'not graded'}  ${evaluator.name} v${evaluator.version} (${evaluator.severity} ${evaluator.kind}${evaluator.counted ? '' : ', not counted'}${confidence})`);
+      const said = entry.error ?? score?.comment ?? null;
+      if (said !== null) output.stdout(`  ${said}`);
+      if (args.prompts === true) {
+        for (const message of entry.judgePrompt ?? []) output.stdout(`  --- ${message.role} ---\n${message.content}`);
+        for (const call of entry.judgeCalls ?? []) output.stdout(`  --- assistant (${call.model}, ${call.promptTokens} in / ${call.completionTokens} out tokens, ${call.durationMs} ms) ---\n${call.response}`);
+      }
+    }
+    return 0;
+  },
+});
+
+export const evalJudgeReviewCommand = defineCommand({
+  name: 'mediforce eval judge-review',
+  description: 'Accept or deny one llm_judge verdict or expected-output agreement score on one trial of an Eval Run, after reading its rationale (mediforce eval report). '
+    + 'An accepted verdict counts toward the Acceptance Criteria whatever its confidence; a denied one is left out, never reversed.',
+  args: {
+    evalRunId: { type: 'positional', required: true, description: 'Eval Run id' },
+    trial: { type: 'string', required: true, description: 'Trial id' },
+    evaluator: { type: 'string', required: true, description: 'The judge\'s or expected-output check\'s Evaluator id' },
+    accept: { type: 'boolean', description: 'Count the verdict' },
+    deny: { type: 'boolean', description: 'Leave the verdict out' },
+    comment: { type: 'string', description: 'Why' },
+    uid: { type: 'string', description: 'Who reviews (required with an API key)' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    if ((args.accept === true) === (args.deny === true)) {
+      output.stderr('Pass exactly one of --accept or --deny');
+      return 2;
+    }
+    const decision = args.accept === true ? 'accepted' : 'denied';
+    const result = await mediforce.evaluation.reviewJudgeVerdict({
+      evalRunId: args.evalRunId,
+      trialId: args.trial,
+      evaluatorId: args.evaluator,
+      decision,
+      ...(args.comment !== undefined ? { comment: args.comment } : {}),
+      ...(args.uid !== undefined ? { uid: args.uid } : {}),
+    });
+    if (jsonMode) printJson(output, result);
+    else output.stdout(`Judge verdict on trial ${args.trial} ${decision}`);
+    return 0;
+  },
+});

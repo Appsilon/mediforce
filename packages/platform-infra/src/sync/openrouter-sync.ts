@@ -111,7 +111,9 @@ export async function syncFromOpenRouter(
     throw new Error('Unexpected OpenRouter response shape: expected array of models');
   }
 
-  const entries = models.map(transformModel);
+  // `:batch` variants only run through OpenRouter's batch adapter; the
+  // chat/completions endpoint every caller here uses answers them with a 404.
+  const entries = models.filter((model) => model.id.endsWith(':batch') === false).map(transformModel);
   const synced = await repo.bulkUpsert(entries);
 
   // Retire absent models and reinstate returned ones

@@ -74,7 +74,8 @@ pnpm dev:mock
 Level definitions (L1–L5) + the rules: [e2e-strategy.md](../testing/e2e-strategy.md).
 Product features must land at **L3**.
 
-Playwright's `globalSetup` applies migrations and starts the mock OAuth server —
+Playwright's `globalSetup` applies migrations and starts the mock OAuth server and the
+scripted mock OpenRouter (`E2E_OPENROUTER_MOCK_PORT`, default 9019) —
 no separate migration step before `pnpm test:e2e`.
 
 **Your dev data is safe.** The suite deletes only the workspace handles it owns
@@ -155,8 +156,17 @@ Run a workflow with an agent step, then open http://localhost:6006 — spans
 
 - `MEDIFORCE_OTEL_CAPTURE_CONTENT=true` also records content — step input,
   envelope result, prompt/completion text. Dev/demo only; may contain patient data.
+  It governs exported spans only: Agent Trajectories (ADR-0023 D8) are stored in
+  the platform's Postgres and always keep full content (ADR-0007 D5).
 - `MEDIFORCE_OTEL_EXPORT_ALL_SPANS=true` exports non-`@mediforce/*` spans too
   (Next.js HTTP instrumentation is filtered out by default).
+- `MEDIFORCE_SCORE_EXPORT=phoenix` also writes each Score next to its Agent Run's
+  span as a Phoenix span annotation (at `PHOENIX_BASE_URL`, by default the OTLP
+  endpoint). `langfuse` needs `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY` and
+  `LANGFUSE_SECRET_KEY`. Unset = off. See
+  [Step Evaluation § Score export](../reference/step-evaluation.md#score-export).
+- `MEDIFORCE_DRIFT_WINDOW` / `MEDIFORCE_DRIFT_THRESHOLD` (default 20 / 0.15) set
+  the drift alerts (`mediforce eval drift`).
 - Container agents (claude-code, opencode, script) call their LLM **inside** the
   container, so they have no `openrouter.chat.completion` child span — only the
   platform-side `OpenRouterLlmClient` is traced. In-container tracing needs
@@ -189,6 +199,7 @@ Run a workflow with an agent step, then open http://localhost:6006 — spans
 | Every authenticated journey redirects to `/login`  | `AUTH_SECRET` missing — NextAuth can't sign the session. `playwright.config.ts` carries a fixed test-only fallback. |
 | Playwright: "chromium executable not found"        | `npx playwright install --with-deps chromium`. Binary must match the `@playwright/test` version. |
 | Stale E2E server on 9007                           | `fuser -k 9007/tcp`.                                             |
+| E2E server won't start: `Email is enabled but APP_BASE_URL is not set` | Your `.env` turns email on and the E2E server inherits it. Run with `MEDIFORCE_DISABLE_EMAIL=true`. |
 
 ## Gotchas
 

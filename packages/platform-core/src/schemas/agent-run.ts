@@ -16,6 +16,30 @@ export const AgentRunStatusSchema = z.enum([
   'interrupted',
 ]);
 
+/**
+ * Why a run left the happy path and went to the step's `fallbackBehavior`.
+ * `output_schema` is a `result` that still broke `agent.outputSchema` after
+ * one retry with the validation error (ADR-0023 D13). `production_evaluator`
+ * is a critical `schema` or `code` Evaluator marked to run in production that
+ * failed the result (D13).
+ */
+export const AgentFallbackReasonSchema = z.enum([
+  'timeout',
+  'low_confidence',
+  'error',
+  'output_schema',
+  'production_evaluator',
+]);
+
+/**
+ * The OpenTelemetry span the run was traced under (ADR-0007), when tracing is
+ * on. Lets its Scores be exported next to the trace (ADR-0023).
+ */
+export const AgentRunTraceSchema = z.object({
+  traceId: z.string().regex(/^[0-9a-f]{32}$/),
+  spanId: z.string().regex(/^[0-9a-f]{16}$/),
+});
+
 export const AgentRunSchema = z.object({
   id: z.string(),
   processInstanceId: z.string(),
@@ -29,10 +53,13 @@ export const AgentRunSchema = z.object({
   completedAt: z.string().datetime().nullable(),
   executorType: z.enum(['human', 'agent']).optional(), // for UI display
   reviewerType: z.enum(['human', 'agent', 'none']).optional(), // for UI display
+  trace: AgentRunTraceSchema.nullable().optional(),
 });
 
 export type AgentRunStatus = z.infer<typeof AgentRunStatusSchema>;
+export type AgentFallbackReason = z.infer<typeof AgentFallbackReasonSchema>;
 export type AgentRun = z.infer<typeof AgentRunSchema>;
+export type AgentRunTrace = z.infer<typeof AgentRunTraceSchema>;
 
 /**
  * KPI-card bucket for Monitoring → Agents — coarser than `AgentRunStatus`

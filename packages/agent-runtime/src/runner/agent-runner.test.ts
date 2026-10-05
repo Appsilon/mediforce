@@ -1,15 +1,18 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentRunner } from './agent-runner';
+import { PluginRunner } from './plugin-runner';
 import {
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
   InMemoryAgentRunRepository,
+  InMemoryAgentTrajectoryRepository,
   type WorkflowStep,
 } from '@mediforce/platform-core';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { InMemoryAgentEventLog } from '../testing/index';
 import { NoopLlmClient } from '../testing/index';
 import type {
+  AgentOutputGate,
   StepExecutorPlugin,
   AgentContext,
   EmitFn,
@@ -267,6 +270,20 @@ describe('AgentRunner', () => {
     expect(span.attributes['gen_ai.request.model']).toBe('anthropic/claude-sonnet-4');
     expect(span.attributes['openinference.span.kind']).toBe('AGENT');
     expect(span.ended).toBe(true);
+  });
+
+  it('records the span it ran under on the Agent Run, and none without a tracer provider', async () => {
+    const agentRunRepo = new InMemoryAgentRunRepository();
+    const tracedRunner = new AgentRunner(instanceRepository, auditRepository, eventLog, agentRunRepo);
+
+    await tracedRunner.runWithWorkflowStep(makeSuccessPlugin(makeValidEnvelope()), makeWorkflowContext());
+    trace.setGlobalTracerProvider(new RecordingTracerProvider());
+    await tracedRunner.runWithWorkflowStep(makeSuccessPlugin(makeValidEnvelope()), makeWorkflowContext());
+
+    const traces = (await agentRunRepo.getByInstanceId('instance-1')).map((agentRun) => agentRun.trace);
+    expect(traces).toHaveLength(2);
+    expect(traces).toContainEqual(null);
+    expect(traces).toContainEqual({ traceId: '1'.repeat(32), spanId: '2'.repeat(16) });
   });
 
   it('does not record run input/output on the span by default (content capture off)', async () => {
@@ -620,7 +637,7 @@ describe('AgentRunner', () => {
 });
 
 describe('AgentRunner.reapAsTimeout (issue #868)', () => {
-  it('terminates the orphaned running AgentRun and routes through the timeout fallback', async () => {
+  it('terminates the orphaned running AgentRun, routes through the timeout fallback, and names the run', async () => {
     const instanceRepository = new InMemoryProcessInstanceRepository();
     const auditRepository = new InMemoryAuditRepository();
     const eventLog = new InMemoryAgentEventLog();
@@ -654,6 +671,7 @@ describe('AgentRunner.reapAsTimeout (issue #868)', () => {
 
     expect(result.fallbackReason).toBe('timeout');
     expect(result.status).toBe('escalated');
+    expect(result.agentRunId).toBe('run-stranded');
 
     const stranded = await agentRunRepo.getById('run-stranded');
     expect(stranded?.status).toBe('escalated');
@@ -746,5 +764,306 @@ describe('AgentRunner.markStepRunsInterrupted (issue #907)', () => {
 
     const count = await runner.markStepRunsInterrupted('instance-1', 'step-1');
     expect(count).toBe(0);
+  });
+});
+
+describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
+  const outputSchema = { type: 'object' as const, required: ['findings'], properties: { findings: { type: 'array' as const } } };
+
+  function makeSchemaStepContext(
+    fallbackBehavior: 'escalate_to_human' | 'continue_with_flag' | 'pause',
+  ): WorkflowAgentContext {
+    const base = makeWorkflowContext({ autonomyLevel: 'L4' });
+    return {
+      ...base,
+      step: { ...base.step, agent: { ...base.step.agent, outputSchema, fallbackBehavior } },
+    };
+  }
+
+  /** Emits each envelope in turn — one per attempt — and records the context each attempt saw. */
+  function makeScriptedPlugin(envelopes: AgentOutputEnvelope[]) {
+    const seenContexts: WorkflowAgentContext[] = [];
+    let attempt = 0;
+    const plugin: StepExecutorPlugin = {
+      initialize: async (context) => {
+        seenContexts.push(context as WorkflowAgentContext);
+      },
+      run: async (emit: EmitFn) => {
+        const envelope = envelopes[Math.min(attempt, envelopes.length - 1)]!;
+        attempt += 1;
+        await emit({ type: 'result', payload: envelope, timestamp: new Date().toISOString() });
+      },
+    };
+    return { plugin, seenContexts };
+  }
+
+  let instanceRepository: InMemoryProcessInstanceRepository;
+  let eventLog: InMemoryAgentEventLog;
+  let runner: AgentRunner;
+
+  beforeEach(async () => {
+    instanceRepository = new InMemoryProcessInstanceRepository();
+    eventLog = new InMemoryAgentEventLog();
+    runner = new AgentRunner(instanceRepository, new InMemoryAuditRepository(), eventLog);
+    await createTestInstance(instanceRepository);
+  });
+
+  it('accepts a conforming result on the first attempt without retrying', async () => {
+    const { plugin, seenContexts } = makeScriptedPlugin([makeValidEnvelope({ result: { findings: [] } })]);
+
+    const result = await runner.runWithWorkflowStep(plugin, makeSchemaStepContext('continue_with_flag'));
+
+    expect(result.status).toBe('completed');
+    expect(result.fallbackReason).toBeNull();
+    expect(seenContexts).toHaveLength(1);
+  });
+
+  it('retries once with the validation error and accepts a corrected result', async () => {
+    const { plugin, seenContexts } = makeScriptedPlugin([
+      makeValidEnvelope({ result: { summary: 'no findings key' } }),
+      makeValidEnvelope({ result: { findings: ['AE grade 3'] } }),
+    ]);
+
+    const result = await runner.runWithWorkflowStep(plugin, makeSchemaStepContext('continue_with_flag'));
+
+    expect(result.status).toBe('completed');
+    expect(result.envelope?.result).toEqual({ findings: ['AE grade 3'] });
+    expect(seenContexts).toHaveLength(2);
+    expect(seenContexts[0]!.outputSchemaViolation).toBeUndefined();
+    expect(seenContexts[1]!.outputSchemaViolation).toBe('missing required keys: findings');
+    const statuses = eventLog.getEvents('instance-1', 'step-1')
+      .filter((event) => event.type === 'status')
+      .map((event) => String(event.payload));
+    expect(statuses.some((payload) => payload.includes('missing required keys: findings'))).toBe(true);
+  });
+
+  it('routes a second violation to fallbackBehavior with reason output_schema', async () => {
+    const { plugin, seenContexts } = makeScriptedPlugin([
+      makeValidEnvelope({ result: { summary: 'still wrong' } }),
+    ]);
+
+    const result = await runner.runWithWorkflowStep(plugin, makeSchemaStepContext('escalate_to_human'));
+
+    expect(seenContexts).toHaveLength(2);
+    expect(result.status).toBe('escalated');
+    expect(result.fallbackReason).toBe('output_schema');
+    expect(result.errorMessage).toContain('missing required keys: findings');
+    const instance = await instanceRepository.getById('instance-1');
+    expect(instance?.pauseReason).toBe('agent_escalated');
+  });
+
+  it('does not retry a non-schema failure', async () => {
+    const { plugin, seenContexts } = makeScriptedPlugin([
+      makeValidEnvelope({ confidence: 0.2, result: { findings: [] } }),
+    ]);
+    const context = makeSchemaStepContext('continue_with_flag');
+    const lowThresholdContext = {
+      ...context,
+      step: { ...context.step, agent: { ...context.step.agent, confidenceThreshold: 0.8 } },
+    };
+
+    const result = await runner.runWithWorkflowStep(plugin, lowThresholdContext);
+
+    expect(result.fallbackReason).toBe('low_confidence');
+    expect(seenContexts).toHaveLength(1);
+  });
+
+  describe('output gate — production Evaluators (D13)', () => {
+    function gatedContext(gate: AgentOutputGate, fallbackBehavior: 'escalate_to_human' | 'continue_with_flag' = 'escalate_to_human'): WorkflowAgentContext {
+      return { ...makeSchemaStepContext(fallbackBehavior), outputGate: gate };
+    }
+
+    function statuses(): string[] {
+      return eventLog.getEvents('instance-1', 'step-1')
+        .filter((event) => event.type === 'status')
+        .map((event) => String(event.payload));
+    }
+
+    it('hands a conforming result to the gate with its Agent Run and lets a pass through', async () => {
+      const gate = vi.fn<AgentOutputGate>().mockResolvedValue({ failure: null, errors: [] });
+      const { plugin } = makeScriptedPlugin([makeValidEnvelope({ result: { findings: [] } })]);
+
+      const result = await runner.runWithWorkflowStep(plugin, gatedContext(gate));
+
+      expect(result.status).toBe('completed');
+      expect(result.fallbackReason).toBeNull();
+      expect(gate).toHaveBeenCalledOnce();
+      const [call] = gate.mock.calls[0]!;
+      expect(call.agentRunId).toBe(result.agentRunId);
+      expect(call.envelope.result).toEqual({ findings: [] });
+    });
+
+    it('routes a gate failure to fallbackBehavior with reason production_evaluator', async () => {
+      const auditRepository = new InMemoryAuditRepository();
+      runner = new AgentRunner(instanceRepository, auditRepository, eventLog);
+      const gate: AgentOutputGate = async () => ({ failure: "Evaluator 'grade-5-flagged' v1 failed: grade 4 on a fatal AE", errors: [] });
+      const { plugin } = makeScriptedPlugin([makeValidEnvelope({ result: { findings: [] } })]);
+
+      const result = await runner.runWithWorkflowStep(plugin, gatedContext(gate));
+
+      expect(result.status).toBe('escalated');
+      expect(result.fallbackReason).toBe('production_evaluator');
+      expect(result.errorMessage).toContain('grade 4 on a fatal AE');
+      expect((await instanceRepository.getById('instance-1'))?.pauseReason).toBe('agent_escalated');
+      expect(statuses().some((payload) => payload.includes('failed a production Evaluator'))).toBe(true);
+      const [audit] = await auditRepository.getByProcess('instance-1');
+      expect(audit?.outputSnapshot).toMatchObject({ error: expect.stringContaining('grade 4 on a fatal AE') });
+    });
+
+    it('keeps a low-confidence signal in the error when the gate fails too', async () => {
+      const gate: AgentOutputGate = async () => ({ failure: "Evaluator 'grade-5-flagged' v1 failed", errors: [] });
+      const { plugin } = makeScriptedPlugin([makeValidEnvelope({ confidence: 0.5, result: { findings: [] } })]);
+      const context = gatedContext(gate);
+      const lowThresholdContext = {
+        ...context,
+        step: { ...context.step, agent: { ...context.step.agent, confidenceThreshold: 0.8 } },
+      };
+
+      const result = await runner.runWithWorkflowStep(plugin, lowThresholdContext);
+
+      expect(result.fallbackReason).toBe('production_evaluator');
+      expect(result.errorMessage).toContain('grade-5-flagged');
+      expect(result.errorMessage).toContain('below the confidence threshold');
+    });
+
+    it('never gates a result that still broke outputSchema', async () => {
+      const gate = vi.fn<AgentOutputGate>().mockResolvedValue({ failure: null, errors: [] });
+      const { plugin } = makeScriptedPlugin([makeValidEnvelope({ result: { summary: 'still wrong' } })]);
+
+      const result = await runner.runWithWorkflowStep(plugin, gatedContext(gate));
+
+      expect(result.fallbackReason).toBe('output_schema');
+      expect(gate).not.toHaveBeenCalled();
+    });
+
+    it('records checks that could not run, and a gate that throws, without failing the run', async () => {
+      const { plugin } = makeScriptedPlugin([makeValidEnvelope({ result: { findings: [] } })]);
+      const withErrors = await runner.runWithWorkflowStep(
+        plugin,
+        gatedContext(async () => ({ failure: null, errors: ['grade-5-flagged: script crashed'] })),
+      );
+      const thrown = await runner.runWithWorkflowStep(plugin, gatedContext(async () => {
+        throw new Error('database unreachable');
+      }));
+
+      expect(withErrors.status).toBe('completed');
+      expect(thrown.status).toBe('completed');
+      expect(statuses()).toEqual(expect.arrayContaining([
+        expect.stringContaining('grade-5-flagged: script crashed'),
+        expect.stringContaining('database unreachable'),
+      ]));
+    });
+  });
+
+  describe('retry budget — both attempts fit inside one step timeout', () => {
+    const STEP_TIMEOUT_MS = 10 * 60_000;
+
+    function makeTimedSchemaStepContext(): WorkflowAgentContext {
+      const context = makeSchemaStepContext('escalate_to_human');
+      return {
+        ...context,
+        step: { ...context.step, agent: { ...context.step.agent, timeoutMinutes: STEP_TIMEOUT_MS / 60_000 } },
+      };
+    }
+
+    /** A plugin whose first attempt takes `firstAttemptMs` of wall-clock time and violates the schema. */
+    function makeSlowViolatingPlugin(firstAttemptMs: number) {
+      const scripted = makeScriptedPlugin([
+        makeValidEnvelope({ result: { summary: 'no findings key' } }),
+        makeValidEnvelope({ result: { findings: [] } }),
+      ]);
+      const run = scripted.plugin.run;
+      let attempts = 0;
+      scripted.plugin.run = async (emit: EmitFn) => {
+        if (attempts === 0) vi.setSystemTime(Date.now() + firstAttemptMs);
+        attempts += 1;
+        await run(emit);
+      };
+      return scripted;
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('gives the retry only the budget the first attempt left', async () => {
+      const execute = vi.spyOn(PluginRunner.prototype, 'execute');
+      const { plugin, seenContexts } = makeSlowViolatingPlugin(4 * 60_000);
+
+      const result = await runner.runWithWorkflowStep(plugin, makeTimedSchemaStepContext());
+
+      expect(seenContexts).toHaveLength(2);
+      expect(result.status).toBe('completed');
+      expect(execute.mock.calls.map((call) => call[2])).toEqual([STEP_TIMEOUT_MS, 6 * 60_000]);
+    });
+
+    it('skips the retry and takes the output_schema fallback when the budget is spent', async () => {
+      const { plugin, seenContexts } = makeSlowViolatingPlugin(STEP_TIMEOUT_MS);
+
+      const result = await runner.runWithWorkflowStep(plugin, makeTimedSchemaStepContext());
+
+      expect(seenContexts).toHaveLength(1);
+      expect(result.fallbackReason).toBe('output_schema');
+      expect(result.status).toBe('escalated');
+      expect(result.errorMessage).toContain('missing required keys: findings');
+    });
+  });
+});
+
+describe('AgentRunner Agent Trajectory (ADR-0023 D8)', () => {
+  function makeRecordingPlugin(): StepExecutorPlugin {
+    let context: WorkflowAgentContext | null = null;
+    return {
+      initialize: async (ctx) => {
+        context = ctx as WorkflowAgentContext;
+      },
+      run: async (emit: EmitFn) => {
+        context?.trajectory?.record([
+          { ts: '2026-09-23T08:00:00.000Z', type: 'assistant', subtype: 'tool_call', tool: 'Read', input: { file_path: '/data/ae.csv' } },
+        ]);
+        await emit({ type: 'result', payload: makeValidEnvelope(), timestamp: new Date().toISOString() });
+      },
+    };
+  }
+
+  async function setup(captureContent: boolean) {
+    const instanceRepository = new InMemoryProcessInstanceRepository();
+    await createTestInstance(instanceRepository);
+    const agentRunRepo = new InMemoryAgentRunRepository();
+    const trajectoryRepo = new InMemoryAgentTrajectoryRepository(agentRunRepo);
+    const runner = new AgentRunner(
+      instanceRepository, new InMemoryAuditRepository(), new InMemoryAgentEventLog(), agentRunRepo,
+      { captureContent }, trajectoryRepo,
+    );
+    return { runner, agentRunRepo, trajectoryRepo };
+  }
+
+  it('stores what the plugin recorded under the Agent Run id, flushed before the run returns', async () => {
+    const { runner, agentRunRepo, trajectoryRepo } = await setup(true);
+
+    await runner.runWithWorkflowStep(makeRecordingPlugin(), makeWorkflowContext());
+
+    const [agentRun] = await agentRunRepo.getByInstanceId('instance-1');
+    const entries = await trajectoryRepo.list(agentRun!.id);
+    expect(entries).toEqual([
+      { seq: 0, ts: '2026-09-23T08:00:00.000Z', type: 'assistant', subtype: 'tool_call', tool: 'Read', input: { file_path: '/data/ae.csv' } },
+    ]);
+  });
+
+  it('keeps full content when span content capture is off — the switch governs exported spans only (ADR-0007 D5)', async () => {
+    const { runner, agentRunRepo, trajectoryRepo } = await setup(false);
+
+    await runner.runWithWorkflowStep(makeRecordingPlugin(), makeWorkflowContext());
+
+    const [agentRun] = await agentRunRepo.getByInstanceId('instance-1');
+    const [entry] = (await trajectoryRepo.list(agentRun!.id)) ?? [];
+    expect(entry).toEqual({
+      seq: 0, ts: '2026-09-23T08:00:00.000Z', type: 'assistant', subtype: 'tool_call', tool: 'Read', input: { file_path: '/data/ae.csv' },
+    });
   });
 });

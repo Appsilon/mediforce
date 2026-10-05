@@ -65,7 +65,7 @@ export { transferWorkflowNamespace } from './workflows/transfer-workflow';
 export { importWorkflow } from './workflows/import-workflow';
 export { getManifest } from './workflows/get-manifest';
 export { getWorkflowRunCount } from './workflows/get-run-count';
-export { checkRetiredModels } from './workflows/retired-model-check';
+export { checkRetiredModels, checkUnknownModels } from './workflows/model-checks';
 
 export { chatCoworkSession } from './cowork/chat';
 export { createVoiceEphemeralKey } from './cowork/voice-ephemeral-key';
@@ -161,6 +161,52 @@ export { seedImageCatalogEntries } from './image-catalog/seed-entries';
 
 export { listAgentRuns } from './agent-runs/list-agent-runs';
 export { getAgentRunCardStatusCounts } from './agent-runs/get-agent-run-card-status-counts';
+export { getAgentTrajectory } from './agent-runs/get-agent-trajectory';
+export { listScores } from './scores/list-scores';
+export {
+  getEvaluationBrief,
+  setEvaluationBrief,
+  listEvaluators,
+  getEvaluator,
+  createEvaluator,
+  addEvaluatorVersion,
+  archiveEvaluator,
+  setEvaluatorProduction,
+  approveEvaluatorSource,
+  previewEvaluator,
+  listStepAgentRuns,
+  listEvalCases,
+  createEvalCase,
+  createEvalCaseFromAgentRun,
+  createPerturbedEvalCase,
+  getStepDrift,
+  archiveEvalCase,
+  updateEvalCase,
+  getAgentRunIo,
+  listEvalDatasets,
+  freezeEvalDataset,
+  getMcpEvalPolicy,
+  setMcpEvalPolicy,
+  estimateEvalRunCost,
+  prepareEvalRun,
+  startEvalRun,
+  getEvalRun,
+  listEvalRuns,
+  cancelEvalRun,
+  advanceEvalRunOfInstance,
+  driveOpenEvalRuns,
+  getAcceptanceCriteria,
+  setAcceptanceCriteria,
+  getStepQualification,
+  getWorkflowValidation,
+  signStepQualification,
+  getEvalRunFailures,
+  getEvalTrial,
+  reviewJudgeVerdict,
+  computeStepFingerprint,
+  changedFingerprintComponents,
+} from './evaluation/index';
+export { askEvaluationAssistant } from './evaluation-assistant/index';
 export { getMonitoringSummary } from './monitoring/get-monitoring-summary';
 
 export { getConfig, getConfigByPrefix } from './config/index';

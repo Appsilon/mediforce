@@ -4,6 +4,7 @@ import type {
   AgentEventRepository,
   AgentOAuthTokenRepository,
   AgentRunRepository,
+  AgentTrajectoryRepository,
   AuditRepository,
   BlobStore,
   CoworkSessionRepository,
@@ -20,6 +21,8 @@ import type {
   PlatformSettingsRepository,
   ProcessInstanceRepository,
   ProcessRepository,
+  ScoreRepository,
+  EvaluationRepository,
   ToolCatalogRepository,
   TriggerRepository,
   UserDirectoryService,
@@ -27,6 +30,7 @@ import type {
   WorkflowAssistantInstructionsRepository,
   WorkflowSecretsRepository,
   AutoJoinRule,
+  DriftSettings,
 } from '@mediforce/platform-core';
 import type {
   CronTrigger,
@@ -44,12 +48,15 @@ import { AuthorizedAgentDefinitionRepository } from './authorized-agent-definiti
 import { AuthorizedAgentEventRepository } from './authorized-agent-event-repository';
 import { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository';
 import { AuthorizedAgentRunRepository } from './authorized-agent-run-repository';
+import { AuthorizedAgentTrajectoryRepository } from './authorized-agent-trajectory-repository';
 import { AuthorizedAuditEventRepository } from './authorized-audit-event-repository';
 import { AuthorizedCoworkSessionRepository } from './authorized-cowork-session-repository';
 import { AuthorizedHandoffRepository } from './authorized-handoff-repository';
 import { AuthorizedHumanTaskRepository } from './authorized-human-task-repository';
 import { AuthorizedImageCatalogRepository } from './authorized-image-catalog-repository';
 import { AuthorizedOAuthProviderRepository } from './authorized-oauth-provider-repository';
+import { AuthorizedScoreRepository } from './authorized-score-repository';
+import { AuthorizedEvaluationRepository } from './authorized-evaluation-repository';
 import { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';
 import { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
 import { AuthorizedTriggerRepository } from './authorized-trigger-repository';
@@ -70,6 +77,9 @@ export interface CallerScopeServices {
   readonly auditRepo: AuditRepository;
   readonly agentEventRepo: AgentEventRepository;
   readonly agentRunRepo: AgentRunRepository;
+  readonly agentTrajectoryRepo: AgentTrajectoryRepository;
+  readonly scoreRepo: ScoreRepository;
+  readonly evaluationRepo: EvaluationRepository;
   readonly humanTaskRepo: HumanTaskRepository;
   readonly taskAttachmentRepo: TaskAttachmentRepository;
   readonly blobStore: BlobStore;
@@ -104,6 +114,7 @@ export interface CallerScopeServices {
   readonly emailProviderInfo: EmailProviderInfo | null;
   readonly passwordAuthEnabled: boolean;
   readonly autoJoinWorkspaces: readonly AutoJoinRule[];
+  readonly driftSettings: DriftSettings;
 }
 
 /**
@@ -135,6 +146,9 @@ export function createCallerScope(
     ),
     agentRuns: new AuthorizedAgentRunRepository(caller, services.agentRunRepo),
     agentEvents: new AuthorizedAgentEventRepository(caller, services.agentEventRepo),
+    agentTrajectories: new AuthorizedAgentTrajectoryRepository(caller, services.agentTrajectoryRepo),
+    scores: new AuthorizedScoreRepository(caller, services.scoreRepo),
+    evaluation: new AuthorizedEvaluationRepository(caller, services.evaluationRepo),
     auditEvents: new AuthorizedAuditEventRepository(caller, services.auditRepo),
     handoffs: new AuthorizedHandoffRepository(caller, services.handoffRepo),
     toolCatalog: new AuthorizedToolCatalogRepository(caller, services.toolCatalogRepo),
@@ -185,6 +199,7 @@ export function createCallerScope(
       emailProviderInfo: services.emailProviderInfo,
       passwordAuthEnabled: services.passwordAuthEnabled,
       autoJoinWorkspaces: services.autoJoinWorkspaces,
+      driftSettings: services.driftSettings,
     },
   };
 }

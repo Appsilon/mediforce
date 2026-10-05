@@ -75,6 +75,30 @@ describe('syncFromOpenRouter', () => {
     expect(result.rankingsUpdated).toBe(1);
   });
 
+  it('leaves out :batch variants, which chat/completions rejects, and retires any already stored', async () => {
+    stubOpenRouter({
+      models: [makeFakeModel({ id: 'openai/gpt-6-luna' }), makeFakeModel({ id: 'openai/gpt-6-luna:batch' })],
+    });
+    const upserted: string[] = [];
+    let keptIds: string[] = [];
+
+    await syncFromOpenRouter(
+      makeRepo({
+        bulkUpsert: async (items) => {
+          upserted.push(...items.map((item) => item.id));
+          return items.length;
+        },
+        retireAbsentModels: async (ids) => {
+          keptIds = ids;
+          return { retired: 0, reinstated: 0 };
+        },
+      }),
+    );
+
+    expect(upserted).toEqual(['openai/gpt-6-luna']);
+    expect(keptIds).toEqual(['openai/gpt-6-luna']);
+  });
+
   it('skips rankings rows without a numeric request count', async () => {
     stubOpenRouter({
       models: [makeFakeModel()],

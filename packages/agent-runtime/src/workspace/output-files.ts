@@ -8,6 +8,7 @@
  */
 import { copyFile, mkdir, readdir, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { MCP_TAPE_DIR } from '../mcp/mcp-tape';
 
 /**
  * Engine-owned control files that must never become Output Files. Shared with
@@ -24,6 +25,9 @@ export const INTERNAL_OUTPUT_FILE_NAMES: ReadonlySet<string> = new Set([
   'input.json',
   'previous_run.json',
   'mcp-config.json',
+  // An eval trial's MCP recordings and replay tapes (mcp/mcp-tape.ts) — tool
+  // results the platform stores itself, never the agent's deliverable.
+  MCP_TAPE_DIR,
   // Inline-script payloads seeded by ScriptContainerPlugin — one per
   // RUNTIME_CONFIG extension (script-container-plugin.ts).
   'script.mjs',
