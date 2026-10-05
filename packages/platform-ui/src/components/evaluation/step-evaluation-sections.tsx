@@ -1576,7 +1576,9 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRu
   const [confirming, setConfirming] = React.useState(false);
   const trials = parseTrialsPerCase(trialsText);
   const budgetUsd = parseBudgetUsd(budgetText);
-  const estimate = useEvalRunEstimate(step, definitionVersion, mayRun ? trials : null);
+  const versions = datasets.data?.datasets ?? [];
+  const [nextDataset] = versions;
+  const estimate = useEvalRunEstimate(step, definitionVersion, mayRun && nextDataset !== undefined ? trials : null);
   const budget: BudgetChoice = budgetUsd === null
     ? { kind: 'auto', suggestedUsd: estimate.data?.suggestedBudgetUsd ?? null }
     : { kind: 'set', budgetUsd };
@@ -1591,15 +1593,13 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRu
     const confirmedBudgetUsd = budget.kind === 'set' ? budget.budgetUsd : budget.suggestedUsd ?? undefined;
     return mediforce.evaluation.startRun({ evalRunId: prepared.evalRun.id, confirmedBudgetUsd });
   });
-  const estimateLabel = trials === null ? null
+  const estimateLabel = trials === null || nextDataset === undefined ? null
     : estimate.isError ? '(no estimate)'
       : estimate.data === undefined ? '(estimating…)'
         : estimate.data.estimate.totalUsd === null ? '(no estimate)'
           : `(estimated ${formatCostUsd(estimate.data.estimate.totalUsd)})`;
   const runs = (data.data?.evalRuns ?? []).filter((run) => run.definitionVersion === definitionVersion || run.status === 'prepared' || run.status === 'running');
   const otherVersion = (run: { definitionVersion: number }) => (run.definitionVersion === definitionVersion ? undefined : run.definitionVersion);
-  const versions = datasets.data?.datasets ?? [];
-  const [nextDataset] = versions;
   const datasetVersion = new Map(versions.map((dataset) => [dataset.id, dataset.version]));
   // Prepared by the assistant or from the CLI, or left when starting one failed: each waits for a person to confirm its budget.
   const waiting: { prepared: PreparedEvalRun; otherVersion: number | undefined }[] = runs.filter((run) => run.status === 'prepared').map((run) => ({
