@@ -4,34 +4,14 @@ import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  ArrowLeft,
-  Bot, Cpu, Terminal, BarChart3, Brain, Zap,
-  Shield, Code, Database, Globe, Sparkles, Settings,
-  Eye, EyeOff,
-} from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
-import { ModelPicker } from '@/components/agents/model-picker';
+import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { cn } from '@/lib/utils';
-import type { LucideIcon } from 'lucide-react';
 import type { AgentDefinition } from '@mediforce/platform-core';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
+import { AGENT_ICON_OPTIONS, RecognitionLabel } from '@/components/agents/agent-form-parts';
 import { ConceptIntro } from '@/components/ui/concept-intro';
-
-const ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [
-  { icon: Bot,      label: 'Bot'      },
-  { icon: Cpu,      label: 'CPU'      },
-  { icon: Terminal, label: 'Terminal' },
-  { icon: BarChart3,label: 'Chart'    },
-  { icon: Brain,    label: 'Brain'    },
-  { icon: Zap,      label: 'Zap'      },
-  { icon: Shield,   label: 'Shield'   },
-  { icon: Code,     label: 'Code'     },
-  { icon: Database, label: 'Database' },
-  { icon: Globe,    label: 'Globe'    },
-  { icon: Sparkles, label: 'Sparkles' },
-  { icon: Settings, label: 'Settings' },
-];
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 
@@ -67,6 +47,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const [prompt, setPrompt] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch(`/api/agents/${id}`)
@@ -97,6 +78,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
 
   async function handleSave() {
     setSaving(true);
+    setError(null);
     try {
       const payload = {
         name: name.trim(),
@@ -108,12 +90,19 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         systemPrompt: prompt,
         visibility,
       };
-      await apiFetch(`/api/agents/${id}`, {
+      const res = await apiFetch(`/api/agents/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      if (!res.ok) throw new Error(`${res.status}`);
       router.push(`/${handle}/agents`);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Could not save the agent: ${err.message}`
+          : 'Could not save the agent.',
+      );
     } finally {
       setSaving(false);
     }
@@ -154,7 +143,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
           <div className="space-y-2">
             <label className="text-sm font-medium">Icon</label>
             <div className="flex flex-wrap gap-2">
-              {ICON_OPTIONS.map(({ icon: Icon, label }) => (
+              {AGENT_ICON_OPTIONS.map(({ icon: Icon, label }) => (
                 <button
                   key={label}
                   type="button"
@@ -175,7 +164,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
 
           {/* 3. Description */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Description</label>
+            <RecognitionLabel>Description (optional)</RecognitionLabel>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -216,7 +205,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
           {/* 5. Input / Output descriptions */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Input</label>
+              <RecognitionLabel>Input (optional)</RecognitionLabel>
               <input
                 type="text"
                 value={inputDescription}
@@ -226,7 +215,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Output</label>
+              <RecognitionLabel>Output (optional)</RecognitionLabel>
               <input
                 type="text"
                 value={outputDescription}
@@ -240,18 +229,20 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
           {/* 6. Foundation model */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Foundation model</label>
-            <ModelPicker value={selectedModelId} onChange={setSelectedModelId} />
+            <ModelPicker
+              ariaLabel="Foundation model"
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              value={selectedModelId === '' ? undefined : selectedModelId}
+              onChange={(model) => setSelectedModelId(model ?? '')}
+            />
             <p className="text-xs text-muted-foreground">
               Used by every workflow step that calls this agent, unless the step sets its own model.
             </p>
           </div>
 
-          {/* MCP Servers — bindings persisted separately via /mcp-servers endpoints */}
-          <AgentMcpSection agentId={id} handle={handle} />
-
           {/* 7. System prompt */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">System prompt</label>
+            <label className="text-sm font-medium">System prompt (optional)</label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -260,6 +251,9 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
               className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none font-mono"
             />
           </div>
+
+          {/* MCP Servers — bindings persisted separately via /mcp-servers endpoints */}
+          <AgentMcpSection agentId={id} handle={handle} />
 
           {/* 8. Save */}
           <div className="flex flex-col items-start gap-1.5 pt-2 pb-6">
@@ -275,6 +269,11 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
             >
               {saving ? 'Saving…' : 'Save changes'}
             </button>
+            {error !== null && (
+              <p className="text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            )}
           </div>
 
         </div>

@@ -3,48 +3,12 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import {
-  ArrowLeft,
-  Bot, Cpu, Terminal, BarChart3, Brain, Zap,
-  Shield, Code, Database, Globe, Sparkles, Settings, Info,
-} from 'lucide-react';
 import { mediforce } from '@/lib/mediforce';
 import type { AgentMcpBindingMap } from '@mediforce/platform-core';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
+import { AGENT_ICON_OPTIONS, RecognitionLabel } from '@/components/agents/agent-form-parts';
 import { cn } from '@/lib/utils';
-import { InstantTooltip } from '@/components/ui/instant-tooltip';
-import type { LucideIcon } from 'lucide-react';
-
-const ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [
-  { icon: Bot,      label: 'Bot'      },
-  { icon: Cpu,      label: 'CPU'      },
-  { icon: Terminal, label: 'Terminal' },
-  { icon: BarChart3,label: 'Chart'    },
-  { icon: Brain,    label: 'Brain'    },
-  { icon: Zap,      label: 'Zap'      },
-  { icon: Shield,   label: 'Shield'   },
-  { icon: Code,     label: 'Code'     },
-  { icon: Database, label: 'Database' },
-  { icon: Globe,    label: 'Globe'    },
-  { icon: Sparkles, label: 'Sparkles' },
-  { icon: Settings, label: 'Settings' },
-];
-
-const RECOGNITION_ONLY_HINT =
-  'Not used by the model. This is for people to recognise the agent when wiring a step.';
-
-function RecognitionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <label className="flex items-center gap-1.5 text-sm font-medium">
-      {children}
-      <InstantTooltip label={RECOGNITION_ONLY_HINT}>
-        <Info className="h-3.5 w-3.5 text-muted-foreground" aria-label={RECOGNITION_ONLY_HINT} />
-      </InstantTooltip>
-    </label>
-  );
-}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -116,7 +80,7 @@ export default function NewAgentPage() {
         <div className="space-y-2">
           <label className="text-sm font-medium">Icon</label>
           <div className="flex flex-wrap gap-2">
-            {ICON_OPTIONS.map(({ icon: Icon, label }) => (
+            {AGENT_ICON_OPTIONS.map(({ icon: Icon, label }) => (
               <button
                 key={label}
                 type="button"
