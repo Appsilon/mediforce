@@ -8,13 +8,8 @@ import { stopRetryOn4xx } from '@/lib/retry';
 import { NICE_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
 import type { ModelPricing } from '@/lib/agent-cost';
 
-/**
- * Platform-wide model id → pricing lookup, synced from OpenRouter. Pricing
- * changes rarely, so NICE LIVE (30 s) is plenty — matches the cadence used
- * for other low-change reference data (e.g. the run name map).
- */
-export function useModelPricing(): Map<string, ModelPricing> {
-  const query = useQuery({
+export function useModelRegistry() {
+  return useQuery({
     queryKey: queryKeys.modelRegistry.list(),
     queryFn: async () => {
       const result = await mediforce.models.list();
@@ -24,6 +19,15 @@ export function useModelPricing(): Map<string, ModelPricing> {
     refetchInterval: (q) => (q.state.error !== null ? false : NICE_LIVE_INTERVAL_MS),
     retry: stopRetryOn4xx,
   });
+}
+
+/**
+ * Platform-wide model id → pricing lookup, synced from OpenRouter. Pricing
+ * changes rarely, so NICE LIVE (30 s) is plenty — matches the cadence used
+ * for other low-change reference data (e.g. the run name map).
+ */
+export function useModelPricing(): Map<string, ModelPricing> {
+  const query = useModelRegistry();
 
   const models = query.data ?? [];
   return useMemo(() => {

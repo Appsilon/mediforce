@@ -16,8 +16,14 @@ function encode(segment: string): string {
  */
 export type AdminEntryPoint = 'tools' | 'settings';
 
-function withEntryPoint(path: string, from: AdminEntryPoint | undefined): string {
-  return from === undefined ? path : `${path}?from=${from}`;
+type AdminPageParams = { from?: AdminEntryPoint; create?: boolean };
+
+function withAdminParams(path: string, params: AdminPageParams | undefined): string {
+  const query = new URLSearchParams();
+  if (params?.from !== undefined) query.set('from', params.from);
+  if (params?.create === true) query.set('new', '1');
+  const qs = query.toString();
+  return qs === '' ? path : `${path}?${qs}`;
 }
 
 export function adminBackHref(handle: string, from: string | null): string {
@@ -112,10 +118,10 @@ export const routes = {
   settings: (handle: string) => `/${handle}/settings`,
 
   // ── Admin ──────────────────────────────────────────────────────
-  adminToolCatalog: (handle: string, params?: { from?: AdminEntryPoint }) =>
-    withEntryPoint(`/${handle}/admin/tool-catalog`, params?.from),
-  adminOAuthProviders: (handle: string, params?: { from?: AdminEntryPoint }) =>
-    withEntryPoint(`/${handle}/admin/oauth-providers`, params?.from),
+  adminToolCatalog: (handle: string, params?: AdminPageParams) =>
+    withAdminParams(`/${handle}/admin/tool-catalog`, params),
+  adminOAuthProviders: (handle: string, params?: AdminPageParams) =>
+    withAdminParams(`/${handle}/admin/oauth-providers`, params),
   adminInfrastructure: (handle: string) => `/${handle}/admin/infrastructure`,
 
   // ── Orgs ───────────────────────────────────────────────────────

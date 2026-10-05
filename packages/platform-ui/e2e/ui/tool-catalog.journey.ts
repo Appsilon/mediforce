@@ -18,9 +18,8 @@ test.describe('Tool Catalog Journey', () => {
     await expect(page.getByText(/secrets required/i).first()).toBeVisible();
     await expect(page.getByText(/open access/i).first()).toBeVisible();
 
-    // Admins see the "Manage catalog" shortcut.
-    await expect(page.getByRole('link', { name: /manage catalog/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /bind to an agent/i })).toBeVisible();
+    // Admins see the "Add MCP" entry point.
+    await expect(page.getByRole('link', { name: /add mcp/i })).toBeVisible();
 
     // Search filters entries by id.
     await page.getByPlaceholder('Search tools...').click();
@@ -49,9 +48,9 @@ test.describe('Tool Catalog Journey', () => {
     await page.getByRole('link', { name: /back to tools/i }).click();
     await expect(page.getByRole('heading', { name: 'Tools' })).toBeVisible({ timeout: 10_000 });
 
-    // Manage catalog entered from Tools goes back to Tools, not to the workspace home.
-    await page.getByRole('link', { name: /manage catalog/i }).click();
-    await expect(page.getByRole('heading', { name: /tool catalog/i })).toBeVisible({ timeout: 30_000 });
+    // Add MCP entered from Tools goes back to Tools, not to the workspace home.
+    await page.getByRole('link', { name: /add mcp/i }).click();
+    await expect(page.getByRole('heading', { name: /add mcp server/i })).toBeVisible({ timeout: 30_000 });
     await page.getByRole('link', { name: 'Back' }).click();
     await expect(page.getByRole('heading', { name: 'Tools' })).toBeVisible({ timeout: 10_000 });
   });

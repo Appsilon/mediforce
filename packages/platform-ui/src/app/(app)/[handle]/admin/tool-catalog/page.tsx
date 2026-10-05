@@ -64,21 +64,29 @@ export default function AdminToolCatalogPage() {
 
   // Sync selected entry with ?id= query
   const selectedId = search.get('id');
+  const wantsNew = search.get('new') === '1';
+  const focusedEdit = search.get('from') === 'tools' && selectedId !== null;
+  const focused = wantsNew || focusedEdit;
   useEffect(() => {
     if (selectedId === null) {
-      setMode((current) => (current.kind === 'edit' ? { kind: 'idle' } : current));
+      setMode((current) => {
+        if (current.kind === 'edit') return { kind: 'idle' };
+        if (wantsNew && current.kind === 'idle') return { kind: 'create' };
+        return current;
+      });
       return;
     }
     const match = entries.find((entry) => entry.id === selectedId);
     if (match !== undefined) {
       setMode({ kind: 'edit', entry: match });
     }
-  }, [selectedId, entries]);
+  }, [selectedId, wantsNew, entries]);
 
   const handleSelect = useCallback(
     (id: string) => {
       const qs = new URLSearchParams(search.toString());
       qs.set('id', id);
+      qs.delete('new');
       router.replace(`/${handle}/admin/tool-catalog?${qs.toString()}`);
     },
     [handle, router, search],
@@ -87,6 +95,7 @@ export default function AdminToolCatalogPage() {
   const handleNew = useCallback(() => {
     const qs = new URLSearchParams(search.toString());
     qs.delete('id');
+    qs.delete('new');
     const url = qs.toString() !== '' ? `/${handle}/admin/tool-catalog?${qs.toString()}` : `/${handle}/admin/tool-catalog`;
     router.replace(url);
     setMode({ kind: 'create' });
@@ -102,8 +111,15 @@ export default function AdminToolCatalogPage() {
           await mediforce.toolCatalog.update({ namespace: handle, id, ...patch });
         } else {
           await mediforce.toolCatalog.create({ namespace: handle, ...entry });
+        }
+        if (focused) {
+          router.push(adminBackHref(handle, search.get('from')));
+          return;
+        }
+        if (mode.kind !== 'edit') {
           const qs = new URLSearchParams(search.toString());
           qs.set('id', entry.id);
+          qs.delete('new');
           router.replace(`/${handle}/admin/tool-catalog?${qs.toString()}`);
         }
         await refresh();
@@ -112,7 +128,7 @@ export default function AdminToolCatalogPage() {
         throw err;
       }
     },
-    [mode, handle, refresh, router, search],
+    [mode, handle, refresh, router, search, focused],
   );
 
   const referenceCount = useMemo(() => {
@@ -131,10 +147,22 @@ export default function AdminToolCatalogPage() {
   const handleDeleteConfirm = useCallback(async () => {
     if (deleteTarget === null) return;
     const target = deleteTarget;
+    if (focused) {
+      setDeleteTarget(null);
+      try {
+        await mediforce.toolCatalog.delete({ namespace: handle, id: target.id });
+      } catch (err: unknown) {
+        setFormError(err instanceof Error ? err.message : 'Delete failed.');
+        return;
+      }
+      router.push(adminBackHref(handle, search.get('from')));
+      return;
+    }
     // Close the dialog and clear selection up-front so the UI responds
     // immediately; failures surface as a page-level listError via refresh().
     const qs = new URLSearchParams(search.toString());
     qs.delete('id');
+    qs.delete('new');
     const url = qs.toString() !== '' ? `/${handle}/admin/tool-catalog?${qs.toString()}` : `/${handle}/admin/tool-catalog`;
     router.replace(url);
     setMode({ kind: 'idle' });
@@ -145,7 +173,7 @@ export default function AdminToolCatalogPage() {
       setListError(err instanceof Error ? err.message : 'Delete failed.');
     }
     await refresh();
-  }, [deleteTarget, handle, refresh, router, search]);
+  }, [deleteTarget, handle, refresh, router, search, focused]);
 
   if (roleLoading) {
     return (
@@ -158,6 +186,76 @@ export default function AdminToolCatalogPage() {
   if (!canAdmin) {
     // Redirect effect above handles navigation; render nothing to avoid flash.
     return null;
+  }
+
+  if (focused) {
+    const editing = mode.kind === 'edit' ? mode.entry : null;
+    return (
+      <div className="min-h-screen bg-background px-4 py-8">
+        <div className="mx-auto max-w-2xl">
+          <div className="mb-6 flex items-center gap-3">
+            <Link
+              href={adminBackHref(handle, search.get('from'))}
+              className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              aria-label="Back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+            <div>
+              <h1 className="text-xl font-semibold">
+                {focusedEdit ? (
+                  <>
+                    Edit MCP server <span className="font-mono">{selectedId}</span>
+                  </>
+                ) : (
+                  'Add MCP server'
+                )}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                A stdio MCP server approved for agents in @{handle}.
+              </p>
+            </div>
+          </div>
+          {listError !== null && (
+            <div className="mb-4 rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {listError}
+            </div>
+          )}
+          <section className="rounded-lg border bg-card px-5 py-5">
+            {focusedEdit ? (
+              listLoading ? (
+                <div className="py-8 text-center text-sm text-muted-foreground animate-pulse">Loading…</div>
+              ) : editing === null ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No catalog entry <span className="font-mono">{selectedId}</span> found.
+                </p>
+              ) : (
+                <CatalogForm
+                  key={editing.id}
+                  entry={editing}
+                  onSubmit={handleSubmit}
+                  onDelete={() => setDeleteTarget(editing)}
+                  submitError={formError}
+                />
+              )
+            ) : (
+              <CatalogForm entry={null} onSubmit={handleSubmit} submitError={formError} />
+            )}
+          </section>
+        </div>
+        {deleteTarget !== null && (
+          <DeleteCatalogEntryDialog
+            entryId={deleteTarget.id}
+            referenceCount={referenceCount}
+            open={true}
+            onOpenChange={(open) => {
+              if (!open) setDeleteTarget(null);
+            }}
+            onConfirm={handleDeleteConfirm}
+          />
+        )}
+      </div>
+    );
   }
 
   return (

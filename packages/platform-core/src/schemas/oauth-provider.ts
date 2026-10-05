@@ -80,8 +80,8 @@ export const UpdateOAuthProviderInputSchema = CreateOAuthProviderInputSchema.omi
 
 export type UpdateOAuthProviderInput = z.infer<typeof UpdateOAuthProviderInputSchema>;
 
-/** Built-in provider presets. UI exposes these as "Add GitHub" / "Add Google"
- *  buttons that pre-fill the admin form. Admin still supplies clientId +
+/** Built-in provider presets. UI exposes these as the GitHub / Google switch on
+ *  "Add provider", pre-filling the admin form. Admin still supplies clientId +
  *  clientSecret for their own OAuth App. */
 export const OAUTH_PROVIDER_PRESETS = {
   github: {

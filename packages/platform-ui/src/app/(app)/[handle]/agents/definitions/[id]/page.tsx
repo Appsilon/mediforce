@@ -1,37 +1,17 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  ArrowLeft,
-  Bot, Cpu, Terminal, BarChart3, Brain, Zap,
-  Shield, Code, Database, Globe, Sparkles, Settings,
-  Check, ChevronDown, Eye, EyeOff,
-} from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
-import { FOUNDATION_MODELS } from '@/lib/agent-models';
+import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { cn } from '@/lib/utils';
-import type { LucideIcon } from 'lucide-react';
 import type { AgentDefinition } from '@mediforce/platform-core';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
+import { AGENT_ICON_OPTIONS, RecognitionLabel } from '@/components/agents/agent-form-parts';
 import { ConceptIntro } from '@/components/ui/concept-intro';
-
-const ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [
-  { icon: Bot,      label: 'Bot'      },
-  { icon: Cpu,      label: 'CPU'      },
-  { icon: Terminal, label: 'Terminal' },
-  { icon: BarChart3,label: 'Chart'    },
-  { icon: Brain,    label: 'Brain'    },
-  { icon: Zap,      label: 'Zap'      },
-  { icon: Shield,   label: 'Shield'   },
-  { icon: Code,     label: 'Code'     },
-  { icon: Database, label: 'Database' },
-  { icon: Globe,    label: 'Globe'    },
-  { icon: Sparkles, label: 'Sparkles' },
-  { icon: Settings, label: 'Settings' },
-];
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 
@@ -64,12 +44,10 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const [inputDescription, setInputDescription] = useState('');
   const [outputDescription, setOutputDescription] = useState('');
   const [selectedModelId, setSelectedModelId] = useState('');
-  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
   const [saving, setSaving] = useState(false);
-
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch(`/api/agents/${id}`)
@@ -96,11 +74,11 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
       .finally(() => setLoadingDef(false));
   }, [id]);
 
-  const activeModel = FOUNDATION_MODELS.find((m) => m.id === selectedModelId);
   const canSave = name.trim().length > 0 && selectedModelId !== '' && !saving;
 
   async function handleSave() {
     setSaving(true);
+    setError(null);
     try {
       const payload = {
         name: name.trim(),
@@ -112,28 +90,23 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         systemPrompt: prompt,
         visibility,
       };
-      await apiFetch(`/api/agents/${id}`, {
+      const res = await apiFetch(`/api/agents/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      if (!res.ok) throw new Error(`${res.status}`);
       router.push(`/${handle}/agents`);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Could not save the agent: ${err.message}`
+          : 'Could not save the agent.',
+      );
     } finally {
       setSaving(false);
     }
   }
-
-  // Close dropdown on outside click
-  React.useEffect(() => {
-    if (!modelDropdownOpen) return;
-    function handleClick(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setModelDropdownOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [modelDropdownOpen]);
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6 max-w-2xl">
@@ -170,7 +143,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
           <div className="space-y-2">
             <label className="text-sm font-medium">Icon</label>
             <div className="flex flex-wrap gap-2">
-              {ICON_OPTIONS.map(({ icon: Icon, label }) => (
+              {AGENT_ICON_OPTIONS.map(({ icon: Icon, label }) => (
                 <button
                   key={label}
                   type="button"
@@ -191,7 +164,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
 
           {/* 3. Description */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Description</label>
+            <RecognitionLabel>Description (optional)</RecognitionLabel>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -232,7 +205,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
           {/* 5. Input / Output descriptions */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Input</label>
+              <RecognitionLabel>Input (optional)</RecognitionLabel>
               <input
                 type="text"
                 value={inputDescription}
@@ -242,7 +215,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Output</label>
+              <RecognitionLabel>Output (optional)</RecognitionLabel>
               <input
                 type="text"
                 value={outputDescription}
@@ -256,62 +229,21 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
           {/* 6. Foundation model */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Foundation model</label>
-            <div className="relative" ref={dropdownRef}>
-              <button
-                type="button"
-                onClick={() => setModelDropdownOpen((prev) => !prev)}
-                className={cn(
-                  'flex w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm transition-colors',
-                  'hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-ring',
-                  modelDropdownOpen && 'ring-2 ring-ring border-ring',
-                )}
-              >
-                {activeModel ? (
-                  <span className="flex items-center gap-2">
-                    <activeModel.Logo className="h-4 w-4 shrink-0" style={{ color: activeModel.logoColor }} />
-                    <span>{activeModel.name}</span>
-                    <span className="text-muted-foreground text-xs">— {activeModel.provider}</span>
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">Select a model…</span>
-                )}
-                <ChevronDown
-                  className={cn('h-4 w-4 text-muted-foreground shrink-0 transition-transform', modelDropdownOpen && 'rotate-180')}
-                />
-              </button>
-
-              {modelDropdownOpen && (
-                <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow-md py-1">
-                  {FOUNDATION_MODELS.map((model) => (
-                    <button
-                      key={model.id}
-                      type="button"
-                      onClick={() => { setSelectedModelId(model.id); setModelDropdownOpen(false); }}
-                      className={cn(
-                        'flex w-full items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-accent transition-colors',
-                        selectedModelId === model.id && 'bg-accent',
-                      )}
-                    >
-                      <model.Logo className="h-4 w-4 shrink-0" style={{ color: model.logoColor }} />
-                      <span className="flex-1">{model.name}</span>
-                      <span className="text-xs text-muted-foreground">{model.provider}</span>
-                      {selectedModelId === model.id && <Check className="h-3.5 w-3.5 text-primary" />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <ModelPicker
+              showAllModels
+              ariaLabel="Foundation model"
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              value={selectedModelId === '' ? undefined : selectedModelId}
+              onChange={(model) => setSelectedModelId(model ?? '')}
+            />
             <p className="text-xs text-muted-foreground">
               Used by every workflow step that calls this agent, unless the step sets its own model.
             </p>
           </div>
 
-          {/* MCP Servers — bindings persisted separately via /mcp-servers endpoints */}
-          <AgentMcpSection agentId={id} handle={handle} />
-
           {/* 7. System prompt */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">System prompt</label>
+            <label className="text-sm font-medium">System prompt (optional)</label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -320,6 +252,9 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
               className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none font-mono"
             />
           </div>
+
+          {/* MCP Servers — bindings persisted separately via /mcp-servers endpoints */}
+          <AgentMcpSection agentId={id} handle={handle} />
 
           {/* 8. Save */}
           <div className="flex flex-col items-start gap-1.5 pt-2 pb-6">
@@ -335,6 +270,11 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
             >
               {saving ? 'Saving…' : 'Save changes'}
             </button>
+            {error !== null && (
+              <p className="text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            )}
           </div>
 
         </div>

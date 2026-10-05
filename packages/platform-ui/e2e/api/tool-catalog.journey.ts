@@ -55,4 +55,18 @@ test.describe('tool-catalog admin API journey', () => {
     const remaining = (await afterDelete.json()) as { entries: Array<{ id: string }> };
     expect(remaining.entries.map((e) => e.id)).not.toContain(entryId);
   });
+
+  test('discover rejects private targets and unauthenticated callers', async ({ request }) => {
+    const privateRes = await request.post(
+      `/api/admin/tool-catalog/discover?namespace=${TEST_ORG_HANDLE}`,
+      { headers: authHeaders, data: { type: 'http', url: 'http://169.254.169.254/latest' } },
+    );
+    expect(privateRes.status(), await privateRes.text()).toBe(400);
+
+    const unauthRes = await request.post(
+      `/api/admin/tool-catalog/discover?namespace=${TEST_ORG_HANDLE}`,
+      { data: { type: 'http', url: 'https://mcp.example.com/mcp' } },
+    );
+    expect(unauthRes.status()).toBe(401);
+  });
 });

@@ -4,18 +4,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  ChevronRight,
   Database,
   FlaskConical,
   Globe,
   HardDrive,
   KeyRound,
-  Plug,
+  Pencil,
+  Plus,
   Search,
-  Settings,
   Shield,
   ShieldAlert,
   ShieldCheck,
+  Trash2,
   Wrench,
 } from 'lucide-react';
 import type { AgentDefinition, ToolCatalogEntry } from '@mediforce/platform-core';
@@ -24,6 +24,8 @@ import { ConceptPopover } from '@/components/ui/concept-intro';
 import { routes } from '@/lib/routes';
 import { apiFetch } from '@/lib/api-fetch';
 import { mediforce } from '@/lib/mediforce';
+import { deleteAgentBinding } from '@/lib/agent-mcp-client';
+import { DeleteCatalogEntryDialog } from '@/components/admin/tool-catalog/delete-catalog-entry-dialog';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useAuth } from '@/contexts/auth-context';
 import {
@@ -70,26 +72,60 @@ function matchesQuery(haystack: string | undefined, needle: string): boolean {
   return haystack.toLowerCase().includes(needle);
 }
 
+function CardActions({
+  editHref,
+  onRemove,
+  removeLabel,
+}: {
+  editHref: string;
+  onRemove?: () => void;
+  removeLabel: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Link
+        href={editHref}
+        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+      >
+        <Pencil className="h-3 w-3" />
+        Edit
+      </Link>
+      {onRemove !== undefined && (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={removeLabel}
+          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+        >
+          <Trash2 className="h-3 w-3" />
+          Remove
+        </button>
+      )}
+    </span>
+  );
+}
+
 function StdioCard({
   entry,
   handle,
   usageCount,
   withAllowlist,
+  canAdmin,
+  onRemove,
 }: {
   entry: ToolCatalogEntry;
   handle: string;
   usageCount: number;
   withAllowlist: boolean;
+  canAdmin: boolean;
+  onRemove: (entry: ToolCatalogEntry) => void;
 }) {
   const Icon = getStdioIcon(entry.id);
   const security = stdioSecurity(entry, withAllowlist);
   const SecurityIcon = security.Icon;
   return (
-    <Link
-      href={`/${handle}/tools/${entry.id}`}
-      className="group rounded-lg border bg-card shadow-sm overflow-hidden transition-all hover:border-primary/40 hover:shadow-md flex flex-col"
-    >
-      <div className="px-4 py-4 flex items-start gap-3 flex-1">
+    <div className="group rounded-lg border bg-card shadow-sm overflow-hidden transition-all hover:border-primary/40 hover:shadow-md flex flex-col">
+      <Link href={`/${handle}/tools/${entry.id}`} className="px-4 py-4 flex items-start gap-3 flex-1">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/5 text-primary">
           <Icon className="h-5 w-5" />
         </div>
@@ -102,22 +138,33 @@ function StdioCard({
             Used by {usageCount} {usageCount === 1 ? 'agent' : 'agents'}
           </p>
         </div>
-      </div>
+      </Link>
       <div className="border-t border-border/50 px-4 py-2.5 flex items-center justify-between">
         <span className={cn('inline-flex items-center gap-1.5 text-xs font-medium', security.color)}>
           <SecurityIcon className="h-3.5 w-3.5" />
           {security.label}
         </span>
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-          View details
-          <ChevronRight className="h-3 w-3" />
-        </span>
+        {canAdmin && (
+          <CardActions
+            editHref={`${routes.adminToolCatalog(handle, { from: 'tools' })}&id=${encodeURIComponent(entry.id)}`}
+            onRemove={() => onRemove(entry)}
+            removeLabel={`Remove ${entry.id}`}
+          />
+        )}
       </div>
-    </Link>
+    </div>
   );
 }
 
-function HttpCard({ binding, handle }: { binding: HttpBindingRow; handle: string }) {
+function HttpCard({
+  binding,
+  handle,
+  onRemove,
+}: {
+  binding: HttpBindingRow;
+  handle: string;
+  onRemove: (binding: HttpBindingRow) => void;
+}) {
   let host = binding.url;
   try {
     host = new URL(binding.url).host;
@@ -131,11 +178,11 @@ function HttpCard({ binding, handle }: { binding: HttpBindingRow; handle: string
       : { label: 'Open access', color: 'text-amber-600 dark:text-amber-400', Icon: ShieldAlert };
   const BadgeIcon = badge.Icon;
   return (
-    <Link
-      href={`/${handle}/agents/definitions/${binding.agentId}`}
-      className="group rounded-lg border bg-card shadow-sm overflow-hidden transition-all hover:border-primary/40 hover:shadow-md flex flex-col"
-    >
-      <div className="px-4 py-4 flex items-start gap-3 flex-1">
+    <div className="group rounded-lg border bg-card shadow-sm overflow-hidden transition-all hover:border-primary/40 hover:shadow-md flex flex-col">
+      <Link
+        href={`/${handle}/agents/definitions/${binding.agentId}`}
+        className="px-4 py-4 flex items-start gap-3 flex-1"
+      >
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/5 text-primary">
           <Globe className="h-5 w-5" />
         </div>
@@ -146,18 +193,19 @@ function HttpCard({ binding, handle }: { binding: HttpBindingRow; handle: string
             Bound to <span className="font-medium">{binding.agentName}</span>
           </p>
         </div>
-      </div>
+      </Link>
       <div className="border-t border-border/50 px-4 py-2.5 flex items-center justify-between">
         <span className={cn('inline-flex items-center gap-1.5 text-xs font-medium', badge.color)}>
           <BadgeIcon className="h-3.5 w-3.5" />
           {badge.label}
         </span>
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-          View agent
-          <ChevronRight className="h-3 w-3" />
-        </span>
+        <CardActions
+          editHref={`/${handle}/agents/definitions/${binding.agentId}`}
+          onRemove={() => onRemove(binding)}
+          removeLabel={`Remove ${binding.name} from ${binding.agentName}`}
+        />
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -172,6 +220,7 @@ export default function ToolsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<ToolCatalogEntry | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -179,7 +228,7 @@ export default function ToolsPage() {
     try {
       const [catalog, agentList] = await Promise.all([
         mediforce.toolCatalog.list({ namespace: handle }).then((res) => res.entries),
-        apiFetch('/api/agents').then(async (res) =>
+        apiFetch(`/api/agents?namespace=${encodeURIComponent(handle)}`).then(async (res) =>
           res.ok ? ((await res.json()) as { agents: AgentDefinition[] }).agents : [],
         ),
       ]);
@@ -224,6 +273,31 @@ export default function ToolsPage() {
 
   const totalVisible = filteredStdio.length + filteredHttp.length;
 
+  const deleteReferenceCount = useMemo(
+    () => (deleteTarget === null ? 0 : countStdioUsage(agents, deleteTarget.id).total),
+    [agents, deleteTarget],
+  );
+
+  const handleDeleteEntry = useCallback(async () => {
+    if (deleteTarget === null) return;
+    await mediforce.toolCatalog.delete({ namespace: handle, id: deleteTarget.id });
+    await refresh();
+  }, [deleteTarget, handle, refresh]);
+
+  const handleRemoveHttp = useCallback(
+    async (binding: HttpBindingRow) => {
+      if (!window.confirm(`Remove "${binding.name}" from ${binding.agentName}?`)) return;
+      try {
+        await deleteAgentBinding(binding.agentId, binding.name);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Remove failed.');
+        return;
+      }
+      await refresh();
+    },
+    [refresh],
+  );
+
   return (
     <div className="flex flex-1 flex-col p-6">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -248,33 +322,24 @@ export default function ToolsPage() {
             MCP servers available to agents in @{handle}.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {canAdmin && (
-            <>
-              <Link
-                href={routes.adminToolCatalog(handle, { from: 'tools' })}
-                className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
-              >
-                <Settings className="h-3.5 w-3.5" />
-                Manage catalog
-              </Link>
-              <Link
-                href={routes.adminOAuthProviders(handle, { from: 'tools' })}
-                className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
-              >
-                <KeyRound className="h-3.5 w-3.5" />
-                OAuth providers
-              </Link>
-            </>
-          )}
-          <Link
-            href={`/${handle}/agents`}
-            className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
-          >
-            <Plug className="h-3.5 w-3.5" />
-            Bind to an agent
-          </Link>
-        </div>
+        {canAdmin && (
+          <div className="flex items-center gap-2">
+            <Link
+              href={routes.adminToolCatalog(handle, { from: 'tools', create: true })}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add MCP
+            </Link>
+            <Link
+              href={routes.adminOAuthProviders(handle, { from: 'tools', create: true })}
+              className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
+            >
+              <KeyRound className="h-3.5 w-3.5" />
+              Add OAuth provider
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="relative mb-6" data-tour="tools-search">
@@ -303,7 +368,7 @@ export default function ToolsPage() {
           </div>
           <p className="text-sm text-muted-foreground">
             {query.trim() === ''
-              ? 'No tools configured yet. Add entries via “Manage catalog” (admin) or bind an HTTP MCP to an agent.'
+              ? 'No tools configured yet. Admins can add one with “Add MCP”.'
               : 'No tools match your search.'}
           </p>
         </div>
@@ -325,6 +390,8 @@ export default function ToolsPage() {
                       handle={handle}
                       usageCount={usage.total}
                       withAllowlist={usage.withAllowlist}
+                      canAdmin={canAdmin}
+                      onRemove={setDeleteTarget}
                     />
                   );
                 })}
@@ -339,7 +406,7 @@ export default function ToolsPage() {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredHttp.map((row) => (
-                  <HttpCard key={row.key} binding={row} handle={handle} />
+                  <HttpCard key={row.key} binding={row} handle={handle} onRemove={handleRemoveHttp} />
                 ))}
               </div>
             </section>
@@ -352,6 +419,18 @@ export default function ToolsPage() {
           {filteredStdio.length} stdio · {filteredHttp.length} HTTP · Security levels reflect secret templates and tool
           allowlists configured on agent bindings.
         </div>
+      )}
+
+      {deleteTarget !== null && (
+        <DeleteCatalogEntryDialog
+          entryId={deleteTarget.id}
+          referenceCount={deleteReferenceCount}
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setDeleteTarget(null);
+          }}
+          onConfirm={handleDeleteEntry}
+        />
       )}
     </div>
   );

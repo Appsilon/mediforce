@@ -13,6 +13,8 @@ interface ModelPickerProps {
   ariaLabel?: string;
   className?: string;
   requireToolSupport?: boolean;
+  /** List every active registry model instead of the top picks. */
+  showAllModels?: boolean;
   /**
    * Hide models whose context window is smaller than this. The workflow
    * assistant sends its full system prompt (embedded authoring docs) + the
@@ -36,7 +38,7 @@ function formatPrice(perToken: number): string {
 
 const TOP_PICKS_COUNT = 20;
 
-export function ModelPicker({ value, onChange, defaultModel, ariaLabel, className, requireToolSupport, minContextTokens }: ModelPickerProps) {
+export function ModelPicker({ value, onChange, defaultModel, ariaLabel, className, requireToolSupport, minContextTokens, showAllModels }: ModelPickerProps) {
   const [allModels, setModels] = useState<ModelRegistryEntry[]>([]);
   const models = useMemo(
     () => allModels
@@ -78,9 +80,10 @@ export function ModelPicker({ value, onChange, defaultModel, ariaLabel, classNam
       .filter((m) => m.retiredAt === null)
       .filter((m) => m.requestCount !== null && m.requestCount > 0)
       .sort((a, b) => (b.requestCount ?? 0) - (a.requestCount ?? 0));
-    if (withUsage.length > 0) return withUsage.slice(0, TOP_PICKS_COUNT);
-    return models.filter((m) => m.retiredAt === null).slice(0, TOP_PICKS_COUNT);
-  }, [models]);
+    const limit = showAllModels === true ? Infinity : TOP_PICKS_COUNT;
+    if (withUsage.length > 0 && showAllModels !== true) return withUsage.slice(0, limit);
+    return models.filter((m) => m.retiredAt === null).slice(0, limit);
+  }, [models, showAllModels]);
 
   const selectedModel = useMemo(() => {
     if (!value) return null;

@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, KeyRound, Plus } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import type { AgentDefinition, OAuthProviderConfig } from '@mediforce/platform-core';
 import { OAUTH_PROVIDER_PRESETS } from '@mediforce/platform-core';
 import { apiFetch } from '@/lib/api-fetch';
+import { cn } from '@/lib/utils';
 import { mediforce } from '@/lib/mediforce';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { adminBackHref } from '@/lib/routes';
@@ -15,6 +16,12 @@ import { ProviderForm } from '@/components/admin/oauth-providers/provider-form';
 import { DeleteProviderDialog } from '@/components/admin/oauth-providers/delete-provider-dialog';
 
 type PresetKey = keyof typeof OAUTH_PROVIDER_PRESETS;
+
+const PROVIDER_TYPES: { label: string; preset: PresetKey | null }[] = [
+  { label: 'GitHub', preset: 'github' },
+  { label: 'Google', preset: 'google' },
+  { label: 'Custom', preset: null },
+];
 
 type FormMode =
   | { kind: 'idle' }
@@ -67,21 +74,27 @@ export default function AdminOAuthProvidersPage() {
   }, [canAdmin, refresh]);
 
   const selectedId = search.get('id');
+  const wantsNew = search.get('new') === '1';
   useEffect(() => {
     if (selectedId === null) {
-      setMode((current) => (current.kind === 'edit' ? { kind: 'idle' } : current));
+      setMode((current) => {
+        if (current.kind === 'edit') return { kind: 'idle' };
+        if (wantsNew && current.kind === 'idle') return { kind: 'create', preset: 'github' };
+        return current;
+      });
       return;
     }
     const match = providers.find((provider) => provider.id === selectedId);
     if (match !== undefined) {
       setMode({ kind: 'edit', provider: match });
     }
-  }, [selectedId, providers]);
+  }, [selectedId, wantsNew, providers]);
 
   const handleSelect = useCallback(
     (id: string) => {
       const qs = new URLSearchParams(search.toString());
       qs.set('id', id);
+      qs.delete('new');
       router.replace(`/${handle}/admin/oauth-providers?${qs.toString()}`);
     },
     [handle, router, search],
@@ -90,6 +103,7 @@ export default function AdminOAuthProvidersPage() {
   const clearSelectionQuery = useCallback(() => {
     const qs = new URLSearchParams(search.toString());
     qs.delete('id');
+    qs.delete('new');
     const url = qs.toString() !== '' ? `/${handle}/admin/oauth-providers?${qs.toString()}` : `/${handle}/admin/oauth-providers`;
     router.replace(url);
   }, [handle, router, search]);
@@ -116,8 +130,13 @@ export default function AdminOAuthProvidersPage() {
           });
         } else {
           await mediforce.oauthProviders.create({ namespace: handle, ...payload });
+          if (wantsNew) {
+            router.push(adminBackHref(handle, search.get('from')));
+            return;
+          }
           const qs = new URLSearchParams(search.toString());
           qs.set('id', payload.id);
+          qs.delete('new');
           router.replace(`/${handle}/admin/oauth-providers?${qs.toString()}`);
         }
         await refresh();
@@ -126,7 +145,7 @@ export default function AdminOAuthProvidersPage() {
         throw err;
       }
     },
-    [mode, handle, refresh, router, search],
+    [mode, handle, refresh, router, search, wantsNew],
   );
 
   const referenceCount = useMemo(() => {
@@ -173,7 +192,63 @@ export default function AdminOAuthProvidersPage() {
   }
 
   const currentPreset = mode.kind === 'create' ? mode.preset : null;
+  const createForm = (
+    <>
+      {wantsNew ? null : <h2 className="mb-4 text-base font-semibold">New OAuth provider</h2>}
+      <div role="tablist" aria-label="Provider type" className="mb-4 inline-flex rounded-md border bg-muted p-0.5">
+        {PROVIDER_TYPES.map((option) => (
+          <button
+            key={option.label}
+            type="button"
+            role="tab"
+            aria-selected={currentPreset === option.preset}
+            onClick={() => setMode({ kind: 'create', preset: option.preset })}
+            className={cn(
+              'rounded px-3 py-1 text-sm font-medium transition-colors',
+              currentPreset === option.preset
+                ? 'bg-background shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <ProviderForm
+        key={currentPreset ?? 'custom'}
+        provider={null}
+        preset={currentPreset}
+        onSubmit={handleSubmit}
+        submitError={formError}
+      />
+    </>
+  );
   const editingProvider = mode.kind === 'edit' ? mode.provider : null;
+
+  if (wantsNew) {
+    return (
+      <div className="min-h-screen bg-background px-4 py-8">
+        <div className="mx-auto max-w-2xl">
+          <div className="mb-6 flex items-center gap-3">
+            <Link
+              href={adminBackHref(handle, search.get('from'))}
+              className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              aria-label="Back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+            <div>
+              <h1 className="text-xl font-semibold">Add OAuth provider</h1>
+              <p className="text-sm text-muted-foreground">
+                OAuth2 provider for HTTP MCP bindings in @{handle}.
+              </p>
+            </div>
+          </div>
+          <section className="rounded-lg border bg-card px-5 py-5">{createForm}</section>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background px-4 py-8">
@@ -192,32 +267,14 @@ export default function AdminOAuthProvidersPage() {
               OAuth2 providers available for HTTP MCP bindings in @{handle}.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => handleNew('github')}
-              className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
-            >
-              <KeyRound className="h-3.5 w-3.5" />
-              Add GitHub
-            </button>
-            <button
-              type="button"
-              onClick={() => handleNew('google')}
-              className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add Google
-            </button>
-            <button
-              type="button"
-              onClick={() => handleNew(null)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add custom
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => handleNew('github')}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add provider
+          </button>
         </div>
 
         {listError !== null && (
@@ -250,27 +307,12 @@ export default function AdminOAuthProvidersPage() {
                 <p className="text-xs text-muted-foreground">
                   {providers.length === 0
                     ? 'Add your first provider — GitHub or Google presets, or a custom OAuth2 endpoint.'
-                    : 'Or add a new provider from the buttons above.'}
+                    : 'Or click “Add provider” above to add another.'}
                 </p>
               </div>
             )}
 
-            {mode.kind === 'create' && (
-              <>
-                <h2 className="mb-4 text-base font-semibold">
-                  {currentPreset !== null
-                    ? `New ${OAUTH_PROVIDER_PRESETS[currentPreset].name} provider`
-                    : 'New OAuth provider'}
-                </h2>
-                <ProviderForm
-                  key={currentPreset ?? 'custom'}
-                  provider={null}
-                  preset={currentPreset}
-                  onSubmit={handleSubmit}
-                  submitError={formError}
-                />
-              </>
-            )}
+            {mode.kind === 'create' && createForm}
 
             {mode.kind === 'edit' && editingProvider !== null && (
               <>
