@@ -11,7 +11,7 @@ import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepo
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
-import { agentLogEntries, createLineStreamReader, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes, unfence } from '@mediforce/platform-core';
+import { agentLogEntries, createLineStreamReader, failedMcpServers, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes, unfence } from '@mediforce/platform-core';
 import { MCP_TAPE_DIR, MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from '../mcp/mcp-tape';
 import type { AgentLogFormat } from '@mediforce/platform-core';
 
@@ -964,6 +964,25 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         } catch (dockerErr) {
           console.error(`[${this.agentName}] Docker container FAILED: step=${this.context.stepId}`, dockerErr);
           throw dockerErr;
+        }
+      }
+
+      // A stdio MCP server that cannot start — typically a command the image
+      // does not carry — is dropped by the CLI without failing the run: the
+      // agent just sees no tools from it. Say so here, where a reader of the
+      // run will see it, rather than leaving "the agent ignored the tool" and
+      // "the tool was never there" indistinguishable.
+      if (this.logFormat === 'claude-stream-json') {
+        for (const server of failedMcpServers(spawnResult.cliOutput)) {
+          await emit({
+            type: 'status',
+            payload:
+              `MCP server '${server}' failed to start — the agent ran without its tools. ` +
+              (isLocalMode
+                ? 'If it is a stdio server, check that its command is installed on the host.'
+                : `If it is a stdio server, check that its command exists in image '${this.agentConfig.image}'.`),
+            timestamp: new Date().toISOString(),
+          });
         }
       }
 

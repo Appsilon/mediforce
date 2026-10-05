@@ -193,6 +193,39 @@ export function agentLogEntries(format: AgentLogFormat, line: string): AgentTraj
   }
 }
 
+const McpInitEventSchema = z.object({
+  type: z.literal('system'),
+  subtype: z.literal('init'),
+  mcp_servers: z.array(z.object({ name: z.string(), status: z.string() })),
+});
+
+/**
+ * Servers a Claude CLI run reports as `failed` in its `system/init` event. Not
+ * `pending` (still connecting) or `needs-auth`: only a definite failure is worth
+ * a warning.
+ *
+ * A stdio MCP server whose command is missing from the image, or that crashes
+ * on start, is dropped silently: the agent just sees no tools from it, and the
+ * only trace is `status: "failed"` in this one event. Surfacing it is the
+ * difference between "the agent ignored the tool" and "the tool was never
+ * there". Pure and total, for the same reason `agentLogEntries` is.
+ */
+export function failedMcpServers(claudeStreamJson: string): string[] {
+  return claudeStreamJson.split(/\r?\n/).flatMap((line) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('{') === false) return [];
+    let event: unknown;
+    try {
+      event = JSON.parse(trimmed);
+    } catch {
+      return [];
+    }
+    const init = McpInitEventSchema.safeParse(event);
+    if (init.success === false) return [];
+    return init.data.mcp_servers.filter((server) => server.status === 'failed').map((server) => server.name);
+  });
+}
+
 /**
  * JSONL entries for one raw stdout line, or `[]` when the line carries nothing
  * loggable. Never throws, like `agentLogEntries`.

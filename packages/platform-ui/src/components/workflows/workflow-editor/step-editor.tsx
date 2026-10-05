@@ -12,7 +12,7 @@ import { carriedSkills } from '@/lib/carried-skills';
 import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
-import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, defaultVerdictLabel, uniqueName, uniqueSlug } from '@mediforce/platform-core';
+import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, defaultVerdictLabel, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
 import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo, ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
@@ -29,6 +29,9 @@ import { FieldRow, FieldGroup, Section, PillToggle, inputBase, inputBaseMono, se
 import { ImageSourceFields } from './image-source-fields';
 import { identityImageValue, pickerImageValue } from './image-options';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
+import { McpCommandWarnings } from '@/components/agents/mcp-command-alert';
+import { stdioServerCommands } from '@/components/agents/mcp-command-warnings';
+import { useToolCatalogEntries } from '@/hooks/use-tool-catalog';
 import { AllowedRolesField, AssignedToField } from './step-editor-roles';
 import { CollapsibleCard } from './collapsible-card';
 import {
@@ -383,6 +386,18 @@ export function StepEditor({
     () => ({ artifacts: workflowArtifacts, namespace: handle, externalSkillsRepo: workflowExternalSkillsRepo }),
     [workflowArtifacts, handle, workflowExternalSkillsRepo],
   );
+
+  // The MCP servers the step's agent binds run inside the step's image. An
+  // image is only probeable once it exists, so a step that builds its own has
+  // nothing to ask about; one that names none runs in the default image.
+  const toolCatalog = useToolCatalogEntries(isAgent ? handle : undefined);
+  const selectedAgent = agentDefinitions.find((agent) => agent.id === step.agentId);
+  const mcpServerCommands = useMemo(
+    () => stdioServerCommands(selectedAgent?.mcpServers ?? {}, toolCatalog),
+    [selectedAgent, toolCatalog],
+  );
+  const stepBuildsItsImage = stepHasBuildSource(step.agent, imageSourceDefinition);
+  const stepImage = step.agent?.image !== undefined && step.agent.image !== '' ? step.agent.image : DEFAULT_AGENT_IMAGE;
 
   const agentImagePicker = useMemo(
     () => buildImagePicker({ catalogEntries, dockerImages: dockerImages ?? [], executor: 'agent' }),
@@ -900,6 +915,14 @@ export function StepEditor({
             imageWarning={imageWarning}
             pickerValue={pickerImageValue}
           />
+          {stepBuildsItsImage === false && mcpServerCommands.length > 0 && (
+            <McpCommandWarnings
+              namespace={handle}
+              image={stepImage}
+              servers={mcpServerCommands}
+              remedy="Pick an image that provides it, or build one."
+            />
+          )}
         </FieldGroup>
       </>)}
 

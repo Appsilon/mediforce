@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
-import type { AgentDefinition, ModelRegistryEntry, WorkflowStep } from '@mediforce/platform-core';
+import type { AgentDefinition, ImageCommandCheck, ModelRegistryEntry, ToolCatalogEntry, WorkflowStep } from '@mediforce/platform-core';
 import type { DockerImageInfo, ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 
 // ---- Mocks (must be before component import) ----
@@ -72,6 +72,26 @@ const rolesState = vi.hoisted(() => ({
 
 vi.mock('@/hooks/use-workspace-roles', () => ({
   useWorkspaceRoles: () => rolesState.workspaceRoles,
+}));
+
+// The MCP command warning reads the tool catalog and probes the image. Both
+// are mutable here so a test can hand the editor an agent whose server runs a
+// command the step's image lacks.
+const mcpState = vi.hoisted(() => ({
+  catalog: [] as ToolCatalogEntry[],
+  checks: {} as Record<string, ImageCommandCheck | undefined>,
+  askedImages: [] as string[],
+}));
+
+vi.mock('@/hooks/use-tool-catalog', () => ({
+  useToolCatalogEntries: () => mcpState.catalog,
+}));
+
+vi.mock('@/hooks/use-image-catalog', () => ({
+  useImageCommandChecks: (_namespace: string, image: string) => {
+    mcpState.askedImages.push(image);
+    return mcpState.checks;
+  },
 }));
 
 vi.mock('@/hooks/use-namespace-members', () => ({
@@ -165,6 +185,9 @@ describe('StepEditor', () => {
     agentState.requests = [];
     agentState.error = false;
     modelState.models = [];
+    mcpState.catalog = [];
+    mcpState.checks = {};
+    mcpState.askedImages = [];
     rolesState.workspaceRoles = {
       roles: [], workflowNames: [], heldRoles: null, loading: false, error: null,
     };
@@ -555,6 +578,65 @@ describe('StepEditor', () => {
 
     const modelSelect = screen.getByRole('combobox', { name: 'Agent Model' });
     expect(modelSelect.options[0].textContent).toContain('anthropic/claude-opus-4-5');
+  });
+
+  describe('MCP command warning', () => {
+    const biomcpAgent = {
+      ...buildAgentDefinition('pharma', 'Pharma agent'),
+      mcpServers: { biomcp: { type: 'stdio', catalogId: 'biomcp' } },
+    } as AgentDefinition;
+
+    function renderPharmaStep(step: Partial<WorkflowStep> = {}) {
+      agentState.response = { agents: [biomcpAgent] };
+      mcpState.catalog = [{ id: 'biomcp', command: 'uvx', args: ['serve'] }];
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'agent', agentId: 'pharma', ...step })}
+          allSteps={[]}
+          onChange={vi.fn()}
+        />,
+      );
+      expandCard('Prompt & model');
+    }
+
+    it('[RENDER] warns that the default image lacks the command a bound server runs', async () => {
+      mcpState.checks = { uvx: { status: 'known', available: false } };
+
+      renderPharmaStep();
+
+      const alert = await screen.findByTestId('mcp-command-warnings');
+      expect(alert.textContent).toContain('biomcp');
+      expect(alert.textContent).toContain('uvx');
+      expect(alert.textContent).toContain(`the default agent image (${DEFAULT_AGENT_IMAGE})`);
+    });
+
+    it('[DATA] asks about the image the step names, not the default', async () => {
+      mcpState.checks = { uvx: { status: 'known', available: false } };
+
+      renderPharmaStep({ agent: { image: 'acme/agent:v2' } });
+
+      const alert = await screen.findByTestId('mcp-command-warnings');
+      expect(alert.textContent).toContain('`acme/agent:v2`');
+      expect(mcpState.askedImages).toContain('acme/agent:v2');
+    });
+
+    it('[RENDER] says nothing when the command is there, or when nobody could answer', async () => {
+      mcpState.checks = { uvx: { status: 'unknown' } };
+
+      renderPharmaStep();
+      await screen.findByRole('combobox', { name: 'Agent' });
+
+      expect(screen.queryByTestId('mcp-command-warnings')).toBeNull();
+    });
+
+    it('[RENDER] says nothing for a step that builds its own image: there is nothing to probe yet', async () => {
+      mcpState.checks = { uvx: { status: 'known', available: false } };
+
+      renderPharmaStep({ agent: { repo: 'Appsilon/agent', commit: 'abc1234' } });
+      await screen.findByRole('combobox', { name: 'Agent' });
+
+      expect(screen.queryByTestId('mcp-command-warnings')).toBeNull();
+    });
   });
 
   it('[DATA] the model picker falls back to the plugin default when no agent is selected', async () => {

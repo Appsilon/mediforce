@@ -100,6 +100,19 @@ data and installed dependencies belong in an image.
 Containers run `--rm -i`, capped at 8 GB / 2 CPUs, named
 `mediforce-<runId>-<stepId>`. Network is unrestricted.
 
+**A stdio MCP server runs inside the step's image.** The agent's bindings resolve
+to catalog entries whose `command` (`uvx`, `npx`, …) must exist in that image;
+the default agent image has `npx` and no `uvx`. A server that cannot start is
+dropped by the Claude CLI without failing the run, so the agent simply sees no
+tools from it. The platform says so in three places, all advisory: the tool
+catalog form and `mediforce images check-command` probe a command against an
+image on demand; the step editor warns when the
+image the step will use is known to lack a bound server's command (a step that
+builds its own image is not checked — there is nothing to probe until it is
+built); and the run
+records a `status` event naming each server the CLI reported `failed` in its
+`system/init` event.
+
 ## Result and Agent Trajectory
 
 An agent step's `result.json` becomes the envelope's `result`. When the step
