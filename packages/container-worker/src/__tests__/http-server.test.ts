@@ -6,6 +6,7 @@ vi.mock('../docker-info', () => ({
   getDiskUsage: vi.fn(),
   getImageHistory: vi.fn(),
   probeImageCapabilities: vi.fn(),
+  probeImageCommand: vi.fn(),
 }));
 
 const uploads = vi.hoisted(() => ({
@@ -31,11 +32,12 @@ vi.mock('../docker-image-builder', async (importOriginal) => {
   };
 });
 
-import { listImages, getDiskUsage, getImageHistory, probeImageCapabilities } from '../docker-info';
+import { listImages, getDiskUsage, getImageHistory, probeImageCapabilities, probeImageCommand } from '../docker-info';
 const mockListImages = vi.mocked(listImages);
 const mockGetDiskUsage = vi.mocked(getDiskUsage);
 const mockGetImageHistory = vi.mocked(getImageHistory);
 const mockProbeImageCapabilities = vi.mocked(probeImageCapabilities);
+const mockProbeImageCommand = vi.mocked(probeImageCommand);
 
 let server: Server | null = null;
 
@@ -206,6 +208,30 @@ describe('HTTP info server', () => {
     const authorized = await fetch(url, { headers: { 'X-Worker-Secret': 'worker-secret' } });
     expect(authorized.status).toBe(200);
     expect(mockProbeImageCapabilities).toHaveBeenCalledWith('alpine:3.24');
+  });
+
+  it('GET /images/:image/command-check answers whether the image resolves the command', async () => {
+    process.env.CONTAINER_WORKER_SECRET = 'worker-secret';
+    mockProbeImageCommand.mockResolvedValue({ status: 'known', available: false });
+
+    const { port } = await getServer();
+    const url = `http://localhost:${port}/images/mediforce-golden-image%3Alatest/command-check?name=uvx`;
+
+    expect((await fetch(url)).status).toBe(401);
+    expect(mockProbeImageCommand).not.toHaveBeenCalled();
+
+    const res = await fetch(url, { headers: { 'X-Worker-Secret': 'worker-secret' } });
+    expect(res.status).toBe(200);
+    expect(mockProbeImageCommand).toHaveBeenCalledWith('mediforce-golden-image:latest', 'uvx');
+    expect(await res.json()).toEqual({ status: 'known', available: false });
+  });
+
+  it('GET /images/:image/command-check refuses a name that is not a bare command', async () => {
+    const { port } = await getServer();
+    const res = await fetch(`http://localhost:${port}/images/alpine%3A3.24/command-check?name=${encodeURIComponent('a;b')}`);
+
+    expect(res.status).toBe(400);
+    expect(mockProbeImageCommand).not.toHaveBeenCalled();
   });
 
   it('GET /images/:image/history returns the layer summary, ungated', async () => {

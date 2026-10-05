@@ -231,6 +231,7 @@ export default function AdminToolCatalogPage() {
                 </p>
               ) : (
                 <CatalogForm
+                  namespace={handle}
                   key={editing.id}
                   entry={editing}
                   onSubmit={handleSubmit}
@@ -239,7 +240,7 @@ export default function AdminToolCatalogPage() {
                 />
               )
             ) : (
-              <CatalogForm entry={null} onSubmit={handleSubmit} submitError={formError} />
+              <CatalogForm namespace={handle} entry={null} onSubmit={handleSubmit} submitError={formError} />
             )}
           </section>
         </div>
@@ -331,7 +332,7 @@ export default function AdminToolCatalogPage() {
             {mode.kind === 'create' && (
               <>
                 <h2 className="mb-4 text-base font-semibold">New catalog entry</h2>
-                <CatalogForm entry={null} onSubmit={handleSubmit} submitError={formError} />
+                <CatalogForm namespace={handle} entry={null} onSubmit={handleSubmit} submitError={formError} />
               </>
             )}
 
@@ -341,6 +342,7 @@ export default function AdminToolCatalogPage() {
                   Edit <span className="font-mono">{mode.entry.id}</span>
                 </h2>
                 <CatalogForm
+                  namespace={handle}
                   key={mode.entry.id}
                   entry={mode.entry}
                   onSubmit={handleSubmit}

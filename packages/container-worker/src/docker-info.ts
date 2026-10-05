@@ -2,6 +2,9 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
   imageCapabilityProbeArgs,
+  imageCommandProbeArgs,
+  IMAGE_COMMAND_CHECK_TIMEOUT_MS,
+  parseImageCommandCheck,
   imageHistoryArgs,
   imageInspectArgs,
   IMAGE_CAPABILITY_PROBE_TIMEOUT_MS,
@@ -15,6 +18,7 @@ import {
   shortImageId,
   type ImageBuildStep,
   type ImageCapabilities,
+  type ImageCommandCheck,
   type ImageLineageFacts,
   type InspectedImage,
   type ReadImageProvenance,
@@ -136,4 +140,17 @@ export async function getDiskUsage(): Promise<DockerDiskUsage> {
       size: buildCache?.Size ?? '0B',
     },
   };
+}
+
+export async function probeImageCommand(image: string, command: string): Promise<ImageCommandCheck> {
+  try {
+    const { stdout } = await execFileAsync(
+      'docker',
+      imageCommandProbeArgs(image, command),
+      { timeout: IMAGE_COMMAND_CHECK_TIMEOUT_MS },
+    );
+    return parseImageCommandCheck(stdout);
+  } catch {
+    return { status: 'unknown' };
+  }
 }

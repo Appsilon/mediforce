@@ -5,6 +5,7 @@ import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 import { NICE_LIVE_INTERVAL_MS, STANDARD_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
+import { ImageCommandNameSchema } from '@mediforce/platform-core';
 import type {
   ImageCatalogEntryView,
   PublishImageCatalogVersionInput,
@@ -265,5 +266,23 @@ export function usePullImageVersion(namespace: string) {
         queryKey: queryKeys.imageCatalogEntry(namespace, data.entryId),
       });
     },
+  });
+}
+
+/**
+ * Whether `image` resolves `command`, asked on demand and only for something
+ * that can be a command name — a half-typed `uv ` or an empty field starts no
+ * container. Every answer goes stale after a live interval: a deploy rebuilds
+ * a mutable tag like `:latest` into a new image, so an open form must ask
+ * again rather than keep reporting the previous image's answer.
+ */
+export function useImageCommandCheck(namespace: string, image: string, command: string) {
+  const isCommand = ImageCommandNameSchema.safeParse(command).success;
+  return useQuery({
+    queryKey: queryKeys.imageCommandCheck(namespace, image, command),
+    queryFn: () => mediforce.imageCatalog.checkCommand({ namespace, image, command }),
+    enabled: namespace !== '' && image !== '' && isCommand,
+    staleTime: STANDARD_LIVE_INTERVAL_MS,
+    retry: stopRetryOn4xx,
   });
 }

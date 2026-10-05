@@ -533,6 +533,8 @@ export {
   PullImageCatalogVersionInputSchema,
   PullImageCatalogVersionOutputSchema,
   SeedImageCatalogEntriesInputSchema,
+  CheckImageCommandInputSchema,
+  CheckImageCommandOutputSchema,
   SeedImageCatalogEntriesOutputSchema,
   type ImageCatalogVersion,
   type ImageCatalogAvailability,
@@ -558,6 +560,8 @@ export {
   type PullImageCatalogVersionOutput,
   type SeedImageCatalogEntriesInput,
   type SeedImageCatalogEntriesOutput,
+  type CheckImageCommandInput,
+  type CheckImageCommandOutput,
 } from './image-catalog';
 
 export {

@@ -7,6 +7,8 @@ import {
   ImageCatalogEntrySchema,
   ImageCatalogSourceSchema,
   ImageCapabilitiesSchema,
+  ImageCommandCheckSchema,
+  ImageCommandNameSchema,
   DOCKER_REPOSITORY_PATTERN,
   DOCKER_TAG_PATTERN,
   isCatalogReference,
@@ -383,3 +385,14 @@ export type PublishImageCatalogVersionInput = z.infer<typeof PublishImageCatalog
 export type PublishImageCatalogVersionOutput = z.infer<typeof PublishImageCatalogVersionOutputSchema>;
 export type DeleteImageCatalogEntryInput = z.infer<typeof DeleteImageCatalogEntryInputSchema>;
 export type DeleteImageCatalogEntryOutput = z.infer<typeof DeleteImageCatalogEntryOutputSchema>;
+
+export const CheckImageCommandInputSchema = NamespaceQuery.extend({
+  /** `repository:tag` of an image on the daemon; a bare repository means `:latest`. */
+  image: z.string().min(1),
+  command: ImageCommandNameSchema,
+});
+
+export const CheckImageCommandOutputSchema = ImageCommandCheckSchema;
+
+export type CheckImageCommandInput = z.infer<typeof CheckImageCommandInputSchema>;
+export type CheckImageCommandOutput = z.infer<typeof CheckImageCommandOutputSchema>;

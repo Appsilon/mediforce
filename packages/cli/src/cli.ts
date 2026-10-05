@@ -63,6 +63,7 @@ import {
   imagesPublishCommand,
   imagesPullCommand,
   imagesSeedCommand,
+  imagesCheckCommandCommand,
 } from './commands/images';
 import { emailStatusCommand } from './commands/email-status';
 import { systemCreditsCommand } from './commands/system-credits';
@@ -407,6 +408,10 @@ export const TREE: Record<string, BranchEntry> = {
       seed: {
         description: "Catalogue the images a step falls back to when it names none (idempotent)",
         fn: imagesSeedCommand,
+      },
+      'check-command': {
+        description: 'Check whether an image provides a command (e.g. uvx for an MCP server)',
+        fn: imagesCheckCommandCommand,
       },
     },
   },

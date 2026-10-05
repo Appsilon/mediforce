@@ -36,7 +36,8 @@ means a duplicated audit trail.
 **Host-daemon HTTP routes carry the shared secret.** The info server's reads
 (`/health`, `/images`, `/disk`, `GET /images/:image/history`) are open, but
 anything that acts on the daemon — `DELETE /images/:id`,
-`GET /images/:image/capabilities`, which starts a probe container,
+`GET /images/:image/capabilities` and `GET /images/:image/command-check?name=`,
+which start a probe container,
 `POST /images/build`, which clones a repo — or unpacks an uploaded build
 context, sent as an `application/x-tar` body — and runs a Dockerfile, and
 `POST /images/pull`, which pulls a registry image onto the daemon — requires
