@@ -395,7 +395,7 @@ describe('executeAgentStep', () => {
       const evalRunId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
       const trialId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
       const caseId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
-      await prepareTrial('inst-eval-unrecorded', evalRunId, trialId, caseId, { meddra: { mode: 'replay' } });
+      await prepareTrial('inst-eval-unrecorded', evalRunId, trialId, caseId, { edc: { mode: 'deny' }, meddra: { mode: 'replay' } });
       const otherStep = { ...evaluatedStep, stepId: 'another-step' };
       await evaluationRepo.appendMcpRecording({
         ...otherStep, id: randomUUID(), caseId, server: 'meddra', tape: readTape('elsewhere'),
