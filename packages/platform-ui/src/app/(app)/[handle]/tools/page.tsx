@@ -228,7 +228,7 @@ export default function ToolsPage() {
     try {
       const [catalog, agentList] = await Promise.all([
         mediforce.toolCatalog.list({ namespace: handle }).then((res) => res.entries),
-        apiFetch('/api/agents').then(async (res) =>
+        apiFetch(`/api/agents?namespace=${encodeURIComponent(handle)}`).then(async (res) =>
           res.ok ? ((await res.json()) as { agents: AgentDefinition[] }).agents : [],
         ),
       ]);

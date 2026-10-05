@@ -140,6 +140,7 @@ export default function NewAgentPage() {
           <label className="text-sm font-medium">Foundation model</label>
           <div data-tour="agent-new-model">
             <ModelPicker
+              showAllModels
               ariaLabel="Foundation model"
               className="w-full rounded-md border bg-background px-3 py-2 text-sm"
               value={selectedModelId === '' ? undefined : selectedModelId}

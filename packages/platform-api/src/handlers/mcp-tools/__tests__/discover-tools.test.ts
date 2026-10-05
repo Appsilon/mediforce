@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { InMemoryToolCatalogRepository } from '@mediforce/platform-core/testing';
 import { discoverMcpTools } from '../discover-tools';
-import { ForbiddenError, NotFoundError, ValidationError } from '../../../errors';
+import { ForbiddenError, ValidationError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
@@ -12,6 +12,10 @@ const mcpClient = vi.hoisted(() => ({
   connect: vi.fn(),
   disconnect: vi.fn(),
   constructed: vi.fn(),
+}));
+
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn(async () => [{ address: '93.184.216.34', family: 4 }]),
 }));
 
 vi.mock('@mediforce/mcp-client', () => ({
@@ -37,24 +41,6 @@ describe('discoverMcpTools handler', () => {
     ]);
   });
 
-  it('lists the tools of a catalog entry with the probe prefix stripped', async () => {
-    const scope = createTestScope({ toolCatalogRepo: repo });
-
-    const result = await discoverMcpTools(
-      { namespace: 'alpha', type: 'stdio', catalogId: sampleEntry.id },
-      scope,
-    );
-
-    expect(result.tools).toEqual([
-      { name: 'query', description: 'Run a query' },
-      { name: 'list_tables' },
-    ]);
-    expect(mcpClient.constructed).toHaveBeenCalledWith([
-      expect.objectContaining({ command: sampleEntry.command }),
-    ]);
-    expect(mcpClient.disconnect).toHaveBeenCalledOnce();
-  });
-
   it('probes an HTTP server by url', async () => {
     const scope = createTestScope({ toolCatalogRepo: repo });
 
@@ -68,12 +54,19 @@ describe('discoverMcpTools handler', () => {
     ]);
   });
 
-  it('throws NotFoundError for an unknown catalog entry', async () => {
+  it.each([
+    'http://127.0.0.1:8080/mcp',
+    'http://169.254.169.254/latest/meta-data',
+    'http://10.0.0.5/mcp',
+    'http://192.168.1.10/mcp',
+    'http://[::1]/mcp',
+  ])('rejects the private HTTP target %s without connecting', async (url) => {
     const scope = createTestScope({ toolCatalogRepo: repo });
 
     await expect(
-      discoverMcpTools({ namespace: 'alpha', type: 'stdio', catalogId: 'missing' }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+      discoverMcpTools({ namespace: 'alpha', type: 'http', url }, scope),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(mcpClient.constructed).not.toHaveBeenCalled();
   });
 
   it('maps connection failures to ValidationError and still disconnects', async () => {
@@ -81,7 +74,7 @@ describe('discoverMcpTools handler', () => {
     const scope = createTestScope({ toolCatalogRepo: repo });
 
     await expect(
-      discoverMcpTools({ namespace: 'alpha', type: 'stdio', catalogId: sampleEntry.id }, scope),
+      discoverMcpTools({ namespace: 'alpha', type: 'http', url: 'https://mcp.example.com/mcp' }, scope),
     ).rejects.toBeInstanceOf(ValidationError);
     expect(mcpClient.disconnect).toHaveBeenCalledOnce();
   });
@@ -93,7 +86,7 @@ describe('discoverMcpTools handler', () => {
     });
 
     await expect(
-      discoverMcpTools({ namespace: 'alpha', type: 'stdio', catalogId: sampleEntry.id }, scope),
+      discoverMcpTools({ namespace: 'alpha', type: 'http', url: 'https://mcp.example.com/mcp' }, scope),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

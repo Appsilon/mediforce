@@ -244,15 +244,10 @@ function StdioFields({
         selected={form.watch('allowedTools')}
         onChange={(tools) => form.setValue('allowedTools', tools)}
         discoveryKey={catalogId}
-        discover={
-          catalogId === ''
-            ? { unavailableReason: 'Choose a catalog entry first.' }
-            : {
-                run: async () =>
-                  (await mediforce.toolCatalog.discoverTools({ namespace, type: 'stdio', catalogId }))
-                    .tools,
-              }
-        }
+        discover={{
+          unavailableReason:
+            'Tool discovery is not available for catalog (stdio) servers. Enter tool names manually.',
+        }}
       />
 
       <FormFooter
@@ -615,6 +610,7 @@ function AllowedToolsSection({
     }
   }
 
+  const discoveryUnavailable = 'unavailableReason' in discover;
   const unlisted = selected.filter((name) => tools?.some((tool) => tool.name === name) !== true);
   const rows: DiscoveredTool[] = [...(tools ?? []), ...unlisted.map((name) => ({ name }))];
   const checkedNames = selected.length === 0 ? rows.map((row) => row.name) : selected;
@@ -654,10 +650,12 @@ function AllowedToolsSection({
           </span>
         </InstantTooltip>
       </div>
-      {discoverError !== null && (
+      {(discoverError !== null || discoveryUnavailable) && (
         <div className="flex flex-col gap-1.5">
-          <p className="text-xs text-muted-foreground" title={discoverError}>
-            Unable to list the tools for this MCP server. Enter the tool names manually instead.
+          <p className="text-xs text-muted-foreground" title={discoverError ?? undefined}>
+            {discoverError !== null
+              ? 'Unable to list the tools for this MCP server. Enter the tool names manually instead.'
+              : 'Enter the allowed tool names manually.'}
           </p>
           <input
             aria-label="Allowed tool names"

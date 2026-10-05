@@ -230,6 +230,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Foundation model</label>
             <ModelPicker
+              showAllModels
               ariaLabel="Foundation model"
               className="w-full rounded-md border bg-background px-3 py-2 text-sm"
               value={selectedModelId === '' ? undefined : selectedModelId}

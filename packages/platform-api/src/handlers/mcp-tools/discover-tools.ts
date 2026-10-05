@@ -1,7 +1,8 @@
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 import { McpClientManager } from '@mediforce/mcp-client';
-import type { McpServerConfig } from '@mediforce/platform-core';
 import { assertCallerIsNamespaceAdmin } from '../../auth';
-import { NotFoundError, ValidationError } from '../../errors';
+import { ValidationError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type {
   DiscoverMcpToolsInputApi,
@@ -11,23 +12,36 @@ import type {
 const PROBE_SERVER_NAME = 'probe';
 const PROBE_PREFIX = `${PROBE_SERVER_NAME}__`;
 
-async function resolveServerConfig(
-  input: DiscoverMcpToolsInputApi,
-  scope: CallerScope,
-): Promise<McpServerConfig> {
-  if (input.type === 'http') {
-    return { name: PROBE_SERVER_NAME, args: [], url: input.url };
+function isPrivateAddress(address: string): boolean {
+  const lower = address.toLowerCase();
+  if (lower.startsWith('::ffff:')) return isPrivateAddress(lower.slice(7));
+  if (isIP(lower) === 6) {
+    return lower === '::1' || lower === '::' || /^f[cd]/.test(lower) || /^fe[89ab]/.test(lower);
   }
-  const entry = await scope.toolCatalog.getById(input.namespace, input.catalogId);
-  if (entry === null) {
-    throw new NotFoundError(`Tool catalog entry '${input.catalogId}' not found`);
+  const [first, second] = lower.split('.').map(Number);
+  return (
+    first === 0 ||
+    first === 10 ||
+    first === 127 ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168) ||
+    (first === 100 && second >= 64 && second <= 127)
+  );
+}
+
+async function assertPublicHttpTarget(rawUrl: string): Promise<void> {
+  const url = new URL(rawUrl);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new ValidationError('Tool discovery only supports http(s) URLs');
   }
-  return {
-    name: PROBE_SERVER_NAME,
-    command: entry.command,
-    args: entry.args ?? [],
-    ...(entry.env !== undefined ? { env: entry.env } : {}),
-  };
+  const hostname = url.hostname.replace(/^\[|\]$/g, '');
+  const addresses = isIP(hostname) !== 0
+    ? [hostname]
+    : (await lookup(hostname, { all: true }).catch(() => [])).map((record) => record.address);
+  if (addresses.length === 0 || addresses.some(isPrivateAddress)) {
+    throw new ValidationError('Tool discovery is limited to publicly reachable servers');
+  }
 }
 
 export async function discoverMcpTools(
@@ -35,7 +49,10 @@ export async function discoverMcpTools(
   scope: CallerScope,
 ): Promise<DiscoverMcpToolsOutput> {
   assertCallerIsNamespaceAdmin(scope.caller, input.namespace);
-  const manager = new McpClientManager([await resolveServerConfig(input, scope)]);
+  await assertPublicHttpTarget(input.url);
+  const manager = new McpClientManager([
+    { name: PROBE_SERVER_NAME, args: [], url: input.url },
+  ]);
   try {
     const definitions = await manager.connect();
     return {
@@ -48,12 +65,7 @@ export async function discoverMcpTools(
     };
   } catch (err: unknown) {
     const reason = err instanceof Error ? err.message : 'Failed to list MCP tools';
-    throw new ValidationError(
-      input.type === 'stdio'
-        ? `Could not list tools: the server process failed to start or exited on the API host (${reason}). ` +
-            'Catalog commands that only exist in the agent container image cannot be probed here.'
-        : `Could not list tools: ${reason}`,
-    );
+    throw new ValidationError(`Could not list tools: ${reason}`);
   } finally {
     await manager.disconnect();
   }
