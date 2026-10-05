@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { mediforce } from '@/lib/mediforce';
 import type { AgentMcpBindingMap } from '@mediforce/platform-core';
-import { ModelPicker } from '@/components/agents/model-picker';
+import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 import { cn } from '@/lib/utils';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
@@ -174,7 +174,14 @@ export default function NewAgentPage() {
         {/* 5. Foundation model */}
         <div className="space-y-1.5">
           <label className="text-sm font-medium">Foundation model</label>
-          <ModelPicker value={selectedModelId} onChange={setSelectedModelId} />
+          <div data-tour="agent-new-model">
+            <ModelPicker
+              ariaLabel="Foundation model"
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              value={selectedModelId === '' ? undefined : selectedModelId}
+              onChange={(model) => setSelectedModelId(model ?? '')}
+            />
+          </div>
           <p className="text-xs text-muted-foreground">
             Used by every workflow step that calls this agent, unless the step sets its own model.
           </p>

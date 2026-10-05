@@ -96,8 +96,7 @@ test.describe('Agent Oversight Journey', () => {
     // Name and foundation model are the only required fields; everything else
     // is left empty on purpose.
     await page.getByPlaceholder(/e\.g\. Risk Analysis Agent/i).fill(agentName);
-    await page.getByRole('button', { name: /select a model/i }).click();
-    await page.getByRole('button', { name: /claude sonnet 4/i }).click();
+    await page.getByLabel('Foundation model').selectOption('anthropic/claude-sonnet-4');
 
     await page.getByRole('button', { name: /save new agent/i }).click();
 
