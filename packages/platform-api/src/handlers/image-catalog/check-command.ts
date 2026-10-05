@@ -1,5 +1,4 @@
 import { assertNamespaceAccess } from '../../auth';
-import { NotFoundError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type {
   CheckImageCommandInput,
@@ -29,7 +28,9 @@ export function clearImageCommandChecks(): void {
  * carry it. Advisory (ADR-0022): the caller warns, nothing is refused.
  *
  * The image must be one the daemon lists, so a caller-supplied string never
- * reaches `docker run` as anything but an image reference we have seen.
+ * reaches `docker run` as anything but an image reference we have seen. An
+ * image the daemon does not hold (the default one before its first build) is
+ * `unknown`, not an error: nobody could answer.
  */
 export async function checkImageCommand(
   input: CheckImageCommandInput,
@@ -42,9 +43,7 @@ export async function checkImageCommand(
 
   const reference = input.image.includes(':') ? input.image : `${input.image}:latest`;
   const image = daemon.images.find((candidate) => `${candidate.repository}:${candidate.tag}` === reference);
-  if (image === undefined) {
-    throw new NotFoundError(`Image '${input.image}' is not on the daemon`);
-  }
+  if (image === undefined) return { status: 'unknown' };
 
   const key = `${image.id}\u0000${input.command}`;
   const cached = settled.get(key);

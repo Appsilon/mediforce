@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ForbiddenError, NotFoundError } from '../../../errors';
+import { ForbiddenError } from '../../../errors';
 import {
   createTestScope,
   userCaller,
@@ -93,10 +93,10 @@ describe('checkImageCommand handler', () => {
     expect(probe.calls).toHaveLength(0);
   });
 
-  it('refuses an image the daemon does not hold, so a reference is never passed to docker unchecked', async () => {
+  it('answers unknown for an image the daemon does not hold, so a reference is never passed to docker unchecked', async () => {
     await expect(
       checkImageCommand({ namespace: 'alpha', image: '--privileged', command: 'uvx' }, scope),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    ).resolves.toEqual({ status: 'unknown' });
     expect(probe.calls).toHaveLength(0);
   });
 
