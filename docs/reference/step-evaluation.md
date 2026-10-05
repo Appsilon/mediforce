@@ -606,12 +606,12 @@ the judge calls. Then:
   error (the count-weighted gap between stated confidence and pass rate; 0 is
   a perfect match). It is what lets routing send only low-confidence outputs
   to a person. In the API and CLI report only (`report.confidence`);
-  the web report shows the verdict calibration below instead.
-- **Verdict calibration.** Web report only: the expected calibration error of
-  the model verdicts a person reviewed — each verdict's confidence against
-  whether the person accepted (holds) or denied (does not) it, with the
-  accepted and denied counts. Until a person reviews one it reads *Waiting for
-  model verdicts human validation*.
+  the web report shows the verdict review below instead.
+- **Model verdicts denied.** Web report only: the share of the model verdicts
+  a person reviewed that they denied, with the denied, reviewed and accepted
+  counts. It uses every reviewed verdict, whether or not the model reported a
+  confidence. Until a person reviews one it reads *Waiting for model verdicts
+  human validation*.
 - **Routing.** Once the trials are done, as the `autonomyLevel` to
   set: `L4` (Control Mode 4) with a `confidenceThreshold` — the lowest
   confidence at which the outputs at or above it (at least 5) passed every

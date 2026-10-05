@@ -1,4 +1,4 @@
-import type { AcceptanceCriterionVerdict, ConfidenceCalibration, ControlRecommendation, JudgeVerdict } from '../schemas/eval-run';
+import type { AcceptanceCriterionVerdict, ConfidenceCalibration, ControlRecommendation } from '../schemas/eval-run';
 
 /** One graded trial: what the agent said of its output, and whether the output passed. */
 export interface ConfidenceOutcome {
@@ -37,19 +37,6 @@ export function calibrateConfidence(outcomes: readonly ConfidenceOutcome[]): Con
     }));
   const ece = filled.reduce((sum, bin) => sum + (bin.count / outcomes.length) * Math.abs(bin.passRate - bin.meanConfidence), 0);
   return { count: outcomes.length, bins: filled, ece: Math.min(1, ece) };
-}
-
-/**
- * How well model verdicts' confidence matches a person's review of them: each
- * reviewed verdict that reported a confidence is an outcome that holds when the
- * person accepted it. Null until a person has reviewed one.
- */
-export function calibrateJudgeReviews(verdicts: readonly Pick<JudgeVerdict, 'confidence' | 'review'>[]): ConfidenceCalibration | null {
-  return calibrateConfidence(verdicts.flatMap((verdict) => (
-    verdict.review === null || verdict.confidence === null
-      ? []
-      : [{ confidence: verdict.confidence, passed: verdict.review.decision === 'accepted' }]
-  )));
 }
 
 /**
