@@ -255,7 +255,7 @@ function StdioFields({
         </select>
         {catalogEntries.length === 0 && (
           <span className="mt-1 text-xs text-muted-foreground">
-            No catalog entries in this namespace yet. Ask an admin to add one via Manage catalog.
+            No catalog entries in this namespace yet. Ask an admin to add one from the Tools page (Add MCP).
           </span>
         )}
       </Field>
