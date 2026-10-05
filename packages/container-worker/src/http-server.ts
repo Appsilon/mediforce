@@ -4,12 +4,14 @@ import {
   getDiskUsage,
   getImageHistory,
   probeImageCapabilities,
+  probeImageCommand,
   removeImage,
 } from './docker-info';
 import {
   BUILD_CONTEXT_MEDIA_TYPE,
   BuildImageRequestSchema,
   BuildUploadedImageRequestSchema,
+  ImageCommandNameSchema,
   PullImageRequestSchema,
 } from '@mediforce/platform-core';
 import {
@@ -135,6 +137,22 @@ export function startHttpServer(): Server {
       } catch (err) {
         jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
       }
+      return;
+    }
+
+    if (url.pathname.startsWith('/images/') && url.pathname.endsWith('/command-check')) {
+      // Starts a container from a caller-supplied reference, like the
+      // capability probe — gated the same way.
+      if (!requireSecret(req, res)) return;
+      const image = decodeURIComponent(
+        url.pathname.slice('/images/'.length, -'/command-check'.length),
+      );
+      const command = ImageCommandNameSchema.safeParse(url.searchParams.get('name') ?? '');
+      if (image.length === 0 || !command.success) {
+        jsonResponse(res, 400, { error: 'Expected an image reference and a bare command name' });
+        return;
+      }
+      jsonResponse(res, 200, await probeImageCommand(image, command.data));
       return;
     }
 

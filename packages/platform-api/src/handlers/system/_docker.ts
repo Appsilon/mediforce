@@ -8,6 +8,10 @@ import { promisify } from 'node:util';
 import {
   BUILD_CONTEXT_MEDIA_TYPE,
   imageCapabilityProbeArgs,
+  imageCommandProbeArgs,
+  IMAGE_COMMAND_CHECK_TIMEOUT_MS,
+  ImageCommandCheckSchema,
+  parseImageCommandCheck,
   imageHistoryArgs,
   imageInspectArgs,
   IMAGE_CAPABILITY_PROBE_TIMEOUT_MS,
@@ -26,6 +30,7 @@ import {
   type ImageBuildStep,
   type PullImageRequest,
   type ImageCapabilities,
+  type ImageCommandCheck,
   type InspectedImage,
 } from '@mediforce/platform-core';
 import {
@@ -147,6 +152,55 @@ export async function probeImageCapabilities(image: string): Promise<ImageCapabi
   return isLocalAgentMode()
     ? probeLocalImageCapabilities(image)
     : probeContainerWorkerImageCapabilities(image);
+}
+
+export async function probeLocalImageCommand(
+  image: string,
+  command: string,
+  options: ProbeImageCapabilitiesOptions = {},
+): Promise<ImageCommandCheck> {
+  const exec = options.exec ?? ((file, args, execOptions) =>
+    execFileAsync(file, [...args], execOptions) as Promise<{ stdout: string; stderr: string }>);
+  try {
+    const { stdout } = await exec(
+      'docker',
+      imageCommandProbeArgs(image, command),
+      { timeout: IMAGE_COMMAND_CHECK_TIMEOUT_MS },
+    );
+    return parseImageCommandCheck(stdout);
+  } catch {
+    return { status: 'unknown' };
+  }
+}
+
+export async function probeContainerWorkerImageCommand(
+  image: string,
+  command: string,
+  options: ProbeImageCapabilitiesOptions = {},
+): Promise<ImageCommandCheck> {
+  const fetchImpl = options.fetch ?? globalThis.fetch;
+  const baseUrl = options.baseUrl ?? process.env.CONTAINER_WORKER_URL ?? DEFAULT_CONTAINER_WORKER_URL;
+  const workerSecret = options.workerSecret ?? process.env.CONTAINER_WORKER_SECRET ?? '';
+  const headers: Record<string, string> = workerSecret === ''
+    ? {}
+    : { 'X-Worker-Secret': workerSecret };
+  try {
+    const response = await fetchImpl(
+      `${baseUrl}/images/${encodeURIComponent(image)}/command-check?name=${encodeURIComponent(command)}`,
+      { headers },
+    );
+    if (!response.ok) return { status: 'unknown' };
+    const parsed = ImageCommandCheckSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data : { status: 'unknown' };
+  } catch {
+    return { status: 'unknown' };
+  }
+}
+
+export async function probeImageCommand(image: string, command: string): Promise<ImageCommandCheck> {
+  return isLocalAgentMode()
+    ? probeLocalImageCommand(image, command)
+    : probeContainerWorkerImageCommand(image, command);
 }
 
 /** A build clones and runs a Dockerfile, so it is bounded far wider than the

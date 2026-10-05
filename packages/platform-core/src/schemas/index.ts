@@ -351,6 +351,15 @@ export {
 } from './image-capabilities';
 
 export {
+  ImageCommandNameSchema,
+  ImageCommandCheckSchema,
+  imageCommandProbeArgs,
+  parseImageCommandCheck,
+  IMAGE_COMMAND_CHECK_TIMEOUT_MS,
+  type ImageCommandCheck,
+} from './image-command-check';
+
+export {
   ImageBuildStepSchema,
   IMAGE_HISTORY_TIMEOUT_MS,
   imageHistoryArgs,

@@ -215,6 +215,8 @@ import {
   PullImageCatalogVersionInputSchema,
   PullImageCatalogVersionOutputSchema,
   SeedImageCatalogEntriesInputSchema,
+  CheckImageCommandInputSchema,
+  CheckImageCommandOutputSchema,
   SeedImageCatalogEntriesOutputSchema,
   DeleteImageCatalogEntryInputSchema,
   DeleteImageCatalogEntryOutputSchema,
@@ -324,6 +326,8 @@ import {
   type PullImageCatalogVersionInput,
   type PullImageCatalogVersionOutput,
   type SeedImageCatalogEntriesInput,
+  type CheckImageCommandInput,
+  type CheckImageCommandOutput,
   type SeedImageCatalogEntriesOutput,
   type DeleteImageCatalogEntryInput,
   type DeleteImageCatalogEntryOutput,
@@ -1008,6 +1012,9 @@ export class Mediforce {
     /** Seed the workspace with the images a step falls back to when it names
      *  none. Idempotent, and what every workspace is created with (#1376). */
     seed: (input: SeedImageCatalogEntriesInput) => Promise<SeedImageCatalogEntriesOutput>;
+    /** Whether one daemon image resolves one command (`uvx`, `npx`, …). Starts a
+     *  short-lived container on a first ask; `unknown` means nobody could answer. */
+    checkCommand: (input: CheckImageCommandInput) => Promise<CheckImageCommandOutput>;
   };
 
   readonly users: {
@@ -2444,6 +2451,17 @@ export class Mediforce {
         });
         const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.seed');
         return SeedImageCatalogEntriesOutputSchema.parse(body);
+      },
+      checkCommand: async (input) => {
+        const validated = CheckImageCommandInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          image: validated.image,
+          command: validated.command,
+        });
+        const res = await this.request(`/api/image-catalog/command-check${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.imageCatalog.checkCommand');
+        return CheckImageCommandOutputSchema.parse(body);
       },
     };
 

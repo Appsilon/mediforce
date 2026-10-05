@@ -158,6 +158,7 @@ export { buildImageCatalogVersion } from './image-catalog/build-version';
 export { uploadImageCatalogVersion } from './image-catalog/upload-version';
 export { publishImageCatalogVersion } from './image-catalog/publish-version';
 export { pullImageCatalogVersion } from './image-catalog/pull-version';
+export { checkImageCommand } from './image-catalog/check-command';
 export { seedImageCatalogEntries } from './image-catalog/seed-entries';
 
 export { listAgentRuns } from './agent-runs/list-agent-runs';

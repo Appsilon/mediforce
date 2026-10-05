@@ -56,7 +56,10 @@ either one left out resets to its default. `images create --repo` takes the
 same `--dockerfile` and `--context`; `images create --workflow <name> --dockerfile
 <path>` describes a Dockerfile a workflow carries (a `carried` source), whose
 versions `images show` prints with their content hash where a built one prints
-its commit.
+its commit. `images check-command --namespace <handle> --command <name> [--image <ref>]` asks whether an
+image (default: the golden image) provides a command — the `uvx` or `npx` an MCP
+catalog entry runs — and `tool-catalog add` warns when the default image lacks
+the entry's command; both are advisory.
 `images publish <entry-id> --version <image-tag> --reference <handle>/<name>
 [--tag] [--intent]` copies one version of a carried entry into a `referenced`
 one, so the image outlives its workflow: the platform rebuilds that version's

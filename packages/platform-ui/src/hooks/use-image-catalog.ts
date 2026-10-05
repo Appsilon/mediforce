@@ -5,6 +5,7 @@ import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 import { NICE_LIVE_INTERVAL_MS, STANDARD_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
+import { ImageCommandNameSchema } from '@mediforce/platform-core';
 import type {
   ImageCatalogEntryView,
   PublishImageCatalogVersionInput,
@@ -265,5 +266,23 @@ export function usePullImageVersion(namespace: string) {
         queryKey: queryKeys.imageCatalogEntry(namespace, data.entryId),
       });
     },
+  });
+}
+
+/**
+ * Whether `image` resolves `command`, asked on demand and only for something
+ * that can be a command name — a half-typed `uv ` or an empty field starts no
+ * container. A settled answer is kept: the daemon addresses an image by
+ * content, so the same reference answers the same way. `unknown` is not kept
+ * for long, since the next ask may reach a daemon that can answer.
+ */
+export function useImageCommandCheck(namespace: string, image: string, command: string) {
+  const isCommand = ImageCommandNameSchema.safeParse(command).success;
+  return useQuery({
+    queryKey: queryKeys.imageCommandCheck(namespace, image, command),
+    queryFn: () => mediforce.imageCatalog.checkCommand({ namespace, image, command }),
+    enabled: namespace !== '' && image !== '' && isCommand,
+    staleTime: (q) => (q.state.data?.status === 'known' ? Infinity : STANDARD_LIVE_INTERVAL_MS),
+    retry: stopRetryOn4xx,
   });
 }

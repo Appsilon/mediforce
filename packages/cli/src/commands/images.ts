@@ -1,6 +1,11 @@
 import { defineCommand } from '../define-command';
 import { printJson } from '../output';
-import { checkBuildContextArchive, formatBytes, imageSourceLine } from '@mediforce/platform-core';
+import {
+  checkBuildContextArchive,
+  DEFAULT_AGENT_IMAGE,
+  formatBytes,
+  imageSourceLine,
+} from '@mediforce/platform-core';
 import type { ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { packContextDirectory } from '../build-context';
 
@@ -586,5 +591,40 @@ export const imagesSeedCommand = defineCommand({
     );
     output.stdout('`mediforce images list` to see them.');
     return 0;
+  },
+});
+
+export const imagesCheckCommandCommand = defineCommand({
+  name: 'mediforce images check-command',
+  description:
+    'Check whether an image provides a command, e.g. the `uvx` an MCP catalog entry runs. Defaults to the golden image a step falls back to. Exits 0 when present, 1 when absent, 2 when it could not be determined.',
+  args: {
+    namespace: { type: 'string', required: true, description: 'Namespace handle' },
+    command: { type: 'string', required: true, description: 'Bare command name, e.g. uvx' },
+    image: {
+      type: 'string',
+      description: `repository:tag of an image on the daemon (default: ${DEFAULT_AGENT_IMAGE})`,
+    },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const image = args.image ?? DEFAULT_AGENT_IMAGE;
+    const result = await mediforce.imageCatalog.checkCommand({
+      namespace: args.namespace,
+      image,
+      command: args.command,
+    });
+    if (jsonMode) {
+      printJson(output, result);
+    } else if (result.status === 'unknown') {
+      output.stdout(`Could not determine whether ${args.command} is available in ${image}.`);
+    } else if (result.available) {
+      output.stdout(`${args.command} is available in ${image}${result.path === undefined ? '' : ` (${result.path})`}.`);
+    } else {
+      output.stdout(
+        `${args.command} is NOT available in ${image}. An MCP server that runs it needs an image that provides it.`,
+      );
+    }
+    if (result.status === 'unknown') return 2;
+    return result.available === true ? 0 : 1;
   },
 });

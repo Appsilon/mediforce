@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { CreateToolCatalogEntryInputApiSchema } from '@mediforce/platform-api/contract';
+import { DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
 import { defineCommand } from '../define-command';
 import { printJson, printError } from '../output';
 
@@ -40,6 +41,19 @@ export const toolCatalogAddCommand = defineCommand({
       return 0;
     }
     output.stdout(`Added '${result.entry.id}' to the ${parsed.data.namespace} Tool Catalog.`);
+
+    // Advisory: a step runs this command in an image, and the default one may
+    // not carry it. The add already succeeded, so a failed check says nothing.
+    const check = await mediforce.imageCatalog
+      .checkCommand({ namespace: parsed.data.namespace, image: DEFAULT_AGENT_IMAGE, command: result.entry.command })
+      .catch(() => undefined);
+    if (check?.status === 'known' && check.available === false) {
+      output.stdout(
+        `Warning: \`${result.entry.command}\` is not available in the default agent image (${DEFAULT_AGENT_IMAGE}). ` +
+          'A step using an agent bound to this server needs an image that provides it — ' +
+          `\`mediforce images check-command --namespace ${parsed.data.namespace} --command ${result.entry.command} --image <image>\`.`,
+      );
+    }
     return 0;
   },
 });

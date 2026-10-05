@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToolCatalogEntry } from '@mediforce/platform-core';
+import { CommandAvailability } from './command-availability';
+import { COMMAND_SUGGESTIONS } from './command-check';
 
 const slugPattern = /^[a-z0-9][a-z0-9_-]*$/;
 
@@ -51,13 +53,14 @@ function valuesToEntry(values: CatalogFormValues, existingId?: string): ToolCata
 }
 
 interface CatalogFormProps {
+  namespace: string;
   entry: ToolCatalogEntry | null;
   onSubmit: (entry: ToolCatalogEntry) => Promise<void>;
   onDelete?: () => void;
   submitError?: string | null;
 }
 
-export function CatalogForm({ entry, onSubmit, onDelete, submitError }: CatalogFormProps) {
+export function CatalogForm({ namespace, entry, onSubmit, onDelete, submitError }: CatalogFormProps) {
   const isEditing = entry !== null;
   const form = useForm<CatalogFormValues>({
     resolver: zodResolver(FormSchema),
@@ -94,11 +97,17 @@ export function CatalogForm({ entry, onSubmit, onDelete, submitError }: CatalogF
             id="entry-command"
             {...form.register('command')}
             placeholder="npx"
+            list="entry-command-suggestions"
             className="rounded-md border bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
             autoComplete="off"
           />
+          <datalist id="entry-command-suggestions">
+            {COMMAND_SUGGESTIONS.map((suggestion) => <option key={suggestion} value={suggestion} />)}
+          </datalist>
         </Field>
       </div>
+
+      <CommandAvailability namespace={namespace} command={form.watch('command') ?? ''} />
 
       <FieldGroup
         label="Args"

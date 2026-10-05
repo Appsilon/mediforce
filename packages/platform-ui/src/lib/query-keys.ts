@@ -189,6 +189,10 @@ export const queryKeys = {
    *  carries the per-version layer summary the listing deliberately omits —
    *  list-prefix invalidation must not clobber it. */
   imageCatalogEntry: (handle: string, id: string) => ['image-catalog-entry', handle, id] as const,
+  /** Whether one image resolves one command. An image reference is
+   *  content-addressed on the daemon, so a settled answer does not expire. */
+  imageCommandCheck: (handle: string, image: string, command: string) =>
+    ['image-command-check', handle, image, command] as const,
   /** Workflows whose steps pin any of the given images, keyed by the set asked
    *  for — two entries asking about different versions are two answers.
    *  `workflowsByImageAll` is the prefix, for the writes that change every
