@@ -306,9 +306,9 @@ export async function executeEvaluationTool(
       };
     }
     case 'get_failures': {
-      const { evalRunId, variantId } = args as Args<'get_failures'>;
+      const { evalRunId } = args as Args<'get_failures'>;
       await loadStepEvalRun(scope, step, evalRunId);
-      return getEvalRunFailures({ evalRunId, ...(variantId === undefined ? {} : { variantId }), limit: 50 }, scope);
+      return getEvalRunFailures({ evalRunId, limit: 50 }, scope);
     }
     case 'preview_evaluator': {
       const { check, agentRunIds } = args as Args<'preview_evaluator'>;
@@ -327,8 +327,6 @@ export async function executeEvaluationTool(
         evaluatorsChanged: qualification.evaluatorsChanged,
         qualification: shown === null ? null : {
           evalRunId: shown.evalRunId,
-          variant: shown.variantLabel,
-          patch: shown.patch,
           acceptanceCriteria: shown.acceptanceCriteria,
           verdicts: shown.verdicts.map(({ severity, status, reason }) => ({ severity, status, reason })),
           deviations: shown.deviations,
@@ -350,8 +348,7 @@ export async function executeEvaluationTool(
       return {
         prepared: {
           evalRunId: evalRun.id,
-          trials: evalRun.caseIds.length * evalRun.trialsPerCase * evalRun.variants.length,
-          variants: evalRun.variants.map((variant) => ({ id: variant.id, label: variant.label, patch: variant.patch })),
+          trials: evalRun.caseIds.length * evalRun.trialsPerCase,
           estimate: evalRun.estimate,
           budgetUsd: evalRun.budgetUsd,
           evaluators: evalRun.evaluators.map((evaluator) => ({ name: evaluator.name, counted: evaluator.counted })),

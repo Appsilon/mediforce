@@ -99,12 +99,10 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
 
     const { evalRun, trials } = await prepareEvalRun({ ...STEP, trialsPerCase: 2, concurrency: 2, budgetUsd: 5 }, scope);
 
-    expect(evalRun.variants.map((variant) => [variant.id, variant.label])).toEqual([['champion', 'Current step']]);
-    expect(evalRun.variants[0]!.fingerprint).not.toBeNull();
+    expect(evalRun.fingerprint).not.toBeNull();
     expect(evalRun).toMatchObject({ acceptanceCriteria: { critical: { minPassRate: 0.9 } } });
     expect(evalRun).not.toHaveProperty('briefVersion');
     expect(trials).toHaveLength(2 * 2);
-    expect(new Set(trials.map((trial) => trial.variantId))).toEqual(new Set(['champion']));
   });
 
   it('refuses to start without the person confirming the budget', async () => {
@@ -144,16 +142,14 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     expect(finished.spentUsd).toBeCloseTo(1, 10);
     expect(trials.every((trial) => trial.status === 'scored')).toBe(true);
 
-    const [champion] = report.variants;
-    const findings = champion!.evaluators.find((evaluator) => evaluator.name === 'findings-present')!;
+    const findings = report.evaluators.find((evaluator) => evaluator.name === 'findings-present')!;
     expect(findings).toMatchObject({ passes: 3, failures: 1, errors: 0, passRate: 0.75, counted: true });
     expect(findings.wilsonLower).toBeCloseTo(0.3006, 3);
     expect(findings.passAtK! + findings.passHatK!).toBeGreaterThan(0);
-    expect(report).toMatchObject({ costUsd: 1, inputTokens: 4000, outputTokens: 800 });
-    expect(champion).toMatchObject({ meanCostUsd: 0.25, meanDurationMs: 4200 });
+    expect(report).toMatchObject({ costUsd: 1, inputTokens: 4000, outputTokens: 800, meanCostUsd: 0.25, meanDurationMs: 4200 });
 
     // The code check writes no result.json: every trial is an error for it, never a failure.
-    const code = champion!.evaluators.find((evaluator) => evaluator.name === 'fatal-flagged')!;
+    const code = report.evaluators.find((evaluator) => evaluator.name === 'fatal-flagged')!;
     expect(code).toMatchObject({ passes: 0, failures: 0, errors: 4, passRate: null, counted: false });
 
     const scores = await fixture.scoreRepo.list({ name: 'findings-present', limit: 50 });
@@ -183,7 +179,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     await expect(cancelEvalRun({ evalRunId: evalRun.id }, scope)).rejects.toBeInstanceOf(ConflictError);
   });
 
-  it('runs, stops and reads a step only an older version has; an unpinned run or a variant takes the runnable version, an archived one none', async () => {
+  it('runs, stops and reads a step only an older version has; an unpinned run takes the runnable version, an archived one none', async () => {
     await fixture.processRepo.saveWorkflowDefinition(buildWorkflowDefinition({
       name: WORKFLOW,
       namespace: NAMESPACE,

@@ -301,7 +301,7 @@ export function ControlSettingsCard({ proposal }: { proposal: Proposal<'propose_
       )}
       <p className="mt-0.5 whitespace-pre-wrap text-muted-foreground">{proposal.rationale}</p>
       <p className="mt-1 text-muted-foreground">
-        From Eval Run <span className="font-mono">{proposal.evalRunId.slice(0, 8)}</span>, variant {proposal.variantId}. Apply it in the workflow editor;
+        From Eval Run <span className="font-mono">{proposal.evalRunId.slice(0, 8)}</span>. Apply it in the workflow editor;
         Control Mode and confidence threshold are not part of the Step Fingerprint, so a qualification stays valid.
       </p>
     </div>
@@ -335,7 +335,7 @@ export function DiagnosisCard({ diagnosis }: { diagnosis: Proposal<'propose_diag
   return (
     <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="diagnosis-card">
       <div className="mb-1 font-medium">
-        Diagnosis of Eval Run <span className="font-mono">{diagnosis.evalRunId.slice(0, 8)}</span>, variant {diagnosis.variantId}
+        Diagnosis of Eval Run <span className="font-mono">{diagnosis.evalRunId.slice(0, 8)}</span>
       </div>
       <ol className="space-y-2">
         {diagnosis.clusters.map((cluster, index) => (

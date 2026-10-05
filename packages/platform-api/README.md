@@ -127,8 +127,7 @@ cancelled Eval Run starts nothing more but is still driven until its in-flight
 trials are scored. A trial's cost is its Agent Run — charged to the budget when
 it is claimed for scoring — plus each LLM judge call, charged as it is made and
 kept on the Score it produced (`_lib/model-prices.ts` prices those). An Eval
-Run's report is computed from the Scores on read, never stored — per variant,
-with the verdict on each frozen Acceptance Criterion and the confidence
+Run's report is computed from the Scores on read, never stored — with the verdict on each frozen Acceptance Criterion and the confidence
 calibration, from platform-core's pure rules. Which Scores count is one rule,
 `checkOutcome` in `_lib/trial-scores.ts`: a judge verdict below its
 `minConfidence` is left out unless a person accepted it, and a denied one — a

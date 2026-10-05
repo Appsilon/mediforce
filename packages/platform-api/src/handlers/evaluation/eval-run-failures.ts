@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import { CHAMPION_VARIANT_ID, type EvalRun, type EvalTrial } from '@mediforce/platform-core';
+import type { EvalRun, EvalTrial } from '@mediforce/platform-core';
 import type {
   EvalTrialFailure,
   GetEvalRunFailuresInputSchema,
@@ -31,7 +31,7 @@ async function evaluatorFailures(scope: CallerScope, run: EvalRun, trial: EvalTr
 }
 
 /**
- * One variant's failing trials in an Eval Run (ADR-0023 D14) — the material
+ * An Eval Run's failing trials (ADR-0023 D14) — the material
  * the Evaluation Assistant diagnoses and fixes from: a trial that failed
  * before producing an Agent Run, one where a counted Evaluator failed, or one
  * a check could not grade. Each carries its case, and the Evaluators that
@@ -43,13 +43,8 @@ export async function getEvalRunFailures(
 ): Promise<GetEvalRunFailuresOutput> {
   const run = await scope.evaluation.getEvalRun(input.evalRunId);
   if (run === null) throw new NotFoundError(`Eval Run '${input.evalRunId}' not found`);
-  const variantId = input.variantId ?? CHAMPION_VARIANT_ID;
-  const variant = run.variants.find((candidate) => candidate.id === variantId);
-  if (variant === undefined) {
-    throw new NotFoundError(`Eval Run '${run.id}' has no variant '${variantId}'; its variants are ${run.variants.map((candidate) => candidate.id).join(', ')}`);
-  }
 
-  const trials = (await scope.evaluation.listTrials(run.id)).filter((trial) => trial.variantId === variantId);
+  const trials = await scope.evaluation.listTrials(run.id);
   const judged = trials.filter((trial) => trial.status === 'failed' || trial.status === 'scored');
   const cases = await casesOfRun(scope, run);
   const withEvaluators = await Promise.all(
@@ -76,5 +71,5 @@ export async function getEvalRunFailures(
       evaluators,
     };
   });
-  return { evalRunId: run.id, variantId, variantLabel: variant.label, total: failing.length, failures };
+  return { evalRunId: run.id, total: failing.length, failures };
 }

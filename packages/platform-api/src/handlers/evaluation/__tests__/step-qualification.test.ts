@@ -102,11 +102,10 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     expect(before).toMatchObject({ status: 'not_qualified', qualification: null, definitionVersion: 1, changed: [] });
 
     const evalRunId = await finishedRun();
-    const { qualification } = await signStepQualification({ evalRunId, variantId: 'champion', deviations: [majorDeviation], password: PASSWORD }, scope);
+    const { qualification } = await signStepQualification({ evalRunId, deviations: [majorDeviation], password: PASSWORD }, scope);
 
     expect(qualification).toMatchObject({
       evalRunId,
-      variantId: 'champion',
       definitionVersion: 1,
       acceptanceCriteria: { critical: { minPassRate: 0.1 }, major: { minPassRate: 0.9 } },
       deviations: [majorDeviation],
@@ -131,7 +130,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
 
   it('goes stale when the step changes, naming what changed, and flags Evaluators changed since', async () => {
     const evalRunId = await finishedRun();
-    await signStepQualification({ evalRunId, variantId: 'champion', deviations: [majorDeviation], password: PASSWORD }, scope);
+    await signStepQualification({ evalRunId, deviations: [majorDeviation], password: PASSWORD }, scope);
 
     const [findings] = await fixture.evaluationRepo.listEvaluators(STEP);
     await addEvaluatorVersion({ evaluatorId: findings!.id, rule: 'The result lists every finding.', origin: 'user' }, scope);
@@ -159,10 +158,10 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
 
   it('needs a justification for each criterion missed or not judged, and none for one that was met', async () => {
     const evalRunId = await finishedRun();
-    await expect(signStepQualification({ evalRunId, variantId: 'champion', deviations: [], password: PASSWORD }, scope))
+    await expect(signStepQualification({ evalRunId, deviations: [], password: PASSWORD }, scope))
       .rejects.toThrow(/major criterion was not judged/);
     await expect(signStepQualification({
-      evalRunId, variantId: 'champion', password: PASSWORD,
+      evalRunId, password: PASSWORD,
       deviations: [majorDeviation, { severity: 'critical', justification: 'Just in case.' }],
     }, scope)).rejects.toThrow(/critical criterion was met/);
     expect((await getStepQualification(STEP, scope)).status).toBe('not_qualified');
@@ -170,8 +169,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
 
   it('needs a justification for a criterion the scored trials met while some trial failed', async () => {
     const evalRunId = await finishedRun(1);
-    const [failed] = (await scope.evaluation.listTrials(evalRunId)).filter((trial) => trial.status === 'failed');
-    const signing = { evalRunId, variantId: failed!.variantId, password: PASSWORD };
+    const signing = { evalRunId, password: PASSWORD };
 
     await expect(signStepQualification({ ...signing, deviations: [majorDeviation] }, scope))
       .rejects.toThrow(/critical criterion was not judged \(1 of 2 trials failed or were skipped/);
@@ -182,7 +180,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
 
   it('asks the signer for their password again, and refuses an API key', async () => {
     const evalRunId = await finishedRun();
-    const signing = { evalRunId, variantId: 'champion', deviations: [majorDeviation] };
+    const signing = { evalRunId, deviations: [majorDeviation] };
 
     await expect(signStepQualification(signing, scope)).rejects.toBeInstanceOf(ValidationError);
     await expect(signStepQualification({ ...signing, password: 'wrong' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
@@ -204,14 +202,14 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
 
   it('signs only a finished run', async () => {
     const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
-    await expect(signStepQualification({ evalRunId: evalRun.id, variantId: 'champion', deviations: [], password: PASSWORD }, scope))
+    await expect(signStepQualification({ evalRunId: evalRun.id, deviations: [], password: PASSWORD }, scope))
       .rejects.toBeInstanceOf(ConflictError);
   });
 
   it('does not sign a cancelled run', async () => {
     const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await cancelEvalRun({ evalRunId: evalRun.id }, scope);
-    await expect(signStepQualification({ evalRunId: evalRun.id, variantId: 'champion', deviations: [majorDeviation], password: PASSWORD }, scope))
+    await expect(signStepQualification({ evalRunId: evalRun.id, deviations: [majorDeviation], password: PASSWORD }, scope))
       .rejects.toThrow(/cancelled/);
   });
   describe('validation status — the newest finished Eval Run of the version, judged on its criteria', () => {

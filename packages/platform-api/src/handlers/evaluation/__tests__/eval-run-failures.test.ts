@@ -29,12 +29,12 @@ describe('getEvalRunFailures (ADR-0023 D14)', () => {
       : { findings: ['graded'] });
   }
 
-  it('lists the champion\'s failing trials with their case and the Evaluators that failed', async () => {
+  it('lists the run\'s failing trials with their case and the Evaluators that failed', async () => {
     const evalRunId = await runWithOneFailure();
 
     const result = await getEvalRunFailures({ evalRunId, limit: 50 }, scenario.scope);
 
-    expect(result).toMatchObject({ evalRunId, variantId: 'champion', variantLabel: 'Current step', total: 1 });
+    expect(result).toMatchObject({ evalRunId, total: 1 });
     expect(result.failures).toEqual([{
       trialId: expect.any(String),
       trialIndex: 0,
@@ -50,12 +50,6 @@ describe('getEvalRunFailures (ADR-0023 D14)', () => {
         name: 'findings-present', severity: 'critical', kind: 'schema', counted: true, outcome: 'failed', error: null,
       })],
     }]);
-  });
-
-  it('refuses a variant the run does not have', async () => {
-    const evalRunId = await runWithOneFailure();
-    await expect(getEvalRunFailures({ evalRunId, variantId: 'challenger-9', limit: 50 }, scenario.scope))
-      .rejects.toThrow(NotFoundError);
   });
 
   it('caps the list at the limit and still reports the total', async () => {

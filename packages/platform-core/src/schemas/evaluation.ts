@@ -1,7 +1,5 @@
 import { z } from 'zod';
 import { AgentOutputSchemaSchema } from './workflow-definition';
-import { CommitShaSchema } from './process-definition';
-import { StepMcpRestrictionSchema } from './agent-mcp-binding';
 
 /**
  * The Evaluation domain of ADR-0023: everything is owned by one agent Workflow
@@ -351,20 +349,6 @@ export const AcceptanceCriteriaVersionSchema = EvaluatedStepSchema.extend({
   createdAt: z.iso.datetime(),
 });
 
-/**
- * A variant of the Step (D5): an override patch over the pinned Definition
- * version. Not strict: a patch stored with few-shot `examples` (ADR-0024)
- * still reads. `prompt` and `allowedTools` replace the step's own; `mcpRestrictions` narrow it further, never widen it;
- * `skillCommit` moves the workflow's external skills repository.
- */
-export const StepVariantPatchSchema = z.object({
-  model: z.string().min(1).optional(),
-  prompt: z.string().min(1).max(64_000).optional(),
-  skillCommit: CommitShaSchema.optional(),
-  allowedTools: z.array(z.string().min(1)).max(50).optional(),
-  mcpRestrictions: StepMcpRestrictionSchema.optional(),
-});
-
 export type EvaluatedStep = z.infer<typeof EvaluatedStepSchema>;
 export type EvaluationOrigin = z.infer<typeof EvaluationOriginSchema>;
 export type EvaluationBrief = z.infer<typeof EvaluationBriefSchema>;
@@ -393,4 +377,3 @@ export type McpReplayMiss = z.infer<typeof McpReplayMissSchema>;
 export type AcceptanceCriterion = z.infer<typeof AcceptanceCriterionSchema>;
 export type AcceptanceCriteria = z.infer<typeof AcceptanceCriteriaSchema>;
 export type AcceptanceCriteriaVersion = z.infer<typeof AcceptanceCriteriaVersionSchema>;
-export type StepVariantPatch = z.infer<typeof StepVariantPatchSchema>;

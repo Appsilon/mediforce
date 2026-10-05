@@ -29,13 +29,13 @@ describe('reviewJudgeVerdict', () => {
         { evaluatorId: JUDGE, name: 'grades-justified', version: 1, kind: 'llm_judge', severity: 'critical', counted: true },
         { evaluatorId: SCHEMA_CHECK, name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true },
       ],
-      variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],
+      fingerprint: null,
       acceptanceCriteria: { critical: { minPassRate: 1 } },
       mcpPolicy: {}, estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
       budgetUsd: 5, spentUsd: 0, status: 'completed', createdBy: 'author-1', createdAt: '2026-10-01T08:00:00.000Z', startedAt: null, completedAt: null, acceptance: null,
     };
     trial = {
-      id: randomUUID(), evalRunId: evalRun.id, caseId: CASE, variantId: 'champion', trialIndex: 0, status: 'scored',
+      id: randomUUID(), evalRunId: evalRun.id, caseId: CASE, trialIndex: 0, status: 'scored',
       processInstanceId: 'trial-run', agentRunId: 'trial-agent-run', costUsd: 0.1, inputTokens: 100, outputTokens: 10, durationMs: 1000,
       confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 1, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
     };
@@ -55,7 +55,7 @@ describe('reviewJudgeVerdict', () => {
   });
 
   it('a denied verdict leaves the judge out of the Acceptance Criteria without reversing it, and is audited', async () => {
-    expect((await getEvalRun({ evalRunId: evalRun.id }, scope)).report.variants[0]!.criteria[0]!.status).toBe('missed');
+    expect((await getEvalRun({ evalRunId: evalRun.id }, scope)).report.criteria[0]!.status).toBe('missed');
     // A run finished before acceptance was stored: the list rebuilds it, and does not write it.
     expect((await listEvalRuns(STEP, scope)).evalRuns[0]!.acceptance).toMatchObject({ status: 'missed' });
     expect((await fixture.evaluationRepo.getEvalRun(evalRun.id))!.acceptance).toBeNull();
@@ -72,8 +72,8 @@ describe('reviewJudgeVerdict', () => {
       passed: false, counts: false,
       review: expect.objectContaining({ decision: 'denied', reviewedBy: 'author-1', comment: 'Source shows the outcome was not fatal.' }),
     })]);
-    expect(report.variants[0]!.evaluators.find((evaluator) => evaluator.evaluatorId === JUDGE)).toMatchObject({ passes: 0, failures: 0, excluded: 1 });
-    expect(report.variants[0]!.criteria[0]!.status).toBe('not_evaluable');
+    expect(report.evaluators.find((evaluator) => evaluator.evaluatorId === JUDGE)).toMatchObject({ passes: 0, failures: 0, excluded: 1 });
+    expect(report.criteria[0]!.status).toBe('not_evaluable');
     expect((await fixture.evaluationRepo.getEvalRun(evalRun.id))!.acceptance).toMatchObject({ status: 'not_judged' });
     expect((await getEvalRunFailures({ evalRunId: evalRun.id, limit: 50 }, scope)).total).toBe(0);
     expect((await fixture.auditRepo.getByEntity('score', score.id)).map((event) => event.action)).toEqual(['score.created']);
@@ -105,7 +105,7 @@ describe('reviewJudgeVerdict', () => {
 
     const { report } = await getEvalRun({ evalRunId: withAgreement.id }, scope);
     expect(report.judgeVerdicts).toEqual([expect.objectContaining({ name: 'matches-expected', counts: false })]);
-    expect(report.variants[0]!.criteria[0]!.status).toBe('not_evaluable');
+    expect(report.criteria[0]!.status).toBe('not_evaluable');
   });
 
   it('needs the workflow\'s edit verb, and a named person for an API key', async () => {

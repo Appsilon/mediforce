@@ -53,7 +53,7 @@ export function calibrateJudgeReviews(verdicts: readonly Pick<JudgeVerdict, 'con
 }
 
 /**
- * What a variant's results say about routing its outputs. Control Mode 4 with
+ * What an Eval Run's results say about routing the step's outputs. Control Mode 4 with
  * a `confidenceThreshold` when some confidence level separates outputs that
  * pass: the lowest threshold whose outputs at or above it passed every counted
  * Evaluator at a rate of at least the strictest criterion's `minPassRate`,

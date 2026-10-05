@@ -5,10 +5,9 @@ import {
   calibrateJudgeReviews,
   qualificationSignatureMeaning,
   type AcceptanceCriterionVerdict,
-  type EvalRunVariantReport,
+  type EvalRunReport,
   type EvaluatedStep,
   type JudgeVerdict,
-  type StepVariantPatch,
 } from '@mediforce/platform-core';
 import type { EvalRunOutput } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
@@ -22,18 +21,6 @@ export function percent(value: number | null): string {
   return value === null ? '—' : `${Math.round(value * 100)}%`;
 }
 
-/** What a variant changes about the step, in words. */
-export function describePatch(patch: StepVariantPatch): string {
-  const changes = [
-    patch.model !== undefined && `model ${patch.model}`,
-    patch.prompt !== undefined && 'its own prompt',
-    patch.skillCommit !== undefined && `skills at ${patch.skillCommit.slice(0, 8)}`,
-    patch.allowedTools !== undefined && `tools ${patch.allowedTools.length === 0 ? 'none extra' : patch.allowedTools.join(', ')}`,
-    patch.mcpRestrictions !== undefined && `MCP narrowed: ${Object.keys(patch.mcpRestrictions).join(', ')}`,
-  ].filter((change) => change !== false);
-  return changes.length === 0 ? 'the step as it is' : changes.join('; ');
-}
-
 const VERDICT_CLASSES: Record<AcceptanceCriterionVerdict['status'], string> = {
   met: 'bg-green-500/10 text-green-700 dark:text-green-400',
   missed: 'bg-red-500/10 text-red-700 dark:text-red-400',
@@ -45,7 +32,7 @@ function TableTitle({ children }: { children: React.ReactNode }) {
 }
 
 /** Each Acceptance Criterion against the counted Evaluators of its severity: how many reached it, and the trials they graded. */
-function CriteriaTable({ variant }: { variant: EvalRunVariantReport }) {
+function CriteriaTable({ report }: { report: EvalRunReport }) {
   return (
     <div>
     <TableTitle>Acceptance criteria</TableTitle>
@@ -62,8 +49,8 @@ function CriteriaTable({ variant }: { variant: EvalRunVariantReport }) {
         </tr>
       </thead>
       <tbody>
-        {variant.criteria.map((verdict) => {
-          const counted = variant.evaluators.filter((evaluator) => evaluator.counted === true && evaluator.severity === verdict.severity);
+        {report.criteria.map((verdict) => {
+          const counted = report.evaluators.filter((evaluator) => evaluator.counted === true && evaluator.severity === verdict.severity);
           const passes = counted.reduce((sum, evaluator) => sum + evaluator.passes, 0);
           const failures = counted.reduce((sum, evaluator) => sum + evaluator.failures, 0);
           const metCount = verdict.evaluators.filter((evaluator) => evaluator.met === true).length;
@@ -92,7 +79,7 @@ function CriteriaTable({ variant }: { variant: EvalRunVariantReport }) {
   );
 }
 
-function EvaluatorTable({ variant, k }: { variant: EvalRunVariantReport; k: number }) {
+function EvaluatorTable({ report }: { report: EvalRunReport }) {
   return (
     <div>
     <TableTitle>Evaluators</TableTitle>
@@ -102,8 +89,8 @@ function EvaluatorTable({ variant, k }: { variant: EvalRunVariantReport; k: numb
           <th className="py-1 font-medium">Evaluator</th>
           <th className="py-1 font-medium">Pass rate</th>
           <th className="py-1 font-medium">95% CI</th>
-          <th className="py-1 font-medium">pass@{k}</th>
-          <th className="py-1 font-medium">pass^{k}</th>
+          <th className="py-1 font-medium">pass@{report.k}</th>
+          <th className="py-1 font-medium">pass^{report.k}</th>
           <th className="py-1 font-medium">Flaky</th>
           <th className="py-1 font-medium">Errors</th>
           <th className="py-1 font-medium">
@@ -114,7 +101,7 @@ function EvaluatorTable({ variant, k }: { variant: EvalRunVariantReport; k: numb
         </tr>
       </thead>
       <tbody>
-        {variant.evaluators.map((evaluator) => (
+        {report.evaluators.map((evaluator) => (
           <tr key={evaluator.evaluatorId} className={cn('border-t', evaluator.counted === false && 'text-muted-foreground')}>
             <td className="py-1.5">
               <span className="font-medium">{evaluator.name}</span>
@@ -137,7 +124,7 @@ function EvaluatorTable({ variant, k }: { variant: EvalRunVariantReport; k: numb
 }
 
 /**
- * Whether the models grading this variant can be trusted: the confidence each
+ * Whether the models grading this run can be trusted: the confidence each
  * gave its verdict against whether a person accepted or denied that verdict.
  */
 function CalibrationSection({ verdicts }: { verdicts: readonly JudgeVerdict[] }) {
@@ -162,32 +149,31 @@ function CalibrationSection({ verdicts }: { verdicts: readonly JudgeVerdict[] })
 }
 
 /**
- * Signing a Step Qualification for one variant (ADR-0023 D10), labelled as an
+ * Signing a Step Qualification for a run (ADR-0023 D10), labelled as an
  * approval of the step configuration: the person
- * reads what the signature means, justifies every criterion the variant did
+ * reads what the signature means, justifies every criterion the run did
  * not meet, and re-enters their password where password sign-in is enabled.
  */
-function SignQualificationForm({ step, evalRunId, variant, onDone }: {
+function SignQualificationForm({ step, evalRunId, criteria, onDone }: {
   step: EvaluatedStep;
   evalRunId: string;
-  variant: EvalRunVariantReport;
+  criteria: readonly AcceptanceCriterionVerdict[];
   onDone: () => void;
 }) {
-  const unmet = variant.criteria.filter((verdict) => verdict.status !== 'met');
+  const unmet = criteria.filter((verdict) => verdict.status !== 'met');
   const [justifications, setJustifications] = React.useState<Record<string, string>>({});
   const [password, setPassword] = React.useState('');
   // Without password sign-in, signing re-authenticates by the session; the server ignores a password.
   const { passwordAuthEnabled } = useAuth();
   const sign = useStepEvaluationMutation(step, () => mediforce.evaluation.signQualification({
     evalRunId,
-    variantId: variant.id,
     deviations: unmet.map((verdict) => ({ severity: verdict.severity, justification: (justifications[verdict.severity] ?? '').trim() })),
     ...(password === '' ? {} : { password }),
   }));
   const justified = unmet.every((verdict) => (justifications[verdict.severity] ?? '').trim() !== '');
   return (
     <div className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-xs" data-testid="sign-qualification-form">
-      <p className="font-medium">Approve the {variant.label} configuration (e-signature)</p>
+      <p className="font-medium">Approve the step configuration (e-signature)</p>
       <p>{qualificationSignatureMeaning()}</p>
       {unmet.map((verdict) => (
         <label key={verdict.severity} className="block space-y-1">
@@ -219,51 +205,51 @@ function SignQualificationForm({ step, evalRunId, variant, onDone }: {
   );
 }
 
-/** Why a variant of this run cannot be signed for, or null when it can. */
-function signingBlocked(output: EvalRunOutput, variant: EvalRunVariantReport, mayEdit: boolean, editReason: string | undefined): string | null {
+/** Why this run cannot be signed for, or null when it can. */
+function signingBlocked(output: EvalRunOutput, mayEdit: boolean, editReason: string | undefined): string | null {
   const { evalRun, report } = output;
   if (mayEdit === false) return editReason ?? 'You may not edit this workflow';
   if (evalRun.status === 'cancelled') return 'This run was cancelled; sign on a run that finished';
   if (evalRun.status === 'prepared' || evalRun.status === 'running' || report.trials.inProgress > 0) return 'Sign once every trial is scored';
   if (evalRun.acceptanceCriteria === null) return 'No Acceptance Criteria were frozen into this run';
-  if (variant.fingerprint === null) return 'This run was prepared before Step Fingerprints';
+  if (evalRun.fingerprint === null) return 'This run was prepared before Step Fingerprints';
   return null;
 }
 
 const APPROVE_EXPLANATION = 'Record your signed approval that this exact step configuration — model, prompt, skills, tools — is fit for use, based on this Eval Run. It is shown on the step and marked out of date once the step changes; nothing is blocked without one.';
 
-function VariantReport({ output, variant, step, mayEdit, editReason }: {
+/**
+ * An Eval Run's results (ADR-0023 D10): every Evaluator's pass rate with its
+ * Wilson 95% interval, pass@k, pass^k and flakiness, the verdict on each
+ * Acceptance Criterion, and how well the grading models' confidence matches a
+ * person's review of their verdicts. A person signs a Step Qualification from here.
+ */
+export function EvalRunSummary({ output, step, mayEdit, editReason }: {
   output: EvalRunOutput;
-  variant: EvalRunVariantReport;
   step: EvaluatedStep;
   mayEdit: boolean;
   editReason: string | undefined;
 }) {
+  const { evalRun, report } = output;
   const [signing, setSigning] = React.useState(false);
-  const blocked = signingBlocked(output, variant, mayEdit, editReason);
+  const blocked = signingBlocked(output, mayEdit, editReason);
   return (
-    <div className="space-y-5 border-t pt-4 first:border-t-0 first:pt-0" data-testid="variant-report">
+    <div className="space-y-5" data-testid="eval-run-report">
+      {evalRun.acceptanceCriteria === null && (
+        <p className="text-xs text-muted-foreground">No Acceptance Criteria were frozen into this run, so nothing is judged.</p>
+      )}
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <span className="text-sm font-medium">{variant.label}</span>
-          <span className="ml-1.5 text-xs text-muted-foreground">{describePatch(variant.patch)}</span>
-          {variant.fingerprint !== null && <span className="ml-1.5 font-mono text-[11px] text-muted-foreground">{variant.fingerprint.hash.slice(0, 12)}</span>}
-        </div>
+        {evalRun.fingerprint !== null && <span className="font-mono text-[11px] text-muted-foreground">{evalRun.fingerprint.hash.slice(0, 12)}</span>}
         <span className="text-xs text-muted-foreground">
-          {variant.trials.scored}/{variant.trials.total} scored · ${variant.costUsd.toFixed(4)}
-          {variant.meanDurationMs !== null && ` · mean ${(variant.meanDurationMs / 1000).toFixed(1)}s`}
+          {report.trials.scored}/{report.trials.total} scored · ${report.costUsd.toFixed(4)}
+          {report.meanDurationMs !== null && ` · mean ${(report.meanDurationMs / 1000).toFixed(1)}s`}
         </span>
       </div>
-      <EvaluatorTable variant={variant} k={output.report.k} />
-      {variant.criteria.length > 0 && <CriteriaTable variant={variant} />}
-      <CalibrationSection verdicts={output.report.judgeVerdicts.filter((verdict) => verdict.variantId === variant.id)} />
+      <EvaluatorTable report={report} />
+      {report.criteria.length > 0 && <CriteriaTable report={report} />}
+      <CalibrationSection verdicts={report.judgeVerdicts} />
       {signing ? (
-        <SignQualificationForm
-          step={step}
-          evalRunId={output.evalRun.id}
-          variant={variant}
-          onDone={() => setSigning(false)}
-        />
+        <SignQualificationForm step={step} evalRunId={evalRun.id} criteria={report.criteria} onDone={() => setSigning(false)} />
       ) : (
         <div className="flex flex-wrap items-start gap-2">
           <InstantTooltip label={blocked ?? APPROVE_EXPLANATION}>
@@ -275,31 +261,6 @@ function VariantReport({ output, variant, step, mayEdit, editReason }: {
           </InstantTooltip>
         </div>
       )}
-    </div>
-  );
-}
-
-/**
- * An Eval Run's results (ADR-0023 D5, D10): per variant, every Evaluator's
- * pass rate with its Wilson 95% interval, pass@k, pass^k and flakiness, the
- * verdict on each Acceptance Criterion, and how well the grading models' confidence matches a person's review of
- * their verdicts. A person signs a Step Qualification for a variant from here.
- */
-export function EvalRunSummary({ output, step, mayEdit, editReason }: {
-  output: EvalRunOutput;
-  step: EvaluatedStep;
-  mayEdit: boolean;
-  editReason: string | undefined;
-}) {
-  const { evalRun, report } = output;
-  return (
-    <div className="space-y-4" data-testid="eval-run-report">
-      <div className="space-y-1 text-xs text-muted-foreground">
-        {evalRun.acceptanceCriteria === null && <p>No Acceptance Criteria were frozen into this run, so nothing is judged.</p>}
-      </div>
-      {report.variants.map((variant) => (
-        <VariantReport key={variant.id} output={output} variant={variant} step={step} mayEdit={mayEdit} editReason={editReason} />
-      ))}
     </div>
   );
 }

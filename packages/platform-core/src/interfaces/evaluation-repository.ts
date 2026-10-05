@@ -101,7 +101,7 @@ export interface EvaluationRepository {
   addEvalRunSpend(id: string, usd: number): Promise<void>;
   setEvalRunAcceptance(id: string, acceptance: EvalRunAcceptance): Promise<void>;
 
-  /** By case, then variant, then trial index. */
+  /** By case, then trial index. */
   listTrials(evalRunId: string): Promise<EvalTrial[]>;
   getTrialByInstanceId(processInstanceId: string): Promise<EvalTrial | null>;
   /** Applies `patch` only while the trial is in `from`; true when it did. */

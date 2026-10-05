@@ -17,7 +17,7 @@ function run(overrides: Partial<EvalRun> = {}): EvalRun {
     ...STEP, id: randomUUID(), definitionVersion: 1, datasetVersionId: randomUUID(), caseIds: [CASE_A, CASE_B],
     trialsPerCase: 2, concurrency: 2,
     evaluators: [{ evaluatorId: EVALUATOR, name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
-    variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],
+    fingerprint: null,
     acceptanceCriteria: null,
     mcpPolicy: {}, estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
     budgetUsd: 5, spentUsd: 0, status: 'completed', createdBy: 'a', createdAt: '2026-09-23T08:00:00.000Z', startedAt: null, completedAt: null, acceptance: null,
@@ -26,10 +26,9 @@ function run(overrides: Partial<EvalRun> = {}): EvalRun {
 }
 
 function trial(evalRunId: string, caseId: string, trialIndex: number, overrides: Partial<EvalTrial> = {}): EvalTrial {
-  const variantId = overrides.variantId ?? 'champion';
   return {
-    id: randomUUID(), evalRunId, caseId, variantId, trialIndex, status: 'scored', processInstanceId: `trial-${variantId}-${caseId}-${trialIndex}`,
-    agentRunId: `agent-${variantId}-${caseId}-${trialIndex}`, costUsd: 0.1, inputTokens: 100, outputTokens: 10, durationMs: 1000,
+    id: randomUUID(), evalRunId, caseId, trialIndex, status: 'scored', processInstanceId: `trial-${caseId}-${trialIndex}`,
+    agentRunId: `agent-${caseId}-${trialIndex}`, costUsd: 0.1, inputTokens: 100, outputTokens: 10, durationMs: 1000,
     confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {}, ...overrides,
   };
 }
@@ -72,12 +71,11 @@ describe('buildEvalRunReport', () => {
 
     const report = await buildEvalRunReport(scope, evalRun, trials);
 
-    const [champion] = report.variants;
-    expect(champion!.evaluators[0]).toMatchObject({
+    expect(report.evaluators[0]).toMatchObject({
       passes: 2, failures: 1, errors: 1, passRate: 2 / 3,
       passAtK: 1, passHatK: 0, flakiness: 0.5,
     });
-    expect(champion).toMatchObject({ id: 'champion', meanDurationMs: 1500, maxDurationMs: 3000, criteria: [], confidence: null });
+    expect(report).toMatchObject({ meanDurationMs: 1500, maxDurationMs: 3000, criteria: [], confidence: null });
     expect(report).toMatchObject({
       k: 2,
       trials: { total: 4, scored: 4, failed: 0, skipped: 0, inProgress: 0 },
@@ -104,9 +102,9 @@ describe('buildEvalRunReport', () => {
     await score(scope, evalRun, trials[1]!, 0, SECOND_EVALUATOR);
     await score(scope, evalRun, trials[2]!, 1);
 
-    const [champion] = (await buildEvalRunReport(scope, evalRun, trials)).variants;
+    const report = await buildEvalRunReport(scope, evalRun, trials);
 
-    expect(champion!.evaluators.map(({ name, passes, failures, errors, passHatK }) => ({ name, passes, failures, errors, passHatK }))).toEqual([
+    expect(report.evaluators.map(({ name, passes, failures, errors, passHatK }) => ({ name, passes, failures, errors, passHatK }))).toEqual([
       { name: 'findings-present', passes: 1, failures: 0, errors: 0, passHatK: 0 },
       { name: 'matches-expected', passes: 1, failures: 1, errors: 0, passHatK: 0 },
     ]);
@@ -128,9 +126,9 @@ describe('buildEvalRunReport', () => {
     const trials = [trial(evalRun.id, CASE_A, 0), trial(evalRun.id, CASE_B, 0)];
     for (const scored of trials) await score(scope, evalRun, scored, 1);
 
-    const [champion] = (await buildEvalRunReport(scope, evalRun, trials)).variants;
+    const report = await buildEvalRunReport(scope, evalRun, trials);
 
-    expect(champion!.criteria[0]).toMatchObject({ status: 'met', evaluators: [{ name: 'findings-present', met: true }] });
+    expect(report.criteria[0]).toMatchObject({ status: 'met', evaluators: [{ name: 'findings-present', met: true }] });
   });
 
   it('counts a failed trial against its case\'s k, but not in the pass rate', async () => {
@@ -143,7 +141,7 @@ describe('buildEvalRunReport', () => {
 
     const report = await buildEvalRunReport(scope, evalRun, trials);
 
-    expect(report.variants[0]!.evaluators[0]).toMatchObject({ passes: 1, failures: 0, errors: 0, passRate: 1, passAtK: 1, passHatK: 0, flakiness: 0 });
+    expect(report.evaluators[0]).toMatchObject({ passes: 1, failures: 0, errors: 0, passRate: 1, passAtK: 1, passHatK: 0, flakiness: 0 });
     expect(report.trials).toMatchObject({ scored: 1, failed: 1 });
   });
 
@@ -157,8 +155,8 @@ describe('buildEvalRunReport', () => {
 
     const report = await buildEvalRunReport(scope, evalRun, trials);
 
-    expect(report.variants.map((variant) => [variant.id, variant.trials.scored, variant.evaluators[0]!.passRate])).toEqual([['champion', 10, 0.2]]);
-    expect(report.variants[0]!.criteria[0]!.status).toBe('missed');
+    expect([report.trials.scored, report.evaluators[0]!.passRate]).toEqual([10, 0.2]);
+    expect(report.criteria[0]!.status).toBe('missed');
     expect(report.costUsd).toBeCloseTo(1, 10);
   });
 
@@ -171,14 +169,14 @@ describe('buildEvalRunReport', () => {
       trial(evalRun.id, CASE_A, index, { confidence: index < 12 ? 0.95 : 0.4 }));
     for (const [index, scored] of trials.entries()) await score(scope, evalRun, scored, index < 12 || index === 19 ? 1 : 0);
 
-    const [champion] = (await buildEvalRunReport(scope, evalRun, trials)).variants;
+    const report = await buildEvalRunReport(scope, evalRun, trials);
 
-    expect(champion!.confidence).toMatchObject({ count: 20, bins: [
+    expect(report.confidence).toMatchObject({ count: 20, bins: [
       { lower: 0.4, upper: 0.6, count: 8, passRate: 1 / 8 },
       { lower: 0.8, upper: 1, count: 12, passRate: 1 },
     ] });
-    expect(champion!.criteria[0]!.status).toBe('missed');
-    expect(champion!.recommendation).toMatchObject({ autonomyLevel: 'L4', confidenceThreshold: 0.95, coverage: 0.6 });
+    expect(report.criteria[0]!.status).toBe('missed');
+    expect(report.recommendation).toMatchObject({ autonomyLevel: 'L4', confidenceThreshold: 0.95, coverage: 0.6 });
   });
 
   it('calibrates confidence only on trials every counted Evaluator graded: a missing Score is not a pass', async () => {
@@ -198,9 +196,9 @@ describe('buildEvalRunReport', () => {
       if (index >= 12) await score(scope, evalRun, scored, 1, SECOND_EVALUATOR);
     }
 
-    const [champion] = (await buildEvalRunReport(scope, evalRun, trials)).variants;
+    const report = await buildEvalRunReport(scope, evalRun, trials);
 
-    expect(champion!.confidence).toMatchObject({ count: 8 });
+    expect(report.confidence).toMatchObject({ count: 8 });
   });
 
   it('does not judge a criterion met while some trial failed or was skipped', async () => {
@@ -213,9 +211,9 @@ describe('buildEvalRunReport', () => {
     ];
     for (const scored of trials.slice(0, 3)) await score(scope, evalRun, scored, 1);
 
-    const [champion] = (await buildEvalRunReport(scope, evalRun, trials)).variants;
+    const report = await buildEvalRunReport(scope, evalRun, trials);
 
-    expect(champion!.criteria[0]).toMatchObject({ status: 'not_evaluable', reason: '1 of 4 trials failed or were skipped, so the Dataset was not evaluated in full' });
+    expect(report.criteria[0]).toMatchObject({ status: 'not_evaluable', reason: '1 of 4 trials failed or were skipped, so the Dataset was not evaluated in full' });
   });
 
   it('states each MCP server\'s mode, and counts the replayed calls no recording answered', async () => {
@@ -252,14 +250,14 @@ describe('buildEvalRunReport', () => {
     expect(report.mcp).toMatchObject({ live: ['meddra'], replayed: ['edc'], recordedFirst: [{ server: 'edc', cases: 1 }] });
   });
 
-  it('recommends nothing for a variant still running', async () => {
+  it('recommends nothing for a run still running', async () => {
     const fixture = await evaluationFixture();
     const scope = fixture.scope();
     const evalRun = run({ acceptanceCriteria: { critical: { minPassRate: 0.5 } } });
     const trials = [trial(evalRun.id, CASE_A, 0), trial(evalRun.id, CASE_A, 1, { status: 'running' })];
     await score(scope, evalRun, trials[0]!, 1);
 
-    expect((await buildEvalRunReport(scope, evalRun, trials)).variants[0]!.recommendation).toBeNull();
+    expect((await buildEvalRunReport(scope, evalRun, trials)).recommendation).toBeNull();
   });
 
   it('leaves a judge verdict below its minimum confidence out of the criteria, unless a person accepted it', async () => {
@@ -274,15 +272,15 @@ describe('buildEvalRunReport', () => {
 
     const report = await buildEvalRunReport(scope, evalRun, trials);
 
-    expect(report.variants[0]!.evaluators[0]).toMatchObject({ passes: 1, failures: 1, excluded: 1, passRate: 0.5 });
-    expect(report.variants[0]!.criteria[0]!.status).toBe('missed');
+    expect(report.evaluators[0]).toMatchObject({ passes: 1, failures: 1, excluded: 1, passRate: 0.5 });
+    expect(report.criteria[0]!.status).toBe('missed');
     expect(report.judgeVerdicts.map((verdict) => [verdict.trialId, verdict.passed, verdict.confidence, verdict.review?.decision ?? null, verdict.counts])).toEqual([
       [trials[0]!.id, true, 0.9, null, true],
       [trials[1]!.id, false, 0.6, null, false],
       [trials[2]!.id, false, 0.5, 'accepted', true],
     ]);
     expect(report.judgeVerdicts[0]).toMatchObject({
-      variantId: 'champion', caseId: CASE_A, evaluatorId: EVALUATOR, name: 'grades-justified', severity: 'critical',
+      caseId: CASE_A, evaluatorId: EVALUATOR, name: 'grades-justified', severity: 'critical',
       minConfidence: 0.8, rationale: 'The agent graded sepsis 5 after reading the fatal outcome.',
     });
   });
@@ -300,8 +298,8 @@ describe('buildEvalRunReport', () => {
 
     const report = await buildEvalRunReport(scope, evalRun, trials);
 
-    expect(report.variants[0]!.evaluators[0]).toMatchObject({ passes: 1, failures: 0, excluded: 1, passRate: 1 });
-    expect(report.variants[0]!.criteria[0]!.status).toBe('met');
+    expect(report.evaluators[0]).toMatchObject({ passes: 1, failures: 0, excluded: 1, passRate: 1 });
+    expect(report.criteria[0]!.status).toBe('met');
     expect(report.judgeVerdicts[1]).toMatchObject({
       counts: false,
       review: { decision: 'denied', reviewedBy: 'reviewer-1', comment: 'The fatal outcome is in the source; the judge misread it.' },
@@ -315,9 +313,9 @@ describe('buildEvalRunReport', () => {
     const trials = [trial(evalRun.id, CASE_A, 0)];
     await judgeScore(scope, evalRun, trials[0]!, true, 0.4);
 
-    const [champion] = (await buildEvalRunReport(scope, evalRun, trials)).variants;
+    const report = await buildEvalRunReport(scope, evalRun, trials);
 
-    expect(champion!.criteria[0]).toMatchObject({ status: 'not_evaluable', reason: expect.stringMatching(/1 verdict left out/) });
+    expect(report.criteria[0]).toMatchObject({ status: 'not_evaluable', reason: expect.stringMatching(/1 verdict left out/) });
   });
 
   it('lists an expected-output agreement score for review, and leaves a denied one out — but not an exact comparison', async () => {
@@ -337,7 +335,7 @@ describe('buildEvalRunReport', () => {
 
     const report = await buildEvalRunReport(scope, evalRun, trials);
 
-    expect(report.variants[0]!.evaluators[0]).toMatchObject({ passes: 1, excluded: 1 });
+    expect(report.evaluators[0]).toMatchObject({ passes: 1, excluded: 1 });
     expect(report.judgeVerdicts.map((verdict) => [verdict.trialId, verdict.review?.decision ?? null, verdict.counts])).toEqual([
       [trials[1]!.id, 'denied', false],
     ]);
@@ -352,7 +350,7 @@ describe('buildEvalRunReport', () => {
 
     const report = await buildEvalRunReport(scope, evalRun, trials);
 
-    expect(report.variants[0]!.evaluators[0]).toMatchObject({ passes: 1, excluded: 0 });
+    expect(report.evaluators[0]).toMatchObject({ passes: 1, excluded: 0 });
     expect(report.judgeVerdicts[0]).toMatchObject({ confidence: null, minConfidence: null, counts: true });
   });
 });

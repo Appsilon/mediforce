@@ -32,6 +32,8 @@ last_reviewed: 2026-10-02
 - **Amended 2026-10-04:** the optimisation code parked in ADR-0024 —
   challengers, applying a variant, few-shot examples (D12) and GEPA — is
   deleted, not only out of the UI; ADR-0024 pins the commit that has it.
+  From 2026-10-05 an Eval Run carries the Step Fingerprint itself, with no
+  variants (D5).
 - **Vocabulary:** Evaluation, Evaluation Assistant, Evaluation Brief, Evaluator, Eval Case, Eval Dataset, Eval Run,
   Agent Trajectory, Step Fingerprint, Acceptance Criteria, Step Qualification
   — all in [`CONTEXT.md`](../../CONTEXT.md) § Evaluation domain.
@@ -93,7 +95,9 @@ usual; if the Step's Fingerprint matches, the qualification carries over.
 Editing Step B never touches Step A. _Amended 2026-10-01: variants beside the
 step as it is (challengers) and applying one are parked in
 [ADR-0024](./0024-optimisation.md); an Eval Run runs the step as its runnable
-Definition version has it, and the Fingerprint binding stands._ _Amended 2026-09-24 (Phase 3): the image
+Definition version has it, and the Fingerprint binding stands. Since
+2026-10-05 the run records that Fingerprint itself rather than a list of
+variants._ _Amended 2026-09-24 (Phase 3): the image
 enters the Fingerprint as the reference the runtime resolves — its tag, or the
 files and commit a build uses — not a registry digest, which would need a
 registry lookup per Fingerprint. A tag re-pushed under the same name does not

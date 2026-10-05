@@ -179,7 +179,7 @@ test.describe('Step Evaluation tab', () => {
     await expect(row.getByTestId('eval-run-acceptance')).toHaveText('Not judged');
     await row.getByRole('link', { name: 'Details' }).click();
     await expect(page.getByTestId('eval-run-detail')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId('variant-report').getByTestId('criteria-verdicts')).toContainText('critical not judged');
+    await expect(page.getByTestId('eval-run-report').getByTestId('criteria-verdicts')).toContainText('critical not judged');
 
     await page.getByTestId('eval-run-tab-verdicts').click();
     const verdict = page.getByTestId('judge-verdict');
@@ -205,7 +205,7 @@ test.describe('Step Evaluation tab', () => {
 
     await page.getByRole('link', { name: `Eval Run ${prepared.evalRun.id.slice(0, 8)}` }).click();
     await page.getByTestId('eval-run-tab-summary').click();
-    await expect(page.getByTestId('variant-report').getByTestId('criteria-verdicts')).toContainText('critical met');
+    await expect(page.getByTestId('eval-run-report').getByTestId('criteria-verdicts')).toContainText('critical met');
   });
 
   test('accepted criteria judge a run, and the person signs a Step Qualification from its report — no Brief needed', async ({ page, request }) => {
@@ -263,7 +263,7 @@ test.describe('Step Evaluation tab', () => {
     // The newest finished run of the version missed its major criterion: validation fails, signed or not.
     await expect(page.getByTestId('validation-status')).toHaveAttribute('data-status', 'failed', { timeout: 10_000 });
     await page.getByTestId('eval-run-row').filter({ hasText: prepared.evalRun.id.slice(0, 8) }).getByRole('link', { name: 'Details' }).click();
-    const report = page.getByTestId('variant-report');
+    const report = page.getByTestId('eval-run-report');
     await expect(report.getByTestId('criteria-verdicts')).toContainText('critical met', { timeout: 15_000 });
     await expect(report.getByTestId('criteria-verdicts')).toContainText('major missed');
     await report.getByTestId('sign-qualification').click();

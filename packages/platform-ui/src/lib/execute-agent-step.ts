@@ -334,18 +334,13 @@ async function evalTrialConfig(
   ]);
   if (evalRun === null) throw new Error(`Eval Run '${evalRunId}' of this trial not found`);
   if (trial === null) throw new Error(`Eval Run '${evalRunId}' has no trial for run '${instanceId}'`);
-  const variant = evalRun.variants.find((candidate) => candidate.id === trial.variantId);
-  if (variant === undefined) throw new Error(`Eval Run '${evalRunId}' has no variant for trial run '${instanceId}'`);
-  if (Object.keys(variant.patch).length > 0) {
-    throw new Error(`Eval Run '${evalRunId}' runs challenger '${variant.label}', and challengers are no longer run (ADR-0024)`);
-  }
-  if (variant.fingerprint !== null) {
+  if (evalRun.fingerprint !== null) {
     const current = await computeStepFingerprint(
       { agentDefinitions: agentDefinitionRepo, toolCatalog: toolCatalogRepo },
       definition,
       step,
     );
-    const changed = changedFingerprintComponents(variant.fingerprint, current);
+    const changed = changedFingerprintComponents(evalRun.fingerprint, current);
     if (changed.length > 0) {
       throw new Error(
         `Step '${step.id}' changed since Eval Run '${evalRunId}' was prepared (${changed.join(', ')}); `

@@ -45,8 +45,6 @@ interface RunContext {
   output: EvalRunOutput;
   step: EvaluatedStep;
   trialHref: (trialId: string) => string;
-  /** By variant id; empty when the run has one variant, so no label is shown. */
-  variantLabels: ReadonlyMap<string, string>;
 }
 
 function Meta({ label, children }: { label: string; children: React.ReactNode }) {
@@ -92,7 +90,7 @@ function trialProblems(output: EvalRunOutput): Array<{ trial: EvalTrial; result:
 }
 
 /** Every trial: its case, how each Evaluator graded it, what it cost; a row opens everything it read and gave. */
-function TrialsTab({ output, trialHref, variantLabels }: RunContext) {
+function TrialsTab({ output, trialHref }: RunContext) {
   const [filter, setFilter] = React.useState<TrialFilter>('all');
   const trials = new Map(output.trials.map((trial) => [trial.id, trial]));
   const rows = output.report.trialResults
@@ -124,7 +122,6 @@ function TrialsTab({ output, trialHref, variantLabels }: RunContext) {
             <thead>
               <tr className="border-b bg-muted text-left text-xs text-muted-foreground">
                 <th className="px-3 py-2 font-medium">Case</th>
-                {variantLabels.size > 0 && <th className="px-3 py-2 font-medium">Variant</th>}
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">
                   <InstantTooltip label="Passed every counted Evaluator that grades its case.">
@@ -152,7 +149,6 @@ function TrialsTab({ output, trialHref, variantLabels }: RunContext) {
               {rows.map(({ result, trial }) => (
                 <tr key={trial.id} className="border-b last:border-0 hover:bg-muted/30" data-testid="eval-trial-row">
                   <td className="px-3 py-2 text-xs">{trialLabel(result, trial)}</td>
-                  {variantLabels.size > 0 && <td className="px-3 py-2 text-xs">{variantLabels.get(trial.variantId) ?? trial.variantId}</td>}
                   <td className="px-3 py-2"><TrialStatusBadge status={trial.status} /></td>
                   <td className="px-3 py-2"><TrialResultBadge passed={result.passed} /></td>
                   {evaluators.map((evaluator) => {
@@ -177,13 +173,14 @@ function TrialsTab({ output, trialHref, variantLabels }: RunContext) {
   );
 }
 
-/** One Evaluator over the whole run: what it looks for, how it did per variant, and its grade on every trial. */
+/** One Evaluator over the whole run: what it looks for, how it did, and its grade on every trial. */
 function EvaluatorCard({ evaluator, version, context }: {
   evaluator: EvalRunEvaluator;
   version: EvaluatorVersion | undefined;
   context: RunContext;
 }) {
-  const { output, trialHref, variantLabels } = context;
+  const { output, trialHref } = context;
+  const stats = output.report.evaluators.find((candidate) => candidate.evaluatorId === evaluator.evaluatorId);
   const trials = new Map(output.trials.map((trial) => [trial.id, trial]));
   const graded = output.report.trialResults.flatMap((result) => {
     const entry = result.evaluators.find((candidate) => candidate.evaluatorId === evaluator.evaluatorId);
@@ -206,32 +203,22 @@ function EvaluatorCard({ evaluator, version, context }: {
           </details>
         </div>
       )}
-      <ul className="space-y-0.5 text-xs">
-        {output.report.variants.map((variant) => {
-          const stats = variant.evaluators.find((candidate) => candidate.evaluatorId === evaluator.evaluatorId);
-          if (stats === undefined) return null;
-          return (
-            <li key={variant.id}>
-              {variantLabels.size > 0 && <span className="font-medium">{variant.label}: </span>}
-              pass rate {percent(stats.passRate)} ({stats.passes}/{stats.passes + stats.failures})
-              {stats.wilsonLower !== null && ` · 95% CI ${percent(stats.wilsonLower)}–${percent(stats.wilsonUpper)}`}
-              {` · pass@${output.report.k} ${percent(stats.passAtK)} · pass^${output.report.k} ${percent(stats.passHatK)}`}
-              {stats.errors > 0 && ` · ${stats.errors} could not grade`}
-              {stats.excluded > 0 && ` · ${stats.excluded} left out`}
-            </li>
-          );
-        })}
-      </ul>
+      {stats !== undefined && (
+        <p className="text-xs">
+          pass rate {percent(stats.passRate)} ({stats.passes}/{stats.passes + stats.failures})
+          {stats.wilsonLower !== null && ` · 95% CI ${percent(stats.wilsonLower)}–${percent(stats.wilsonUpper)}`}
+          {` · pass@${output.report.k} ${percent(stats.passAtK)} · pass^${output.report.k} ${percent(stats.passHatK)}`}
+          {stats.errors > 0 && ` · ${stats.errors} could not grade`}
+          {stats.excluded > 0 && ` · ${stats.excluded} left out`}
+        </p>
+      )}
       {graded.length > 0 && (
         <ul className="divide-y rounded-md border text-xs">
           {graded.map(({ result, entry, trial }) => (
             <li key={trial.id} className="flex items-start gap-3 px-3 py-2">
               <OutcomeChip outcome={entry.outcome} />
               <div className="min-w-0 flex-1">
-                <p className="font-medium">
-                  {trialLabel(result, trial)}
-                  {variantLabels.size > 0 && <span className="font-normal text-muted-foreground"> · {variantLabels.get(trial.variantId)}</span>}
-                </p>
+                <p className="font-medium">{trialLabel(result, trial)}</p>
                 {entry.comment !== null && <p className="line-clamp-2 text-muted-foreground" title={entry.comment}>{entry.comment}</p>}
               </div>
               <TrialLink href={trialHref(trial.id)} />
@@ -258,7 +245,7 @@ function EvaluatorsTab(context: RunContext) {
 }
 
 /** Trials that failed, or that a check could not grade, with why. */
-function ProblemsTab({ output, trialHref, variantLabels }: RunContext) {
+function ProblemsTab({ output, trialHref }: RunContext) {
   const problems = trialProblems(output);
   const { unrecordedCalls } = output.report.mcp;
   if (problems.length === 0 && unrecordedCalls.length === 0) return <p className="text-sm text-muted-foreground">No trial had a problem.</p>;
@@ -276,10 +263,7 @@ function ProblemsTab({ output, trialHref, variantLabels }: RunContext) {
               <li key={trial.id} className="flex items-start gap-3 px-3 py-2">
                 <TrialStatusBadge status={trial.status} />
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium">
-                    {result === undefined ? `trial ${trial.trialIndex + 1}` : trialLabel(result, trial)}
-                    {variantLabels.size > 0 && <span className="font-normal text-muted-foreground"> · {variantLabels.get(trial.variantId)}</span>}
-                  </p>
+                  <p className="font-medium">{result === undefined ? `trial ${trial.trialIndex + 1}` : trialLabel(result, trial)}</p>
                   <p className="whitespace-pre-wrap text-muted-foreground">{problem}</p>
                 </div>
                 <TrialLink href={trialHref(trial.id)} />
@@ -331,7 +315,7 @@ function RunHeader({ handle, workflowName, output, step, mayRun, runReason }: {
             evalRunId: evalRun.id,
             budgetUsd: evalRun.budgetUsd,
             estimatedUsd: evalRun.estimate.totalUsd,
-            trials: evalRun.caseIds.length * evalRun.trialsPerCase * evalRun.variants.length,
+            trials: evalRun.caseIds.length * evalRun.trialsPerCase,
           }}
           mayRun={mayRun}
           runReason={runReason}
@@ -344,7 +328,7 @@ function RunHeader({ handle, workflowName, output, step, mayRun, runReason }: {
           {report.trials.scored}/{report.trials.total} scored
           {report.trials.inProgress > 0 && <Loader2 className="ml-1 inline h-3 w-3 animate-spin" />}
           <span className="block text-xs text-muted-foreground">
-            {evalRun.trialsPerCase} per case × {evalRun.variants.length} variant(s)
+            {evalRun.trialsPerCase} per case
             {report.trials.failed > 0 && ` · ${report.trials.failed} failed`}
             {report.trials.skipped > 0 && ` · ${report.trials.skipped} skipped`}
           </span>
@@ -363,9 +347,9 @@ function RunHeader({ handle, workflowName, output, step, mayRun, runReason }: {
 const tabTriggerClass = 'border-b-2 border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:font-medium data-[state=active]:text-foreground';
 
 /**
- * One Eval Run (ADR-0023): its header — status, how its champion fared on the
+ * One Eval Run (ADR-0023): its header — status, how it fared on the
  * Acceptance Criteria, dataset, cost — and five views from overall to one
- * trial: the summary per variant, every trial, every Evaluator, every model
+ * trial: the summary, every trial, every Evaluator, every model
  * verdict to review, and the trials that had problems. Each trial opens on its
  * own page with everything the step and its Evaluators read and gave.
  */
@@ -389,7 +373,6 @@ export function EvalRunDetail({ handle, workflowName, evalRunId }: { handle: str
     output,
     step,
     trialHref: (trialId) => routes.workflowEvalTrial(handle, workflowName, evalRun.id, trialId),
-    variantLabels: new Map(evalRun.variants.length > 1 ? evalRun.variants.map((variant) => [variant.id, variant.label]) : []),
   };
   const leftOut = report.judgeVerdicts.filter((verdict) => verdict.counts === false).length;
   const problems = trialProblems(output).length;
@@ -430,7 +413,6 @@ export function EvalRunDetail({ handle, workflowName, evalRunId }: { handle: str
               verdicts={report.judgeVerdicts}
               mayEdit={mayEdit}
               editReason={editReason}
-              variantLabels={context.variantLabels}
               trialHref={context.trialHref}
             />
           )}

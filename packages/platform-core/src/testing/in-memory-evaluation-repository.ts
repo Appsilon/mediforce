@@ -252,7 +252,6 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     return [...this.trials.values()]
       .filter((trial) => trial.evalRunId === evalRunId)
       .sort((left, right) => left.caseId.localeCompare(right.caseId)
-        || left.variantId.localeCompare(right.variantId)
         || left.trialIndex - right.trialIndex);
   }
 

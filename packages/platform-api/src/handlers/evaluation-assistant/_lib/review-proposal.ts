@@ -65,7 +65,7 @@ async function selfTest(
  * person sees it, so a card never offers what accepting would refuse: a name
  * already taken, an Evaluator of another step, an output that is not one of
  * the step's production runs, a perturbation that does not apply to its run,
- * a routing recommendation for a run or variant the step does not have.
+ * a routing recommendation for a run the step does not have.
  */
 export async function reviewEvaluationProposal(
   toolName: string,
@@ -98,32 +98,24 @@ export async function reviewEvaluationProposal(
       return { ok: true };
     }
     case 'propose_control_settings': {
-      const { evalRunId, variantId } = args as Args<'propose_control_settings'>;
+      const { evalRunId } = args as Args<'propose_control_settings'>;
       const run = await scope.evaluation.getEvalRun(evalRunId);
       if (run === null || isSameStep(run, step) === false) {
         return { ok: false, error: `Eval Run '${evalRunId}' is not a run of this step` };
-      }
-      if (run.variants.some((variant) => variant.id === variantId) === false) {
-        return { ok: false, error: `Eval Run '${evalRunId}' has no variant '${variantId}'; its variants are ${run.variants.map((variant) => variant.id).join(', ')}` };
       }
       return { ok: true };
     }
     case 'propose_diagnosis': {
-      const { evalRunId, variantId, clusters } = args as Args<'propose_diagnosis'>;
+      const { evalRunId, clusters } = args as Args<'propose_diagnosis'>;
       const run = await scope.evaluation.getEvalRun(evalRunId);
       if (run === null || isSameStep(run, step) === false) {
         return { ok: false, error: `Eval Run '${evalRunId}' is not a run of this step` };
       }
-      if (run.variants.some((variant) => variant.id === variantId) === false) {
-        return { ok: false, error: `Eval Run '${evalRunId}' has no variant '${variantId}'; its variants are ${run.variants.map((variant) => variant.id).join(', ')}` };
-      }
-      const known = new Set((await scope.evaluation.listTrials(evalRunId))
-        .filter((trial) => trial.variantId === variantId)
-        .map((trial) => trial.id));
+      const known = new Set((await scope.evaluation.listTrials(evalRunId)).map((trial) => trial.id));
       const unknown = clusters.flatMap((cluster) => cluster.trialIds).filter((trialId) => known.has(trialId) === false);
       return unknown.length === 0
         ? { ok: true }
-        : { ok: false, error: `Not trials of variant '${variantId}' in Eval Run '${evalRunId}': ${[...new Set(unknown)].join(', ')} — take trial ids from get_failures` };
+        : { ok: false, error: `Not trials of Eval Run '${evalRunId}': ${[...new Set(unknown)].join(', ')} — take trial ids from get_failures` };
     }
     case 'propose_eval_case': {
       const { agentRunId } = args as Args<'propose_eval_case'>;

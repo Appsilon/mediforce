@@ -563,8 +563,9 @@ _Avoid_: "validated version", "qualified version" (only a step is qualified).
 
 **Eval Run**:
 One execution of an Eval Dataset against a Workflow Step, repeated per case,
-producing Scores judged against Acceptance Criteria. (Running variants of the
-step beside it is parked in ADR-0024.) Fits the existing Run family (Workflow
+producing Scores judged against Acceptance Criteria; it carries the Step
+Fingerprint it ran. (Running variants of the step beside it is parked in
+ADR-0024.) Fits the existing Run family (Workflow
 Run, Agent Run).
 _Avoid_: "Experiment" (vague, collides with nothing but explains nothing).
 

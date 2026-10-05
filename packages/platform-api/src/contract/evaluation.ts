@@ -17,7 +17,6 @@ import {
   EvalTrialSchema,
   JudgeCallSchema,
   EvalTrialStatusSchema,
-  EvalVariantSchema,
   JudgeVerdictSchema,
   StoredAgentTrajectoryEntrySchema,
   EvaluatedStepSchema,
@@ -417,7 +416,6 @@ export const EvalTrialEvaluatorSchema = z.object({
 
 export const GetEvalTrialOutputSchema = z.object({
   trial: EvalTrialSchema,
-  variant: EvalVariantSchema,
   /** Null when the case no longer exists. */
   evalCase: EvalCaseSchema.nullable(),
   /** What the step was given; null before the trial has an Agent Run. */
@@ -431,13 +429,12 @@ export const GetEvalTrialOutputSchema = z.object({
 });
 
 /**
- * One variant's failing trials in an Eval Run, the material a fix starts from
- * (ADR-0023 D14): a counted Evaluator failed, a check errored, or the trial
- * failed before producing an Agent Run. `variantId` defaults to the champion.
+ * An Eval Run's failing trials, the material a fix starts from (ADR-0023 D14):
+ * a counted Evaluator failed, a check errored, or the trial failed before
+ * producing an Agent Run.
  */
 export const GetEvalRunFailuresInputSchema = z.object({
   evalRunId: z.uuid(),
-  variantId: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
@@ -491,9 +488,7 @@ export const ReviewJudgeVerdictOutputSchema = z.object({ score: ScoreSchema });
 
 export const GetEvalRunFailuresOutputSchema = z.object({
   evalRunId: z.uuid(),
-  variantId: z.string(),
-  variantLabel: z.string(),
-  /** Every failing trial of the variant; `failures` holds the first `limit`. */
+  /** Every failing trial; `failures` holds the first `limit`. */
   total: z.number().int().nonnegative(),
   failures: z.array(EvalTrialFailureSchema),
 });
@@ -595,15 +590,14 @@ export const GetStepDriftOutputSchema = z.object({
 });
 
 /**
- * A person signs a Step Qualification for one variant of a finished Eval Run
- * (D10). Each criterion the variant missed, or that could not be judged,
+ * A person signs a Step Qualification for a finished Eval Run (D10). Each
+ * criterion the run missed, or that could not be judged,
  * needs a deviation with a written justification. Where password sign-in is
  * enabled, the signer's password re-authenticates them (21 CFR 11.200); an
  * API key cannot sign.
  */
 export const SignStepQualificationInputSchema = z.object({
   evalRunId: z.uuid(),
-  variantId: z.string().min(1),
   deviations: z.array(QualificationDeviationSchema).default([]),
   password: z.string().min(1).optional(),
 });

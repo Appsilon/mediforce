@@ -7,14 +7,12 @@ import {
   EvaluatorSeveritySchema,
   McpEvalServerPolicySchema,
   McpReplayMissSchema,
-  StepVariantPatchSchema,
 } from './evaluation';
 
 /**
- * An Eval Run (ADR-0023 D4, D5, D10): variants of a Step — the champion, the
- * Step as its pinned Definition version has it, and challengers patched over
- * it — run over a frozen Eval Dataset version, `trialsPerCase` times per case
- * and variant. Each trial is a real single-step Workflow Run flagged with the
+ * An Eval Run (ADR-0023 D4, D5, D10): a Step, as its pinned Definition version
+ * has it, run over a frozen Eval Dataset version, `trialsPerCase` times per
+ * case. Each trial is a real single-step Workflow Run flagged with the
  * Eval Run's id.
  */
 export const EvalRunStatusSchema = z.enum([
@@ -53,9 +51,6 @@ export const EvalRunEstimateSchema = z.object({
   sampleSize: z.number().int().nonnegative(),
 });
 
-/** The variant every Eval Run has: the Step unpatched, the baseline challengers are compared against. */
-export const CHAMPION_VARIANT_ID = 'champion';
-
 /** A SHA-256, hex. */
 export const StepFingerprintHashSchema = z.string().regex(/^[0-9a-f]{64}$/);
 
@@ -81,16 +76,8 @@ export const StepFingerprintSchema = z.object({
   components: z.record(StepFingerprintComponentSchema, StepFingerprintHashSchema),
 });
 
-export const EvalVariantSchema = z.object({
-  id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/),
-  label: z.string().min(1).max(120),
-  patch: StepVariantPatchSchema,
-  /** The patched Step's Fingerprint when the run was prepared; null on runs prepared before Fingerprints. */
-  fingerprint: StepFingerprintSchema.nullable(),
-});
-
 /**
- * How an Eval Run's champion fared on the Acceptance Criteria frozen into it:
+ * How an Eval Run fared on the Acceptance Criteria frozen into it:
  * `met` every one, `missed` one, `not_judged` none missed but one not judged,
  * `no_criteria` none were frozen.
  */
@@ -107,8 +94,8 @@ export const EvalRunSchema = EvaluatedStepSchema.extend({
   trialsPerCase: z.number().int().min(1).max(10),
   concurrency: z.number().int().min(1).max(8),
   evaluators: z.array(EvalRunEvaluatorSchema).min(1),
-  /** The champion first, then the challengers. */
-  variants: z.array(EvalVariantSchema).min(1),
+  /** The Step's Fingerprint when the run was prepared; null on runs prepared before Fingerprints. */
+  fingerprint: StepFingerprintSchema.nullable(),
   /** Frozen at prepare (D10); null when the Step had none, and then the report judges nothing. */
   acceptanceCriteria: AcceptanceCriteriaSchema.nullable(),
   /** The MCP eval policy the trials ran under, one entry per server of the Step's agent (D6). */
@@ -152,7 +139,6 @@ export const EvalTrialSchema = z.object({
   id: z.uuid(),
   evalRunId: z.uuid(),
   caseId: z.uuid(),
-  variantId: EvalVariantSchema.shape.id,
   trialIndex: z.number().int().nonnegative(),
   status: EvalTrialStatusSchema,
   processInstanceId: z.string().nullable(),
@@ -198,7 +184,7 @@ export const EvalRunEvaluatorReportSchema = EvalRunEvaluatorSchema.extend({
   flakiness: z.number().min(0).max(1).nullable(),
 });
 
-/** How one Acceptance Criterion fared for one variant (D10). */
+/** How one Acceptance Criterion fared (D10). */
 export const AcceptanceCriterionVerdictSchema = z.object({
   severity: EvaluatorSeveritySchema,
   criterion: AcceptanceCriterionSchema,
@@ -235,7 +221,7 @@ export const ConfidenceCalibrationSchema = z.object({
 });
 
 /**
- * What the report recommends for the variant's routing: `L4` (Control Mode 4,
+ * What the report recommends for the Step's routing: `L4` (Control Mode 4,
  * the agent applies its output) above a `confidenceThreshold`, below which the
  * step's fallback sends it to a person — or `L3` (Control Mode 3), a person
  * reviews every output. Control Mode itself is presentational (ADR-0014).
@@ -254,22 +240,6 @@ const TrialCountsSchema = z.object({
   failed: z.number().int().nonnegative(),
   skipped: z.number().int().nonnegative(),
   inProgress: z.number().int().nonnegative(),
-});
-
-/** One variant's results: its Evaluators, criteria, confidence calibration and what it cost. */
-export const EvalRunVariantReportSchema = EvalVariantSchema.extend({
-  trials: TrialCountsSchema,
-  evaluators: z.array(EvalRunEvaluatorReportSchema),
-  /** One verdict per severity the run's criteria set; empty when the run has none. */
-  criteria: z.array(AcceptanceCriterionVerdictSchema),
-  confidence: ConfidenceCalibrationSchema.nullable(),
-  recommendation: ControlRecommendationSchema.nullable(),
-  costUsd: z.number().nonnegative(),
-  meanCostUsd: z.number().nonnegative().nullable(),
-  inputTokens: z.number().int().nonnegative(),
-  outputTokens: z.number().int().nonnegative(),
-  meanDurationMs: z.number().nonnegative().nullable(),
-  maxDurationMs: z.number().nonnegative().nullable(),
 });
 
 /**
@@ -305,7 +275,6 @@ export const JudgeReviewDecisionSchema = z.enum(['accepted', 'denied']);
 export const JudgeVerdictSchema = z.object({
   trialId: z.uuid(),
   trialIndex: z.number().int().nonnegative(),
-  variantId: z.string(),
   caseId: z.uuid(),
   /** Null when the case no longer exists. */
   caseName: z.string().nullable(),
@@ -342,7 +311,6 @@ export const EvalTrialOutcomeSchema = z.enum(['pass', 'fail', 'excluded', 'error
 /** One trial as graded by every Evaluator its case selects; none until it is scored. */
 export const EvalTrialResultSchema = z.object({
   trialId: z.uuid(),
-  variantId: z.string(),
   /** Null when the case no longer exists. */
   caseName: z.string().nullable(),
   /** Whether every counted Evaluator graded it and passed it; null when one did not grade it or none counts. */
@@ -355,19 +323,26 @@ export const EvalTrialResultSchema = z.object({
   })),
 });
 
+/** An Eval Run's results: its Evaluators, criteria, confidence calibration, what it cost, and every verdict and grade. */
 export const EvalRunReportSchema = z.object({
   k: z.number().int().positive(),
   trials: TrialCountsSchema,
   mcp: EvalRunMcpReportSchema,
-  /** The champion first, then the challengers, as the run froze them. */
-  variants: z.array(EvalRunVariantReportSchema),
-  /** Every model's verdict on a scored trial — judges' and agreement scores — by variant, case and trial. */
+  evaluators: z.array(EvalRunEvaluatorReportSchema),
+  /** One verdict per severity the run's criteria set; empty when the run has none. */
+  criteria: z.array(AcceptanceCriterionVerdictSchema),
+  confidence: ConfidenceCalibrationSchema.nullable(),
+  recommendation: ControlRecommendationSchema.nullable(),
+  /** Every model's verdict on a scored trial — judges' and agreement scores — by case and trial. */
   judgeVerdicts: z.array(JudgeVerdictSchema),
-  /** Every trial's grades, by variant, case and trial. */
+  /** Every trial's grades, by case and trial. */
   trialResults: z.array(EvalTrialResultSchema),
   costUsd: z.number().nonnegative(),
+  meanCostUsd: z.number().nonnegative().nullable(),
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
+  meanDurationMs: z.number().nonnegative().nullable(),
+  maxDurationMs: z.number().nonnegative().nullable(),
 });
 
 export type EvalRunStatus = z.infer<typeof EvalRunStatusSchema>;
@@ -380,13 +355,11 @@ export type JudgeCall = z.infer<typeof JudgeCallSchema>;
 export type EvalRunEvaluatorReport = z.infer<typeof EvalRunEvaluatorReportSchema>;
 export type EvalRunReport = z.infer<typeof EvalRunReportSchema>;
 export type EvalRunMcpReport = z.infer<typeof EvalRunMcpReportSchema>;
-export type EvalVariant = z.infer<typeof EvalVariantSchema>;
 export type StepFingerprintComponent = z.infer<typeof StepFingerprintComponentSchema>;
 export type StepFingerprint = z.infer<typeof StepFingerprintSchema>;
 export type AcceptanceCriterionVerdict = z.infer<typeof AcceptanceCriterionVerdictSchema>;
 export type ConfidenceCalibration = z.infer<typeof ConfidenceCalibrationSchema>;
 export type ControlRecommendation = z.infer<typeof ControlRecommendationSchema>;
-export type EvalRunVariantReport = z.infer<typeof EvalRunVariantReportSchema>;
 export type JudgeReviewDecision = z.infer<typeof JudgeReviewDecisionSchema>;
 export type JudgeVerdict = z.infer<typeof JudgeVerdictSchema>;
 export type EvalTrialOutcome = z.infer<typeof EvalTrialOutcomeSchema>;

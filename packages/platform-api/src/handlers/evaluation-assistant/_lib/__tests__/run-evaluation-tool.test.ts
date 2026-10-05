@@ -264,7 +264,7 @@ describe('executeEvaluationTool', () => {
 
     const prepared = await executeEvaluationTool('prepare_eval_run', { trialsPerCase: 2, budgetUsd: 2 }, scope, context) as { prepared: { evalRunId: string } };
     expect(prepared).toMatchObject({
-      prepared: { trials: 2, variants: [{ id: 'champion' }], budgetUsd: 2, acceptanceCriteria: { critical: { minPassRate: 0.9 } } },
+      prepared: { trials: 2, budgetUsd: 2, acceptanceCriteria: { critical: { minPassRate: 0.9 } } },
     });
     expect((await scope.evaluation.getEvalRun(prepared.prepared.evalRunId))?.definitionVersion).toBe(1);
   });
@@ -301,13 +301,12 @@ describe('executeEvaluationTool', () => {
       return { fixture, scenario, scope: scenario.scope, context: { step: STEP, definition, workflowStep: step } };
     }
 
-    it('reads a variant\'s failing trials with their cases, and only of this step\'s runs', async () => {
+    it('reads a run\'s failing trials with their cases, and only of this step\'s runs', async () => {
       const { fixture, scenario, scope, context } = await scenarioContext();
       const evalRunId = await finishEvalRun(fixture, scenario, { trialsPerCase: 1, budgetUsd: 5 },
         (trial) => trial.caseId === scenario.caseIds['Grade 4 neutropenia'] ? { summary: 'none' } : { findings: ['ok'] });
 
       expect(await executeEvaluationTool('get_failures', { evalRunId }, scope, context)).toMatchObject({
-        variantId: 'champion',
         total: 1,
         failures: [{ caseName: 'Grade 4 neutropenia', split: 'dev', evaluators: [{ name: 'findings-present', outcome: 'failed', counted: true }] }],
       });

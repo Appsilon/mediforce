@@ -7,7 +7,6 @@ import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { Bot, ChevronRight, Info, Loader2, X } from 'lucide-react';
 import {
-  CHAMPION_VARIANT_ID,
   DEFAULT_ACCEPTANCE_CRITERIA,
   EvalCaseComparisonSchema,
   EvalCaseInputSchema,
@@ -45,7 +44,6 @@ import { useAgentRun } from '@/hooks/use-agent-runs';
 import { useAgentRunIo, useEvalRunEstimate, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { formatCostUsd } from '@/lib/format';
 import { routes } from '@/lib/routes';
-import { describePatch } from './eval-run-report';
 import { AcceptanceBadge, EvalRunStatusBadge } from './eval-run-badges';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 import { VALIDATION_STATUS } from './validation-status';
@@ -1270,7 +1268,6 @@ function QualificationDetails({ status }: { status: GetStepQualificationOutput }
     <div className="space-y-1" data-testid="step-qualification">
       <p>
         Signed by <span className="font-medium">{qualification.signature.signerName}</span> on {qualification.signature.signedAt.slice(0, 16).replace('T', ' ')}
-        {' '}for {qualification.variantId === CHAMPION_VARIANT_ID ? 'the step' : `'${qualification.variantLabel}' (${describePatch(qualification.patch)})`}
         {' '}— Eval Run <span className="font-mono">{qualification.evalRunId.slice(0, 8)}</span>,
         {' '}fingerprint <span className="font-mono">{qualification.fingerprint.hash.slice(0, 12)}</span>.
       </p>
@@ -1610,7 +1607,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRu
       evalRunId: run.id,
       budgetUsd: run.budgetUsd,
       estimatedUsd: run.estimate.totalUsd,
-      trials: run.caseIds.length * run.trialsPerCase * run.variants.length,
+      trials: run.caseIds.length * run.trialsPerCase,
     },
     otherVersion: otherVersion(run),
   }));
@@ -1666,7 +1663,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRu
                 <th className="px-3 py-2 font-medium">Cost</th>
                 <th className="px-3 py-2 font-medium">Dataset</th>
                 <th className="px-3 py-2 font-medium">
-                  <InstantTooltip label="How the step as it is (the champion) fared on the Acceptance Criteria frozen into the run.">
+                  <InstantTooltip label="How the step fared on the Acceptance Criteria frozen into the run.">
                     <span>Acceptance</span>
                   </InstantTooltip>
                 </th>
@@ -1679,7 +1676,6 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRu
                   <td className="px-3 py-2 font-mono text-xs">
                     {run.id.slice(0, 8)}
                     {otherVersion(run) !== undefined && <span className="ml-1.5 text-muted-foreground">v{run.definitionVersion}</span>}
-                    {run.variants.length > 1 && <span className="ml-1.5 font-sans text-muted-foreground">{run.variants.length} variants</span>}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground" title={run.createdAt}>
                     {formatDistanceToNow(new Date(run.createdAt), { addSuffix: true })}

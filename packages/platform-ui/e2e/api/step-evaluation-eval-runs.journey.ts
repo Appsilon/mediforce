@@ -137,13 +137,12 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
       const res = await request.get(`/api/scores?runId=${trial.processInstanceId}&stepId=grade-aes`, { headers: AUTH_HEADERS });
       return ListScoresOutputSchema.parse(await res.json()).scores;
     }));
-    const [champion] = finished.report.variants;
-    for (const evaluator of champion!.evaluators) {
+    for (const evaluator of finished.report.evaluators) {
       const scores = trialScores.flat().filter((score) => score.evaluatorId === evaluator.evaluatorId);
       expect(evaluator.passes).toBe(scores.filter((score) => score.value >= 0.5).length);
       expect(evaluator.failures).toBe(scores.filter((score) => score.value < 0.5).length);
     }
-    const byName = Object.fromEntries(champion!.evaluators.map((evaluator) => [evaluator.name, evaluator]));
+    const byName = Object.fromEntries(finished.report.evaluators.map((evaluator) => [evaluator.name, evaluator]));
     expect(byName['summary-present']).toMatchObject({ passes: 2, failures: 0, passRate: 1, passAtK: 1, passHatK: 1, flakiness: 0 });
     expect(byName['findings-present']).toMatchObject({ passes: 0, failures: 2, passRate: 0, passAtK: 0, passHatK: 0 });
     expect(byName['summary-present']!.wilsonLower).toBeCloseTo(0.3424, 3);
@@ -266,7 +265,7 @@ test.describe('Step Evaluation judge verdicts — API E2E', () => {
     }, { description: `Eval Run ${evalRunId} to complete`, timeoutMs: 90_000 });
 
     const judgeReport = (output: EvalRunOutput) =>
-      output.report.variants[0]!.evaluators.find((evaluator) => evaluator.evaluatorId === judge.id);
+      output.report.evaluators.find((evaluator) => evaluator.evaluatorId === judge.id);
     const verdictOn = (output: EvalRunOutput, caseId: string) =>
       output.report.judgeVerdicts.find((verdict) => verdict.caseId === caseId);
 
@@ -374,7 +373,7 @@ test.describe('Step Evaluation judge verdicts — API E2E', () => {
     }, { description: `Eval Run ${evalRunId} to complete`, timeoutMs: 90_000 });
 
     // The expected-output check passed all three; the schema check graded only the case that did not narrow its Evaluators — no errors for the others.
-    const byName = Object.fromEntries(finished.report.variants[0]!.evaluators.map((evaluator) => [evaluator.name, evaluator]));
+    const byName = Object.fromEntries(finished.report.evaluators.map((evaluator) => [evaluator.name, evaluator]));
     expect(byName['matches-expected']).toMatchObject({ passes: 3, failures: 0, errors: 0, passRate: 1 });
     expect(byName['findings-present']).toMatchObject({ passes: 0, failures: 1, errors: 0 });
     for (const trial of finished.trials) expect(trial.status).toBe('scored');

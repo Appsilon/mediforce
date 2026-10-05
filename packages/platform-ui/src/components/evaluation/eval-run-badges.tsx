@@ -30,7 +30,7 @@ const ACCEPTANCE: Record<EvalRunAcceptance['status'], { label: string; className
   no_criteria: { label: 'No criteria', className: GRAY },
 };
 
-/** How the run's champion fared on its Acceptance Criteria; a dash while it is prepared or running. */
+/** How the run fared on its Acceptance Criteria; a dash while it is prepared or running. */
 export function AcceptanceBadge({ acceptance }: { acceptance: EvalRunAcceptance | null }) {
   if (acceptance === null) return <span className="text-xs text-muted-foreground">—</span>;
   return (

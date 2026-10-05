@@ -1,5 +1,5 @@
 import { EvaluatorSeveritySchema, type AcceptanceCriteria } from '../schemas/evaluation';
-import { CHAMPION_VARIANT_ID, type AcceptanceCriterionVerdict, type EvalRun, type EvalRunAcceptance, type EvalRunEvaluatorReport, type EvalRunVariantReport } from '../schemas/eval-run';
+import type { AcceptanceCriterionVerdict, EvalRun, EvalRunAcceptance, EvalRunEvaluatorReport, EvalRunReport } from '../schemas/eval-run';
 
 const SEVERITIES = EvaluatorSeveritySchema.options;
 
@@ -15,7 +15,7 @@ function notGraded(evaluator: EvalRunEvaluatorReport): string {
 }
 
 /**
- * Judges one variant's Evaluator results against the run's Acceptance
+ * Judges an Eval Run's Evaluator results against its Acceptance
  * Criteria (ADR-0023 D10). A criterion holds for a severity when every counted
  * Evaluator of that severity reaches it: its pass rate — passes over graded
  * trials, taken literally — at least `minPassRate`, and its pass^k at least
@@ -94,18 +94,17 @@ export function describeAcceptanceCriteria(criteria: AcceptanceCriteria): string
 }
 
 /**
- * How an Eval Run's champion fared on the criteria frozen into it — the
+ * How an Eval Run fared on the criteria frozen into it — the
  * step's validation when the run is its newest finished one. Null while the
  * run is prepared or running.
  */
 export function evalRunAcceptance(
   run: Pick<EvalRun, 'status' | 'acceptanceCriteria'>,
-  report: { variants: ReadonlyArray<Pick<EvalRunVariantReport, 'id' | 'criteria'>> },
+  report: Pick<EvalRunReport, 'criteria'>,
 ): EvalRunAcceptance | null {
   if (run.status === 'prepared' || run.status === 'running') return null;
   if (run.acceptanceCriteria === null) return { status: 'no_criteria', reason: 'No Acceptance Criteria were frozen into this run.' };
-  const verdicts = report.variants.find((variant) => variant.id === CHAMPION_VARIANT_ID)?.criteria ?? [];
-  const unmet = verdicts.filter((verdict) => verdict.status !== 'met');
+  const unmet = report.criteria.filter((verdict) => verdict.status !== 'met');
   if (unmet.length === 0) return { status: 'met', reason: 'Every criterion met.' };
   return {
     status: unmet.some((verdict) => verdict.status === 'missed') ? 'missed' : 'not_judged',

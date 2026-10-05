@@ -4,12 +4,10 @@ import {
   EvaluatedStepSchema,
   EvaluatorSeveritySchema,
   McpEvalServerPolicySchema,
-  StepVariantPatchSchema,
 } from './evaluation';
 import {
   AcceptanceCriterionVerdictSchema,
   EvalRunEvaluatorSchema,
-  EvalVariantSchema,
   StepFingerprintSchema,
 } from './eval-run';
 
@@ -41,17 +39,14 @@ export function qualificationSignatureMeaning(): string {
 /**
  * A signed decision that one Step Fingerprint met its Acceptance Criteria in
  * an Eval Run (D10, D11). It cites everything the decision rested on — the
- * run, the variant and its Fingerprint, the Evaluator versions and the MCP
- * eval policy — and is never
- * changed. It is informational: nothing is blocked without one.
+ * run, the Step's Fingerprint, the Evaluator versions and the MCP eval
+ * policy — and is never changed; one signed before variants were removed
+ * still carries their keys, which reads ignore. It is informational: nothing is blocked without one.
  */
 export const StepQualificationSchema = EvaluatedStepSchema.extend({
   id: z.uuid(),
   evalRunId: z.uuid(),
   definitionVersion: z.number().int().positive(),
-  variantId: EvalVariantSchema.shape.id,
-  variantLabel: z.string(),
-  patch: StepVariantPatchSchema,
   fingerprint: StepFingerprintSchema,
   evaluators: z.array(EvalRunEvaluatorSchema),
   mcpPolicy: z.record(z.string(), McpEvalServerPolicySchema),

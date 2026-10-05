@@ -58,7 +58,6 @@ describe('getEvalTrial (ADR-0023)', () => {
     const result = await getEvalTrial({ evalRunId, trialId: failing.id }, scenario.scope);
 
     expect(result.trial.id).toBe(failing.id);
-    expect(result.variant).toMatchObject({ id: 'champion' });
     expect(result.evalCase).toMatchObject({ name: 'Grade 4 neutropenia' });
     expect(result.result).toEqual({ summary: 'no findings' });
     expect(result.evaluators.map(({ evaluator, outcome, score, error }) => [evaluator.name, outcome, score?.confidence ?? null, error])).toEqual([
@@ -84,7 +83,6 @@ describe('getEvalTrial (ADR-0023)', () => {
 
     expect(report.trialResults.find((entry) => entry.trialId === failing.id)).toEqual({
       trialId: failing.id,
-      variantId: 'champion',
       caseName: 'Grade 4 neutropenia',
       passed: false,
       evaluators: [
@@ -109,7 +107,7 @@ describe('getEvalTrial (ADR-0023)', () => {
     expect(judge.judgeCalls?.[0]).toMatchObject({ model: 'anthropic/claude-haiku-4.5', response: 'I would rather not say.' });
   });
 
-  it('lists each run with how its champion fared on the Acceptance Criteria, none while it is prepared', async () => {
+  it('lists each run with how it fared on the Acceptance Criteria, none while it is prepared', async () => {
     const evalRunId = await finishedRun();
     const { evalRun: prepared } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scenario.scope);
 

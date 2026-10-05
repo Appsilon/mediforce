@@ -60,8 +60,11 @@ refused rather than run unpatched.
 | **Case expectation** | _Returned to ADR-0023 D17 on 2026-10-02._ Was: an Eval Case is `positive` (a correct output exists) or `negative` (no output should be accepted), used only as GEPA feedback. Now it says whether a case's expected output is one to match or to avoid. | `EvalCaseExpectationSchema` in `platform-core/src/schemas/evaluation.ts` |
 | **Web UI** | Challenger JSON on **Eval Runs → Prepare**, the comparison table and **Apply to step** in a run's report, the **Optimisations** section, the **Positive case / Negative case** buttons and the expectation selector on a case. | `platform-ui/src/components/evaluation/step-evaluation-sections.tsx` (`EvalRunsSection`, `OptimisationsSection`, `CasesSection`, `CaseForm`), `eval-run-report.tsx` (`Comparison`, `ApplyVariant`) |
 
-What stays today: an Eval Run and its report still carry a `variants` list,
-which now only ever holds the step as it is (`champion`).
+What stays today: nothing of variants. Since 2026-10-05 an Eval Run carries
+its Step Fingerprint itself and its report has no per-variant level
+(migration `0073_eval_run_fingerprint.sql`); `eval_trials.variant_id` remains
+as a legacy column every row sets to `champion`, and a qualification signed
+before keeps its variant keys, which reads ignore.
 
 ## Decisions (proposed)
 

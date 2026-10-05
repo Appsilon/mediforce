@@ -32,14 +32,12 @@ function confidenceText(verdict: JudgeVerdict): string {
 }
 
 /** One model verdict with its rationale, and the Accept / Deny a person reviews it with. */
-export function JudgeVerdictRow({ step, evalRunId, verdict, mayEdit, editReason, variantLabel, trialHref, rationale }: {
+export function JudgeVerdictRow({ step, evalRunId, verdict, mayEdit, editReason, trialHref, rationale }: {
   step: EvaluatedStep;
   evalRunId: string;
   verdict: JudgeVerdict;
   mayEdit: boolean;
   editReason: string | undefined;
-  /** Shown when the run has more than one variant. */
-  variantLabel?: string;
   /** Where the trial's details are; omitted on the trial's own page. */
   trialHref?: string;
   /** The rationale as the page renders it; its plain text by default. */
@@ -64,7 +62,7 @@ export function JudgeVerdictRow({ step, evalRunId, verdict, mayEdit, editReason,
   return (
     <li className="space-y-1 border-t pt-2 first:border-t-0 first:pt-0" data-testid="judge-verdict">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="font-medium">{verdict.caseName ?? verdict.caseId.slice(0, 8)} · trial {verdict.trialIndex + 1}{variantLabel === undefined ? '' : ` · ${variantLabel}`}</span>
+        <span className="font-medium">{verdict.caseName ?? verdict.caseId.slice(0, 8)} · trial {verdict.trialIndex + 1}</span>
         <span className="text-muted-foreground">{verdict.name} · {verdict.severity}</span>
         <span className={cn(
           'rounded px-1.5 py-0.5 text-[11px] font-medium',
@@ -128,14 +126,12 @@ export function JudgeVerdictRow({ step, evalRunId, verdict, mayEdit, editReason,
  * verdict, so it counts however unsure the judge was, or denies it, leaving it
  * out of the Acceptance Criteria.
  */
-export function JudgeVerdicts({ step, evalRunId, verdicts, mayEdit, editReason, variantLabels, trialHref }: {
+export function JudgeVerdicts({ step, evalRunId, verdicts, mayEdit, editReason, trialHref }: {
   step: EvaluatedStep;
   evalRunId: string;
   verdicts: readonly JudgeVerdict[];
   mayEdit: boolean;
   editReason: string | undefined;
-  /** By variant id, when the run has more than one. */
-  variantLabels?: ReadonlyMap<string, string>;
   trialHref?: (trialId: string) => string;
 }) {
   const leftOut = verdicts.filter((verdict) => verdict.counts === false).length;
@@ -153,7 +149,6 @@ export function JudgeVerdicts({ step, evalRunId, verdicts, mayEdit, editReason, 
             verdict={verdict}
             mayEdit={mayEdit}
             editReason={editReason}
-            variantLabel={variantLabels?.get(verdict.variantId)}
             trialHref={trialHref?.(verdict.trialId)}
           />
         ))}

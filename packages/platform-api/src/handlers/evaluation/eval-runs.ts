@@ -1,14 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import {
-  CHAMPION_VARIANT_ID,
   DEFAULT_ACCEPTANCE_CRITERIA,
   evaluatorTrust,
   resolveDefinitionModels,
   type EvalRun,
   type EvalRunEvaluator,
   type EvalTrial,
-  type EvalVariant,
   type EvaluatedStep,
   type McpEvalServerPolicy,
   type WorkflowDefinition,
@@ -114,16 +112,11 @@ async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, s
     agentServers.map((name) => [name, policy?.servers[name] ?? DEFAULT_MCP_EVAL_SERVER_POLICY]),
   );
   await assertModelsRunnable(scope, definition);
-  const variants: EvalVariant[] = [{
-    id: CHAMPION_VARIANT_ID,
-    label: 'Current step',
-    patch: {},
-    fingerprint: await computeStepFingerprint(scope, definition, workflowStep),
-  }];
+  const fingerprint = await computeStepFingerprint(scope, definition, workflowStep);
   const caseIds = dataset.caseIds;
   const estimate = await estimateEvalRun(scope, step, workflowStep, frozenEvaluators, caseIds.length * input.trialsPerCase);
   const suggestedBudgetUsd = estimate.totalUsd === null ? null : defaultBudget(estimate.totalUsd);
-  return { step, definition, dataset, frozenEvaluators, mcpPolicy, variants, caseIds, estimate, suggestedBudgetUsd };
+  return { step, definition, dataset, frozenEvaluators, mcpPolicy, fingerprint, caseIds, estimate, suggestedBudgetUsd };
 }
 
 /**
@@ -139,7 +132,7 @@ export async function estimateEvalRunCost(
     estimate: plan.estimate,
     suggestedBudgetUsd: plan.suggestedBudgetUsd,
     caseCount: plan.caseIds.length,
-    trialCount: plan.caseIds.length * input.trialsPerCase * plan.variants.length,
+    trialCount: plan.caseIds.length * input.trialsPerCase,
   };
 }
 
@@ -152,9 +145,9 @@ export async function prepareEvalRun(
   input: z.output<typeof PrepareEvalRunInputSchema>,
   scope: CallerScope,
 ): Promise<EvalRunOutput> {
-  const { step, definition, dataset, frozenEvaluators, mcpPolicy, variants, caseIds, estimate, suggestedBudgetUsd } = await planEvalRun(input, scope);
+  const { step, definition, dataset, frozenEvaluators, mcpPolicy, fingerprint, caseIds, estimate, suggestedBudgetUsd } = await planEvalRun(input, scope);
   const [criteria] = await scope.evaluation.listAcceptanceCriteria(step);
-  const trialCount = caseIds.length * input.trialsPerCase * variants.length;
+  const trialCount = caseIds.length * input.trialsPerCase;
   const budgetUsd = input.budgetUsd ?? suggestedBudgetUsd;
   if (budgetUsd === null) {
     throw new ValidationError('No cost history or model price for this step — set budgetUsd to cap the run');
@@ -170,7 +163,7 @@ export async function prepareEvalRun(
     trialsPerCase: input.trialsPerCase,
     concurrency: input.concurrency,
     evaluators: frozenEvaluators.map(({ frozen }) => frozen),
-    variants,
+    fingerprint,
     acceptanceCriteria: criteria?.criteria ?? DEFAULT_ACCEPTANCE_CRITERIA,
     mcpPolicy,
     estimate,
@@ -183,12 +176,11 @@ export async function prepareEvalRun(
     completedAt: null,
     acceptance: null,
   };
-  const trials: EvalTrial[] = caseIds.flatMap((caseId) => variants.flatMap((variant) =>
+  const trials: EvalTrial[] = caseIds.flatMap((caseId) =>
     Array.from({ length: input.trialsPerCase }, (_unused, trialIndex) => ({
       id: randomUUID(),
       evalRunId: run.id,
       caseId,
-      variantId: variant.id,
       trialIndex,
       status: 'pending' as const,
       processInstanceId: null,
@@ -205,18 +197,18 @@ export async function prepareEvalRun(
       completedAt: null,
       mcpReplayMisses: [],
       erroredJudgeCalls: {},
-    }))));
+    })));
   await scope.evaluation.createEvalRun(run, trials);
   await appendEvaluationAudit(scope, {
     action: 'eval_run.prepared',
-    description: `Eval Run prepared for step '${step.stepId}': ${variants.length} variant(s), ${trialCount} trial(s), budget $${budgetUsd}`,
+    description: `Eval Run prepared for step '${step.stepId}': ${trialCount} trial(s), budget $${budgetUsd}`,
     namespace: step.namespace,
     entityType: 'eval_run',
     entityId: run.id,
     inputSnapshot: { ...step, definitionVersion: run.definitionVersion, datasetVersionId: dataset.id, trialsPerCase: input.trialsPerCase },
     outputSnapshot: {
       evaluators: run.evaluators,
-      variants,
+      fingerprint,
       acceptanceCriteria: run.acceptanceCriteria,
       mcpPolicy,
       estimate,

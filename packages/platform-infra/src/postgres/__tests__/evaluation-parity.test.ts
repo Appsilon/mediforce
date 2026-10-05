@@ -238,10 +238,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         trialsPerCase: 2,
         concurrency: 2,
         evaluators: [{ evaluatorId: randomUUID(), name: 'findings-present', version: 1, kind: 'schema' as const, severity: 'critical' as const, counted: true }],
-        variants: [
-          { id: 'champion', label: 'Current step', patch: {}, fingerprint: fingerprint('a') },
-          { id: 'challenger-1', label: 'GPT-5', patch: { model: 'openai/gpt-5' }, fingerprint: fingerprint('b') },
-        ],
+        fingerprint: fingerprint('a'),
         acceptanceCriteria: { critical: { minPassRate: 0.9, minPassHatK: 0.8 } },
         mcpPolicy: { edc: { mode: 'deny' as const } },
         estimate: { perTrialUsd: 0.25, totalUsd: 0.5, basis: 'history' as const, sampleSize: 4 },
@@ -255,7 +252,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         acceptance: null,
       };
       const trials = [0, 1].map((trialIndex) => ({
-        id: randomUUID(), evalRunId: run.id, caseId, variantId: 'champion', trialIndex, status: 'pending' as const,
+        id: randomUUID(), evalRunId: run.id, caseId, trialIndex, status: 'pending' as const,
         processInstanceId: null, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null,
         durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
       }));
@@ -296,14 +293,15 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       expect((await repo.getEvalRun(run.id))?.acceptance).toEqual({ status: 'missed', reason: 'critical missed' });
     });
 
-    it('orders trials by case, variant, then trial index, and keeps a trial\'s confidence', async () => {
+    it('orders trials by case, then trial index, and keeps a trial\'s confidence', async () => {
       const dataset = await repo.appendDatasetVersion({
         ...step, id: randomUUID(), version: 1, caseIds: [randomUUID()], containsProductionData: false,
         createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z',
       });
       const run = storedRun(dataset.id, dataset.caseIds);
-      const trials = (['challenger-1', 'champion'] as const).flatMap((variantId) => [1, 0].map((trialIndex) => ({
-        id: randomUUID(), evalRunId: run.id, caseId: dataset.caseIds[0]!, variantId, trialIndex, status: 'pending' as const,
+      const caseIds = [dataset.caseIds[0]!, randomUUID()].sort().reverse();
+      const trials = caseIds.flatMap((caseId) => [1, 0].map((trialIndex) => ({
+        id: randomUUID(), evalRunId: run.id, caseId, trialIndex, status: 'pending' as const,
         processInstanceId: null, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null,
         durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
       })));
@@ -311,8 +309,8 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       await repo.transitionTrial(trials[0]!.id, 'pending', { status: 'skipped', confidence: 0.75 });
 
       const listed = await repo.listTrials(run.id);
-      expect(listed.map((trial) => [trial.variantId, trial.trialIndex])).toEqual([
-        ['challenger-1', 0], ['challenger-1', 1], ['champion', 0], ['champion', 1],
+      expect(listed.map((trial) => [trial.caseId, trial.trialIndex])).toEqual([
+        [caseIds[1], 0], [caseIds[1], 1], [caseIds[0], 0], [caseIds[0], 1],
       ]);
       expect(listed.find((trial) => trial.id === trials[0]!.id)?.confidence).toBe(0.75);
     });
@@ -341,10 +339,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         id: randomUUID(),
         evalRunId: run.id,
         definitionVersion: 3,
-        variantId: 'challenger-1',
-        variantLabel: 'GPT-5',
-        patch: { model: 'openai/gpt-5' },
-        fingerprint: fingerprint('b'),
+        fingerprint: fingerprint('a'),
         evaluators: run.evaluators,
         mcpPolicy: run.mcpPolicy,
         acceptanceCriteria: { critical: { minPassRate: 0.9 } },
@@ -378,7 +373,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       const run = storedRun(dataset.id, dataset.caseIds);
       const trialId = randomUUID();
       await repo.createEvalRun(run, [{
-        id: trialId, evalRunId: run.id, caseId, variantId: 'champion', trialIndex: 0, status: 'scoring',
+        id: trialId, evalRunId: run.id, caseId, trialIndex: 0, status: 'scoring',
         processInstanceId: null, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null,
         durationMs: null, confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
       }]);
@@ -419,10 +414,7 @@ function storedRun(datasetVersionId: string, caseIds: string[]): EvalRun {
     trialsPerCase: 2,
     concurrency: 2,
     evaluators: [{ evaluatorId: randomUUID(), name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
-    variants: [
-      { id: 'champion', label: 'Current step', patch: {}, fingerprint: fingerprint('a') },
-      { id: 'challenger-1', label: 'GPT-5', patch: { model: 'openai/gpt-5' }, fingerprint: fingerprint('b') },
-    ],
+    fingerprint: fingerprint('a'),
     acceptanceCriteria: null,
     mcpPolicy: {},
     estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },

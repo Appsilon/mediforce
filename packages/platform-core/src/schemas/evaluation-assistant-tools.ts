@@ -144,7 +144,6 @@ export const ProposeAcceptanceCriteriaToolSchema = z.object({
  */
 export const ProposeControlSettingsToolSchema = z.object({
   evalRunId: z.uuid(),
-  variantId: z.string().min(1),
   autonomyLevel: z.enum(['L3', 'L4']),
   confidenceThreshold: z.number().min(0).max(1).optional(),
   /** What in the report supports it: criteria, calibration, coverage. */
@@ -182,13 +181,12 @@ export const FixKindSchema = z.enum([
 ]);
 
 /**
- * A diagnosis of one variant's failures in an Eval Run: its failing trials
+ * A diagnosis of an Eval Run's failures: its failing trials
  * grouped by root cause, each group with its evidence and the kind of fix it
  * points to. A card only — nothing is created.
  */
 export const ProposeDiagnosisToolSchema = z.object({
   evalRunId: z.uuid(),
-  variantId: z.string().min(1),
   clusters: z.array(z.object({
     rootCause: FailureRootCauseSchema,
     summary: z.string().min(1).max(1000),
@@ -242,14 +240,11 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
   /** One Eval Run's report, to explain it. */
   get_eval_run_report: z.object({ evalRunId: z.string().min(1) }),
   /**
-   * One variant's failing trials in an Eval Run — a counted Evaluator failed,
+   * An Eval Run's failing trials — a counted Evaluator failed,
    * a check errored, or the trial produced no Agent Run — with each trial's
    * case and the Evaluators that failed or errored on it.
    */
-  get_failures: z.object({
-    evalRunId: z.uuid(),
-    variantId: z.string().min(1).optional().describe('Defaults to the champion.'),
-  }),
+  get_failures: z.object({ evalRunId: z.uuid() }),
   /** Run a draft check against existing outputs; writes nothing. */
   preview_evaluator: z.object({
     check: AssistantCheckSchema,

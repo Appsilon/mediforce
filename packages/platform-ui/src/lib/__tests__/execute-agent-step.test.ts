@@ -246,33 +246,6 @@ describe('executeAgentStep', () => {
     expect(mockAgentRunner.runWithWorkflowStep).not.toHaveBeenCalled();
   });
 
-  it('[DATA] refuses a trial of a challenger prepared before challengers were removed (ADR-0024)', async () => {
-    const evalRunId = '11111111-1111-4111-8111-111111111111';
-    const caseId = '22222222-2222-4222-8222-222222222222';
-    await evaluationRepo.createEvalRun({
-      namespace: 'test-namespace', workflowName: 'community-digest', stepId: 'gather-data',
-      id: evalRunId, definitionVersion: 1, datasetVersionId: '33333333-3333-4333-8333-333333333333', caseIds: [caseId],
-      trialsPerCase: 1, concurrency: 1,
-      evaluators: [{ evaluatorId: '44444444-4444-4444-8444-444444444444', name: 'summary-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
-      variants: [
-        { id: 'champion', label: 'Current step', patch: {}, fingerprint: null },
-        { id: 'challenger-1', label: 'GPT-5', patch: { model: 'openai/gpt-5' }, fingerprint: null },
-      ],
-      acceptanceCriteria: null, mcpPolicy: {},
-      estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
-      budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null, acceptance: null,
-    }, [{
-      id: '55555555-5555-4555-8555-555555555555', evalRunId, caseId, variantId: 'challenger-1', trialIndex: 0, status: 'running',
-      processInstanceId: 'inst-wf-001', agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null, durationMs: null,
-      confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
-    }]);
-    mockInstanceRepo.getById.mockResolvedValue({ ...defaultInstance, evalRunId });
-
-    await expect(executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1'))
-      .rejects.toThrow("runs challenger 'GPT-5', and challengers are no longer run");
-    expect(mockAgentRunner.runWithWorkflowStep).not.toHaveBeenCalled();
-  });
-
   describe('an eval trial whose step changed since its Eval Run was prepared', () => {
     const agentStep: WorkflowStep = { ...firstStep, agentId: 'digest-agent' };
     const agentWithPrompt = (systemPrompt: string) => ({ id: 'digest-agent', systemPrompt, mcpServers: {} });
@@ -290,12 +263,12 @@ describe('executeAgentStep', () => {
         id: evalRunId, definitionVersion: 1, datasetVersionId: '33333333-3333-4333-8333-333333333333', caseIds: [caseId],
         trialsPerCase: 1, concurrency: 1,
         evaluators: [{ evaluatorId: '44444444-4444-4444-8444-444444444444', name: 'summary-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
-        variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint }],
+        fingerprint,
         acceptanceCriteria: null, mcpPolicy: {},
         estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
         budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null, acceptance: null,
       }, [{
-        id: trialId, evalRunId, caseId, variantId: 'champion', trialIndex: 0, status: 'running',
+        id: trialId, evalRunId, caseId, trialIndex: 0, status: 'running',
         processInstanceId: instanceId, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null, durationMs: null,
         confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
       }]);
@@ -313,7 +286,7 @@ describe('executeAgentStep', () => {
       expect(mockAgentRunner.runWithWorkflowStep).not.toHaveBeenCalled();
     });
 
-    it('[DATA] runs it when the step is still the one its variant was prepared with', async () => {
+    it('[DATA] runs it when the step is still the one its run was prepared with', async () => {
       await prepareTrial('inst-eval-same', '88888888-8888-4888-8888-888888888888', '99999999-9999-4999-8999-999999999999');
 
       await executeAgentStep('inst-eval-same', 'gather-data', agentStep, {}, 'user-1');
@@ -350,12 +323,12 @@ describe('executeAgentStep', () => {
         id: evalRunId, definitionVersion: 1, datasetVersionId: '33333333-3333-4333-8333-333333333333', caseIds: [caseId],
         trialsPerCase: 1, concurrency: 1,
         evaluators: [{ evaluatorId: '44444444-4444-4444-8444-444444444444', name: 'summary-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
-        variants: [{ id: 'champion', label: 'Current step', patch: {}, fingerprint: null }],
+        fingerprint: null,
         acceptanceCriteria: null, mcpPolicy,
         estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
         budgetUsd: 1, spentUsd: 0, status: 'running', createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z', startedAt: null, completedAt: null, acceptance: null,
       }, [{
-        id: trialId, evalRunId, caseId, variantId: 'champion', trialIndex: 0, status: 'running',
+        id: trialId, evalRunId, caseId, trialIndex: 0, status: 'running',
         processInstanceId: instanceId, agentRunId: null, costUsd: null, inputTokens: null, outputTokens: null, durationMs: null,
         confidence: null, error: null, startedAt: null, scoringStartedAt: null, scoringAttempts: 0, completedAt: null, mcpReplayMisses: [], erroredJudgeCalls: {},
       }]);

@@ -93,7 +93,7 @@ The step's Brief is sent to the assistant on every turn. What it can help with:
   (`get_failures`: the run's trials where a counted Evaluator failed, a
   check errored, or no Agent Run was produced — each with its case, its
   trial error and the Evaluators that failed or errored; at most 50 listed,
-  with the total; `mediforce eval failures <evalRunId> [--variant <id>]`,
+  with the total; `mediforce eval failures <evalRunId>`,
   `GET /api/evaluation/runs/:id/failures`), then the trajectories and cases,
   and clusters the failures by root cause in a **diagnosis** card
   (`propose_diagnosis`): `ambiguous_instruction`, `missing_context`,
@@ -605,7 +605,7 @@ the judge calls. Then:
   a pass: the pass rate in five confidence bins and the expected calibration
   error (the count-weighted gap between stated confidence and pass rate; 0 is
   a perfect match). It is what lets routing send only low-confidence outputs
-  to a person. In the API and CLI report only (`report.variants[].confidence`);
+  to a person. In the API and CLI report only (`report.confidence`);
   the web report shows the verdict calibration below instead.
 - **Verdict calibration.** Web report only: the expected calibration error of
   the model verdicts a person reviewed — each verdict's confidence against
@@ -620,7 +620,7 @@ the judge calls. Then:
   reported no confidence, or no threshold holds. A recommendation to apply in
   the workflow editor.
 
-- **Trial results.** Every trial, by variant, with each of its case's
+- **Trial results.** Every trial, by case, with each of its case's
   Evaluators' grade — `pass`, `fail`, `excluded` (a model verdict left out) or
   `errored` — and comment, and whether it passed every counted Evaluator
   (`report.trialResults`).
@@ -628,7 +628,7 @@ the judge calls. Then:
 ### Reading an Eval Run
 
 The Evaluation tab lists the step's Eval Runs as a table — ID, created,
-status, cost against budget, Dataset version, **Acceptance** (how the champion
+status, cost against budget, Dataset version, **Acceptance** (how the run
 fared on the criteria frozen into the run: Met, Missed, Not judged or No
 criteria; `acceptance` on the run, from `GET /api/evaluation/runs` and in
 `mediforce eval run-list`). It is stored on the run when the run finishes or is
@@ -647,7 +647,7 @@ prepared) and five views, from the whole run to one trial:
   confidence, cost and time; filters for failed trials and trials with
   problems.
 - **Evaluators** — per Evaluator, what it looks for (its rule) and how it
-  checks, its numbers per variant, and its grade and comment on every trial.
+  checks, its numbers, and its grade and comment on every trial.
 - **Model verdicts** — every judge verdict and agreement score to **Accept**
   or **Deny**, each linking to what the judge read.
 - **Problems** — trials that failed or that a check could not grade, with why,
@@ -752,7 +752,7 @@ it stale. The badge is informational: nothing is blocked without one.
 Separate from signing, every step has a **validation** status for its runnable
 workflow version (or the version asked for), read from the newest finished
 Eval Run of that version (`completed` or `budget_exceeded`; a cancelled run
-does not count) on the champion:
+does not count):
 
 - **Passed** — that run met every Acceptance Criterion frozen into it.
 - **Failed** — a criterion was missed or could not be judged.

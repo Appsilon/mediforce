@@ -10,34 +10,31 @@ function percent(value: number | null): string {
 
 function printRun(output: OutputSink, { evalRun, report }: EvalRunOutput): void {
   const estimate = evalRun.estimate.totalUsd === null ? 'no estimate' : `est. $${evalRun.estimate.totalUsd} (${evalRun.estimate.basis})`;
-  output.stdout(`${evalRun.id}  ${evalRun.status}  ${evalRun.caseIds.length} case(s) × ${evalRun.trialsPerCase} × ${evalRun.variants.length} variant(s)  budget $${evalRun.budgetUsd}, spent $${evalRun.spentUsd.toFixed(4)}  ${estimate}`);
+  output.stdout(`${evalRun.id}  ${evalRun.status}  ${evalRun.caseIds.length} case(s) × ${evalRun.trialsPerCase}  budget $${evalRun.budgetUsd}, spent $${evalRun.spentUsd.toFixed(4)}  ${estimate}`);
   output.stdout(`trials: ${report.trials.scored} scored, ${report.trials.failed} failed, ${report.trials.skipped} skipped, ${report.trials.inProgress} in progress`);
   if (evalRun.acceptanceCriteria === null) output.stdout('no Acceptance Criteria frozen into this run');
   output.stdout(describeMcpReport(report.mcp));
-  for (const variant of report.variants) {
-    output.stdout(`\n${variant.id} — ${variant.label}`);
-    output.stdout('evaluator                 pass   95% CI        pass@k pass^k flaky  errors');
-    for (const evaluator of variant.evaluators) {
-      const interval = evaluator.wilsonLower === null ? '      -      ' : `[${percent(evaluator.wilsonLower)}, ${percent(evaluator.wilsonUpper)}]`;
-      const counted = evaluator.counted ? '' : `  not counted (${evaluator.reason})`;
-      const excluded = evaluator.excluded === 0 ? '' : `  ${evaluator.excluded} model verdict(s) left out`;
-      output.stdout(`${evaluator.name.padEnd(24)} ${percent(evaluator.passRate)}  ${interval}  ${percent(evaluator.passAtK)}  ${percent(evaluator.passHatK)} ${percent(evaluator.flakiness)}  ${String(evaluator.errors).padStart(3)}${counted}${excluded}`);
-    }
-    for (const verdict of variant.criteria) {
-      output.stdout(`criterion ${verdict.severity}: ${verdict.status.replace('_', ' ')} — ${verdict.reason}`);
-    }
-    if (variant.confidence !== null) output.stdout(`confidence: ECE ${variant.confidence.ece.toFixed(3)} over ${variant.confidence.count} trial(s)`);
-    if (variant.recommendation !== null) {
-      const threshold = variant.recommendation.confidenceThreshold === null ? '' : ` above confidence ${variant.recommendation.confidenceThreshold}`;
-      output.stdout(`routing: ${variant.recommendation.autonomyLevel}${threshold} — ${variant.recommendation.reason}`);
-    }
+  output.stdout('\nevaluator                 pass   95% CI        pass@k pass^k flaky  errors');
+  for (const evaluator of report.evaluators) {
+    const interval = evaluator.wilsonLower === null ? '      -      ' : `[${percent(evaluator.wilsonLower)}, ${percent(evaluator.wilsonUpper)}]`;
+    const counted = evaluator.counted ? '' : `  not counted (${evaluator.reason})`;
+    const excluded = evaluator.excluded === 0 ? '' : `  ${evaluator.excluded} model verdict(s) left out`;
+    output.stdout(`${evaluator.name.padEnd(24)} ${percent(evaluator.passRate)}  ${interval}  ${percent(evaluator.passAtK)}  ${percent(evaluator.passHatK)} ${percent(evaluator.flakiness)}  ${String(evaluator.errors).padStart(3)}${counted}${excluded}`);
+  }
+  for (const verdict of report.criteria) {
+    output.stdout(`criterion ${verdict.severity}: ${verdict.status.replace('_', ' ')} — ${verdict.reason}`);
+  }
+  if (report.confidence !== null) output.stdout(`confidence: ECE ${report.confidence.ece.toFixed(3)} over ${report.confidence.count} trial(s)`);
+  if (report.recommendation !== null) {
+    const threshold = report.recommendation.confidenceThreshold === null ? '' : ` above confidence ${report.recommendation.confidenceThreshold}`;
+    output.stdout(`routing: ${report.recommendation.autonomyLevel}${threshold} — ${report.recommendation.reason}`);
   }
   const leftOut = report.judgeVerdicts.filter((verdict) => verdict.counts === false);
   if (leftOut.length > 0) output.stdout(`\nmodel verdicts left out of the criteria (review with: mediforce eval judge-review ${evalRun.id} --trial <id> --evaluator <id> --accept|--deny):`);
   for (const verdict of leftOut) {
     const confidence = verdict.confidence === null ? 'no confidence' : `confidence ${verdict.confidence.toFixed(2)} < ${verdict.minConfidence ?? '-'}`;
     const why = verdict.review?.decision === 'denied' ? 'denied' : confidence;
-    output.stdout(`  trial ${verdict.trialId}  ${verdict.name} (${verdict.evaluatorId})  ${verdict.passed ? 'pass' : 'fail'}, ${why}  ${verdict.variantId} "${verdict.caseName ?? verdict.caseId}"`);
+    output.stdout(`  trial ${verdict.trialId}  ${verdict.name} (${verdict.evaluatorId})  ${verdict.passed ? 'pass' : 'fail'}, ${why}  "${verdict.caseName ?? verdict.caseId}"`);
   }
 }
 
@@ -131,7 +128,7 @@ export const evalRunStartCommand = defineCommand({
 
 export const evalRunGetCommand = defineCommand({
   name: 'mediforce eval report',
-  description: 'Print an Eval Run and its report: per variant and Evaluator pass rate, Wilson 95% interval, pass@k, pass^k, flakiness; criteria verdicts and routing.',
+  description: 'Print an Eval Run and its report: per Evaluator pass rate, Wilson 95% interval, pass@k, pass^k, flakiness; criteria verdicts and routing.',
   args: { evalRunId: { type: 'positional', required: true, description: 'Eval Run id' } },
   async run({ args, output, mediforce, jsonMode }) {
     const result = await mediforce.evaluation.getRun({ evalRunId: args.evalRunId });
@@ -174,10 +171,9 @@ export const evalRunCancelCommand = defineCommand({
 
 export const evalRunFailuresCommand = defineCommand({
   name: 'mediforce eval failures',
-  description: 'Print one variant\'s failing trials in an Eval Run — the material a fix starts from: each trial\'s case, its error, and the Evaluators that failed or errored.',
+  description: 'Print an Eval Run\'s failing trials — the material a fix starts from: each trial\'s case, its error, and the Evaluators that failed or errored.',
   args: {
     evalRunId: { type: 'positional', required: true, description: 'Eval Run id' },
-    variant: { type: 'string', description: 'Variant id (default: champion)' },
     limit: { type: 'string', description: 'Most trials to list (default: 50)' },
   },
   async run({ args, output, mediforce, jsonMode }) {
@@ -188,14 +184,13 @@ export const evalRunFailuresCommand = defineCommand({
     }
     const result = await mediforce.evaluation.getRunFailures({
       evalRunId: args.evalRunId,
-      ...(args.variant !== undefined ? { variantId: args.variant } : {}),
       ...(limit !== undefined ? { limit } : {}),
     });
     if (jsonMode) {
       printJson(output, result);
       return 0;
     }
-    output.stdout(`${result.variantId} — ${result.variantLabel}: ${result.total} failing trial(s)${result.total > result.failures.length ? `, showing ${result.failures.length}` : ''}`);
+    output.stdout(`${result.total} failing trial(s)${result.total > result.failures.length ? `, showing ${result.failures.length}` : ''}`);
     for (const failure of result.failures) {
       output.stdout(`\ntrial ${failure.trialId}  case "${failure.caseName ?? failure.caseId}" (${failure.split ?? '?'}, ${failure.expectation ?? '?'})  ${failure.status}${failure.agentRunId === null ? '' : `  agent run ${failure.agentRunId}`}`);
       if (failure.expectedOutput !== null) output.stdout(`  expected output (${failure.expectation === 'negative' ? 'to avoid' : 'to match'}): ${JSON.stringify(failure.expectedOutput)}`);
@@ -223,8 +218,8 @@ export const evalTrialCommand = defineCommand({
       printJson(output, result);
       return 0;
     }
-    const { trial, variant, evalCase } = result;
-    output.stdout(`trial ${trial.id}  ${trial.status}  ${variant.id} — ${variant.label}  case "${evalCase?.name ?? trial.caseId}" trial ${trial.trialIndex + 1}${trial.agentRunId === null ? '' : `  agent run ${trial.agentRunId}`}`);
+    const { trial, evalCase } = result;
+    output.stdout(`trial ${trial.id}  ${trial.status}  case "${evalCase?.name ?? trial.caseId}" trial ${trial.trialIndex + 1}${trial.agentRunId === null ? '' : `  agent run ${trial.agentRunId}`}`);
     if (trial.error !== null) output.stdout(`error: ${trial.error}`);
     output.stdout(`input: ${JSON.stringify(result.stepInput)}`);
     if (evalCase?.expectedOutput != null) output.stdout(`expected output (${evalCase.expectation === 'negative' ? 'to avoid' : 'to match'}): ${JSON.stringify(evalCase.expectedOutput)}`);

@@ -13,7 +13,6 @@ import { secondaryButtonClass } from '@/components/ui/button-styles';
 import { useEvalRun, useEvalTrial } from '@/hooks/use-step-evaluation';
 import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
 import { OutcomeChip, TrialResultBadge, TrialStatusBadge } from './eval-run-badges';
-import { describePatch } from './eval-run-report';
 import { JudgeVerdictRow } from './judge-verdicts';
 import { CHECK_KINDS, CheckDetails } from './evaluator-check-editor';
 import { citationParts, citedEntries } from './judge-citations';
@@ -260,7 +259,7 @@ export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
   if (trial.data === undefined || run.data === undefined) return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
 
   const output = trial.data;
-  const { trial: evalTrial, variant, evalCase, evaluators } = output;
+  const { trial: evalTrial, evalCase, evaluators } = output;
   const { evalRun, report } = run.data;
   const step: EvaluatedStep = { namespace: evalRun.namespace, workflowName: evalRun.workflowName, stepId: evalRun.stepId };
   const passed = report.trialResults.find((result) => result.trialId === evalTrial.id)?.passed ?? null;
@@ -288,10 +287,11 @@ export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
           <TrialResultBadge passed={passed} />
         </div>
         <p className="text-xs text-muted-foreground">
-          {variant.label} — {describePatch(variant.patch)}
-          {evalTrial.costUsd !== null && ` · ${formatCostUsd(evalTrial.costUsd)}`}
-          {evalTrial.durationMs !== null && ` · ${formatDuration(evalTrial.durationMs)}`}
-          {evalTrial.inputTokens !== null && ` · ${evalTrial.inputTokens + (evalTrial.outputTokens ?? 0)} tokens`}
+          {[
+            evalTrial.costUsd === null ? null : formatCostUsd(evalTrial.costUsd),
+            evalTrial.durationMs === null ? null : formatDuration(evalTrial.durationMs),
+            evalTrial.inputTokens === null ? null : `${evalTrial.inputTokens + (evalTrial.outputTokens ?? 0)} tokens`,
+          ].filter((part) => part !== null).join(' · ')}
         </p>
         {evalTrial.error !== null && <p className="whitespace-pre-wrap text-xs text-amber-700 dark:text-amber-300">{evalTrial.error}</p>}
       </div>

@@ -99,7 +99,7 @@ test.describe('Step Evaluation qualification — API E2E', () => {
       acceptanceCriteria: { critical: { minPassRate: 0.1, minPassHatK: 1 }, major: { minPassRate: 0.5 } },
     });
     expect(prepared.evalRun).not.toHaveProperty('briefVersion');
-    expect(prepared.evalRun.variants.map((variant) => variant.id)).toEqual(['champion']);
+    expect(prepared.evalRun.fingerprint).not.toBeNull();
     expect(prepared.trials).toHaveLength(1);
     await post(request, `/api/evaluation/runs/${prepared.evalRun.id}/start`, { confirmedBudgetUsd: 1 });
 
@@ -117,16 +117,14 @@ test.describe('Step Evaluation qualification — API E2E', () => {
       expect(trial).toMatchObject({ status: 'scored', confidence: 1 });
       expect(await trajectoryText(request, trial.agentRunId!)).toContain('with MCP servers: meddra.');
     }
-    const [champion] = finished.report.variants;
-    expect(champion!.criteria.map((verdict) => [verdict.severity, verdict.status])).toEqual([['critical', 'met'], ['major', 'missed']]);
-    expect(champion!.recommendation).toMatchObject({ autonomyLevel: 'L3' });
+    expect(finished.report.criteria.map((verdict) => [verdict.severity, verdict.status])).toEqual([['critical', 'met'], ['major', 'missed']]);
+    expect(finished.report.recommendation).toMatchObject({ autonomyLevel: 'L3' });
 
     const unsigned = GetStepQualificationOutputSchema.parse(await (await request.get(`/api/evaluation/qualification?${query}`, { headers: AUTH_HEADERS })).json());
     expect(unsigned).toMatchObject({ status: 'not_qualified', qualification: null, validation: { status: 'failed', evalRunId: finished.evalRun.id } });
 
     const signing = {
       evalRunId: finished.evalRun.id,
-      variantId: 'champion',
       deviations: [{ severity: 'major', justification: 'Findings are listed by the downstream step; a reviewer reads every grade.' }],
       password: TEST_USER_PASSWORD,
     };
@@ -145,8 +143,7 @@ test.describe('Step Evaluation qualification — API E2E', () => {
     const { qualification } = SignStepQualificationOutputSchema.parse(await signedRes.json());
     expect(qualification).toMatchObject({
       evalRunId: finished.evalRun.id,
-      variantId: 'champion',
-      fingerprint: { hash: champion!.fingerprint!.hash },
+      fingerprint: { hash: finished.evalRun.fingerprint!.hash },
       signature: { signerId: callers.member.uid, reauthentication: 'password' },
     });
 

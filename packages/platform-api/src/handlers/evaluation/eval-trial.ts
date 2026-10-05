@@ -56,8 +56,6 @@ export async function getEvalTrial(input: GetEvalTrialInput, scope: CallerScope)
   await loadEvaluatedStep(scope, stepRef(run), 'read', run.definitionVersion);
   const trial = (await scope.evaluation.listTrials(run.id)).find((candidate) => candidate.id === input.trialId);
   if (trial === undefined) throw new NotFoundError(`Eval Run '${run.id}' has no trial '${input.trialId}'`);
-  const variant = run.variants.find((candidate) => candidate.id === trial.variantId);
-  if (variant === undefined) throw new NotFoundError(`Eval Run '${run.id}' has no variant '${trial.variantId}'`);
 
   const evalCase = await scope.evaluation.getCase(trial.caseId);
   const subject = trial.agentRunId === null ? null : await loadEvaluationSubject(scope, trial.agentRunId);
@@ -94,7 +92,6 @@ export async function getEvalTrial(input: GetEvalTrialInput, scope: CallerScope)
 
   return {
     trial,
-    variant,
     evalCase,
     stepInput: subject?.stepInput ?? null,
     result: subject?.agentRun.envelope?.result ?? null,

@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import {
-  CHAMPION_VARIANT_ID,
   DEFAULT_ACCEPTANCE_CRITERIA,
   inlineMcpServerNames,
   qualificationSignatureMeaning,
@@ -114,9 +113,8 @@ async function stepValidation(
   const since = `since Eval Run ${run.id.slice(0, 8)}`;
   const fingerprint = await stepFingerprint();
 
-  const champion = run.variants.find((variant) => variant.id === CHAMPION_VARIANT_ID);
-  if (champion?.fingerprint == null || champion.fingerprint.hash !== fingerprint.hash) {
-    const changed = champion?.fingerprint == null ? [] : changedFingerprintComponents(champion.fingerprint, fingerprint);
+  if (run.fingerprint === null || run.fingerprint.hash !== fingerprint.hash) {
+    const changed = run.fingerprint === null ? [] : changedFingerprintComponents(run.fingerprint, fingerprint);
     return notVerified(`The step changed ${since}${changed.length === 0 ? '' : `: ${changed.join(', ')}`}.`);
   }
   const evaluatorsChanged = evaluatorChanges(await rows.evaluators(), run.evaluators, 'run with');
@@ -234,8 +232,8 @@ async function reauthenticate(scope: CallerScope, uid: string, password: string 
 }
 
 /**
- * A person signs a Step Qualification for one variant of a finished Eval Run
- * (ADR-0023 D10) — not a cancelled one. It binds that variant's Step Fingerprint and cites the run,
+ * A person signs a Step Qualification for a finished Eval Run (ADR-0023
+ * D10) — not a cancelled one. It binds the run's Step Fingerprint and cites the run,
  * the Evaluator versions, the MCP eval policy and the
  * Acceptance Criteria frozen into it, with the verdict on each criterion.
  * Signing despite a criterion missed or not judged records a deviation with a
@@ -260,9 +258,8 @@ export async function signStepQualification(
     throw new ConflictError(`Eval Run '${run.id}' has not finished; sign once every trial is scored`);
   }
   if (run.status === 'cancelled') throw new ConflictError(`Eval Run '${run.id}' was cancelled; qualify a step on a run that finished`);
-  const variant = run.variants.find((candidate) => candidate.id === input.variantId);
-  if (variant === undefined) throw new NotFoundError(`Eval Run '${run.id}' has no variant '${input.variantId}'`);
-  if (variant.fingerprint === null) {
+  const { fingerprint } = run;
+  if (fingerprint === null) {
     throw new ValidationError('This Eval Run was prepared before Step Fingerprints; run the step again to qualify it');
   }
   if (run.acceptanceCriteria === null) {
@@ -270,7 +267,7 @@ export async function signStepQualification(
   }
 
   const report = await buildEvalRunReport(scope, run, trials);
-  const verdicts = report.variants.find((candidate) => candidate.id === variant.id)!.criteria;
+  const verdicts = report.criteria;
   const justified = new Set<string>();
   for (const deviation of input.deviations) {
     if (justified.has(deviation.severity)) throw new ValidationError(`Give one justification for the ${deviation.severity} criterion`);
@@ -295,10 +292,7 @@ export async function signStepQualification(
     id: randomUUID(),
     evalRunId: run.id,
     definitionVersion: run.definitionVersion,
-    variantId: variant.id,
-    variantLabel: variant.label,
-    patch: variant.patch,
-    fingerprint: variant.fingerprint,
+    fingerprint,
     evaluators: run.evaluators,
     mcpPolicy: run.mcpPolicy,
     acceptanceCriteria: run.acceptanceCriteria,
@@ -319,7 +313,7 @@ export async function signStepQualification(
     namespace: step.namespace,
     entityType: 'step_qualification',
     entityId: qualification.id,
-    inputSnapshot: { evalRunId: run.id, variantId: variant.id, deviations: input.deviations },
+    inputSnapshot: { evalRunId: run.id, deviations: input.deviations },
     outputSnapshot: {
       fingerprint: qualification.fingerprint.hash,
       verdicts: verdicts.map((verdict) => ({ severity: verdict.severity, status: verdict.status })),

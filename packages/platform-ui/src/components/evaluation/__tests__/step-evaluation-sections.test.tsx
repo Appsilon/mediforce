@@ -581,7 +581,7 @@ describe('AcceptanceCriteriaSection', () => {
     data: {
       status, changed, validation, evaluatorsChanged: [], history: status === 'not_qualified' ? [] : [{}],
       qualification: status === 'not_qualified' ? null : {
-        evalRunId: 'run-0000aaaa-0000-0000-0000-000000000000', variantId: 'champion', variantLabel: 'Current step', patch: {},
+        evalRunId: 'run-0000aaaa-0000-0000-0000-000000000000',
         fingerprint: { hash: 'f'.repeat(64) }, acceptanceCriteria: { critical: { minPassRate: 0.9 } }, mcpPolicy: {}, deviations: [],
         signature: { signerName: 'Dr Q', signedAt: '2026-09-30T10:00:00.000Z', meaning: 'Approved.', reauthentication: 'password' },
       },

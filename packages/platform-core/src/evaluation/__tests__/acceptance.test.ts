@@ -93,38 +93,32 @@ describe('judgeAcceptanceCriteria', () => {
 describe('evalRunAcceptance', () => {
   const criteria = { critical: { minPassRate: 0.9 }, major: { minPassRate: 0.8 } };
   const findings = report({ name: 'findings-present', severity: 'critical' });
-  const champion = (evaluators: EvalRunEvaluatorReport[]) => ({
-    variants: [
-      { id: 'champion', criteria: judgeAcceptanceCriteria(criteria, evaluators) },
-      // A challenger that misses everything never decides the run.
-      { id: 'challenger-1', criteria: judgeAcceptanceCriteria(criteria, [{ ...findings, passes: 0, failures: 30, passRate: 0 }]) },
-    ],
-  });
+  const judged = (evaluators: EvalRunEvaluatorReport[]) => ({ criteria: judgeAcceptanceCriteria(criteria, evaluators) });
 
   it('is null while the run is prepared or running', () => {
-    expect(evalRunAcceptance({ status: 'prepared', acceptanceCriteria: criteria }, champion([findings]))).toBeNull();
-    expect(evalRunAcceptance({ status: 'running', acceptanceCriteria: criteria }, champion([findings]))).toBeNull();
+    expect(evalRunAcceptance({ status: 'prepared', acceptanceCriteria: criteria }, judged([findings]))).toBeNull();
+    expect(evalRunAcceptance({ status: 'running', acceptanceCriteria: criteria }, judged([findings]))).toBeNull();
   });
 
   it('says no criteria were frozen into the run', () => {
-    expect(evalRunAcceptance({ status: 'completed', acceptanceCriteria: null }, champion([findings])))
+    expect(evalRunAcceptance({ status: 'completed', acceptanceCriteria: null }, judged([findings])))
       .toEqual({ status: 'no_criteria', reason: 'No Acceptance Criteria were frozen into this run.' });
   });
 
-  it('is met when the champion meets every criterion', () => {
+  it('is met when the run meets every criterion', () => {
     const graded = report({ name: 'grades-present', severity: 'major' });
-    expect(evalRunAcceptance({ status: 'cancelled', acceptanceCriteria: criteria }, champion([findings, graded])))
+    expect(evalRunAcceptance({ status: 'cancelled', acceptanceCriteria: criteria }, judged([findings, graded])))
       .toEqual({ status: 'met', reason: 'Every criterion met.' });
   });
 
   it('is missed when one criterion is missed, even beside one not judged', () => {
     const failing = { ...findings, passes: 20, failures: 10, passRate: 20 / 30 };
-    expect(evalRunAcceptance({ status: 'completed', acceptanceCriteria: criteria }, champion([failing])))
+    expect(evalRunAcceptance({ status: 'completed', acceptanceCriteria: criteria }, judged([failing])))
       .toEqual({ status: 'missed', reason: 'critical missed, major not judged' });
   });
 
   it('is not judged when nothing is missed but a criterion could not be judged', () => {
-    expect(evalRunAcceptance({ status: 'budget_exceeded', acceptanceCriteria: criteria }, champion([findings])))
+    expect(evalRunAcceptance({ status: 'budget_exceeded', acceptanceCriteria: criteria }, judged([findings])))
       .toEqual({ status: 'not_judged', reason: 'major not judged' });
   });
 });

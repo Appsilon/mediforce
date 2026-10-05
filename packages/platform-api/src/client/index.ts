@@ -2620,8 +2620,8 @@ export class Mediforce {
           EvalRunOutputSchema, 'mediforce.evaluation.cancelRun');
       },
       getRunFailures: async (input) => {
-        const { evalRunId, variantId, limit } = GetEvalRunFailuresInputSchema.parse(input);
-        const qs = toSearchParams({ variantId, limit: String(limit) });
+        const { evalRunId, limit } = GetEvalRunFailuresInputSchema.parse(input);
+        const qs = toSearchParams({ limit: String(limit) });
         return this.getJson(`/api/evaluation/runs/${encodeURIComponent(evalRunId)}/failures${qs}`, GetEvalRunFailuresOutputSchema, 'mediforce.evaluation.getRunFailures');
       },
       getTrial: async (input) => {
