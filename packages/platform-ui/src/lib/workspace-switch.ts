@@ -10,6 +10,7 @@ import { routes } from '@/lib/routes';
 const SECTION_ROUTES: Record<string, (handle: string) => string> = {
   runs: routes.runs,
   agents: routes.agents,
+  models: routes.models,
   tools: routes.tools,
   tasks: routes.tasks,
   monitoring: routes.monitoring,
@@ -20,7 +21,7 @@ const SECTION_ROUTES: Record<string, (handle: string) => string> = {
  * `currentHandle` for `targetHandle`.
  *
  * Preserves the current top-level section when the user is on a stable list
- * route (`/runs`, `/agents`, `/tools`, `/tasks`, `/monitoring`) — those lists
+ * route (`/runs`, `/agents`, `/models`, `/tools`, `/tasks`, `/monitoring`) — those lists
  * exist in every workspace, so the equivalent view is the right landing.
  * Falls back to the workspace root `/{targetHandle}` for everything else:
  * resource-detail routes (a specific workflow name or run id) and the home

@@ -8,12 +8,12 @@ describe('workspaceSwitchHref', () => {
     expect(workspaceSwitchHref('/acme/tools', 'acme', 'beta')).toBe('/beta/tools');
     expect(workspaceSwitchHref('/acme/tasks', 'acme', 'beta')).toBe('/beta/tasks');
     expect(workspaceSwitchHref('/acme/monitoring', 'acme', 'beta')).toBe('/beta/monitoring');
+    expect(workspaceSwitchHref('/acme/models', 'acme', 'beta')).toBe('/beta/models');
   });
 
   it('falls back to the workspace root for resource-detail routes', () => {
     expect(workspaceSwitchHref('/acme/runs/run-123', 'acme', 'beta')).toBe('/beta');
     expect(workspaceSwitchHref('/acme/agents/agent-9', 'acme', 'beta')).toBe('/beta');
-    expect(workspaceSwitchHref('/acme/agents/models', 'acme', 'beta')).toBe('/beta');
     expect(workspaceSwitchHref('/acme/workflows/onboarding', 'acme', 'beta')).toBe('/beta');
     expect(workspaceSwitchHref('/acme/workflows/onboarding/runs/run-1', 'acme', 'beta')).toBe('/beta');
     expect(workspaceSwitchHref('/acme/workflows/onboarding/runs/run-1/steps/some-step', 'acme', 'beta')).toBe(

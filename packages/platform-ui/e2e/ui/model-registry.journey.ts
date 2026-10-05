@@ -21,7 +21,7 @@ test.describe('Model Registry Journey', () => {
     const modelCell = (name: string) => page.getByRole('cell', { name, exact: true });
 
     // ── Navigate to Models page via sidebar ──────────────────────────────
-    await page.goto(`/${TEST_ORG_HANDLE}/agents/models`);
+    await page.goto(`/${TEST_ORG_HANDLE}/models`);
     await expect(page.getByRole('heading', { name: /model registry/i })).toBeVisible({ timeout: 30_000 });
 
     // ── Table renders seeded models, unfiltered by default ───────────────

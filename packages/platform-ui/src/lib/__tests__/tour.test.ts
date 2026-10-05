@@ -145,7 +145,7 @@ describe('tour content', () => {
     const routes = [
       '/test',
       '/test/agents',
-      '/test/agents/models',
+      '/test/models',
       '/test/agents/new',
       '/test/tools',
       '/test/images',

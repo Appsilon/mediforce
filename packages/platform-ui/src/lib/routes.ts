@@ -93,6 +93,7 @@ export const routes = {
   },
 
   // ── Tools ──────────────────────────────────────────────────────
+  models: (handle: string) => `/${handle}/models`,
   tools: (handle: string) => `/${handle}/tools`,
   tool: (handle: string, toolId: string) => `/${handle}/tools/${encode(toolId)}`,
 
