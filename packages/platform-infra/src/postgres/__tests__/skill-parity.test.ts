@@ -99,6 +99,19 @@ function contract(name: string, factory: () => Promise<SkillRepository>) {
       expect((await repo.list('appsilon', publicOnly)).map((summary) => summary.id)).toEqual(['ae-grading']);
     });
 
+    it('listPublic returns public skills of every namespace, ordered by namespace then id', async () => {
+      await repo.create(skill());
+      await repo.create(skill({ id: 'ae-grading', name: 'ae-grading', visibility: 'public' }));
+      await repo.create(skill({ namespace: 'other-ws', id: 'adam-derivation', name: 'adam-derivation', visibility: 'public' }));
+      await repo.create(skill({ namespace: 'other-ws', id: 'zz-private', name: 'zz-private' }));
+      const listed = await repo.listPublic();
+      expect(listed.map((summary) => `${summary.namespace}/${summary.id}`)).toEqual([
+        'appsilon/ae-grading',
+        'other-ws/adam-derivation',
+      ]);
+      expect(listed[0]?.paths).toEqual(['SKILL.md', 'references/domains.md']);
+    });
+
     it('delete removes the skill and is a no-op when absent', async () => {
       await repo.create(skill());
       await repo.delete('appsilon', 'sdtm-mapping');

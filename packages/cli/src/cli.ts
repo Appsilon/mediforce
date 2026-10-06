@@ -81,6 +81,7 @@ import {
 import { agentGetCommand } from './commands/agent-get';
 import { agentDeleteCommand } from './commands/agent-delete';
 import { agentSetVisibilityCommand } from './commands/agent-set-visibility';
+import { agentSetSkillsCommand } from './commands/agent-set-skills';
 import { agentCreateCommand } from './commands/agent-create';
 import { modelListCommand } from './commands/model-list';
 import { modelGetCommand } from './commands/model-get';
@@ -266,6 +267,7 @@ export const TREE: Record<string, BranchEntry> = {
       create: { description: 'Create an agent from a JSON file', fn: agentCreateCommand },
       delete: { description: 'Delete an agent definition', fn: agentDeleteCommand },
       'set-visibility': { description: 'Set agent visibility (public|private)', fn: agentSetVisibilityCommand },
+      'set-skills': { description: 'Replace the Skills an agent holds', fn: agentSetSkillsCommand },
     },
   },
   'tool-catalog': {

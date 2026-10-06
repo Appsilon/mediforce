@@ -21,6 +21,9 @@ export interface AgentDefinitionRepository {
   listAll(): Promise<AgentDefinition[]>;
   /** Returns agents that are `visibility: 'public'` OR whose namespace is in `allowed`. */
   listVisibleTo(allowed: readonly string[]): Promise<AgentDefinition[]>;
+  /** Every agent, in any namespace, whose `skills` names `(namespace, id)`.
+   *  Unscoped: the caller-scoped wrapper decides which of them to reveal. */
+  listHoldingSkill(namespace: string, id: string): Promise<AgentDefinition[]>;
   update(id: string, input: UpdateAgentDefinitionInput): Promise<AgentDefinition>;
   delete(id: string): Promise<void>;
 }

@@ -1,4 +1,6 @@
+import type { CreateAgentDefinitionInput } from '@mediforce/platform-core';
 import {
+  InMemoryAgentDefinitionRepository,
   InMemoryAuditRepository,
   InMemorySkillRepository,
 } from '@mediforce/platform-core/testing';
@@ -15,13 +17,31 @@ export const files = [
   { path: 'references/domains.md', contents: '# DM, AE\n' },
 ];
 
+export const agentInput = (overrides: Partial<CreateAgentDefinitionInput> = {}): CreateAgentDefinitionInput => ({
+  kind: 'plugin',
+  name: 'Mapper',
+  iconName: 'Bot',
+  description: '',
+  foundationModel: 'sonnet',
+  systemPrompt: '',
+  inputDescription: '',
+  outputDescription: '',
+  namespace: 'alpha',
+  visibility: 'private',
+  ...overrides,
+});
+
 export function createSkillTestKit() {
   const repo = new InMemorySkillRepository();
+  const agentRepo = new InMemoryAgentDefinitionRepository();
   const auditRepo = new InMemoryAuditRepository();
+  const scopeFor = (uid: string, namespaces: string[]) =>
+    createTestScope({ skillRepo: repo, agentDefinitionRepo: agentRepo, auditRepo, caller: userCaller(uid, namespaces) });
   return {
     repo,
+    agentRepo,
     auditRepo,
-    member: () => createTestScope({ skillRepo: repo, auditRepo, caller: userCaller('u-member', ['alpha']) }),
-    outsider: () => createTestScope({ skillRepo: repo, auditRepo, caller: userCaller('u-out', ['beta']) }),
+    member: () => scopeFor('u-member', ['alpha']),
+    outsider: () => scopeFor('u-out', ['beta']),
   };
 }

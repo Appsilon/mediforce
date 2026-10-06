@@ -66,6 +66,19 @@ export class AuthorizedAgentDefinitionRepository extends AuthorizedScope {
     return this.raw.update(id, input);
   };
 
+  /** Throws ForbiddenError unless the caller may create agents in the
+   *  namespace. Lets a handler refuse before validating the input. */
+  assertCanCreateIn = (namespace: string): void => this.assertNamespaceWrite(namespace);
+
+  /** The agent, when the caller may update it; NotFoundError otherwise, as
+   *  `update` itself would throw. Lets a handler refuse before validating. */
+  getForUpdate = async (id: string): Promise<AgentDefinition> => {
+    const existing = await this.raw.getById(id);
+    if (existing === null) throw new NotFoundError();
+    this.assertWriteOrThrowNotFound(existing.namespace);
+    return existing;
+  };
+
   /**
    * MCP-binding writes follow the legacy `mcp-servers` route contract, which is
    * deliberately looser than `update`/`delete`: a namespace-less (platform-global)
@@ -84,6 +97,23 @@ export class AuthorizedAgentDefinitionRepository extends AuthorizedScope {
       throw new NotFoundError();
     }
     return this.raw.update(id, { mcpServers });
+  };
+
+  /**
+   * The agents holding Skill `(namespace, id)`, from every namespace: a public
+   * Skill can be held by other workspaces' agents. Only the ones the caller
+   * may read are returned; the rest are counted, so a guard can say how many
+   * holders there are without naming agents the caller cannot see.
+   */
+  holdersOfSkill = async (
+    namespace: string,
+    id: string,
+  ): Promise<{ visible: AgentDefinition[]; hiddenCount: number }> => {
+    const holders = await this.raw.listHoldingSkill(namespace, id);
+    const visible = holders.filter(
+      (agent) => agent.visibility === 'public' || this.canSeeNamespace(agent.namespace),
+    );
+    return { visible, hiddenCount: holders.length - visible.length };
   };
 
   delete = async (id: string): Promise<void> => {

@@ -636,12 +636,15 @@ export type { AuditEventCursorPayload } from './cursors/audit-event-cursor';
 // Agent definition schema + repository interface
 export {
   AgentDefinitionSchema,
+  AgentSkillRefSchema,
+  AgentSkillRefsSchema,
   AgentVisibilitySchema,
   CreateAgentDefinitionInputSchema,
   UpdateAgentDefinitionInputSchema,
 } from './schemas/agent-definition';
 export type {
   AgentDefinition,
+  AgentSkillRef,
   AgentVisibility,
   CreateAgentDefinitionInput,
   UpdateAgentDefinitionInput,

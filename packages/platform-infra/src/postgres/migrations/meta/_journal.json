@@ -526,6 +526,13 @@
       "when": 1789641802100,
       "tag": "0074_skills",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1789641802200,
+      "tag": "0075_agent_skills",
+      "breakpoints": true
     }
   ]
 }

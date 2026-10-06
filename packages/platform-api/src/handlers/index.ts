@@ -147,6 +147,7 @@ export { getToolCatalogEntry } from './tool-catalog/get-entry';
 export { createToolCatalogEntry } from './tool-catalog/create-entry';
 export { updateToolCatalogEntry } from './tool-catalog/update-entry';
 export { deleteToolCatalogEntry } from './tool-catalog/delete-entry';
+export { listSkills } from './skills/list-skills';
 export { createSkill } from './skills/create-skill';
 export { updateSkill } from './skills/update-skill';
 export { deleteSkill } from './skills/delete-skill';

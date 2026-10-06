@@ -27,6 +27,14 @@ export class AuthorizedSkillRepository extends AuthorizedScope {
   list = async (namespace: string): Promise<SkillSummary[]> =>
     this.raw.list(namespace, { publicOnly: this.canSeeNamespace(namespace) === false });
 
+  /** Every `public` Skill in the deployment; readable by any caller. */
+  listPublic = async (): Promise<SkillSummary[]> => this.raw.listPublic();
+
+  /** Throws ForbiddenError unless the caller may write the namespace's
+   *  Skills. Handlers call it before a guard whose refusal would otherwise
+   *  tell a caller without write access which Agents hold a Skill. */
+  assertCanWrite = (namespace: string): void => this.assertNamespaceWrite(namespace);
+
   create = async (skill: SkillWrite): Promise<Skill | null> => {
     this.assertNamespaceWrite(skill.namespace);
     return this.raw.create(skill);

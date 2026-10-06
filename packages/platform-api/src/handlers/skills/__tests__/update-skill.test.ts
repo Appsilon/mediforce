@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { UpdateSkillInputSchema } from '../../../contract/skills';
-import { ForbiddenError, NotFoundError, ValidationError } from '../../../errors';
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../../errors';
 import { createSkill } from '../create-skill';
 import { updateSkill } from '../update-skill';
-import { createSkillTestKit, files, skillMd } from './fixtures';
+import { agentInput, createSkillTestKit, files, skillMd } from './fixtures';
 
 describe('updateSkill', () => {
   let kit: ReturnType<typeof createSkillTestKit>;
@@ -43,5 +43,43 @@ describe('updateSkill', () => {
 
     await expect(updateSkill({ namespace: 'alpha', id: 'sdtm-mapping', visibility: 'public' }, kit.outsider())).rejects.toBeInstanceOf(NotFoundError);
     await expect(updateSkill({ namespace: 'alpha', id: 'ae-grading', visibility: 'private' }, kit.outsider())).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  describe('making a held skill private', () => {
+    const held = { skills: [{ namespace: 'alpha', id: 'sdtm-mapping' }] };
+
+    beforeEach(async () => {
+      await createSkill({ namespace: 'alpha', files, visibility: 'public' }, kit.member());
+    });
+
+    it('is allowed while only its own workspace\'s private agents hold it', async () => {
+      await kit.agentRepo.upsert('own', agentInput(held));
+      const { skill } = await updateSkill({ namespace: 'alpha', id: 'sdtm-mapping', visibility: 'private' }, kit.member());
+      expect(skill.visibility).toBe('private');
+    });
+
+    it('is refused while a public agent holds it', async () => {
+      await kit.agentRepo.upsert('shared', agentInput({ name: 'Shared Mapper', visibility: 'public', ...held }));
+      const refusal = updateSkill({ namespace: 'alpha', id: 'sdtm-mapping', visibility: 'private' }, kit.member());
+      await expect(refusal).rejects.toBeInstanceOf(ConflictError);
+      await expect(refusal).rejects.toThrow("'Shared Mapper' (alpha)");
+      expect((await kit.repo.getById('alpha', 'sdtm-mapping', { publicOnly: false }))?.visibility).toBe('public');
+    });
+
+    it('is refused while an agent in another workspace holds it, without naming that agent', async () => {
+      await kit.agentRepo.upsert('own', agentInput(held));
+      await kit.agentRepo.upsert('foreign', agentInput({ name: 'Foreign Mapper', namespace: 'gamma', ...held }));
+      const refusal = await updateSkill({ namespace: 'alpha', id: 'sdtm-mapping', visibility: 'private' }, kit.member())
+        .catch((error: unknown) => error);
+      expect(refusal).toBeInstanceOf(ConflictError);
+      expect((refusal as ConflictError).message).toContain('held by 1 agent you cannot see');
+    });
+
+    it('does not consult holders when the visibility does not change', async () => {
+      await kit.agentRepo.upsert('foreign', agentInput({ namespace: 'gamma', ...held }));
+      const nextFiles = [{ path: 'SKILL.md', contents: skillMd('sdtm-mapping', 'Map to SDTM v3.4') }];
+      const { skill } = await updateSkill({ namespace: 'alpha', id: 'sdtm-mapping', files: nextFiles }, kit.member());
+      expect(skill.visibility).toBe('public');
+    });
   });
 });

@@ -83,6 +83,12 @@ export class InMemoryAgentDefinitionRepository implements AgentDefinitionReposit
     });
   }
 
+  async listHoldingSkill(namespace: string, id: string): Promise<AgentDefinition[]> {
+    return [...this.byId.values()].filter((agent) =>
+      (agent.skills ?? []).some((ref) => ref.namespace === namespace && ref.id === id),
+    );
+  }
+
   async update(id: string, input: UpdateAgentDefinitionInput): Promise<AgentDefinition> {
     const existing = this.byId.get(id);
     if (existing === undefined) {

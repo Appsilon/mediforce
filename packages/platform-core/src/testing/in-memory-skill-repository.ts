@@ -19,7 +19,14 @@ export class InMemorySkillRepository implements SkillRepository {
     return [...this.skills.values()]
       .filter((skill) => skill.namespace === namespace && (scope.publicOnly === false || skill.visibility === 'public'))
       .sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0))
-      .map(({ files, ...summary }) => ({ ...summary, paths: files.map((file) => file.path) }));
+      .map(toSummary);
+  }
+
+  async listPublic(): Promise<SkillSummary[]> {
+    return [...this.skills.values()]
+      .filter((skill) => skill.visibility === 'public')
+      .sort((left, right) => (this.key(left.namespace, left.id) < this.key(right.namespace, right.id) ? -1 : 1))
+      .map(toSummary);
   }
 
   async create(skill: SkillWrite): Promise<Skill | null> {
@@ -47,4 +54,8 @@ export class InMemorySkillRepository implements SkillRepository {
   async delete(namespace: string, id: string): Promise<void> {
     this.skills.delete(this.key(namespace, id));
   }
+}
+
+function toSummary({ files, ...summary }: Skill): SkillSummary {
+  return { ...summary, paths: files.map((file) => file.path) };
 }

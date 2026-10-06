@@ -3,7 +3,7 @@ import { NotFoundError, ValidationError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type { UpdateSkillInput, UpdateSkillOutput } from '../../contract/skills';
 import { actorFromCaller } from '../_helpers';
-import { skillContentHash } from './_helpers';
+import { hasHolders, heldSkillConflict, skillContentHash } from './_helpers';
 
 export async function updateSkill(
   input: UpdateSkillInput,
@@ -23,14 +23,31 @@ export async function updateSkill(
     );
   }
 
-  // Refusing `private` while a public Agent, or an Agent in another namespace,
-  // holds this skill (ADR-0025 decision 3) lands with #1461.
+  const visibility = input.visibility ?? existing.visibility;
+  if (visibility === 'private' && existing.visibility === 'public') {
+    // A private Skill may be held only by its own workspace's private Agents
+    // (ADR-0025 decision 3). Agents the caller cannot see are all in other
+    // workspaces, so every one of them would lose the skill.
+    scope.skills.assertCanWrite(namespace);
+    const holders = await scope.agentDefinitions.holdersOfSkill(namespace, id);
+    const outside = {
+      visible: holders.visible.filter((agent) => agent.visibility === 'public' || agent.namespace !== namespace),
+      hiddenCount: holders.hiddenCount,
+    };
+    if (hasHolders(outside)) {
+      throw heldSkillConflict(
+        `Skill '${id}' cannot be made private while public agents or agents in other workspaces hold it`,
+        outside,
+      );
+    }
+  }
+
   const skill = await scope.skills.update({
     namespace,
     id,
     name,
     description,
-    visibility: input.visibility ?? existing.visibility,
+    visibility,
     contentHash: skillContentHash(files),
     files,
   });

@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql, type SQL } from 'drizzle-orm';
 import {
   SkillSchema,
   SkillSummarySchema,
@@ -31,6 +31,14 @@ export class PostgresSkillRepository implements SkillRepository {
   }
 
   async list(namespace: string, scope: SkillReadScope): Promise<SkillSummary[]> {
+    return this.listSummaries(and(eq(skills.workspace, namespace), visibleTo(scope)), [asc(skills.id)]);
+  }
+
+  async listPublic(): Promise<SkillSummary[]> {
+    return this.listSummaries(eq(skills.visibility, 'public'), [asc(skills.workspace), asc(skills.id)]);
+  }
+
+  private async listSummaries(where: SQL | undefined, orderBy: SQL[]): Promise<SkillSummary[]> {
     const rows = await this.db
       .select({
         workspace: skills.workspace,
@@ -44,8 +52,8 @@ export class PostgresSkillRepository implements SkillRepository {
         updatedAt: skills.updatedAt,
       })
       .from(skills)
-      .where(and(eq(skills.workspace, namespace), visibleTo(scope)))
-      .orderBy(asc(skills.id));
+      .where(where)
+      .orderBy(...orderBy);
     return rows.map(({ workspace, createdAt, updatedAt, ...rest }) =>
       parseRow(SkillSummarySchema, {
         ...rest,

@@ -105,6 +105,30 @@ function contract(
       expect(created.mcpServers).toEqual(mcp);
     });
 
+    it('upsert and update round-trip skills; an agent without them reads back undefined', async () => {
+      const skills = [{ namespace: 'ws-1', id: 'sdtm-mapping' }];
+      await repo.upsert('with-skills', inputBase({ skills }));
+      expect((await repo.getById('with-skills'))?.skills).toEqual(skills);
+      const updated = await repo.update('with-skills', { skills: [] });
+      expect(updated.skills).toEqual([]);
+      const plain = await repo.upsert('plain', inputBase());
+      expect(plain.skills).toBeUndefined();
+    });
+
+    it('listHoldingSkill matches namespace and id together, across every agent', async () => {
+      await registerWorkspace('ws-1');
+      await repo.upsert('holder-private', inputBase({ namespace: 'ws-1', skills: [{ namespace: 'shared', id: 'sdtm-mapping' }] }));
+      await repo.upsert('holder-public', inputBase({ visibility: 'public', skills: [
+        { namespace: 'other', id: 'ae-grading' },
+        { namespace: 'shared', id: 'sdtm-mapping' },
+      ] }));
+      await repo.upsert('same-id-other-ns', inputBase({ skills: [{ namespace: 'other', id: 'sdtm-mapping' }] }));
+      await repo.upsert('no-skills', inputBase());
+      const holders = await repo.listHoldingSkill('shared', 'sdtm-mapping');
+      expect(holders.map((agent) => agent.id).sort()).toEqual(['holder-private', 'holder-public']);
+      expect(await repo.listHoldingSkill('shared', 'missing')).toEqual([]);
+    });
+
     it('listAll returns every agent regardless of visibility', async () => {
       await registerWorkspace('ws-1');
       await repo.upsert('a', inputBase({ visibility: 'public' }));

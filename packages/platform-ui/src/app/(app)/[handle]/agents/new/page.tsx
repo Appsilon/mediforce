@@ -4,9 +4,10 @@ import * as React from 'react';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { mediforce } from '@/lib/mediforce';
-import type { AgentMcpBindingMap } from '@mediforce/platform-core';
+import type { AgentMcpBindingMap, AgentSkillRef } from '@mediforce/platform-core';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
+import { AgentSkillsSection } from '@/components/agents/agent-skills-section';
 import { AGENT_ICON_OPTIONS, RecognitionLabel } from '@/components/agents/agent-form-parts';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +25,7 @@ export default function NewAgentPage() {
   const [selectedModelId, setSelectedModelId] = useState('');
   const [prompt, setPrompt] = useState('');
   const [mcpServers, setMcpServers] = useState<AgentMcpBindingMap>({});
+  const [skills, setSkills] = useState<AgentSkillRef[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +46,7 @@ export default function NewAgentPage() {
         foundationModel: selectedModelId,
         systemPrompt: prompt,
         mcpServers,
+        skills,
         namespace: handle,
         visibility: 'private',
       });
@@ -170,7 +173,10 @@ export default function NewAgentPage() {
           draft={{ bindings: mcpServers, onChange: setMcpServers }}
         />
 
-        {/* 8. Save */}
+        {/* 8. Skills */}
+        <AgentSkillsSection namespace={handle} ownsNamespace visibility="private" selected={skills} onChange={setSkills} />
+
+        {/* 9. Save */}
         <div className="flex flex-col items-start gap-1.5 pt-2 pb-6">
           <button
             type="button"

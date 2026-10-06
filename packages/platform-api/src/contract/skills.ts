@@ -9,7 +9,11 @@ import {
 const NamespaceQuery = z.object({ namespace: z.string().min(1) });
 const SkillRef = NamespaceQuery.extend({ id: z.string().min(1) });
 
-export const ListSkillsInputSchema = NamespaceQuery;
+/** `includePublic` adds every other workspace's public Skills after the
+ *  namespace's own: the Skills an Agent of that workspace may hold. */
+export const ListSkillsInputSchema = NamespaceQuery.extend({
+  includePublic: z.boolean().optional(),
+});
 export const ListSkillsOutputSchema = z.object({
   skills: z.array(SkillSummarySchema),
 });

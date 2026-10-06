@@ -17,6 +17,9 @@ export interface SkillRepository {
   getById(namespace: string, id: string, scope: SkillReadScope): Promise<Skill | null>;
   /** Return every Skill in the namespace without file contents, ordered by id. */
   list(namespace: string, scope: SkillReadScope): Promise<SkillSummary[]>;
+  /** Return every `public` Skill in every namespace without file contents,
+   *  ordered by namespace then id. */
+  listPublic(): Promise<SkillSummary[]>;
   /** Insert a new Skill; null when `(namespace, id)` is already taken. */
   create(skill: SkillWrite): Promise<Skill | null>;
   /** Replace an existing Skill; null when it is absent, so a concurrent

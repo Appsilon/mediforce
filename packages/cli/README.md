@@ -43,6 +43,11 @@ refusing, by name, a symlink or any file that is not UTF-8 text. The skill's id,
 description come from the folder's `SKILL.md` frontmatter — there are no flags
 for them.
 
+`agent set-skills <id> --skills <list>` replaces the Skills an agent holds. Each
+entry is `<namespace>/<id>`, or a bare `<id>` for a Skill in the agent's own
+workspace; an empty list removes them all. The API refuses a Skill the agent may
+not hold (ADR-0025 decision 3), naming it.
+
 `mediforce images` and `mediforce system images` are different things and the
 names are close enough to be worth stating: `images` is the per-namespace
 **Image Catalog** — the images a workspace offers for steps, one row per source

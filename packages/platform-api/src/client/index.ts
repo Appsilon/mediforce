@@ -2367,7 +2367,10 @@ export class Mediforce {
     this.skills = {
       list: async (input) => {
         const validated = ListSkillsInputSchema.parse(input);
-        const qs = toSearchParams({ namespace: validated.namespace });
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          includePublic: validated.includePublic === true ? 'true' : undefined,
+        });
         const res = await this.request(`/api/skills${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.skills.list');
         return ListSkillsOutputSchema.parse(body);

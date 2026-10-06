@@ -27,6 +27,9 @@ export const agentGetCommand = defineCommand({
       ['runtimeId', agent.runtimeId],
       ['visibility', agent.visibility],
       ['namespace', agent.namespace],
+      ['skills', agent.skills !== undefined && agent.skills.length > 0
+        ? agent.skills.map((ref) => `${ref.namespace}/${ref.id}`).join(', ')
+        : undefined],
     ]);
     return 0;
   },

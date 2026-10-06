@@ -157,4 +157,99 @@ test.describe('skills API journey', () => {
       await request.delete(`/api/skills/${name}?namespace=${namespace}`, { headers });
     }
   });
+
+  test('an agent holds skills it may reach, and a held skill cannot be deleted or made private', async ({ request, baseURL }) => {
+    if (baseURL === undefined) throw new Error('Playwright baseURL is not configured');
+    const member = sessionCookieHeaders(callers.member);
+    const outsider = sessionCookieHeaders(callers.outsider);
+    const stamp = Date.now();
+    const ownPrivate = `e2e-own-private-${stamp}`;
+    const otherPrivate = `e2e-other-private-${stamp}`;
+    const otherPublic = `e2e-other-public-${stamp}`;
+    const skillFiles = (name: string) => [{ path: 'SKILL.md', contents: `---\nname: ${name}\ndescription: Derive ADaM ADSL\n---\n` }];
+
+    for (const [namespace, name, visibility, headers] of [
+      [TEST_ORG_HANDLE, ownPrivate, 'private', member],
+      [OUTSIDER_NAMESPACE, otherPrivate, 'private', outsider],
+      [OUTSIDER_NAMESPACE, otherPublic, 'public', outsider],
+    ] as const) {
+      const res = await request.post(`/api/skills?namespace=${namespace}`, { headers, data: { files: skillFiles(name), visibility } });
+      expect(res.status(), await res.text()).toBe(201);
+    }
+
+    const createAgent = await request.post('/api/agents', {
+      headers: member,
+      data: {
+        name: `L3 Skill Holder ${stamp}`,
+        iconName: 'Bot',
+        description: '',
+        foundationModel: 'anthropic/claude-sonnet-4',
+        systemPrompt: '',
+        inputDescription: '',
+        outputDescription: '',
+        namespace: TEST_ORG_HANDLE,
+      },
+    });
+    expect(createAgent.status(), await createAgent.text()).toBe(201);
+    const agentId = ((await createAgent.json()) as { agent: { id: string } }).agent.id;
+    const putAgent = (data: Record<string, unknown>) => request.put(`/api/agents/${agentId}`, { headers: member, data });
+    const readAgent = async () =>
+      ((await (await request.get(`/api/agents/${agentId}`, { headers: member })).json()) as {
+        agent: { visibility: string; skills?: Array<{ namespace: string; id: string }> };
+      }).agent;
+
+    // The form's list: the workspace's own skills, then other workspaces' public ones.
+    const available = await request.get(`/api/skills?namespace=${TEST_ORG_HANDLE}&includePublic=true`, { headers: member });
+    const availableRefs = ((await available.json()) as { skills: Array<{ namespace: string; id: string }> }).skills
+      .map((skill) => `${skill.namespace}/${skill.id}`);
+    expect(availableRefs).toEqual(expect.arrayContaining([`${TEST_ORG_HANDLE}/${ownPrivate}`, `${OUTSIDER_NAMESPACE}/${otherPublic}`]));
+    expect(availableRefs).not.toContain(`${OUTSIDER_NAMESPACE}/${otherPrivate}`);
+
+    // Own private skill (bare id) and another workspace's public one, through the CLI.
+    cli(baseURL, ['agent', 'set-skills', agentId, '--skills', `${ownPrivate},${OUTSIDER_NAMESPACE}/${otherPublic}`]);
+    expect((await readAgent()).skills).toEqual([
+      { namespace: TEST_ORG_HANDLE, id: ownPrivate },
+      { namespace: OUTSIDER_NAMESPACE, id: otherPublic },
+    ]);
+
+    const unknown = await putAgent({ skills: [{ namespace: TEST_ORG_HANDLE, id: `e2e-missing-${stamp}` }] });
+    expect(unknown.status()).toBe(400);
+    expect(await unknown.text()).toContain(`e2e-missing-${stamp}`);
+
+    const foreignPrivate = await putAgent({ skills: [{ namespace: OUTSIDER_NAMESPACE, id: otherPrivate }] });
+    expect(foreignPrivate.status()).toBe(400);
+    expect(await foreignPrivate.text()).toContain(otherPrivate);
+
+    const madePublic = await putAgent({ visibility: 'public' });
+    expect(madePublic.status()).toBe(400);
+    expect(await madePublic.text()).toContain(`'${TEST_ORG_HANDLE}/${ownPrivate}' is private`);
+    expect((await readAgent()).visibility).toBe('private');
+
+    // Held skills: delete refused for both owners; the outsider sees the holder only as a count.
+    const deleteOwn = await request.delete(`/api/skills/${ownPrivate}?namespace=${TEST_ORG_HANDLE}`, { headers: member });
+    expect(deleteOwn.status()).toBe(409);
+    expect(await deleteOwn.text()).toContain(`L3 Skill Holder ${stamp}`);
+    const deleteOther = await request.delete(`/api/skills/${otherPublic}?namespace=${OUTSIDER_NAMESPACE}`, { headers: outsider });
+    expect(deleteOther.status()).toBe(409);
+    const deleteOtherBody = await deleteOther.text();
+    expect(deleteOtherBody).toContain('1 agent you cannot see');
+    expect(deleteOtherBody).not.toContain('L3 Skill Holder');
+    const makePrivate = await request.patch(`/api/skills/${otherPublic}?namespace=${OUTSIDER_NAMESPACE}`, { headers: outsider, data: { visibility: 'private' } });
+    expect(makePrivate.status()).toBe(409);
+
+    // A public agent may hold the public skill; a later partial edit keeps it public.
+    const goPublic = await putAgent({ visibility: 'public', skills: [{ namespace: OUTSIDER_NAMESPACE, id: otherPublic }] });
+    expect(goPublic.status(), await goPublic.text()).toBe(200);
+    expect((await putAgent({ description: 'edited' })).status()).toBe(200);
+    expect((await readAgent()).visibility).toBe('public');
+
+    cli(baseURL, ['agent', 'set-skills', agentId, '--skills', '']);
+    expect((await readAgent()).skills).toEqual([]);
+    const deleteFreed = await request.delete(`/api/skills/${otherPublic}?namespace=${OUTSIDER_NAMESPACE}`, { headers: outsider });
+    expect(deleteFreed.ok(), await deleteFreed.text()).toBe(true);
+
+    await request.delete(`/api/agents/${agentId}`, { headers: member });
+    await request.delete(`/api/skills/${ownPrivate}?namespace=${TEST_ORG_HANDLE}`, { headers: member });
+    await request.delete(`/api/skills/${otherPrivate}?namespace=${OUTSIDER_NAMESPACE}`, { headers: outsider });
+  });
 });

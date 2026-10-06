@@ -55,6 +55,7 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
           inputDescription: values.inputDescription,
           outputDescription: values.outputDescription,
           mcpServers: values.mcpServers,
+          skills: values.skills,
           namespace: values.namespace,
           visibility: values.visibility,
           // updated_at handled by the set_updated_at trigger.
@@ -101,6 +102,14 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
     return rows.map(toAgent);
   }
 
+  async listHoldingSkill(namespace: string, id: string): Promise<AgentDefinition[]> {
+    const rows = await this.db
+      .select()
+      .from(agents)
+      .where(sql`${agents.skills} @> ${JSON.stringify([{ namespace, id }])}::jsonb`);
+    return rows.map(toAgent);
+  }
+
   async update(id: string, input: UpdateAgentDefinitionInput): Promise<AgentDefinition> {
     const current = await this.getById(id);
     if (!current) {
@@ -124,6 +133,7 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
         inputDescription: merged.inputDescription,
         outputDescription: merged.outputDescription,
         mcpServers: merged.mcpServers ?? null,
+        skills: merged.skills ?? null,
         namespace: merged.namespace ?? null,
         visibility: merged.visibility,
         // updated_at handled by the set_updated_at trigger.
@@ -174,6 +184,7 @@ function toRow(id: string, input: CreateAgentDefinitionInput) {
     inputDescription: parsed.inputDescription,
     outputDescription: parsed.outputDescription,
     mcpServers: parsed.mcpServers ?? null,
+    skills: parsed.skills ?? null,
     namespace: parsed.namespace ?? null,
     visibility: parsed.visibility,
   };
@@ -195,6 +206,7 @@ function toAgent(row: typeof agents.$inferSelect): AgentDefinition {
     updatedAt: row.updatedAt.toISOString(),
     runtimeId: row.runtimeId ?? undefined,
     mcpServers: row.mcpServers ?? undefined,
+    skills: row.skills ?? undefined,
     namespace: row.namespace ?? undefined,
   });
 }
