@@ -25,6 +25,7 @@ function buildScope(overrides: Record<string, unknown> = {}): CallerScope {
           },
         },
       ]),
+      assertCanCreateIn: vi.fn(),
       create: vi.fn().mockImplementation((input: Record<string, unknown>) =>
         Promise.resolve({ id: 'agent-new', ...input })),
     },
@@ -151,7 +152,10 @@ describe('runWorkflowPlatformTool', () => {
     // the turn continues and the model tells them an admin is needed — it does
     // not crash the conversation, and it does not find another way through.
     const scope = buildScope({
-      agentDefinitions: { create: vi.fn().mockRejectedValue(new ForbiddenError('Only admins may create agents')) },
+      agentDefinitions: {
+        assertCanCreateIn: vi.fn().mockImplementation(() => { throw new ForbiddenError('Only admins may create agents'); }),
+        create: vi.fn(),
+      },
     });
     const result = await runWorkflowPlatformTool('create_agent', {
       name: 'X', description: 'X', systemPrompt: 'X',
