@@ -27,10 +27,17 @@ export const CreateToolCatalogEntryOutputSchema = z.object({
 });
 
 /** PATCH input: id from URL, partial body, id cannot be renamed (bindings
- *  reference it). */
+ *  reference it). An optional field left out keeps its value; sent as `null`
+ *  it is cleared. */
+const catalogFields = ToolCatalogEntrySchema.shape;
 export const UpdateToolCatalogEntryInputApiSchema = NamespaceQuery
   .extend({ id: z.string().min(1) })
-  .merge(ToolCatalogEntrySchema.omit({ id: true }).partial().strict());
+  .merge(z.object({
+    command: catalogFields.command.optional(),
+    args: catalogFields.args.nullable(),
+    env: catalogFields.env.nullable(),
+    description: catalogFields.description.nullable(),
+  }).strict());
 export const UpdateToolCatalogEntryOutputSchema = z.object({
   entry: ToolCatalogEntrySchema,
 });

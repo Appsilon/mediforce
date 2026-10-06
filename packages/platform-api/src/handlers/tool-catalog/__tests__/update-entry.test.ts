@@ -41,6 +41,25 @@ describe('updateToolCatalogEntry handler', () => {
     expect(events[0].action).toBe('tool_catalog_entry.updated');
   });
 
+  it('clears an optional field sent as null and keeps the ones left out', async () => {
+    await repo.upsert('alpha', { ...sampleEntry, env: { TOKEN: 'x' } });
+    const scope = createTestScope({
+      toolCatalogRepo: repo,
+      auditRepo,
+      caller: userCaller('u-admin', ['alpha'], adminRoles),
+    });
+
+    const result = await updateToolCatalogEntry(
+      { namespace: 'alpha', id: 'tealflow-mcp', args: null, env: null },
+      scope,
+    );
+
+    expect(result.entry.args).toBeUndefined();
+    expect(result.entry.env).toBeUndefined();
+    expect(result.entry.description).toBe('TealFlow deployment MCP');
+    expect(await repo.getById('alpha', 'tealflow-mcp')).toEqual(result.entry);
+  });
+
   it('throws NotFoundError when entry does not exist', async () => {
     const scope = createTestScope({
       toolCatalogRepo: repo,

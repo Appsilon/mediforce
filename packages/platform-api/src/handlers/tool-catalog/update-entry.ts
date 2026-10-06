@@ -1,3 +1,4 @@
+import { ToolCatalogEntrySchema } from '@mediforce/platform-core';
 import { assertCallerIsNamespaceAdmin } from '../../auth';
 import { NotFoundError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
@@ -19,7 +20,9 @@ export async function updateToolCatalogEntry(
     throw new NotFoundError(`Tool catalog entry '${id}' not found`);
   }
 
-  const merged = { ...existing, ...patch, id };
+  const merged = ToolCatalogEntrySchema.parse(
+    Object.fromEntries(Object.entries({ ...existing, ...patch, id }).filter(([, value]) => value !== null)),
+  );
   const entry = await scope.toolCatalog.upsert(namespace, merged);
 
   const actor = actorFromCaller(scope);

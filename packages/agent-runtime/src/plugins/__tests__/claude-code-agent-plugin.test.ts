@@ -7,7 +7,7 @@ import type { ProcessConfig } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 
-type DockerResult = { cliOutput: string; failedMcpServers?: string[]; gitMetadata: null; presentation: string | null; outputDir: string; injectedEnvVars: string[] };
+type DockerResult = { cliOutput: string; failedMcpServers?: string[]; pendingMcpServers?: string[]; gitMetadata: null; presentation: string | null; outputDir: string; injectedEnvVars: string[] };
 type SpawnDockerTarget = { spawnDockerContainer: (prompt: string, options?: Record<string, unknown>) => Promise<DockerResult> };
 type SpawnLocalTarget = {
   spawnLocalProcess: (prompt: string, options: Record<string, unknown>, workingDir: string) => Promise<DockerResult>;
@@ -65,6 +65,39 @@ function buildMockContext(overrides: Partial<AgentContext> = {}): AgentContext {
     getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
     ...overrides,
   };
+}
+
+function buildWorkflowContext(agentOverrides: Record<string, unknown>): WorkflowAgentContext {
+  return {
+    stepId: 'triage',
+    processInstanceId: 'pi-868',
+    runNamespace: 'test-namespace',
+    definitionVersion: 'v1',
+    stepInput: {},
+    autonomyLevel: 'L2',
+    workflowDefinition: {
+      name: 'wf',
+      version: 1,
+      namespace: 'test-namespace',
+      visibility: 'private',
+      steps: [],
+      transitions: [],
+    },
+    step: {
+      id: 'triage',
+      name: 'Triage',
+      type: 'creation',
+      executor: 'agent',
+      agent: {
+        skill: 'trial-metadata-extractor',
+        skillsDir: '/plugins/protocol-to-tfl/skills',
+        image: 'mediforce-agent:protocol-to-tfl',
+        ...agentOverrides,
+      },
+    },
+    llm: { complete: vi.fn() },
+    getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
+  } as unknown as WorkflowAgentContext;
 }
 
 function buildEmitSpy(): { emit: EmitFn; events: EmitPayload[] } {
@@ -293,6 +326,58 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(warnings).toHaveLength(1);
       expect(warnings[0].payload).toContain("MCP server 'biomcp' failed to start");
       expect(warnings[0].payload).toContain("mediforce-agent:protocol-to-tfl");
+    });
+
+    it('[DATA] warns, without failing the step, when a bound MCP server was still connecting as the agent started', async () => {
+      await plugin.initialize({
+        ...buildWorkflowContext({}),
+        resolvedMcpConfig: { servers: { biomcp: { type: 'stdio', command: 'uvx' } } },
+      } as WorkflowAgentContext);
+
+      const { emit, events } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
+      mockSpawn(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
+        pendingMcpServers: ['biomcp'],
+        gitMetadata: null,
+        presentation: null,
+        outputDir: '/tmp/mock-output',
+        injectedEnvVars: [],
+      });
+
+      await expect(plugin.run(emit)).resolves.toBeUndefined();
+
+      const warnings = events.filter((e) => e.type === 'status' && String(e.payload).includes('MCP server'));
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].payload).toContain("MCP server 'biomcp' was still connecting");
+      expect(warnings[0].payload).toContain("set MCP_TIMEOUT (milliseconds, now 120000) in the step's env");
+    });
+
+    it('[DATA] leaves out the MCP_TIMEOUT hint for an http server, which has no cold start to wait out', async () => {
+      await plugin.initialize({
+        ...buildWorkflowContext({}),
+        resolvedMcpConfig: { servers: { remote: { type: 'http', url: 'https://mcp.example.com' } } },
+      } as WorkflowAgentContext);
+
+      const { emit, events } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
+      mockSpawn(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
+        failedMcpServers: ['remote'],
+        pendingMcpServers: ['remote'],
+        gitMetadata: null,
+        presentation: null,
+        outputDir: '/tmp/mock-output',
+        injectedEnvVars: [],
+      });
+
+      await plugin.run(emit);
+
+      const warnings = events.filter((e) => e.type === 'status' && String(e.payload).includes('MCP server'));
+      expect(warnings).toHaveLength(2);
+      for (const warning of warnings) {
+        expect(warning.payload).not.toContain('MCP_TIMEOUT');
+      }
     });
 
     it('[DATA] points at the host, not an image, when the failed MCP server ran in local mode', async () => {
@@ -1059,38 +1144,6 @@ describe('ClaudeCodeAgentPlugin', () => {
   // "approximately N minutes" budget derives from the same timeoutMs the container
   // kill uses, so it is a faithful proxy for the effective timeout.
   describe('timeout single-source (issue #868)', () => {
-    function buildWorkflowContext(agentOverrides: Record<string, unknown>): WorkflowAgentContext {
-      return {
-        stepId: 'triage',
-        processInstanceId: 'pi-868',
-        runNamespace: 'test-namespace',
-        definitionVersion: 'v1',
-        stepInput: {},
-        autonomyLevel: 'L2',
-        workflowDefinition: {
-          name: 'wf',
-          version: 1,
-          namespace: 'test-namespace',
-          visibility: 'private',
-          steps: [],
-          transitions: [],
-        },
-        step: {
-          id: 'triage',
-          name: 'Triage',
-          type: 'creation',
-          executor: 'agent',
-          agent: {
-            skill: 'trial-metadata-extractor',
-            skillsDir: '/plugins/protocol-to-tfl/skills',
-            image: 'mediforce-agent:protocol-to-tfl',
-            ...agentOverrides,
-          },
-        },
-        llm: { complete: vi.fn() },
-        getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
-      } as unknown as WorkflowAgentContext;
-    }
 
     async function captureBudgetMinutes(agentOverrides: Record<string, unknown>): Promise<string> {
       const context = buildWorkflowContext(agentOverrides);
@@ -1113,6 +1166,54 @@ describe('ClaudeCodeAgentPlugin', () => {
     it('[DATA] honours an explicit step timeoutMinutes', async () => {
       const prompt = await captureBudgetMinutes({ timeoutMinutes: 45 });
       expect(prompt).toContain('approximately 45 minutes');
+    });
+
+    // The CLI holds the agent's first turn until each MCP server connects, for
+    // MCP_TIMEOUT ms. A cold `uvx`/`npx` install routinely outlasts the CLI's own
+    // 30s default, and the agent then starts without the server's tools.
+    describe('MCP startup timeout', () => {
+      function internalEnvVars(): Record<string, string> {
+        return (plugin as unknown as { getInternalEnvVars(): Record<string, string> }).getInternalEnvVars();
+      }
+
+      it('[DATA] gives a step with a stdio MCP server a startup window longer than the CLI default', async () => {
+        await plugin.initialize({
+          ...buildWorkflowContext({}),
+          resolvedMcpConfig: {
+            servers: {
+              biomcp: { type: 'stdio', command: 'uvx' },
+              remote: { type: 'http', url: 'https://mcp.example.com' },
+            },
+          },
+        } as WorkflowAgentContext);
+
+        expect(internalEnvVars().MCP_TIMEOUT).toBe('120000');
+      });
+
+      it('[DATA] leaves the CLI default for a step whose MCP servers are all http', async () => {
+        await plugin.initialize({
+          ...buildWorkflowContext({}),
+          resolvedMcpConfig: { servers: { remote: { type: 'http', url: 'https://mcp.example.com' } } },
+        } as WorkflowAgentContext);
+
+        expect(internalEnvVars().MCP_TIMEOUT).toBeUndefined();
+      });
+
+      it('[DATA] sets nothing for a step without MCP servers', async () => {
+        await plugin.initialize(buildWorkflowContext({}));
+
+        expect(internalEnvVars().MCP_TIMEOUT).toBeUndefined();
+      });
+
+      it('[DATA] leaves an MCP_TIMEOUT the step env sets explicitly alone', async () => {
+        await plugin.initialize({
+          ...buildWorkflowContext({}),
+          resolvedMcpConfig: { servers: { biomcp: { type: 'stdio', command: 'uvx' } } },
+        } as WorkflowAgentContext);
+        (plugin as unknown as { resolvedEnv: { vars: Record<string, string> } }).resolvedEnv = { vars: { MCP_TIMEOUT: '600000' } };
+
+        expect(internalEnvVars().MCP_TIMEOUT).toBeUndefined();
+      });
     });
 
     it('[ERROR] still hands back an eval trial\'s MCP recording and replay misses when the agent fails (ADR-0023 D6)', async () => {

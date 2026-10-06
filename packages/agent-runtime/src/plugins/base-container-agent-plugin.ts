@@ -11,7 +11,7 @@ import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepo
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
-import { agentLogEntries, createLineStreamReader, offeredSkill, failedMcpServers, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes, unfence } from '@mediforce/platform-core';
+import { agentLogEntries, createLineStreamReader, offeredSkill, mcpServersWithStatus, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes, unfence } from '@mediforce/platform-core';
 import { MCP_TAPE_DIR, MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from '../mcp/mcp-tape';
 import type { AgentLogFormat } from '@mediforce/platform-core';
 
@@ -114,6 +114,8 @@ export interface SpawnDockerResult {
    *  stream: `cliOutput` is only the final result event, which no longer
    *  carries the `system/init` event naming them. */
   failedMcpServers?: string[];
+  /** MCP servers still connecting when the agent started, from the same event. */
+  pendingMcpServers?: string[];
   gitMetadata: GitMetadata | null;
   presentation: Presentation | null;
   outputDir: string;
@@ -295,6 +297,12 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *  Default: empty. */
   protected getInternalEnvVars(): Record<string, string> {
     return {};
+  }
+
+  /** Extra advice appended to the warning for an MCP server that failed or was
+   *  still connecting when the agent started. Default: none. */
+  protected mcpStartupHint(_server: string): string {
+    return '';
   }
 
   /** Return plugin-internal env vars for local (non-Docker) execution.
@@ -1003,8 +1011,18 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
             payload:
               `MCP server '${server}' failed to start — the agent ran without its tools. ` +
               (isLocalMode
-                ? 'If it is a stdio server, check that its command is installed on the host.'
-                : `If it is a stdio server, check that its command exists in image '${this.agentConfig.image}'.`),
+                ? 'If it is a stdio server, check that its command is installed on the host'
+                : `If it is a stdio server, check that its command exists in image '${this.agentConfig.image}'`) +
+              '.' + this.mcpStartupHint(server),
+            timestamp: new Date().toISOString(),
+          });
+        }
+        for (const server of spawnResult.pendingMcpServers ?? []) {
+          await emit({
+            type: 'status',
+            payload:
+              `MCP server '${server}' was still connecting when the agent started, so its tools were missing at least at first.` +
+              this.mcpStartupHint(server),
             timestamp: new Date().toISOString(),
           });
         }
@@ -1505,6 +1523,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const commandSpec = this.getAgentCommand(promptFilePath, options);
 
     let failedServers: string[] = [];
+    let pendingServers: string[] = [];
     const cliOutput = await new Promise<string>((resolve, reject) => {
       const child = spawn(commandSpec.args[0], commandSpec.args.slice(1), {
         cwd: workingDir,
@@ -1566,7 +1585,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
         const rawStdout = rawLines.join('\n');
         const finalResult = this.parseAgentOutput(rawStdout);
-        failedServers = failedMcpServers(rawStdout);
+        failedServers = mcpServersWithStatus(rawStdout, 'failed');
+        pendingServers = mcpServersWithStatus(rawStdout, 'pending');
 
         if (code !== 0) {
           const exitInfo = signal
@@ -1604,7 +1624,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
     const localPresentation = await readPresentation(outputDir);
 
-    return { cliOutput, failedMcpServers: failedServers, gitMetadata, presentation: localPresentation, outputDir, injectedEnvVars: [] };
+    return { cliOutput, failedMcpServers: failedServers, pendingMcpServers: pendingServers, gitMetadata, presentation: localPresentation, outputDir, injectedEnvVars: [] };
   }
 
   protected async spawnDockerContainer(
@@ -1758,7 +1778,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
     const rawStdout = rawLines.join('\n');
     const finalResult = this.parseAgentOutput(rawStdout);
-    const failedServers = failedMcpServers(rawStdout);
+    const failedServers = mcpServersWithStatus(rawStdout, 'failed');
+    const pendingServers = mcpServersWithStatus(rawStdout, 'pending');
     const timeoutMinutes = Math.round(timeoutMs / 60_000);
 
     if (spawnResult.exitCode !== 0) {
@@ -1789,7 +1810,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
     const presentation = await readPresentation(outputDir);
 
-    return { cliOutput, failedMcpServers: failedServers, gitMetadata, presentation, outputDir, injectedEnvVars };
+    return { cliOutput, failedMcpServers: failedServers, pendingMcpServers: pendingServers, gitMetadata, presentation, outputDir, injectedEnvVars };
   }
 }
 

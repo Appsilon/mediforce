@@ -7,7 +7,7 @@
  * after exit.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { agentLogEntries, failedMcpServers, formatAgentLogLine, stageLogEntry, AgentLogFormatSchema } from '../agent-log-format';
+import { agentLogEntries, mcpServersWithStatus, formatAgentLogLine, stageLogEntry, AgentLogFormatSchema } from '../agent-log-format';
 
 describe('formatAgentLogLine', () => {
   it('formats a claude stream-json assistant tool call', () => {
@@ -96,26 +96,29 @@ describe('stage entries', () => {
   });
 });
 
-describe('failedMcpServers', () => {
+describe('mcpServersWithStatus', () => {
   const init = (servers: Array<{ name: string; status: string }>) =>
     JSON.stringify({ type: 'system', subtype: 'init', mcp_servers: servers });
+  const stdout = [
+    init([{ name: 'biomcp', status: 'failed' }, { name: 'github', status: 'connected' }, { name: 'slow', status: 'pending' }, { name: 'crashy', status: 'failed' }]),
+    JSON.stringify({ type: 'assistant', message: { content: [] } }),
+  ].join('\n');
 
   it('names only the servers the CLI reported as failed in its init event, not ones still pending', () => {
-    const stdout = [
-      init([{ name: 'biomcp', status: 'failed' }, { name: 'github', status: 'connected' }, { name: 'slow', status: 'pending' }, { name: 'crashy', status: 'failed' }]),
-      JSON.stringify({ type: 'assistant', message: { content: [] } }),
-    ].join('\n');
+    expect(mcpServersWithStatus(stdout, 'failed')).toEqual(['biomcp', 'crashy']);
+  });
 
-    expect(failedMcpServers(stdout)).toEqual(['biomcp', 'crashy']);
+  it('names the servers still connecting when the agent started', () => {
+    expect(mcpServersWithStatus(stdout, 'pending')).toEqual(['slow']);
   });
 
   it('is empty when every server connected, or none were bound', () => {
-    expect(failedMcpServers(init([{ name: 'github', status: 'connected' }]))).toEqual([]);
-    expect(failedMcpServers(init([]))).toEqual([]);
+    expect(mcpServersWithStatus(init([{ name: 'github', status: 'connected' }]), 'failed')).toEqual([]);
+    expect(mcpServersWithStatus(init([]), 'pending')).toEqual([]);
   });
 
   it('ignores output that is not an event stream, and never throws on a broken line', () => {
-    expect(failedMcpServers('plain text\n{not json\n')).toEqual([]);
-    expect(failedMcpServers('')).toEqual([]);
+    expect(mcpServersWithStatus('plain text\n{not json\n', 'failed')).toEqual([]);
+    expect(mcpServersWithStatus('', 'pending')).toEqual([]);
   });
 });
