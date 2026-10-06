@@ -193,10 +193,12 @@ only `anthropic/*` models for it — a plugin declares this in its capability
 metadata (`modelProviders`); `opencode-agent` declares none and runs any provider.
 Where the platform picks a model for you (assistants, cowork chat, voice
 synthesis) it is `DEFAULT_MODEL`, OpenRouter's newest-Sonnet alias
-`~anthropic/claude-sonnet-latest`. A default that gets saved (a new agent, an agent step added in the editor, a new
-LLM judge, a seeded agent) is pinned instead to the newest concrete Sonnet the
-registry lists (`pinDefaultModel`), so the definition keeps naming the model it
-was qualified with
+`~anthropic/claude-sonnet-latest`. A default that gets saved (a new agent, an
+agent or cowork chat step the editor creates — added by hand or by the AI
+Assistant, or from the new-workflow template — a new LLM judge, a seeded agent)
+is pinned instead to the newest concrete Sonnet the registry lists
+(`pinDefaultModel`), falling back to the alias while the registry is
+unavailable, so the definition keeps naming the model it was qualified with
 ([`model-registry.ts`](../../packages/platform-core/src/schemas/model-registry.ts)).
 
 ## Agents — autonomy, reliability, review, internet access

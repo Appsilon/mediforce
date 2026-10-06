@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { globSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver, splitPastedDefinition, pastedWorkflowName, defaultAgentModel, selectAgentPatch } from '../workflow-editor-utils';
+import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver, splitPastedDefinition, pastedWorkflowName, withDefaultModel, selectAgentPatch } from '../workflow-editor-utils';
 import type { WorkflowStep } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -464,23 +464,42 @@ describe('pastedWorkflowName', () => {
   });
 });
 
-describe('defaultAgentModel', () => {
+describe('withDefaultModel', () => {
   const SONNET = 'anthropic/claude-sonnet-4.6';
+  const agentStep = (patch: Partial<WorkflowStep> = {}): WorkflowStep => ({ id: 'review', name: 'Review', type: 'creation', executor: 'agent', plugin: 'opencode-agent', ...patch });
+  const coworkStep = (cowork: WorkflowStep['cowork']): WorkflowStep => ({ id: 'chat', name: 'Chat', type: 'creation', executor: 'cowork', cowork });
 
   it('gives a new agent step the default model, not the plugin fallback', () => {
-    expect(defaultAgentModel({}, SONNET)).toEqual({ model: SONNET });
+    expect(withDefaultModel(agentStep(), SONNET).agent).toEqual({ model: SONNET });
   });
 
   it('keeps the rest of the agent config it was given', () => {
-    expect(defaultAgentModel({ agent: { skill: 'draft-note' } }, SONNET)).toEqual({ skill: 'draft-note', model: SONNET });
+    expect(withDefaultModel(agentStep({ agent: { skill: 'draft-note' } }), SONNET).agent).toEqual({ skill: 'draft-note', model: SONNET });
   });
 
-  it('keeps a model the step already names', () => {
-    expect(defaultAgentModel({ agent: { model: 'openai/gpt-4o' } }, SONNET)).toEqual({ model: 'openai/gpt-4o' });
+  it('keeps a model the agent step already names', () => {
+    expect(withDefaultModel(agentStep({ agent: { model: 'openai/gpt-4o' } }), SONNET).agent).toEqual({ model: 'openai/gpt-4o' });
   });
 
   it('leaves the model blank when the step names a saved agent, so it inherits that agent\'s model', () => {
-    expect(defaultAgentModel({ agentId: 'agent-1' }, SONNET)).toBeUndefined();
+    expect(withDefaultModel(agentStep({ agentId: 'agent-1' }), SONNET).agent).toBeUndefined();
+  });
+
+  it('gives a new cowork chat step the default model', () => {
+    expect(withDefaultModel(coworkStep({ agent: 'chat' }), SONNET).cowork).toEqual({ agent: 'chat', chat: { model: SONNET } });
+  });
+
+  it('keeps a model the cowork chat step already names', () => {
+    expect(withDefaultModel(coworkStep({ agent: 'chat', chat: { model: 'openai/gpt-4o' } }), SONNET).cowork).toEqual({ agent: 'chat', chat: { model: 'openai/gpt-4o' } });
+  });
+
+  it('leaves a voice cowork step alone, since its realtime model is not an OpenRouter one', () => {
+    expect(withDefaultModel(coworkStep({ agent: 'voice-realtime' }), SONNET).cowork).toEqual({ agent: 'voice-realtime' });
+  });
+
+  it('leaves human and script steps alone', () => {
+    const human: WorkflowStep = { id: 'draft', name: 'Draft', type: 'creation', executor: 'human' };
+    expect(withDefaultModel(human, SONNET)).toEqual(human);
   });
 });
 

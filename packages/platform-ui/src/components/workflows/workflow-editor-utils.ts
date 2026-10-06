@@ -251,21 +251,25 @@ export function unheldStepRoles(
 }
 
 /**
- * The agent config a new agent step starts with. A step naming a saved agent
- * inherits that agent's model; any other blank model would fall through to the
- * plugin's own default (DeepSeek for opencode-agent), so it gets `defaultModel`.
+ * A new step with its model filled in, so every new agent and cowork chat step
+ * starts on the same default. An agent step naming a saved agent inherits that
+ * agent's model; any other blank agent model would fall through to the plugin's
+ * own default (DeepSeek for opencode-agent). A voice cowork step keeps its
+ * realtime model, which is not an OpenRouter one.
  */
-export function defaultAgentModel(
-  step: Pick<WorkflowStep, 'agentId' | 'agent'>,
-  defaultModel: string,
-): WorkflowStep['agent'] {
-  if (step.agentId !== undefined || step.agent?.model !== undefined) return step.agent;
-  return { ...step.agent, model: defaultModel };
+export function withDefaultModel(step: WorkflowStep, defaultModel: string): WorkflowStep {
+  if (step.executor === 'agent' && step.agentId === undefined && step.agent?.model === undefined) {
+    return { ...step, agent: { ...step.agent, model: defaultModel } };
+  }
+  if (step.executor === 'cowork' && step.cowork?.agent === 'chat' && step.cowork.chat?.model === undefined) {
+    return { ...step, cowork: { ...step.cowork, chat: { ...step.cowork.chat, model: defaultModel } } };
+  }
+  return step;
 }
 
 /**
  * The patch for picking a saved agent on a step. A model that is still the
- * default `defaultAgentModel` filled in is dropped, so the step inherits the
+ * default `withDefaultModel` filled in is dropped, so the step inherits the
  * agent's own model rather than overriding it with the default.
  */
 export function selectAgentPatch(

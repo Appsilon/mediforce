@@ -29,7 +29,7 @@ import { WorkflowNotificationsPanel } from './workflow-notifications-panel';
 import { pruneWorkflowSettings } from './workflow-settings-utils';
 import type { WorkflowSettingsDraft } from './workflow-settings-utils';
 import { unheldStepRoles } from './workflow-editor-utils';
-import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver, defaultAgentModel } from './workflow-editor-utils';
+import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver, withDefaultModel } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 import { useImageCatalogEntries } from '@/hooks/use-image-catalog';
 import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
@@ -364,18 +364,17 @@ export function WorkflowEditorCanvas({
     const existingIds = editedSteps.map((step) => step.id);
     const newId = uniqueSlug(payload.name ?? '', existingIds)
       || uniqueSlug(`new-step-${String(stepNum)}`, existingIds);
-    const newStep: WorkflowStep = {
+    const newStep = withDefaultModel({
       ...payload,
       id: newId,
       name: payload.name || `New Step ${stepNum}`,
       ...(payload.executor === 'agent' ? {
         plugin: payload.plugin ?? 'opencode-agent',
         autonomyLevel: payload.autonomyLevel ?? 'L3',
-        agent: defaultAgentModel(payload, pinnedDefaultModel ?? DEFAULT_MODEL),
       } : {}),
       ...(payload.executor === 'script' ? { plugin: payload.plugin ?? 'script-container' } : {}),
       ...(payload.executor === 'cowork' ? { cowork: payload.cowork ?? { agent: 'chat' as const } } : {}),
-    };
+    }, pinnedDefaultModel ?? DEFAULT_MODEL);
 
     const resolvedInsertAfterId = insertAfterId ?? selectedStepId;
 
@@ -547,8 +546,13 @@ export function WorkflowEditorCanvas({
       settingsDraftRef.current,
       editedInputForNextRunRef.current,
     );
+    // Steps the assistant adds start on the same default model as a block added
+    // by hand, unless it named one.
+    const added = new Set(result.addedStepIds);
+    const defaultModel = pinnedDefaultModel ?? DEFAULT_MODEL;
+    const steps = result.steps.map((step) => (added.has(step.id) ? withDefaultModel(step, defaultModel) : step));
     saveSnapshot();
-    setEditedSteps(result.steps);
+    setEditedSteps(steps);
     setEditedTransitions(result.transitions);
     // Carry-over names steps, so it lands with them rather than through the
     // page's settings draft.
@@ -587,11 +591,11 @@ export function WorkflowEditorCanvas({
     }
     return {
       // The graph the reducer produced, so a caller checking whether it can be saved reads what just landed rather than waiting for the state to commit and the mirror refs to catch up a macrotask later.
-      steps: result.steps,
+      steps,
       summary: parts.length > 0 ? `Updated the workflow: ${parts.join(', ')}.` : '',
       error: errors.length > 0 ? errors.join(' ') : null,
     };
-  }, [saveSnapshot, onSettingsChange]);
+  }, [saveSnapshot, onSettingsChange, pinnedDefaultModel]);
 
   /** The canvas as the assistant sees it, for both calls. */
   const assistantWorkflowDefinition = useCallback(() => ({
