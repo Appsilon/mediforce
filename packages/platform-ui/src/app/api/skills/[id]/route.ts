@@ -7,7 +7,7 @@ import {
   type GetSkillInput,
   type UpdateSkillInput,
 } from '@mediforce/platform-api/contract';
-import { deleteSkill, getSkill, updateSkill } from '@mediforce/platform-api/handlers';
+import { deleteSkill, getByIdAdapter, updateSkill } from '@mediforce/platform-api/handlers';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -19,7 +19,11 @@ export const GET = createRouteAdapter<typeof GetSkillInputSchema, GetSkillInput,
     namespace: new URL(req.url).searchParams.get('namespace') ?? '',
     id: (await ctx.params).id,
   }),
-  getSkill,
+  getByIdAdapter(
+    (input: GetSkillInput, scope) => scope.skills.getById(input.namespace, input.id),
+    (input) => `Skill '${input.id}' not found in namespace '${input.namespace}'`,
+    'skill',
+  ),
 );
 
 export const PATCH = createRouteAdapter<typeof UpdateSkillInputSchema, UpdateSkillInput, unknown, RouteContext>(

@@ -1,5 +1,5 @@
 import { SkillSchema, type Skill, type SkillSummary } from '../schemas/skill';
-import type { SkillRepository, SkillWrite } from '../interfaces/skill-repository';
+import type { SkillReadScope, SkillRepository, SkillWrite } from '../interfaces/skill-repository';
 
 /** In-memory double for SkillRepository, keyed by `${namespace}/${id}`. */
 export class InMemorySkillRepository implements SkillRepository {
@@ -9,24 +9,30 @@ export class InMemorySkillRepository implements SkillRepository {
     return `${namespace}/${id}`;
   }
 
-  async getById(namespace: string, id: string): Promise<Skill | null> {
+  async getById(namespace: string, id: string, scope: SkillReadScope): Promise<Skill | null> {
     const skill = this.skills.get(this.key(namespace, id));
-    return skill ? structuredClone(skill) : null;
+    if (skill === undefined || (scope.publicOnly && skill.visibility !== 'public')) return null;
+    return structuredClone(skill);
   }
 
-  async list(namespace: string): Promise<SkillSummary[]> {
+  async list(namespace: string, scope: SkillReadScope): Promise<SkillSummary[]> {
     return [...this.skills.values()]
-      .filter((skill) => skill.namespace === namespace)
+      .filter((skill) => skill.namespace === namespace && (scope.publicOnly === false || skill.visibility === 'public'))
       .sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0))
       .map(({ files, ...summary }) => ({ ...summary, paths: files.map((file) => file.path) }));
   }
 
   async create(skill: SkillWrite): Promise<Skill | null> {
     if (this.skills.has(this.key(skill.namespace, skill.id))) return null;
-    return this.upsert(skill);
+    return this.write(skill);
   }
 
-  async upsert(skill: SkillWrite): Promise<Skill> {
+  async update(skill: SkillWrite): Promise<Skill | null> {
+    if (this.skills.has(this.key(skill.namespace, skill.id)) === false) return null;
+    return this.write(skill);
+  }
+
+  private write(skill: SkillWrite): Skill {
     const now = new Date().toISOString();
     const existing = this.skills.get(this.key(skill.namespace, skill.id));
     const stored = SkillSchema.parse({

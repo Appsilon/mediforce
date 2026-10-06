@@ -5,14 +5,14 @@ import {
   type CreateSkillInput,
   type ListSkillsInput,
 } from '@mediforce/platform-api/contract';
-import { createSkill, listSkills } from '@mediforce/platform-api/handlers';
+import { createSkill, listAdapter } from '@mediforce/platform-api/handlers';
 
 export const GET = createRouteAdapter<typeof ListSkillsInputSchema, ListSkillsInput>(
   ListSkillsInputSchema,
   (req) => ({
     namespace: new URL(req.url).searchParams.get('namespace') ?? '',
   }),
-  listSkills,
+  listAdapter('skills', (input: ListSkillsInput, scope) => scope.skills.list(input.namespace)),
 );
 
 export const POST = createRouteAdapter<typeof CreateSkillInputSchema, CreateSkillInput>(

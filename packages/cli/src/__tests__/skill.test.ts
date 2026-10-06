@@ -28,6 +28,13 @@ describe('readSkillFolder', () => {
     ]);
   });
 
+  it('keeps a UTF-8 byte-order mark so the upload matches the file on disk', () => {
+    const dir = skillFolder();
+    writeFileSync(join(dir, 'references', 'bom.md'), '\uFEFF# bom\n');
+    const bom = readSkillFolder(dir).find((file) => file.path === 'references/bom.md');
+    expect(bom?.contents).toBe('\uFEFF# bom\n');
+  });
+
   it('refuses a file that is not UTF-8, naming it', () => {
     const dir = skillFolder();
     writeFileSync(join(dir, 'references', 'logo.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0xfe]));

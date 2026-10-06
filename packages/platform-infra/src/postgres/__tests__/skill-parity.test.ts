@@ -25,6 +25,7 @@ const skillMd = '---\nname: sdtm-mapping\ndescription: Map raw data to SDTM\n---
 function contract(name: string, factory: () => Promise<SkillRepository>) {
   describe(`${name} — SkillRepository contract`, () => {
     let repo: SkillRepository;
+    const all = { publicOnly: false };
 
     beforeEach(async () => {
       repo = await factory();
@@ -45,54 +46,68 @@ function contract(name: string, factory: () => Promise<SkillRepository>) {
     });
 
     it('returns null for getById when the skill is absent', async () => {
-      expect(await repo.getById('appsilon', 'missing')).toBeNull();
+      expect(await repo.getById('appsilon', 'missing', all)).toBeNull();
     });
 
-    it('upsert then getById round-trips every file unchanged', async () => {
-      const written = await repo.upsert(skill());
-      const got = await repo.getById('appsilon', 'sdtm-mapping');
+    it('create then getById round-trips every file unchanged', async () => {
+      const written = await repo.create(skill());
+      const got = await repo.getById('appsilon', 'sdtm-mapping', all);
       expect(got).toEqual(written);
       expect(got?.files).toEqual(skill().files);
       expect(typeof got?.createdAt).toBe('string');
     });
 
-    it('upsert replaces an existing skill and keeps createdAt', async () => {
-      const first = await repo.upsert(skill());
-      await repo.upsert(skill({ contentHash: 'hash-2', visibility: 'public', files: [{ path: 'SKILL.md', contents: skillMd }] }));
-      const got = await repo.getById('appsilon', 'sdtm-mapping');
+    it('update replaces an existing skill and keeps createdAt', async () => {
+      const first = await repo.create(skill());
+      await repo.update(skill({ contentHash: 'hash-2', visibility: 'public', files: [{ path: 'SKILL.md', contents: skillMd }] }));
+      const got = await repo.getById('appsilon', 'sdtm-mapping', all);
       expect(got?.contentHash).toBe('hash-2');
       expect(got?.visibility).toBe('public');
       expect(got?.files).toHaveLength(1);
-      expect(got?.createdAt).toBe(first.createdAt);
+      expect(got?.createdAt).toBe(first?.createdAt);
     });
 
     it('create inserts once and returns null when the id is taken, leaving the first write', async () => {
       const first = await repo.create(skill());
       expect(first?.files).toEqual(skill().files);
       expect(await repo.create(skill({ contentHash: 'hash-2' }))).toBeNull();
-      expect((await repo.getById('appsilon', 'sdtm-mapping'))?.contentHash).toBe('hash-1');
+      expect((await repo.getById('appsilon', 'sdtm-mapping', all))?.contentHash).toBe('hash-1');
     });
 
     it('list returns summaries with paths, ordered by id, scoped to the namespace', async () => {
       const other = '---\nname: ae-grading\ndescription: Grade AEs\n---\n';
-      await repo.upsert(skill());
-      await repo.upsert(skill({ id: 'ae-grading', name: 'ae-grading', files: [{ path: 'SKILL.md', contents: other }] }));
-      await repo.upsert(skill({ namespace: 'other-ws' }));
-      const listed = await repo.list('appsilon');
+      await repo.create(skill());
+      await repo.create(skill({ id: 'ae-grading', name: 'ae-grading', files: [{ path: 'SKILL.md', contents: other }] }));
+      await repo.create(skill({ namespace: 'other-ws' }));
+      const listed = await repo.list('appsilon', all);
       expect(listed.map((summary) => summary.id)).toEqual(['ae-grading', 'sdtm-mapping']);
       expect(listed[1]?.paths).toEqual(['SKILL.md', 'references/domains.md']);
       expect(listed[1]).not.toHaveProperty('files');
     });
 
+    it('update returns null and writes nothing when the skill is absent', async () => {
+      expect(await repo.update(skill())).toBeNull();
+      expect(await repo.getById('appsilon', 'sdtm-mapping', all)).toBeNull();
+    });
+
+    it('publicOnly hides private skills from getById and list', async () => {
+      await repo.create(skill());
+      await repo.create(skill({ id: 'ae-grading', name: 'ae-grading', visibility: 'public' }));
+      const publicOnly = { publicOnly: true };
+      expect(await repo.getById('appsilon', 'sdtm-mapping', publicOnly)).toBeNull();
+      expect((await repo.getById('appsilon', 'ae-grading', publicOnly))?.id).toBe('ae-grading');
+      expect((await repo.list('appsilon', publicOnly)).map((summary) => summary.id)).toEqual(['ae-grading']);
+    });
+
     it('delete removes the skill and is a no-op when absent', async () => {
-      await repo.upsert(skill());
+      await repo.create(skill());
       await repo.delete('appsilon', 'sdtm-mapping');
       await repo.delete('appsilon', 'sdtm-mapping');
-      expect(await repo.getById('appsilon', 'sdtm-mapping')).toBeNull();
+      expect(await repo.getById('appsilon', 'sdtm-mapping', all)).toBeNull();
     });
 
     it('rejects a write whose files have no SKILL.md', async () => {
-      await expect(repo.upsert(skill({ files: [{ path: 'README.md', contents: '' }] }))).rejects.toThrow();
+      await expect(repo.create(skill({ files: [{ path: 'README.md', contents: '' }] }))).rejects.toThrow();
     });
   });
 }

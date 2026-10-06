@@ -10,7 +10,7 @@ import { printError, printJson, type OutputSink } from '../output';
  * disk. Its id, name and description come from the folder's `SKILL.md`.
  */
 
-const utf8 = new TextDecoder('utf-8', { fatal: true });
+const utf8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 
 /**
  * Read a skill folder into the `files[]` the API takes: every regular file

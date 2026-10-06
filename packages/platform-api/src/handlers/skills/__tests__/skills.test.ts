@@ -3,7 +3,7 @@ import {
   InMemoryAuditRepository,
   InMemorySkillRepository,
 } from '@mediforce/platform-core/testing';
-import { CreateSkillInputSchema } from '../../../contract/skills';
+import { CreateSkillInputSchema, UpdateSkillInputSchema } from '../../../contract/skills';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../../errors';
 import {
   createTestScope,
@@ -11,8 +11,6 @@ import {
 } from '../../../repositories/__tests__/create-test-scope';
 import { createSkill } from '../create-skill';
 import { deleteSkill } from '../delete-skill';
-import { getSkill } from '../get-skill';
-import { listSkills } from '../list-skills';
 import { updateSkill } from '../update-skill';
 
 const skillMd = (name: string, description = 'Map raw data to SDTM') =>
@@ -65,6 +63,21 @@ describe('skill handlers', () => {
     await expect(createSkill({ namespace: 'alpha', files }, outsider())).rejects.toBeInstanceOf(ForbiddenError);
   });
 
+  it('accepts a file over the per-artifact cap while the whole Skill stays under its own', () => {
+    const big = [...files, { path: 'references/big.md', contents: 'x'.repeat(100 * 1024) }];
+    expect(CreateSkillInputSchema.safeParse({ namespace: 'alpha', files: big }).success).toBe(true);
+  });
+
+  it('refuses a NUL character in a file, which jsonb cannot store', () => {
+    const nul = [...files, { path: 'references/nul.md', contents: 'a\u0000b' }];
+    expect(CreateSkillInputSchema.safeParse({ namespace: 'alpha', files: nul }).success).toBe(false);
+  });
+
+  it('refuses an update that changes nothing', () => {
+    expect(UpdateSkillInputSchema.safeParse({ namespace: 'alpha', id: 'sdtm-mapping' }).success).toBe(false);
+    expect(UpdateSkillInputSchema.safeParse({ namespace: 'alpha', id: 'sdtm-mapping', visibility: 'public' }).success).toBe(true);
+  });
+
   it('the contract refuses a name or description sent beside the files', () => {
     expect(CreateSkillInputSchema.safeParse({ namespace: 'alpha', files, name: 'other' }).success).toBe(false);
     expect(CreateSkillInputSchema.safeParse({ namespace: 'alpha', files, description: 'other' }).success).toBe(false);
@@ -94,9 +107,9 @@ describe('skill handlers', () => {
     const other = [{ path: 'SKILL.md', contents: skillMd('ae-grading', 'Grade AEs by CTCAE') }];
     await createSkill({ namespace: 'alpha', files: other, visibility: 'public' }, member());
 
-    expect((await listSkills({ namespace: 'alpha' }, outsider())).skills.map((skill) => skill.id)).toEqual(['ae-grading']);
-    expect((await getSkill({ namespace: 'alpha', id: 'ae-grading' }, outsider())).skill.files).toEqual(other);
-    await expect(getSkill({ namespace: 'alpha', id: 'sdtm-mapping' }, outsider())).rejects.toBeInstanceOf(NotFoundError);
+    expect((await outsider().skills.list('alpha')).map((skill) => skill.id)).toEqual(['ae-grading']);
+    expect((await outsider().skills.getById('alpha', 'ae-grading'))?.files).toEqual(other);
+    expect(await outsider().skills.getById('alpha', 'sdtm-mapping')).toBeNull();
     await expect(updateSkill({ namespace: 'alpha', id: 'sdtm-mapping', visibility: 'public' }, outsider())).rejects.toBeInstanceOf(NotFoundError);
     await expect(updateSkill({ namespace: 'alpha', id: 'ae-grading', visibility: 'private' }, outsider())).rejects.toBeInstanceOf(ForbiddenError);
     await expect(deleteSkill({ namespace: 'alpha', id: 'ae-grading' }, outsider())).rejects.toBeInstanceOf(ForbiddenError);
@@ -106,7 +119,7 @@ describe('skill handlers', () => {
     await createSkill({ namespace: 'alpha', files }, member());
     await deleteSkill({ namespace: 'alpha', id: 'sdtm-mapping' }, member());
     await deleteSkill({ namespace: 'alpha', id: 'sdtm-mapping' }, member());
-    expect(await repo.getById('alpha', 'sdtm-mapping')).toBeNull();
+    expect(await repo.getById('alpha', 'sdtm-mapping', { publicOnly: false })).toBeNull();
     const events = await auditRepo.getByEntity('skill', 'sdtm-mapping');
     expect(events.map((event) => event.action).sort()).toEqual(['skill.created', 'skill.deleted']);
   });

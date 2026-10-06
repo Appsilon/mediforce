@@ -30,7 +30,10 @@ export const CreateSkillOutputSchema = z.object({ skill: SkillSchema });
 export const UpdateSkillInputSchema = SkillRef.extend({
   files: SkillFilesSchema.optional(),
   visibility: SkillVisibilitySchema.optional(),
-}).strict();
+}).strict().refine(
+  (input) => input.files !== undefined || input.visibility !== undefined,
+  'send files, visibility or both: an empty patch changes nothing',
+);
 export const UpdateSkillOutputSchema = z.object({ skill: SkillSchema });
 
 export const DeleteSkillInputSchema = SkillRef;

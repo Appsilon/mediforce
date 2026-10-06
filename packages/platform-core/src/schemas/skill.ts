@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { parse as parseYaml } from 'yaml';
-import { WorkflowArtifactSchema, validateFileTree, type WorkflowArtifact } from './workflow-definition';
+import { ArtifactTextSchema, WorkflowArtifactPathSchema, validateFileTree } from './workflow-definition';
 
 /**
  * A Skill (ADR-0025): a Claude Code skill folder stored as a workspace
@@ -56,11 +56,21 @@ export function parseSkillFrontmatter(markdown: string): FrontmatterResult {
 }
 
 /**
- * The files of one Skill. Paths follow {@link WorkflowArtifactSchema}, the set
- * passes the same file-tree checks a workflow's artifacts do, and it must hold
- * a `SKILL.md` at its root whose frontmatter parses.
+ * One file of a Skill. Its path follows the workflow artifact rules; its size
+ * is bounded only by the whole-Skill cap {@link SkillFilesSchema} enforces.
  */
-export const SkillFilesSchema = z.array(WorkflowArtifactSchema).superRefine((files, ctx) => {
+export const SkillFileSchema = z.object({
+  path: WorkflowArtifactPathSchema,
+  contents: ArtifactTextSchema,
+});
+export type SkillFile = z.infer<typeof SkillFileSchema>;
+
+/**
+ * The files of one Skill. The set passes the same file-tree checks, including
+ * the total size cap, that a workflow's artifacts do, and it must hold a
+ * `SKILL.md` at its root whose frontmatter parses.
+ */
+export const SkillFilesSchema = z.array(SkillFileSchema).superRefine((files, ctx) => {
   validateFileTree(files, [], ctx, 'a skill is text an agent reads, so keep large data out of it');
   const manifest = files.find((file) => file.path === SKILL_MANIFEST_PATH);
   if (manifest === undefined) {
@@ -72,7 +82,6 @@ export const SkillFilesSchema = z.array(WorkflowArtifactSchema).superRefine((fil
     ctx.addIssue({ code: 'custom', path: [files.indexOf(manifest), 'contents'], message: frontmatter.message });
   }
 });
-export type SkillFile = WorkflowArtifact;
 
 /** `name` and `description` of a file set {@link SkillFilesSchema} accepted. */
 export function skillManifest(files: ReadonlyArray<SkillFile>): SkillFrontmatter {

@@ -21,26 +21,20 @@ export class AuthorizedSkillRepository extends AuthorizedScope {
     super(caller);
   }
 
-  getById = async (namespace: string, id: string): Promise<Skill | null> => {
-    const skill = await this.raw.getById(namespace, id);
-    if (skill === null) return null;
-    return this.canSeeNamespace(namespace) || skill.visibility === 'public' ? skill : null;
-  };
+  getById = async (namespace: string, id: string): Promise<Skill | null> =>
+    this.raw.getById(namespace, id, { publicOnly: this.canSeeNamespace(namespace) === false });
 
-  list = async (namespace: string): Promise<SkillSummary[]> => {
-    const skills = await this.raw.list(namespace);
-    if (this.canSeeNamespace(namespace)) return skills;
-    return skills.filter((skill) => skill.visibility === 'public');
-  };
+  list = async (namespace: string): Promise<SkillSummary[]> =>
+    this.raw.list(namespace, { publicOnly: this.canSeeNamespace(namespace) === false });
 
   create = async (skill: SkillWrite): Promise<Skill | null> => {
     this.assertNamespaceWrite(skill.namespace);
     return this.raw.create(skill);
   };
 
-  upsert = async (skill: SkillWrite): Promise<Skill> => {
+  update = async (skill: SkillWrite): Promise<Skill | null> => {
     this.assertNamespaceWrite(skill.namespace);
-    return this.raw.upsert(skill);
+    return this.raw.update(skill);
   };
 
   delete = async (namespace: string, id: string): Promise<void> => {

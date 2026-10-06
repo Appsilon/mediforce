@@ -749,21 +749,30 @@ function utf8Bytes(text: string): number {
  * here rather than at write time. `.mediforce/` is the engine's own directory
  * inside a run workspace and is not an author's to write.
  */
+export const WorkflowArtifactPathSchema = z.string()
+  .min(1, 'artifact path is required')
+  .max(512, 'artifact path is too long')
+  .refine((value) => value.startsWith('/') === false, 'artifact path must be relative')
+  .refine((value) => value.includes('\\') === false, 'artifact path must use forward slashes')
+  .refine(
+    (value) => value.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..'),
+    'artifact path must not contain empty, "." or ".." segments',
+  )
+  .refine(
+    (value) => value.split('/')[0] !== '.mediforce',
+    '.mediforce is written by the platform, so it cannot hold an artifact',
+  );
+
+/** Stored as `jsonb`, which cannot represent U+0000, so it is refused here
+ *  as a validation error rather than surfacing as a database failure. */
+export const ArtifactTextSchema = z.string().refine(
+  (value) => value.includes('\u0000') === false,
+  'artifact must be text; it contains a NUL character',
+);
+
 export const WorkflowArtifactSchema = z.object({
-  path: z.string()
-    .min(1, 'artifact path is required')
-    .max(512, 'artifact path is too long')
-    .refine((value) => value.startsWith('/') === false, 'artifact path must be relative')
-    .refine((value) => value.includes('\\') === false, 'artifact path must use forward slashes')
-    .refine(
-      (value) => value.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..'),
-      'artifact path must not contain empty, "." or ".." segments',
-    )
-    .refine(
-      (value) => value.split('/')[0] !== '.mediforce',
-      '.mediforce is written by the platform, so it cannot hold an artifact',
-    ),
-  contents: z.string().refine(
+  path: WorkflowArtifactPathSchema,
+  contents: ArtifactTextSchema.refine(
     (value) => utf8Bytes(value) <= WORKFLOW_ARTIFACT_MAX_BYTES,
     `artifact is larger than ${String(WORKFLOW_ARTIFACT_MAX_BYTES)} bytes`,
   ),

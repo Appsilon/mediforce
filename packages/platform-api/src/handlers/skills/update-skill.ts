@@ -25,7 +25,7 @@ export async function updateSkill(
 
   // Refusing `private` while a public Agent, or an Agent in another namespace,
   // holds this skill (ADR-0025 decision 3) lands with #1461.
-  const skill = await scope.skills.upsert({
+  const skill = await scope.skills.update({
     namespace,
     id,
     name,
@@ -34,6 +34,9 @@ export async function updateSkill(
     contentHash: skillContentHash(files),
     files,
   });
+  if (skill === null) {
+    throw new NotFoundError(`Skill '${id}' not found in namespace '${namespace}'`);
+  }
 
   await scope.system.audit.append({
     ...actorFromCaller(scope),

@@ -595,6 +595,7 @@ export type {
   TriggerRepository,
   TriggerUpdate,
   ToolCatalogRepository,
+  SkillReadScope,
   SkillRepository,
   SkillWrite,
   ImageCatalogRepository,

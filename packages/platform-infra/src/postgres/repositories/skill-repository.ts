@@ -4,6 +4,7 @@ import {
   SkillSummarySchema,
   parseRow,
   type Skill,
+  type SkillReadScope,
   type SkillRepository,
   type SkillSummary,
   type SkillWrite,
@@ -19,17 +20,17 @@ import { skills } from '../schema/skill';
 export class PostgresSkillRepository implements SkillRepository {
   constructor(private readonly db: Database) {}
 
-  async getById(namespace: string, id: string): Promise<Skill | null> {
+  async getById(namespace: string, id: string, scope: SkillReadScope): Promise<Skill | null> {
     const rows = await this.db
       .select()
       .from(skills)
-      .where(and(eq(skills.workspace, namespace), eq(skills.id, id)))
+      .where(and(eq(skills.workspace, namespace), eq(skills.id, id), visibleTo(scope)))
       .limit(1);
     const row = rows[0];
     return row ? toSkill(row) : null;
   }
 
-  async list(namespace: string): Promise<SkillSummary[]> {
+  async list(namespace: string, scope: SkillReadScope): Promise<SkillSummary[]> {
     const rows = await this.db
       .select({
         workspace: skills.workspace,
@@ -43,7 +44,7 @@ export class PostgresSkillRepository implements SkillRepository {
         updatedAt: skills.updatedAt,
       })
       .from(skills)
-      .where(eq(skills.workspace, namespace))
+      .where(and(eq(skills.workspace, namespace), visibleTo(scope)))
       .orderBy(asc(skills.id));
     return rows.map(({ workspace, createdAt, updatedAt, ...rest }) =>
       parseRow(SkillSummarySchema, {
@@ -65,7 +66,7 @@ export class PostgresSkillRepository implements SkillRepository {
     return row ? toSkill(row) : null;
   }
 
-  async upsert(skill: SkillWrite): Promise<Skill> {
+  async update(skill: SkillWrite): Promise<Skill | null> {
     const parsed = SkillSchema.omit({ createdAt: true, updatedAt: true }).parse(skill);
     const values = {
       name: parsed.name,
@@ -76,11 +77,11 @@ export class PostgresSkillRepository implements SkillRepository {
       // updated_at is set by the set_updated_at() trigger on every UPDATE.
     };
     const [row] = await this.db
-      .insert(skills)
-      .values({ workspace: parsed.namespace, id: parsed.id, ...values })
-      .onConflictDoUpdate({ target: [skills.workspace, skills.id], set: values })
+      .update(skills)
+      .set(values)
+      .where(and(eq(skills.workspace, parsed.namespace), eq(skills.id, parsed.id)))
       .returning();
-    return toSkill(row);
+    return row ? toSkill(row) : null;
   }
 
   async delete(namespace: string, id: string): Promise<void> {
@@ -88,6 +89,10 @@ export class PostgresSkillRepository implements SkillRepository {
       .delete(skills)
       .where(and(eq(skills.workspace, namespace), eq(skills.id, id)));
   }
+}
+
+function visibleTo(scope: SkillReadScope) {
+  return scope.publicOnly ? eq(skills.visibility, 'public') : undefined;
 }
 
 function toSkill(row: typeof skills.$inferSelect): Skill {
