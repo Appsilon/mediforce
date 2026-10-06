@@ -118,13 +118,17 @@ describe('GET /api/admin/tool-catalog', () => {
     expect(res.status).toBe(200);
   });
 
-  it('[AUTHZ] plain member gets 403 (bug fix)', async () => {
+  it('[AUTHZ] plain member reads entries without args and env', async () => {
     mockResolveCallerIdentity.mockResolvedValue(memberCaller());
+    mockCatalogList.mockResolvedValue([{ ...catalogEntry, args: ['--token'], env: { KEY: 'secret' } }]);
 
     const res = await GET(makeGetRequest('appsilon'));
+    const json = await res.json();
 
-    expect(res.status).toBe(403);
-    expect(mockCatalogList).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(json.entries).toEqual([
+      { id: catalogEntry.id, command: catalogEntry.command, description: catalogEntry.description },
+    ]);
   });
 
   it('[AUTHZ] non-member (no role on namespace) gets 403', async () => {

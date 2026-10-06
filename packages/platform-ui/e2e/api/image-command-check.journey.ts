@@ -32,8 +32,8 @@ test.describe('Checking a command against an image — API E2E', () => {
     callers = await setupMultiNamespaceCallers();
   });
 
-  test('refuses a name that is not a bare command', async ({ request }) => {
-    for (const command of ['a;b', '--help', '/usr/bin/uvx', 'uvx serve']) {
+  test('refuses a command that is not a name or path', async ({ request }) => {
+    for (const command of ['a;b', '--help', 'uvx serve']) {
       const res = await request.get(checkUrl(ORG_HANDLE, 'mediforce-golden-image', command), {
         headers: sessionCookieHeaders(callers.member),
       });
