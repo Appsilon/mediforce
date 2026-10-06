@@ -144,7 +144,8 @@ A Skill is edited in place and has no version history in v1, the same as an
 Agent. An edit takes effect on the next Step that runs. Deleting a Skill is
 refused while any Agent holds it. The refusal lists the holding Agents the
 caller can see and counts the rest. A cascading delete would silently change
-other Namespaces' Agents.
+other Namespaces' Agents. Deleting a Namespace is refused on the same ground: while
+an Agent that survives it holds one of its Skills.
 
 Every agent Step Execution records `(namespace, id, contentHash)` for each Skill
 it was offered. Under decision 5 the record says what was *available* to the

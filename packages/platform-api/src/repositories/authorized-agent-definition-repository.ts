@@ -100,21 +100,21 @@ export class AuthorizedAgentDefinitionRepository extends AuthorizedScope {
   };
 
   /**
-   * The agents holding Skill `(namespace, id)`, from every namespace: a public
-   * Skill can be held by other workspaces' agents. Only the ones the caller
-   * may read are returned; the rest are counted, so a guard can say how many
-   * holders there are without naming agents the caller cannot see.
+   * The agents holding Skill `(namespace, id)` — or any Skill of `namespace`
+   * when `id` is omitted — from every namespace: a public Skill can be held by
+   * other workspaces' agents. Visibility is applied in the storage query, so
+   * only the agents the caller may read are loaded; the rest are counted, so a
+   * guard can say how many holders there are without naming agents the caller
+   * cannot see.
    */
   holdersOfSkill = async (
     namespace: string,
-    id: string,
-  ): Promise<{ visible: AgentDefinition[]; hiddenCount: number }> => {
-    const holders = await this.raw.listHoldingSkill(namespace, id);
-    const visible = holders.filter(
-      (agent) => agent.visibility === 'public' || this.canSeeNamespace(agent.namespace),
+    id?: string,
+  ): Promise<{ visible: AgentDefinition[]; hiddenCount: number }> =>
+    this.raw.findSkillHolders(
+      { namespace, id },
+      this.caller.isSystemActor ? null : [...this.caller.namespaces],
     );
-    return { visible, hiddenCount: holders.length - visible.length };
-  };
 
   delete = async (id: string): Promise<void> => {
     const existing = await this.raw.getById(id);

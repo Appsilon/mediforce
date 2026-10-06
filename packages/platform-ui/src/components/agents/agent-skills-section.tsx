@@ -68,7 +68,13 @@ export function AgentSkillsSection({ namespace, ownsNamespace, visibility, selec
 
   function toggle(ref: AgentSkillRef) {
     const key = refKey(ref);
-    onChange(selectedKeys.has(key) ? selected.filter((held) => refKey(held) !== key) : [...selected, ref]);
+    if (selectedKeys.has(key)) {
+      onChange(selected.filter((held) => refKey(held) !== key));
+      return;
+    }
+    // Skill ids are plugin directory names, so a second namespace's skill with
+    // the same id replaces the held one instead of being added beside it.
+    onChange([...selected.filter((held) => held.id !== ref.id), ref]);
   }
 
   return (

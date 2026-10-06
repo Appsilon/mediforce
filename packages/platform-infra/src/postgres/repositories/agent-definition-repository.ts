@@ -102,12 +102,23 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
     return rows.map(toAgent);
   }
 
-  async listHoldingSkill(namespace: string, id: string): Promise<AgentDefinition[]> {
-    const rows = await this.db
-      .select()
+  async findSkillHolders(
+    skill: { namespace: string; id?: string },
+    allowed: readonly string[] | null,
+  ): Promise<{ visible: AgentDefinition[]; hiddenCount: number }> {
+    const ref = skill.id === undefined ? { namespace: skill.namespace } : { namespace: skill.namespace, id: skill.id };
+    const holds = sql`${agents.skills} @> ${JSON.stringify([ref])}::jsonb`;
+    if (allowed === null) {
+      const rows = await this.db.select().from(agents).where(holds);
+      return { visible: rows.map(toAgent), hiddenCount: 0 };
+    }
+    const visibility = visibilityFilter(allowed);
+    const rows = await this.db.select().from(agents).where(and(holds, visibility));
+    const [hidden] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
       .from(agents)
-      .where(sql`${agents.skills} @> ${JSON.stringify([{ namespace, id }])}::jsonb`);
-    return rows.map(toAgent);
+      .where(and(holds, sql`not (${visibility})`));
+    return { visible: rows.map(toAgent), hiddenCount: hidden?.count ?? 0 };
   }
 
   async update(id: string, input: UpdateAgentDefinitionInput): Promise<AgentDefinition> {

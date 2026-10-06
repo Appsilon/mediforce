@@ -115,7 +115,7 @@ function contract(
       expect(plain.skills).toBeUndefined();
     });
 
-    it('listHoldingSkill matches namespace and id together, across every agent', async () => {
+    it('findSkillHolders matches namespace and id together, scoped by visibility', async () => {
       await registerWorkspace('ws-1');
       await repo.upsert('holder-private', inputBase({ namespace: 'ws-1', skills: [{ namespace: 'shared', id: 'sdtm-mapping' }] }));
       await repo.upsert('holder-public', inputBase({ visibility: 'public', skills: [
@@ -124,9 +124,17 @@ function contract(
       ] }));
       await repo.upsert('same-id-other-ns', inputBase({ skills: [{ namespace: 'other', id: 'sdtm-mapping' }] }));
       await repo.upsert('no-skills', inputBase());
-      const holders = await repo.listHoldingSkill('shared', 'sdtm-mapping');
-      expect(holders.map((agent) => agent.id).sort()).toEqual(['holder-private', 'holder-public']);
-      expect(await repo.listHoldingSkill('shared', 'missing')).toEqual([]);
+      const shared = { namespace: 'shared', id: 'sdtm-mapping' };
+      const everyone = await repo.findSkillHolders(shared, null);
+      expect(everyone.visible.map((agent) => agent.id).sort()).toEqual(['holder-private', 'holder-public']);
+      expect(everyone.hiddenCount).toBe(0);
+      const outsider = await repo.findSkillHolders(shared, ['elsewhere']);
+      expect(outsider.visible.map((agent) => agent.id)).toEqual(['holder-public']);
+      expect(outsider.hiddenCount).toBe(1);
+      const member = await repo.findSkillHolders(shared, ['ws-1']);
+      expect(member.visible.map((agent) => agent.id).sort()).toEqual(['holder-private', 'holder-public']);
+      expect((await repo.findSkillHolders({ namespace: 'shared' }, null)).visible).toHaveLength(2);
+      expect((await repo.findSkillHolders({ namespace: 'shared', id: 'missing' }, null)).visible).toEqual([]);
     });
 
     it('listAll returns every agent regardless of visibility', async () => {

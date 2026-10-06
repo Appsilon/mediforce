@@ -7,6 +7,7 @@ import { emitAudit } from '../../audit-helpers';
 import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import { resolvePersonalNamespace } from '../_helpers';
+import { hasHolders, heldSkillConflict } from '../skills/_helpers';
 import { deleteWorkflow } from '../workflows/delete-workflow';
 import type {
   DeleteNamespaceInput,
@@ -107,6 +108,19 @@ export async function deleteNamespace(
       'A personal workspace cannot be deleted — every user needs one, so it would be recreated empty on the next sign-in. Reset it instead to remove its workflows.',
       { handle: input.handle, type: existing.type },
     );
+  }
+
+  // The cascade drops the workspace's Skills, and an Agent's skill refs are
+  // unconstrained JSON, so it would leave dangling references — the same
+  // refusal as deleting a held Skill (ADR-0025 decision 7). Private agents of
+  // this workspace die in the cascade, so only the survivors count.
+  const holders = await scope.agentDefinitions.holdersOfSkill(input.handle);
+  const surviving = {
+    visible: holders.visible.filter((agent) => agent.visibility === 'public' || agent.namespace !== input.handle),
+    hiddenCount: holders.hiddenCount,
+  };
+  if (hasHolders(surviving)) {
+    throw heldSkillConflict(`Namespace '${input.handle}' cannot be deleted while agents hold its skills`, surviving);
   }
 
   // `audit_events.workspace` is NOT NULL with an FK to `workspaces.handle`
