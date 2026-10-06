@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { fileTreeBytes } from '@mediforce/platform-core';
 import { GetAgentTrajectoryOutputSchema, GetProcessStepsOutputSchema } from '@mediforce/platform-api/contract';
 import { test, expect } from '../helpers/test-fixtures';
 import { JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
@@ -86,8 +87,10 @@ test.describe('skills API journey', () => {
 
     const listRes = await request.get(`/api/skills?namespace=${TEST_ORG_HANDLE}`, { headers: apiKeyHeaders() });
     expect(listRes.ok(), await listRes.text()).toBe(true);
-    const list = (await listRes.json()) as { skills: Array<{ id: string; paths: string[] }> };
-    expect(list.skills.find((skill) => skill.id === name)?.paths).toEqual(files.map((file) => file.path));
+    const list = (await listRes.json()) as { skills: Array<{ id: string; paths: string[]; size: number }> };
+    const listed = list.skills.find((skill) => skill.id === name);
+    expect(listed?.paths).toEqual(files.map((file) => file.path));
+    expect(listed?.size).toBe(fileTreeBytes(files));
 
     const getRes = await request.get(`/api/skills/${name}?namespace=${TEST_ORG_HANDLE}`, { headers: apiKeyHeaders() });
     expect(getRes.ok(), await getRes.text()).toBe(true);

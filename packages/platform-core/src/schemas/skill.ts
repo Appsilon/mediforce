@@ -10,7 +10,7 @@ import { ArtifactTextSchema, WorkflowArtifactPathSchema, validateFileTree } from
  * the stored row and the folder Claude Code reads cannot disagree.
  */
 
-const SKILL_MANIFEST_PATH = 'SKILL.md';
+export const SKILL_MANIFEST_PATH = 'SKILL.md';
 
 export const SkillVisibilitySchema = z.enum(['private', 'public']);
 export type SkillVisibility = z.infer<typeof SkillVisibilitySchema>;
@@ -110,5 +110,7 @@ export type Skill = z.infer<typeof SkillSchema>;
 /** A Skill without its file contents — what a listing returns. */
 export const SkillSummarySchema = SkillSchema.omit({ files: true }).extend({
   paths: z.array(z.string()),
+  /** `fileTreeBytes` of its files: what they cost against the 256 KB cap. */
+  size: z.number().int().nonnegative(),
 });
 export type SkillSummary = z.infer<typeof SkillSummarySchema>;

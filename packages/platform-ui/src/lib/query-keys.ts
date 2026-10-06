@@ -191,6 +191,12 @@ export const queryKeys = {
   imageCatalogEntry: (handle: string, id: string) => ['image-catalog-entry', handle, id] as const,
   /** Per-namespace MCP Tool Catalog. */
   toolCatalog: (handle: string) => ['tool-catalog', handle] as const,
+  /** A workspace's Skills followed by every other workspace's public ones
+   *  (ADR-0025). Summaries only; one Skill's files live under `skill`. */
+  skills: (handle: string) => ['skills', handle] as const,
+  skill: (namespace: string, id: string) => ['skill', namespace, id] as const,
+  /** Every agent definition the caller can see — what "used by" counts. */
+  agentDefinitions: () => ['agent-definitions'] as const,
   /** Whether one image resolves one command. Keyed by reference, which a deploy
    *  can rebuild (`:latest`), so an answer is refreshed on a live interval. */
   imageCommandCheck: (handle: string, image: string, command: string) =>

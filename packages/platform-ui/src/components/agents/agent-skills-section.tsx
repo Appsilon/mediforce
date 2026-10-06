@@ -1,10 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { useEffect, useState } from 'react';
 import { BookOpen } from 'lucide-react';
-import type { AgentSkillRef, AgentVisibility, SkillSummary } from '@mediforce/platform-core';
-import { mediforce } from '@/lib/mediforce';
+import type { AgentSkillRef, AgentVisibility } from '@mediforce/platform-core';
+import Link from 'next/link';
+import { routes } from '@/lib/routes';
+import { useSkills } from '@/hooks/use-skills';
 
 const CLAUDE_CODE_RUNTIME = 'claude-code-agent';
 
@@ -34,28 +35,8 @@ const refKey = (ref: AgentSkillRef) => `${ref.namespace}/${ref.id}`;
  * still shows so it can be unticked.
  */
 export function AgentSkillsSection({ namespace, ownsNamespace, visibility, selected, onChange, runtimeId }: AgentSkillsSectionProps) {
-  const [available, setAvailable] = useState<SkillSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    mediforce.skills
-      .list({ namespace, includePublic: true })
-      .then((result) => {
-        if (cancelled === false) setAvailable(result.skills);
-      })
-      .catch((err: unknown) => {
-        if (cancelled === false) setError(err instanceof Error ? err.message : 'Failed to load skills.');
-      })
-      .finally(() => {
-        if (cancelled === false) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [namespace]);
+  const skills = useSkills(namespace);
+  const available = skills.data ?? [];
 
   const selectedKeys = new Set(selected.map(refKey));
   const mayHold = available.filter((skill) =>
@@ -96,13 +77,13 @@ export function AgentSkillsSection({ namespace, ownsNamespace, visibility, selec
         </div>
       )}
 
-      {error !== null && (
+      {skills.isError && (
         <div className="rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
+          {skills.error instanceof Error ? skills.error.message : 'Failed to load skills.'}
         </div>
       )}
 
-      {loading ? (
+      {skills.isPending ? (
         <div className="rounded-md border border-dashed px-3 py-4 text-center text-xs text-muted-foreground animate-pulse">
           Loading…
         </div>
@@ -110,7 +91,11 @@ export function AgentSkillsSection({ namespace, ownsNamespace, visibility, selec
         <div className="rounded-md border border-dashed px-3 py-6 text-center">
           <p className="text-sm font-medium">No skills available.</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Create one with <code className="font-mono">mediforce skill create --from &lt;dir&gt;</code>.
+            Create or upload one on the{' '}
+            <Link href={routes.skills(namespace)} className="font-medium text-foreground underline">
+              Skills
+            </Link>{' '}
+            page.
           </p>
         </div>
       ) : (

@@ -1,4 +1,5 @@
 import { SkillSchema, type Skill, type SkillSummary } from '../schemas/skill';
+import { fileTreeBytes } from '../schemas/workflow-definition';
 import type { SkillReadScope, SkillRepository, SkillWrite } from '../interfaces/skill-repository';
 
 /** In-memory double for SkillRepository, keyed by `${namespace}/${id}`. */
@@ -57,5 +58,5 @@ export class InMemorySkillRepository implements SkillRepository {
 }
 
 function toSummary({ files, ...summary }: Skill): SkillSummary {
-  return { ...summary, paths: files.map((file) => file.path) };
+  return { ...summary, paths: files.map((file) => file.path), size: fileTreeBytes(files) };
 }

@@ -48,6 +48,7 @@ export class PostgresSkillRepository implements SkillRepository {
         visibility: skills.visibility,
         contentHash: skills.contentHash,
         paths: sql<string[]>`jsonb_path_query_array(${skills.files}, '$[*].path')`,
+        size: sql<number>`(select coalesce(sum(octet_length(file->>'path') + octet_length(file->>'contents')), 0)::int from jsonb_array_elements(${skills.files}) as file)`,
         createdAt: skills.createdAt,
         updatedAt: skills.updatedAt,
       })

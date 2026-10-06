@@ -571,10 +571,7 @@ export function validateFileTree(
     }
   });
 
-  const total = files.reduce(
-    (sum, file) => sum + utf8Bytes(file.path) + utf8Bytes(file.contents),
-    0,
-  );
+  const total = fileTreeBytes(files);
   if (total > WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES) {
     ctx.addIssue({
       code: 'custom',
@@ -735,6 +732,12 @@ export const WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES = 256 * 1024;
  *  character count would let four-byte characters through the cap. */
 function utf8Bytes(text: string): number {
   return new TextEncoder().encode(text).length;
+}
+
+/** The bytes a set of files costs against {@link WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES}:
+ *  every path and its contents, as UTF-8. */
+export function fileTreeBytes(files: ReadonlyArray<{ path: string; contents: string }>): number {
+  return files.reduce((sum, file) => sum + utf8Bytes(file.path) + utf8Bytes(file.contents), 0);
 }
 
 /**

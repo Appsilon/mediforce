@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { SkillRepository, SkillWrite } from '@mediforce/platform-core';
+import { fileTreeBytes, type SkillRepository, type SkillWrite } from '@mediforce/platform-core';
 import { InMemorySkillRepository } from '@mediforce/platform-core/testing';
 import { PostgresSkillRepository } from '../repositories/skill-repository';
 import * as schema from '../schema/index';
@@ -82,6 +82,7 @@ function contract(name: string, factory: () => Promise<SkillRepository>) {
       const listed = await repo.list('appsilon', all);
       expect(listed.map((summary) => summary.id)).toEqual(['ae-grading', 'sdtm-mapping']);
       expect(listed[1]?.paths).toEqual(['SKILL.md', 'references/domains.md']);
+      expect(listed[1]?.size).toBe(fileTreeBytes(skill().files));
       expect(listed[1]).not.toHaveProperty('files');
     });
 

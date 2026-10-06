@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { render as renderDom, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { SkillSummary } from '@mediforce/platform-core';
 
 const list = vi.fn();
@@ -15,9 +17,13 @@ const summary = (namespace: string, id: string, visibility: 'public' | 'private'
   visibility,
   contentHash: 'hash',
   paths: ['SKILL.md'],
+  size: 64,
   createdAt: '2026-10-06T00:00:00Z',
   updatedAt: '2026-10-06T00:00:00Z',
 });
+
+const render = (ui: ReactElement) =>
+  renderDom(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>);
 
 const checkboxNames = () => screen.getAllByRole('checkbox').map((box) => box.getAttribute('aria-label'));
 

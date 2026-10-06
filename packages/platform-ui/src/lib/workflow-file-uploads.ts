@@ -2,6 +2,7 @@ import {
   WorkflowArtifactSchema,
   WORKFLOW_ARTIFACT_MAX_BYTES,
   WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES,
+  fileTreeBytes,
   type WorkflowArtifact,
 } from '@mediforce/platform-core';
 
@@ -12,10 +13,6 @@ export interface RejectedUpload {
 }
 
 const encoder = new TextEncoder();
-
-function byteLength(artifact: WorkflowArtifact): number {
-  return encoder.encode(artifact.path).length + encoder.encode(artifact.contents).length;
-}
 
 /**
  * Decode an uploaded file as text, or `null` when it is not text.
@@ -69,7 +66,7 @@ export function mergeUploadedFiles(
 ): { artifacts: WorkflowArtifact[]; rejected: RejectedUpload[] } {
   const artifacts = [...existing];
   const rejected: RejectedUpload[] = [];
-  let used = artifacts.reduce((sum, artifact) => sum + byteLength(artifact), 0);
+  let used = fileTreeBytes(artifacts);
 
   for (const upload of uploads) {
     const parsed = WorkflowArtifactSchema.safeParse(upload);
@@ -85,8 +82,8 @@ export function mergeUploadedFiles(
     }
 
     const at = artifacts.findIndex((artifact) => artifact.path === upload.path);
-    const replacing = at === -1 ? 0 : byteLength(artifacts[at]);
-    const next = used - replacing + byteLength(upload);
+    const replacing = at === -1 ? 0 : fileTreeBytes([artifacts[at]]);
+    const next = used - replacing + fileTreeBytes([upload]);
     if (next > WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES) {
       rejected.push({ path: upload.path, reason: 'no room left in this workflow' });
       continue;

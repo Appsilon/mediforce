@@ -97,6 +97,14 @@ export const routes = {
   tools: (handle: string) => `/${handle}/tools`,
   tool: (handle: string, toolId: string) => `/${handle}/tools/${encode(toolId)}`,
 
+  // ── Skills ─────────────────────────────────────────────────────
+  skills: (handle: string) => `/${handle}/skills`,
+  skillNew: (handle: string) => `/${handle}/skills/new`,
+  /** A Skill is keyed on its own workspace, which differs from `handle` for
+   *  another workspace's public Skill. */
+  skill: (handle: string, namespace: string, skillId: string) =>
+    `/${handle}/skills/${encode(namespace)}/${encode(skillId)}`,
+
   // ── Images ─────────────────────────────────────────────────────
   images: (handle: string) => `/${handle}/images`,
   /** The Images view with one entry already open — how Infrastructure crosses
