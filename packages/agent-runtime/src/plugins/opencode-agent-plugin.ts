@@ -226,6 +226,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
   }
 
   protected override async prepareOutputDir(outputDir: string): Promise<void> {
+    await super.prepareOutputDir(outputDir);
     const model = normaliseModelId(this.agentConfig.model ?? DEFAULT_MODEL);
     const config: Record<string, unknown> = {
       $schema: 'https://opencode.ai/config.json',

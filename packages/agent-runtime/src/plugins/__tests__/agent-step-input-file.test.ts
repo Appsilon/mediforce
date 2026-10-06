@@ -7,6 +7,8 @@ import type { ChildProcess } from 'node:child_process';
 import type { WorkflowAgentContext, EmitFn, EmitPayload } from '../../interfaces/step-executor-plugin';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
+import { OpenCodeAgentPlugin } from '../opencode-agent-plugin';
+import type { BaseContainerAgentPlugin } from '../base-container-agent-plugin';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 
 vi.mock('node:child_process', async (importOriginal) => {
@@ -22,15 +24,20 @@ vi.mock('@mediforce/container-worker', async (importOriginal) => {
 import { spawn } from 'node:child_process';
 const spawnMock = vi.mocked(spawn);
 
-const RESULT_LINE = JSON.stringify({
+const CLAUDE_RESULT_LINE = JSON.stringify({
   type: 'result',
   subtype: 'success',
   result: JSON.stringify({ summary: 'done' }),
 });
 
+const OPENCODE_RESULT_LINE = JSON.stringify({
+  type: 'text',
+  part: { type: 'text', text: JSON.stringify({ summary: 'done' }) },
+});
+
 let seeded: Record<string, unknown> | null = null;
 
-function mockCliSuccess(): void {
+function mockCliSuccess(resultLine: string): void {
   spawnMock.mockImplementation((_cmd: string, args?: readonly string[]) => {
     const child = new EventEmitter() as ChildProcess;
     Object.assign(child, {
@@ -48,7 +55,7 @@ function mockCliSuccess(): void {
         .then((raw) => { seeded = JSON.parse(raw) as Record<string, unknown>; })
         .catch(() => { seeded = null; })
         .finally(() => {
-          (child.stdout as Readable).push(`${RESULT_LINE}\n`);
+          (child.stdout as Readable).push(`${resultLine}\n`);
           (child.stdout as Readable).push(null);
           (child.stderr as Readable).push(null);
           child.emit('close', 0, null);
@@ -58,13 +65,13 @@ function mockCliSuccess(): void {
   });
 }
 
-function buildContext(stepInput: Record<string, unknown>): WorkflowAgentContext {
+function buildContext(pluginId: string, stepInput: Record<string, unknown>): WorkflowAgentContext {
   const step = {
     id: 'test-application',
     name: 'Test Application',
     type: 'creation' as const,
     executor: 'agent' as const,
-    plugin: 'claude-code-agent',
+    plugin: pluginId,
     agent: { prompt: 'Test the app.', image: 'mediforce-golden-image' },
   };
   return {
@@ -85,11 +92,24 @@ function buildContext(stepInput: Record<string, unknown>): WorkflowAgentContext 
 
 const noopEmit: EmitFn = async (_event: EmitPayload) => undefined;
 
-describe('an agent step reads its input from /output/input.json', () => {
-  let plugin: ClaudeCodeAgentPlugin;
+const plugins = [
+  {
+    pluginId: 'claude-code-agent',
+    resultLine: CLAUDE_RESULT_LINE,
+    create: (): BaseContainerAgentPlugin => new ClaudeCodeAgentPlugin({ workspaceManager: createFakeWorkspaceManager() }),
+  },
+  {
+    pluginId: 'opencode-agent',
+    resultLine: OPENCODE_RESULT_LINE,
+    create: (): BaseContainerAgentPlugin => new OpenCodeAgentPlugin({ workspaceManager: createFakeWorkspaceManager() }),
+  },
+];
+
+describe.each(plugins)('a $pluginId step reads its input from /output/input.json', ({ pluginId, resultLine, create }) => {
+  let plugin: BaseContainerAgentPlugin;
 
   beforeEach(() => {
-    plugin = new ClaudeCodeAgentPlugin({ workspaceManager: createFakeWorkspaceManager() });
+    plugin = create();
     spawnMock.mockReset();
     seeded = null;
   });
@@ -99,8 +119,8 @@ describe('an agent step reads its input from /output/input.json', () => {
       improved_code: 'library(teal)',
       steps: { 'review-and-improve-code': { improved_code: 'library(teal)' } },
     };
-    await plugin.initialize(buildContext(stepInput));
-    mockCliSuccess();
+    await plugin.initialize(buildContext(pluginId, stepInput));
+    mockCliSuccess(resultLine);
 
     await plugin.run(noopEmit);
 
