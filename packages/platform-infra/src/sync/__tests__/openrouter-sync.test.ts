@@ -75,15 +75,20 @@ describe('syncFromOpenRouter', () => {
     expect(result.rankingsUpdated).toBe(1);
   });
 
-  it('leaves out :batch variants, which chat/completions rejects, and retires any already stored', async () => {
+  it('leaves out :batch variants, which chat/completions rejects, and deletes any already stored', async () => {
     stubOpenRouter({
       models: [makeFakeModel({ id: 'openai/gpt-6-luna' }), makeFakeModel({ id: 'openai/gpt-6-luna:batch' })],
     });
     const upserted: string[] = [];
+    const deleted: string[] = [];
     let keptIds: string[] = [];
 
     await syncFromOpenRouter(
       makeRepo({
+        listIds: async () => ['openai/gpt-6-luna', 'openai/gpt-5-mini:batch'],
+        delete: async (id) => {
+          deleted.push(id);
+        },
         bulkUpsert: async (items) => {
           upserted.push(...items.map((item) => item.id));
           return items.length;
@@ -97,6 +102,7 @@ describe('syncFromOpenRouter', () => {
 
     expect(upserted).toEqual(['openai/gpt-6-luna']);
     expect(keptIds).toEqual(['openai/gpt-6-luna']);
+    expect(deleted).toEqual(['openai/gpt-5-mini:batch']);
   });
 
   it('skips rankings rows without a numeric request count', async () => {

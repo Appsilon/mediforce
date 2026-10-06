@@ -113,7 +113,12 @@ export async function syncFromOpenRouter(
 
   // `:batch` variants only run through OpenRouter's batch adapter; the
   // chat/completions endpoint every caller here uses answers them with a 404.
-  const entries = models.filter((model) => model.id.endsWith(':batch') === false).map(transformModel);
+  // Rows stored before this filter existed were never usable, so they are
+  // deleted rather than retired — retired models stay listed.
+  const isBatchVariant = (id: string) => id.endsWith(':batch');
+  const entries = models.filter((model) => isBatchVariant(model.id) === false).map(transformModel);
+  const storedBatchIds = (await repo.listIds()).filter(isBatchVariant);
+  for (const id of storedBatchIds) await repo.delete(id);
   const synced = await repo.bulkUpsert(entries);
 
   // Retire absent models and reinstate returned ones
