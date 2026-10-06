@@ -249,3 +249,34 @@ export function unheldStepRoles(
   }
   return unheld;
 }
+
+/**
+ * The agent config a new agent step starts with. A step naming a saved agent
+ * inherits that agent's model; any other blank model would fall through to the
+ * plugin's own default (DeepSeek for opencode-agent), so it gets `defaultModel`.
+ */
+export function defaultAgentModel(
+  step: Pick<WorkflowStep, 'agentId' | 'agent'>,
+  defaultModel: string,
+): WorkflowStep['agent'] {
+  if (step.agentId !== undefined || step.agent?.model !== undefined) return step.agent;
+  return { ...step.agent, model: defaultModel };
+}
+
+/**
+ * The patch for picking a saved agent on a step. A model that is still the
+ * default `defaultAgentModel` filled in is dropped, so the step inherits the
+ * agent's own model rather than overriding it with the default.
+ */
+export function selectAgentPatch(
+  step: Pick<WorkflowStep, 'agent'>,
+  agentId: string | undefined,
+  defaultModels: ReadonlyArray<string | undefined>,
+): Pick<WorkflowStep, 'agentId' | 'agent'> {
+  const model = step.agent?.model;
+  if (agentId === undefined || model === undefined || defaultModels.includes(model) === false) {
+    return { agentId, agent: step.agent };
+  }
+  const { model: _defaultModel, ...rest } = step.agent ?? {};
+  return { agentId, agent: Object.keys(rest).length > 0 ? rest : undefined };
+}

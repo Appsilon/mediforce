@@ -4,6 +4,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
+import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { useNamespaceMembers } from '@/hooks/use-namespace-members';
 import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
 import { useAuth } from '@/contexts/auth-context';
@@ -12,10 +13,11 @@ import { carriedSkills } from '@/lib/carried-skills';
 import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
-import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, defaultVerdictLabel, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
+import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, DEFAULT_MODEL, defaultVerdictLabel, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
 import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo, ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
+import { selectAgentPatch } from '../workflow-editor-utils';
 import {
   STEP_TYPE_LABELS,
   FALLBACK_OPTIONS,
@@ -257,6 +259,7 @@ export function StepEditor({
   const isNewStep = step.id.startsWith('new-step-');
   const skillsOnHand = carriedSkills(workflowArtifacts);
   const { plugins } = usePlugins();
+  const pinnedDefaultModel = usePinnedDefaultModel();
   const selectedPluginMetadata = plugins.find((p) => p.name === step.plugin)?.metadata;
   const selectedPluginDefaultModel = selectedPluginMetadata?.foundationModel;
   // The plugin declares its own io contract; prefer it over the authored
@@ -753,7 +756,7 @@ export function StepEditor({
             <select
               aria-label="Agent"
               value={step.agentId ?? ''}
-              onChange={(e) => onChange({ agentId: e.target.value || undefined })}
+              onChange={(e) => onChange(selectAgentPatch(step, e.target.value || undefined, [pinnedDefaultModel, DEFAULT_MODEL]))}
               className={rs}
             >
               <option value="">{agentsLoading ? 'Loading agents…' : 'No agent selected'}</option>
@@ -776,6 +779,7 @@ export function StepEditor({
               value={step.agent?.model}
               onChange={(model) => updateAgent({ model })}
               defaultModel={selectedAgentDefaultModel}
+              providers={selectedPluginMetadata?.modelProviders}
               ariaLabel="Agent Model"
               className={rs}
             />

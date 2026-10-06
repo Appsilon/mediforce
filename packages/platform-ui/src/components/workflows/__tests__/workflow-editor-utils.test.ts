@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { globSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver, splitPastedDefinition, pastedWorkflowName } from '../workflow-editor-utils';
+import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver, splitPastedDefinition, pastedWorkflowName, defaultAgentModel, selectAgentPatch } from '../workflow-editor-utils';
 import type { WorkflowStep } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -461,5 +461,46 @@ describe('pastedWorkflowName', () => {
 
   it('returns null when the paste names the workflow neither way', () => {
     expect(pastedWorkflowName({ description: 'no name here' })).toBeNull();
+  });
+});
+
+describe('defaultAgentModel', () => {
+  const SONNET = 'anthropic/claude-sonnet-4.6';
+
+  it('gives a new agent step the default model, not the plugin fallback', () => {
+    expect(defaultAgentModel({}, SONNET)).toEqual({ model: SONNET });
+  });
+
+  it('keeps the rest of the agent config it was given', () => {
+    expect(defaultAgentModel({ agent: { skill: 'draft-note' } }, SONNET)).toEqual({ skill: 'draft-note', model: SONNET });
+  });
+
+  it('keeps a model the step already names', () => {
+    expect(defaultAgentModel({ agent: { model: 'openai/gpt-4o' } }, SONNET)).toEqual({ model: 'openai/gpt-4o' });
+  });
+
+  it('leaves the model blank when the step names a saved agent, so it inherits that agent\'s model', () => {
+    expect(defaultAgentModel({ agentId: 'agent-1' }, SONNET)).toBeUndefined();
+  });
+});
+
+describe('selectAgentPatch', () => {
+  const SONNET = 'anthropic/claude-sonnet-4.6';
+  const DEFAULTS = [SONNET, '~anthropic/claude-sonnet-latest'];
+
+  it('drops the default model a new step was given, so the step inherits the agent\'s model', () => {
+    expect(selectAgentPatch({ agent: { model: SONNET } }, 'agent-1', DEFAULTS)).toEqual({ agentId: 'agent-1', agent: undefined });
+  });
+
+  it('keeps the rest of the agent config when it drops the default model', () => {
+    expect(selectAgentPatch({ agent: { model: SONNET, skill: 'draft-note' } }, 'agent-1', DEFAULTS)).toEqual({ agentId: 'agent-1', agent: { skill: 'draft-note' } });
+  });
+
+  it('keeps a model the author chose as an override', () => {
+    expect(selectAgentPatch({ agent: { model: 'openai/gpt-4o' } }, 'agent-1', DEFAULTS)).toEqual({ agentId: 'agent-1', agent: { model: 'openai/gpt-4o' } });
+  });
+
+  it('keeps the model when the agent is cleared', () => {
+    expect(selectAgentPatch({ agent: { model: SONNET } }, undefined, DEFAULTS)).toEqual({ agentId: undefined, agent: { model: SONNET } });
   });
 });

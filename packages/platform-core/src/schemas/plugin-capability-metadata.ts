@@ -9,6 +9,9 @@ export const PluginCapabilityMetadataSchema = z.object({
   outputDescription: z.string(),
   roles: z.array(PluginRoleSchema).min(1),
   foundationModel: z.string().optional(),
+  /** Model providers (the `anthropic` in `anthropic/claude-sonnet-4.6`) this
+   *  plugin can run. Absent means any provider. */
+  modelProviders: z.array(z.string()).optional(),
   /** Env vars the plugin implicitly needs inside the container.
    *  Each inner array is one alternative group — ALL keys in a group
    *  must be present. At least ONE group must be fully satisfied.

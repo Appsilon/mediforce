@@ -29,9 +29,10 @@ import { WorkflowNotificationsPanel } from './workflow-notifications-panel';
 import { pruneWorkflowSettings } from './workflow-settings-utils';
 import type { WorkflowSettingsDraft } from './workflow-settings-utils';
 import { unheldStepRoles } from './workflow-editor-utils';
-import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver } from './workflow-editor-utils';
+import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver, defaultAgentModel } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 import { useImageCatalogEntries } from '@/hooks/use-image-catalog';
+import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { mediforce, mediforceSilent, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
@@ -133,6 +134,7 @@ export function WorkflowEditorCanvas({
   const { toast } = useToast();
   const { images: dockerImages, isAvailable: dockerAvailable } = useDockerImages();
   const { entries: catalogEntries } = useImageCatalogEntries(namespace);
+  const pinnedDefaultModel = usePinnedDefaultModel();
   const warningStepIds = useMemo(() => {
     if (!dockerAvailable) return undefined;
     const map = new Map<string, string>();
@@ -366,7 +368,11 @@ export function WorkflowEditorCanvas({
       ...payload,
       id: newId,
       name: payload.name || `New Step ${stepNum}`,
-      ...(payload.executor === 'agent' ? { plugin: payload.plugin ?? 'opencode-agent', autonomyLevel: payload.autonomyLevel ?? 'L3' } : {}),
+      ...(payload.executor === 'agent' ? {
+        plugin: payload.plugin ?? 'opencode-agent',
+        autonomyLevel: payload.autonomyLevel ?? 'L3',
+        agent: defaultAgentModel(payload, pinnedDefaultModel ?? DEFAULT_MODEL),
+      } : {}),
       ...(payload.executor === 'script' ? { plugin: payload.plugin ?? 'script-container' } : {}),
       ...(payload.executor === 'cowork' ? { cowork: payload.cowork ?? { agent: 'chat' as const } } : {}),
     };
@@ -419,7 +425,7 @@ export function WorkflowEditorCanvas({
       setSelectedStepId(newId);
     }
     return newId;
-  }, [editedSteps, selectedStepId, saveSnapshot]);
+  }, [editedSteps, selectedStepId, saveSnapshot, pinnedDefaultModel]);
 
   const removeStep = useCallback((stepId: string) => {
     saveSnapshot();

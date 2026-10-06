@@ -22,6 +22,10 @@ const modelState = vi.hoisted(() => ({
   models: [] as ModelRegistryEntry[],
 }));
 
+vi.mock('@/hooks/use-model-registry', () => ({
+  usePinnedDefaultModel: () => undefined,
+}));
+
 vi.mock('@/hooks/use-plugins', () => ({
   usePlugins: () => ({ plugins: pluginState.plugins }),
 }));
@@ -578,6 +582,68 @@ describe('StepEditor', () => {
 
     const modelSelect = screen.getByRole('combobox', { name: 'Agent Model' });
     expect(modelSelect.options[0].textContent).toContain('anthropic/claude-opus-4-5');
+  });
+
+  describe('agent model picker by plugin', () => {
+    function registryModel(id: string, name: string): ModelRegistryEntry {
+      return {
+        id,
+        canonicalSlug: id,
+        name,
+        provider: id.split('/')[0],
+        contextLength: 200_000,
+        maxCompletionTokens: 16_384,
+        pricing: { input: 0.000003, output: 0.000015 },
+        modality: 'text->text',
+        inputModalities: ['text'],
+        outputModalities: ['text'],
+        supportsTools: true,
+        supportsVision: false,
+        source: 'openrouter',
+        requestCount: 10,
+        lastSyncedAt: '2026-01-01T00:00:00.000Z',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        retiredAt: null,
+      };
+    }
+
+    beforeEach(() => {
+      modelState.models = [
+        registryModel('anthropic/claude-sonnet-4.6', 'Claude Sonnet 4.6'),
+        registryModel('openai/gpt-4o', 'GPT-4o'),
+        registryModel('deepseek/deepseek-chat', 'DeepSeek Chat'),
+      ];
+      pluginState.plugins = [
+        { name: 'claude-code-agent', metadata: { name: 'Claude Code Agent', description: '', inputDescription: '', outputDescription: '', roles: ['executor'], modelProviders: ['anthropic'] } },
+        { name: 'opencode-agent', metadata: { name: 'OpenCode Agent', description: '', inputDescription: '', outputDescription: '', roles: ['executor'] } },
+      ];
+    });
+
+    async function renderAgentStep(step: Partial<WorkflowStep>): Promise<HTMLSelectElement> {
+      render(<StepEditor step={buildStep({ executor: 'agent', ...step })} allSteps={[]} onChange={vi.fn()} />);
+      expandCard('Prompt & model');
+      await screen.findByRole('option', { name: /Claude Sonnet 4\.6/ });
+      return screen.getByRole('combobox', { name: 'Agent Model' });
+    }
+
+    it('[DATA] offers only Anthropic models for a claude-code-agent step', async () => {
+      await renderAgentStep({ plugin: 'claude-code-agent' });
+      expect(screen.queryByRole('option', { name: /GPT-4o/ })).toBeNull();
+      expect(screen.queryByRole('option', { name: /DeepSeek Chat/ })).toBeNull();
+    });
+
+    it('[DATA] offers every model for a plugin that runs any provider', async () => {
+      await renderAgentStep({ plugin: 'opencode-agent' });
+      expect(screen.getByRole('option', { name: /GPT-4o/ })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: /DeepSeek Chat/ })).toBeInTheDocument();
+    });
+
+    it('[RENDER] keeps a saved non-Anthropic model visible and says the plugin cannot run it', async () => {
+      const modelSelect = await renderAgentStep({ plugin: 'claude-code-agent', agent: { model: 'openai/gpt-4o' } });
+      expect(modelSelect.value).toBe('openai/gpt-4o');
+      expect(screen.getByText(/runs only anthropic models/i)).toBeInTheDocument();
+    });
   });
 
   describe('MCP command warning', () => {

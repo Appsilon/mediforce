@@ -2,19 +2,11 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { apiFetch } from '@/lib/api-fetch';
-
-interface PluginMetadata {
-  name: string;
-  description: string;
-  inputDescription: string;
-  outputDescription: string;
-  roles: ('executor' | 'reviewer')[];
-  foundationModel?: string;
-}
+import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
 
 interface PluginEntry {
   name: string;
-  metadata?: PluginMetadata;
+  metadata?: PluginCapabilityMetadata;
 }
 
 export function usePlugins() {

@@ -102,6 +102,7 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
       'Examples: extracted metadata, generated code, analysis reports.',
     roles: ['executor'],
     foundationModel: 'Claude Sonnet 4.6',
+    modelProviders: ['anthropic'],
     requiredEnv: [['ANTHROPIC_API_KEY'], ['OPENROUTER_API_KEY', 'ANTHROPIC_BASE_URL']],
   };
 
