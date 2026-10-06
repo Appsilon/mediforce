@@ -24,6 +24,8 @@ import { workspaces } from './workspace';
  *
  * Small primitive fields are lifted to columns. `mcp_servers` stays as
  * `jsonb` (variable-size map of bindings, never queried by element).
+ * `skills` is a `jsonb` array of `{ namespace, id }` Skill references
+ * (ADR-0025), GIN-indexed for the "which agents hold this skill" lookup.
  */
 export const agents = pgTable(
   'agents',
@@ -42,6 +44,7 @@ export const agents = pgTable(
     inputDescription: text('input_description').notNull(),
     outputDescription: text('output_description').notNull(),
     mcpServers: jsonb('mcp_servers'),
+    skills: jsonb('skills'),
     namespace: text('namespace'),
     visibility: text('visibility').notNull().default('private'),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -54,6 +57,8 @@ export const agents = pgTable(
   (table) => ({
     // Hot list: visibility filter + namespace lookups for listVisibleTo.
     visibilityIdx: index('agents_visibility_idx').on(table.visibility),
+    // `listHoldingSkill` asks `skills @> [{namespace, id}]` across every agent.
+    skillsIdx: index('agents_skills_idx').using('gin', sql`${table.skills} jsonb_path_ops`),
     namespaceIdx: index('agents_namespace_idx')
       .on(table.namespace)
       .where(sql`${table.namespace} is not null`),

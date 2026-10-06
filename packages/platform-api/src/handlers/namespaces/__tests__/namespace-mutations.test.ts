@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { AuditEvent } from '@mediforce/platform-core';
 import {
+  InMemoryAgentDefinitionRepository,
   InMemoryAuditRepository,
   InMemoryProcessRepository,
   buildWorkflowDefinition,
@@ -14,7 +15,8 @@ import {
   updateNamespace,
   updateNamespaceMemberRole,
 } from '../namespace-mutations';
-import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../../errors';
+import { ConflictError, ForbiddenError, NotFoundError, PreconditionFailedError } from '../../../errors';
+import { agentInput } from '../../skills/__tests__/fixtures';
 import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index';
 
 /**
@@ -235,6 +237,22 @@ describe('deleteNamespace handler', () => {
     for (const uid of ['uid-owner', 'uid-member', 'uid-admin']) {
       expect(namespaceRepo.userOrganizations.get(uid)).toEqual([]);
     }
+  });
+
+  it('refuses while a surviving agent holds one of its skills, but not for its own private agents', async () => {
+    seedOwnerPersonal();
+    const agentDefinitionRepo = new InMemoryAgentDefinitionRepository();
+    const held = { skills: [{ namespace: HANDLE, id: 'sdtm-mapping' }] };
+    await agentDefinitionRepo.upsert('own-private', agentInput({ namespace: HANDLE, visibility: 'private', ...held }));
+    await agentDefinitionRepo.upsert('foreign', agentInput({ namespace: 'other', visibility: 'public', ...held }));
+    const scope = createTestScope({ namespaceRepo, auditRepo, agentDefinitionRepo, caller: ownerCaller });
+
+    await expect(deleteNamespace({ handle: HANDLE }, scope)).rejects.toBeInstanceOf(ConflictError);
+    expect(namespaceRepo.namespaces.get(HANDLE)).toBeDefined();
+
+    await agentDefinitionRepo.update('foreign', { skills: [] });
+    await deleteNamespace({ handle: HANDLE }, scope);
+    expect(namespaceRepo.namespaces.get(HANDLE)).toBeUndefined();
   });
 
   it('rejects admin role with ForbiddenError (owner only)', async () => {

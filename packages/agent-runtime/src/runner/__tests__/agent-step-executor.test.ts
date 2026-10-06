@@ -292,6 +292,53 @@ describe('AgentStepExecutor', () => {
     );
   });
 
+  it('records the skills the agent was offered, with their content hashes (ADR-0025 decision 7)', async () => {
+    mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+      status: 'completed',
+      envelope: defaultEnvelope,
+      appliedToWorkflow: false,
+      fallbackReason: null,
+    });
+    const agentSkills = [{
+      namespace: 'alpha',
+      id: 'sdtm-mapping',
+      name: 'sdtm-mapping',
+      description: 'Map raw data to SDTM',
+      visibility: 'private' as const,
+      contentHash: 'sha-sdtm',
+      files: [{ path: 'SKILL.md', contents: '---\nname: sdtm-mapping\ndescription: Map raw data to SDTM\n---\n' }],
+      createdAt: '2026-10-06T00:00:00.000Z',
+      updatedAt: '2026-10-06T00:00:00.000Z',
+    }];
+    const offered = [{ namespace: 'alpha', id: 'sdtm-mapping', contentHash: 'sha-sdtm' }];
+
+    await executor.execute(mockPlugin, makeContext({ agentSkills }), services, meta);
+
+    expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+      'inst-001',
+      'exec-001',
+      expect.objectContaining({ agentOutput: expect.objectContaining({ skills: offered }) }),
+    );
+    expect(mockAuditRepo.append).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'agent.step.started',
+      inputSnapshot: expect.objectContaining({ agentSkills: offered }),
+    }));
+  });
+
+  it('records no skills for an agent that holds none', async () => {
+    mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+      status: 'completed',
+      envelope: defaultEnvelope,
+      appliedToWorkflow: false,
+      fallbackReason: null,
+    });
+
+    await executor.execute(mockPlugin, makeContext({ agentSkills: [] }), services, meta);
+
+    const update = mockInstanceRepo.updateStepExecution.mock.calls[0]?.[2] as { agentOutput: Record<string, unknown> };
+    expect(update.agentOutput).not.toHaveProperty('skills');
+  });
+
   it('marks step execution as failed on error fallback', async () => {
     mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
       status: 'escalated',

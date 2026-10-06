@@ -2,6 +2,7 @@ import type { CreateAgentInput, CreateAgentOutput } from '../../contract/agents'
 import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
+import { assertAgentMayHoldSkills } from './agent-skills';
 
 export async function createAgent(
   input: CreateAgentInput,
@@ -14,6 +15,8 @@ export async function createAgent(
   if (input.namespace === undefined) {
     throw new ValidationError('An agent needs a namespace (the owning workspace).');
   }
+  scope.agentDefinitions.assertCanCreateIn(input.namespace);
+  await assertAgentMayHoldSkills(input, scope);
   const agent = await scope.agentDefinitions.create(input);
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({

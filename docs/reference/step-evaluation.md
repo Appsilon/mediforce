@@ -707,7 +707,7 @@ its own so two Fingerprints say what differs:
 | `step` | the agent config, plugin, agent id, params, step params, env and MCP restrictions — not its name, display, `autonomyLevel`, `review`, `confidenceThreshold` or `fallbackBehavior` |
 | `model` | the step's model, or its agent's when the step names none |
 | `systemPrompt` | the agent's system prompt |
-| `skill` | every file the workflow carries under `<skillsDir>/<skill>/`, or the external skills repository, commit and path |
+| `skill` | every file the workflow carries under `<skillsDir>/<skill>/`, or the external skills repository, commit and path; plus, when the step's agent holds Skills, each one's namespace, id and content hash ([ADR-0025](../adr/0025-skill-catalog.md)). An agent with no Skills leaves the component as it was. |
 | `image` | the image reference the runtime resolves, the files a carried Dockerfile builds from, and the commit a repository build checks out |
 | `mcpServers` | the MCP servers and tools production resolves for the step |
 | `preamble` | the workflow preamble |

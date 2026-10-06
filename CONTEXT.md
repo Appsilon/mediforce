@@ -28,8 +28,8 @@ Deployment is in play.
 
 **Namespace** *(canonical domain term; Workspace is the UI/storage term per ADR-0001)*:
 An isolated scope of work inside a Deployment. Owns workflow definitions,
-workflow runs, agents, OAuth providers, secrets, tool catalog, image catalog,
-cowork sessions. Identified by a URL-safe `handle`. Two types: `personal`
+workflow runs, agents, skills, OAuth providers, secrets, tool catalog, image
+catalog, cowork sessions. Identified by a URL-safe `handle`. Two types: `personal`
 (auto-created per user, linked via `linkedUserId`) and `organization`
 (multi-member, shared — e.g. a department inside the customer tenant).
 _Avoid_: Workspace (UI term in transition — see note below), Tenant (= the
@@ -216,10 +216,21 @@ A pluggable Step executor. Agent plugins are LLM-driven; script plugins are
 deterministic. Plugins produce an Output; autonomy remains a workflow concern.
 _Avoid_: conflating with Skill — Plugin is the runtime; Skill is data.
 
-**Skill** *(code payload)*:
-A code artifact (script or git repo) consumed by an agent at spawn time
-(e.g. Claude Code loads it into the container).
+**Skill** *(Namespace resource — ADR-0025)*:
+A named folder of text an agent can load — a `SKILL.md` plus any references,
+scripts and templates — owned by one Namespace, identified there by the name in
+its `SKILL.md`, and `private` (its Namespace only) or `public` like an Agent.
+Given to an Agent, never to a Workflow. Offered, not imposed: the agent loads
+one when its description fits the task.
 _Avoid_: Conflating with Plugin — Plugin is the runtime; Skill is data.
+"Catalog skill" (there is no other kind of Skill).
+
+**Step skill** *(workflow-carried)*:
+A skill folder a Workflow Definition carries in its files or pins in its
+skills repository, named by one Workflow Step (`step.agent.skill`). Lives and
+versions with the Workflow Definition; not a Skill. Always in the Step's
+prompt.
+_Avoid_: "workflow skill", "Skill" unqualified.
 
 **Agent**:
 A reusable, mutable agent configuration: system prompt, foundation model and
@@ -228,8 +239,8 @@ Steps and is not versioned today.
 _Avoid_: Agent Definition (legacy code term; there is no versioned definition).
 _Note_: A Step inherits two things from the Agent it names — `systemPrompt`
 reaches the prompt as `agentIdentityPrompt`, and `foundationModel` supplies the
-run's model whenever the Step leaves `step.agent.model` unset. Skills are
-step-level only (`step.agent.skillsDir`); the Agent has no `skills` field.
+run's model whenever the Step leaves `step.agent.model` unset. A Step also
+gets the Agent's Skills; its own Step skill is separate.
 
 **MCP Server**:
 External tool host (stdio or HTTP) accessible to an agent via Model Context
@@ -538,7 +549,7 @@ _Avoid_: "Dataset" alone (collides with generic data-engineering usage),
 
 **Step Fingerprint**:
 The identity of everything that shapes one agent Workflow Step's behaviour — its
-config, the skill and agent instructions it reads, its image and its
+config, the Step skill, its Agent's Skills and instructions, its image and its
 effective MCP tools — independent of the Workflow Definition version.
 _Avoid_: "step version", "config hash".
 
@@ -585,7 +596,7 @@ the user-facing immutable log.
 
 - A **Deployment** contains many **Namespaces**.
 - A **Namespace** owns its **Workflows** (with their **Workflow Definitions**),
-  **Workflow Runs**, **Agents**, **OAuth Providers**, **Secrets**,
+  **Workflow Runs**, **Agents**, **Skills**, **OAuth Providers**, **Secrets**,
   **Tool Catalog**, **Image Catalog**.
 - A **Workflow** has many versioned **Workflow Definitions**; its `visibility`
   controls cross-Namespace read access.
@@ -597,6 +608,8 @@ the user-facing immutable log.
 - An **Agent Run** may produce 0..N **Handoffs**.
 - An **Agent** has many **Agent MCP Bindings** (per server) and
   many **Agent OAuth Tokens** (per server).
+- An **Agent** has 0..N **Skills**: its own Namespace's, or any `public` one.
+  A `public` **Agent** has only `public` **Skills**.
 - An agent **Workflow Step** owns 0..N **Evaluators** and 0..N
   versioned **Eval Datasets**; neither is shared with another Workflow Step (reuse
   is by copy).

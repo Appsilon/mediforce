@@ -72,7 +72,10 @@ export {
   GateResultSchema,
   ReviewVerdictSchema,
   AgentOutputSnapshotSchema,
+  OfferedSkillSchema,
+  offeredSkill,
   StepExecutionSchema,
+  type OfferedSkill,
   type StepExecutionStatus,
   type GateResult,
   type ReviewVerdict,
@@ -408,6 +411,7 @@ export {
   WorkflowArtifactSchema,
   WORKFLOW_ARTIFACT_MAX_BYTES,
   WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES,
+  fileTreeBytes,
   HttpMethodSchema,
   HttpActionConfigSchema,
   ReshapeActionConfigSchema,
@@ -574,6 +578,20 @@ export {
   AgentDefinitionSchema,
   type AgentDefinition,
 } from './agent-definition';
+
+export {
+  SkillVisibilitySchema,
+  SkillFilesSchema,
+  SkillSchema,
+  SkillSummarySchema,
+  parseSkillFrontmatter,
+  skillManifest,
+  SKILL_MANIFEST_PATH,
+  type SkillVisibility,
+  type SkillFile,
+  type Skill,
+  type SkillSummary,
+} from './skill';
 
 export {
   WorkflowSecretsSchema,

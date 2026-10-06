@@ -1,6 +1,7 @@
 import type { UpdateAgentInput, UpdateAgentBody, UpdateAgentOutput } from '../../contract/agents';
 import type { CallerScope } from '../../repositories/index';
 import { actorFromCaller } from '../_helpers';
+import { assertAgentMayHoldSkills } from './agent-skills';
 
 // Body is merged into input by the route adapter — see route.ts for the
 // inputFromRequest shape. Wrapper enforces namespace-write on the existing
@@ -9,6 +10,12 @@ export async function updateAgent(
   input: UpdateAgentInput & { body: UpdateAgentBody },
   scope: CallerScope,
 ): Promise<UpdateAgentOutput> {
+  // A patch to skills, visibility or namespace can each break the rule on
+  // which Skills the agent may hold, so the merged result is checked.
+  if (input.body.skills !== undefined || input.body.visibility !== undefined || input.body.namespace !== undefined) {
+    const existing = await scope.agentDefinitions.getForUpdate(input.id);
+    await assertAgentMayHoldSkills({ ...existing, ...input.body }, scope);
+  }
   const agent = await scope.agentDefinitions.update(input.id, input.body);
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({

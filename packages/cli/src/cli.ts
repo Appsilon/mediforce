@@ -71,9 +71,17 @@ import { agentListCommand } from './commands/agent-list';
 import { toolCatalogListCommand } from './commands/tool-catalog-list';
 import { toolCatalogAddCommand } from './commands/tool-catalog-add';
 import { toolCatalogDiscoverCommand } from './commands/tool-catalog-discover';
+import {
+  skillListCommand,
+  skillGetCommand,
+  skillCreateCommand,
+  skillUpdateCommand,
+  skillDeleteCommand,
+} from './commands/skill';
 import { agentGetCommand } from './commands/agent-get';
 import { agentDeleteCommand } from './commands/agent-delete';
 import { agentSetVisibilityCommand } from './commands/agent-set-visibility';
+import { agentSetSkillsCommand } from './commands/agent-set-skills';
 import { agentCreateCommand } from './commands/agent-create';
 import { modelListCommand } from './commands/model-list';
 import { modelGetCommand } from './commands/model-get';
@@ -259,6 +267,7 @@ export const TREE: Record<string, BranchEntry> = {
       create: { description: 'Create an agent from a JSON file', fn: agentCreateCommand },
       delete: { description: 'Delete an agent definition', fn: agentDeleteCommand },
       'set-visibility': { description: 'Set agent visibility (public|private)', fn: agentSetVisibilityCommand },
+      'set-skills': { description: 'Replace the Skills an agent holds', fn: agentSetSkillsCommand },
     },
   },
   'tool-catalog': {
@@ -267,6 +276,16 @@ export const TREE: Record<string, BranchEntry> = {
       list: { description: 'List a workspace Tool Catalog', fn: toolCatalogListCommand },
       add: { description: 'Add an MCP server from a JSON file (admin)', fn: toolCatalogAddCommand },
       discover: { description: 'List the tools an MCP server exposes (admin)', fn: toolCatalogDiscoverCommand },
+    },
+  },
+  skill: {
+    description: 'Skills — Claude Code skill folders a workspace owns (list, get, create, update, delete)',
+    leaves: {
+      list: { description: 'List a workspace\'s Skills', fn: skillListCommand },
+      get: { description: 'Show a Skill and its files', fn: skillGetCommand },
+      create: { description: 'Create a Skill from a local skill folder', fn: skillCreateCommand },
+      update: { description: 'Replace a Skill\'s files or change its visibility', fn: skillUpdateCommand },
+      delete: { description: 'Delete a Skill', fn: skillDeleteCommand },
     },
   },
   'agent-run': {

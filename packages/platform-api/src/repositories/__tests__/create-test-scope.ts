@@ -19,6 +19,7 @@ import {
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
   InMemoryToolCatalogRepository,
+  InMemorySkillRepository,
   InMemoryImageCatalogRepository,
   InMemoryTriggerRepository,
   InMemoryAgentOAuthTokenRepository,
@@ -200,6 +201,7 @@ export interface TestScopeOverrides {
   readonly coworkSessionRepo?: InMemoryCoworkSessionRepository;
   readonly triggerRepo?: InMemoryTriggerRepository;
   readonly toolCatalogRepo?: InMemoryToolCatalogRepository;
+  readonly skillRepo?: InMemorySkillRepository;
   readonly imageCatalogRepo?: InMemoryImageCatalogRepository;
   readonly oauthProviderRepo?: InMemoryOAuthProviderRepository;
   readonly agentOAuthTokenRepo?: InMemoryAgentOAuthTokenRepository;
@@ -262,6 +264,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     coworkSessionRepo: overrides.coworkSessionRepo ?? new InMemoryCoworkSessionRepository(instanceRepo),
     triggerRepo: overrides.triggerRepo ?? new InMemoryTriggerRepository(),
     toolCatalogRepo: overrides.toolCatalogRepo ?? new InMemoryToolCatalogRepository(),
+    skillRepo: overrides.skillRepo ?? new InMemorySkillRepository(),
     imageCatalogRepo: overrides.imageCatalogRepo ?? new InMemoryImageCatalogRepository(),
     namespaceRepo: overrides.namespaceRepo ?? stubNamespaceRepo,
     userProfileRepo: overrides.userProfileRepo ?? new InMemoryUserProfileRepository(),

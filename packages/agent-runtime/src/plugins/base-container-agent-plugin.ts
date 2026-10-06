@@ -11,7 +11,7 @@ import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepo
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
-import { agentLogEntries, createLineStreamReader, failedMcpServers, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes, unfence } from '@mediforce/platform-core';
+import { agentLogEntries, createLineStreamReader, offeredSkill, failedMcpServers, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes, unfence } from '@mediforce/platform-core';
 import { MCP_TAPE_DIR, MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from '../mcp/mcp-tape';
 import type { AgentLogFormat } from '@mediforce/platform-core';
 
@@ -809,6 +809,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       stepId, instanceId, skillName,
       image: this.agentConfig.image ?? 'local',
       skillsDir: this.agentConfig.skillsDir ?? null,
+      agentSkills: isWorkflowAgentContext(this.context)
+        ? (this.context.agentSkills ?? []).map(offeredSkill)
+        : [],
       MEDIFORCE_ROOT: process.env.MEDIFORCE_ROOT ?? 'NOT_SET',
       cwd: process.cwd(),
     });
@@ -925,15 +928,12 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         options.addDirs = [tempDir];
       }
 
-      // Plugin directory — host path to the Claude Code plugin that owns this skill.
-      // Convention: `skillsDir` points at `<plugin-root>/skills`; the plugin root
-      // (which holds `.claude-plugin/plugin.json`) is its parent directory.
-      // Agents that support `--plugin-dir` (Claude Code) pass this along so native
-      // skill resolution (SKILL.md + references/) works without workspace pollution.
-      if (this.agentConfig.skillsDir) {
-        const resolvedSkillsDir = this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath);
-        options.pluginDir = dirname(resolvedSkillsDir);
-      }
+      // Plugin directory — host path to the Claude Code plugin holding the step's
+      // skills and its agent's. Agents that support `--plugin-dir` (Claude Code)
+      // pass this along so native skill resolution (SKILL.md + references/)
+      // works without workspace pollution.
+      const pluginDir = await this.resolvePluginDir(this.agentConfig.skillsDir, resolveProjectPath);
+      if (pluginDir !== undefined) options.pluginDir = pluginDir;
 
       // Create activity log file for observability
       const logsDir = join(tmpdir(), 'mediforce-step-logs');
@@ -1688,7 +1688,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       dockerArgs.push('-v', `${artifactsHostDir}:${CONTAINER_ARTIFACTS_MOUNT}:ro`);
     }
 
-    // Bind-mount the Claude Code plugin root (read-only) when skillsDir is configured.
+    // Bind-mount the Claude Code plugin root (read-only) when the step has one (skillsDir or agent skills).
     // The host `options.pluginDir` becomes `${CONTAINER_PLUGIN_MOUNT}` inside the container;
     // we rewrite the options before getAgentCommand so the agent always receives the path
     // it will actually see (no Docker-vs-local branching in subclass code).

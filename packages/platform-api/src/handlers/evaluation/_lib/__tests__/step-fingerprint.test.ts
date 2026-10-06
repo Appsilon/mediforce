@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
+import { createHash } from 'node:crypto';
+import { canonicalJson, type WorkflowDefinition, type WorkflowStep } from '@mediforce/platform-core';
+import { InMemorySkillRepository } from '@mediforce/platform-core/testing';
 import { loadEvaluatedStep } from '../evaluated-step';
 import { changedFingerprintComponents, computeStepFingerprint } from '../step-fingerprint';
-import { evaluationFixture, STEP } from '../../__tests__/fixture';
+import { evaluationFixture, NAMESPACE, STEP } from '../../__tests__/fixture';
 
 describe('computeStepFingerprint', () => {
   async function loaded() {
@@ -63,5 +65,41 @@ describe('computeStepFingerprint', () => {
     const base = await fingerprint({ step: skillStep, definition: artifacts('Grade by CTCAE v5.') });
     const edited = await fingerprint({ step: skillStep, definition: artifacts('Grade by CTCAE v6.') });
     expect(changedFingerprintComponents(base, edited)).toEqual(['skill']);
+  });
+
+  it('folds the agent\'s skills into the skill component, and keeps it as it was for an agent with none', async () => {
+    const fixture = await evaluationFixture();
+    const skillRepo = new InMemorySkillRepository();
+    const scope = fixture.scope(undefined, { skillRepo });
+    const { definition, step } = await loadEvaluatedStep(scope, STEP, 'read');
+    const fingerprint = () => computeStepFingerprint(scope, definition, step);
+    const skill = (contentHash: string) => ({
+      namespace: NAMESPACE,
+      id: 'ctcae-grading',
+      name: 'ctcae-grading',
+      description: 'Grade AEs by CTCAE v5',
+      visibility: 'private' as const,
+      contentHash,
+      files: [{ path: 'SKILL.md', contents: '---\nname: ctcae-grading\ndescription: Grade AEs by CTCAE v5\n---\n' }],
+    });
+
+    // No agent skills: the component hashes the step skill alone (none here), as before agents held skills.
+    const withoutSkills = await fingerprint();
+    expect(withoutSkills.components.skill).toBe(createHash('sha256').update(canonicalJson(null)).digest('hex'));
+
+    await skillRepo.create(skill('hash-v1'));
+    const agent = (await fixture.agentDefinitionRepo.getById('ae-grader'))!;
+    await fixture.agentDefinitionRepo.upsert('ae-grader', { ...agent, skills: [{ namespace: NAMESPACE, id: 'ctcae-grading' }] });
+    const held = await fingerprint();
+    expect(changedFingerprintComponents(withoutSkills, held)).toEqual(['skill']);
+
+    await skillRepo.update(skill('hash-v2'));
+    const edited = await fingerprint();
+    expect(changedFingerprintComponents(held, edited)).toEqual(['skill']);
+
+    await skillRepo.delete(NAMESPACE, 'ctcae-grading');
+    const broken = await fingerprint();
+    expect(changedFingerprintComponents(edited, broken)).toEqual(['skill']);
+    expect(broken.components.skill).not.toBe(withoutSkills.components.skill);
   });
 });

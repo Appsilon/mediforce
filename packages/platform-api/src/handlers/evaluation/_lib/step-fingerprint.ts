@@ -1,25 +1,35 @@
 import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
 import {
+  AgentDefinitionNotFoundError,
+  SkillNotFoundError,
   resolveBuildSource,
   resolveCarriedBuild,
   resolveMcpForStep,
+  resolveSkillsForStep,
   resolveStepImage,
   type ResolveMcpForStepDeps,
+  type ResolveSkillsForStepDeps,
 } from '@mediforce/agent-runtime';
 import {
   STEP_FINGERPRINT_COMPONENTS,
   canonicalJson,
+  offeredSkill,
   type StepFingerprint,
   type StepFingerprintComponent,
   type WorkflowDefinition,
   type WorkflowStep,
 } from '@mediforce/platform-core';
 
-/** The repositories a Fingerprint reads the step's agent and tools from — a CallerScope, or the runtime's own. */
+/** The repositories a Fingerprint reads the step's agent, tools and skills from — a CallerScope, or the runtime's own. */
 export interface StepFingerprintRepos {
   agentDefinitions: ResolveMcpForStepDeps['agentDefinitionRepo'];
   toolCatalog: ResolveMcpForStepDeps['toolCatalogRepo'];
+  /** A caller's scope reads the same Skills the runtime does for any agent the
+   *  caller can see: a private agent is visible only to its workspace's
+   *  members, who see its private Skills, and a public one holds only public
+   *  Skills. */
+  skills: ResolveSkillsForStepDeps['skillRepo'];
 }
 
 function sha256(text: string): string {
@@ -67,6 +77,37 @@ function skillIdentity(definition: WorkflowDefinition, step: WorkflowStep): unkn
 }
 
 /**
+ * The `skill` component: the step skill, and the Skills its agent holds by
+ * reference and content hash (ADR-0025 decision 7), so editing one makes the
+ * step a changed step. A step whose agent holds none hashes the step skill
+ * alone, exactly as before agents could hold Skills, so no existing
+ * Fingerprint moves. A reference that no longer resolves is a component of
+ * its own, as the runtime refuses to run the step.
+ */
+async function skillComponent(repos: StepFingerprintRepos, definition: WorkflowDefinition, step: WorkflowStep): Promise<unknown> {
+  const stepSkill = skillIdentity(definition, step);
+  const agentSkills = await resolveSkillsForStep(step, {
+    agentDefinitionRepo: repos.agentDefinitions,
+    skillRepo: repos.skills,
+  }).then(
+    (skills) => skills ?? [],
+    (error: unknown) => {
+      if (error instanceof SkillNotFoundError) return null;
+      if (error instanceof AgentDefinitionNotFoundError) return [];
+      throw error;
+    },
+  );
+  if (agentSkills === null) return { step: stepSkill, agentSkills: { refused: true } };
+  if (agentSkills.length === 0) return stepSkill;
+  return {
+    step: stepSkill,
+    agentSkills: agentSkills
+      .map(offeredSkill)
+      .sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0)),
+  };
+}
+
+/**
  * The image the step runs in, as the runtime resolves it: the tag it names or
  * derives, the files a carried Dockerfile builds from, and the commit a
  * repository build checks out. A tag the author re-pushes under the same name
@@ -85,7 +126,7 @@ function imageIdentity(definition: WorkflowDefinition, step: WorkflowStep): unkn
 /**
  * The Step Fingerprint (ADR-0023 D5): a SHA-256 over the parts of an agent
  * Step that shape its behaviour — the step config, the model it runs, its
- * agent's system prompt, the skill it loads, its image, the MCP servers and
+ * agent's system prompt, the skills it loads, its image, the MCP servers and
  * tools production resolves for it, and the workflow preamble. Each part is
  * hashed on its own, so two Fingerprints can say what differs. The MCP eval
  * policy is not part of it (D6); a Step Qualification states it instead.
@@ -108,7 +149,7 @@ export async function computeStepFingerprint(
     step: behaviouralStep(step),
     model: step.agent?.model ?? agent?.foundationModel ?? null,
     systemPrompt: agent?.systemPrompt ?? null,
-    skill: skillIdentity(definition, step),
+    skill: await skillComponent(repos, definition, step),
     image: imageIdentity(definition, step),
     mcpServers,
     preamble: definition.preamble ?? null,

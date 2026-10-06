@@ -51,6 +51,7 @@ export type { ResolvedEmailSender } from './email/resolve-sender';
 // Postgres repositories — the only data backend (ADR-0001).
 export { PostgresToolCatalogRepository } from './postgres/repositories/tool-catalog-repository';
 export { PostgresImageCatalogRepository } from './postgres/repositories/image-catalog-repository';
+export { PostgresSkillRepository } from './postgres/repositories/skill-repository';
 export { PostgresNamespaceRepository } from './postgres/repositories/namespace-repository';
 export { PostgresAuditRepository } from './postgres/repositories/audit-repository';
 export { PostgresOAuthProviderRepository } from './postgres/repositories/oauth-provider-repository';

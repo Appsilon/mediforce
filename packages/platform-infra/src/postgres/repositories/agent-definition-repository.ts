@@ -55,6 +55,7 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
           inputDescription: values.inputDescription,
           outputDescription: values.outputDescription,
           mcpServers: values.mcpServers,
+          skills: values.skills,
           namespace: values.namespace,
           visibility: values.visibility,
           // updated_at handled by the set_updated_at trigger.
@@ -101,6 +102,25 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
     return rows.map(toAgent);
   }
 
+  async findSkillHolders(
+    skill: { namespace: string; id?: string },
+    allowed: readonly string[] | null,
+  ): Promise<{ visible: AgentDefinition[]; hiddenCount: number }> {
+    const ref = skill.id === undefined ? { namespace: skill.namespace } : { namespace: skill.namespace, id: skill.id };
+    const holds = sql`${agents.skills} @> ${JSON.stringify([ref])}::jsonb`;
+    if (allowed === null) {
+      const rows = await this.db.select().from(agents).where(holds);
+      return { visible: rows.map(toAgent), hiddenCount: 0 };
+    }
+    const visibility = visibilityFilter(allowed);
+    const rows = await this.db.select().from(agents).where(and(holds, visibility));
+    const [hidden] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(agents)
+      .where(and(holds, sql`not (${visibility})`));
+    return { visible: rows.map(toAgent), hiddenCount: hidden?.count ?? 0 };
+  }
+
   async update(id: string, input: UpdateAgentDefinitionInput): Promise<AgentDefinition> {
     const current = await this.getById(id);
     if (!current) {
@@ -124,6 +144,7 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
         inputDescription: merged.inputDescription,
         outputDescription: merged.outputDescription,
         mcpServers: merged.mcpServers ?? null,
+        skills: merged.skills ?? null,
         namespace: merged.namespace ?? null,
         visibility: merged.visibility,
         // updated_at handled by the set_updated_at trigger.
@@ -174,6 +195,7 @@ function toRow(id: string, input: CreateAgentDefinitionInput) {
     inputDescription: parsed.inputDescription,
     outputDescription: parsed.outputDescription,
     mcpServers: parsed.mcpServers ?? null,
+    skills: parsed.skills ?? null,
     namespace: parsed.namespace ?? null,
     visibility: parsed.visibility,
   };
@@ -195,6 +217,7 @@ function toAgent(row: typeof agents.$inferSelect): AgentDefinition {
     updatedAt: row.updatedAt.toISOString(),
     runtimeId: row.runtimeId ?? undefined,
     mcpServers: row.mcpServers ?? undefined,
+    skills: row.skills ?? undefined,
     namespace: row.namespace ?? undefined,
   });
 }

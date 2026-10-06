@@ -5,11 +5,12 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
-import { apiFetch } from '@/lib/api-fetch';
+import { mediforce, ApiError } from '@/lib/mediforce';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { cn } from '@/lib/utils';
-import type { AgentDefinition } from '@mediforce/platform-core';
+import type { AgentSkillRef } from '@mediforce/platform-core';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
+import { AgentSkillsSection } from '@/components/agents/agent-skills-section';
 import { AGENT_ICON_OPTIONS, RecognitionLabel } from '@/components/agents/agent-form-parts';
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
@@ -45,22 +46,16 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const [selectedModelId, setSelectedModelId] = useState('');
   const [prompt, setPrompt] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
+  const [skills, setSkills] = useState<AgentSkillRef[]>([]);
+  const [runtimeId, setRuntimeId] = useState<string | undefined>(undefined);
+  const [agentNamespace, setAgentNamespace] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch(`/api/agents/${id}`)
-      .then((res) => {
-        if (res.status === 404) {
-          setNotFound(true);
-          return null;
-        }
-        if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
-        return res.json() as Promise<{ agent: AgentDefinition }>;
-      })
-      .then((data) => {
-        if (!data) return;
-        const def = data.agent;
+    mediforce.agents
+      .get({ id })
+      .then(({ agent: def }) => {
         setName(def.name);
         setSelectedIcon(def.iconName);
         setDescription(def.description);
@@ -69,6 +64,16 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         setSelectedModelId(def.foundationModel);
         setPrompt(def.systemPrompt);
         setVisibility(def.visibility ?? 'private');
+        setSkills(def.skills ?? []);
+        setRuntimeId(def.runtimeId);
+        setAgentNamespace(def.namespace);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.status === 404) {
+          setNotFound(true);
+          return;
+        }
+        setError(err instanceof Error ? `Could not load the agent: ${err.message}` : 'Could not load the agent.');
       })
       .finally(() => setLoadingDef(false));
   }, [id]);
@@ -79,7 +84,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
     setSaving(true);
     setError(null);
     try {
-      const payload = {
+      await mediforce.agents.update({ id }, {
         name: name.trim(),
         iconName: selectedIcon,
         description,
@@ -88,13 +93,8 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         foundationModel: selectedModelId,
         systemPrompt: prompt,
         visibility,
-      };
-      const res = await apiFetch(`/api/agents/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        skills,
       });
-      if (!res.ok) throw new Error(`${res.status}`);
       router.push(`/${handle}/agents`);
     } catch (err) {
       setError(
@@ -246,6 +246,15 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
 
           {/* MCP Servers — bindings persisted separately via /mcp-servers endpoints */}
           <AgentMcpSection agentId={id} handle={handle} />
+
+          <AgentSkillsSection
+            namespace={agentNamespace ?? handle}
+            ownsNamespace={agentNamespace !== undefined}
+            visibility={visibility}
+            selected={skills}
+            onChange={setSkills}
+            runtimeId={runtimeId}
+          />
 
           {/* 8. Save */}
           <div className="flex flex-col items-start gap-1.5 pt-2 pb-6">

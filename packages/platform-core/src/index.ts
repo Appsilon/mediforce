@@ -34,6 +34,8 @@ export {
   GateResultSchema,
   ReviewVerdictSchema,
   AgentOutputSnapshotSchema,
+  OfferedSkillSchema,
+  offeredSkill,
   StepExecutionSchema,
   AnnotationSchema,
   StepOutputEnvelopeSchema,
@@ -167,6 +169,7 @@ export {
   WorkflowArtifactSchema,
   WORKFLOW_ARTIFACT_MAX_BYTES,
   WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES,
+  fileTreeBytes,
   HttpMethodSchema,
   WebhookTriggerConfigSchema,
   HttpActionConfigSchema,
@@ -413,6 +416,7 @@ export type {
   GateResult,
   ReviewVerdict,
   AgentOutputSnapshot,
+  OfferedSkill,
   StepExecution,
   Annotation,
   StepOutputEnvelope,
@@ -595,6 +599,9 @@ export type {
   TriggerRepository,
   TriggerUpdate,
   ToolCatalogRepository,
+  SkillReadScope,
+  SkillRepository,
+  SkillWrite,
   ImageCatalogRepository,
   NamespaceRepository,
   NamespaceUpdates,
@@ -633,17 +640,36 @@ export type { AuditEventCursorPayload } from './cursors/audit-event-cursor';
 // Agent definition schema + repository interface
 export {
   AgentDefinitionSchema,
+  AgentSkillRefSchema,
+  AgentSkillRefsSchema,
   AgentVisibilitySchema,
   CreateAgentDefinitionInputSchema,
   UpdateAgentDefinitionInputSchema,
+  agentMayHoldSkill,
 } from './schemas/agent-definition';
 export type {
   AgentDefinition,
+  AgentSkillRef,
   AgentVisibility,
   CreateAgentDefinitionInput,
   UpdateAgentDefinitionInput,
 } from './schemas/agent-definition';
 export type { AgentDefinitionRepository } from './repositories/agent-definition-repository';
+
+// Skill (ADR-0025)
+export {
+  SkillVisibilitySchema,
+  SkillFilesSchema,
+  SkillSchema,
+  SkillSummarySchema,
+  parseSkillFrontmatter,
+  skillManifest,
+  SKILL_MANIFEST_PATH,
+  type SkillVisibility,
+  type SkillFile,
+  type Skill,
+  type SkillSummary,
+} from './schemas/skill';
 
 // Model registry schema + repository interface
 export {

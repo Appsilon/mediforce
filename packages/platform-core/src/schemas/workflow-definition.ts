@@ -522,48 +522,61 @@ function validateArtifacts(
   ctx: z.RefinementCtx,
 ): void {
   if (!wd.artifacts) return;
+  validateFileTree(wd.artifacts, ['artifacts'], ctx, 'put what is bigger in an image or a repository');
+}
 
+/**
+ * The checks any set of text files written to one directory needs: no path
+ * used twice, no path used as both a file and a directory, and the whole set
+ * within {@link WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES}. `field` is where the files
+ * sit in the parsed object, so an issue points at the offending entry;
+ * `overflowHint` tells the author where bigger content belongs.
+ */
+export function validateFileTree(
+  files: ReadonlyArray<{ path: string; contents: string }>,
+  field: ReadonlyArray<string>,
+  ctx: z.RefinementCtx,
+  overflowHint: string,
+): void {
+  const label = field[field.length - 1] ?? 'files';
   const byPath = new Map<string, number>();
-  wd.artifacts.forEach((artifact, i) => {
-    const seenAt = byPath.get(artifact.path);
+  files.forEach((file, i) => {
+    const seenAt = byPath.get(file.path);
     if (seenAt !== undefined) {
       ctx.addIssue({
         code: 'custom',
-        path: ['artifacts', i, 'path'],
-        message: `artifacts[${i}].path '${artifact.path}' is already used by artifacts[${String(seenAt)}]`,
+        path: [...field, i, 'path'],
+        message: `${label}[${i}].path '${file.path}' is already used by ${label}[${String(seenAt)}]`,
       });
       return;
     }
-    byPath.set(artifact.path, i);
+    byPath.set(file.path, i);
   });
 
-  // A directory prefix of another artifact cannot also be a file. Checked
-  // against every ancestor rather than only the parent, so `a` conflicting with
+  // A directory prefix of another file cannot also be a file. Checked against
+  // every ancestor rather than only the parent, so `a` conflicting with
   // `a/b/c` is caught too.
-  wd.artifacts.forEach((artifact, i) => {
-    const segments = artifact.path.split('/');
+  files.forEach((file, i) => {
+    const segments = file.path.split('/');
     for (let depth = 1; depth < segments.length; depth += 1) {
       const ancestor = segments.slice(0, depth).join('/');
       if (byPath.has(ancestor)) {
         ctx.addIssue({
           code: 'custom',
-          path: ['artifacts', i, 'path'],
-          message: `artifacts[${i}].path '${artifact.path}' needs '${ancestor}' to be a directory, but artifacts[${String(byPath.get(ancestor))}] is a file at that path`,
+          path: [...field, i, 'path'],
+          message: `${label}[${i}].path '${file.path}' needs '${ancestor}' to be a directory, but ${label}[${String(byPath.get(ancestor))}] is a file at that path`,
         });
         return;
       }
     }
   });
 
-  const total = wd.artifacts.reduce(
-    (sum, artifact) => sum + utf8Bytes(artifact.path) + utf8Bytes(artifact.contents),
-    0,
-  );
+  const total = fileTreeBytes(files);
   if (total > WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES) {
     ctx.addIssue({
       code: 'custom',
-      path: ['artifacts'],
-      message: `artifacts total ${String(total)} bytes, over the ${String(WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES)} byte limit — put what is bigger in an image or a repository`,
+      path: [...field],
+      message: `${label} total ${String(total)} bytes, over the ${String(WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES)} byte limit — ${overflowHint}`,
     });
   }
 }
@@ -721,6 +734,12 @@ function utf8Bytes(text: string): number {
   return new TextEncoder().encode(text).length;
 }
 
+/** The bytes a set of files costs against {@link WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES}:
+ *  every path and its contents, as UTF-8. */
+export function fileTreeBytes(files: ReadonlyArray<{ path: string; contents: string }>): number {
+  return files.reduce((sum, file) => sum + utf8Bytes(file.path) + utf8Bytes(file.contents), 0);
+}
+
 /**
  * A file a workflow carries with it: a script a step runs, a Dockerfile its
  * image is built from, a SKILL.md an agent reads. Text only, and part of the
@@ -733,21 +752,30 @@ function utf8Bytes(text: string): number {
  * here rather than at write time. `.mediforce/` is the engine's own directory
  * inside a run workspace and is not an author's to write.
  */
+export const WorkflowArtifactPathSchema = z.string()
+  .min(1, 'artifact path is required')
+  .max(512, 'artifact path is too long')
+  .refine((value) => value.startsWith('/') === false, 'artifact path must be relative')
+  .refine((value) => value.includes('\\') === false, 'artifact path must use forward slashes')
+  .refine(
+    (value) => value.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..'),
+    'artifact path must not contain empty, "." or ".." segments',
+  )
+  .refine(
+    (value) => value.split('/')[0] !== '.mediforce',
+    '.mediforce is written by the platform, so it cannot hold an artifact',
+  );
+
+/** Stored as `jsonb`, which cannot represent U+0000, so it is refused here
+ *  as a validation error rather than surfacing as a database failure. */
+export const ArtifactTextSchema = z.string().refine(
+  (value) => value.includes('\u0000') === false,
+  'artifact must be text; it contains a NUL character',
+);
+
 export const WorkflowArtifactSchema = z.object({
-  path: z.string()
-    .min(1, 'artifact path is required')
-    .max(512, 'artifact path is too long')
-    .refine((value) => value.startsWith('/') === false, 'artifact path must be relative')
-    .refine((value) => value.includes('\\') === false, 'artifact path must use forward slashes')
-    .refine(
-      (value) => value.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..'),
-      'artifact path must not contain empty, "." or ".." segments',
-    )
-    .refine(
-      (value) => value.split('/')[0] !== '.mediforce',
-      '.mediforce is written by the platform, so it cannot hold an artifact',
-    ),
-  contents: z.string().refine(
+  path: WorkflowArtifactPathSchema,
+  contents: ArtifactTextSchema.refine(
     (value) => utf8Bytes(value) <= WORKFLOW_ARTIFACT_MAX_BYTES,
     `artifact is larger than ${String(WORKFLOW_ARTIFACT_MAX_BYTES)} bytes`,
   ),

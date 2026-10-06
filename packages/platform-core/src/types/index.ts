@@ -38,6 +38,7 @@ export type {
   GateResult,
   ReviewVerdict,
   AgentOutputSnapshot,
+  OfferedSkill,
   StepExecution,
 } from '../schemas/step-execution';
 

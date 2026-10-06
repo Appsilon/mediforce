@@ -503,6 +503,29 @@ export {
 } from './tool-catalog';
 
 export {
+  ListSkillsInputSchema,
+  ListSkillsOutputSchema,
+  GetSkillInputSchema,
+  GetSkillOutputSchema,
+  CreateSkillInputSchema,
+  CreateSkillOutputSchema,
+  UpdateSkillInputSchema,
+  UpdateSkillOutputSchema,
+  DeleteSkillInputSchema,
+  DeleteSkillOutputSchema,
+  type ListSkillsInput,
+  type ListSkillsOutput,
+  type GetSkillInput,
+  type GetSkillOutput,
+  type CreateSkillInput,
+  type CreateSkillOutput,
+  type UpdateSkillInput,
+  type UpdateSkillOutput,
+  type DeleteSkillInput,
+  type DeleteSkillOutput,
+} from './skills';
+
+export {
   DiscoverMcpToolsInputApiSchema,
   DiscoverMcpToolsOutputSchema,
   type DiscoverMcpToolsInputApi,

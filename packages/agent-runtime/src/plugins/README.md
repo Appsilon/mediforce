@@ -76,5 +76,13 @@ resolve an artifact path by hand: `materializeArtifacts` refuses a path that
 would escape the directory, and the tag/dir are keyed on file content so a
 changed file never overwrites what a running step is reading.
 
+An agent's Skills (ADR-0025) reach the container through the same `/plugin`
+mount. `resolvePluginDir` in `container-plugin.ts` returns the step's own plugin
+root when the agent holds none, so those steps mount exactly what they did
+before. When it holds some and the plugin sets `loadsAgentSkills` (only
+`claude-code-agent`), `materializeAgentSkillsPlugin` writes them, merged with
+the step's skills, to a folder named by their content hashes; the step's
+skill wins a name clash. Other runtimes log that they skip them.
+
 Execution model in depth:
 [`docs/reference/container-steps.md`](../../../../docs/reference/container-steps.md).

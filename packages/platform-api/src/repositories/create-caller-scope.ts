@@ -24,6 +24,7 @@ import type {
   ScoreRepository,
   EvaluationRepository,
   ToolCatalogRepository,
+  SkillRepository,
   TriggerRepository,
   UserDirectoryService,
   UserProfileRepository,
@@ -59,6 +60,7 @@ import { AuthorizedScoreRepository } from './authorized-score-repository';
 import { AuthorizedEvaluationRepository } from './authorized-evaluation-repository';
 import { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';
 import { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
+import { AuthorizedSkillRepository } from './authorized-skill-repository';
 import { AuthorizedTriggerRepository } from './authorized-trigger-repository';
 import { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository';
 import { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository';
@@ -88,6 +90,7 @@ export interface CallerScopeServices {
   readonly coworkSessionRepo: CoworkSessionRepository;
   readonly triggerRepo: TriggerRepository;
   readonly toolCatalogRepo: ToolCatalogRepository;
+  readonly skillRepo: SkillRepository;
   readonly imageCatalogRepo: ImageCatalogRepository;
   readonly namespaceRepo: NamespaceRepository;
   readonly userProfileRepo: UserProfileRepository;
@@ -152,6 +155,7 @@ export function createCallerScope(
     auditEvents: new AuthorizedAuditEventRepository(caller, services.auditRepo),
     handoffs: new AuthorizedHandoffRepository(caller, services.handoffRepo),
     toolCatalog: new AuthorizedToolCatalogRepository(caller, services.toolCatalogRepo),
+    skills: new AuthorizedSkillRepository(caller, services.skillRepo),
     imageCatalog: new AuthorizedImageCatalogRepository(caller, services.imageCatalogRepo),
     oauthProviders: new AuthorizedOAuthProviderRepository(
       caller,

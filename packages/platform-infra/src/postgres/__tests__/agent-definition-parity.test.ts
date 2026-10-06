@@ -105,6 +105,38 @@ function contract(
       expect(created.mcpServers).toEqual(mcp);
     });
 
+    it('upsert and update round-trip skills; an agent without them reads back undefined', async () => {
+      const skills = [{ namespace: 'ws-1', id: 'sdtm-mapping' }];
+      await repo.upsert('with-skills', inputBase({ skills }));
+      expect((await repo.getById('with-skills'))?.skills).toEqual(skills);
+      const updated = await repo.update('with-skills', { skills: [] });
+      expect(updated.skills).toEqual([]);
+      const plain = await repo.upsert('plain', inputBase());
+      expect(plain.skills).toBeUndefined();
+    });
+
+    it('findSkillHolders matches namespace and id together, scoped by visibility', async () => {
+      await registerWorkspace('ws-1');
+      await repo.upsert('holder-private', inputBase({ namespace: 'ws-1', skills: [{ namespace: 'shared', id: 'sdtm-mapping' }] }));
+      await repo.upsert('holder-public', inputBase({ visibility: 'public', skills: [
+        { namespace: 'other', id: 'ae-grading' },
+        { namespace: 'shared', id: 'sdtm-mapping' },
+      ] }));
+      await repo.upsert('same-id-other-ns', inputBase({ skills: [{ namespace: 'other', id: 'sdtm-mapping' }] }));
+      await repo.upsert('no-skills', inputBase());
+      const shared = { namespace: 'shared', id: 'sdtm-mapping' };
+      const everyone = await repo.findSkillHolders(shared, null);
+      expect(everyone.visible.map((agent) => agent.id).sort()).toEqual(['holder-private', 'holder-public']);
+      expect(everyone.hiddenCount).toBe(0);
+      const outsider = await repo.findSkillHolders(shared, ['elsewhere']);
+      expect(outsider.visible.map((agent) => agent.id)).toEqual(['holder-public']);
+      expect(outsider.hiddenCount).toBe(1);
+      const member = await repo.findSkillHolders(shared, ['ws-1']);
+      expect(member.visible.map((agent) => agent.id).sort()).toEqual(['holder-private', 'holder-public']);
+      expect((await repo.findSkillHolders({ namespace: 'shared' }, null)).visible).toHaveLength(2);
+      expect((await repo.findSkillHolders({ namespace: 'shared', id: 'missing' }, null)).visible).toEqual([]);
+    });
+
     it('listAll returns every agent regardless of visibility', async () => {
       await registerWorkspace('ws-1');
       await repo.upsert('a', inputBase({ visibility: 'public' }));

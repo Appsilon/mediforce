@@ -7,12 +7,14 @@ import { randomUUID } from 'node:crypto';
 import { getPlatformServices } from './platform-services';
 import {
   resolveMcpForStep,
+  resolveSkillsForStep,
   resolveOAuthToken,
   OAuthTokenUnavailableError,
   PluginNotFoundError,
   MockAgentPlugin,
   ensureStepImageBuilt,
   type McpTapeContext,
+  type ResolveSkillsForStepDeps,
   type StepExecutorPlugin,
   type ResolvedOAuthBinding,
   type WorkflowAgentContext,
@@ -83,7 +85,13 @@ export async function executeAgentStep(
     agentOAuthTokenRepo,
     modelRegistryRepo,
     evaluationRepo,
+    skillRepo,
   } = getPlatformServices();
+  // The runtime reads every Skill; which ones an agent may reach is
+  // resolveSkillsForStep's rule (ADR-0025 decision 3).
+  const runtimeSkillRepo: ResolveSkillsForStepDeps['skillRepo'] = {
+    getById: (namespace, id) => skillRepo.getById(namespace, id, { publicOnly: false }),
+  };
 
   const instance = await instanceRepo.getById(instanceId);
   if (!instance) {
@@ -106,7 +114,7 @@ export async function executeAgentStep(
   // under the run's policy (ADR-0023 D5, D6).
   const evalTrial = reapTimedOut || instance.evalRunId === undefined
     ? null
-    : await evalTrialConfig(workflowDefinition, workflowStep, instanceId, instance.evalRunId, evaluationRepo, agentDefinitionRepo, toolCatalogRepo);
+    : await evalTrialConfig(workflowDefinition, workflowStep, instanceId, instance.evalRunId, evaluationRepo, agentDefinitionRepo, toolCatalogRepo, runtimeSkillRepo);
 
   // Resolve plugin: use workflowStep.plugin when set, fall back to stepId
   const pluginId = workflowStep.plugin ?? stepId;
@@ -199,6 +207,13 @@ export async function executeAgentStep(
     : {};
   const agentIdentityPrompt = agentDefaults.identityPrompt;
 
+  // The Skills the step's agent holds, each from the namespace its reference
+  // names (ADR-0025 decision 4). undefined when the step has no agentId; a
+  // reference to a Skill that is gone fails the step.
+  const agentSkills = reapTimedOut
+    ? undefined
+    : (await resolveSkillsForStep(workflowStep, { agentDefinitionRepo, skillRepo: runtimeSkillRepo })) ?? undefined;
+
   // Picking an agent picks its model unless the step deliberately overrides it.
   const resolvedStep = applyAgentModel(workflowStep, agentDefaults.model);
 
@@ -223,6 +238,7 @@ export async function executeAgentStep(
       : {}),
     oauthTokens,
     agentIdentityPrompt,
+    ...(agentSkills === undefined ? {} : { agentSkills }),
     ...(mcpTapes === undefined ? {} : { mcpTapes }),
     getPreviousStepOutputs: async () => {
       const executions = await instanceRepo.getStepExecutions(instanceId);
@@ -320,6 +336,7 @@ async function evalTrialConfig(
   evaluationRepo: EvaluationRepository,
   agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>,
   toolCatalogRepo: Pick<ToolCatalogRepository, 'getById'>,
+  skillRepo: ResolveSkillsForStepDeps['skillRepo'],
 ): Promise<{ mcpStep: WorkflowStep; mcpTapes?: McpTapeContext }> {
   const inlineServers = inlineMcpServerNames(step);
   if (inlineServers.length > 0) {
@@ -336,7 +353,7 @@ async function evalTrialConfig(
   if (trial === null) throw new Error(`Eval Run '${evalRunId}' has no trial for run '${instanceId}'`);
   if (evalRun.fingerprint !== null) {
     const current = await computeStepFingerprint(
-      { agentDefinitions: agentDefinitionRepo, toolCatalog: toolCatalogRepo },
+      { agentDefinitions: agentDefinitionRepo, toolCatalog: toolCatalogRepo, skills: skillRepo },
       definition,
       step,
     );

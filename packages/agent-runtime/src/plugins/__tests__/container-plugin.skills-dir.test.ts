@@ -1,10 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { join } from 'node:path';
+import { describe, it, expect, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { readFile, readdir } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ContainerPlugin, skillsCacheDir } from '../container-plugin';
-import { artifactsDir } from '../workflow-artifacts';
+import { artifactsDir, materializeArtifacts } from '../workflow-artifacts';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../../interfaces/step-executor-plugin';
-import type { PluginCapabilityMetadata } from '@mediforce/platform-core';
+import type { PluginCapabilityMetadata, Skill } from '@mediforce/platform-core';
 
 /** Minimal concrete subclass to exercise the protected resolveSkillsDir. */
 class TestPlugin extends ContainerPlugin {
@@ -19,6 +22,14 @@ class TestPlugin extends ContainerPlugin {
   setContext(context: AgentContext | WorkflowAgentContext): void {
     this.context = context;
   }
+  exposeResolvePluginDir(skillsDir: string | undefined, resolveProjectPath: (p: string) => string): Promise<string | undefined> {
+    return this.resolvePluginDir(skillsDir, resolveProjectPath);
+  }
+}
+
+/** A plugin whose CLI loads an agent's Skills, as Claude Code does. */
+class SkillLoadingTestPlugin extends TestPlugin {
+  protected override readonly loadsAgentSkills = true;
 }
 
 const PROJECT = (p: string): string => join('/project', p);
@@ -141,5 +152,83 @@ describe('resolveSkillsDir — skills the workflow carries itself', () => {
     plugin.setContext(artifactsContext(nearMiss, { url: 'git@github.com:org/a.git', commit: 'aaa' }));
     expect(plugin.exposeResolveSkillsDir('skills', PROJECT))
       .toBe(skillsCacheDir('git@github.com:org/a.git', 'aaa', 'skills'));
+  });
+});
+
+describe('resolvePluginDir — an agent\'s skills merged with the step\'s', () => {
+  const skillMd = (id: string, body: string) => `---\nname: ${id}\ndescription: ${id} skill\n---\n${body}`;
+  const agentSkill = (id: string, body: string): Skill => ({
+    namespace: 'alpha',
+    id,
+    name: id,
+    description: `${id} skill`,
+    visibility: 'private',
+    contentHash: randomUUID(),
+    files: [
+      { path: 'SKILL.md', contents: skillMd(id, body) },
+      { path: 'references/notes.md', contents: `${id} notes\n` },
+    ],
+    createdAt: '2026-10-06T00:00:00.000Z',
+    updatedAt: '2026-10-06T00:00:00.000Z',
+  });
+
+  /** A workflow carrying step skills at `plugin/skills`, run by an agent holding `agentSkills`. */
+  async function stepWithAgentSkills(agentSkills: Skill[]): Promise<WorkflowAgentContext> {
+    const artifacts = [
+      { path: 'plugin/skills/sdtm-mapping/SKILL.md', contents: skillMd('sdtm-mapping', `step version ${randomUUID()}\n`) },
+      { path: 'plugin/skills/define-xml/SKILL.md', contents: skillMd('define-xml', 'step skill\n') },
+    ];
+    await materializeArtifacts(artifacts);
+    return {
+      workflowDefinition: { artifacts },
+      step: { id: 's4' },
+      stepId: 's4',
+      agentSkills,
+    } as unknown as WorkflowAgentContext;
+  }
+
+  it('[DATA] mounts one folder holding the agent\'s skills and the step\'s, the step winning the clash', async () => {
+    const plugin = new SkillLoadingTestPlugin();
+    plugin.setContext(await stepWithAgentSkills([agentSkill('sdtm-mapping', 'agent version\n'), agentSkill('meddra-coding', 'agent skill\n')]));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const pluginDir = await plugin.exposeResolvePluginDir('plugin/skills', PROJECT);
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("the step's skill 'sdtm-mapping' replaces the agent's skill of the same name"));
+    warn.mockRestore();
+
+    expect(pluginDir).toBeDefined();
+    expect((await readdir(join(pluginDir!, 'skills'))).sort()).toEqual(['define-xml', 'meddra-coding', 'sdtm-mapping']);
+    expect(await readFile(join(pluginDir!, 'skills', 'sdtm-mapping', 'SKILL.md'), 'utf-8')).toContain('step version');
+    expect(await readFile(join(pluginDir!, 'skills', 'meddra-coding', 'references', 'notes.md'), 'utf-8')).toBe('meddra-coding notes\n');
+    expect(existsSync(join(pluginDir!, '.claude-plugin', 'plugin.json'))).toBe(true);
+  });
+
+  it('[DATA] mounts the agent\'s skills alone when the step has no skillsDir', async () => {
+    const plugin = new SkillLoadingTestPlugin();
+    plugin.setContext({ workflowDefinition: {}, step: { id: 's5' }, stepId: 's5', agentSkills: [agentSkill('meddra-coding', 'agent skill\n')] } as unknown as WorkflowAgentContext);
+
+    const pluginDir = await plugin.exposeResolvePluginDir(undefined, PROJECT);
+
+    expect(await readdir(join(pluginDir!, 'skills'))).toEqual(['meddra-coding']);
+  });
+
+  it('[DATA] keeps today\'s plugin root when the agent holds no skills', async () => {
+    const context = await stepWithAgentSkills([]);
+    const plugin = new SkillLoadingTestPlugin();
+    plugin.setContext(context);
+
+    const artifacts = context.workflowDefinition.artifacts ?? [];
+    expect(await plugin.exposeResolvePluginDir('plugin/skills', PROJECT)).toBe(dirname(join(artifactsDir(artifacts), 'plugin/skills')));
+    expect(await plugin.exposeResolvePluginDir(undefined, PROJECT)).toBeUndefined();
+  });
+
+  it('[DATA] a runtime that does not load agent skills keeps the step plugin root', async () => {
+    const context = await stepWithAgentSkills([agentSkill('meddra-coding', 'agent skill\n')]);
+    const plugin = new TestPlugin();
+    plugin.setContext(context);
+
+    const artifacts = context.workflowDefinition.artifacts ?? [];
+    expect(await plugin.exposeResolvePluginDir('plugin/skills', PROJECT)).toBe(dirname(join(artifactsDir(artifacts), 'plugin/skills')));
   });
 });

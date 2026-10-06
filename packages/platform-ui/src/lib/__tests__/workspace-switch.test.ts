@@ -6,6 +6,7 @@ describe('workspaceSwitchHref', () => {
     expect(workspaceSwitchHref('/acme/runs', 'acme', 'beta')).toBe('/beta/runs');
     expect(workspaceSwitchHref('/acme/agents', 'acme', 'beta')).toBe('/beta/agents');
     expect(workspaceSwitchHref('/acme/tools', 'acme', 'beta')).toBe('/beta/tools');
+    expect(workspaceSwitchHref('/acme/skills', 'acme', 'beta')).toBe('/beta/skills');
     expect(workspaceSwitchHref('/acme/tasks', 'acme', 'beta')).toBe('/beta/tasks');
     expect(workspaceSwitchHref('/acme/monitoring', 'acme', 'beta')).toBe('/beta/monitoring');
     expect(workspaceSwitchHref('/acme/models', 'acme', 'beta')).toBe('/beta/models');

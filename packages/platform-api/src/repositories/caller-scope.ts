@@ -40,6 +40,7 @@ import type { AuthorizedScoreRepository } from './authorized-score-repository';
 import type { AuthorizedEvaluationRepository } from './authorized-evaluation-repository';
 import type { AuthorizedTaskAttachmentRepository } from './authorized-task-attachment-repository';
 import type { AuthorizedToolCatalogRepository } from './authorized-tool-catalog-repository';
+import type { AuthorizedSkillRepository } from './authorized-skill-repository';
 import type { AuthorizedTriggerRepository } from './authorized-trigger-repository';
 import type { AuthorizedWorkflowDefinitionRepository } from './authorized-workflow-definition-repository';
 import type { AuthorizedWorkflowRunRepository } from './authorized-workflow-run-repository';
@@ -84,6 +85,7 @@ export interface CallerScope {
   readonly auditEvents: AuthorizedAuditEventRepository;
   readonly handoffs: AuthorizedHandoffRepository;
   readonly toolCatalog: AuthorizedToolCatalogRepository;
+  readonly skills: AuthorizedSkillRepository;
   readonly imageCatalog: AuthorizedImageCatalogRepository;
   readonly oauthProviders: AuthorizedOAuthProviderRepository;
   readonly agentOAuthTokens: AuthorizedAgentOAuthTokenRepository;

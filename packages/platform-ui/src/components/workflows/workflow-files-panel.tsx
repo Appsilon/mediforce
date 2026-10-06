@@ -6,10 +6,12 @@ import { z } from 'zod';
 import {
   WorkflowArtifactSchema,
   WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES,
+  fileTreeBytes,
   validateArtifacts,
   type WorkflowArtifact,
 } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
+import { formatBytes } from '@/lib/format';
 import { CodeEditor } from './workflow-editor/code-editor';
 import { decodeTextFile, mergeUploadedFiles, uploadPathFor, type RejectedUpload } from '@/lib/workflow-file-uploads';
 
@@ -23,18 +25,6 @@ const ArtifactSetSchema = z
 function firstIssue(artifacts: WorkflowArtifact[]): string | null {
   const result = ArtifactSetSchema.safeParse({ artifacts });
   return result.success ? null : (result.error.issues[0]?.message ?? 'These files cannot be saved.');
-}
-
-function totalBytes(artifacts: WorkflowArtifact[]): number {
-  const encoder = new TextEncoder();
-  return artifacts.reduce(
-    (sum, artifact) => sum + encoder.encode(artifact.path).length + encoder.encode(artifact.contents).length,
-    0,
-  );
-}
-
-function formatBytes(bytes: number): string {
-  return bytes < 1024 ? `${String(bytes)} B` : `${(bytes / 1024).toFixed(1)} KB`;
 }
 
 /**
@@ -81,7 +71,7 @@ export function WorkflowFilesPanel({
   };
 
   const issue = firstIssue(artifacts);
-  const used = totalBytes(artifacts);
+  const used = fileTreeBytes(artifacts);
   const current = artifacts[selected];
 
   const addFile = (): void => {
