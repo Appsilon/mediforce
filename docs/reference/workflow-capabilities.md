@@ -188,9 +188,12 @@ Full model IDs come from the OpenRouter-synced registry, populated by
 and queried with `mediforce model list` / `mediforce model validate` (both need
 a deployment + API key). Offline, prefer short Claude aliases (`sonnet`, `opus`,
 `haiku`): the `claude-code-agent` plugin passes `--model` straight through.
-Where the platform picks a model for you (assistants, cowork chat, a new agent
-or LLM judge) it is `DEFAULT_MODEL`, OpenRouter's newest-Sonnet alias
-`~anthropic/claude-sonnet-latest`
+Where the platform picks a model for you (assistants, cowork chat, voice
+synthesis) it is `DEFAULT_MODEL`, OpenRouter's newest-Sonnet alias
+`~anthropic/claude-sonnet-latest`. A default that gets saved (a new agent, a new
+LLM judge, a seeded agent) is pinned instead to the newest concrete Sonnet the
+registry lists (`pinDefaultModel`), so the definition keeps naming the model it
+was qualified with
 ([`model-registry.ts`](../../packages/platform-core/src/schemas/model-registry.ts)).
 
 ## Agents — autonomy, reliability, review, internet access

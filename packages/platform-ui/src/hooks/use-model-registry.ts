@@ -6,6 +6,7 @@ import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 import { NICE_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
+import { pinDefaultModel } from '@mediforce/platform-core';
 import type { ModelPricing } from '@/lib/agent-cost';
 
 export function useModelRegistry() {
@@ -35,4 +36,13 @@ export function useModelPricing(): Map<string, ModelPricing> {
     for (const model of models) map.set(model.id, model.pricing);
     return map;
   }, [models]);
+}
+
+/**
+ * The concrete model a saved default is pinned to — the newest Claude Sonnet
+ * in the registry (`pinDefaultModel`). Undefined until the registry loads.
+ */
+export function usePinnedDefaultModel(): string | undefined {
+  const query = useModelRegistry();
+  return useMemo(() => (query.data === undefined ? undefined : pinDefaultModel(query.data)), [query.data]);
 }

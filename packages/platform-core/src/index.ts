@@ -672,6 +672,7 @@ export {
 // Model registry schema + repository interface
 export {
   DEFAULT_MODEL,
+  pinDefaultModel,
   ModelRegistryEntrySchema,
   ModelRegistryMetaSchema,
   CreateModelRegistryEntryInputSchema,

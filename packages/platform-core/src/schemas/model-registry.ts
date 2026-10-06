@@ -7,6 +7,30 @@ import { z } from 'zod';
  */
 export const DEFAULT_MODEL = '~anthropic/claude-sonnet-latest';
 
+const SONNET_ID = /^anthropic\/claude-sonnet-(\d+)(?:\.(\d+))?$/;
+
+/**
+ * The concrete model `DEFAULT_MODEL` stands for today: the newest live Claude
+ * Sonnet the registry lists. A default that gets saved (a new agent, a new
+ * judge) is pinned to this, so the definition keeps naming the model it was
+ * qualified with when the alias moves on. The alias itself when the registry
+ * lists no Sonnet.
+ */
+export function pinDefaultModel(models: ReadonlyArray<{ id: string; retiredAt: string | null }>): string {
+  let newest: { id: string; major: number; minor: number } | null = null;
+  for (const model of models) {
+    if (model.retiredAt !== null) continue;
+    const match = SONNET_ID.exec(model.id);
+    if (match === null) continue;
+    const major = Number(match[1]);
+    const minor = Number(match[2] ?? 0);
+    if (newest === null || major > newest.major || (major === newest.major && minor > newest.minor)) {
+      newest = { id: model.id, major, minor };
+    }
+  }
+  return newest?.id ?? DEFAULT_MODEL;
+}
+
 export const ModelRegistryEntrySchema = z.object({
   id: z.string(),
   canonicalSlug: z.string().nullable(),

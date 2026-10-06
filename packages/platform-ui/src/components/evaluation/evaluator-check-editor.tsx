@@ -67,13 +67,16 @@ const CODE_TEMPLATES: Record<CodeRuntime, string> = {
   ].join('\n'),
 };
 
-/** The step's own `agent.outputSchema`, when it declares one, is the natural start for a schema check. */
-export function emptyCheckDraft(kind: CheckDraftKind, stepOutputSchema?: AgentOutputSchema): CheckDraft {
+/**
+ * The step's own `agent.outputSchema`, when it declares one, is the natural
+ * start for a schema check; `judgeModel` starts a judge.
+ */
+export function emptyCheckDraft(kind: CheckDraftKind, stepOutputSchema?: AgentOutputSchema, judgeModel: string = DEFAULT_MODEL): CheckDraft {
   switch (kind) {
     case 'schema': return { kind, schemaText: JSON.stringify(stepOutputSchema ?? { type: 'object', required: [] }, null, 2) };
     case 'code': return { kind, runtime: 'python', source: CODE_TEMPLATES.python };
-    case 'llm_judge': return { kind, model: DEFAULT_MODEL, rubric: '', minConfidence: DEFAULT_JUDGE_MIN_CONFIDENCE };
-    case 'expected_output': return { kind, model: DEFAULT_MODEL, instructions: '', minAgreement: DEFAULT_MIN_AGREEMENT, maxAgreement: DEFAULT_MAX_AGREEMENT };
+    case 'llm_judge': return { kind, model: judgeModel, rubric: '', minConfidence: DEFAULT_JUDGE_MIN_CONFIDENCE };
+    case 'expected_output': return { kind, model: judgeModel, instructions: '', minAgreement: DEFAULT_MIN_AGREEMENT, maxAgreement: DEFAULT_MAX_AGREEMENT };
   }
 }
 

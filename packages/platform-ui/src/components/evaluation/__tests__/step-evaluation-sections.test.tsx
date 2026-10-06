@@ -38,6 +38,7 @@ const evaluation = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('@/hooks/use-model-registry', () => ({ usePinnedDefaultModel: () => 'anthropic/claude-sonnet-5.5' }));
 
 vi.mock('@/components/agents/agent-log-panel', () => ({
   AgentRunLog: ({ run }: { run: { id: string } }) => <div data-testid="agent-run-log">{run.id}</div>,
@@ -141,11 +142,11 @@ describe('EvaluatorsSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
     expect(evaluation.createEvaluator).toHaveBeenCalledWith(expect.objectContaining({
-      check: { kind: 'expected_output', model: '~anthropic/claude-sonnet-latest', instructions: 'A changed grade means low agreement.', minAgreement: 0.9, maxAgreement: 0.2 },
+      check: { kind: 'expected_output', model: 'anthropic/claude-sonnet-5.5', instructions: 'A changed grade means low agreement.', minAgreement: 0.9, maxAgreement: 0.2 },
     }));
   });
 
-  it('builds a judge from a question and a minimum confidence, defaulting the model', async () => {
+  it('builds a judge from a question and a minimum confidence, defaulting the model to the pinned newest Sonnet', async () => {
     evaluation.createEvaluator.mockClear();
     openForm();
     fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'llm_judge' } });
@@ -158,7 +159,7 @@ describe('EvaluatorsSection', () => {
     expect(evaluation.createEvaluator).toHaveBeenCalledWith(expect.objectContaining({
       check: {
         kind: 'llm_judge',
-        model: '~anthropic/claude-sonnet-latest',
+        model: 'anthropic/claude-sonnet-5.5',
         rubric: 'Is every grade justified?',
         minConfidence: 0.9,
       },

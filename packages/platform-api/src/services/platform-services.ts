@@ -487,7 +487,7 @@ export function getPlatformServices(): PlatformServices {
 
   if (!seedingStarted) {
     seedingStarted = true;
-    seedBuiltinAgentDefinitions(agentDefinitionRepo).catch((err) => {
+    seedBuiltinAgentDefinitions(agentDefinitionRepo, modelRegistryRepo).catch((err) => {
       console.error('[platform-services] Failed to seed built-in agent definitions:', err);
     });
     seedBuiltinToolCatalog(toolCatalogRepo).catch((err) => {
