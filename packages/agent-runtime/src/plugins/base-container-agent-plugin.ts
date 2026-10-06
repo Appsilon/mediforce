@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { readFile, readdir, mkdtemp, writeFile, rm, mkdir, appendFile, realpath, cp } from 'node:fs/promises';
-import { join, dirname, isAbsolute, resolve } from 'node:path';
+import { join, dirname, isAbsolute, resolve, posix } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
@@ -178,13 +178,13 @@ function resolveDownload(downloadUrl: string): { url: string; headers: Record<st
 /** Re-point each downloaded file's `localPath` at the container mount, so the
  *  path the agent is told about is one it can open. The host temp dir only
  *  exists outside the container. */
-export function toContainerFilePaths(stepInput: Record<string, unknown>): Record<string, unknown> {
+function toContainerFilePaths(stepInput: Record<string, unknown>): Record<string, unknown> {
   if (!hasFiles(stepInput)) {
     return stepInput;
   }
   return {
     ...stepInput,
-    files: stepInput.files.map((file) => ({ ...file, localPath: `${CONTAINER_DATA_MOUNT}/${file.name}` })),
+    files: stepInput.files.map((file) => ({ ...file, localPath: posix.join(CONTAINER_DATA_MOUNT, file.name) })),
   };
 }
 
