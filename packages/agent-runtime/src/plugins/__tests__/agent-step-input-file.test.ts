@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import { Readable, Writable } from 'node:stream';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ChildProcess } from 'node:child_process';
 import type { WorkflowAgentContext, EmitFn, EmitPayload } from '../../interfaces/step-executor-plugin';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
@@ -36,6 +36,8 @@ const OPENCODE_RESULT_LINE = JSON.stringify({
 });
 
 let seeded: Record<string, unknown> | null = null;
+let seededPrompt: string | null = null;
+let dockerArgs: readonly string[] = [];
 
 function mockCliSuccess(resultLine: string): void {
   spawnMock.mockImplementation((_cmd: string, args?: readonly string[]) => {
@@ -50,10 +52,14 @@ function mockCliSuccess(resultLine: string): void {
     });
     const mount = (args ?? []).find((arg) => arg.endsWith(':/output'));
     const hostDir = mount?.slice(0, -':/output'.length) ?? '';
+    dockerArgs = args ?? [];
     setTimeout(() => {
       void readFile(join(hostDir, 'input.json'), 'utf-8')
         .then((raw) => { seeded = JSON.parse(raw) as Record<string, unknown>; })
         .catch(() => { seeded = null; })
+        .then(() => readFile(join(hostDir, 'prompt.txt'), 'utf-8'))
+        .then((prompt) => { seededPrompt = prompt; })
+        .catch(() => { seededPrompt = null; })
         .finally(() => {
           (child.stdout as Readable).push(`${resultLine}\n`);
           (child.stdout as Readable).push(null);
@@ -112,6 +118,12 @@ describe.each(plugins)('a $pluginId step reads its input from /output/input.json
     plugin = create();
     spawnMock.mockReset();
     seeded = null;
+    seededPrompt = null;
+    dockerArgs = [];
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('seeds the file the docs promise, with the same input the prompt carries', async () => {
@@ -125,5 +137,22 @@ describe.each(plugins)('a $pluginId step reads its input from /output/input.json
     await plugin.run(noopEmit);
 
     expect(seeded).toEqual(stepInput);
+  });
+
+  it('points uploaded files at the /data mount the container sees, not the host temp dir', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('xpt-bytes', { status: 200 })));
+    const stepInput = {
+      files: [{ name: 'ae.xpt', downloadUrl: '/api/attachments/abc/blob', storagePath: 'abc' }],
+    };
+    await plugin.initialize(buildContext(pluginId, stepInput));
+    mockCliSuccess(resultLine);
+
+    await plugin.run(noopEmit);
+
+    const seededFiles = (seeded as { files: Array<{ localPath: string }> }).files;
+    expect(seededFiles[0].localPath).toBe('/data/ae.xpt');
+    expect(seededPrompt).toContain('"localPath": "/data/ae.xpt"');
+    expect(seededPrompt).not.toContain('mediforce-agent-');
+    expect(dockerArgs.some((arg) => arg.endsWith(':/data:ro'))).toBe(true);
   });
 });

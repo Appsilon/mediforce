@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { readFile, readdir, mkdtemp, writeFile, rm, mkdir, appendFile, realpath, cp } from 'node:fs/promises';
-import { join, dirname, isAbsolute, resolve } from 'node:path';
+import { join, dirname, isAbsolute, resolve, posix } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
@@ -43,6 +43,9 @@ const __dirname_base = dirname(__filename_base);
 // rather than `error` (ADR-0010). The workflow path never reaches this — it
 // resolves the timeout from the step via resolveStepTimeoutMinutes.
 export const DEFAULT_TIMEOUT_MS = 30 * 60_000;
+
+/** Container-side path where downloaded step input files are bind-mounted read-only. */
+export const CONTAINER_DATA_MOUNT = '/data';
 
 /** Container-side path for bind-mounted Claude Code plugin roots. */
 export const CONTAINER_PLUGIN_MOUNT = '/plugin';
@@ -172,6 +175,19 @@ function resolveDownload(downloadUrl: string): { url: string; headers: Record<st
   return { url: url.toString(), headers };
 }
 
+/** Re-point each downloaded file's `localPath` at the container mount, so the
+ *  path the agent is told about is one it can open. The host temp dir only
+ *  exists outside the container. */
+function toContainerFilePaths(stepInput: Record<string, unknown>): Record<string, unknown> {
+  if (!hasFiles(stepInput)) {
+    return stepInput;
+  }
+  return {
+    ...stepInput,
+    files: stepInput.files.map((file) => ({ ...file, localPath: posix.join(CONTAINER_DATA_MOUNT, file.name) })),
+  };
+}
+
 /** Download remote files to a temp directory and return updated input with localPath fields. */
 export async function downloadFilesToLocal(
   stepInput: Record<string, unknown>,
@@ -264,6 +280,8 @@ function buildHttpHeaders(
  */
 export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
   protected agentConfig!: AgentConfig;
+  /** Step input as the agent sees it (file paths valid inside its container). Seeds `/output/input.json`. */
+  private agentVisibleInput: Record<string, unknown> | null = null;
 
   constructor(init: ContainerPluginInit = {}) {
     super(init);
@@ -370,7 +388,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
   protected async prepareOutputDir(outputDir: string): Promise<void> {
     await writeFile(
       join(outputDir, 'input.json'),
-      JSON.stringify(this.context.stepInput, null, 2),
+      JSON.stringify(this.agentVisibleInput ?? this.context.stepInput, null, 2),
       'utf-8',
     );
     await this.writeMcpConfig(outputDir);
@@ -851,6 +869,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       }
 
       const isLocalMode = !this.agentConfig.image;
+      const agentInput = isLocalMode ? updatedInput : toContainerFilePaths(updatedInput);
+      this.agentVisibleInput = agentInput;
       agentLog('run.mode', `execution mode: ${isLocalMode ? 'local' : 'docker'}`, { stepId });
 
       // Create output dir early so buildPrompt can write large files into it.
@@ -891,7 +911,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         resolvedSkillsDir: this.agentConfig.skillsDir ? this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath) : null,
       });
 
-      const prompt = await this.buildPrompt(updatedInput, timeoutMs, outputDirForPrompt, dockerOutputDir, workingDirForPrompt);
+      const prompt = await this.buildPrompt(agentInput, timeoutMs, outputDirForPrompt, dockerOutputDir, workingDirForPrompt);
 
       await emit({
         type: 'prompt',
@@ -1681,7 +1701,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     // Mount data directory if files were downloaded
     if (options?.addDirs) {
       for (const dir of options.addDirs) {
-        dockerArgs.push('-v', `${dir}:/data:ro`);
+        dockerArgs.push('-v', `${dir}:${CONTAINER_DATA_MOUNT}:ro`);
       }
     }
 

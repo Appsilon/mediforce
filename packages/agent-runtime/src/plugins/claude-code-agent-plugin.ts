@@ -1,6 +1,7 @@
 import type { AgentLogFormat, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import {
   BaseContainerAgentPlugin,
+  CONTAINER_DATA_MOUNT,
   type SpawnCliOptions,
   type AgentCommandSpec,
 } from './base-container-agent-plugin';
@@ -122,7 +123,7 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
     if (options?.addDirs) {
       // In Docker mode, files are mounted at /data; in local mode, use the real host path
       for (const dir of options.addDirs) {
-        args.push('--add-dir', this.agentConfig.image ? '/data' : dir);
+        args.push('--add-dir', this.agentConfig.image ? CONTAINER_DATA_MOUNT : dir);
       }
     }
     if (options?.pluginDir) {
