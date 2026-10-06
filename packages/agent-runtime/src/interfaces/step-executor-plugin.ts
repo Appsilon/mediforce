@@ -25,7 +25,7 @@ export interface LlmResponse {
 }
 
 export interface LlmClient {
-  complete(messages: LlmMessage[], model?: string): Promise<LlmResponse>;
+  complete(messages: LlmMessage[], model: string): Promise<LlmResponse>;
 }
 
 /**

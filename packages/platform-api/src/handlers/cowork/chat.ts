@@ -2,7 +2,7 @@ import {
   McpClientManager,
   type McpToolDefinition,
 } from '@mediforce/mcp-client';
-import type { ConversationTurn, CoworkSession, OutputSchemaShape } from '@mediforce/platform-core';
+import { DEFAULT_MODEL, type ConversationTurn, type CoworkSession, type OutputSchemaShape } from '@mediforce/platform-core';
 import {
   HandlerError,
   PreconditionFailedError,
@@ -27,7 +27,6 @@ import {
 import { validateOutputSchema } from '@mediforce/agent-runtime';
 
 const MAX_TOOL_LOOP_ITERATIONS = 10;
-const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
 /**
  * Output budget per turn. A full WorkflowDefinition artifact (many steps,
  * transitions, descriptions) is emitted as `update_artifact` tool-call

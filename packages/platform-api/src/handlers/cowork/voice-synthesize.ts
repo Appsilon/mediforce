@@ -1,6 +1,7 @@
-import type {
-  ConversationTurn,
-  CoworkSession,
+import {
+  DEFAULT_MODEL,
+  type ConversationTurn,
+  type CoworkSession,
 } from '@mediforce/platform-core';
 import { HandlerError, PreconditionFailedError } from '../../errors';
 import { loadOr404 } from '../_helpers';
@@ -11,7 +12,6 @@ import type {
 } from '../../contract/cowork';
 import { callOpenRouter } from '../../services/openrouter-client';
 
-const DEFAULT_SYNTHESIS_MODEL = 'anthropic/claude-sonnet-4';
 const SYNTHESIS_TEMPERATURE = 0.3;
 const SYNTHESIS_MAX_TOKENS = 4096;
 
@@ -74,7 +74,7 @@ async function loadSynthesisContext(
   return {
     session,
     openRouterKey,
-    model: session.voiceConfig?.synthesisModel ?? DEFAULT_SYNTHESIS_MODEL,
+    model: session.voiceConfig?.synthesisModel ?? DEFAULT_MODEL,
   };
 }
 

@@ -13,17 +13,14 @@ export type { LlmClient, LlmMessage, LlmResponse } from '../interfaces/step-exec
 export class OpenRouterLlmClient {
   constructor(
     private readonly apiKey: string,
-    private readonly defaultModel: string = 'anthropic/claude-sonnet-4',
     private readonly tracingOptions: OpenTelemetryTracingOptions = {},
   ) {}
 
-  async complete(messages: LlmMessage[], model?: string): Promise<LlmResponse> {
-    const selectedModel = model ?? this.defaultModel;
-
+  async complete(messages: LlmMessage[], model: string): Promise<LlmResponse> {
     return withOpenRouterLlmSpan(
       {
         messages,
-        selectedModel,
+        selectedModel: model,
         captureContent: this.tracingOptions.captureContent === true,
       },
       async (span) => {
@@ -34,7 +31,7 @@ export class OpenRouterLlmClient {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: selectedModel,
+            model,
             messages,
             temperature: 0.7,
             max_tokens: 16_000,

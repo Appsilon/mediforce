@@ -10,7 +10,7 @@ import {
 import { isWorkflowAgentContext } from './container-plugin';
 
 /** Default model used when agentConfig.model is not set. */
-const DEFAULT_MODEL = 'deepseek/deepseek-chat';
+const OPENCODE_DEFAULT_MODEL = 'deepseek/deepseek-chat';
 
 /**
  * OpenCode agent plugin — runs the OpenCode CLI inside a Docker container.
@@ -63,7 +63,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     // For long prompts, we read from the prompt file using $(cat ...) to avoid
     // shell argument length limits on the docker run command itself.
     // The expansion happens inside the container's bash, where ARG_MAX is ~2MB.
-    const model = this.agentConfig.model ?? DEFAULT_MODEL;
+    const model = this.agentConfig.model ?? OPENCODE_DEFAULT_MODEL;
 
     // OpenCode's --model flag format is "providerID/modelID" — the first path
     // segment is the provider, the rest is the model ID within that provider.
@@ -227,7 +227,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
 
   protected override async prepareOutputDir(outputDir: string): Promise<void> {
     await super.prepareOutputDir(outputDir);
-    const model = normaliseModelId(this.agentConfig.model ?? DEFAULT_MODEL);
+    const model = normaliseModelId(this.agentConfig.model ?? OPENCODE_DEFAULT_MODEL);
     const config: Record<string, unknown> = {
       $schema: 'https://opencode.ai/config.json',
       permission: 'allow',

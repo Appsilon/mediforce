@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { mediforce } from '@/lib/mediforce';
-import type { AgentMcpBindingMap, AgentSkillRef } from '@mediforce/platform-core';
+import { DEFAULT_MODEL, type AgentMcpBindingMap, type AgentSkillRef } from '@mediforce/platform-core';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 import { AgentSkillsSection } from '@/components/agents/agent-skills-section';
@@ -22,7 +22,7 @@ export default function NewAgentPage() {
   const [description, setDescription] = useState('');
   const [inputDescription, setInputDescription] = useState('');
   const [outputDescription, setOutputDescription] = useState('');
-  const [selectedModelId, setSelectedModelId] = useState('');
+  const [selectedModelId, setSelectedModelId] = useState(DEFAULT_MODEL);
   const [prompt, setPrompt] = useState('');
   const [mcpServers, setMcpServers] = useState<AgentMcpBindingMap>({});
   const [skills, setSkills] = useState<AgentSkillRef[]>([]);

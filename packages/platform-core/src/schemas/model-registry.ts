@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+/**
+ * The model the platform picks when the caller names none (assistants, cowork
+ * chat, voice synthesis, new agents and LLM judges): OpenRouter's alias for its
+ * newest Claude Sonnet, so a new release is picked up without a code change.
+ */
+export const DEFAULT_MODEL = '~anthropic/claude-sonnet-latest';
+
 export const ModelRegistryEntrySchema = z.object({
   id: z.string(),
   canonicalSlug: z.string().nullable(),

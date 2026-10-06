@@ -8,7 +8,7 @@ import {
   WorkflowStepSchema,
   TransitionSchema,
   InputForNextRunEntrySchema,
-  WORKFLOW_ASSISTANT_DEFAULT_MODEL,
+  DEFAULT_MODEL,
   mergeVerdictTransitions,
   ensureEntryStepFirst,
   uniqueSlug,
@@ -1115,7 +1115,7 @@ export function WorkflowEditorCanvas({
                   <ModelPicker
                     value={assistantModel}
                     onChange={setAssistantModel}
-                    defaultModel={WORKFLOW_ASSISTANT_DEFAULT_MODEL}
+                    defaultModel={DEFAULT_MODEL}
                     requireToolSupport
                     minContextTokens={32000}
                     className={selectBase}

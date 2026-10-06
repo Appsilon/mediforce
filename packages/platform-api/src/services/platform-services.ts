@@ -325,7 +325,6 @@ export function getPlatformServices(): PlatformServices {
 
   const llmClient = new OpenRouterLlmClient(
     process.env.OPENROUTER_API_KEY ?? '',
-    'anthropic/claude-sonnet-4',
     otelTracingOptions,
   );
 

@@ -288,8 +288,8 @@ a reachable deployment and `MEDIFORCE_API_KEY`, so they do **not** work against 
 bare checkout. Treat them as optional. When authoring offline:
 
 - Prefer short Claude aliases (`sonnet`, `opus`, `haiku`) — the
-  `claude-code-agent` plugin passes `--model` straight through, and the runtime
-  default is `anthropic/claude-sonnet-4`.
+  `claude-code-agent` plugin passes `--model` straight through. The platform's
+  own fallback is `~anthropic/claude-sonnet-latest` (newest Claude Sonnet).
 - Or copy a full ID already used in an example / `apps/*` workflow.
 - The registry itself is populated from OpenRouter (`sync-models.ts`); see the
   Models section of `docs/reference/workflow-capabilities.md` for the source pointers.
