@@ -34,6 +34,8 @@ export {
   GateResultSchema,
   ReviewVerdictSchema,
   AgentOutputSnapshotSchema,
+  OfferedSkillSchema,
+  offeredSkill,
   StepExecutionSchema,
   AnnotationSchema,
   StepOutputEnvelopeSchema,
@@ -413,6 +415,7 @@ export type {
   GateResult,
   ReviewVerdict,
   AgentOutputSnapshot,
+  OfferedSkill,
   StepExecution,
   Annotation,
   StepOutputEnvelope,
@@ -641,6 +644,7 @@ export {
   AgentVisibilitySchema,
   CreateAgentDefinitionInputSchema,
   UpdateAgentDefinitionInputSchema,
+  agentMayHoldSkill,
 } from './schemas/agent-definition';
 export type {
   AgentDefinition,

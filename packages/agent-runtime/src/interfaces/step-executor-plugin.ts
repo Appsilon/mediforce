@@ -6,6 +6,7 @@ import type {
   ProcessConfig,
   PluginCapabilityMetadata,
   ResolvedMcpConfig,
+  Skill,
   WorkflowDefinition,
   WorkflowStep,
 } from '@mediforce/platform-core';
@@ -122,6 +123,11 @@ export interface WorkflowAgentContext {
    *  buildPrompt() after the workflow preamble. Skills are step-level
    *  (agentConfig.skillsDir) and are resolved separately. */
   agentIdentityPrompt?: string;
+  /** The Skills the AgentDefinition referenced by step.agentId holds
+   *  (ADR-0025), resolved by resolveSkillsForStep in platform-ui's
+   *  executeAgentStep. Offered to Claude Code through the plugin folder, never
+   *  pasted into the prompt. undefined when step.agentId is unset. */
+  agentSkills?: Skill[];
   /** Set by AgentRunner on the one retry after `result` broke
    *  `step.agent.outputSchema`: the validation error, for the prompt. */
   outputSchemaViolation?: string;

@@ -2,7 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { GetAgentTrajectoryOutputSchema, GetProcessStepsOutputSchema } from '@mediforce/platform-api/contract';
 import { test, expect } from '../helpers/test-fixtures';
+import { JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
 import {
   OUTSIDER_NAMESPACE,
   TEST_ORG_HANDLE,
@@ -18,6 +20,9 @@ import {
  * PostgresSkillRepository → live Postgres. The create goes through the real
  * `mediforce skill create --from <dir>` binary, which is the upload path a
  * developer uses.
+ *
+ * MOCK_AGENT=true: the mock agent's first trajectory entry names the agent
+ * skills the step was offered (#1462).
  */
 
 const CLI_BIN = resolve(__dirname, '..', '..', '..', 'cli', 'bin', 'mediforce.cjs');
@@ -251,5 +256,52 @@ test.describe('skills API journey', () => {
     await request.delete(`/api/agents/${agentId}`, { headers: member });
     await request.delete(`/api/skills/${ownPrivate}?namespace=${TEST_ORG_HANDLE}`, { headers: member });
     await request.delete(`/api/skills/${otherPrivate}?namespace=${OUTSIDER_NAMESPACE}`, { headers: outsider });
+  });
+
+  test('a step whose agent holds a skill is offered it, and its execution records the skill\'s content hash', async ({ request, baseURL }) => {
+    if (baseURL === undefined) throw new Error('Playwright baseURL is not configured');
+    test.setTimeout(120_000);
+    const stamp = Date.now();
+    const name = `e2e-run-skill-${stamp}`;
+    const { dir } = writeSkillFolder(name);
+    const created = JSON.parse(cli(baseURL, ['skill', 'create', '--from', dir, '--namespace', TEST_ORG_HANDLE])) as { skill: SkillBody };
+
+    const agentFile = join(mkdtempSync(join(tmpdir(), 'skill-agent-')), 'agent.json');
+    writeFileSync(agentFile, JSON.stringify({
+      name: `L3 Skill Runner ${stamp}`,
+      iconName: 'Bot',
+      description: '',
+      foundationModel: 'anthropic/claude-sonnet-4',
+      systemPrompt: 'Use the SDTM mapping skill.',
+      inputDescription: '',
+      outputDescription: '',
+    }));
+    const agentId = (JSON.parse(cli(baseURL, ['agent', 'create', '--file', agentFile, '--namespace', TEST_ORG_HANDLE])) as { agent: { id: string } }).agent.id;
+
+    try {
+      cli(baseURL, ['agent', 'set-skills', agentId, '--skills', name]);
+
+      // The workflow names the agent only — no skill, no skillsDir.
+      const runId = await startRun(request, agentStepWorkflow(`e2e-skill-run-${stamp}`, {
+        autonomyLevel: 'L4',
+        agentId,
+        agent: { prompt: 'Map the raw data to SDTM.' },
+      }));
+      const agentRun = await awaitFinishedAgentRun(request, runId);
+
+      const trajectory = GetAgentTrajectoryOutputSchema.parse(JSON.parse(cli(baseURL, ['agent-run', 'trajectory', agentRun.id])));
+      expect(trajectory.entries[0]?.text).toContain(`Agent skills: ${name}.`);
+
+      // No CLI command reads a run's step executions.
+      const stepsRes = await request.get(`/api/processes/${runId}/steps`, { headers: JSON_HEADERS });
+      expect(stepsRes.status(), await stepsRes.text()).toBe(200);
+      const step = GetProcessStepsOutputSchema.parse(await stepsRes.json()).steps.find((entry) => entry.stepId === 'grade-aes');
+      expect(step?.executions.at(-1)?.agentOutput?.skills).toEqual([
+        { namespace: TEST_ORG_HANDLE, id: name, contentHash: created.skill.contentHash },
+      ]);
+    } finally {
+      cli(baseURL, ['agent', 'delete', agentId, '--force']);
+      cli(baseURL, ['skill', 'delete', name, '--namespace', TEST_ORG_HANDLE, '--force']);
+    }
   });
 });

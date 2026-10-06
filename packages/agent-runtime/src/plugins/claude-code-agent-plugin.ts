@@ -271,6 +271,7 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
   }
 
   protected override readonly logFormat: AgentLogFormat = 'claude-stream-json';
+  protected override readonly loadsAgentSkills = true;
 
   protected override extractErrorFromResult(resultLine: string): string | null {
     return extractErrorDetail(resultLine);

@@ -1,4 +1,4 @@
-import type { AgentDefinition } from '@mediforce/platform-core';
+import { agentMayHoldSkill, type AgentDefinition } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
 
@@ -20,10 +20,10 @@ export async function assertAgentMayHoldSkills(agent: SkillHolder, scope: Caller
     let message: string | null = null;
     if (skill === null) {
       message = `skill ${label} does not exist`;
-    } else if (skill.visibility === 'private' && agent.visibility === 'public') {
-      message = `skill ${label} is private, and a public agent may hold only public skills`;
-    } else if (skill.visibility === 'private' && skill.namespace !== agent.namespace) {
-      message = `skill ${label} is private to workspace '${skill.namespace}'`;
+    } else if (agentMayHoldSkill(agent, skill) === false) {
+      message = agent.visibility === 'public'
+        ? `skill ${label} is private, and a public agent may hold only public skills`
+        : `skill ${label} is private to workspace '${skill.namespace}'`;
     }
     if (message !== null) issues.push({ code: 'custom', path: ['skills', index], message });
   });

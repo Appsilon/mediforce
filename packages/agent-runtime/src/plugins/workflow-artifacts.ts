@@ -80,7 +80,7 @@ export function artifactsBuildHash(artifacts: readonly WorkflowArtifact[], build
 /** The same rule `WorkflowArtifactSchema` applies, enforced again at the point
  *  of writing: a definition stored before that check, or reaching here around
  *  it, must not be able to write outside the directory. */
-function assertContainedPath(path: string): void {
+export function assertContainedPath(path: string, label = 'artifact path', inside = 'the workflow'): void {
   const segments = path.split('/');
   const contained =
     path !== '' &&
@@ -88,7 +88,7 @@ function assertContainedPath(path: string): void {
     path.includes('\\') === false &&
     segments.every((segment) => segment !== '' && segment !== '.' && segment !== '..');
   if (contained === false) {
-    throw new Error(`artifact path '${path}' does not name a file inside the workflow`);
+    throw new Error(`${label} '${path}' does not name a file inside ${inside}`);
   }
 }
 

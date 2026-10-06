@@ -42,7 +42,7 @@ path and branch conventions live in `workspace-paths.ts` so the read-only
 | `/output` | rw | the step | Engine ↔ step channel. Host seeds `input.json`, `prompt.txt`, `previous_run.json`, `mcp-config.json`, `script.<ext>`; the step writes `result.json` and optional `presentation.md`. |
 | `/data` | ro | the step | Uploaded attachments the host downloaded for this step. Each `files[].localPath` in the agent's prompt and `input.json` points here. |
 | `/artifacts` | ro | the definition | The files the workflow carries (`artifacts` on the definition): scripts, a Dockerfile, skills. Materialized to a content-addressed host directory per file set, so every step of every run of an unchanged workflow shares one write. Absent when the workflow carries none. |
-| `/plugin` | ro | the step | The Claude Code plugin root, when an agent step sets `skillsDir`. Its parent is the resolved skills directory: carried skills, then the `externalSkillsRepo` cache, then the repo checkout on the host. |
+| `/plugin` | ro | the step | The Claude Code plugin root, when an agent step sets `skillsDir` or its agent holds Skills. With `skillsDir` alone it is the parent of the resolved skills directory: carried skills, then the `externalSkillsRepo` cache, then the repo checkout on the host. When the agent holds Skills (`claude-code-agent` only, [ADR-0025](../adr/0025-skill-catalog.md)), it is a content-hashed folder under `mediforce-agent-skills/` holding them under `skills/<id>/`, merged with the step's skills, which win a name clash. |
 
 Why `/workspace` and `/output` stay separate — and why `/output` is a bad name
 for a channel that carries inputs — is argued in the header comment of

@@ -1,5 +1,6 @@
 import {
   calculateEstimatedCost,
+  offeredSkill,
   type AgentFallbackReason,
   type AgentOutputEnvelope,
 } from '@mediforce/platform-core';
@@ -25,6 +26,7 @@ export class AgentStepExecutor implements StepExecutor {
     const { instanceId, stepId, pluginId, triggeredBy, stepExecutionId, definitionVersion } = meta;
     const autonomyLevel = context.autonomyLevel;
     const workflowStep = context.step;
+    const offeredSkills = (context.agentSkills ?? []).map(offeredSkill);
 
     if (meta.reapTimedOut !== true) {
       await auditRepo.append({
@@ -34,7 +36,13 @@ export class AgentStepExecutor implements StepExecutor {
         action: 'agent.step.started',
         description: `Workflow agent step '${stepId}' started (plugin: ${pluginId}, autonomy: ${autonomyLevel})`,
         timestamp: new Date().toISOString(),
-        inputSnapshot: { stepId, pluginId, autonomyLevel, ...context.stepInput },
+        inputSnapshot: {
+          stepId,
+          pluginId,
+          autonomyLevel,
+          ...context.stepInput,
+          ...(offeredSkills.length > 0 ? { agentSkills: offeredSkills } : {}),
+        },
         outputSnapshot: {},
         basis: `Triggered by ${triggeredBy}`,
         entityType: 'processInstance',
@@ -102,6 +110,7 @@ export class AgentStepExecutor implements StepExecutor {
               presentation: envelope.presentation ?? null,
               ...(envelope.tokenUsage ? { tokenUsage: envelope.tokenUsage } : {}),
               ...costResult,
+              ...(offeredSkills.length > 0 ? { skills: offeredSkills } : {}),
             }
           : null,
       });

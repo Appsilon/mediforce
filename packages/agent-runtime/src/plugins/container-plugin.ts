@@ -55,7 +55,7 @@
 import { existsSync, mkdirSync, cpSync, renameSync } from 'node:fs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
 import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata, WorkflowArtifact } from '@mediforce/platform-core';
@@ -76,6 +76,7 @@ import { resolveStepEnv, type ResolvedEnv } from './resolve-env';
 import type { ImageBuildMeta } from './docker-spawn-strategy';
 import { WorkspaceManager, type RunWorkspaceHandle } from '../workspace/workspace-manager';
 import { copyOutputFilesIntoWorkspace } from '../workspace/output-files';
+import { materializeAgentSkillsPlugin } from '../skills/agent-skills-plugin';
 
 export function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext): ctx is WorkflowAgentContext {
   return 'step' in ctx && 'workflowDefinition' in ctx;
@@ -362,6 +363,9 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
   /** Run-scoped git worktree — populated by `resolveRunWorkspace` at run start. */
   protected runWorkspaceHandle: RunWorkspaceHandle | null = null;
   protected workspaceManager: WorkspaceManagerLike | null = null;
+  /** Whether the agent CLI loads an agent's Skills from `--plugin-dir`.
+   *  Claude Code only in v1 (ADR-0025 decision 6). */
+  protected readonly loadsAgentSkills: boolean = false;
 
   constructor(init: ContainerPluginInit = {}) {
     this.workspaceManager = init.workspaceManager ?? null;
@@ -604,5 +608,38 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
       return skillsCacheDir(wfRepo.url, wfRepo.commit, skillsDir);
     }
     return resolveProjectPath(skillsDir);
+  }
+
+  /**
+   * Host path of the Claude Code plugin folder the step mounts, or undefined
+   * for none. Without agent Skills it is the step's own plugin root:
+   * `skillsDir` points at `<plugin-root>/skills`, so the root is its parent.
+   * With them, it is the folder {@link materializeAgentSkillsPlugin} merges
+   * both into (ADR-0025 decision 6), the step's skill winning a name clash.
+   */
+  protected async resolvePluginDir(
+    skillsDir: string | undefined,
+    resolveProjectPath: (p: string) => string,
+  ): Promise<string | undefined> {
+    const stepSkillsDir = skillsDir === undefined || skillsDir === '' ? null : this.resolveSkillsDir(skillsDir, resolveProjectPath);
+    const stepPluginDir = stepSkillsDir === null ? undefined : dirname(stepSkillsDir);
+    const agentSkills = isWorkflowAgentContext(this.context) ? this.context.agentSkills ?? [] : [];
+    if (agentSkills.length === 0) return stepPluginDir;
+    if (this.loadsAgentSkills === false) {
+      console.log(
+        `[${this.metadata.name}] Step '${this.context.stepId}' runs without its agent's skills ` +
+        `(${agentSkills.map((skill) => skill.id).join(', ')}): they reach Claude Code agents only`,
+      );
+      return stepPluginDir;
+    }
+
+    const plugin = await materializeAgentSkillsPlugin(agentSkills, stepSkillsDir);
+    for (const id of plugin.clashes) {
+      console.warn(
+        `[${this.metadata.name}] Step '${this.context.stepId}': the step's skill '${id}' ` +
+        `replaces the agent's skill of the same name`,
+      );
+    }
+    return plugin.dir;
   }
 }

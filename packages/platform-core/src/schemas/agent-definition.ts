@@ -4,6 +4,7 @@
 // "Agent vs Agent Definition" flagged ambiguity.
 import { z } from 'zod';
 import { AgentMcpBindingMapSchema } from './agent-mcp-binding';
+import type { Skill } from './skill';
 
 export const AgentVisibilitySchema = z.enum(['public', 'private']);
 export type AgentVisibility = z.infer<typeof AgentVisibilitySchema>;
@@ -63,6 +64,16 @@ export const AgentDefinitionSchema = z.object({
 });
 
 export type AgentDefinition = z.infer<typeof AgentDefinitionSchema>;
+
+/** ADR-0025 decision 3: a private Skill is held only by a private Agent of its
+ *  own Namespace; a public Skill by every Agent. */
+export function agentMayHoldSkill(
+  agent: Pick<AgentDefinition, 'namespace' | 'visibility'>,
+  skill: Pick<Skill, 'namespace' | 'visibility'>,
+): boolean {
+  if (skill.visibility === 'public') return true;
+  return agent.visibility === 'private' && agent.namespace === skill.namespace;
+}
 
 export const CreateAgentDefinitionInputSchema = AgentDefinitionSchema.omit({
   id: true,

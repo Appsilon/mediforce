@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PresentationSchema, TokenUsageSchema } from './agent-output-envelope';
+import type { Skill } from './skill';
 
 export const StepExecutionStatusSchema = z.enum([
   'pending',
@@ -29,6 +30,20 @@ export const ReviewVerdictSchema = z.object({
   timestamp: z.string().datetime(),
 });
 
+/** A Skill an agent step was offered (ADR-0025 decision 7): what was available
+ *  to it, not what the model chose to open. */
+export const OfferedSkillSchema = z.object({
+  namespace: z.string().min(1),
+  id: z.string().min(1),
+  contentHash: z.string().min(1),
+});
+export type OfferedSkill = z.infer<typeof OfferedSkillSchema>;
+
+/** What a step records of a Skill it was offered. */
+export function offeredSkill(skill: Pick<Skill, 'namespace' | 'id' | 'contentHash'>): OfferedSkill {
+  return { namespace: skill.namespace, id: skill.id, contentHash: skill.contentHash };
+}
+
 export const AgentOutputSnapshotSchema = z.object({
   confidence: z.number().nullable(),
   confidence_rationale: z.string().nullable(),
@@ -50,6 +65,8 @@ export const AgentOutputSnapshotSchema = z.object({
     )
     .nullable()
     .optional(),
+  /** Absent when the step's agent holds no Skills. */
+  skills: z.array(OfferedSkillSchema).optional(),
 });
 
 export const StepExecutionSchema = z.object({

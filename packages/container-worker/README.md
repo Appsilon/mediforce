@@ -113,6 +113,15 @@ and keep any new payload field readable by a worker one release behind.
 Host capacity, the probe that watches it, and recovery are in
 [`docs/guides/redis-operations.md`](../../docs/guides/redis-operations.md).
 
+**Host paths in a job must resolve on the worker too, so the worker shares the
+platform's `/tmp`.** The platform writes some of what a step mounts to a
+host directory under the system temp dir and passes only its path in the job:
+`/output`, the carried artifacts (`mediforce-artifacts/`), the git skills cache
+(`mediforce-skills-cache/`) and an agent's Skills (`mediforce-agent-skills/`,
+ADR-0025), mounted at `/plugin`. Both compose files bind-mount `/tmp:/tmp` into
+the platform and the worker for this reason. A worker on another host would see
+none of those paths; shipping them over Redis is not built.
+
 **Nothing in a job payload can be a function.** The job crosses Redis as JSON.
 Behaviour the worker needs travels as a name it can resolve against a shared
 module — `lineFormat` picks a `formatAgentLogLine` formatter from `platform-core`

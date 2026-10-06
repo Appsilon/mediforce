@@ -549,7 +549,7 @@ _Avoid_: "Dataset" alone (collides with generic data-engineering usage),
 
 **Step Fingerprint**:
 The identity of everything that shapes one agent Workflow Step's behaviour — its
-config, the skill and agent instructions it reads, its image and its
+config, the Step skill, its Agent's Skills and instructions, its image and its
 effective MCP tools — independent of the Workflow Definition version.
 _Avoid_: "step version", "config hash".
 
