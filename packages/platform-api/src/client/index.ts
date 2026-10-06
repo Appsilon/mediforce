@@ -196,6 +196,16 @@ import {
   UpdateToolCatalogEntryOutputSchema,
   DeleteToolCatalogEntryInputSchema,
   DeleteToolCatalogEntryOutputSchema,
+  ListSkillsInputSchema,
+  ListSkillsOutputSchema,
+  GetSkillInputSchema,
+  GetSkillOutputSchema,
+  CreateSkillInputSchema,
+  CreateSkillOutputSchema,
+  UpdateSkillInputSchema,
+  UpdateSkillOutputSchema,
+  DeleteSkillInputSchema,
+  DeleteSkillOutputSchema,
   DiscoverMcpToolsInputApiSchema,
   DiscoverMcpToolsOutputSchema,
   ListImageCatalogEntriesInputSchema,
@@ -307,6 +317,16 @@ import {
   type UpdateToolCatalogEntryOutput,
   type DeleteToolCatalogEntryInput,
   type DeleteToolCatalogEntryOutput,
+  type ListSkillsInput,
+  type ListSkillsOutput,
+  type GetSkillInput,
+  type GetSkillOutput,
+  type CreateSkillInput,
+  type CreateSkillOutput,
+  type UpdateSkillInput,
+  type UpdateSkillOutput,
+  type DeleteSkillInput,
+  type DeleteSkillOutput,
   type DiscoverMcpToolsInputApi,
   type DiscoverMcpToolsOutput,
   type ListImageCatalogEntriesInput,
@@ -988,6 +1008,14 @@ export class Mediforce {
     update: (input: UpdateToolCatalogEntryInputApi) => Promise<UpdateToolCatalogEntryOutput>;
     delete: (input: DeleteToolCatalogEntryInput) => Promise<DeleteToolCatalogEntryOutput>;
     discoverTools: (input: DiscoverMcpToolsInputApi) => Promise<DiscoverMcpToolsOutput>;
+  };
+
+  readonly skills: {
+    list: (input: ListSkillsInput) => Promise<ListSkillsOutput>;
+    get: (input: GetSkillInput) => Promise<GetSkillOutput>;
+    create: (input: CreateSkillInput) => Promise<CreateSkillOutput>;
+    update: (input: UpdateSkillInput) => Promise<UpdateSkillOutput>;
+    delete: (input: DeleteSkillInput) => Promise<DeleteSkillOutput>;
   };
 
   readonly imageCatalog: {
@@ -2333,6 +2361,54 @@ export class Mediforce {
         });
         const body = await parseJsonOrThrow(res, 'mediforce.toolCatalog.discoverTools');
         return DiscoverMcpToolsOutputSchema.parse(body);
+      },
+    };
+
+    this.skills = {
+      list: async (input) => {
+        const validated = ListSkillsInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/skills${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.skills.list');
+        return ListSkillsOutputSchema.parse(body);
+      },
+      get: async (input) => {
+        const validated = GetSkillInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/skills/${encodeURIComponent(validated.id)}${qs}`);
+        const body = await parseJsonOrThrow(res, 'mediforce.skills.get');
+        return GetSkillOutputSchema.parse(body);
+      },
+      create: async (input) => {
+        const { namespace, ...createBody } = CreateSkillInputSchema.parse(input);
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(`/api/skills${qs}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(createBody),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.skills.create');
+        return CreateSkillOutputSchema.parse(body);
+      },
+      update: async (input) => {
+        const { namespace, id, ...patch } = UpdateSkillInputSchema.parse(input);
+        const qs = toSearchParams({ namespace });
+        const res = await this.request(`/api/skills/${encodeURIComponent(id)}${qs}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.skills.update');
+        return UpdateSkillOutputSchema.parse(body);
+      },
+      delete: async (input) => {
+        const validated = DeleteSkillInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace });
+        const res = await this.request(`/api/skills/${encodeURIComponent(validated.id)}${qs}`, {
+          method: 'DELETE',
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.skills.delete');
+        return DeleteSkillOutputSchema.parse(body);
       },
     };
 

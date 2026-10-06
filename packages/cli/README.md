@@ -32,9 +32,16 @@ src/output.ts            Human and JSON output shaping
 src/errors.ts            Exit-code mapping
 ```
 
-Sixty-plus commands across workflows, runs, tasks, agents, namespaces,
+Sixty-plus commands across workflows, runs, tasks, agents, skills, namespaces,
 users, secrets, models, scores, evaluation (`mediforce eval`), cowork, config,
 images and system.
+
+`skill create --from <dir>` (and `skill update <id> --from <dir>`) is how a
+developer uploads a Skill ([ADR-0025](../../docs/adr/0025-skill-catalog.md)): it
+reads a local skill folder into the API's `files[]`, skipping hidden entries and
+refusing, by name, a symlink or any file that is not UTF-8 text. The skill's id, name and
+description come from the folder's `SKILL.md` frontmatter — there are no flags
+for them.
 
 `mediforce images` and `mediforce system images` are different things and the
 names are close enough to be worth stating: `images` is the per-namespace

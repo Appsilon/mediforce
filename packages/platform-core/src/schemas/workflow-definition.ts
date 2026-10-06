@@ -522,48 +522,64 @@ function validateArtifacts(
   ctx: z.RefinementCtx,
 ): void {
   if (!wd.artifacts) return;
+  validateFileTree(wd.artifacts, ['artifacts'], ctx, 'put what is bigger in an image or a repository');
+}
 
+/**
+ * The checks any set of text files written to one directory needs: no path
+ * used twice, no path used as both a file and a directory, and the whole set
+ * within {@link WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES}. `field` is where the files
+ * sit in the parsed object, so an issue points at the offending entry;
+ * `overflowHint` tells the author where bigger content belongs.
+ */
+export function validateFileTree(
+  files: ReadonlyArray<{ path: string; contents: string }>,
+  field: ReadonlyArray<string>,
+  ctx: z.RefinementCtx,
+  overflowHint: string,
+): void {
+  const label = field[field.length - 1] ?? 'files';
   const byPath = new Map<string, number>();
-  wd.artifacts.forEach((artifact, i) => {
-    const seenAt = byPath.get(artifact.path);
+  files.forEach((file, i) => {
+    const seenAt = byPath.get(file.path);
     if (seenAt !== undefined) {
       ctx.addIssue({
         code: 'custom',
-        path: ['artifacts', i, 'path'],
-        message: `artifacts[${i}].path '${artifact.path}' is already used by artifacts[${String(seenAt)}]`,
+        path: [...field, i, 'path'],
+        message: `${label}[${i}].path '${file.path}' is already used by ${label}[${String(seenAt)}]`,
       });
       return;
     }
-    byPath.set(artifact.path, i);
+    byPath.set(file.path, i);
   });
 
-  // A directory prefix of another artifact cannot also be a file. Checked
-  // against every ancestor rather than only the parent, so `a` conflicting with
+  // A directory prefix of another file cannot also be a file. Checked against
+  // every ancestor rather than only the parent, so `a` conflicting with
   // `a/b/c` is caught too.
-  wd.artifacts.forEach((artifact, i) => {
-    const segments = artifact.path.split('/');
+  files.forEach((file, i) => {
+    const segments = file.path.split('/');
     for (let depth = 1; depth < segments.length; depth += 1) {
       const ancestor = segments.slice(0, depth).join('/');
       if (byPath.has(ancestor)) {
         ctx.addIssue({
           code: 'custom',
-          path: ['artifacts', i, 'path'],
-          message: `artifacts[${i}].path '${artifact.path}' needs '${ancestor}' to be a directory, but artifacts[${String(byPath.get(ancestor))}] is a file at that path`,
+          path: [...field, i, 'path'],
+          message: `${label}[${i}].path '${file.path}' needs '${ancestor}' to be a directory, but ${label}[${String(byPath.get(ancestor))}] is a file at that path`,
         });
         return;
       }
     }
   });
 
-  const total = wd.artifacts.reduce(
-    (sum, artifact) => sum + utf8Bytes(artifact.path) + utf8Bytes(artifact.contents),
+  const total = files.reduce(
+    (sum, file) => sum + utf8Bytes(file.path) + utf8Bytes(file.contents),
     0,
   );
   if (total > WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES) {
     ctx.addIssue({
       code: 'custom',
-      path: ['artifacts'],
-      message: `artifacts total ${String(total)} bytes, over the ${String(WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES)} byte limit — put what is bigger in an image or a repository`,
+      path: [...field],
+      message: `${label} total ${String(total)} bytes, over the ${String(WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES)} byte limit — ${overflowHint}`,
     });
   }
 }

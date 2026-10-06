@@ -1,5 +1,6 @@
 export * from './tool-catalog';
 export * from './image-catalog';
+export * from './skill';
 export * from './workspace';
 export * from './audit-event';
 export * from './oauth-provider';

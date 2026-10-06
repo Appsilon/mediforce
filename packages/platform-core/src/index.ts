@@ -595,6 +595,8 @@ export type {
   TriggerRepository,
   TriggerUpdate,
   ToolCatalogRepository,
+  SkillRepository,
+  SkillWrite,
   ImageCatalogRepository,
   NamespaceRepository,
   NamespaceUpdates,
@@ -644,6 +646,20 @@ export type {
   UpdateAgentDefinitionInput,
 } from './schemas/agent-definition';
 export type { AgentDefinitionRepository } from './repositories/agent-definition-repository';
+
+// Skill (ADR-0025)
+export {
+  SkillVisibilitySchema,
+  SkillFilesSchema,
+  SkillSchema,
+  SkillSummarySchema,
+  parseSkillFrontmatter,
+  skillManifest,
+  type SkillVisibility,
+  type SkillFile,
+  type Skill,
+  type SkillSummary,
+} from './schemas/skill';
 
 // Model registry schema + repository interface
 export {

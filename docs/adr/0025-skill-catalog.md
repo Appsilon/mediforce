@@ -10,9 +10,8 @@ last_reviewed: 2026-10-05
 **Deciders:** Krystian Zieliński
 **Epic:** [#1458](https://github.com/Appsilon/mediforce/issues/1458) — Skill Catalog
 
-Nothing here is built yet. #1460 builds the stored object and its API/CLI,
-#1461 the Agent → Skill binding, #1462 the delivery to the container, #1463
-the catalog UI.
+#1460 builds the stored object and its API/CLI, #1461 the Agent → Skill
+binding, #1462 the delivery to the container, #1463 the catalog UI.
 
 ## Context
 
@@ -64,7 +63,8 @@ frontmatter carrying `name` (kebab-case) and `description`.
 ### 2. Stored as a Postgres row, files as `jsonb`
 
 One row per Skill: `namespace`, `id`, `name`, `description`, `visibility`,
-`files jsonb` (path → contents), and a content hash computed over the files.
+`files jsonb` (an array of `{ path, contents }`), and a content hash computed
+over the files.
 
 A `BlobStore` exists for task attachments (ADR-0003). It is not used here.
 Attachments are large and streamed, while a Skill is at most 256 KB of text and

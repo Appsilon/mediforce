@@ -576,6 +576,19 @@ export {
 } from './agent-definition';
 
 export {
+  SkillVisibilitySchema,
+  SkillFilesSchema,
+  SkillSchema,
+  SkillSummarySchema,
+  parseSkillFrontmatter,
+  skillManifest,
+  type SkillVisibility,
+  type SkillFile,
+  type Skill,
+  type SkillSummary,
+} from './skill';
+
+export {
   WorkflowSecretsSchema,
   type WorkflowSecrets,
 } from './workflow-secret';
