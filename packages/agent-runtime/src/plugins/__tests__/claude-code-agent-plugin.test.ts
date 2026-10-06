@@ -7,7 +7,7 @@ import type { ProcessConfig } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 
-type DockerResult = { cliOutput: string; gitMetadata: null; presentation: string | null; outputDir: string; injectedEnvVars: string[] };
+type DockerResult = { cliOutput: string; failedMcpServers?: string[]; gitMetadata: null; presentation: string | null; outputDir: string; injectedEnvVars: string[] };
 type SpawnDockerTarget = { spawnDockerContainer: (prompt: string, options?: Record<string, unknown>) => Promise<DockerResult> };
 type SpawnLocalTarget = {
   spawnLocalProcess: (prompt: string, options: Record<string, unknown>, workingDir: string) => Promise<DockerResult>;
@@ -270,6 +270,54 @@ describe('ClaudeCodeAgentPlugin', () => {
       const statusEvents = events.filter((e) => e.type === 'status');
       expect(statusEvents.length).toBeGreaterThanOrEqual(1);
       expect(statusEvents[0].payload).toContain('trial-metadata-extractor');
+    });
+
+    it('[DATA] says so when the CLI reports a bound MCP server as failed, instead of staying silent', async () => {
+      const context = buildMockContext();
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
+      mockSpawn(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
+        failedMcpServers: ['biomcp'],
+        gitMetadata: null,
+        presentation: null,
+        outputDir: '/tmp/mock-output',
+        injectedEnvVars: [],
+      });
+
+      await plugin.run(emit);
+
+      const warnings = events.filter((e) => e.type === 'status' && String(e.payload).includes('MCP server'));
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].payload).toContain("MCP server 'biomcp' failed to start");
+      expect(warnings[0].payload).toContain("mediforce-agent:protocol-to-tfl");
+    });
+
+    it('[DATA] points at the host, not an image, when the failed MCP server ran in local mode', async () => {
+      process.env.ALLOW_LOCAL_AGENTS = 'true';
+      const context = buildMockContext({
+        config: {
+          processName: 'p', configName: 'c', configVersion: 'v1',
+          stepConfigs: [{ stepId: 'extract', executorType: 'agent', plugin: 'claude-code-agent', agentConfig: { skill: 'trial-metadata-extractor', skillsDir: '/plugins/protocol-to-tfl/skills' } }],
+        } as ProcessConfig,
+      });
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
+      mockSpawnLocal(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
+        failedMcpServers: ['biomcp'],
+        gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [],
+      });
+
+      await plugin.run(emit);
+
+      const warning = events.find((e) => e.type === 'status' && String(e.payload).includes("MCP server 'biomcp'"));
+      expect(warning?.payload).toContain('installed on the host');
+      expect(String(warning?.payload)).not.toContain('undefined');
     });
 
     it('[DATA] parses an answer the agent wrapped in a ```json fence', async () => {

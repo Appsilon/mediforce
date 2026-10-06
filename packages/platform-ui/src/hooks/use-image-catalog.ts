@@ -1,11 +1,11 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 import { NICE_LIVE_INTERVAL_MS, STANDARD_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
-import { ImageCommandNameSchema } from '@mediforce/platform-core';
+import { ImageCommandNameSchema, type ImageCommandCheck } from '@mediforce/platform-core';
 import type {
   ImageCatalogEntryView,
   PublishImageCatalogVersionInput,
@@ -269,20 +269,38 @@ export function usePullImageVersion(namespace: string) {
   });
 }
 
-/**
- * Whether `image` resolves `command`, asked on demand and only for something
- * that can be a command name — a half-typed `uv ` or an empty field starts no
- * container. Every answer goes stale after a live interval: a deploy rebuilds
- * a mutable tag like `:latest` into a new image, so an open form must ask
- * again rather than keep reporting the previous image's answer.
- */
-export function useImageCommandCheck(namespace: string, image: string, command: string) {
-  const isCommand = ImageCommandNameSchema.safeParse(command).success;
-  return useQuery({
+/** One question — does `image` resolve `command` — as a query. Every answer
+ *  goes stale after a live interval: a deploy rebuilds a mutable tag like
+ *  `:latest` into a new image, so an open form must ask again rather than keep
+ *  reporting the previous image's answer. Only something that can be a command
+ *  name is asked: a half-typed `uv ` or an empty field starts no container. */
+function imageCommandCheckQuery(namespace: string, image: string, command: string) {
+  return {
     queryKey: queryKeys.imageCommandCheck(namespace, image, command),
     queryFn: () => mediforce.imageCatalog.checkCommand({ namespace, image, command }),
-    enabled: namespace !== '' && image !== '' && isCommand,
+    enabled: namespace !== '' && image !== '' && ImageCommandNameSchema.safeParse(command).success,
     staleTime: STANDARD_LIVE_INTERVAL_MS,
     retry: stopRetryOn4xx,
+  };
+}
+
+export function useImageCommandCheck(namespace: string, image: string, command: string) {
+  return useQuery(imageCommandCheckQuery(namespace, image, command));
+}
+
+/**
+ * `useImageCommandCheck` for several commands at once, as the answers settled
+ * so far by command. A command with no answer yet is simply absent, so a
+ * caller that warns on a known absence stays quiet while one is in flight.
+ */
+export function useImageCommandChecks(
+  namespace: string,
+  image: string,
+  commands: readonly string[],
+): Record<string, ImageCommandCheck | undefined> {
+  const distinct = [...new Set(commands)];
+  const results = useQueries({
+    queries: distinct.map((command) => imageCommandCheckQuery(namespace, image, command)),
   });
+  return Object.fromEntries(distinct.map((command, index) => [command, results[index]?.data]));
 }

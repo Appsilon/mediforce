@@ -36,15 +36,19 @@ describe('listToolCatalogEntries handler', () => {
     expect(result.entries).toHaveLength(1);
   });
 
-  it('throws ForbiddenError for a member-role caller (bug fix)', async () => {
+  it('gives a member-role caller the command but not the args or env', async () => {
+    await repo.upsert('alpha', { ...sampleEntry, env: { TOKEN: 'secret' } });
     const scope = createTestScope({
       toolCatalogRepo: repo,
       caller: userCaller('u-member', ['alpha'], memberRoles),
     });
 
-    await expect(
-      listToolCatalogEntries({ namespace: 'alpha' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    const result = await listToolCatalogEntries({ namespace: 'alpha' }, scope);
+
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].command).toBe(sampleEntry.command);
+    expect(result.entries[0]).not.toHaveProperty('args');
+    expect(result.entries[0]).not.toHaveProperty('env');
   });
 
   it('throws ForbiddenError for a non-member caller', async () => {

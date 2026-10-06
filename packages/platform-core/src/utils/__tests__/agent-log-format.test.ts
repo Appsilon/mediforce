@@ -7,7 +7,7 @@
  * after exit.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { agentLogEntries, formatAgentLogLine, stageLogEntry, AgentLogFormatSchema } from '../agent-log-format';
+import { agentLogEntries, failedMcpServers, formatAgentLogLine, stageLogEntry, AgentLogFormatSchema } from '../agent-log-format';
 
 describe('formatAgentLogLine', () => {
   it('formats a claude stream-json assistant tool call', () => {
@@ -93,5 +93,29 @@ describe('stage entries', () => {
     const entry = JSON.parse(stageLogEntry('Preparing container image acme:1'));
     expect(entry).toMatchObject({ type: 'stage', text: 'Preparing container image acme:1' });
     expect(entry.ts).toEqual(expect.any(String));
+  });
+});
+
+describe('failedMcpServers', () => {
+  const init = (servers: Array<{ name: string; status: string }>) =>
+    JSON.stringify({ type: 'system', subtype: 'init', mcp_servers: servers });
+
+  it('names only the servers the CLI reported as failed in its init event, not ones still pending', () => {
+    const stdout = [
+      init([{ name: 'biomcp', status: 'failed' }, { name: 'github', status: 'connected' }, { name: 'slow', status: 'pending' }, { name: 'crashy', status: 'failed' }]),
+      JSON.stringify({ type: 'assistant', message: { content: [] } }),
+    ].join('\n');
+
+    expect(failedMcpServers(stdout)).toEqual(['biomcp', 'crashy']);
+  });
+
+  it('is empty when every server connected, or none were bound', () => {
+    expect(failedMcpServers(init([{ name: 'github', status: 'connected' }]))).toEqual([]);
+    expect(failedMcpServers(init([]))).toEqual([]);
+  });
+
+  it('ignores output that is not an event stream, and never throws on a broken line', () => {
+    expect(failedMcpServers('plain text\n{not json\n')).toEqual([]);
+    expect(failedMcpServers('')).toEqual([]);
   });
 });

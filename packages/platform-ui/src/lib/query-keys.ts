@@ -189,8 +189,10 @@ export const queryKeys = {
    *  carries the per-version layer summary the listing deliberately omits —
    *  list-prefix invalidation must not clobber it. */
   imageCatalogEntry: (handle: string, id: string) => ['image-catalog-entry', handle, id] as const,
-  /** Whether one image resolves one command. An image reference is
-   *  content-addressed on the daemon, so a settled answer does not expire. */
+  /** Per-namespace MCP Tool Catalog. */
+  toolCatalog: (handle: string) => ['tool-catalog', handle] as const,
+  /** Whether one image resolves one command. Keyed by reference, which a deploy
+   *  can rebuild (`:latest`), so an answer is refreshed on a live interval. */
   imageCommandCheck: (handle: string, image: string, command: string) =>
     ['image-command-check', handle, image, command] as const,
   /** Workflows whose steps pin any of the given images, keyed by the set asked
