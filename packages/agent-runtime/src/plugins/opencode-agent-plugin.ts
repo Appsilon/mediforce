@@ -63,8 +63,22 @@ function toolPermissions(servers: Record<string, McpConfigEntry>): OpenCodePermi
   const restricted = Object.values(servers).some((server) => (server.allowedTools?.length ?? 0) > 0);
   if (restricted === false) return 'allow';
   const rules: Record<string, 'allow' | 'deny'> = { '*': 'allow' };
-  const byPrefixLength = Object.entries(servers)
-    .map(([name, server]) => ({ prefix: openCodeToolNamePart(name), allowedTools: server.allowedTools ?? [] }))
+  const entries = Object.entries(servers).map(([name, server]) => ({
+    name,
+    prefix: openCodeToolNamePart(name),
+    allowedTools: server.allowedTools ?? [],
+  }));
+  const nameByPrefix = new Map<string, string>();
+  for (const { name, prefix } of entries) {
+    const clashingName = nameByPrefix.get(prefix);
+    if (clashingName !== undefined) {
+      throw new Error(
+        `MCP servers "${clashingName}" and "${name}" both become OpenCode tool prefix "${prefix}_", so allowedTools cannot tell their tools apart. Rename one.`,
+      );
+    }
+    nameByPrefix.set(prefix, name);
+  }
+  const byPrefixLength = entries
     .sort((left, right) => left.prefix.length - right.prefix.length);
   for (const { prefix, allowedTools } of byPrefixLength) {
     rules[`${prefix}_*`] = allowedTools.length > 0 ? 'deny' : 'allow';
@@ -157,7 +171,10 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
   protected override extractErrorFromResult(resultLine: string): string | null {
     if (!resultLine) return null;
     try {
-      const { result } = JSON.parse(resultLine) as { result?: unknown };
+      const { result, errors } = JSON.parse(resultLine) as { result?: unknown; errors?: unknown };
+      if (Array.isArray(errors) && errors.length > 0) {
+        return errors.join('\n').slice(0, 500);
+      }
       if (typeof result === 'string' && result.startsWith(OPENCODE_ERROR_PREFIX)) {
         return result.replaceAll(OPENCODE_ERROR_PREFIX, '').slice(0, 500);
       }
@@ -313,6 +330,8 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       return '';
     }
 
+    // Errors travel beside the result so a mid-run failure survives later text events.
+    const errorsField = errors.length > 0 ? { errors } : {};
     const usage = (totalInputTokens > 0 || totalOutputTokens > 0)
       ? {
           input_tokens: totalInputTokens,
@@ -330,17 +349,17 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
         // Extract the JSON object from the text (model may add preamble/postamble)
         const jsonMatch = part.match(/\{[^{}]*"output_file"[^{}]*\}/);
         const contractJson = jsonMatch ? jsonMatch[0] : part;
-        return JSON.stringify({ result: contractJson, ...(usage ? { usage } : {}) });
+        return JSON.stringify({ result: contractJson, ...errorsField, ...(usage ? { usage } : {}) });
       }
     }
 
     // Fallback: use the last text part (most likely the final response)
     if (textParts.length > 0) {
-      return JSON.stringify({ result: textParts[textParts.length - 1], ...(usage ? { usage } : {}) });
+      return JSON.stringify({ result: textParts[textParts.length - 1], ...errorsField, ...(usage ? { usage } : {}) });
     }
 
     // Only errors
-    return JSON.stringify({ result: errors.map((e) => `${OPENCODE_ERROR_PREFIX}${e}`).join('\n'), ...(usage ? { usage } : {}) });
+    return JSON.stringify({ result: errors.map((e) => `${OPENCODE_ERROR_PREFIX}${e}`).join('\n'), ...errorsField, ...(usage ? { usage } : {}) });
   }
 
   protected override async writeAgentConfig(outputDir: string, agentOptions?: SpawnCliOptions): Promise<void> {

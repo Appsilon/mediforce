@@ -179,6 +179,15 @@ describe('OpenCodeAgentPlugin — Claude Code parity (#1477)', () => {
         ['github_enterprise_*', 'allow'],
       ]);
     });
+
+    it('[ERROR] refuses server names that collapse to the same tool prefix', async () => {
+      await initializeWithServers({
+        'ehr.prod': { type: 'stdio', command: 'ehr-mcp', allowedTools: ['read'] },
+        ehr_prod: { type: 'stdio', command: 'ehr-mcp' },
+      });
+
+      await expect(writtenConfig()).rejects.toThrow(/ehr\.prod.*ehr_prod.*ehr_prod_/);
+    });
   });
 
   describe('Skills', () => {
@@ -289,6 +298,16 @@ describe('OpenCodeAgentPlugin — Claude Code parity (#1477)', () => {
       const detail = internals().extractErrorFromResult(plugin.parseAgentOutput(stdout));
 
       expect(detail).toBe('Missing Authentication header');
+    });
+
+    it('[DATA] keeps an error emitted before later text', async () => {
+      await plugin.initialize(buildContext());
+      const stdout = [
+        JSON.stringify({ type: 'error', error: { name: 'APIError', data: { message: 'Tool crashed' } } }),
+        JSON.stringify({ type: 'text', part: { type: 'text', text: 'giving up' } }),
+      ].join('\n');
+
+      expect(internals().extractErrorFromResult(plugin.parseAgentOutput(stdout))).toBe('Tool crashed');
     });
 
     it('[DATA] has no error detail for a normal answer', async () => {
