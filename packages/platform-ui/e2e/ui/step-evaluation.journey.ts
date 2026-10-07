@@ -205,7 +205,7 @@ test.describe('Step Evaluation tab', () => {
 
     await page.getByRole('link', { name: `Eval Run ${prepared.evalRun.id.slice(0, 8)}` }).click();
     await page.getByTestId('eval-run-tab-summary').click();
-    await expect(page.getByTestId('eval-run-report').getByTestId('criteria-verdict')).toContainText('Every counted Evaluator reached it');
+    await expect(page.getByTestId('eval-run-report').getByTestId('criteria-verdict')).toHaveAttribute('data-status', 'met');
   });
 
   test('accepted criteria judge a run, and the person signs a Step Qualification from its report — no Brief needed', async ({ page, request }) => {
@@ -262,8 +262,9 @@ test.describe('Step Evaluation tab', () => {
     await expect(page.getByTestId('validation-status')).toHaveAttribute('data-status', 'failed', { timeout: 10_000 });
     await page.getByTestId('eval-run-row').filter({ hasText: prepared.evalRun.id.slice(0, 8) }).getByRole('link', { name: 'Details' }).click();
     const report = page.getByTestId('eval-run-report');
-    await expect(report.getByTestId('criteria-verdict')).toContainText('missed', { timeout: 15_000 });
-    await expect(report.getByTestId('criteria-verdict')).toContainText('findings-present: pass rate 0% < 50%');
+    await expect(report.getByTestId('criteria-verdict')).toHaveText('Acceptance criteria missed — 1 of 2 counted Evaluators below pass rate ≥ 50%', { timeout: 15_000 });
+    await expect(report.getByRole('row').filter({ hasText: 'findings-present' }).getByTestId('evaluator-pass-rate')).toHaveAttribute('data-met', 'false');
+    await expect(report.getByRole('row').filter({ hasText: 'summary-present' }).getByTestId('evaluator-pass-rate')).toHaveAttribute('data-met', 'true');
     await report.getByTestId('sign-qualification').click();
     const form = page.getByTestId('sign-qualification-form');
     await expect(form).toContainText('qualify this Step configuration as it ran in it');

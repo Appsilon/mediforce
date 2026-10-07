@@ -30,51 +30,34 @@ function TableTitle({ children }: { children: React.ReactNode }) {
   return <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{children}</h4>;
 }
 
-/** The Acceptance Criteria against every counted Evaluator: how many reached them, and the trials they graded. */
-function CriteriaTable({ report, verdict }: { report: EvalRunReport; verdict: AcceptanceCriterionVerdict }) {
-  const counted = report.evaluators.filter((evaluator) => evaluator.counted === true);
-  const passes = counted.reduce((sum, evaluator) => sum + evaluator.passes, 0);
-  const failures = counted.reduce((sum, evaluator) => sum + evaluator.failures, 0);
-  const metCount = verdict.evaluators.filter((evaluator) => evaluator.met === true).length;
+function describeFloor(verdict: AcceptanceCriterionVerdict): string {
+  const passHatK = verdict.criterion.minPassHatK === undefined ? '' : ` and pass^k ≥ ${percent(verdict.criterion.minPassHatK)}`;
+  return `pass rate ≥ ${percent(verdict.criterion.minPassRate)}${passHatK}`;
+}
+
+/** The Acceptance Criteria in one line: the verdict, and how many counted Evaluators reached the floor. Each Evaluator's own result is coloured in the Evaluators table. */
+function CriteriaLine({ verdict }: { verdict: AcceptanceCriterionVerdict }) {
+  const total = verdict.evaluators.length;
+  const missed = verdict.evaluators.filter((evaluator) => evaluator.met === false).length;
+  const detail = verdict.status === 'met'
+    ? `${total === 1 ? 'the one counted Evaluator' : `all ${total} counted Evaluators`} at ${describeFloor(verdict)}`
+    : verdict.status === 'missed'
+      ? `${missed} of ${total} counted Evaluator${total === 1 ? '' : 's'} below ${describeFloor(verdict)}`
+      : verdict.reason;
   return (
-    <div>
-    <TableTitle>Acceptance criteria</TableTitle>
-    <table className="w-full text-xs" data-testid="criteria-verdicts">
-      <thead className="text-muted-foreground">
-        <tr className="text-left">
-          <th className="py-1 font-medium">Verdict</th>
-          <th className="py-1 font-medium">Required</th>
-          <th className="py-1 font-medium">Evaluators met</th>
-          <th className="py-1 font-medium">Passed</th>
-          <th className="py-1 font-medium">Failed</th>
-          <th className="py-1 font-medium">Pass rate</th>
-          <th className="py-1 font-medium">Detail</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr className="border-t align-top" data-testid="criteria-verdict">
-          <td className="py-1.5">
-            <span className={cn('whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium', VERDICT_CLASSES[verdict.status])}>
-              {verdict.status === 'not_evaluable' ? 'not judged' : verdict.status}
-            </span>
-          </td>
-          <td className="py-1.5">
-            pass rate ≥ {percent(verdict.criterion.minPassRate)}
-            {verdict.criterion.minPassHatK !== undefined && `, pass^k ≥ ${percent(verdict.criterion.minPassHatK)}`}
-          </td>
-          <td className="py-1.5">{metCount}/{verdict.evaluators.length}</td>
-          <td className="py-1.5">{passes}</td>
-          <td className="py-1.5">{failures}</td>
-          <td className="py-1.5">{percent(passes + failures === 0 ? null : passes / (passes + failures))}</td>
-          <td className="py-1.5 text-muted-foreground">{verdict.reason}</td>
-        </tr>
-      </tbody>
-    </table>
-    </div>
+    <p className="text-sm" data-testid="criteria-verdict" data-status={verdict.status}>
+      Acceptance criteria{' '}
+      <span className={cn('whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium', VERDICT_CLASSES[verdict.status])}>
+        {verdict.status === 'not_evaluable' ? 'not judged' : verdict.status}
+      </span>
+      {' '}— {detail}
+    </p>
   );
 }
 
+/** Every Evaluator's results; a counted one's pass rate is green when it reached the Acceptance Criteria, red when it missed them. */
 function EvaluatorTable({ report }: { report: EvalRunReport }) {
+  const judged = new Map((report.criteriaVerdict?.evaluators ?? []).map((line) => [line.evaluatorId, line.met]));
   return (
     <div>
     <TableTitle>Evaluators</TableTitle>
@@ -103,7 +86,16 @@ function EvaluatorTable({ report }: { report: EvalRunReport }) {
               <span className="ml-1 text-xs text-muted-foreground">v{evaluator.version}</span>
               {evaluator.counted === false && <div className="text-xs">not counted — {evaluator.reason}</div>}
             </td>
-            <td className="py-1.5">{percent(evaluator.passRate)} <span className="text-xs text-muted-foreground">({evaluator.passes}/{evaluator.passes + evaluator.failures})</span></td>
+            <td className="py-1.5">
+              <span
+                className={cn(judged.has(evaluator.evaluatorId) && 'rounded px-1.5 py-0.5 font-medium', judged.get(evaluator.evaluatorId) === true && VERDICT_CLASSES.met, judged.get(evaluator.evaluatorId) === false && VERDICT_CLASSES.missed)}
+                data-testid="evaluator-pass-rate"
+                data-met={judged.has(evaluator.evaluatorId) ? String(judged.get(evaluator.evaluatorId)) : undefined}
+              >
+                {percent(evaluator.passRate)}
+              </span>
+              {' '}<span className="text-xs text-muted-foreground">({evaluator.passes}/{evaluator.passes + evaluator.failures})</span>
+            </td>
             <td className="py-1.5 text-xs">{evaluator.wilsonLower === null ? '—' : `${percent(evaluator.wilsonLower)}–${percent(evaluator.wilsonUpper)}`}</td>
             <td className="py-1.5">{percent(evaluator.passAtK)}</td>
             <td className="py-1.5">{percent(evaluator.passHatK)}</td>
@@ -238,8 +230,8 @@ export function EvalRunSummary({ output, step, mayEdit, editReason }: {
           {report.meanDurationMs !== null && ` · mean ${(report.meanDurationMs / 1000).toFixed(1)}s`}
         </span>
       </div>
+      {report.criteriaVerdict !== null && <CriteriaLine verdict={report.criteriaVerdict} />}
       <EvaluatorTable report={report} />
-      {report.criteriaVerdict !== null && <CriteriaTable report={report} verdict={report.criteriaVerdict} />}
       <VerdictReviewSection verdicts={report.judgeVerdicts} />
       {signing ? (
         <SignQualificationForm step={step} evalRunId={evalRun.id} verdict={report.criteriaVerdict} onDone={() => setSigning(false)} />

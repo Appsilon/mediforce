@@ -637,10 +637,13 @@ model's verdict, so the list never rebuilds a report. **Details** opens the run 
 acceptance, Dataset, trials, cost, Cancel while it runs, Start while
 prepared) and five views, from the whole run to one trial:
 
-- **Summary** — the report: Evaluators, criteria, verdict calibration, and **Approve step
-  configuration** (signs a Step Qualification). The criteria are one row: the
-  verdict, the floor required, how many counted Evaluators met it, the trials
-  they passed and failed, and the pass rate. Routing and the MCP line are not
+- **Summary** — the report: criteria, Evaluators, verdict calibration, and **Approve step
+  configuration** (signs a Step Qualification). The criteria are one line: met,
+  missed or not judged, and how many counted Evaluators fell below the floor —
+  each Evaluator is judged on its own pass rate, so the trials pooled across
+  Evaluators say nothing about the verdict. In the Evaluators table a counted
+  Evaluator's pass rate is green when it reached the floor and red when it
+  missed it. Routing and the MCP line are not
   shown here; `mediforce eval report` still carries both.
 - **Trials** — every trial with each Evaluator's grade, the agent's
   confidence, cost and time; filters for failed trials and trials with
