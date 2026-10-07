@@ -1216,6 +1216,38 @@ describe('ClaudeCodeAgentPlugin', () => {
       });
     });
 
+    // The CLI holds the first turn only on 2.1.292+. An older image starts the
+    // agent with the server still `pending`, so the prompt tells it to wait.
+    describe('MCP startup instruction', () => {
+      async function promptFor(resolvedMcpConfig?: WorkflowAgentContext['resolvedMcpConfig']): Promise<string> {
+        await plugin.initialize({ ...buildWorkflowContext({}), resolvedMcpConfig } as WorkflowAgentContext);
+        mockReadSkill(plugin).mockResolvedValue('# Skill');
+        const spawnSpy = mockSpawn(plugin).mockResolvedValue({
+          cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [],
+        });
+        await plugin.run(buildEmitSpy().emit);
+        return spawnSpy.mock.calls[0][0] as string;
+      }
+
+      it('[DATA] tells an agent with MCP servers to wait for them, naming the servers and the CLI tool', async () => {
+        const prompt = await promptFor({
+          servers: { biomcp: { type: 'stdio', command: 'uvx' }, remote: { type: 'http', url: 'https://mcp.example.com' } },
+        });
+
+        expect(prompt).toContain('## MCP Servers');
+        expect(prompt).toContain('biomcp, remote');
+        expect(prompt).toContain('WaitForMcpServers');
+        expect(prompt).toContain('about 2 minutes');
+      });
+
+      it('[DATA] adds nothing for an agent without MCP servers', async () => {
+        const prompt = await promptFor(undefined);
+
+        expect(prompt).not.toContain('## MCP Servers');
+        expect(prompt).not.toContain('WaitForMcpServers');
+      });
+    });
+
     it('[ERROR] still hands back an eval trial\'s MCP recording and replay misses when the agent fails (ADR-0023 D6)', async () => {
       const onRecorded = vi.fn().mockResolvedValue(undefined);
       const record = vi.fn();

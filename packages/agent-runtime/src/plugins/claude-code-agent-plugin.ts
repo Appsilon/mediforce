@@ -5,7 +5,6 @@ import {
   type SpawnCliOptions,
   type AgentCommandSpec,
 } from './base-container-agent-plugin';
-import { isWorkflowAgentContext } from './container-plugin';
 
 /**
  * Spell a model the way the endpoint the CLI is pointed at expects.
@@ -85,7 +84,6 @@ function extractErrorDetail(resultLine: string): string | null {
  *  install routinely takes. */
 const DEFAULT_STDIO_MCP_TIMEOUT_MS = 120_000;
 
-type McpServerEntry = { name: string; allowedTools?: string[]; stdio: boolean };
 
 export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
   readonly agentName = 'Claude Code';
@@ -127,24 +125,12 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
     return ` If it is slow to start, set MCP_TIMEOUT (milliseconds, now ${waitedMs}) in the step's env to wait longer.`;
   }
 
-  // Workflow runs use the agent's resolved bindings; inline
-  // `agentConfig.mcpServers` is the deprecated step-level path.
-  private mcpServerEntries(): McpServerEntry[] {
-    const workflowResolved = isWorkflowAgentContext(this.context)
-      ? this.context.resolvedMcpConfig
-      : undefined;
-    if (workflowResolved !== undefined) {
-      return Object.entries(workflowResolved.servers).map(([name, server]) => ({
-        name,
-        allowedTools: server.allowedTools,
-        stdio: server.type === 'stdio',
-      }));
-    }
-    return (this.agentConfig.mcpServers ?? []).map((server) => ({
-      name: server.name,
-      allowedTools: server.allowedTools,
-      stdio: server.command !== undefined,
-    }));
+  protected override mcpWaitInstruction(): string {
+    return (
+      `${super.mcpWaitInstruction()} ` +
+      `Call the \`WaitForMcpServers\` tool until it returns \`ready: true\` — each call waits up to 5 seconds ` +
+      `and returns as soon as the servers connect.`
+    );
   }
 
   getAgentCommand(_promptFilePath: string, options?: SpawnCliOptions): AgentCommandSpec {

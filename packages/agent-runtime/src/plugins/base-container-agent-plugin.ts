@@ -15,6 +15,8 @@ import { agentLogEntries, createLineStreamReader, offeredSkill, mcpServersWithSt
 import { MCP_TAPE_DIR, MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from '../mcp/mcp-tape';
 import type { AgentLogFormat } from '@mediforce/platform-core';
 
+type McpServerEntry = { name: string; allowedTools?: string[]; stdio: boolean };
+
 /** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`
  *  but the agent context carries no OAuth token entry for that server. The
  *  message points the user at the UI to connect the account — that's the
@@ -303,6 +305,36 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *  still connecting when the agent started. Default: none. */
   protected mcpStartupHint(_server: string): string {
     return '';
+  }
+
+  /** Tells the agent to wait for MCP servers that are still starting. Plugins
+   *  whose CLI offers a way to wait extend this with how. */
+  protected mcpWaitInstruction(): string {
+    return (
+      `Some of your MCP tools may not be available yet because their servers are still starting. ` +
+      `If a tool you need is missing, wait and check again for up to about 2 minutes before proceeding without it, ` +
+      `and say so in your output.`
+    );
+  }
+
+  // Workflow runs use the agent's resolved bindings; inline
+  // `agentConfig.mcpServers` is the deprecated step-level path.
+  protected mcpServerEntries(): McpServerEntry[] {
+    const workflowResolved = isWorkflowAgentContext(this.context)
+      ? this.context.resolvedMcpConfig
+      : undefined;
+    if (workflowResolved !== undefined) {
+      return Object.entries(workflowResolved.servers).map(([name, server]) => ({
+        name,
+        allowedTools: server.allowedTools,
+        stdio: server.type === 'stdio',
+      }));
+    }
+    return (this.agentConfig.mcpServers ?? []).map((server) => ({
+      name: server.name,
+      allowedTools: server.allowedTools,
+      stdio: server.command !== undefined,
+    }));
   }
 
   /** Return plugin-internal env vars for local (non-Docker) execution.
@@ -1303,6 +1335,12 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     // 2. Custom prompt
     if (this.agentConfig.prompt) {
       parts.push(this.agentConfig.prompt);
+    }
+
+    // 2b. MCP startup — a server still connecting leaves its tools missing
+    const mcpServerNames = this.mcpServerEntries().map((server) => server.name);
+    if (mcpServerNames.length > 0) {
+      parts.push(`## MCP Servers\nYou have MCP servers: ${mcpServerNames.join(', ')}. ${this.mcpWaitInstruction()}`);
     }
 
     // 3. Time budget

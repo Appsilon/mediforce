@@ -82,6 +82,12 @@ waits at all. A server the CLI reports `failed` or still `pending` at start
 becomes a status warning on the run, never a step failure; for a stdio server
 the warning says to raise `MCP_TIMEOUT` in the step's `env`.
 
+Every agent that binds an MCP server also gets an `## MCP Servers` section in
+its prompt (`buildPrompt` in the base plugin) telling it to wait up to about two
+minutes for tools that are not there yet. An older CLI image, which does not
+hold the first turn, would otherwise start the agent without them;
+`ClaudeCodeAgentPlugin` adds how, by calling `WaitForMcpServers` until `ready`.
+
 **`MOCK_AGENT=true` replaces `claude-code-agent` with `MockAgentPlugin`,**
 returning fixture data instantly. This is what makes UI development and E2E runs
 possible without API keys or Docker.
