@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-10-05
+last_reviewed: 2026-10-07
 ---
 
 # ADR-0025: A Skill is a Namespace resource an Agent owns, not something a Workflow carries
@@ -134,7 +134,11 @@ skill from both sources is visible. The Step skill is the more specific choice,
 and the Workflow Definition that carries it is versioned.
 
 **Claude Code agents only in v1.** OpenCode agents ignore an Agent's Skills,
-and the Agent form says so when its runtime is OpenCode. Delivery assumes the
+and the Agent form says so when its runtime is OpenCode. _Amended 2026-10-07
+([#1477](https://github.com/Appsilon/mediforce/issues/1477)): OpenCode agents
+load the same plugin folder from the same `/plugin` mount, through
+`skills.paths` in `opencode.json`; the form warns only for runtimes that load
+neither._ Delivery assumes the
 worker shares the host `/tmp` with the step container, as the git skills cache
 already does. Shipping Skill files to a remote worker over Redis is not in v1.
 

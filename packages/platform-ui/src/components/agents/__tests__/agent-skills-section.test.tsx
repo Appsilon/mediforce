@@ -49,4 +49,16 @@ describe('AgentSkillsSection', () => {
     expect(checkboxNames()).toEqual(['Skill alpha/own-public', 'Skill beta/beta-public', 'Skill alpha/own-private']);
     expect(screen.getByText(/may not hold this skill/)).toBeTruthy();
   });
+
+  it.each(['claude-code-agent', 'opencode-agent'])('does not warn that an agent on %s goes without its skills', async (runtimeId) => {
+    render(<AgentSkillsSection namespace="alpha" ownsNamespace visibility="private" selected={[]} onChange={() => {}} runtimeId={runtimeId} />);
+    await screen.findByText('own-private');
+    expect(screen.queryByText(/will not receive them/)).toBeNull();
+  });
+
+  it('warns that an agent on a runtime without skills goes without them', async () => {
+    render(<AgentSkillsSection namespace="alpha" ownsNamespace visibility="private" selected={[]} onChange={() => {}} runtimeId="script-container" />);
+    await screen.findByText('own-private');
+    expect(screen.getByText(/will not receive them/)).toBeTruthy();
+  });
 });

@@ -363,8 +363,8 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
   /** Run-scoped git worktree — populated by `resolveRunWorkspace` at run start. */
   protected runWorkspaceHandle: RunWorkspaceHandle | null = null;
   protected workspaceManager: WorkspaceManagerLike | null = null;
-  /** Whether the agent CLI loads an agent's Skills from `--plugin-dir`.
-   *  Claude Code only in v1 (ADR-0025 decision 6). */
+  /** Whether the agent CLI loads an agent's Skills from the plugin dir:
+   *  Claude Code through `--plugin-dir`, OpenCode through `skills.paths`. */
   protected readonly loadsAgentSkills: boolean = false;
 
   constructor(init: ContainerPluginInit = {}) {
@@ -628,7 +628,7 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
     if (this.loadsAgentSkills === false) {
       console.log(
         `[${this.metadata.name}] Step '${this.context.stepId}' runs without its agent's skills ` +
-        `(${agentSkills.map((skill) => skill.id).join(', ')}): they reach Claude Code agents only`,
+        `(${agentSkills.map((skill) => skill.id).join(', ')}): this runtime does not load Skills`,
       );
       return stepPluginDir;
     }

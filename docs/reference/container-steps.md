@@ -39,10 +39,10 @@ path and branch conventions live in `workspace-paths.ts` so the read-only
 | Path | Mode | Lifetime | Carries |
 |---|---|---|---|
 | `/workspace` | rw | the run | The git worktree. Deliverables go here; it is the working directory. |
-| `/output` | rw | the step | Engine ↔ step channel. Host seeds `input.json`, `prompt.txt`, `previous_run.json`, `mcp-config.json`, `script.<ext>`; the step writes `result.json` and optional `presentation.md`. |
+| `/output` | rw | the step | Engine ↔ step channel. Host seeds `input.json`, `prompt.txt`, `previous_run.json`, the agent CLI's config (`mcp-config.json` for Claude Code, `opencode.json` for OpenCode), `script.<ext>`; the step writes `result.json` and optional `presentation.md`. |
 | `/data` | ro | the step | Uploaded attachments the host downloaded for this step. Each `files[].localPath` in the agent's prompt and `input.json` points here. |
 | `/artifacts` | ro | the definition | The files the workflow carries (`artifacts` on the definition): scripts, a Dockerfile, skills. Materialized to a content-addressed host directory per file set, so every step of every run of an unchanged workflow shares one write. Absent when the workflow carries none. |
-| `/plugin` | ro | the step | The Claude Code plugin root, when an agent step sets `skillsDir` or its agent holds Skills. With `skillsDir` alone it is the parent of the resolved skills directory: carried skills, then the `externalSkillsRepo` cache, then the repo checkout on the host. When the agent holds Skills (`claude-code-agent` only, [ADR-0025](../adr/0025-skill-catalog.md)), it is a content-hashed folder under `mediforce-agent-skills/` holding them under `skills/<id>/`, merged with the step's skills, which win a name clash. |
+| `/plugin` | ro | the step | The plugin root (`skills/<id>/SKILL.md`), when an agent step sets `skillsDir` or its agent holds Skills. With `skillsDir` alone it is the parent of the resolved skills directory: carried skills, then the `externalSkillsRepo` cache, then the repo checkout on the host. When the agent holds Skills (`claude-code-agent` via `--plugin-dir`, `opencode-agent` via `skills.paths` in `opencode.json`; [ADR-0025](../adr/0025-skill-catalog.md)), it is a content-hashed folder under `mediforce-agent-skills/` holding them under `skills/<id>/`, merged with the step's skills, which win a name clash. |
 
 Why `/workspace` and `/output` stay separate — and why `/output` is a bad name
 for a channel that carries inputs — is argued in the header comment of
@@ -105,16 +105,20 @@ to catalog entries whose `command` (`uvx`, `npx`, …) must exist in that image;
 the default agent image has `npx` and no `uvx`. A Claude Code agent waits up to
 120s for its stdio servers to connect before its first turn, so a cold
 `uvx`/`npx` install has time to finish; a slower server needs `MCP_TIMEOUT`
-(milliseconds) in the step's `env`. A server that cannot start is
-dropped by the Claude CLI without failing the run, so the agent simply sees no
+(milliseconds) in the step's `env`. An OpenCode agent is passed the same value
+(each local server's `timeout`), but OpenCode's MCP SDK caps the handshake at
+60s, so on OpenCode a server slower than that has to be installed in the
+image. A server that cannot start is
+dropped by the CLI without failing the run, so the agent simply sees no
 tools from it. The platform says so in three places, all advisory: the tool
 catalog form and `mediforce images check-command` probe a command against an
 image on demand; the step editor warns when the
 image the step will use is known to lack a bound server's command (a step that
 builds its own image is not checked — there is nothing to probe until it is
 built); and the run
-records a `status` event naming each server the CLI reported `failed` in its
-`system/init` event.
+records a `status` event naming each server the CLI reported `failed` — Claude
+Code in its `system/init` event, OpenCode in its log under
+`/output/.local/share/opencode/log/`, the only place it reports MCP status.
 
 ## Result and Agent Trajectory
 

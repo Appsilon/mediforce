@@ -11,11 +11,29 @@ import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepo
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
-import { agentLogEntries, createLineStreamReader, offeredSkill, mcpServersWithStatus, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes, unfence } from '@mediforce/platform-core';
+import { agentLogEntries, createLineStreamReader, offeredSkill, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes, unfence } from '@mediforce/platform-core';
 import { MCP_TAPE_DIR, MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from '../mcp/mcp-tape';
 import type { AgentLogFormat } from '@mediforce/platform-core';
 
 type McpServerEntry = { name: string; allowedTools?: string[]; stdio: boolean };
+
+/** One MCP server as the agent CLI starts it: secrets resolved, OAuth header
+ *  rendered, and in an eval trial swapped for the record/replay tape. Each
+ *  runtime writes these into its own config format. */
+export type McpConfigEntry =
+  | { type: 'stdio'; command: string; args?: string[]; env?: Record<string, string>; allowedTools?: string[] }
+  | { type: 'http'; url: string; headers?: Record<string, string>; allowedTools?: string[] };
+
+/** MCP servers by status at agent start, as the CLI reported them. */
+export interface McpServerStatus {
+  failed: string[];
+  pending: string[];
+}
+
+/** How long the CLI waits for a stdio MCP server to connect when the step env
+ *  sets no MCP_TIMEOUT. The CLIs' own defaults (30s) are shorter than a cold
+ *  `uvx`/`npx` install routinely takes. */
+export const DEFAULT_STDIO_MCP_TIMEOUT_MS = 120_000;
 
 /** Thrown when a resolved HTTP MCP binding declares `auth.type === 'oauth'`
  *  but the agent context carries no OAuth token entry for that server. The
@@ -302,9 +320,20 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
   }
 
   /** Extra advice appended to the warning for an MCP server that failed or was
-   *  still connecting when the agent started. Default: none. */
-  protected mcpStartupHint(_server: string): string {
-    return '';
+   *  still connecting when the agent started: for a stdio server, how to wait
+   *  longer. An http server has no cold start to wait out. */
+  protected mcpStartupHint(server: string): string {
+    const entry = this.mcpServerEntries().find((candidate) => candidate.name === server);
+    if (entry?.stdio !== true) return '';
+    const waitedMs = this.resolvedEnv.vars.MCP_TIMEOUT ?? String(DEFAULT_STDIO_MCP_TIMEOUT_MS);
+    return ` If it is slow to start, set MCP_TIMEOUT (milliseconds, now ${waitedMs}) in the step's env to wait longer.`;
+  }
+
+  /** MCP servers that failed or were still connecting when the agent started,
+   *  read from whatever the CLI left behind: its stdout, or files in the
+   *  output dir. Default: none reported. */
+  protected async mcpServerStatus(_rawStdout: string, _outputDir: string): Promise<McpServerStatus> {
+    return { failed: [], pending: [] };
   }
 
   /** Tells the agent to wait for MCP servers that are still starting. Plugins
@@ -423,19 +452,40 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
   }
 
   /** Hook called after the output directory is created and prompt.txt is written,
-   *  but before the Docker container is spawned. Override to write additional files
-   *  (e.g. agent config) into the output dir that will be mounted at /output. */
-  protected async prepareOutputDir(outputDir: string): Promise<void> {
+   *  but before the Docker container is spawned. Writes `input.json` and the
+   *  agent CLI's own config into the output dir that will be mounted at /output.
+   *  @param agentOptions — the spawn options with paths as the agent sees them
+   *    (`pluginDir` is the container mount in Docker mode). */
+  protected async prepareOutputDir(outputDir: string, agentOptions?: SpawnCliOptions): Promise<void> {
     await writeFile(
       join(outputDir, 'input.json'),
       JSON.stringify(this.agentVisibleInput ?? this.context.stepInput, null, 2),
       'utf-8',
     );
+    await this.writeAgentConfig(outputDir, agentOptions);
+  }
+
+  /** Write the agent CLI's config into the output dir. Default: the
+   *  `mcp-config.json` Claude Code reads through `--mcp-config`. */
+  protected async writeAgentConfig(outputDir: string, _agentOptions?: SpawnCliOptions): Promise<void> {
     await this.writeMcpConfig(outputDir);
   }
 
-  /** Generate mcp-config.json for Claude CLI --mcp-config flag.
-   *  Resolves {{SECRET}} templates in MCP server env vars.
+  /** Generate mcp-config.json for Claude CLI --mcp-config flag. Writes nothing
+   *  when the step binds no MCP server. */
+  protected async writeMcpConfig(outputDir: string): Promise<void> {
+    const servers = await this.buildMcpServers(outputDir);
+    if (Object.keys(servers).length === 0) return;
+    await writeFile(
+      join(outputDir, 'mcp-config.json'),
+      JSON.stringify({ mcpServers: servers }, null, 2),
+      'utf-8',
+    );
+  }
+
+  /** The MCP servers the agent CLI starts, by name — empty when the step binds
+   *  none. Every runtime serialises this one list into its own config, so the
+   *  runtimes cannot drift on what a binding means.
    *
    *  Two sources, checked in order:
    *   1. Workflow-mode with a pre-resolved config from resolveMcpForStep
@@ -444,31 +494,31 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *   2. Legacy inline config on agentConfig.mcpServers (array of
    *      McpServerConfig). Still used by process-mode steps and
    *      by workflow steps that predate the migration to agentId. */
-  protected async writeMcpConfig(outputDir: string): Promise<void> {
+  protected async buildMcpServers(outputDir: string): Promise<Record<string, McpConfigEntry>> {
     const resolved = isWorkflowAgentContext(this.context)
       ? this.context.resolvedMcpConfig
       : undefined;
 
     if (resolved !== undefined) {
-      await this.writeResolvedMcpConfig(outputDir, resolved);
-      return;
+      return this.buildResolvedMcpServers(outputDir, resolved);
     }
 
-    await this.writeLegacyMcpConfig(outputDir);
+    return this.buildLegacyMcpServers();
   }
 
-  /** Serialize a resolved MCP config into the flat mcp-config.json shape
-   *  Claude CLI expects. Applies {{SECRET}} template resolution to env
+  /** Serialize a resolved MCP config into flat server entries. Applies
+   *  {{SECRET}} template resolution to env
    *  values on stdio entries and to any HTTP `auth.type === 'headers'`
    *  values at write time. For `auth.type === 'oauth'`, the access token
    *  comes from `context.oauthTokens[name]` (pre-loaded + pre-refreshed
-   *  by the caller) and is stamped into `headerValueTemplate`. */
-  private async writeResolvedMcpConfig(
+   *  by the caller) and is stamped into `headerValueTemplate`. In an eval
+   *  trial it writes the record/replay tape files into the output dir. */
+  private async buildResolvedMcpServers(
     outputDir: string,
     resolved: ResolvedMcpConfig,
-  ): Promise<void> {
+  ): Promise<Record<string, McpConfigEntry>> {
     const entries = Object.entries(resolved.servers);
-    if (entries.length === 0) return;
+    if (entries.length === 0) return {};
 
     const workflowSecrets = isWorkflowAgentContext(this.context)
       ? this.context.workflowSecrets
@@ -477,9 +527,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       ? this.context.oauthTokens
       : undefined;
 
-    type StdioEntry = { type: 'stdio'; command: string; args?: string[]; env?: Record<string, string>; allowedTools?: string[] };
-    type HttpEntry = { type: 'http'; url: string; headers?: Record<string, string>; allowedTools?: string[] };
-    const mcpConfig: Record<string, StdioEntry | HttpEntry> = {};
+    const mcpConfig: Record<string, McpConfigEntry> = {};
 
     const tapes = isWorkflowAgentContext(this.context) ? this.context.mcpTapes : undefined;
     const taped = entries.some(([name]) => tapes !== undefined && (name in tapes.replay || tapes.record.includes(name)));
@@ -545,16 +593,11 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       }
     }
 
-    await writeFile(
-      join(outputDir, 'mcp-config.json'),
-      JSON.stringify({ mcpServers: mcpConfig }, null, 2),
-      'utf-8',
-    );
-
-    agentLog('mcp.config', 'MCP config written (resolver-backed)', {
+    agentLog('mcp.config', 'MCP servers resolved (resolver-backed)', {
       stepId: this.context.stepId,
       servers: entries.map(([name]) => name),
     });
+    return mcpConfig;
   }
 
   /** Once the agent has exited — finished, failed or timed out: hand each
@@ -602,20 +645,18 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     }
   }
 
-  /** Pre-refactor path: serialize agentConfig.mcpServers (array) directly
-   *  into mcp-config.json. Retained for process-mode steps and any
+  /** Pre-refactor path: serialize agentConfig.mcpServers (array) directly.
+   *  Retained for process-mode steps and any
    *  workflow step that has not yet migrated to agentId. */
-  private async writeLegacyMcpConfig(outputDir: string): Promise<void> {
+  private buildLegacyMcpServers(): Record<string, McpConfigEntry> {
     const servers = this.agentConfig.mcpServers;
-    if (!servers || servers.length === 0) return;
+    if (!servers || servers.length === 0) return {};
 
     const workflowSecrets = isWorkflowAgentContext(this.context)
       ? this.context.workflowSecrets
       : undefined;
 
-    type StdioEntry = { type: 'stdio'; command: string; args: string[]; env?: Record<string, string>; allowedTools?: string[] };
-    type HttpEntry = { type: 'http'; url: string; allowedTools?: string[] };
-    const mcpConfig: Record<string, StdioEntry | HttpEntry> = {};
+    const mcpConfig: Record<string, McpConfigEntry> = {};
 
     for (const server of servers) {
       const resolvedEnv: Record<string, string> = {};
@@ -648,16 +689,11 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       }
     }
 
-    await writeFile(
-      join(outputDir, 'mcp-config.json'),
-      JSON.stringify({ mcpServers: mcpConfig }, null, 2),
-      'utf-8',
-    );
-
-    agentLog('mcp.config', 'MCP config written (legacy)', {
+    agentLog('mcp.config', 'MCP servers resolved (legacy)', {
       stepId: this.context.stepId,
       servers: servers.map((s) => s.name),
     });
+    return mcpConfig;
   }
 
   /**
@@ -968,10 +1004,10 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         options.addDirs = [tempDir];
       }
 
-      // Plugin directory — host path to the Claude Code plugin holding the step's
-      // skills and its agent's. Agents that support `--plugin-dir` (Claude Code)
-      // pass this along so native skill resolution (SKILL.md + references/)
-      // works without workspace pollution.
+      // Plugin directory — host path to the plugin holding the step's skills and
+      // its agent's. Claude Code gets it as `--plugin-dir`, OpenCode as
+      // `skills.paths` in opencode.json, so native skill resolution
+      // (SKILL.md + references/) works without workspace pollution.
       const pluginDir = await this.resolvePluginDir(this.agentConfig.skillsDir, resolveProjectPath);
       if (pluginDir !== undefined) options.pluginDir = pluginDir;
 
@@ -1036,28 +1072,26 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       // agent just sees no tools from it. Say so here, where a reader of the
       // run will see it, rather than leaving "the agent ignored the tool" and
       // "the tool was never there" indistinguishable.
-      if (this.logFormat === 'claude-stream-json') {
-        for (const server of spawnResult.failedMcpServers ?? []) {
-          await emit({
-            type: 'status',
-            payload:
-              `MCP server '${server}' failed to start — the agent ran without its tools. ` +
-              (isLocalMode
-                ? 'If it is a stdio server, check that its command is installed on the host'
-                : `If it is a stdio server, check that its command exists in image '${this.agentConfig.image}'`) +
-              '.' + this.mcpStartupHint(server),
-            timestamp: new Date().toISOString(),
-          });
-        }
-        for (const server of spawnResult.pendingMcpServers ?? []) {
-          await emit({
-            type: 'status',
-            payload:
-              `MCP server '${server}' was still connecting when the agent started, so its tools were missing at least at first.` +
-              this.mcpStartupHint(server),
-            timestamp: new Date().toISOString(),
-          });
-        }
+      for (const server of spawnResult.failedMcpServers ?? []) {
+        await emit({
+          type: 'status',
+          payload:
+            `MCP server '${server}' failed to start — the agent ran without its tools. ` +
+            (isLocalMode
+              ? 'If it is a stdio server, check that its command is installed on the host'
+              : `If it is a stdio server, check that its command exists in image '${this.agentConfig.image}'`) +
+            '.' + this.mcpStartupHint(server),
+          timestamp: new Date().toISOString(),
+        });
+      }
+      for (const server of spawnResult.pendingMcpServers ?? []) {
+        await emit({
+          type: 'status',
+          payload:
+            `MCP server '${server}' was still connecting when the agent started, so its tools were missing at least at first.` +
+            this.mcpStartupHint(server),
+          timestamp: new Date().toISOString(),
+        });
       }
 
       // Log injected env vars with source info for audit
@@ -1554,14 +1588,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const promptFilePath = join(outputDir, 'prompt.txt');
     await writeFile(promptFilePath, prompt, 'utf-8');
 
-    await this.prepareOutputDir(outputDir);
+    await this.prepareOutputDir(outputDir, options);
     // Workspace (git worktree) is already set up by run() → resolveRunWorkspace; nothing to do here.
 
     // --- Spawn the agent CLI ---
     const commandSpec = this.getAgentCommand(promptFilePath, options);
 
-    let failedServers: string[] = [];
-    let pendingServers: string[] = [];
+    let rawStdout = '';
     const cliOutput = await new Promise<string>((resolve, reject) => {
       const child = spawn(commandSpec.args[0], commandSpec.args.slice(1), {
         cwd: workingDir,
@@ -1621,10 +1654,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
         const timeoutMinutes = Math.round(timeoutMs / 60_000);
 
-        const rawStdout = rawLines.join('\n');
+        rawStdout = rawLines.join('\n');
         const finalResult = this.parseAgentOutput(rawStdout);
-        failedServers = mcpServersWithStatus(rawStdout, 'failed');
-        pendingServers = mcpServersWithStatus(rawStdout, 'pending');
 
         if (code !== 0) {
           const exitInfo = signal
@@ -1661,8 +1692,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     });
 
     const localPresentation = await readPresentation(outputDir);
+    const mcpStatus = await this.mcpServerStatus(rawStdout, outputDir);
 
-    return { cliOutput, failedMcpServers: failedServers, pendingMcpServers: pendingServers, gitMetadata, presentation: localPresentation, outputDir, injectedEnvVars: [] };
+    return { cliOutput, failedMcpServers: mcpStatus.failed, pendingMcpServers: mcpStatus.pending, gitMetadata, presentation: localPresentation, outputDir, injectedEnvVars: [] };
   }
 
   protected async spawnDockerContainer(
@@ -1705,8 +1737,14 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const promptFilePath = join(outputDir, 'prompt.txt');
     await writeFile(promptFilePath, prompt, 'utf-8');
 
+    // The host `options.pluginDir` is mounted at `${CONTAINER_PLUGIN_MOUNT}` inside the
+    // container; the agent's config and command get the path it will actually see
+    // (no Docker-vs-local branching in subclass code).
+    const containerOptions: SpawnCliOptions = { ...options };
+    if (options?.pluginDir) containerOptions.pluginDir = CONTAINER_PLUGIN_MOUNT;
+
     // Let subclass write additional files (e.g. agent config) to the output dir
-    await this.prepareOutputDir(outputDir);
+    await this.prepareOutputDir(outputDir, containerOptions);
 
     const isMockAgent = process.env.MOCK_AGENT === 'true';
 
@@ -1746,14 +1784,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       dockerArgs.push('-v', `${artifactsHostDir}:${CONTAINER_ARTIFACTS_MOUNT}:ro`);
     }
 
-    // Bind-mount the Claude Code plugin root (read-only) when the step has one (skillsDir or agent skills).
-    // The host `options.pluginDir` becomes `${CONTAINER_PLUGIN_MOUNT}` inside the container;
-    // we rewrite the options before getAgentCommand so the agent always receives the path
-    // it will actually see (no Docker-vs-local branching in subclass code).
-    const containerOptions: SpawnCliOptions = { ...options };
+    // Bind-mount the plugin root (read-only) when the step has one (skillsDir or agent skills).
     if (options?.pluginDir) {
       dockerArgs.push('-v', `${options.pluginDir}:${CONTAINER_PLUGIN_MOUNT}:ro`);
-      containerOptions.pluginDir = CONTAINER_PLUGIN_MOUNT;
     }
 
     // Mount data directory if files were downloaded
@@ -1816,8 +1849,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
     const rawStdout = rawLines.join('\n');
     const finalResult = this.parseAgentOutput(rawStdout);
-    const failedServers = mcpServersWithStatus(rawStdout, 'failed');
-    const pendingServers = mcpServersWithStatus(rawStdout, 'pending');
     const timeoutMinutes = Math.round(timeoutMs / 60_000);
 
     if (spawnResult.exitCode !== 0) {
@@ -1847,8 +1878,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     });
 
     const presentation = await readPresentation(outputDir);
+    const mcpStatus = await this.mcpServerStatus(rawStdout, outputDir);
 
-    return { cliOutput, failedMcpServers: failedServers, pendingMcpServers: pendingServers, gitMetadata, presentation, outputDir, injectedEnvVars };
+    return { cliOutput, failedMcpServers: mcpStatus.failed, pendingMcpServers: mcpStatus.pending, gitMetadata, presentation, outputDir, injectedEnvVars };
   }
 }
 

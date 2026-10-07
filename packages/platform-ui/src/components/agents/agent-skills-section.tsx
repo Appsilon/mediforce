@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { routes } from '@/lib/routes';
 import { useSkills } from '@/hooks/use-skills';
 
-const CLAUDE_CODE_RUNTIME = 'claude-code-agent';
+const SKILL_LOADING_RUNTIMES: ReadonlySet<string> = new Set(['claude-code-agent', 'opencode-agent']);
 
 interface AgentSkillsSectionProps {
   /** The agent's workspace, whose Skills are listed first. A built-in agent
@@ -66,13 +66,13 @@ export function AgentSkillsSection({ namespace, ownsNamespace, visibility, selec
       </header>
 
       <p className="text-xs text-muted-foreground">
-        Claude Code skills offered to this agent in every step. It loads one when the skill&apos;s description fits
+        Skills offered to this agent in every step. It loads one when the skill&apos;s description fits
         the task.
       </p>
 
-      {runtimeId !== undefined && runtimeId !== CLAUDE_CODE_RUNTIME && (
+      {runtimeId !== undefined && SKILL_LOADING_RUNTIMES.has(runtimeId) === false && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-          Skills are applied to Claude Code agents only. This agent&apos;s runtime is{' '}
+          Skills are applied to Claude Code and OpenCode agents only. This agent&apos;s runtime is{' '}
           <code className="font-mono">{runtimeId}</code>, so it will not receive them.
         </div>
       )}
