@@ -1,7 +1,9 @@
-import type { AgentLogFormat, PluginCapabilityMetadata } from '@mediforce/platform-core';
+import { mcpServersWithStatus, type AgentLogFormat, type PluginCapabilityMetadata } from '@mediforce/platform-core';
 import {
   BaseContainerAgentPlugin,
   CONTAINER_DATA_MOUNT,
+  DEFAULT_STDIO_MCP_TIMEOUT_MS,
+  type McpServerStatus,
   type SpawnCliOptions,
   type AgentCommandSpec,
 } from './base-container-agent-plugin';
@@ -84,12 +86,6 @@ function extractErrorDetail(resultLine: string): string | null {
   return null;
 }
 
-/** How long the CLI waits for stdio MCP servers to connect when the step env
- *  sets no MCP_TIMEOUT. The CLI's own 30s is shorter than a cold `uvx`/`npx`
- *  install routinely takes. */
-const DEFAULT_STDIO_MCP_TIMEOUT_MS = 120_000;
-
-
 export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
   readonly agentName = 'Claude Code';
 
@@ -124,11 +120,12 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
     return vars;
   }
 
-  protected override mcpStartupHint(server: string): string {
-    const entry = this.mcpServerEntries().find((candidate) => candidate.name === server);
-    if (entry?.stdio !== true) return '';
-    const waitedMs = this.resolvedEnv.vars.MCP_TIMEOUT ?? String(DEFAULT_STDIO_MCP_TIMEOUT_MS);
-    return ` If it is slow to start, set MCP_TIMEOUT (milliseconds, now ${waitedMs}) in the step's env to wait longer.`;
+  /** Read from the `system/init` stream event, which names each server's status. */
+  protected override async mcpServerStatus(rawStdout: string): Promise<McpServerStatus> {
+    return {
+      failed: mcpServersWithStatus(rawStdout, 'failed'),
+      pending: mcpServersWithStatus(rawStdout, 'pending'),
+    };
   }
 
   protected override mcpWaitInstruction(): string {

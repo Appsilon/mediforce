@@ -15,7 +15,7 @@ actually executes and whether its result is trustworthy enough to continue.
 | `src/plugins/` | `BaseContainerAgentPlugin` and the concrete plugins, and the code-check container Step Evaluation runs — see [`src/plugins/README.md`](src/plugins/README.md) |
 | `src/interfaces/` | `StepExecutorPlugin`, review and step-executor contracts |
 | `src/mcp/` | Per-step MCP resolution (`resolveMcpForStep`); the record/replay proxy an eval trial runs in an MCP server's place (`mcp-tape.ts`, ADR-0023 D6) |
-| `src/skills/` | Per-step agent Skill resolution (`resolveSkillsForStep`) and the content-hashed Claude Code plugin folder they are delivered in (`materializeAgentSkillsPlugin`, ADR-0025) |
+| `src/skills/` | Per-step agent Skill resolution (`resolveSkillsForStep`) and the content-hashed plugin folder they are delivered in (`materializeAgentSkillsPlugin`, ADR-0025) |
 | `src/oauth/` | MCP OAuth — discovery, dynamic client registration, token resolution |
 | `src/workspace/` | Run workspace paths, output-file collection, workspace reads |
 | `src/testing/` | `InMemoryAgentEventLog`, `NoopLlmClient`, recording tracer |
@@ -70,17 +70,24 @@ setting `REDIS_URL` switches to `QueuedDockerSpawnStrategy`, which hands work to
 [`@mediforce/container-worker`](../container-worker/README.md). Plugins are
 written against the strategy interface and never shell out to `docker` directly.
 
-**The agent CLI spawns stdio MCP servers, not the platform.** The plugin only
-writes `mcp-config.json`; `claude` starts each server inside the container and
-holds the agent's first turn until it connects, for at most `MCP_TIMEOUT` (the
-CLI version pinned in [`Dockerfile.base`](container/Dockerfile.base) does).
-`ClaudeCodeAgentPlugin` sets it to 120s when the step binds a stdio server — the
-CLI's own 30s is shorter than a cold `uvx`/`npx` install — unless the workflow
-or step `env` sets `MCP_TIMEOUT` itself. In local mode that also overrides one
+**The agent CLI spawns stdio MCP servers, not the platform.** The base plugin
+resolves the step's servers once (`buildMcpServers`: secrets, OAuth header,
+eval record/replay tape) and each runtime writes that one list into its own
+config — `mcp-config.json` for `claude`, the `mcp` block of `opencode.json` for
+`opencode`, with a binding's `allowedTools` as `permission` deny/allow rules.
+The CLI starts each server inside the container and holds the agent's first
+turn until it connects, for at most `MCP_TIMEOUT` (the CLI versions pinned in
+[`Dockerfile.base`](container/Dockerfile.base) do). Both plugins set it to 120s
+for a stdio server — the CLIs' own 30s is shorter than a cold `uvx`/`npx`
+install — unless the workflow or step `env` sets `MCP_TIMEOUT` itself. Claude
+Code honours it; OpenCode's MCP SDK caps the handshake at 60s whatever it says,
+so its warning points at the image instead. In local mode that also overrides one
 exported in the host shell, and the host's own `claude` decides whether it
-waits at all. A server the CLI reports `failed` or still `pending` at start
+waits at all. A server the CLI reports `failed` or still `pending` at start (OpenCode reports
+this only in its log, which the plugin reads from the output dir)
 becomes a status warning on the run, never a step failure; for a stdio server
-the warning says to raise `MCP_TIMEOUT` in the step's `env`.
+the warning says to raise `MCP_TIMEOUT` in the step's `env` (Claude Code) or to
+install the server in the image (OpenCode).
 
 Every agent that binds an MCP server also gets an `## MCP Servers` section in
 its prompt (`buildPrompt` in the base plugin) telling it to wait up to about two

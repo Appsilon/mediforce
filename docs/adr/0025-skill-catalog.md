@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-10-05
+last_reviewed: 2026-10-07
 ---
 
 # ADR-0025: A Skill is a Namespace resource an Agent owns, not something a Workflow carries
@@ -121,7 +121,7 @@ in the prompt. To make an Agent always use one of its Skills, its
 This keeps an Agent with many Skills from paying for all of them on every
 prompt, and it is the mechanism ADR-0003 removed that we are not bringing back.
 
-### 6. Delivery: a content-hashed Claude Code plugin folder, Claude Code only
+### 6. Delivery: a content-hashed plugin folder, mounted for Claude Code and OpenCode
 
 At run time the Agent's Skills are written to a plugin folder on the host. The
 folder is named by a hash of the Skills' content, so identical Skill sets share
@@ -133,8 +133,10 @@ into one plugin folder. **The Step skill wins on a name clash**; otherwise every
 skill from both sources is visible. The Step skill is the more specific choice,
 and the Workflow Definition that carries it is versioned.
 
-**Claude Code agents only in v1.** OpenCode agents ignore an Agent's Skills,
-and the Agent form says so when its runtime is OpenCode. Delivery assumes the
+**Claude Code and OpenCode agents load the folder.** Claude Code takes it
+through `--plugin-dir`; OpenCode reads the same `/plugin` mount through
+`skills.paths` in `opencode.json` ([#1477](https://github.com/Appsilon/mediforce/issues/1477)).
+The Agent form warns only for runtimes that load neither. Delivery assumes the
 worker shares the host `/tmp` with the step container, as the git skills cache
 already does. Shipping Skill files to a remote worker over Redis is not in v1.
 

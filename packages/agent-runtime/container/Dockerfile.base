@@ -35,8 +35,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
 ARG CLAUDE_CODE_VERSION=2.1.292
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 
-# Install OpenCode CLI
-RUN curl -fsSL https://opencode.ai/install | bash \
+# Install OpenCode CLI, pinned for the same reason. The plugin reads which MCP
+# servers failed from OpenCode's log, whose format changed between 1.15 and 1.17.
+# renovate: datasource=npm depName=opencode-ai
+ARG OPENCODE_VERSION=1.17.8
+RUN curl -fsSL https://opencode.ai/install | bash -s -- --version ${OPENCODE_VERSION} \
   && ln -s /root/.opencode/bin/opencode /usr/local/bin/opencode
 
 # Create standard directories

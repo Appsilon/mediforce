@@ -1,9 +1,12 @@
-import { writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir, readdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { type AgentLogFormat, type PluginCapabilityMetadata, normaliseModelId } from '@mediforce/platform-core';
 export { normaliseModelId };
 import {
   BaseContainerAgentPlugin,
+  DEFAULT_STDIO_MCP_TIMEOUT_MS,
+  type McpConfigEntry,
+  type McpServerStatus,
   type SpawnCliOptions,
   type AgentCommandSpec,
 } from './base-container-agent-plugin';
@@ -11,6 +14,100 @@ import { isWorkflowAgentContext } from './container-plugin';
 
 /** Default model used when agentConfig.model is not set. */
 const OPENCODE_DEFAULT_MODEL = 'deepseek/deepseek-chat';
+
+const OPENCODE_ERROR_PREFIX = '[OpenCode error] ';
+
+/** An `mcp` entry in opencode.json (https://opencode.ai/docs/mcp-servers/). */
+type OpenCodeMcpEntry =
+  | { type: 'local'; command: string[]; environment?: Record<string, string>; timeout: number }
+  | { type: 'remote'; url: string; headers?: Record<string, string>; oauth: false };
+
+type OpenCodePermission = 'allow' | Record<string, 'allow' | 'deny'>;
+
+/** The platform's resolved MCP servers as opencode.json entries. `timeout` is
+ *  how long OpenCode waits for a local server to connect (its default: 30s).
+ *  OAuth discovery is off: the platform already rendered the auth header. */
+function toOpenCodeMcp(servers: Record<string, McpConfigEntry>, localTimeoutMs: number): Record<string, OpenCodeMcpEntry> {
+  const entries: Record<string, OpenCodeMcpEntry> = {};
+  for (const [name, server] of Object.entries(servers)) {
+    entries[name] = server.type === 'stdio'
+      ? {
+        type: 'local',
+        command: [server.command, ...(server.args ?? [])],
+        ...(server.env !== undefined ? { environment: server.env } : {}),
+        timeout: localTimeoutMs,
+      }
+      : {
+        type: 'remote',
+        url: server.url,
+        ...(server.headers !== undefined ? { headers: server.headers } : {}),
+        oauth: false,
+      };
+  }
+  return entries;
+}
+
+/** OpenCode spells an MCP tool `<server>_<tool>`, each part with anything
+ *  outside [A-Za-z0-9_-] replaced by `_`. A `*` stays, as the glob it is in an
+ *  allowedTools entry. */
+function openCodeToolNamePart(name: string): string {
+  return name.replace(/[^A-Za-z0-9_*-]/g, '_');
+}
+
+/** Every tool allowed, except a binding's MCP tools it does not list. A denied
+ *  tool is never offered to the model. Of the rules matching a tool the last
+ *  one wins, so a server's rules follow those of any shorter-named server whose
+ *  wildcard also matches its tools (`github_*` matches `github_enterprise_x`),
+ *  and its listed tools follow its own wildcard. */
+function toolPermissions(servers: Record<string, McpConfigEntry>): OpenCodePermission {
+  const restricted = Object.values(servers).some((server) => (server.allowedTools?.length ?? 0) > 0);
+  if (restricted === false) return 'allow';
+  const rules: Record<string, 'allow' | 'deny'> = { '*': 'allow' };
+  const entries = Object.entries(servers).map(([name, server]) => ({
+    name,
+    prefix: openCodeToolNamePart(name),
+    allowedTools: server.allowedTools ?? [],
+  }));
+  const nameByPrefix = new Map<string, string>();
+  for (const { name, prefix } of entries) {
+    const clashingName = nameByPrefix.get(prefix);
+    if (clashingName !== undefined) {
+      throw new Error(
+        `MCP servers "${clashingName}" and "${name}" both become OpenCode tool prefix "${prefix}_", so allowedTools cannot tell their tools apart. Rename one.`,
+      );
+    }
+    nameByPrefix.set(prefix, name);
+  }
+  const byPrefixLength = entries
+    .sort((left, right) => left.prefix.length - right.prefix.length);
+  for (const { prefix, allowedTools } of byPrefixLength) {
+    rules[`${prefix}_*`] = allowedTools.length > 0 ? 'deny' : 'allow';
+    for (const tool of allowedTools) {
+      rules[`${prefix}_${openCodeToolNamePart(tool)}`] = 'allow';
+    }
+  }
+  return rules;
+}
+
+/** The MCP servers OpenCode's log shows never connected. OpenCode reports MCP
+ *  status nowhere in its `--format json` output, only in its log (INFO level by
+ *  default). From 1.17 a failed server gets a `"server unavailable"` line; 1.15
+ *  logs a `found` line per server and `successfully created client` for each
+ *  one that connected. */
+export function failedMcpServersInLog(openCodeLog: string): string[] {
+  const failed: string[] = [];
+  const found: string[] = [];
+  const connected = new Set<string>();
+  for (const line of openCodeLog.split('\n')) {
+    const unavailable = /message="server unavailable" key=(\S+)/.exec(line);
+    if (unavailable !== null) failed.push(unavailable[1]);
+    const foundMatch = /service=mcp key=(\S+) type=\S+ found$/.exec(line.trim());
+    if (foundMatch !== null) found.push(foundMatch[1]);
+    const connectedMatch = /service=mcp key=(\S+) .*create\(\) successfully created client/.exec(line);
+    if (connectedMatch !== null) connected.add(connectedMatch[1]);
+  }
+  return [...new Set([...failed, ...found.filter((server) => connected.has(server) === false)])];
+}
 
 /**
  * OpenCode agent plugin — runs the OpenCode CLI inside a Docker container.
@@ -48,6 +145,43 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       // XDG override so OpenCode writes auth.json where we mount it
       XDG_DATA_HOME: '/output/.local/share',
     };
+  }
+
+  /** OpenCode passes MCP_TIMEOUT on as each local server's `timeout`, but its
+   *  MCP SDK gives up on a handshake after 60s whatever it says — below the
+   *  120s default, so raising MCP_TIMEOUT never helps here. */
+  protected override mcpStartupHint(server: string): string {
+    if (super.mcpStartupHint(server) === '') return '';
+    return ' OpenCode waits at most 60s for a server to start, so a slower one has to be installed in the image.';
+  }
+
+  protected override async mcpServerStatus(_rawStdout: string, outputDir: string): Promise<McpServerStatus> {
+    // XDG_DATA_HOME points into the output dir (getInternalEnvVars), so the log lands there.
+    const logDir = join(outputDir, '.local', 'share', 'opencode', 'log');
+    let logFiles: string[];
+    try {
+      logFiles = (await readdir(logDir)).filter((name) => name.endsWith('.log'));
+    } catch {
+      return { failed: [], pending: [] };
+    }
+    const logs = await Promise.all(logFiles.map((name) => readFile(join(logDir, name), 'utf-8')));
+    return { failed: failedMcpServersInLog(logs.join('\n')), pending: [] };
+  }
+
+  protected override extractErrorFromResult(resultLine: string): string | null {
+    if (!resultLine) return null;
+    try {
+      const { result, errors } = JSON.parse(resultLine) as { result?: unknown; errors?: unknown };
+      if (Array.isArray(errors) && errors.length > 0) {
+        return errors.join('\n').slice(0, 500);
+      }
+      if (typeof result === 'string' && result.startsWith(OPENCODE_ERROR_PREFIX)) {
+        return result.replaceAll(OPENCODE_ERROR_PREFIX, '').slice(0, 500);
+      }
+    } catch {
+      // not valid JSON
+    }
+    return null;
   }
 
   protected override getLocalInternalEnvVars(outputDir: string): Record<string, string> {
@@ -133,6 +267,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
   }
 
   protected override readonly logFormat: AgentLogFormat = 'opencode-jsonl';
+  protected override readonly loadsAgentSkills = true;
 
   parseAgentOutput(rawStdout: string): string {
     // OpenCode with --format json outputs JSONL events.
@@ -195,6 +330,8 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       return '';
     }
 
+    // Errors travel beside the result so a mid-run failure survives later text events.
+    const errorsField = errors.length > 0 ? { errors } : {};
     const usage = (totalInputTokens > 0 || totalOutputTokens > 0)
       ? {
           input_tokens: totalInputTokens,
@@ -212,26 +349,33 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
         // Extract the JSON object from the text (model may add preamble/postamble)
         const jsonMatch = part.match(/\{[^{}]*"output_file"[^{}]*\}/);
         const contractJson = jsonMatch ? jsonMatch[0] : part;
-        return JSON.stringify({ result: contractJson, ...(usage ? { usage } : {}) });
+        return JSON.stringify({ result: contractJson, ...errorsField, ...(usage ? { usage } : {}) });
       }
     }
 
     // Fallback: use the last text part (most likely the final response)
     if (textParts.length > 0) {
-      return JSON.stringify({ result: textParts[textParts.length - 1], ...(usage ? { usage } : {}) });
+      return JSON.stringify({ result: textParts[textParts.length - 1], ...errorsField, ...(usage ? { usage } : {}) });
     }
 
     // Only errors
-    return JSON.stringify({ result: errors.map((e) => `[OpenCode error] ${e}`).join('\n'), ...(usage ? { usage } : {}) });
+    return JSON.stringify({ result: errors.map((e) => `${OPENCODE_ERROR_PREFIX}${e}`).join('\n'), ...errorsField, ...(usage ? { usage } : {}) });
   }
 
-  protected override async prepareOutputDir(outputDir: string): Promise<void> {
-    await super.prepareOutputDir(outputDir);
+  protected override async writeAgentConfig(outputDir: string, agentOptions?: SpawnCliOptions): Promise<void> {
     const model = normaliseModelId(this.agentConfig.model ?? OPENCODE_DEFAULT_MODEL);
+    const mcpServers = await this.buildMcpServers(outputDir);
     const config: Record<string, unknown> = {
       $schema: 'https://opencode.ai/config.json',
-      permission: 'allow',
+      permission: toolPermissions(mcpServers),
     };
+    if (Object.keys(mcpServers).length > 0) {
+      config.mcp = toOpenCodeMcp(mcpServers, this.localMcpTimeoutMs());
+    }
+    if (agentOptions?.pluginDir !== undefined) {
+      // The plugin root holds the step's and the agent's skills, one folder each.
+      config.skills = { paths: [join(agentOptions.pluginDir, 'skills')] };
+    }
 
     const workflowSecrets = isWorkflowAgentContext(this.context)
       ? this.context.workflowSecrets
@@ -265,5 +409,12 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       const authPath = join(authDir, 'auth.json');
       await writeFile(authPath, JSON.stringify(auth), 'utf-8');
     }
+  }
+
+  /** `MCP_TIMEOUT` from the step env when it is a positive whole number of ms,
+   *  so the knob is the same one a Claude Code step uses. */
+  private localMcpTimeoutMs(): number {
+    const configured = Number(this.resolvedEnv.vars.MCP_TIMEOUT);
+    return Number.isInteger(configured) && configured > 0 ? configured : DEFAULT_STDIO_MCP_TIMEOUT_MS;
   }
 }

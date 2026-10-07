@@ -26,6 +26,10 @@ All four are registered in
 Subclass `BaseContainerAgentPlugin` and implement `getAgentCommand()`,
 `getMockDockerArgs()`, and `parseAgentOutput()`; set `logFormat` to name the
 CLI's stream format, which feeds both the activity log and the Agent Trajectory.
+An agent CLI with its own config file overrides `writeAgentConfig()` and
+serialises `buildMcpServers()` into it, and `mcpServerStatus()` to report MCP
+servers that never connected, so a step's MCP bindings mean the same thing on
+every runtime.
 The base class already handles
 spawning, mounts, git clone, MCP config assembly, environment resolution, and
 output extraction — roughly everything that is hard to get right and identical
@@ -79,8 +83,8 @@ changed file never overwrites what a running step is reading.
 An agent's Skills (ADR-0025) reach the container through the same `/plugin`
 mount. `resolvePluginDir` in `container-plugin.ts` returns the step's own plugin
 root when the agent holds none, so those steps mount exactly what they did
-before. When it holds some and the plugin sets `loadsAgentSkills` (only
-`claude-code-agent`), `materializeAgentSkillsPlugin` writes them, merged with
+before. When it holds some and the plugin sets `loadsAgentSkills`
+(`claude-code-agent` and `opencode-agent`), `materializeAgentSkillsPlugin` writes them, merged with
 the step's skills, to a folder named by their content hashes; the step's
 skill wins a name clash. Other runtimes log that they skip them.
 
