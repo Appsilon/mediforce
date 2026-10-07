@@ -5,7 +5,7 @@ import { Bot, Cpu, Terminal, BarChart3, Settings, Plus, Search } from 'lucide-re
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { getModelDisplayName } from '@/lib/agent-models';
-import { apiFetch } from '@/lib/api-fetch';
+import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { ConceptPopover } from '@/components/ui/concept-intro';
 import type { LucideIcon } from 'lucide-react';
@@ -236,11 +236,8 @@ function AgentCatalog({ handle }: { handle: string }) {
   const [query, setQuery] = useState('');
 
   useEffect(() => {
-    apiFetch(`/api/agents?namespace=${encodeURIComponent(handle)}`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to fetch agent definitions: ${res.status}`);
-        return res.json() as Promise<{ agents: AgentDefinition[] }>;
-      })
+    mediforce.agents
+      .list({ namespace: handle })
       .then((definitionsData) => {
         // Map from runtimeId → definition entry. Dedups definitions that share a
         // runtimeId (e.g. an older seeded doc + the builtin-seeded doc).

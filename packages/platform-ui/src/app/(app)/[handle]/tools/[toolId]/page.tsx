@@ -5,7 +5,6 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Lock, Plug, Shield, Terminal, Users } from 'lucide-react';
 import type { AgentDefinition, ToolCatalogEntry } from '@mediforce/platform-core';
-import { apiFetch } from '@/lib/api-fetch';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { useAuth } from '@/contexts/auth-context';
 
@@ -33,9 +32,7 @@ export default function ToolDetailPage() {
           .catch((err: unknown) =>
             err instanceof ApiError && err.status === 404 ? null : Promise.reject(err),
           ),
-        apiFetch('/api/agents').then(async (res) =>
-          res.ok ? ((await res.json()) as { agents: AgentDefinition[] }).agents : [],
-        ),
+        mediforce.agents.list().then((res) => res.agents),
       ]);
       setEntry(fetchedEntry);
       setAgents(agentList);

@@ -3,18 +3,15 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const listToolCatalogMock = vi.fn();
-const apiFetchMock = vi.fn();
+const listAgentsMock = vi.fn();
 
 vi.mock('@/lib/mediforce', () => ({
   mediforce: {
+    agents: { list: (...args: unknown[]) => listAgentsMock(...args) },
     toolCatalog: {
       list: (...args: unknown[]) => listToolCatalogMock(...args),
     },
   },
-}));
-
-vi.mock('@/lib/api-fetch', () => ({
-  apiFetch: (...args: unknown[]) => apiFetchMock(...args),
 }));
 
 vi.mock('@/hooks/use-namespace-role', () => ({
@@ -37,10 +34,7 @@ import AdminToolCatalogPage from '../page';
 
 beforeEach(() => {
   listToolCatalogMock.mockResolvedValue({ entries: [] });
-  apiFetchMock.mockResolvedValue({
-    ok: true,
-    json: async () => ({ agents: [] }),
-  });
+  listAgentsMock.mockResolvedValue({ agents: [] });
 });
 
 describe('AdminToolCatalogPage', () => {

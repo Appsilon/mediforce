@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { ArrowLeft, Plus } from 'lucide-react';
 import type { AgentDefinition, OAuthProviderConfig } from '@mediforce/platform-core';
 import { OAUTH_PROVIDER_PRESETS } from '@mediforce/platform-core';
-import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
 import { mediforce } from '@/lib/mediforce';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
@@ -56,9 +55,7 @@ export default function AdminOAuthProvidersPage() {
     try {
       const [listRes, agentRes] = await Promise.all([
         mediforce.oauthProviders.list({ namespace: handle }),
-        apiFetch('/api/agents').then(async (res) =>
-          res.ok ? ((await res.json()) as { agents: AgentDefinition[] }).agents : [],
-        ),
+        mediforce.agents.list().then((res) => res.agents),
       ]);
       setProviders(listRes.providers as OAuthProviderConfig[]);
       setAgents(agentRes);
