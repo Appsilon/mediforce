@@ -22,7 +22,6 @@ import type { AgentDefinition, ToolCatalogEntry } from '@mediforce/platform-core
 import { cn } from '@/lib/utils';
 import { ConceptPopover } from '@/components/ui/concept-intro';
 import { routes } from '@/lib/routes';
-import { apiFetch } from '@/lib/api-fetch';
 import { mediforce } from '@/lib/mediforce';
 import { deleteAgentBinding } from '@/lib/agent-mcp-client';
 import { DeleteCatalogEntryDialog } from '@/components/admin/tool-catalog/delete-catalog-entry-dialog';
@@ -228,9 +227,7 @@ export default function ToolsPage() {
     try {
       const [catalog, agentList] = await Promise.all([
         mediforce.toolCatalog.list({ namespace: handle }).then((res) => res.entries),
-        apiFetch(`/api/agents?namespace=${encodeURIComponent(handle)}`).then(async (res) =>
-          res.ok ? ((await res.json()) as { agents: AgentDefinition[] }).agents : [],
-        ),
+        mediforce.agents.list({ namespace: handle }).then((res) => res.agents),
       ]);
       setEntries(catalog);
       setAgents(agentList);

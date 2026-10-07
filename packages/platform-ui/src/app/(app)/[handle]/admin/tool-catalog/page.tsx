@@ -5,7 +5,6 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Plus } from 'lucide-react';
 import type { AgentDefinition, ToolCatalogEntry } from '@mediforce/platform-core';
-import { apiFetch } from '@/lib/api-fetch';
 import { mediforce } from '@/lib/mediforce';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { adminBackHref } from '@/lib/routes';
@@ -45,9 +44,7 @@ export default function AdminToolCatalogPage() {
     try {
       const [fetched, agentRes] = await Promise.all([
         mediforce.toolCatalog.list({ namespace: handle }).then((res) => res.entries),
-        apiFetch('/api/agents').then(async (res) =>
-          res.ok ? ((await res.json()) as { agents: AgentDefinition[] }).agents : [],
-        ),
+        mediforce.agents.list().then((res) => res.agents),
       ]);
       setEntries(fetched);
       setAgents(agentRes);
