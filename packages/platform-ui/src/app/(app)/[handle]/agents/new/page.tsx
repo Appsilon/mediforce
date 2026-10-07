@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { mediforce } from '@/lib/mediforce';
 import type { AgentMcpBindingMap, AgentSkillRef } from '@mediforce/platform-core';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
+import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 import { AgentSkillsSection } from '@/components/agents/agent-skills-section';
 import { AGENT_ICON_OPTIONS, RecognitionLabel } from '@/components/agents/agent-form-parts';
@@ -22,7 +23,9 @@ export default function NewAgentPage() {
   const [description, setDescription] = useState('');
   const [inputDescription, setInputDescription] = useState('');
   const [outputDescription, setOutputDescription] = useState('');
-  const [selectedModelId, setSelectedModelId] = useState('');
+  const pinnedDefaultModel = usePinnedDefaultModel();
+  const [chosenModelId, setChosenModelId] = useState<string | null>(null);
+  const selectedModelId = chosenModelId ?? pinnedDefaultModel;
   const [prompt, setPrompt] = useState('');
   const [mcpServers, setMcpServers] = useState<AgentMcpBindingMap>({});
   const [skills, setSkills] = useState<AgentSkillRef[]>([]);
@@ -147,7 +150,7 @@ export default function NewAgentPage() {
               ariaLabel="Foundation model"
               className="w-full rounded-md border bg-background px-3 py-2 text-sm"
               value={selectedModelId === '' ? undefined : selectedModelId}
-              onChange={(model) => setSelectedModelId(model ?? '')}
+              onChange={(model) => setChosenModelId(model ?? null)}
             />
           </div>
           <p className="text-xs text-muted-foreground">

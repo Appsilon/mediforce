@@ -1,5 +1,5 @@
 import {
-  EVALUATION_ASSISTANT_DEFAULT_MODEL,
+  DEFAULT_MODEL,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   type EvaluationAssistantPlatformToolName,
@@ -54,7 +54,7 @@ export async function askEvaluationAssistant(
   const step = stepRef(input);
   const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'read', input.definitionVersion);
   const apiKey = await requireOpenRouterApiKey(scope, step.namespace);
-  const model = input.model ?? EVALUATION_ASSISTANT_DEFAULT_MODEL;
+  const model = input.model ?? DEFAULT_MODEL;
 
   await recordAssistantPrompt(scope, {
     namespace: step.namespace,

@@ -7,7 +7,7 @@ import {
   WORKFLOW_ASSISTANT_TOOLS,
   WORKFLOW_ASSISTANT_PLATFORM_TOOLS,
   isPlatformToolName,
-  WORKFLOW_ASSISTANT_DEFAULT_MODEL,
+  DEFAULT_MODEL,
   toProcessDefinition,
   mergeVerdictTransitions,
   ensureEntryStepFirst,
@@ -279,7 +279,7 @@ export async function askWorkflowAssistant(
   }
 
   const apiKey = await requireOpenRouterApiKey(scope, input.namespace);
-  const model = input.model ?? WORKFLOW_ASSISTANT_DEFAULT_MODEL;
+  const model = input.model ?? DEFAULT_MODEL;
 
   await recordAssistantPrompt(scope, {
     namespace: input.namespace,

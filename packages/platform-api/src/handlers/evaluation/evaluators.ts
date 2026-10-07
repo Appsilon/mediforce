@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
+import { isMovingModelAlias, type EvaluatorCheck } from '@mediforce/platform-core';
 import type {
   AddEvaluatorVersionInputSchema,
   ArchiveEvaluatorInputSchema,
@@ -30,6 +31,13 @@ export async function getEvaluator(input: GetEvaluatorInput, scope: CallerScope)
   return { evaluator: await evaluatorView(scope, await loadEvaluator(scope, input.evaluatorId)) };
 }
 
+/** A version is immutable (ADR-0023 D7), so its judge must name one model, not an alias that moves. */
+function assertPinnedJudgeModel(check: EvaluatorCheck): void {
+  if ('model' in check && isMovingModelAlias(check.model)) {
+    throw new ValidationError(`The judge model '${check.model}' is an alias whose model changes under the same name; pick a concrete model so this Evaluator version keeps meaning what it scored`);
+  }
+}
+
 const NOT_IN_PRODUCTION = 'An expected-output check never runs in production: a production run has no expected output to compare with';
 
 /** An Evaluator starts at version 1. A `schema` check counts at once; the others wait for the trust gate (D9). */
@@ -48,6 +56,7 @@ export async function createEvaluator(
   const createdBy = authorId(scope);
   const runInProduction = input.runInProduction ?? false;
   if (runInProduction === true && input.check.kind === 'expected_output') throw new ValidationError(NOT_IN_PRODUCTION);
+  assertPinnedJudgeModel(input.check);
   const evaluator = {
     ...step,
     id: randomUUID(),
@@ -104,6 +113,7 @@ export async function addEvaluatorVersion(
   if (input.check !== undefined && (input.check.kind === 'expected_output') !== (latest.check.kind === 'expected_output')) {
     throw new ValidationError(`Evaluator '${evaluator.name}' is ${latest.check.kind === 'expected_output' ? 'an expected-output check and stays one' : `a ${latest.check.kind} check and cannot become an expected-output check`}`);
   }
+  if (input.check !== undefined) assertPinnedJudgeModel(input.check);
   const version = await scope.evaluation.appendEvaluatorVersion(evaluator, {
     evaluatorId: evaluator.id,
     version: latest.version + 1,

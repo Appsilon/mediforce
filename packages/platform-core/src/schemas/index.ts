@@ -277,7 +277,6 @@ export {
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EvaluationAssistantProposalSchema,
-  EVALUATION_ASSISTANT_DEFAULT_MODEL,
   type EvaluationAssistantProposalToolName,
   type EvaluationAssistantPlatformToolName,
   type EvaluationAssistantProposal,
@@ -488,7 +487,6 @@ export {
   RemoveStepToolSchema,
   ListModelsToolSchema,
   WORKFLOW_ASSISTANT_TOOLS,
-  WORKFLOW_ASSISTANT_DEFAULT_MODEL,
   WorkflowAssistantToolCallSchema,
   type AddStepTool,
   type UpdateStepTool,
@@ -627,6 +625,10 @@ export {
 } from './trigger';
 
 export {
+  DEFAULT_MODEL,
+  FALLBACK_PINNED_MODEL,
+  isMovingModelAlias,
+  pinDefaultModel,
   ModelRegistryEntrySchema,
   ModelRegistryMetaSchema,
   CreateModelRegistryEntryInputSchema,

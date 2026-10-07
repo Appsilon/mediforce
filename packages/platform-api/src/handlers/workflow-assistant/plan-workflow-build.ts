@@ -3,7 +3,7 @@ import {
   type PlanWorkflowBuildInput,
   type PlanWorkflowBuildOutput,
 } from '../../contract/workflow-assistant';
-import { WORKFLOW_ASSISTANT_DEFAULT_MODEL } from '@mediforce/platform-core';
+import { DEFAULT_MODEL } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index';
 import { HandlerError } from '../../errors';
 import { callOpenRouter } from '../../services/openrouter-client';
@@ -40,7 +40,7 @@ export async function planWorkflowBuild(
   const apiKey = await requireOpenRouterApiKey(scope, input.namespace);
 
   const response = await callOpenRouter({
-    model: input.model ?? WORKFLOW_ASSISTANT_DEFAULT_MODEL,
+    model: input.model ?? DEFAULT_MODEL,
     apiKey,
     maxTokens: PLAN_MAX_OUTPUT_TOKENS,
     messages: [

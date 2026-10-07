@@ -8,7 +8,7 @@
     "description": "Executes code generation, analysis, and automated software tasks using Claude's advanced coding capabilities.",
     "inputDescription": "Task description and relevant code context",
     "outputDescription": "Generated code, analysis results, or task completion report",
-    "foundationModel": "anthropic/claude-sonnet-4",
+    "foundationModel": "~anthropic/claude-sonnet-latest",
     "systemPrompt": ""
   },
   "opencode-agent": {
@@ -32,7 +32,7 @@
     "description": "Sandboxed execution environment for running custom scripts, data transformations, and automation tasks.",
     "inputDescription": "Script definition and input parameters",
     "outputDescription": "Script execution output and exit status",
-    "foundationModel": "anthropic/claude-sonnet-4",
+    "foundationModel": "~anthropic/claude-sonnet-latest",
     "systemPrompt": ""
   },
   "tealflow-cowork-chat": {
@@ -44,7 +44,7 @@
     "description": "Chat cowork agent with the tealflow MCP server attached for teal module exploration.",
     "inputDescription": "User messages and artifact state",
     "outputDescription": "Teal module selection artifact",
-    "foundationModel": "anthropic/claude-sonnet-4",
+    "foundationModel": "~anthropic/claude-sonnet-latest",
     "systemPrompt": "",
     "mcpServers": {
       "tealflow": { "type": "stdio", "catalogId": "tealflow-mcp" }

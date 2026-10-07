@@ -4,7 +4,7 @@ import { pruneWorkflowSettings } from '@/components/workflows/workflow-settings-
 import type { WorkflowSettingsDraft } from '@/components/workflows/workflow-settings-utils';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Save } from 'lucide-react';
+import { Loader2, Save } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
@@ -13,11 +13,12 @@ import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { mediforceSilent } from '@/lib/mediforce';
 import { validateSteps, toastRegistrationWarnings, handleSaveFailure, DISPLAY_NAME_KEY } from '@/lib/workflow-save-utils';
-import { pastedWorkflowName } from '@/components/workflows/workflow-editor-utils';
+import { pastedWorkflowName, withDefaultModel } from '@/components/workflows/workflow-editor-utils';
+import { useModelRegistry } from '@/hooks/use-model-registry';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
-import { mergeVerdictTransitions, ensureEntryStepFirst } from '@mediforce/platform-core';
+import { mergeVerdictTransitions, ensureEntryStepFirst, pinDefaultModel } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -81,6 +82,18 @@ export default function NewWorkflowPage() {
   const [stepErrors, setStepErrors] = useState<Record<string, Record<string, string>>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [canvasDirty, setCanvasDirty] = useState(false);
+
+  // The template's agent step starts on the same pinned default as a block
+  // added by hand. The canvas reads its steps once on mount, so they are fixed
+  // the first time the registry answers, and a later refetch cannot move them.
+  const modelRegistry = useModelRegistry();
+  const [templateSteps, setTemplateSteps] = useState<WorkflowStep[] | null>(null);
+  useEffect(() => {
+    if (templateSteps !== null) return;
+    if (modelRegistry.data === undefined && modelRegistry.isError === false) return;
+    const defaultModel = pinDefaultModel(modelRegistry.data ?? []);
+    setTemplateSteps(TEMPLATE_STEPS.map((step) => withDefaultModel(step, defaultModel)));
+  }, [templateSteps, modelRegistry.data, modelRegistry.isError]);
 
   // Track current canvas state so the header button can trigger save
   const currentStepsRef = useRef<WorkflowStep[]>(TEMPLATE_STEPS);
@@ -341,29 +354,35 @@ export default function NewWorkflowPage() {
       </div>
 
       {/* Editor canvas */}
-      <WorkflowEditorCanvas
-        initialSteps={TEMPLATE_STEPS}
-        initialTransitions={TEMPLATE_TRANSITIONS}
-        namespace={effectiveNamespace}
-        wdJsonFields={{ ...wdJsonFields, ...settingsDraft }}
-        settingsDraft={settingsDraft}
-        onSettingsChange={setSettingsDraft}
-        onNonGraphFieldsChange={(fields) => {
-          setSettingsDraft(fields);
-          // The create page owns the name and description as form state, so a
-          // paste has to fill the inputs rather than register values the author
-          // cannot see. The name comes from the pasted `title`, not its `name`:
-          // `name` is the definition's id, so using it put "landing-zone-
-          // CDISCPILOT01" where "Landing Zone — CDISCPILOT01" belongs, and the
-          // id this page registers is slugified from the field anyway.
-          if (typeof fields.description === 'string') setDescription(fields.description);
-          const pastedName = pastedWorkflowName(fields);
-          if (pastedName !== null) setWorkflowName(pastedName);
-        }}
-        onChange={handleCanvasChange}
-        onDirtyChange={setCanvasDirty}
-        stepErrors={stepErrors}
-      />
+      {templateSteps === null ? (
+        <div className="flex flex-1 items-center justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <WorkflowEditorCanvas
+          initialSteps={templateSteps}
+          initialTransitions={TEMPLATE_TRANSITIONS}
+          namespace={effectiveNamespace}
+          wdJsonFields={{ ...wdJsonFields, ...settingsDraft }}
+          settingsDraft={settingsDraft}
+          onSettingsChange={setSettingsDraft}
+          onNonGraphFieldsChange={(fields) => {
+            setSettingsDraft(fields);
+            // The create page owns the name and description as form state, so a
+            // paste has to fill the inputs rather than register values the author
+            // cannot see. The name comes from the pasted `title`, not its `name`:
+            // `name` is the definition's id, so using it put "landing-zone-
+            // CDISCPILOT01" where "Landing Zone — CDISCPILOT01" belongs, and the
+            // id this page registers is slugified from the field anyway.
+            if (typeof fields.description === 'string') setDescription(fields.description);
+            const pastedName = pastedWorkflowName(fields);
+            if (pastedName !== null) setWorkflowName(pastedName);
+          }}
+          onChange={handleCanvasChange}
+          onDirtyChange={setCanvasDirty}
+          stepErrors={stepErrors}
+        />
+      )}
 
       <UnsavedChangesGuard when={hasUnsavedChanges} />
 

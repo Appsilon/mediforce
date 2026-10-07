@@ -31,7 +31,7 @@ describe('OpenRouterLlmClient tracing', () => {
     const response = await client.complete([
       { role: 'system', content: 'You are a reviewer.' },
       { role: 'user', content: 'Review this output.' },
-    ]);
+    ], 'anthropic/claude-sonnet-4');
 
     expect(response.usage).toEqual({ promptTokens: 11, completionTokens: 7 });
 
@@ -63,11 +63,11 @@ describe('OpenRouterLlmClient tracing', () => {
       }),
     );
 
-    const client = new OpenRouterLlmClient('test-api-key', 'anthropic/claude-sonnet-4', {
+    const client = new OpenRouterLlmClient('test-api-key', {
       captureContent: true,
     });
 
-    await client.complete([{ role: 'user', content: 'Summarize this.' }]);
+    await client.complete([{ role: 'user', content: 'Summarize this.' }], 'anthropic/claude-sonnet-4');
 
     const span = tracerProvider.spans[0];
     expect(span.attributes['gen_ai.prompt.0.role']).toBe('user');

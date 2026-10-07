@@ -350,7 +350,6 @@ export {
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EvaluationAssistantProposalSchema,
-  EVALUATION_ASSISTANT_DEFAULT_MODEL,
   type EvaluationAssistantProposalToolName,
   type EvaluationAssistantPlatformToolName,
   type EvaluationAssistantProposal,
@@ -534,7 +533,6 @@ export {
   WORKFLOW_ASSISTANT_TOOLS,
   WORKFLOW_ASSISTANT_PLATFORM_TOOLS,
   isPlatformToolName,
-  WORKFLOW_ASSISTANT_DEFAULT_MODEL,
   WORKFLOW_ASSISTANT_INSTRUCTIONS_MAX_CHARS,
   WorkflowAssistantToolCallSchema,
   applyWorkflowAssistantToolCalls,
@@ -673,6 +671,10 @@ export {
 
 // Model registry schema + repository interface
 export {
+  DEFAULT_MODEL,
+  FALLBACK_PINNED_MODEL,
+  isMovingModelAlias,
+  pinDefaultModel,
   ModelRegistryEntrySchema,
   ModelRegistryMetaSchema,
   CreateModelRegistryEntryInputSchema,

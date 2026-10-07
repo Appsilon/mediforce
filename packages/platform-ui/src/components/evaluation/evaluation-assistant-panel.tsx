@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Bot, Check, Loader2, Send, Settings, Sparkles, User, X } from 'lucide-react';
-import { EVALUATION_ASSISTANT_DEFAULT_MODEL } from '@mediforce/platform-core';
+import { DEFAULT_MODEL } from '@mediforce/platform-core';
 import type {
   EvaluatedStep,
   EvaluationAssistantPlatformToolName,
@@ -249,7 +249,7 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
           <ModelPicker
             value={assistantModel}
             onChange={setAssistantModel}
-            defaultModel={EVALUATION_ASSISTANT_DEFAULT_MODEL}
+            defaultModel={DEFAULT_MODEL}
             requireToolSupport
             minContextTokens={32000}
             ariaLabel="Evaluation Assistant Model"

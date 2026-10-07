@@ -325,7 +325,6 @@ export function getPlatformServices(): PlatformServices {
 
   const llmClient = new OpenRouterLlmClient(
     process.env.OPENROUTER_API_KEY ?? '',
-    'anthropic/claude-sonnet-4',
     otelTracingOptions,
   );
 
@@ -488,7 +487,7 @@ export function getPlatformServices(): PlatformServices {
 
   if (!seedingStarted) {
     seedingStarted = true;
-    seedBuiltinAgentDefinitions(agentDefinitionRepo).catch((err) => {
+    seedBuiltinAgentDefinitions(agentDefinitionRepo, modelRegistryRepo).catch((err) => {
       console.error('[platform-services] Failed to seed built-in agent definitions:', err);
     });
     seedBuiltinToolCatalog(toolCatalogRepo).catch((err) => {

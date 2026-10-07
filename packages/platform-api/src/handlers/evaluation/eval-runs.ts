@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import {
   DEFAULT_ACCEPTANCE_CRITERIA,
+  applyAgentModel,
   evaluatorTrust,
+  isMovingModelAlias,
   resolveDefinitionModels,
   type EvalRun,
   type EvalRunEvaluator,
@@ -106,6 +108,12 @@ async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, s
   if (frozenEvaluators.length === 0) throw new ValidationError(`Step '${step.stepId}' has no Evaluators to run`);
 
   const agent = workflowStep.agentId === undefined ? null : await scope.agentDefinitions.getById(workflowStep.agentId);
+  const model = applyAgentModel(workflowStep, agent?.foundationModel || undefined).agent?.model;
+  if (model !== undefined && isMovingModelAlias(model)) {
+    throw new ValidationError(
+      `Step '${step.stepId}' runs on '${model}', an alias whose model changes under the same name, so its Fingerprint would not say which model was evaluated (ADR-0023 D5). Pin a concrete model on the step or its Agent.`,
+    );
+  }
   const agentServers = Object.keys(agent?.mcpServers ?? {});
   const policy = await scope.evaluation.getMcpPolicy(step);
   const mcpPolicy: Record<string, McpEvalServerPolicy> = Object.fromEntries(

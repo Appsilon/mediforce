@@ -22,6 +22,14 @@ interface ModelPickerProps {
    * would truncate and fail — filter those out rather than let the user pick one.
    */
   minContextTokens?: number;
+  /** Offer only models from these providers — the plugin can run no others.
+   *  Absent means every provider. */
+  providers?: readonly string[];
+}
+
+/** `anthropic` for `anthropic/claude-sonnet-4.6` and `~anthropic/claude-sonnet-latest`. */
+function modelProvider(modelId: string): string {
+  return modelId.replace(/^~/, '').split('/')[0];
 }
 
 function formatContext(tokens: number): string {
@@ -38,13 +46,14 @@ function formatPrice(perToken: number): string {
 
 const TOP_PICKS_COUNT = 20;
 
-export function ModelPicker({ value, onChange, defaultModel, ariaLabel, className, requireToolSupport, minContextTokens, showAllModels }: ModelPickerProps) {
+export function ModelPicker({ value, onChange, defaultModel, ariaLabel, className, requireToolSupport, minContextTokens, showAllModels, providers }: ModelPickerProps) {
   const [allModels, setModels] = useState<ModelRegistryEntry[]>([]);
   const models = useMemo(
     () => allModels
       .filter((m) => (requireToolSupport ? m.supportsTools : true))
-      .filter((m) => (minContextTokens !== undefined ? m.contextLength >= minContextTokens : true)),
-    [allModels, requireToolSupport, minContextTokens],
+      .filter((m) => (minContextTokens !== undefined ? m.contextLength >= minContextTokens : true))
+      .filter((m) => (providers !== undefined ? providers.includes(modelProvider(m.id)) : true)),
+    [allModels, requireToolSupport, minContextTokens, providers],
   );
   const hiddenForContext = useMemo(
     () => (minContextTokens === undefined ? 0
@@ -97,6 +106,14 @@ export function ModelPicker({ value, onChange, defaultModel, ariaLabel, classNam
 
   const displayDefault = defaultModel ?? 'plugin default';
   const isCustom = value !== undefined && value !== '' && !topPicks.some((m) => m.id === value);
+  const unsupportedProvider = value !== undefined && value !== '' && providers !== undefined
+    && providers.includes(modelProvider(value)) === false;
+  const providerWarning = unsupportedProvider && (
+    <p className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+      This plugin runs only {providers.join(', ')} models — pick one of those or change the plugin.
+    </p>
+  );
 
   if (customInput) {
     return (
@@ -123,6 +140,7 @@ export function ModelPicker({ value, onChange, defaultModel, ariaLabel, classNam
         </datalist>
         {selectedModel && <ModelMeta model={selectedModel} />}
         {retiredModel && <RetiredWarning model={retiredModel} />}
+        {providerWarning}
       </div>
     );
   }
@@ -177,6 +195,7 @@ export function ModelPicker({ value, onChange, defaultModel, ariaLabel, classNam
         <ModelMeta model={(selectedModel ?? defaultModelMeta(models, defaultModel))!} />
       )}
       {retiredModel && <RetiredWarning model={retiredModel} />}
+      {providerWarning}
     </div>
   );
 }

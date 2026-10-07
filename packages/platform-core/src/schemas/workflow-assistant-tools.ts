@@ -202,8 +202,6 @@ export const WorkflowAssistantToolCallSchema = z.discriminatedUnion('tool', [
 ]);
 export type WorkflowAssistantToolCall = z.infer<typeof WorkflowAssistantToolCallSchema>;
 
-export const WORKFLOW_ASSISTANT_DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
-
 /**
  * Cap on a person's standing instructions for the assistant in one workspace.
  *

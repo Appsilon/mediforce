@@ -186,10 +186,29 @@ default for small glue.
 Full model IDs come from the OpenRouter-synced registry, populated by
 [`sync-models.ts`](../../packages/platform-api/src/handlers/models/sync-models.ts)
 and queried with `mediforce model list` / `mediforce model validate` (both need
-a deployment + API key). Offline, prefer short Claude aliases (`sonnet`, `opus`,
-`haiku`): the `claude-code-agent` plugin passes `--model` straight through, and
-the runtime default is `anthropic/claude-sonnet-4`
-([`llm-client.ts`](../../packages/agent-runtime/src/runner/llm-client.ts)).
+a deployment + API key). Offline, pin a concrete full ID
+(`anthropic/claude-sonnet-5.5`). An OpenRouter moving alias (`~…-latest`) is
+refused by an Eval Run; the CLI's short names (`sonnet`, `opus`, `haiku`) are
+accepted but also move under the same string, so a qualification against them
+goes silently stale — avoid them in new steps.
+That plugin runs Anthropic models only, so the step editor's model picker lists
+only `anthropic/*` models for it — a plugin declares this in its capability
+metadata (`modelProviders`); `opencode-agent` declares none and runs any provider.
+Where the platform picks a model for a call nobody saves (assistants, cowork
+chat, voice synthesis) it is `DEFAULT_MODEL`, OpenRouter's newest-Sonnet alias
+`~anthropic/claude-sonnet-latest`. A default that gets saved (a new agent, an
+agent or cowork chat step the editor creates — added by hand or by the AI
+Assistant, or from the new-workflow template — a new LLM judge, a seeded agent)
+is pinned instead to the newest concrete Sonnet the registry lists
+(`pinDefaultModel`), or to `FALLBACK_PINNED_MODEL` while the registry lists
+none — never the alias. So a workflow authored when Sonnet 5.5 is newest keeps
+naming Sonnet 5.5 after Sonnet 6 ships, and its step fingerprint and scored
+Evaluator versions keep meaning the model they were qualified with
+([`model-registry.ts`](../../packages/platform-core/src/schemas/model-registry.ts)).
+An Eval Run evaluates exactly the model the step pins (its own, or its Agent's
+when it names none). The server enforces the pin: an Evaluator version whose
+judge names a `~` alias, and an Eval Run on a step whose model is one, are
+refused ([ADR-0023](../adr/0023-step-evaluation.md) D5, D7).
 
 ## Agents — autonomy, reliability, review, internet access
 

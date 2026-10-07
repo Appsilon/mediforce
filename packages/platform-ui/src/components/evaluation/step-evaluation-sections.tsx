@@ -42,6 +42,7 @@ import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { AgentRunLog } from '@/components/agents/agent-log-panel';
 import { useAgentRun } from '@/hooks/use-agent-runs';
 import { useAgentRunIo, useEvalRunEstimate, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
+import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { formatCostUsd } from '@/lib/format';
 import { routes } from '@/lib/routes';
 import { AcceptanceBadge, EvalRunStatusBadge } from './eval-run-badges';
@@ -230,6 +231,7 @@ function EvaluatorForm({ initial, editing = false, stepOutputSchema, submitLabel
 }) {
   const [values, setValues] = React.useState(initial);
   const [draftError, setDraftError] = React.useState<string | null>(null);
+  const judgeModel = usePinnedDefaultModel();
   const submit = () => {
     const result = checkFromDraft(values.draft);
     if ('error' in result) {
@@ -262,7 +264,7 @@ function EvaluatorForm({ initial, editing = false, stepOutputSchema, submitLabel
           disabled={editing}
           onChange={(event) => {
             const kind = EvaluatorKindSchema.parse(event.target.value);
-            setValues({ ...values, draft: emptyCheckDraft(kind, stepOutputSchema) });
+            setValues({ ...values, draft: emptyCheckDraft(kind, stepOutputSchema, judgeModel) });
           }}
         >
           {EvaluatorKindSchema.options.map((kind) => <option key={kind} value={kind}>{CHECK_KINDS[kind].label}</option>)}

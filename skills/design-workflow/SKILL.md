@@ -287,10 +287,12 @@ resolve model IDs against the registry, but both **hit the platform** — they n
 a reachable deployment and `MEDIFORCE_API_KEY`, so they do **not** work against a
 bare checkout. Treat them as optional. When authoring offline:
 
-- Prefer short Claude aliases (`sonnet`, `opus`, `haiku`) — the
-  `claude-code-agent` plugin passes `--model` straight through, and the runtime
-  default is `anthropic/claude-sonnet-4`.
-- Or copy a full ID already used in an example / `apps/*` workflow.
+- Pin a concrete full ID (e.g. `anthropic/claude-sonnet-5.5`) — an Eval Run
+  evaluates the model the step pins. Never write an OpenRouter moving alias
+  (`~anthropic/claude-sonnet-latest`): an Eval Run on it is refused. The CLI's
+  short names (`sonnet` / `opus` / `haiku`) also move under the same string, so
+  a qualification would go silently stale — avoid them in new steps (some
+  `apps/*` workflows still use them).
 - The registry itself is populated from OpenRouter (`sync-models.ts`); see the
   Models section of `docs/reference/workflow-capabilities.md` for the source pointers.
 

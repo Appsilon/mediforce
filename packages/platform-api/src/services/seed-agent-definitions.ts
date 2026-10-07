@@ -4,8 +4,9 @@ import { fileURLToPath } from 'node:url';
 import type {
   AgentDefinitionRepository,
   CreateAgentDefinitionInput,
+  ModelRegistryRepository,
 } from '@mediforce/platform-core';
-import { CreateAgentDefinitionInputSchema } from '@mediforce/platform-core';
+import { CreateAgentDefinitionInputSchema, DEFAULT_MODEL, pinDefaultModel } from '@mediforce/platform-core';
 
 /** Deterministic slug → AgentDefinition body. Slug doubles as Firestore
  *  doc id so wd.json files can reference it via step.agentId without
@@ -16,7 +17,8 @@ import { CreateAgentDefinitionInputSchema } from '@mediforce/platform-core';
  *  drift in the JSON surfaces at startup, not at the first call site.
  *
  *  Idempotent: only writes when the doc is missing — user edits via the
- *  Agents UI are preserved across restarts. */
+ *  Agents UI are preserved across restarts. A seed on `DEFAULT_MODEL` is
+ *  pinned to the concrete model the registry resolves it to at write time. */
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -37,12 +39,14 @@ const BUILTIN_AGENTS = loadBuiltinAgents();
 
 export async function seedBuiltinAgentDefinitions(
   repo: AgentDefinitionRepository,
+  modelRegistryRepo: ModelRegistryRepository,
 ): Promise<void> {
+  const pinnedDefault = pinDefaultModel(await modelRegistryRepo.list());
   await Promise.all(
     Object.entries(BUILTIN_AGENTS).map(async ([id, body]) => {
       const existing = await repo.getById(id);
       if (existing === null) {
-        await repo.upsert(id, body);
+        await repo.upsert(id, body.foundationModel === DEFAULT_MODEL ? { ...body, foundationModel: pinnedDefault } : body);
       }
     }),
   );

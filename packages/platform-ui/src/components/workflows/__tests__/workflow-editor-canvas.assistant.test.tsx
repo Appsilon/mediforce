@@ -61,6 +61,10 @@ vi.mock('@/hooks/use-image-catalog', () => ({
   useImageCatalogEntries: () => ({ entries: [], loading: false, error: null }),
 }));
 
+vi.mock('@/hooks/use-model-registry', () => ({
+  usePinnedDefaultModel: () => 'anthropic/claude-sonnet-5.5',
+}));
+
 vi.mock('../workflow-editor/step-editor', () => ({
   StepEditor: () => <div data-testid="step-editor" />,
 }));

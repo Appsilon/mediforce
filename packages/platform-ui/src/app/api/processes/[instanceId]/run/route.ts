@@ -5,7 +5,7 @@ import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { advanceEvalRunOfInstance, checkRetiredModels, checkUnknownModels } from '@mediforce/platform-api/handlers';
 import { defaultBuildScope } from '@/lib/route-adapter';
-import { resolveCoworkOutputSchema, resolveDefinitionModels, resolveStepTimeoutMs, buildTaskVerdicts, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
+import { DEFAULT_MODEL, resolveCoworkOutputSchema, resolveDefinitionModels, resolveStepTimeoutMs, buildTaskVerdicts, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -401,7 +401,7 @@ export async function POST(
             const voiceConfig = agentType === 'voice-realtime'
               ? {
                   voice: currentStep.cowork?.voiceRealtime?.voice ?? 'alloy',
-                  synthesisModel: currentStep.cowork?.voiceRealtime?.synthesisModel ?? 'anthropic/claude-sonnet-4',
+                  synthesisModel: currentStep.cowork?.voiceRealtime?.synthesisModel ?? DEFAULT_MODEL,
                   maxDurationSeconds: currentStep.cowork?.voiceRealtime?.maxDurationSeconds ?? 600,
                   idleTimeoutSeconds: currentStep.cowork?.voiceRealtime?.idleTimeoutSeconds ?? 60,
                 }

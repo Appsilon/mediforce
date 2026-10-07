@@ -16,11 +16,16 @@ import { isWorkflowAgentContext } from './container-plugin';
  * API directly it is not: there a model is a bare id (`claude-sonnet-4`), so the
  * provider prefix has to come off, and a non-Anthropic model cannot be served at
  * all — better to say so than to quietly run a different model than the one the
- * step and the audit trail name.
+ * step and the audit trail name. OpenRouter's "newest of a family" alias
+ * (`~anthropic/claude-sonnet-latest`) becomes the CLI's alias for the same
+ * family (`sonnet`).
  */
 export function resolveClaudeModel(model: string, viaGateway: boolean): string {
   const separator = model.indexOf('/');
   if (viaGateway || separator < 0) return model;
+
+  const latestAlias = /^~anthropic\/claude-([a-z]+)-latest$/.exec(model);
+  if (latestAlias !== null) return latestAlias[1];
 
   const provider = model.slice(0, separator);
   if (provider !== 'anthropic') {
@@ -97,6 +102,7 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
       'Examples: extracted metadata, generated code, analysis reports.',
     roles: ['executor'],
     foundationModel: 'Claude Sonnet 4.6',
+    modelProviders: ['anthropic'],
     requiredEnv: [['ANTHROPIC_API_KEY'], ['OPENROUTER_API_KEY', 'ANTHROPIC_BASE_URL']],
   };
 

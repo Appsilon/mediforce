@@ -1025,6 +1025,15 @@ describe('ClaudeCodeAgentPlugin', () => {
         expect(spec.args[spec.args.indexOf('--model') + 1]).toBe('claude-sonnet-4');
       });
 
+      it('[DATA] maps an OpenRouter latest alias to the CLI alias of the same family when talking to the Anthropic API directly', async () => {
+        await plugin.initialize(buildMockContext());
+        withEnv(plugin, { ANTHROPIC_API_KEY: 'sk-ant-x' });
+
+        const spec = plugin.getAgentCommand('/output/prompt.txt', { model: '~anthropic/claude-sonnet-latest' });
+
+        expect(spec.args[spec.args.indexOf('--model') + 1]).toBe('sonnet');
+      });
+
       it('[DATA] leaves an already-bare Anthropic id or CLI alias alone', async () => {
         await plugin.initialize(buildMockContext());
         withEnv(plugin, { ANTHROPIC_API_KEY: 'sk-ant-x' });
