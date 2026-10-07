@@ -107,7 +107,7 @@ An Evaluator check that cannot run comes back as `error`, never as a failed
 output (`_lib/run-evaluator-check.ts`). Evaluators flagged `runInProduction`
 (`setEvaluatorProduction`) score live runs through `_lib/production-evaluators.ts`,
 the runner's output gate: counted `schema`/`code` ones run inline and a failing
-critical one sends the run to the step's fallback; `llm_judge` ones only write
+one sends the run to the step's fallback; `llm_judge` ones only write
 Scores, asynchronously (D13). Nothing here approves a `code` check's
 source or reviews a judge verdict on anyone's behalf: both record the person who did
 it, and an API key must name them. A synthesized Eval Case's file changes are the

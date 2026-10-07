@@ -37,8 +37,8 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
       runKicker: kicker,
     });
 
-    await createEvaluator({ ...STEP, name: 'findings-present', rule: 'The result lists findings.', severity: 'critical', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
-    await createEvaluator({ ...STEP, name: 'fatal-flagged', rule: 'A fatal AE is flagged.', severity: 'major', check: { kind: 'code', runtime: 'python', source: 'print(1)' }, origin: 'assistant' }, scope);
+    await createEvaluator({ ...STEP, name: 'findings-present', rule: 'The result lists findings.', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
+    await createEvaluator({ ...STEP, name: 'fatal-flagged', rule: 'A fatal AE is flagged.', check: { kind: 'code', runtime: 'python', source: 'print(1)' }, origin: 'assistant' }, scope);
     for (const name of ['Grade 5 sepsis', 'Grade 4 neutropenia']) {
       await createEvalCase({
         ...STEP,
@@ -87,7 +87,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
       ['findings-present', true, undefined],
     ]);
     expect(evalRun.mcpPolicy).toEqual({ edc: { mode: 'live' }, email: { mode: 'live' } });
-    expect(evalRun.acceptanceCriteria).toEqual({ critical: { minPassRate: 1 }, major: { minPassRate: 1 }, minor: { minPassRate: 1 } });
+    expect(evalRun.acceptanceCriteria).toEqual({ minPassRate: 1 });
     expect(evalRun.estimate).toMatchObject({ perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 });
     expect(trials).toHaveLength(4);
     expect(report.trials).toMatchObject({ total: 4, inProgress: 4 });
@@ -95,12 +95,12 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
 
   it('runs the step over every case with its Fingerprint, freezing the criteria in force — and no Brief', async () => {
     await setEvaluationBrief({ ...STEP, text: 'Grades AEs for the DSMB.', origin: 'user' }, scope);
-    await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.9 } }, origin: 'user' }, scope);
+    await setAcceptanceCriteria({ ...STEP, criteria: { minPassRate: 0.9 }, origin: 'user' }, scope);
 
     const { evalRun, trials } = await prepareEvalRun({ ...STEP, trialsPerCase: 2, concurrency: 2, budgetUsd: 5 }, scope);
 
     expect(evalRun.fingerprint).not.toBeNull();
-    expect(evalRun).toMatchObject({ acceptanceCriteria: { critical: { minPassRate: 0.9 } } });
+    expect(evalRun).toMatchObject({ acceptanceCriteria: { minPassRate: 0.9 } });
     expect(evalRun).not.toHaveProperty('briefVersion');
     expect(trials).toHaveLength(2 * 2);
   });
@@ -270,7 +270,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
   /** Adds an LLM judge Evaluator whose every call spends 4000 tokens in and 500 out, priced as `prices` says. */
   async function withJudge(prices: ReadonlyArray<{ id: string; pricing: { input: number; output: number } }>) {
     await createEvaluator({
-      ...STEP, name: 'grades-present', rule: 'Every AE carries a grade.', severity: 'major', origin: 'user',
+      ...STEP, name: 'grades-present', rule: 'Every AE carries a grade.', origin: 'user',
       check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Every AE carries a grade.', minConfidence: 0.7 },
     }, scope);
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({

@@ -15,7 +15,7 @@ describe('getStepDrift', () => {
   beforeEach(async () => {
     fixture = await evaluationFixture();
     const { evaluator } = await createEvaluator(
-      { ...STEP, name: 'findings-present', rule: 'The result lists findings.', severity: 'major', check: findingsSchema, origin: 'user', runInProduction: true },
+      { ...STEP, name: 'findings-present', rule: 'The result lists findings.', check: findingsSchema, origin: 'user', runInProduction: true },
       fixture.scope(),
     );
     evaluatorId = evaluator.id;
@@ -56,7 +56,7 @@ describe('getStepDrift', () => {
       window: 4,
       threshold: 0.25,
       evaluators: [{
-        evaluatorId, name: 'findings-present', severity: 'major', evaluatorVersion: 1,
+        evaluatorId, name: 'findings-present', evaluatorVersion: 1,
         recentMean: 0.25, baselineMean: 1, recentCount: 4, baselineCount: 4, drifting: true,
       }],
     });
@@ -96,7 +96,7 @@ describe('getStepDrift', () => {
 
   it('leaves out Evaluators that do not run in production', async () => {
     await createEvaluator(
-      { ...STEP, name: 'grade-5-flagged', rule: 'r', severity: 'critical', check: findingsSchema, origin: 'user' },
+      { ...STEP, name: 'grade-5-flagged', rule: 'r', check: findingsSchema, origin: 'user' },
       fixture.scope(),
     );
 

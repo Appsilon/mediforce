@@ -47,7 +47,7 @@ describe('getEvalRunFailures (ADR-0023 D14)', () => {
       agentRunId: expect.any(String),
       error: null,
       evaluators: [expect.objectContaining({
-        name: 'findings-present', severity: 'critical', kind: 'schema', counted: true, outcome: 'failed', error: null,
+        name: 'findings-present', kind: 'schema', counted: true, outcome: 'failed', error: null,
       })],
     }]);
   });

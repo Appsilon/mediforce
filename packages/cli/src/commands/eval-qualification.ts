@@ -27,8 +27,8 @@ export const evalCriteriaGetCommand = defineCommand({
 
 export const evalCriteriaSetCommand = defineCommand({
   name: 'mediforce eval criteria-set',
-  description: 'Set a step\'s Acceptance Criteria from a JSON file: { "critical": { "minPassRate": 0.95, "minPassHatK": 0.9 }, "major": { "minPassRate": 0.8 } }.',
-  args: { ...STEP_ARGS, file: { type: 'string', required: true, description: 'JSON file with the criteria per severity' } },
+  description: 'Set a step\'s Acceptance Criteria from a JSON file: { "minPassRate": 0.95, "minPassHatK": 0.9 }. Every counted Evaluator must reach them.',
+  args: { ...STEP_ARGS, file: { type: 'string', required: true, description: 'JSON file with minPassRate and, optionally, minPassHatK' } },
   async run({ args, output, mediforce, jsonMode }) {
     const result = await mediforce.evaluation.setAcceptanceCriteria({
       ...stepFrom(args),
@@ -65,7 +65,7 @@ export const evalQualificationCommand = defineCommand({
     output.stdout(`signed by ${qualification.signature.signerName} at ${qualification.signature.signedAt} for Eval Run ${qualification.evalRunId}`);
     output.stdout(`criteria: ${describeCriteria(qualification.acceptanceCriteria)}`);
     output.stdout(describeMcpPolicy(qualification.mcpPolicy));
-    for (const deviation of qualification.deviations) output.stdout(`deviation (${deviation.severity}): ${deviation.justification}`);
+    for (const deviation of qualification.deviations) output.stdout(`deviation${deviation.severity === undefined ? '' : ` (${deviation.severity})`}: ${deviation.justification}`);
     if (result.changed.length > 0) output.stdout(`changed since: ${result.changed.join(', ')}`);
     for (const change of result.evaluatorsChanged) output.stdout(`evaluators changed: ${change}`);
     return 0;

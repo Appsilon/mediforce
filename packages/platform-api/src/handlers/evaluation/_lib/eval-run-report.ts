@@ -140,12 +140,10 @@ function confidenceOutcomes(run: EvalRun, trials: readonly EvalTrial[], scores: 
  * A criterion is met on the whole frozen Dataset or not at all: while some
  * trial failed or was skipped, one the scored trials reached is not judged.
  */
-function judgedOnEveryTrial(verdicts: AcceptanceCriterionVerdict[], counts: EvalRunReport['trials']): AcceptanceCriterionVerdict[] {
+function judgedOnEveryTrial(verdict: AcceptanceCriterionVerdict | null, counts: EvalRunReport['trials']): AcceptanceCriterionVerdict | null {
   const unscored = counts.failed + counts.skipped;
-  if (unscored === 0) return verdicts;
-  return verdicts.map((verdict): AcceptanceCriterionVerdict => (verdict.status === 'met'
-    ? { ...verdict, status: 'not_evaluable', reason: `${unscored} of ${counts.total} trials failed or were skipped, so the Dataset was not evaluated in full` }
-    : verdict));
+  if (verdict === null || unscored === 0 || verdict.status !== 'met') return verdict;
+  return { ...verdict, status: 'not_evaluable', reason: `${unscored} of ${counts.total} trials failed or were skipped, so the Dataset was not evaluated in full` };
 }
 
 /**
@@ -200,7 +198,6 @@ function judgeVerdicts(
       agentRunId: trial.agentRunId!,
       evaluatorId: judge.evaluatorId,
       name: judge.name,
-      severity: judge.severity,
       scoreId: score.id,
       passed: isPass(score),
       ...judgeConfidenceOf(score),
@@ -260,7 +257,7 @@ export async function buildEvalRunReport(scope: CallerScope, run: EvalRun, trial
   const counts = trialCounts(trials);
   // An Evaluator no case selects grades nothing, so it is left out of the criteria like one that does not count.
   const grading = evaluators.filter((evaluator) => trials.some((trial) => gradesTrial(run, cases, trial, evaluator.evaluatorId)));
-  const criteria = judgedOnEveryTrial(judgeAcceptanceCriteria(run.acceptanceCriteria, grading), counts);
+  const criteriaVerdict = judgedOnEveryTrial(judgeAcceptanceCriteria(run.acceptanceCriteria, grading), counts);
   const outcomes = confidenceOutcomes(run, trials, scores, cases);
   // Routing is recommended on finished results only.
   const finished = counts.inProgress === 0 && counts.scored > 0;
@@ -271,9 +268,9 @@ export async function buildEvalRunReport(scope: CallerScope, run: EvalRun, trial
     trials: counts,
     mcp: await mcpReport(scope, run, trials),
     evaluators,
-    criteria,
+    criteriaVerdict,
     confidence: calibrateConfidence(outcomes),
-    recommendation: finished ? recommendControl(outcomes, criteria) : null,
+    recommendation: finished ? recommendControl(outcomes, criteriaVerdict) : null,
     judgeVerdicts: judgeVerdicts(run, trials, scores, cases),
     trialResults: trialResults(run, trials, scores, cases),
     costUsd: costs.reduce((sum, cost) => sum + cost, 0),

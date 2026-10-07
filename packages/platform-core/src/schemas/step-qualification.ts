@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import {
-  AcceptanceCriteriaSchema,
   EvaluatedStepSchema,
-  EvaluatorSeveritySchema,
+  LegacyEvaluatorSeveritySchema,
   McpEvalServerPolicySchema,
+  SignedAcceptanceCriteriaSchema,
 } from './evaluation';
 import {
   AcceptanceCriterionVerdictSchema,
@@ -11,9 +11,13 @@ import {
   StepFingerprintSchema,
 } from './eval-run';
 
-/** Signing although a criterion was missed, or could not be judged, records why (D10). */
+/**
+ * Signing although the criteria were missed, or could not be judged, records
+ * why (D10). One signed while Evaluators had a severity carries one per
+ * severity, naming it.
+ */
 export const QualificationDeviationSchema = z.object({
-  severity: EvaluatorSeveritySchema,
+  severity: LegacyEvaluatorSeveritySchema.optional(),
   justification: z.string().trim().min(1).max(4000),
 });
 
@@ -50,8 +54,10 @@ export const StepQualificationSchema = EvaluatedStepSchema.extend({
   fingerprint: StepFingerprintSchema,
   evaluators: z.array(EvalRunEvaluatorSchema),
   mcpPolicy: z.record(z.string(), McpEvalServerPolicySchema),
-  acceptanceCriteria: AcceptanceCriteriaSchema,
-  verdicts: z.array(AcceptanceCriterionVerdictSchema),
+  /** Read exactly as signed — one signed while Evaluators had a severity keeps its floor per severity. */
+  acceptanceCriteria: SignedAcceptanceCriteriaSchema,
+  /** The verdict on the criteria, when the run had them; one signed while Evaluators had a severity has one per severity. */
+  verdicts: z.array(AcceptanceCriterionVerdictSchema.extend({ severity: LegacyEvaluatorSeveritySchema.optional() })),
   deviations: z.array(QualificationDeviationSchema),
   signature: ElectronicSignatureSchema,
 });

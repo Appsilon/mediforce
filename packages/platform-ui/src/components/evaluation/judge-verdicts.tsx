@@ -63,7 +63,7 @@ export function JudgeVerdictRow({ step, evalRunId, verdict, mayEdit, editReason,
     <li className="space-y-1 border-t pt-2 first:border-t-0 first:pt-0" data-testid="judge-verdict">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <span className="font-medium">{verdict.caseName ?? verdict.caseId.slice(0, 8)} · trial {verdict.trialIndex + 1}</span>
-        <span className="text-muted-foreground">{verdict.name} · {verdict.severity}</span>
+        <span className="text-muted-foreground">{verdict.name}</span>
         <span className={cn(
           'rounded px-1.5 py-0.5 text-[11px] font-medium',
           verdict.passed ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-500/10 text-red-700 dark:text-red-400',

@@ -15,9 +15,9 @@ describe('Acceptance Criteria (ADR-0023 D10)', () => {
     const scope = fixture.scope();
     expect(await getAcceptanceCriteria(STEP, scope)).toEqual({ criteria: null, versions: [] });
 
-    await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.9 } }, origin: 'user' }, scope);
+    await setAcceptanceCriteria({ ...STEP, criteria: { minPassRate: 0.9 }, origin: 'user' }, scope);
     const { criteria } = await setAcceptanceCriteria({
-      ...STEP, criteria: { critical: { minPassRate: 0.95, minPassHatK: 0.9 }, minor: { minPassRate: 0.5 } }, origin: 'assistant',
+      ...STEP, criteria: { minPassRate: 0.95, minPassHatK: 0.9 }, origin: 'assistant',
     }, scope);
 
     expect(criteria).toMatchObject({ version: 2, origin: 'assistant', createdBy: 'author-1' });
@@ -31,7 +31,7 @@ describe('Acceptance Criteria (ADR-0023 D10)', () => {
 
   it('reads a workflow in another workspace as missing, and writes nothing there', async () => {
     const outsider = fixture.scope(userCaller('outsider', ['pharma-b']));
-    await expect(setAcceptanceCriteria({ ...STEP, criteria: { major: { minPassRate: 0.8 } }, origin: 'user' }, outsider))
+    await expect(setAcceptanceCriteria({ ...STEP, criteria: { minPassRate: 0.8 }, origin: 'user' }, outsider))
       .rejects.toBeInstanceOf(NotFoundError);
     expect((await getAcceptanceCriteria(STEP, fixture.scope())).versions).toEqual([]);
   });

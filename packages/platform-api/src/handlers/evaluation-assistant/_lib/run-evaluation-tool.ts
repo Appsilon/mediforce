@@ -261,7 +261,6 @@ export async function executeEvaluationTool(
           name: evaluator.name,
           version: evaluator.latest.version,
           rule: evaluator.latest.rule,
-          severity: evaluator.latest.severity,
           check: clip(evaluator.latest.check, 2000),
           counts: evaluator.trust.trusted,
           ...(evaluator.trust.trusted ? {} : { notCountedBecause: evaluator.trust.reason }),

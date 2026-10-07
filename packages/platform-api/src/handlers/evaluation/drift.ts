@@ -34,7 +34,6 @@ export async function getStepDrift(
     evaluators.push({
       evaluatorId: evaluator.id,
       name: evaluator.name,
-      severity: version.severity,
       evaluatorVersion: version.version,
       ...detectDrift(values, settings),
     });

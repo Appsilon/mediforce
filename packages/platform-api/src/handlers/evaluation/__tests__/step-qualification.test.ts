@@ -27,6 +27,9 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
   let credentials: InMemoryCredentialsRepository;
   let scope: CallerScope;
   let previousAllowLocal: string | undefined;
+  // grades-present fails every trial: the strict floor misses on it, the lenient one is met.
+  const strict = { minPassRate: 0.9 };
+  const lenient = { minPassRate: 0 };
 
   afterEach(() => {
     if (previousAllowLocal === undefined) delete process.env.ALLOW_LOCAL_AGENTS;
@@ -42,8 +45,9 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     await credentials.setPasswordHash('author-1', await hash(PASSWORD, 4));
     scope = withEngine(fixture.scope(undefined, { credentialsRepo: credentials }));
 
-    await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.1 }, major: { minPassRate: 0.9 } }, origin: 'user' }, scope);
-    await createEvaluator({ ...STEP, name: 'findings-present', rule: 'The result lists findings.', severity: 'critical', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
+    await setAcceptanceCriteria({ ...STEP, criteria: strict, origin: 'user' }, scope);
+    await createEvaluator({ ...STEP, name: 'findings-present', rule: 'The result lists findings.', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
+    await createEvaluator({ ...STEP, name: 'grades-present', rule: 'The result lists grades.', check: { kind: 'schema', schema: { required: ['grades'] } }, origin: 'user' }, scope);
     for (const name of ['Grade 5 sepsis', 'Grade 4 neutropenia']) {
       await createEvalCase({
         ...STEP,
@@ -95,20 +99,20 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     return evalRun.id;
   }
 
-  const majorDeviation = { severity: 'major' as const, justification: 'No major check counts yet; a reviewer reads every grade until one does.' };
+  const justification = 'grades-present is new; a reviewer reads every grade until it passes.';
 
   it('is not qualified until signed, then qualified for the Fingerprint it signed — with no Evaluation Brief', async () => {
     const before = await getStepQualification(STEP, scope);
     expect(before).toMatchObject({ status: 'not_qualified', qualification: null, definitionVersion: 1, changed: [] });
 
     const evalRunId = await finishedRun();
-    const { qualification } = await signStepQualification({ evalRunId, deviations: [majorDeviation], password: PASSWORD }, scope);
+    const { qualification } = await signStepQualification({ evalRunId, justification, password: PASSWORD }, scope);
 
     expect(qualification).toMatchObject({
       evalRunId,
       definitionVersion: 1,
-      acceptanceCriteria: { critical: { minPassRate: 0.1 }, major: { minPassRate: 0.9 } },
-      deviations: [majorDeviation],
+      acceptanceCriteria: strict,
+      deviations: [{ justification }],
       signature: {
         signerId: 'author-1',
         signerName: 'author-1',
@@ -116,7 +120,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
         meaning: 'Approved: I reviewed this Eval Run and qualify this Step configuration as it ran in it.',
       },
     });
-    expect(qualification.verdicts.map((verdict) => [verdict.severity, verdict.status])).toEqual([['critical', 'met'], ['major', 'not_evaluable']]);
+    expect(qualification.verdicts.map((verdict) => [verdict.status, verdict.reason])).toEqual([['missed', 'grades-present: pass rate 0% < 90%']]);
     expect(qualification.fingerprint.hash).toBe(before.fingerprint.hash);
 
     const after = await getStepQualification(STEP, scope);
@@ -130,7 +134,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
 
   it('goes stale when the step changes, naming what changed, and flags Evaluators changed since', async () => {
     const evalRunId = await finishedRun();
-    await signStepQualification({ evalRunId, deviations: [majorDeviation], password: PASSWORD }, scope);
+    await signStepQualification({ evalRunId, justification, password: PASSWORD }, scope);
 
     const [findings] = await fixture.evaluationRepo.listEvaluators(STEP);
     await addEvaluatorVersion({ evaluatorId: findings!.id, rule: 'The result lists every finding.', origin: 'user' }, scope);
@@ -156,31 +160,31 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     expect(await getStepQualification({ ...STEP, definitionVersion: 1 }, scope)).toMatchObject({ status: 'qualified' });
   });
 
-  it('needs a justification for each criterion missed or not judged, and none for one that was met', async () => {
-    const evalRunId = await finishedRun();
-    await expect(signStepQualification({ evalRunId, deviations: [], password: PASSWORD }, scope))
-      .rejects.toThrow(/major criterion was not judged/);
-    await expect(signStepQualification({
-      evalRunId, password: PASSWORD,
-      deviations: [majorDeviation, { severity: 'critical', justification: 'Just in case.' }],
-    }, scope)).rejects.toThrow(/critical criterion was met/);
+  it('needs a justification when the criteria were missed, and none when they were met', async () => {
+    const missedRunId = await finishedRun();
+    await expect(signStepQualification({ evalRunId: missedRunId, password: PASSWORD }, scope))
+      .rejects.toThrow(/Acceptance Criteria were missed/);
+    await setAcceptanceCriteria({ ...STEP, criteria: lenient, origin: 'user' }, scope);
+    const metRunId = await finishedRun();
+    await expect(signStepQualification({ evalRunId: metRunId, justification: 'Just in case.', password: PASSWORD }, scope))
+      .rejects.toThrow(/Acceptance Criteria were met/);
     expect((await getStepQualification(STEP, scope)).status).toBe('not_qualified');
   });
 
-  it('needs a justification for a criterion the scored trials met while some trial failed', async () => {
+  it('needs a justification for criteria the scored trials met while some trial failed', async () => {
+    await setAcceptanceCriteria({ ...STEP, criteria: lenient, origin: 'user' }, scope);
     const evalRunId = await finishedRun(1);
     const signing = { evalRunId, password: PASSWORD };
 
-    await expect(signStepQualification({ ...signing, deviations: [majorDeviation] }, scope))
-      .rejects.toThrow(/critical criterion was not judged \(1 of 2 trials failed or were skipped/);
-    const criticalDeviation = { severity: 'critical' as const, justification: 'The one trial lost to an OOM kill is re-run in the next Eval Run.' };
-    const { qualification } = await signStepQualification({ ...signing, deviations: [majorDeviation, criticalDeviation] }, scope);
-    expect(qualification.verdicts.map((verdict) => verdict.status)).toEqual(['not_evaluable', 'not_evaluable']);
+    await expect(signStepQualification(signing, scope))
+      .rejects.toThrow(/Acceptance Criteria were not judged \(1 of 2 trials failed or were skipped/);
+    const { qualification } = await signStepQualification({ ...signing, justification: 'The one trial lost to an OOM kill is re-run in the next Eval Run.' }, scope);
+    expect(qualification.verdicts.map((verdict) => verdict.status)).toEqual(['not_evaluable']);
   });
 
   it('asks the signer for their password again, and refuses an API key', async () => {
     const evalRunId = await finishedRun();
-    const signing = { evalRunId, deviations: [majorDeviation] };
+    const signing = { evalRunId, justification };
 
     await expect(signStepQualification(signing, scope)).rejects.toBeInstanceOf(ValidationError);
     await expect(signStepQualification({ ...signing, password: 'wrong' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
@@ -202,18 +206,17 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
 
   it('signs only a finished run', async () => {
     const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
-    await expect(signStepQualification({ evalRunId: evalRun.id, deviations: [], password: PASSWORD }, scope))
+    await expect(signStepQualification({ evalRunId: evalRun.id, password: PASSWORD }, scope))
       .rejects.toBeInstanceOf(ConflictError);
   });
 
   it('does not sign a cancelled run', async () => {
     const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await cancelEvalRun({ evalRunId: evalRun.id }, scope);
-    await expect(signStepQualification({ evalRunId: evalRun.id, deviations: [majorDeviation], password: PASSWORD }, scope))
+    await expect(signStepQualification({ evalRunId: evalRun.id, justification, password: PASSWORD }, scope))
       .rejects.toThrow(/cancelled/);
   });
   describe('validation status — the newest finished Eval Run of the version, judged on its criteria', () => {
-    const criticalOnly = { critical: { minPassRate: 0.1 } };
     const aCase = {
       ...STEP,
       name: 'Grade 3 anaemia',
@@ -226,7 +229,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     };
 
     async function passedRun(): Promise<string> {
-      await setAcceptanceCriteria({ ...STEP, criteria: criticalOnly, origin: 'user' }, scope);
+      await setAcceptanceCriteria({ ...STEP, criteria: lenient, origin: 'user' }, scope);
       const evalRunId = await finishedRun();
       expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'passed', evalRunId, runInProgress: false });
       return evalRunId;
@@ -236,13 +239,13 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
       expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'not_verified', evalRunId: null, runInProgress: false });
     });
 
-    it('passes when the run met every criterion, and fails when one was missed or not judged — signed or not', async () => {
+    it('passes when the run met the criteria, and fails when they were missed or not judged — signed or not', async () => {
       await passedRun();
-      await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.1 }, major: { minPassRate: 0.9 } }, origin: 'user' }, scope);
+      await setAcceptanceCriteria({ ...STEP, criteria: strict, origin: 'user' }, scope);
       const evalRunId = await finishedRun();
       const { validation } = await getStepQualification(STEP, scope);
       expect(validation).toMatchObject({ status: 'failed', evalRunId });
-      expect(validation.reason).toContain('major');
+      expect(validation.reason).toContain('grades-present');
     });
 
     it('resets to not verified when an Evaluator changes', async () => {
@@ -267,7 +270,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
 
     it('resets to not verified when the Acceptance Criteria change', async () => {
       await passedRun();
-      await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.5 } }, origin: 'user' }, scope);
+      await setAcceptanceCriteria({ ...STEP, criteria: { minPassRate: 0.5 }, origin: 'user' }, scope);
       expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'not_verified', reason: expect.stringContaining('Acceptance Criteria') });
     });
 
@@ -289,7 +292,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     });
 
     it('rolls each live workflow version up across its agent steps; a run prepared for an older version verifies that version', async () => {
-      await setAcceptanceCriteria({ ...STEP, criteria: criticalOnly, origin: 'user' }, scope);
+      await setAcceptanceCriteria({ ...STEP, criteria: lenient, origin: 'user' }, scope);
       await fixture.processRepo.saveWorkflowDefinition(buildWorkflowDefinition({
         name: WORKFLOW,
         namespace: NAMESPACE,
@@ -317,7 +320,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
         ],
       });
 
-      await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.1 }, major: { minPassRate: 0.9 } }, origin: 'user' }, scope);
+      await setAcceptanceCriteria({ ...STEP, criteria: strict, origin: 'user' }, scope);
       await finishedRun(0, 2);
       const [newest] = (await getWorkflowValidation(workflow, scope)).versions;
       expect(newest).toMatchObject({ definitionVersion: 2, status: 'failed' });

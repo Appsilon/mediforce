@@ -38,7 +38,7 @@ describe('Evaluation Assistant fix-loop tools (ADR-0023 D14)', () => {
   });
 
   it('lets a proposed Evaluator ask to run in production, and keeps that in the card', () => {
-    const evaluator = { name: 'grade-in-range', rule: 'Grades are 1-5.', severity: 'critical', check: { kind: 'schema', schema: { required: ['findings'] } } };
+    const evaluator = { name: 'grade-in-range', rule: 'Grades are 1-5.', check: { kind: 'schema', schema: { required: ['findings'] } } };
     expect(ProposeEvaluatorToolSchema.parse({ ...evaluator, runInProduction: true }).runInProduction).toBe(true);
     expect(ProposeEvaluatorToolSchema.parse(evaluator).runInProduction).toBeUndefined();
     expect(EvaluationAssistantProposalSchema.parse({ tool: 'propose_evaluator', arguments: { ...evaluator, runInProduction: true } }))
@@ -46,7 +46,7 @@ describe('Evaluation Assistant fix-loop tools (ADR-0023 D14)', () => {
   });
 
   it('turns the name a model writes into an Evaluator name', () => {
-    const evaluator = { rule: 'Grades are 1-5.', severity: 'critical', check: { kind: 'schema', schema: { required: ['findings'] } } };
+    const evaluator = { rule: 'Grades are 1-5.', check: { kind: 'schema', schema: { required: ['findings'] } } };
     expect(ProposeEvaluatorToolSchema.parse({ ...evaluator, name: 'Grade_In Range!' }).name).toBe('grade-in-range');
     expect(ProposeEvaluatorToolSchema.parse({ ...evaluator, name: `-${'a'.repeat(62)}-b` }).name).toBe('a'.repeat(62));
     expect(ProposeEvaluatorToolSchema.safeParse({ ...evaluator, name: '!!!' }).success).toBe(false);

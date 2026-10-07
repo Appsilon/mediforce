@@ -96,7 +96,7 @@ describe('Eval Cases', () => {
 
   it('adds a manual case with its expected output and the Evaluators that grade it, and hides archived ones from the list', async () => {
     const { evaluator } = await createEvaluator(
-      { ...STEP, name: 'matches-expected', rule: 'The output matches the expected output.', severity: 'critical', check: { kind: 'expected_output', model: 'anthropic/claude-haiku-4.5', minAgreement: 0.8, maxAgreement: 0.1 }, origin: 'user', runInProduction: false },
+      { ...STEP, name: 'matches-expected', rule: 'The output matches the expected output.', check: { kind: 'expected_output', model: 'anthropic/claude-haiku-4.5', minAgreement: 0.8, maxAgreement: 0.1 }, origin: 'user', runInProduction: false },
       fixture.scope(),
     );
     const { evalCase } = await write({
@@ -115,7 +115,7 @@ describe('Eval Cases', () => {
     const elsewhere = '00000000-0000-4000-8000-0000000000ff';
     await expect(write({ evaluatorIds: [elsewhere] })).rejects.toThrow(`Step 'grade-aes' has no live Evaluator '${elsewhere}'`);
     const { evaluator: archived } = await createEvaluator(
-      { ...STEP, name: 'retired', rule: 'r', severity: 'minor', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user', runInProduction: false },
+      { ...STEP, name: 'retired', rule: 'r', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user', runInProduction: false },
       fixture.scope(),
     );
     await archiveEvaluator({ evaluatorId: archived.id, archived: true }, fixture.scope());

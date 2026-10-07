@@ -88,7 +88,6 @@ test.describe('Step Evaluation entities — API E2E', () => {
       ...step,
       name: 'summary-present',
       rule: 'The result carries a summary.',
-      severity: 'critical',
       check: { kind: 'schema', schema: { required: ['summary'] } },
     }, 201));
     expect(schema.evaluator.trust).toEqual({ trusted: true });
@@ -97,7 +96,6 @@ test.describe('Step Evaluation entities — API E2E', () => {
       ...step,
       name: 'summary-not-empty',
       rule: 'The summary says something.',
-      severity: 'major',
       check: {
         kind: 'code',
         runtime: 'javascript',
@@ -145,7 +143,6 @@ test.describe('Step Evaluation entities — API E2E', () => {
       ...step,
       name: 'always-passes',
       rule: 'Every output passes.',
-      severity: 'minor',
       check: { kind: 'code', runtime: 'python', source },
     }, 201));
     await post(request, `/api/evaluation/evaluators/${evaluator.id}/approve`, { version: 1, uid: TEST_USER_ID });
@@ -153,12 +150,11 @@ test.describe('Step Evaluation entities — API E2E', () => {
     const nothing = await request.post(`/api/evaluation/evaluators/${evaluator.id}/versions`, { headers: JSON_HEADERS, data: {} });
     expect(nothing.status(), await nothing.text()).toBe(400);
 
-    const edited = EvaluatorOutputSchema.parse(await post(request, `/api/evaluation/evaluators/${evaluator.id}/versions`, { severity: 'major' }, 201));
+    const edited = EvaluatorOutputSchema.parse(await post(request, `/api/evaluation/evaluators/${evaluator.id}/versions`, { rule: 'Every output always passes.' }, 201));
     expect(edited.evaluator.name).toBe('always-passes');
     expect(edited.evaluator.latest).toMatchObject({
       version: 2,
-      severity: 'major',
-      rule: 'Every output passes.',
+      rule: 'Every output always passes.',
       check: { kind: 'code', runtime: 'python', source },
       sourceApproval: null,
     });
@@ -166,7 +162,7 @@ test.describe('Step Evaluation entities — API E2E', () => {
     expect(edited.evaluator.trust).toEqual({ trusted: false, reason: 'source not approved' });
 
     const outsider = await request.post(`/api/evaluation/evaluators/${evaluator.id}/versions`, {
-      headers: sessionCookieHeaders(callers.outsider), data: { severity: 'critical' },
+      headers: sessionCookieHeaders(callers.outsider), data: { rule: 'Nothing passes.' },
     });
     expect(outsider.status(), await outsider.text()).toBe(404);
   });
@@ -346,7 +342,6 @@ test.describe('Step Evaluation entities — API E2E', () => {
         ...gatedStep,
         name: 'summary-present',
         rule: 'The result carries a summary.',
-        severity: 'critical',
         check: { kind: 'schema', schema: { required: ['summary'] } },
       };
 

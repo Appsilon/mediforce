@@ -21,7 +21,7 @@ describe('getEvalTrial (ADR-0023)', () => {
     fixture = await evaluationFixture();
     scenario = await evalScenario(fixture);
     await createEvaluator({
-      ...STEP, name: 'grades-justified', rule: 'Every grade follows CTCAE v5.', severity: 'major', origin: 'user',
+      ...STEP, name: 'grades-justified', rule: 'Every grade follows CTCAE v5.', origin: 'user',
       check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Every grade follows CTCAE v5.', minConfidence: 0.7 },
     }, scenario.scope);
     judgeCalls = [];
@@ -44,7 +44,7 @@ describe('getEvalTrial (ADR-0023)', () => {
     else process.env.ALLOW_LOCAL_AGENTS = previousAllowLocal;
   });
 
-  /** The neutropenia case returns no findings, so the critical schema check fails it; sepsis passes. */
+  /** The neutropenia case returns no findings, so the schema check fails it; sepsis passes. */
   async function finishedRun(): Promise<string> {
     return finishEvalRun(fixture, scenario, { trialsPerCase: 1, budgetUsd: 5 }, (trial) =>
       trial.caseId === scenario.caseIds['Grade 4 neutropenia'] ? { summary: 'no findings' } : { findings: ['Grade 5 sepsis'] });
@@ -114,7 +114,7 @@ describe('getEvalTrial (ADR-0023)', () => {
     const { evalRuns } = await listEvalRuns(STEP, scenario.scope);
 
     expect(evalRuns.find((run) => run.id === prepared.id)?.acceptance).toBeNull();
-    expect(evalRuns.find((run) => run.id === evalRunId)?.acceptance).toEqual({ status: 'missed', reason: expect.stringContaining('critical missed') });
+    expect(evalRuns.find((run) => run.id === evalRunId)?.acceptance).toEqual({ status: 'missed', reason: expect.stringContaining('findings-present: pass rate 50% < 100%') });
   });
 
   it('does not show a trial of another run, or of another workspace', async () => {

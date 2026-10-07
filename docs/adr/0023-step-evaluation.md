@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-10-02
+last_reviewed: 2026-10-07
 ---
 
 # 0023 — Step Evaluation: Evaluation Assistant, Evaluators, single-step Eval Runs, Step Qualification
@@ -203,7 +203,14 @@ Until a step's criteria are set, every severity defaults to a 100% floor:
 every graded trial passes. Amended again the same day: floors were first
 judged on the Wilson 95% lower bound, which made a floor read as something
 other than the share of trials that passed (8 of 10 missed an 80% floor);
-every floor is now judged on the pass rate itself._
+every floor is now judged on the pass rate itself. Amended 2026-10-07:
+Evaluators have no severity, and the criteria are one floor — a minimum pass
+rate and optionally a minimum pass^k — that every counted Evaluator must reach.
+Three floors asked the author to grade each check's importance twice, once as
+its severity and once as its floor, and a check not worth the floor does not
+belong in the Evaluation. The default is a 100% floor. Criteria stored per
+severity read as the strictest of them; a Step Qualification signed then keeps
+its per-severity verdicts and deviations as signed._
 
 **D11 — Step Qualification is informational.** A badge (Qualified / Stale /
 Not qualified) on the Step and in run views. Nothing is blocked: no Control
@@ -225,7 +232,9 @@ Holdout cases are never offered as examples.
 **D13 — Production Evaluators are opt-in; only deterministic ones gate.** An
 Evaluator marked "also run in production" scores live Agent Runs. `schema` and
 `code` run synchronously; a failing critical one triggers the Step's existing
-`fallbackBehavior`, as low confidence does. `llm_judge` runs asynchronously and
+`fallbackBehavior`, as low confidence does. _Amended 2026-10-07: Evaluators
+have no severity (D10), so any failing production `schema` or `code` Evaluator
+triggers it._ `llm_judge` runs asynchronously and
 only writes Scores. Human verdicts on CM3 reviews become Scores automatically,
 best-effort until handlers get a cross-repository transaction (#516): the verdict
 itself is always on the task and its `task.completed` audit event.
@@ -313,7 +322,7 @@ and a `comparison`: `exact`, where any difference fails, or `agreement`, where a
 model scores 0–1 how far the outputs agree. The comparison is an Evaluator kind,
 `expected_output` (`model`, `instructions`, `minAgreement` for positive
 cases, `maxAgreement` for negative ones), not a built-in, so
-it has a severity, versions, a report row and a place in the Acceptance
+it has versions, a report row and a place in the Acceptance
 Criteria like any other check, and one model choice serves every case; a case
 adds its own `agreementInstructions` (what is trivial, what decides). It counts
 at once (D9) — an exact match needs no trust; an agreement verdict is a model's,
@@ -325,7 +334,7 @@ Evaluators grade it; an Evaluator a case does not select is *not applicable*
 to its trials — neither a pass, a failure nor an error — and one that grades no
 case of a run is left out of its Acceptance Criteria, like one that does not
 count, so an expected-output check before any case has an expected output does
-not leave a severity unjudged. The comparison is chosen per case, not on the
+not leave the criteria unjudged. The comparison is chosen per case, not on the
 Evaluator: editing a case makes a new case, so a run's cases fix what each
 comparison measured. A harvested run a person
 reviewed brings its output as the expected output: approved positive, rejected

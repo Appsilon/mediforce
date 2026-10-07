@@ -10,7 +10,7 @@ function describeProduction(evaluator: EvaluatorView): string {
 
 function describeEvaluator(evaluator: EvaluatorView): string {
   const trust = evaluator.trust.trusted ? 'counted' : `not counted (${evaluator.trust.reason})`;
-  return `${evaluator.id}  ${evaluator.name.padEnd(24)} v${evaluator.latest.version}  ${evaluator.latest.check.kind.padEnd(9)} ${evaluator.latest.severity.padEnd(8)} ${trust}${describeProduction(evaluator)}`;
+  return `${evaluator.id}  ${evaluator.name.padEnd(24)} v${evaluator.latest.version}  ${evaluator.latest.check.kind.padEnd(9)} ${trust}${describeProduction(evaluator)}`;
 }
 
 export const evalEvaluatorListCommand = defineCommand({
@@ -31,8 +31,8 @@ export const evalEvaluatorListCommand = defineCommand({
 
 export const evalEvaluatorCreateCommand = defineCommand({
   name: 'mediforce eval evaluator-create',
-  description: 'Create an Evaluator from a JSON file: { name, rule, severity, check }.',
-  args: { ...STEP_ARGS, file: { type: 'string', required: true, description: 'JSON file with name, rule, severity and check' } },
+  description: 'Create an Evaluator from a JSON file: { name, rule, check }.',
+  args: { ...STEP_ARGS, file: { type: 'string', required: true, description: 'JSON file with name, rule and check' } },
   async run({ args, output, mediforce, jsonMode }) {
     const body = readJsonFile(args.file) as Record<string, unknown>;
     const result = await mediforce.evaluation.createEvaluator({ ...body, ...stepFrom(args) } as Parameters<typeof mediforce.evaluation.createEvaluator>[0]);
@@ -44,7 +44,7 @@ export const evalEvaluatorCreateCommand = defineCommand({
 
 export const evalEvaluatorVersionCommand = defineCommand({
   name: 'mediforce eval evaluator-version',
-  description: 'Add a version to an Evaluator from a JSON file with any of { rule, severity, check }.',
+  description: 'Add a version to an Evaluator from a JSON file with any of { rule, check }.',
   args: {
     evaluatorId: { type: 'positional', required: true, description: 'Evaluator id' },
     file: { type: 'string', required: true, description: 'JSON file with the changed fields' },
@@ -180,7 +180,7 @@ export const evalDriftCommand = defineCommand({
     output.stdout(`window ${result.window}, threshold ${result.threshold}`);
     if (result.evaluators.length === 0) output.stdout('No Evaluator scores this step\'s production runs.');
     for (const evaluator of result.evaluators) {
-      output.stdout(`${evaluator.drifting ? 'ALERT' : 'ok   '}  ${evaluator.name} v${evaluator.evaluatorVersion} (${evaluator.severity})  `
+      output.stdout(`${evaluator.drifting ? 'ALERT' : 'ok   '}  ${evaluator.name} v${evaluator.evaluatorVersion}  `
         + `recent ${describeMean(evaluator.recentMean, evaluator.recentCount, result.window)}, `
         + `before ${describeMean(evaluator.baselineMean, evaluator.baselineCount, result.window)}`);
     }

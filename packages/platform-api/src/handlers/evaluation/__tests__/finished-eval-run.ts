@@ -18,7 +18,7 @@ export interface EvalScenario {
 
 /**
  * A scope that can start Eval Runs (with a run kicker that records instead of
- * running), a critical `findings-present` schema Evaluator, and a frozen
+ * running), a `findings-present` schema Evaluator, and a frozen
  * Dataset of two dev cases, "Grade 5 sepsis" and "Grade 4 neutropenia".
  */
 export async function evalScenario(fixture: EvaluationFixture): Promise<EvalScenario> {
@@ -29,7 +29,7 @@ export async function evalScenario(fixture: EvaluationFixture): Promise<EvalScen
     runKicker: kicker,
   });
   await createEvaluator({
-    ...STEP, name: 'findings-present', rule: 'The result lists findings.', severity: 'critical',
+    ...STEP, name: 'findings-present', rule: 'The result lists findings.',
     check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user',
   }, scope);
   const caseIds: Record<string, string> = {};

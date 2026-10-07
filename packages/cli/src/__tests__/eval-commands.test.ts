@@ -105,7 +105,7 @@ describe('mediforce eval', () => {
   it('evaluator-production --on posts the flag and prints that it waits until it counts', async () => {
     const evaluatorId = '0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
     const latest = {
-      evaluatorId, version: 1, rule: 'A fatal AE is graded 5.', severity: 'critical', check: { kind: 'code', runtime: 'python', source: 'print(1)' },
+      evaluatorId, version: 1, rule: 'A fatal AE is graded 5.', check: { kind: 'code', runtime: 'python', source: 'print(1)' },
       origin: 'user', sourceApproval: null, createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
     };
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
@@ -138,11 +138,11 @@ describe('mediforce eval', () => {
       threshold: 0.2,
       evaluators: [
         {
-          evaluatorId: 'e-1', name: 'grade-5-is-fatal', severity: 'critical', evaluatorVersion: 2,
+          evaluatorId: 'e-1', name: 'grade-5-is-fatal', evaluatorVersion: 2,
           recentMean: 0.6, baselineMean: 0.9, recentCount: 10, baselineCount: 10, drifting: true,
         },
         {
-          evaluatorId: 'e-2', name: 'no-phi', severity: 'major', evaluatorVersion: 1,
+          evaluatorId: 'e-2', name: 'no-phi', evaluatorVersion: 1,
           recentMean: 1, baselineMean: null, recentCount: 10, baselineCount: 3, drifting: false,
         },
       ],
@@ -156,8 +156,8 @@ describe('mediforce eval', () => {
     );
     expect(output.stdoutLines).toEqual([
       'window 10, threshold 0.2',
-      'ALERT  grade-5-is-fatal v2 (critical)  recent 0.60, before 0.90',
-      'ok     no-phi v1 (major)  recent 1.00, before 3/10 Scores',
+      'ALERT  grade-5-is-fatal v2  recent 0.60, before 0.90',
+      'ok     no-phi v1  recent 1.00, before 3/10 Scores',
     ]);
   });
 
@@ -193,7 +193,7 @@ describe('mediforce eval', () => {
   it('criteria-set posts the criteria from the file for the step', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'eval-cli-'));
     const file = join(dir, 'criteria.json');
-    const criteria = { critical: { minPassRate: 0.95, minPassHatK: 0.9 }, major: { minPassRate: 0.8 } };
+    const criteria = { minPassRate: 0.95, minPassHatK: 0.9 };
     writeFileSync(file, JSON.stringify(criteria));
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
       criteria: {
@@ -208,7 +208,7 @@ describe('mediforce eval', () => {
     const [url, init] = fetchSpy.mock.calls[0]!;
     expect(url).toBe('http://localhost:5555/api/evaluation/acceptance-criteria');
     expect(JSON.parse(String(init?.body))).toEqual({ namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', criteria, origin: 'user' });
-    expect(output.stdoutLines).toEqual(['Acceptance Criteria v2 written: critical: pass rate ≥ 0.95, pass^k ≥ 0.9; major: pass rate ≥ 0.8']);
+    expect(output.stdoutLines).toEqual(['Acceptance Criteria v2 written: pass rate ≥ 0.95, pass^k ≥ 0.9']);
   });
 
   it('qualification asks for the version given and prints the badge', async () => {
@@ -229,7 +229,7 @@ describe('mediforce eval', () => {
   it('validation prints each workflow version and its agent steps', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
       versions: [
-        { definitionVersion: 2, status: 'passed', steps: [{ stepId: 'grade-aes', stepName: 'Grade AEs', validation: { status: 'passed', evalRunId: 'f7a1c2d3-0000-4000-8000-000000000001', reason: 'Eval Run f7a1c2d3 met every criterion.', runInProgress: false } }] },
+        { definitionVersion: 2, status: 'passed', steps: [{ stepId: 'grade-aes', stepName: 'Grade AEs', validation: { status: 'passed', evalRunId: 'f7a1c2d3-0000-4000-8000-000000000001', reason: 'Eval Run f7a1c2d3 met its Acceptance Criteria.', runInProgress: false } }] },
         { definitionVersion: 1, status: 'not_verified', steps: [{ stepId: 'grade-aes', stepName: 'Grade AEs', validation: { status: 'not_verified', evalRunId: null, reason: 'No Eval Run of version 1 has finished yet.', runInProgress: false } }] },
       ],
     }));
@@ -240,7 +240,7 @@ describe('mediforce eval', () => {
     expect(fetchSpy.mock.calls[0]![0]).toBe('http://localhost:5555/api/evaluation/workflow-validation?namespace=pharma-a&workflowName=ae-grading');
     expect(output.stdoutLines).toEqual([
       'v2  verified',
-      '  grade-aes  passed: Eval Run f7a1c2d3 met every criterion.',
+      '  grade-aes  passed: Eval Run f7a1c2d3 met its Acceptance Criteria.',
       'v1  not verified',
       '  grade-aes  not verified: No Eval Run of version 1 has finished yet.',
     ]);

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { AcceptanceCriteriaSection, CasesSection, DriftAlert, EvaluatorsSection, caseFromFile, datasetDrift, toEvaluatorName, withPassRate } from '../step-evaluation-sections';
+import { AcceptanceCriteriaSection, CasesSection, DriftAlert, EvaluatorsSection, caseFromFile, datasetDrift, toEvaluatorName } from '../step-evaluation-sections';
 
 const verdicts = vi.hoisted((): Record<string, 'positive' | 'negative'> => ({}));
 
@@ -79,7 +79,7 @@ vi.mock('@/lib/api-fetch', () => ({
 
 describe('DriftAlert', () => {
   const evaluator = {
-    evaluatorId: 'e-1', name: 'grade-5-is-fatal', severity: 'critical', evaluatorVersion: 2,
+    evaluatorId: 'e-1', name: 'grade-5-is-fatal', evaluatorVersion: 2,
     recentMean: 0.6, baselineMean: 0.9, recentCount: 20, baselineCount: 20, drifting: true,
   };
 
@@ -87,7 +87,7 @@ describe('DriftAlert', () => {
     render(<DriftAlert data={{ data: { window: 20, threshold: 0.15, evaluators: [evaluator, { ...evaluator, evaluatorId: 'e-2', name: 'no-phi', drifting: false }] } } as never} />);
 
     const alert = screen.getByRole('alert');
-    expect(alert.textContent).toContain('grade-5-is-fatal v2 (critical): mean 0.60 over the last 20 production Scores, down from 0.90');
+    expect(alert.textContent).toContain('grade-5-is-fatal v2: mean 0.60 over the last 20 production Scores, down from 0.90');
     expect(alert.textContent).not.toContain('no-phi');
   });
 
@@ -125,7 +125,6 @@ describe('EvaluatorsSection', () => {
 
     expect(evaluation.createEvaluator).toHaveBeenCalledWith(expect.objectContaining({
       name: 'grades-valid',
-      severity: 'major',
       check: { kind: 'code', runtime: 'javascript', source: 'process.exit(0)' },
     }));
   });
@@ -192,7 +191,7 @@ describe('EvaluatorsSection', () => {
 describe('Evaluator view and edit', () => {
   const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
   const version = {
-    evaluatorId: '5b0f2f3e-8f5c-4c55-9d0a-3f1f7c1b2a10', version: 1, rule: 'Every grade is justified.', severity: 'major',
+    evaluatorId: '5b0f2f3e-8f5c-4c55-9d0a-3f1f7c1b2a10', version: 1, rule: 'Every grade is justified.',
     check: { kind: 'llm_judge', model: 'anthropic/claude-sonnet-4', rubric: 'Is every grade justified?', minConfidence: 0.75 },
     origin: 'user', sourceApproval: null, createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z',
   };
@@ -226,9 +225,9 @@ describe('Evaluator view and edit', () => {
     expect(screen.getByText('Nothing changed.')).toBeTruthy();
     expect(evaluation.addEvaluatorVersion).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByLabelText('Severity'), { target: { value: 'critical' } });
+    fireEvent.change(screen.getByLabelText('Rule'), { target: { value: 'Every grade is justified by the record.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save as v2' }));
-    expect(evaluation.addEvaluatorVersion).toHaveBeenCalledWith({ evaluatorId: evaluator.id, severity: 'critical' });
+    expect(evaluation.addEvaluatorVersion).toHaveBeenCalledWith({ evaluatorId: evaluator.id, rule: 'Every grade is justified by the record.' });
   });
 });
 
@@ -320,7 +319,7 @@ describe('Adding an Eval Case from a production run', () => {
   });
 });
 
-const evaluatorOf = (id: string, name: string, kind: string) => ({ id, name, latest: { check: { kind }, severity: 'critical' } });
+const evaluatorOf = (id: string, name: string, kind: string) => ({ id, name, latest: { check: { kind } } });
 const EXPECTED_OUTPUT_CHECK = evaluatorOf('e-expected', 'matches-expected', 'expected_output');
 const SCHEMA_CHECK = evaluatorOf('e-schema', 'findings-present', 'schema');
 
@@ -583,7 +582,7 @@ describe('AcceptanceCriteriaSection', () => {
       status, changed, validation, evaluatorsChanged: [], history: status === 'not_qualified' ? [] : [{}],
       qualification: status === 'not_qualified' ? null : {
         evalRunId: 'run-0000aaaa-0000-0000-0000-000000000000',
-        fingerprint: { hash: 'f'.repeat(64) }, acceptanceCriteria: { critical: { minPassRate: 0.9 } }, mcpPolicy: {}, deviations: [],
+        fingerprint: { hash: 'f'.repeat(64) }, acceptanceCriteria: { minPassRate: 0.9 }, mcpPolicy: {}, deviations: [],
         signature: { signerName: 'Dr Q', signedAt: '2026-09-30T10:00:00.000Z', meaning: 'Approved.', reauthentication: 'password' },
       },
     },
@@ -594,17 +593,17 @@ describe('AcceptanceCriteriaSection', () => {
     ['failed', 'Validation failed'],
     ['not_verified', 'Not verified'],
   ])('shows the validation from the newest Eval Run as one status icon — %s: %s, whether signed or not', (status, label) => {
-    const validation = { status, evalRunId: 'run-0000aaaa-0000-0000-0000-000000000000', reason: 'Eval Run run-0000: critical missed.', runInProgress: false };
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ critical: { minPassRate: 0.9 } })} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
+    const validation = { status, evalRunId: 'run-0000aaaa-0000-0000-0000-000000000000', reason: 'Eval Run run-0000: findings-present: pass rate 80% < 90%.', runInProgress: false };
+    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
 
     expect(screen.getByTestId('validation-status').textContent).toBe(label);
     expect(screen.queryByTestId('step-qualification')).toBeNull();
     fireEvent.click(screen.getByTestId('validation-status'));
-    expect(screen.getByTestId('validation-reason').textContent).toContain('critical missed');
+    expect(screen.getByTestId('validation-reason').textContent).toContain('pass rate 80% < 90%');
   });
 
   it('opens what the qualification rests on — its Eval Run, not a Brief — from the icon', () => {
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ critical: { minPassRate: 0.9 } })} qualification={qualificationOf('stale', ['model'])} mayEdit={false} />);
+    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} qualification={qualificationOf('stale', ['model'])} mayEdit={false} />);
     fireEvent.click(screen.getByTestId('validation-status'));
 
     expect(screen.getByTestId('step-qualification').textContent).toContain('Eval Run run-0000');
@@ -613,47 +612,31 @@ describe('AcceptanceCriteriaSection', () => {
   });
 
   it('keeps the thresholds out of sight until Set the threshold opens them', () => {
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ critical: { minPassRate: 0.9 } })} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
 
     expect(screen.queryByText('Acceptance Criteria')).toBeNull();
     expect(screen.queryByText(/v2/)).toBeNull();
     expect(screen.queryByRole('slider')).toBeNull();
     fireEvent.click(screen.getByTestId('set-threshold'));
-    expect(screen.getAllByRole('slider')).toHaveLength(3);
+    expect(screen.getAllByRole('slider')).toHaveLength(1);
   });
 
-  it('starts every severity at 100% until criteria are set', () => {
+  it('starts the threshold at 100% until criteria are set', () => {
     render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf(null)} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
     fireEvent.click(screen.getByTestId('set-threshold'));
 
-    for (const severity of ['critical', 'major', 'minor']) {
-      expect((screen.getByLabelText(`${severity} minimum pass rate`) as HTMLInputElement).value).toBe('100');
-    }
+    expect((screen.getByLabelText('Minimum pass rate') as HTMLInputElement).value).toBe('100');
   });
 
-  it('saves the tuned thresholds once, on Save, keeping a severity\'s pass^k', () => {
+  it('saves the tuned threshold once, on Save, keeping its pass^k', () => {
     evaluation.setAcceptanceCriteria.mockClear();
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ critical: { minPassRate: 0.9, minPassHatK: 1 } })} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9, minPassHatK: 1 })} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
     fireEvent.click(screen.getByTestId('set-threshold'));
 
-    fireEvent.change(screen.getByLabelText('critical minimum pass rate'), { target: { value: '95' } });
-    fireEvent.click(screen.getByLabelText('judge minor'));
-    fireEvent.change(screen.getByLabelText('minor minimum pass rate'), { target: { value: '50' } });
+    fireEvent.change(screen.getByLabelText('Minimum pass rate'), { target: { value: '95' } });
     expect(evaluation.setAcceptanceCriteria).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(evaluation.setAcceptanceCriteria).toHaveBeenCalledTimes(1);
-    expect(evaluation.setAcceptanceCriteria).toHaveBeenCalledWith({ ...step, criteria: { critical: { minPassRate: 0.95, minPassHatK: 1 }, minor: { minPassRate: 0.5 } } });
-  });
-
-  it('cannot stop judging the only severity judged', () => {
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ major: { minPassRate: 0.8 } })} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
-    fireEvent.click(screen.getByTestId('set-threshold'));
-
-    expect((screen.getByLabelText('judge major') as HTMLInputElement).disabled).toBe(true);
-    expect((screen.getByLabelText('critical minimum pass rate') as HTMLInputElement).disabled).toBe(true);
-  });
-
-  it('drops a severity set to not judged', () => {
-    expect(withPassRate({ critical: { minPassRate: 0.9 }, major: { minPassRate: 0.8 } }, 'major', '')).toEqual({ critical: { minPassRate: 0.9 } });
+    expect(evaluation.setAcceptanceCriteria).toHaveBeenCalledWith({ ...step, criteria: { minPassRate: 0.95, minPassHatK: 1 } });
   });
 });

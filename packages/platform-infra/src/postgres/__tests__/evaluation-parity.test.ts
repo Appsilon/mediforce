@@ -52,7 +52,6 @@ function buildVersion(evaluatorId: string, overrides: Partial<EvaluatorVersion> 
     evaluatorId,
     version: 1,
     rule: 'Every adverse event carries a CTCAE grade.',
-    severity: 'critical',
     check: { kind: 'code', runtime: 'python', source: 'import json\nprint(json.dumps({"passed": True}))' },
     origin: 'user',
     sourceApproval: null,
@@ -114,7 +113,6 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       await repo.createEvaluator(evaluator, first);
       const second = await repo.appendEvaluatorVersion(buildVersion(evaluator.id, {
         version: 2,
-        severity: 'major',
         check: {
           kind: 'llm_judge',
           model: 'anthropic/claude-sonnet-4',
@@ -237,9 +235,9 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         caseIds: dataset.caseIds,
         trialsPerCase: 2,
         concurrency: 2,
-        evaluators: [{ evaluatorId: randomUUID(), name: 'findings-present', version: 1, kind: 'schema' as const, severity: 'critical' as const, counted: true }],
+        evaluators: [{ evaluatorId: randomUUID(), name: 'findings-present', version: 1, kind: 'schema' as const, counted: true }],
         fingerprint: fingerprint('a'),
-        acceptanceCriteria: { critical: { minPassRate: 0.9, minPassHatK: 0.8 } },
+        acceptanceCriteria: { minPassRate: 0.9, minPassHatK: 0.8 },
         mcpPolicy: { edc: { mode: 'deny' as const } },
         estimate: { perTrialUsd: 0.25, totalUsd: 0.5, basis: 'history' as const, sampleSize: 4 },
         budgetUsd: 1,
@@ -289,8 +287,8 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       await repo.transitionTrial(first!.id, 'scoring', { status: 'scored' });
       expect(await repo.listEvalRunIdsToDrive()).toEqual([]);
 
-      await repo.setEvalRunAcceptance(run.id, { status: 'missed', reason: 'critical missed' });
-      expect((await repo.getEvalRun(run.id))?.acceptance).toEqual({ status: 'missed', reason: 'critical missed' });
+      await repo.setEvalRunAcceptance(run.id, { status: 'missed', reason: 'findings-present: pass rate 50% < 90%' });
+      expect((await repo.getEvalRun(run.id))?.acceptance).toEqual({ status: 'missed', reason: 'findings-present: pass rate 50% < 90%' });
     });
 
     it('orders trials by case, then trial index, and keeps a trial\'s confidence', async () => {
@@ -317,14 +315,14 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
 
     it('versions a step\'s Acceptance Criteria, newest first', async () => {
       const base = { ...step, origin: 'user' as const, createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z' };
-      const first = await repo.appendAcceptanceCriteria({ ...base, version: 1, criteria: { critical: { minPassRate: 0.9 } } });
+      const first = await repo.appendAcceptanceCriteria({ ...base, version: 1, criteria: { minPassRate: 0.9 } });
       const second = await repo.appendAcceptanceCriteria({
-        ...base, version: 2, origin: 'assistant', criteria: { critical: { minPassRate: 0.95, minPassHatK: 0.9 }, minor: { minPassRate: 0.5 } },
+        ...base, version: 2, origin: 'assistant', criteria: { minPassRate: 0.95, minPassHatK: 0.9 },
       });
 
       expect(await repo.listAcceptanceCriteria(step)).toEqual([second, first]);
       expect(await repo.listAcceptanceCriteria(otherStep)).toEqual([]);
-      await expect(repo.appendAcceptanceCriteria({ ...base, version: 2, criteria: { major: { minPassRate: 0.8 } } })).rejects.toThrow();
+      await expect(repo.appendAcceptanceCriteria({ ...base, version: 2, criteria: { minPassRate: 0.8 } })).rejects.toThrow();
     });
 
     it('keeps signed Step Qualifications, newest first', async () => {
@@ -342,9 +340,9 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         fingerprint: fingerprint('a'),
         evaluators: run.evaluators,
         mcpPolicy: run.mcpPolicy,
-        acceptanceCriteria: { critical: { minPassRate: 0.9 } },
-        verdicts: [{ severity: 'critical', criterion: { minPassRate: 0.9 }, status: 'missed', evaluators: [], reason: 'findings-present: pass rate 80% < 90%' }],
-        deviations: [{ severity: 'critical', justification: 'Every miss was a formatting slip a reviewer catches.' }],
+        acceptanceCriteria: { minPassRate: 0.9 },
+        verdicts: [{ criterion: { minPassRate: 0.9 }, status: 'missed', evaluators: [], reason: 'findings-present: pass rate 80% < 90%' }],
+        deviations: [{ justification: 'Every miss was a formatting slip a reviewer catches.' }],
         signature: { signerId: 'author-1', signerName: 'Ada Author', meaning: 'Approval', signedAt, reauthentication: 'password' },
       });
       const older = await repo.createQualification(qualification('2026-09-23T10:00:00.000Z'));
@@ -413,7 +411,7 @@ function storedRun(datasetVersionId: string, caseIds: string[]): EvalRun {
     caseIds,
     trialsPerCase: 2,
     concurrency: 2,
-    evaluators: [{ evaluatorId: randomUUID(), name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
+    evaluators: [{ evaluatorId: randomUUID(), name: 'findings-present', version: 1, kind: 'schema', counted: true }],
     fingerprint: fingerprint('a'),
     acceptanceCriteria: null,
     mcpPolicy: {},

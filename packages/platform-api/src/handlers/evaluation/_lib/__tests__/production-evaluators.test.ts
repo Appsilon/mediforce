@@ -24,12 +24,12 @@ async function addEvaluator(
   fixture: EvaluationFixture,
   name: string,
   check: EvaluatorCheck,
-  options: { severity?: 'critical' | 'major'; runInProduction?: boolean; approved?: boolean } = {},
+  options: { runInProduction?: boolean; approved?: boolean } = {},
 ) {
   const id = randomUUID();
   const now = '2026-09-23T08:00:00.000Z';
   const version: EvaluatorVersion = {
-    evaluatorId: id, version: 1, rule: `${name} rule`, severity: options.severity ?? 'critical', check, origin: 'user',
+    evaluatorId: id, version: 1, rule: `${name} rule`, check, origin: 'user',
     sourceApproval: options.approved === true ? { approvedBy: 'reviewer-1', approvedAt: now } : null,
     createdBy: 'author-1', createdAt: now,
   };
@@ -53,7 +53,7 @@ describe('production Evaluators (ADR-0023 D13)', () => {
     return scoreProductionRun(scope, STEP, await loadEvaluationSubject(scope, agentRunId, STEP));
   }
 
-  it('fails the gate on a failing critical schema Evaluator and records a production Score', async () => {
+  it('fails the gate on a failing schema Evaluator and records a production Score', async () => {
     const id = await addEvaluator(fixture, 'findings-present', findings);
 
     const { verdict } = await score(UNGRADED_RUN);
@@ -72,13 +72,6 @@ describe('production Evaluators (ADR-0023 D13)', () => {
     const { verdict } = await score(GRADED_RUN);
     expect(verdict).toEqual({ failure: null, errors: [] });
     expect((await fixture.scoreRepo.list({ agentRunId: GRADED_RUN, limit: 100 }))[0]).toMatchObject({ value: 1 });
-  });
-
-  it('records a failing major Evaluator as a Score without failing the gate', async () => {
-    await addEvaluator(fixture, 'findings-present', findings, { severity: 'major' });
-    const { verdict } = await score(UNGRADED_RUN);
-    expect(verdict.failure).toBeNull();
-    expect(await fixture.scoreRepo.list({ agentRunId: UNGRADED_RUN, limit: 100 })).toHaveLength(1);
   });
 
   it('reports a check that cannot run as an error, never a failure, and writes no Score', async () => {

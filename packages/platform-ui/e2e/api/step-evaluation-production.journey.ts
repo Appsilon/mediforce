@@ -6,7 +6,7 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
 
 /**
- * API E2E for production Evaluators (ADR-0023 D13): a critical `schema`
+ * API E2E for production Evaluators (ADR-0023 D13): a `schema`
  * Evaluator marked "also run in production" fails a live run's output, which
  * takes the step's `fallbackBehavior` with reason `production_evaluator`, and
  * scores the run with a Score marked `production`. The flag reports whether
@@ -28,7 +28,7 @@ async function scoresOf(request: APIRequestContext, runId: string) {
 }
 
 test.describe('Step Evaluation production Evaluators — API E2E', () => {
-  test('a failing critical production Evaluator sends the run to the step fallback and scores it', async ({ request }) => {
+  test('a failing production Evaluator sends the run to the step fallback and scores it', async ({ request }) => {
     test.setTimeout(120_000);
     const workflowName = `e2e-production-${randomUUID().slice(0, 8)}`;
     const firstRunId = await startRun(request, agentStepWorkflow(workflowName, {
@@ -40,7 +40,7 @@ test.describe('Step Evaluation production Evaluators — API E2E', () => {
     const step = { namespace: TEST_ORG_HANDLE, workflowName, stepId: 'grade-aes' };
 
     const created = EvaluatorOutputSchema.parse(await post(request, '/api/evaluation/evaluators', {
-      ...step, name: 'findings-present', rule: 'The result lists findings.', severity: 'critical',
+      ...step, name: 'findings-present', rule: 'The result lists findings.',
       check: { kind: 'schema', schema: { required: ['findings'] } },
     }, 201));
     expect(created.evaluator).toMatchObject({ runInProduction: false, production: { active: false } });
@@ -80,7 +80,7 @@ test.describe('Step Evaluation production Evaluators — API E2E', () => {
     })));
     const created = EvaluatorOutputSchema.parse(await post(request, '/api/evaluation/evaluators', {
       namespace: TEST_ORG_HANDLE, workflowName, stepId: 'grade-aes', name: 'grade-5-flagged',
-      rule: 'A fatal AE is graded 5.', severity: 'critical', runInProduction: true,
+      rule: 'A fatal AE is graded 5.', runInProduction: true,
       check: { kind: 'code', runtime: 'python', source: 'print(1)' },
     }, 201));
 

@@ -1,12 +1,11 @@
 import { z } from 'zod';
 import {
   AcceptanceCriteriaSchema,
-  AcceptanceCriterionSchema,
   EvaluatedStepSchema,
   EvaluatorKindSchema,
-  EvaluatorSeveritySchema,
   McpEvalServerPolicySchema,
   McpReplayMissSchema,
+  StoredAcceptanceCriteriaSchema,
 } from './evaluation';
 
 /**
@@ -31,7 +30,6 @@ export const EvalRunEvaluatorSchema = z.object({
   name: z.string(),
   version: z.number().int().positive(),
   kind: EvaluatorKindSchema,
-  severity: EvaluatorSeveritySchema,
   counted: z.boolean(),
   /** Why it does not count, when it does not. */
   reason: z.string().optional(),
@@ -97,7 +95,7 @@ export const EvalRunSchema = EvaluatedStepSchema.extend({
   /** The Step's Fingerprint when the run was prepared; null on runs prepared before Fingerprints. */
   fingerprint: StepFingerprintSchema.nullable(),
   /** Frozen at prepare (D10); null when the Step had none, and then the report judges nothing. */
-  acceptanceCriteria: AcceptanceCriteriaSchema.nullable(),
+  acceptanceCriteria: StoredAcceptanceCriteriaSchema.nullable(),
   /** The MCP eval policy the trials ran under, one entry per server of the Step's agent (D6). */
   mcpPolicy: z.record(z.string(), McpEvalServerPolicySchema),
   estimate: EvalRunEstimateSchema,
@@ -184,11 +182,10 @@ export const EvalRunEvaluatorReportSchema = EvalRunEvaluatorSchema.extend({
   flakiness: z.number().min(0).max(1).nullable(),
 });
 
-/** How one Acceptance Criterion fared (D10). */
+/** How the Acceptance Criteria fared (D10). */
 export const AcceptanceCriterionVerdictSchema = z.object({
-  severity: EvaluatorSeveritySchema,
-  criterion: AcceptanceCriterionSchema,
-  /** `not_evaluable`: no counted Evaluator of this severity, or one that graded no trial. */
+  criterion: AcceptanceCriteriaSchema,
+  /** `not_evaluable`: no counted Evaluator, or one that graded no trial. */
   status: z.enum(['met', 'missed', 'not_evaluable']),
   evaluators: z.array(z.object({
     evaluatorId: z.uuid(),
@@ -281,7 +278,6 @@ export const JudgeVerdictSchema = z.object({
   agentRunId: z.string(),
   evaluatorId: z.uuid(),
   name: z.string(),
-  severity: EvaluatorSeveritySchema,
   /** The judge's Score. */
   scoreId: z.uuid(),
   passed: z.boolean(),
@@ -329,8 +325,8 @@ export const EvalRunReportSchema = z.object({
   trials: TrialCountsSchema,
   mcp: EvalRunMcpReportSchema,
   evaluators: z.array(EvalRunEvaluatorReportSchema),
-  /** One verdict per severity the run's criteria set; empty when the run has none. */
-  criteria: z.array(AcceptanceCriterionVerdictSchema),
+  /** The verdict on the run's Acceptance Criteria; null when the run has none. */
+  criteriaVerdict: AcceptanceCriterionVerdictSchema.nullable(),
   confidence: ConfidenceCalibrationSchema.nullable(),
   recommendation: ControlRecommendationSchema.nullable(),
   /** Every model's verdict on a scored trial — judges' and agreement scores — by case and trial. */

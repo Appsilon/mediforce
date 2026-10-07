@@ -125,14 +125,14 @@ function ProposalSummary({ step, proposal }: { step: EvaluatedStep; proposal: De
     case 'propose_evaluator':
       return (
         <>
-          {proposal.arguments.name} ({proposal.arguments.check.kind}, {proposal.arguments.severity}) — {proposal.arguments.rule}
+          {proposal.arguments.name} ({proposal.arguments.check.kind}) — {proposal.arguments.rule}
           {proposal.arguments.runInProduction === true && '\nAlso runs in production once trusted.'}
         </>
       );
     case 'propose_evaluator_version': {
-      const { evaluatorId, rule, severity, check, rationale } = proposal.arguments;
+      const { evaluatorId, rule, check, rationale } = proposal.arguments;
       const evaluator = evaluators.data?.evaluators.find((candidate) => candidate.id === evaluatorId);
-      const changes = [rule !== undefined && `rule: ${rule}`, severity !== undefined && `severity: ${severity}`, check !== undefined && `a new ${check.kind} check`]
+      const changes = [rule !== undefined && `rule: ${rule}`, check !== undefined && `a new ${check.kind} check`]
         .filter((change) => change !== false);
       return (
         <>
@@ -216,12 +216,6 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
   );
 }
 
-const SEVERITY_CLASSES = {
-  critical: 'bg-red-500/10 text-red-700 dark:text-red-400',
-  major: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
-  minor: 'bg-muted text-muted-foreground',
-} as const;
-
 /**
  * An evaluation plan, its risks highest first. It creates nothing: the person
  * picks a risk and the assistant drafts, previews and proposes its check.
@@ -234,10 +228,9 @@ export function PlanCard({ step, plan, onDraft, busy, mayEdit, editReason }: {
   mayEdit: boolean;
   editReason: string | undefined;
 }) {
-  const { acceptanceCriteria: criteria } = plan;
   const adopt = useStepEvaluationMutation(step, () => mediforce.evaluation.setAcceptanceCriteria({
     ...step,
-    criteria: { critical: { minPassRate: criteria.critical }, major: { minPassRate: criteria.major }, minor: { minPassRate: criteria.minor } },
+    criteria: { minPassRate: plan.minPassRate },
     origin: 'assistant',
   }));
   return (
@@ -249,7 +242,6 @@ export function PlanCard({ step, plan, onDraft, busy, mayEdit, editReason }: {
           <li key={index} className="border-t pt-2 first:border-t-0 first:pt-0" data-testid="plan-risk">
             <div className="flex items-start gap-1.5">
               <span className="font-medium">{index + 1}.</span>
-              <span className={cn('rounded px-1.5 text-[11px]', SEVERITY_CLASSES[risk.severity])}>{risk.severity}</span>
               <span className="font-medium">{risk.failure}</span>
             </div>
             <p className="mt-0.5 text-muted-foreground">{risk.why}</p>
@@ -261,13 +253,13 @@ export function PlanCard({ step, plan, onDraft, busy, mayEdit, editReason }: {
               type="button"
               className={cn(buttonClass, 'mt-1')}
               disabled={busy}
-              onClick={() => onDraft(`Draft and preview the check for risk ${index + 1} of the plan — "${risk.failure}" (${risk.severity}), as a ${risk.check.kind} check: ${risk.check.rule}`)}
+              onClick={() => onDraft(`Draft and preview the check for risk ${index + 1} of the plan — "${risk.failure}", as a ${risk.check.kind} check: ${risk.check.rule}`)}
             >Draft this check</button>
           </li>
         ))}
       </ol>
       <p className="mt-2 text-muted-foreground">
-        Suggested Acceptance Criteria — minimum pass rate: critical {criteria.critical}, major {criteria.major}, minor {criteria.minor}.
+        Suggested Acceptance Criteria — every counted Evaluator passes at least {plan.minPassRate} of its graded trials.
         The next Eval Run prepared is judged against the criteria set then.
       </p>
       <div className="mt-1 flex items-center gap-1.5">

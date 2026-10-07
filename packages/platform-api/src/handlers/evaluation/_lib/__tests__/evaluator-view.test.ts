@@ -9,7 +9,7 @@ describe('evaluatorView', () => {
     const fixture = await evaluationFixture();
     const evaluator = { ...STEP, id: randomUUID(), name: 'fatal-flagged', archived: false, runInProduction: true, createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z' };
     const version = {
-      evaluatorId: evaluator.id, version: 1, rule: 'A fatal AE is flagged.', severity: 'critical' as const,
+      evaluatorId: evaluator.id, version: 1, rule: 'A fatal AE is flagged.' as const,
       check: { kind: 'code' as const, runtime: 'python' as const, source: 'print(1)' }, origin: 'user' as const,
       sourceApproval: null, createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z',
     };

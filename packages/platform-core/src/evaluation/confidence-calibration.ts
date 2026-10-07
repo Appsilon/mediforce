@@ -43,33 +43,32 @@ export function calibrateConfidence(outcomes: readonly ConfidenceOutcome[]): Con
  * What an Eval Run's results say about routing the step's outputs. Control Mode 4 with
  * a `confidenceThreshold` when some confidence level separates outputs that
  * pass: the lowest threshold whose outputs at or above it passed every counted
- * Evaluator at a rate of at least the strictest criterion's `minPassRate`,
+ * Evaluator at a rate of at least the criteria's `minPassRate`,
  * over at least a handful of trials. Below it the
  * step's fallback routes the output — so a step that misses its criteria
  * overall can still run unreviewed where it is confident. Control Mode 3, a
- * person reviewing every output, when there are no criteria, a criterion could
- * not be judged, the agent reported no confidence, or no threshold holds.
+ * person reviewing every output, when there are no criteria, they could not
+ * be judged, the agent reported no confidence, or no threshold holds.
  */
 export function recommendControl(
   outcomes: readonly ConfidenceOutcome[],
-  verdicts: readonly AcceptanceCriterionVerdict[],
+  verdict: AcceptanceCriterionVerdict | null,
 ): ControlRecommendation {
   const review = (reason: string): ControlRecommendation => ({
     autonomyLevel: 'L3', confidenceThreshold: null, coverage: null, reason,
   });
-  if (verdicts.length === 0) {
+  if (verdict === null) {
     return review('No Acceptance Criteria were frozen into this run, so there is no floor to run unreviewed against; keep a person reviewing every output.');
   }
-  const unjudged = verdicts.filter((verdict) => verdict.status === 'not_evaluable');
-  if (unjudged.length > 0) {
-    return review(`The ${unjudged.map((verdict) => verdict.severity).join(' and ')} criterion could not be judged; keep a person reviewing every output.`);
+  if (verdict.status === 'not_evaluable') {
+    return review('The Acceptance Criteria could not be judged; keep a person reviewing every output.');
   }
   if (outcomes.length === 0) {
     return review('The agent reported no confidence to route on; keep a person reviewing every output.');
   }
 
-  const allMet = verdicts.every((verdict) => verdict.status === 'met');
-  const target = Math.max(...verdicts.map((verdict) => verdict.criterion.minPassRate));
+  const met = verdict.status === 'met';
+  const target = verdict.criterion.minPassRate;
   const thresholds = [...new Set(outcomes.map((outcome) => outcome.confidence))].sort((left, right) => left - right);
   for (const threshold of thresholds) {
     const covered = outcomes.filter((outcome) => outcome.confidence >= threshold);
@@ -81,8 +80,8 @@ export function recommendControl(
         autonomyLevel: 'L4',
         confidenceThreshold: threshold,
         coverage: covered.length / outcomes.length,
-        reason: `${allMet ? 'Every criterion was met, and outputs' : 'Not every criterion was met overall, but outputs'} with confidence ${threshold} or more `
-          + `passed every counted Evaluator ${passes}/${covered.length} times (pass rate ${passRate.toFixed(2)}, at least the strictest floor ${target}). `
+        reason: `${met ? 'The criteria were met, and outputs' : 'The criteria were missed overall, but outputs'} with confidence ${threshold} or more `
+          + `passed every counted Evaluator ${passes}/${covered.length} times (pass rate ${passRate.toFixed(2)}, at least the floor ${target}). `
           + 'Below the threshold the step\'s fallbackBehavior applies; escalate_to_human sends the output to a person.',
       };
     }

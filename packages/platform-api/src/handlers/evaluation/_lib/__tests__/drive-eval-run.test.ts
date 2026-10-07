@@ -27,7 +27,7 @@ describe('driveEvalRun', () => {
       engine: new WorkflowEngine(fixture.processRepo, fixture.instanceRepo, fixture.auditRepo),
       runKicker: kicker,
     });
-    await createEvaluator({ ...STEP, name: 'findings-present', rule: 'r', severity: 'critical', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
+    await createEvaluator({ ...STEP, name: 'findings-present', rule: 'r', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
     await createEvalCase({
       ...STEP, name: 'case', input: { triggerPayload: {}, previousStepOutputs: {} }, workspaceSeedCommit: null,
       expectation: 'positive', expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null, split: 'dev', containsProductionData: false, origin: 'user',

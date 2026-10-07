@@ -91,7 +91,7 @@ test.describe('Step Evaluation MCP replay — API E2E', () => {
     const step = { namespace: TEST_ORG_HANDLE, workflowName, stepId: 'grade-aes' };
 
     await post(request, '/api/evaluation/evaluators', {
-      ...step, name: 'summary-present', rule: 'The result carries a summary.', severity: 'critical',
+      ...step, name: 'summary-present', rule: 'The result carries a summary.',
       check: { kind: 'schema', schema: { required: ['summary'] } },
     }, 201);
     const { evalCase } = EvalCaseOutputSchema.parse(await post(request, '/api/evaluation/cases/from-agent-run', {
