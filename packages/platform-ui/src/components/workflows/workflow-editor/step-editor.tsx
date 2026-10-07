@@ -13,7 +13,7 @@ import { carriedSkills } from '@/lib/carried-skills';
 import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
-import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, DEFAULT_MODEL, defaultVerdictLabel, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
+import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, defaultVerdictLabel, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
 import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo, ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
@@ -756,7 +756,7 @@ export function StepEditor({
             <select
               aria-label="Agent"
               value={step.agentId ?? ''}
-              onChange={(e) => onChange(selectAgentPatch(step, e.target.value || undefined, [pinnedDefaultModel, DEFAULT_MODEL]))}
+              onChange={(e) => onChange(selectAgentPatch(step, e.target.value || undefined, pinnedDefaultModel))}
               className={rs}
             >
               <option value="">{agentsLoading ? 'Loading agents…' : 'No agent selected'}</option>

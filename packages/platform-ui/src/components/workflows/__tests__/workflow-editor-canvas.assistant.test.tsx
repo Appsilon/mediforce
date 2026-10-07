@@ -62,7 +62,7 @@ vi.mock('@/hooks/use-image-catalog', () => ({
 }));
 
 vi.mock('@/hooks/use-model-registry', () => ({
-  usePinnedDefaultModel: () => undefined,
+  usePinnedDefaultModel: () => 'anthropic/claude-sonnet-5.5',
 }));
 
 vi.mock('../workflow-editor/step-editor', () => ({

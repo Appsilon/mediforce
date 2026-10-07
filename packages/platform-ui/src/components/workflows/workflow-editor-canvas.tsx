@@ -374,7 +374,7 @@ export function WorkflowEditorCanvas({
       } : {}),
       ...(payload.executor === 'script' ? { plugin: payload.plugin ?? 'script-container' } : {}),
       ...(payload.executor === 'cowork' ? { cowork: payload.cowork ?? { agent: 'chat' as const } } : {}),
-    }, pinnedDefaultModel ?? DEFAULT_MODEL);
+    }, pinnedDefaultModel);
 
     const resolvedInsertAfterId = insertAfterId ?? selectedStepId;
 
@@ -549,8 +549,7 @@ export function WorkflowEditorCanvas({
     // Steps the assistant adds start on the same default model as a block added
     // by hand, unless it named one.
     const added = new Set(result.addedStepIds);
-    const defaultModel = pinnedDefaultModel ?? DEFAULT_MODEL;
-    const steps = result.steps.map((step) => (added.has(step.id) ? withDefaultModel(step, defaultModel) : step));
+    const steps = result.steps.map((step) => (added.has(step.id) ? withDefaultModel(step, pinnedDefaultModel) : step));
     saveSnapshot();
     setEditedSteps(steps);
     setEditedTransitions(result.transitions);

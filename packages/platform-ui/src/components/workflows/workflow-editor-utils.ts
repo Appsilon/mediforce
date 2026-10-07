@@ -275,10 +275,10 @@ export function withDefaultModel(step: WorkflowStep, defaultModel: string): Work
 export function selectAgentPatch(
   step: Pick<WorkflowStep, 'agent'>,
   agentId: string | undefined,
-  defaultModels: ReadonlyArray<string | undefined>,
+  defaultModel: string,
 ): Pick<WorkflowStep, 'agentId' | 'agent'> {
   const model = step.agent?.model;
-  if (agentId === undefined || model === undefined || defaultModels.includes(model) === false) {
+  if (agentId === undefined || model !== defaultModel) {
     return { agentId, agent: step.agent };
   }
   const { model: _defaultModel, ...rest } = step.agent ?? {};

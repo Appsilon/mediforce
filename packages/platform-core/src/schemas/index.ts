@@ -626,6 +626,8 @@ export {
 
 export {
   DEFAULT_MODEL,
+  FALLBACK_PINNED_MODEL,
+  isMovingModelAlias,
   pinDefaultModel,
   ModelRegistryEntrySchema,
   ModelRegistryMetaSchema,

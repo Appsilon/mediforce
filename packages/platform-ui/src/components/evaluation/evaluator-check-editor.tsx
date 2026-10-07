@@ -6,7 +6,7 @@ import {
   DEFAULT_JUDGE_MIN_CONFIDENCE,
   DEFAULT_MAX_AGREEMENT,
   DEFAULT_MIN_AGREEMENT,
-  DEFAULT_MODEL,
+  FALLBACK_PINNED_MODEL,
   EvaluatorCheckSchema,
   type AgentOutputSchema,
   type EvalCase,
@@ -71,7 +71,7 @@ const CODE_TEMPLATES: Record<CodeRuntime, string> = {
  * The step's own `agent.outputSchema`, when it declares one, is the natural
  * start for a schema check; `judgeModel` starts a judge.
  */
-export function emptyCheckDraft(kind: CheckDraftKind, stepOutputSchema?: AgentOutputSchema, judgeModel: string = DEFAULT_MODEL): CheckDraft {
+export function emptyCheckDraft(kind: CheckDraftKind, stepOutputSchema?: AgentOutputSchema, judgeModel: string = FALLBACK_PINNED_MODEL): CheckDraft {
   switch (kind) {
     case 'schema': return { kind, schemaText: JSON.stringify(stepOutputSchema ?? { type: 'object', required: [] }, null, 2) };
     case 'code': return { kind, runtime: 'python', source: CODE_TEMPLATES.python };

@@ -40,9 +40,9 @@ export function useModelPricing(): Map<string, ModelPricing> {
 
 /**
  * The concrete model a saved default is pinned to — the newest Claude Sonnet
- * in the registry (`pinDefaultModel`). Undefined until the registry loads.
+ * in the registry (`pinDefaultModel`), its fallback until the registry loads.
  */
-export function usePinnedDefaultModel(): string | undefined {
+export function usePinnedDefaultModel(): string {
   const query = useModelRegistry();
-  return useMemo(() => (query.data === undefined ? undefined : pinDefaultModel(query.data)), [query.data]);
+  return useMemo(() => pinDefaultModel(query.data ?? []), [query.data]);
 }

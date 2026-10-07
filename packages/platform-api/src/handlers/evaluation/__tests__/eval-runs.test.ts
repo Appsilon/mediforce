@@ -105,6 +105,47 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     expect(trials).toHaveLength(2 * 2);
   });
 
+  describe('refuses a step whose model is a moving alias (ADR-0023 D5)', () => {
+    const run = { ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 };
+    const ALIAS = '~anthropic/claude-sonnet-latest';
+
+    async function setGraderModel(foundationModel: string) {
+      const agent = await fixture.agentDefinitionRepo.getById('ae-grader');
+      await fixture.agentDefinitionRepo.upsert('ae-grader', { ...agent!, foundationModel });
+    }
+
+    async function setStepModel(model: string) {
+      await fixture.processRepo.saveWorkflowDefinition(buildWorkflowDefinition({
+        name: WORKFLOW,
+        namespace: NAMESPACE,
+        version: 2,
+        steps: [
+          { id: 'extract-aes', name: 'Extract AEs', type: 'creation', executor: 'script', script: { runtime: 'python', inlineScript: 'print(1)' } },
+          { id: 'grade-aes', name: 'Grade AEs', type: 'creation', executor: 'agent', agentId: 'ae-grader', agent: { prompt: 'Grade each AE.', model } },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'extract-aes', to: 'grade-aes' }, { from: 'grade-aes', to: 'done' }],
+      }));
+      await fixture.processRepo.setDefaultWorkflowVersion(NAMESPACE, WORKFLOW, 2);
+    }
+
+    it('inherited from its Agent', async () => {
+      await setGraderModel(ALIAS);
+      await expect(prepareEvalRun(run, scope)).rejects.toThrow(ALIAS);
+    });
+
+    it('inherited from its Agent through a blank step model', async () => {
+      await setGraderModel(ALIAS);
+      await setStepModel('');
+      await expect(prepareEvalRun(run, scope)).rejects.toThrow(ALIAS);
+    });
+
+    it('set on the step', async () => {
+      await setStepModel(ALIAS);
+      await expect(prepareEvalRun(run, scope)).rejects.toThrow(ALIAS);
+    });
+  });
+
   it('refuses to start without the person confirming the budget', async () => {
     const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
 

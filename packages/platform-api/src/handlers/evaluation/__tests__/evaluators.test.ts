@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ConflictError, NotFoundError } from '../../../errors';
+import { ConflictError, NotFoundError, ValidationError } from '../../../errors';
 import { userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { createEvaluator, addEvaluatorVersion, archiveEvaluator, listEvaluators, setEvaluatorProduction } from '../evaluators';
 import { evaluationFixture, STEP, type EvaluationFixture } from './fixture';
@@ -82,6 +82,15 @@ describe('Evaluators', () => {
     await expect(addEvaluatorVersion({ evaluatorId: evaluator.id, check: findingsSchema, origin: 'user' }, fixture.scope())).rejects.toThrow('stays one');
     const { evaluator: changed } = await addEvaluatorVersion({ evaluatorId: evaluator.id, check: { ...check, minAgreement: 0.9 }, origin: 'user' }, fixture.scope());
     expect(changed.latest.check).toMatchObject({ minAgreement: 0.9 });
+  });
+
+  it('refuses a judge on a moving model alias, so a scored version keeps meaning one model (ADR-0023 D7)', async () => {
+    const judge = { kind: 'llm_judge' as const, model: '~anthropic/claude-sonnet-latest', rubric: 'Is every grade justified?', minConfidence: 0.8 };
+    const input = { ...STEP, name: 'grades-justified', rule: 'Every grade is justified.', severity: 'major' as const, check: judge, origin: 'user' as const };
+    await expect(createEvaluator(input, fixture.scope())).rejects.toBeInstanceOf(ValidationError);
+
+    const { evaluator } = await createEvaluator({ ...input, check: { ...judge, model: 'anthropic/claude-sonnet-5.5' } }, fixture.scope());
+    await expect(addEvaluatorVersion({ evaluatorId: evaluator.id, check: judge, origin: 'user' }, fixture.scope())).rejects.toBeInstanceOf(ValidationError);
   });
 
   it('says a flagged Evaluator that does not count yet waits for it', async () => {

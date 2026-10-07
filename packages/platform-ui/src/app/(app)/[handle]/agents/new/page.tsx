@@ -25,7 +25,7 @@ export default function NewAgentPage() {
   const [outputDescription, setOutputDescription] = useState('');
   const pinnedDefaultModel = usePinnedDefaultModel();
   const [chosenModelId, setChosenModelId] = useState<string | null>(null);
-  const selectedModelId = chosenModelId ?? pinnedDefaultModel ?? '';
+  const selectedModelId = chosenModelId ?? pinnedDefaultModel;
   const [prompt, setPrompt] = useState('');
   const [mcpServers, setMcpServers] = useState<AgentMcpBindingMap>({});
   const [skills, setSkills] = useState<AgentSkillRef[]>([]);

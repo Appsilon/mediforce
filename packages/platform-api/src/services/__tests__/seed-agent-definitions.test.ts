@@ -3,7 +3,7 @@ import {
   InMemoryAgentDefinitionRepository,
   InMemoryModelRegistryRepository,
 } from '@mediforce/platform-core/testing';
-import { DEFAULT_MODEL, type CreateModelRegistryEntryInput } from '@mediforce/platform-core';
+import { DEFAULT_MODEL, FALLBACK_PINNED_MODEL, type CreateModelRegistryEntryInput } from '@mediforce/platform-core';
 import { seedBuiltinAgentDefinitions } from '../seed-agent-definitions';
 
 function makeEntry(id: string): CreateModelRegistryEntryInput {
@@ -39,11 +39,11 @@ describe('seedBuiltinAgentDefinitions', () => {
     expect((await agents.getById('opencode-agent'))?.foundationModel).toBe('deepseek/deepseek-chat');
   });
 
-  it('[DATA] keeps the alias when the registry has not synced yet', async () => {
+  it('[DATA] pins to the fallback Sonnet, never the moving alias, when the registry has not synced yet', async () => {
     const agents = new InMemoryAgentDefinitionRepository();
 
     await seedBuiltinAgentDefinitions(agents, new InMemoryModelRegistryRepository());
 
-    expect((await agents.getById('claude-code-agent'))?.foundationModel).toBe(DEFAULT_MODEL);
+    expect((await agents.getById('claude-code-agent'))?.foundationModel).toBe(FALLBACK_PINNED_MODEL);
   });
 });

@@ -18,7 +18,7 @@ import { useModelRegistry } from '@/hooks/use-model-registry';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
-import { DEFAULT_MODEL, mergeVerdictTransitions, ensureEntryStepFirst, pinDefaultModel } from '@mediforce/platform-core';
+import { mergeVerdictTransitions, ensureEntryStepFirst, pinDefaultModel } from '@mediforce/platform-core';
 import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
 // ---------------------------------------------------------------------------
@@ -91,7 +91,7 @@ export default function NewWorkflowPage() {
   useEffect(() => {
     if (templateSteps !== null) return;
     if (modelRegistry.data === undefined && modelRegistry.isError === false) return;
-    const defaultModel = modelRegistry.data === undefined ? DEFAULT_MODEL : pinDefaultModel(modelRegistry.data);
+    const defaultModel = pinDefaultModel(modelRegistry.data ?? []);
     setTemplateSteps(TEMPLATE_STEPS.map((step) => withDefaultModel(step, defaultModel)));
   }, [templateSteps, modelRegistry.data, modelRegistry.isError]);
 

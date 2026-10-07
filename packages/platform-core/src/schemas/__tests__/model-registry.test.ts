@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_MODEL, pinDefaultModel } from '../model-registry';
+import { DEFAULT_MODEL, FALLBACK_PINNED_MODEL, isMovingModelAlias, pinDefaultModel } from '../model-registry';
 
 function entry(id: string, retiredAt: string | null = null) {
   return { id, retiredAt };
@@ -30,8 +30,16 @@ describe('pinDefaultModel', () => {
     expect(pinDefaultModel(models)).toBe('anthropic/claude-sonnet-5.5');
   });
 
-  it('[DATA] falls back to the alias when the registry lists no Claude Sonnet', () => {
-    expect(pinDefaultModel([entry('openai/gpt-4o'), entry('deepseek/deepseek-chat')])).toBe(DEFAULT_MODEL);
-    expect(pinDefaultModel([])).toBe(DEFAULT_MODEL);
+  it('[DATA] falls back to a concrete Sonnet, never the moving alias, when the registry lists no Claude Sonnet', () => {
+    expect(pinDefaultModel([entry('openai/gpt-4o'), entry('deepseek/deepseek-chat')])).toBe(FALLBACK_PINNED_MODEL);
+    expect(pinDefaultModel([])).toBe(FALLBACK_PINNED_MODEL);
+    expect(isMovingModelAlias(FALLBACK_PINNED_MODEL)).toBe(false);
+  });
+});
+
+describe('isMovingModelAlias', () => {
+  it('[DATA] flags OpenRouter latest aliases and nothing concrete', () => {
+    expect(isMovingModelAlias(DEFAULT_MODEL)).toBe(true);
+    expect(isMovingModelAlias('anthropic/claude-sonnet-5.5')).toBe(false);
   });
 });

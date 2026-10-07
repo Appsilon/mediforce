@@ -14,7 +14,7 @@ import {
   WorkspaceFilePathSchema,
   hasPerturbationChange,
 } from './evaluation';
-import { DEFAULT_MODEL } from './model-registry';
+import { FALLBACK_PINNED_MODEL } from './model-registry';
 
 /**
  * The Evaluation Assistant's tools (ADR-0023 D14, D15), by what the assistant
@@ -37,8 +37,8 @@ const AssistantCheckSchema = EvaluatorCheckSchema.describe(
     kind: 'code', runtime: 'python',
     source: 'import json\nwith open("/output/input.json") as handle:\n    data = json.load(handle)\nwith open("/output/result.json", "w") as handle:\n    json.dump({"passed": "findings" in data["result"]}, handle)',
   },
-  { kind: 'llm_judge', model: DEFAULT_MODEL, rubric: 'Does the result explain its findings?', minConfidence: 0.8 },
-  { kind: 'expected_output', model: DEFAULT_MODEL, instructions: 'Wording of free text is trivial; a changed grade or term is not.', minAgreement: 0.9, maxAgreement: 0.1 },
+  { kind: 'llm_judge', model: FALLBACK_PINNED_MODEL, rubric: 'Does the result explain its findings?', minConfidence: 0.8 },
+  { kind: 'expected_output', model: FALLBACK_PINNED_MODEL, instructions: 'Wording of free text is trivial; a changed grade or term is not.', minAgreement: 0.9, maxAgreement: 0.1 },
 ] });
 
 /** Models name rules in prose or snake_case; an Evaluator's name is kebab-case. */

@@ -672,6 +672,8 @@ export {
 // Model registry schema + repository interface
 export {
   DEFAULT_MODEL,
+  FALLBACK_PINNED_MODEL,
+  isMovingModelAlias,
   pinDefaultModel,
   ModelRegistryEntrySchema,
   ModelRegistryMetaSchema,

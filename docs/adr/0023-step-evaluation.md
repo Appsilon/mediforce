@@ -102,7 +102,17 @@ enters the Fingerprint as the reference the runtime resolves — its tag, or the
 files and commit a build uses — not a registry digest, which would need a
 registry lookup per Fingerprint. A tag re-pushed under the same name does not
 change the Fingerprint; pin an image by digest (`image@sha256:…`) where that
-matters._
+matters._ _Amended 2026-10-07: an Eval Run runs on the model the Step pins in
+its Definition (its own `agent.model`, or its Agent's `foundationModel` when it
+names none) — no model override for now. The Fingerprint hashes that model
+string, so it must name one model: an OpenRouter moving alias
+(`~anthropic/claude-sonnet-latest`) changes model under the same string, and a
+qualification against it would stay "Qualified" after the alias moved. An Eval
+Run on a Step whose model is a `~` alias is refused until the Step or its Agent
+pins a concrete model. Saved defaults are pinned at creation
+(`pinDefaultModel`): a workflow authored when Sonnet 5.5 is newest keeps Sonnet
+5.5 after Sonnet 6 ships. The CLI's short names (`sonnet`, `opus`, `haiku`)
+move too; they are discouraged in saved steps but not yet refused._
 
 **D6 — Default-deny eval policy for MCP servers.** Each MCP server a Step can
 use carries an eval policy: `live`, `deny`, or `live` with named tools denied.
@@ -141,6 +151,9 @@ Evaluation tab no longer shows the policy._
 immutable.** Eval Runs record the Evaluator versions used; a Step
 Qualification cites them. A newer Evaluator version flags the qualification
 ("evaluators changed since qualification") without making it stale.
+_Amended 2026-10-07: immutable means the judge model too — an `llm_judge` or
+`expected_output` version naming a `~` moving alias is refused, since it would
+score with a different model under the same version._
 
 **D8 — Agent Trajectories are persisted for every Agent Run.** The tool-call
 record the plugins already produce for the step's activity log also becomes a
@@ -196,7 +209,10 @@ every floor is now judged on the pass rate itself._
 Not qualified) on the Step and in run views. Nothing is blocked: no Control
 Mode is refused and no run is downgraded when a qualification is missing or
 stale. ADR-0007 D2's example of a model swap "gated on a green Eval Run" is
-therefore **not** adopted; a swap shows as Stale.
+therefore **not** adopted; a swap shows as Stale. _Amended 2026-10-07: refusing
+an Eval Run on a moving-alias model (D5) is a precondition of the run itself,
+not a gate on qualification — production runs on such a Step are never
+blocked._
 
 **D12 — Few-shot examples are a structured, provenance-tracked field.**
 _Moved 2026-10-01 to [ADR-0024](./0024-optimisation.md) D5; not binding until

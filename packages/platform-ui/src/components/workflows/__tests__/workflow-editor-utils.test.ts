@@ -505,21 +505,20 @@ describe('withDefaultModel', () => {
 
 describe('selectAgentPatch', () => {
   const SONNET = 'anthropic/claude-sonnet-4.6';
-  const DEFAULTS = [SONNET, '~anthropic/claude-sonnet-latest'];
 
   it('drops the default model a new step was given, so the step inherits the agent\'s model', () => {
-    expect(selectAgentPatch({ agent: { model: SONNET } }, 'agent-1', DEFAULTS)).toEqual({ agentId: 'agent-1', agent: undefined });
+    expect(selectAgentPatch({ agent: { model: SONNET } }, 'agent-1', SONNET)).toEqual({ agentId: 'agent-1', agent: undefined });
   });
 
   it('keeps the rest of the agent config when it drops the default model', () => {
-    expect(selectAgentPatch({ agent: { model: SONNET, skill: 'draft-note' } }, 'agent-1', DEFAULTS)).toEqual({ agentId: 'agent-1', agent: { skill: 'draft-note' } });
+    expect(selectAgentPatch({ agent: { model: SONNET, skill: 'draft-note' } }, 'agent-1', SONNET)).toEqual({ agentId: 'agent-1', agent: { skill: 'draft-note' } });
   });
 
   it('keeps a model the author chose as an override', () => {
-    expect(selectAgentPatch({ agent: { model: 'openai/gpt-4o' } }, 'agent-1', DEFAULTS)).toEqual({ agentId: 'agent-1', agent: { model: 'openai/gpt-4o' } });
+    expect(selectAgentPatch({ agent: { model: 'openai/gpt-4o' } }, 'agent-1', SONNET)).toEqual({ agentId: 'agent-1', agent: { model: 'openai/gpt-4o' } });
   });
 
   it('keeps the model when the agent is cleared', () => {
-    expect(selectAgentPatch({ agent: { model: SONNET } }, undefined, DEFAULTS)).toEqual({ agentId: undefined, agent: { model: SONNET } });
+    expect(selectAgentPatch({ agent: { model: SONNET } }, undefined, SONNET)).toEqual({ agentId: undefined, agent: { model: SONNET } });
   });
 });
