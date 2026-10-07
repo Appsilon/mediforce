@@ -236,7 +236,7 @@ function AgentCatalog({ handle }: { handle: string }) {
   const [query, setQuery] = useState('');
 
   useEffect(() => {
-    apiFetch('/api/agents')
+    apiFetch(`/api/agents?namespace=${encodeURIComponent(handle)}`)
       .then((res) => {
         if (!res.ok) throw new Error(`Failed to fetch agent definitions: ${res.status}`);
         return res.json() as Promise<{ agents: AgentDefinition[] }>;
@@ -258,7 +258,7 @@ function AgentCatalog({ handle }: { handle: string }) {
       .finally(() => {
         setLoading(false);
       });
-  }, []);
+  }, [handle]);
 
   const filtered = useMemo(
     () => (query.trim() === '' ? agents : agents.filter((a) => agentMatchesQuery(a, query.trim()))),

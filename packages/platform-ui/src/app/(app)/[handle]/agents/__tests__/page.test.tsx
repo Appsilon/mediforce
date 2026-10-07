@@ -40,4 +40,12 @@ describe('AgentsPage', () => {
       screen.getByText(/run uses the agent's foundation model unless the workflow step/),
     ).toBeInTheDocument();
   });
+
+  it('requests only the agents of the workspace in the URL', async () => {
+    render(<AgentsPage />);
+
+    await screen.findByRole('button', { name: 'What is an agent?' });
+
+    expect(apiFetchMock).toHaveBeenCalledWith('/api/agents?namespace=acme');
+  });
 });
