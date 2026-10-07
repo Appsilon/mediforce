@@ -928,6 +928,6 @@ export {
   type StepUiComponent,
 } from './schemas/step-ui-config';
 
-export { agentLogEntries, failedMcpServers, formatAgentLogLine, stageLogEntry, appendStageEntry, AgentLogFormatSchema, type AgentLogFormat } from './utils/agent-log-format';
+export { agentLogEntries, mcpServersWithStatus, formatAgentLogLine, stageLogEntry, appendStageEntry, AgentLogFormatSchema, type AgentLogFormat } from './utils/agent-log-format';
 
 export { auditSignificance, type AuditSignificance } from './schemas/audit-significance';

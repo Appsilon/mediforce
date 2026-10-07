@@ -28,8 +28,12 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
   && apt-get install -y --no-install-recommends nodejs \
   && rm -rf /var/lib/apt/lists/*
 
-# Install Claude Code CLI
-RUN npm install -g @anthropic-ai/claude-code
+# Install Claude Code CLI, pinned: an unpinned install reuses whatever version
+# the cached layer first got. 2.1.292 is verified to hold the agent's first turn
+# until stdio MCP servers connect (up to MCP_TIMEOUT); 2.1.183 started without them.
+# renovate: datasource=npm depName=@anthropic-ai/claude-code
+ARG CLAUDE_CODE_VERSION=2.1.292
+RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 
 # Install OpenCode CLI
 RUN curl -fsSL https://opencode.ai/install | bash \

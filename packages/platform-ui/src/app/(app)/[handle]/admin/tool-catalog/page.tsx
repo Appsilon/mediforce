@@ -108,7 +108,9 @@ export default function AdminToolCatalogPage() {
       try {
         if (mode.kind === 'edit') {
           const { id, ...patch } = entry;
-          await mediforce.toolCatalog.update({ namespace: handle, id, ...patch });
+          // The form omits an emptied field; null tells the PATCH to clear it.
+          const cleared = { args: null, env: null, description: null };
+          await mediforce.toolCatalog.update({ namespace: handle, id, ...cleared, ...patch });
         } else {
           await mediforce.toolCatalog.create({ namespace: handle, ...entry });
         }

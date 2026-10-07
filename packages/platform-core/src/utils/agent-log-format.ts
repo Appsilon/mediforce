@@ -200,17 +200,16 @@ const McpInitEventSchema = z.object({
 });
 
 /**
- * Servers a Claude CLI run reports as `failed` in its `system/init` event. Not
- * `pending` (still connecting) or `needs-auth`: only a definite failure is worth
- * a warning.
+ * Servers a Claude CLI run reports with `status` in its `system/init` event.
  *
  * A stdio MCP server whose command is missing from the image, or that crashes
  * on start, is dropped silently: the agent just sees no tools from it, and the
- * only trace is `status: "failed"` in this one event. Surfacing it is the
- * difference between "the agent ignored the tool" and "the tool was never
- * there". Pure and total, for the same reason `agentLogEntries` is.
+ * only trace is `status: "failed"` in this one event. One still `pending` when
+ * the agent started had its tools missing for at least the first turn. Surfacing
+ * either is the difference between "the agent ignored the tool" and "the tool
+ * was never there". Pure and total, for the same reason `agentLogEntries` is.
  */
-export function failedMcpServers(claudeStreamJson: string): string[] {
+export function mcpServersWithStatus(claudeStreamJson: string, status: 'failed' | 'pending'): string[] {
   return claudeStreamJson.split(/\r?\n/).flatMap((line) => {
     const trimmed = line.trim();
     if (trimmed.startsWith('{') === false) return [];
@@ -222,7 +221,7 @@ export function failedMcpServers(claudeStreamJson: string): string[] {
     }
     const init = McpInitEventSchema.safeParse(event);
     if (init.success === false) return [];
-    return init.data.mcp_servers.filter((server) => server.status === 'failed').map((server) => server.name);
+    return init.data.mcp_servers.filter((server) => server.status === status).map((server) => server.name);
   });
 }
 

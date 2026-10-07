@@ -102,7 +102,10 @@ Containers run `--rm -i`, capped at 8 GB / 2 CPUs, named
 
 **A stdio MCP server runs inside the step's image.** The agent's bindings resolve
 to catalog entries whose `command` (`uvx`, `npx`, …) must exist in that image;
-the default agent image has `npx` and no `uvx`. A server that cannot start is
+the default agent image has `npx` and no `uvx`. A Claude Code agent waits up to
+120s for its stdio servers to connect before its first turn, so a cold
+`uvx`/`npx` install has time to finish; a slower server needs `MCP_TIMEOUT`
+(milliseconds) in the step's `env`. A server that cannot start is
 dropped by the Claude CLI without failing the run, so the agent simply sees no
 tools from it. The platform says so in three places, all advisory: the tool
 catalog form and `mediforce images check-command` probe a command against an
