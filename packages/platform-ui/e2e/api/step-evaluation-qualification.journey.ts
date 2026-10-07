@@ -74,17 +74,17 @@ test.describe('Step Evaluation qualification — API E2E', () => {
 
     await post(request, '/api/evaluation/briefs', { ...step, text: 'Grades AEs for the DSMB; a missed grade 5 is critical.' }, 201);
     await post(request, '/api/evaluation/acceptance-criteria', {
-      ...step, criteria: { critical: { minPassRate: 0.1, minPassHatK: 1 }, major: { minPassRate: 0.5 } },
+      ...step, criteria: { minPassRate: 0.5, minPassHatK: 1 },
     }, 201);
     const criteriaRes = await request.get(`/api/evaluation/acceptance-criteria?${query}`, { headers: AUTH_HEADERS });
     expect(GetAcceptanceCriteriaOutputSchema.parse(await criteriaRes.json()).criteria).toMatchObject({ version: 1 });
 
     await post(request, '/api/evaluation/evaluators', {
-      ...step, name: 'summary-present', rule: 'The result carries a summary.', severity: 'critical',
+      ...step, name: 'summary-present', rule: 'The result carries a summary.',
       check: { kind: 'schema', schema: { required: ['summary'] } },
     }, 201);
     await post(request, '/api/evaluation/evaluators', {
-      ...step, name: 'findings-present', rule: 'The result lists findings.', severity: 'major',
+      ...step, name: 'findings-present', rule: 'The result lists findings.',
       check: { kind: 'schema', schema: { required: ['findings'] } },
     }, 201);
     await post(request, '/api/evaluation/cases/from-agent-run', { agentRunId: production.id, expectation: 'positive' }, 201);
@@ -96,7 +96,7 @@ test.describe('Step Evaluation qualification — API E2E', () => {
       ...step, trialsPerCase: 1, concurrency: 2, budgetUsd: 1,
     }, 201));
     expect(prepared.evalRun).toMatchObject({
-      acceptanceCriteria: { critical: { minPassRate: 0.1, minPassHatK: 1 }, major: { minPassRate: 0.5 } },
+      acceptanceCriteria: { minPassRate: 0.5, minPassHatK: 1 },
     });
     expect(prepared.evalRun).not.toHaveProperty('briefVersion');
     expect(prepared.evalRun.fingerprint).not.toBeNull();
@@ -117,7 +117,7 @@ test.describe('Step Evaluation qualification — API E2E', () => {
       expect(trial).toMatchObject({ status: 'scored', confidence: 1 });
       expect(await trajectoryText(request, trial.agentRunId!)).toContain('with MCP servers: meddra.');
     }
-    expect(finished.report.criteria.map((verdict) => [verdict.severity, verdict.status])).toEqual([['critical', 'met'], ['major', 'missed']]);
+    expect(finished.report.criteriaVerdict).toMatchObject({ status: 'missed', reason: 'findings-present: pass rate 0% < 50%, pass^k 0% < 100%' });
     expect(finished.report.recommendation).toMatchObject({ autonomyLevel: 'L3' });
 
     const unsigned = GetStepQualificationOutputSchema.parse(await (await request.get(`/api/evaluation/qualification?${query}`, { headers: AUTH_HEADERS })).json());
@@ -125,13 +125,13 @@ test.describe('Step Evaluation qualification — API E2E', () => {
 
     const signing = {
       evalRunId: finished.evalRun.id,
-      deviations: [{ severity: 'major', justification: 'Findings are listed by the downstream step; a reviewer reads every grade.' }],
+      justification: 'Findings are listed by the downstream step; a reviewer reads every grade.',
       password: TEST_USER_PASSWORD,
     };
     const member = sessionCookieHeaders(callers.member);
     const byApiKey = await request.post('/api/evaluation/qualification', { headers: JSON_HEADERS, data: signing });
     expect(byApiKey.status(), await byApiKey.text()).toBe(403);
-    const unjustified = await request.post('/api/evaluation/qualification', { headers: member, data: { ...signing, deviations: [] } });
+    const unjustified = await request.post('/api/evaluation/qualification', { headers: member, data: { evalRunId: signing.evalRunId, password: signing.password } });
     expect(unjustified.status(), await unjustified.text()).toBe(400);
     const wrongPassword = await request.post('/api/evaluation/qualification', { headers: member, data: { ...signing, password: 'not-the-password' } });
     expect(wrongPassword.status(), await wrongPassword.text()).toBe(403);

@@ -30,7 +30,7 @@ test.describe('Step Evaluation drift alerts — API E2E', () => {
     const query = new URLSearchParams({ ...step, window: '2' }).toString();
 
     const created = EvaluatorOutputSchema.parse(await post(request, '/api/evaluation/evaluators', {
-      ...step, name: 'summary-present', rule: 'The result has a summary.', severity: 'major', runInProduction: true,
+      ...step, name: 'summary-present', rule: 'The result has a summary.', runInProduction: true,
       check: { kind: 'schema', schema: { required: ['summary'] } },
     }, 201));
 
@@ -48,7 +48,7 @@ test.describe('Step Evaluation drift alerts — API E2E', () => {
       window: 2,
       threshold: 0.15,
       evaluators: [{
-        evaluatorId: created.evaluator.id, name: 'summary-present', severity: 'major', evaluatorVersion: 1,
+        evaluatorId: created.evaluator.id, name: 'summary-present', evaluatorVersion: 1,
         recentMean: 1, baselineMean: null, recentCount: 2, baselineCount: 0, drifting: false,
       }],
     });

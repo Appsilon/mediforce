@@ -99,7 +99,6 @@ async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, s
       name: evaluator.name,
       version: version.version,
       kind: version.check.kind,
-      severity: version.severity,
       counted: trust.trusted,
       ...(trust.trusted ? {} : { reason: trust.reason }),
     };

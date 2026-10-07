@@ -26,7 +26,6 @@ export const EvaluationBriefSchema = EvaluatedStepSchema.extend({
 });
 
 export const EvaluatorKindSchema = z.enum(['schema', 'code', 'llm_judge', 'expected_output']);
-export const EvaluatorSeveritySchema = z.enum(['critical', 'major', 'minor']);
 
 /** Checks the step's `result` against the structural JSON Schema subset `agent.outputSchema` uses. */
 export const SchemaCheckSchema = z.object({
@@ -125,7 +124,6 @@ export const EvaluatorVersionSchema = z.object({
   version: z.number().int().positive(),
   /** The plain-language rule the check stands for. */
   rule: z.string().min(1).max(2000),
-  severity: EvaluatorSeveritySchema,
   check: EvaluatorCheckSchema,
   origin: EvaluationOriginSchema,
   sourceApproval: SourceApprovalSchema.nullable(),
@@ -322,28 +320,51 @@ export const McpEvalPolicySchema = EvaluatedStepSchema.extend({
 });
 
 /**
- * One Acceptance Criterion (D10): what every counted Evaluator of a severity
- * must reach — its pass rate, passes over graded trials, and optionally
- * pass^k, the share of cases where every trial passed.
+ * A Step's Acceptance Criteria (D10): what every counted Evaluator must reach —
+ * its pass rate, passes over graded trials, and optionally pass^k, the share of
+ * cases where every trial passed.
  */
-export const AcceptanceCriterionSchema = z.object({
+export const AcceptanceCriteriaSchema = z.object({
   minPassRate: z.number().min(0).max(1),
   minPassHatK: z.number().min(0).max(1).optional(),
 });
 
-/** Acceptance Criteria per severity; a severity without one is not judged. */
-export const AcceptanceCriteriaSchema = z.object({
-  critical: AcceptanceCriterionSchema.optional(),
-  major: AcceptanceCriterionSchema.optional(),
-  minor: AcceptanceCriterionSchema.optional(),
-}).refine((criteria) => criteria.critical !== undefined || criteria.major !== undefined || criteria.minor !== undefined, {
-  message: 'set a criterion for at least one severity',
+/** The severities Evaluators had before every Evaluator was held to the same floor; only records from then carry one. */
+export const LegacyEvaluatorSeveritySchema = z.enum(['critical', 'major', 'minor']);
+
+const LegacyAcceptanceCriteriaSchema = z.object({
+  critical: AcceptanceCriteriaSchema.optional(),
+  major: AcceptanceCriteriaSchema.optional(),
+  minor: AcceptanceCriteriaSchema.optional(),
+}).refine((legacy) => legacy.critical !== undefined || legacy.major !== undefined || legacy.minor !== undefined, {
+  message: 'set a minimum pass rate',
 });
+
+/** Acceptance Criteria exactly as a Step Qualification was signed against: one floor, or one per severity. */
+export const SignedAcceptanceCriteriaSchema = z.union([AcceptanceCriteriaSchema, LegacyAcceptanceCriteriaSchema]);
+
+/**
+ * Acceptance Criteria as stored. Criteria set before Evaluators lost their
+ * severity held one floor per severity; they read as the strictest of them,
+ * so no Evaluator is held to less than it was. Signed qualifications keep them
+ * as signed (`SignedAcceptanceCriteriaSchema`).
+ */
+export const StoredAcceptanceCriteriaSchema = z.union([
+  AcceptanceCriteriaSchema,
+  LegacyAcceptanceCriteriaSchema.transform((legacy) => {
+    const floors = [legacy.critical, legacy.major, legacy.minor].filter((floor) => floor !== undefined);
+    const passHatKs = floors.flatMap((floor) => (floor.minPassHatK === undefined ? [] : [floor.minPassHatK]));
+    return {
+      minPassRate: Math.max(...floors.map((floor) => floor.minPassRate)),
+      ...(passHatKs.length === 0 ? {} : { minPassHatK: Math.max(...passHatKs) }),
+    };
+  }),
+]);
 
 /** A Step's Acceptance Criteria, set before an Eval Run and frozen into it. Every write is a new version. */
 export const AcceptanceCriteriaVersionSchema = EvaluatedStepSchema.extend({
   version: z.number().int().positive(),
-  criteria: AcceptanceCriteriaSchema,
+  criteria: StoredAcceptanceCriteriaSchema,
   origin: EvaluationOriginSchema,
   createdBy: z.string().min(1),
   createdAt: z.iso.datetime(),
@@ -353,7 +374,6 @@ export type EvaluatedStep = z.infer<typeof EvaluatedStepSchema>;
 export type EvaluationOrigin = z.infer<typeof EvaluationOriginSchema>;
 export type EvaluationBrief = z.infer<typeof EvaluationBriefSchema>;
 export type EvaluatorKind = z.infer<typeof EvaluatorKindSchema>;
-export type EvaluatorSeverity = z.infer<typeof EvaluatorSeveritySchema>;
 export type EvaluatorCheck = z.infer<typeof EvaluatorCheckSchema>;
 export type SourceApproval = z.infer<typeof SourceApprovalSchema>;
 export type Evaluator = z.infer<typeof EvaluatorSchema>;
@@ -374,6 +394,6 @@ export type McpTapeCall = z.infer<typeof McpTapeCallSchema>;
 export type McpTape = z.infer<typeof McpTapeSchema>;
 export type McpRecording = z.infer<typeof McpRecordingSchema>;
 export type McpReplayMiss = z.infer<typeof McpReplayMissSchema>;
-export type AcceptanceCriterion = z.infer<typeof AcceptanceCriterionSchema>;
 export type AcceptanceCriteria = z.infer<typeof AcceptanceCriteriaSchema>;
+export type SignedAcceptanceCriteria = z.infer<typeof SignedAcceptanceCriteriaSchema>;
 export type AcceptanceCriteriaVersion = z.infer<typeof AcceptanceCriteriaVersionSchema>;

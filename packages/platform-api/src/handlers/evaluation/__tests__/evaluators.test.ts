@@ -12,11 +12,11 @@ describe('Evaluators', () => {
 
   it('trusts a schema check at once and holds a code check until approved', async () => {
     const { evaluator: schema } = await createEvaluator(
-      { ...STEP, name: 'findings-present', rule: 'The result lists findings.', severity: 'critical', check: findingsSchema, origin: 'user' },
+      { ...STEP, name: 'findings-present', rule: 'The result lists findings.', check: findingsSchema, origin: 'user' },
       fixture.scope(),
     );
     const { evaluator: code } = await createEvaluator(
-      { ...STEP, name: 'grade-5-flagged', rule: 'A fatal AE is graded 5.', severity: 'critical', check: { kind: 'code', runtime: 'python', source: 'print(1)' }, origin: 'assistant' },
+      { ...STEP, name: 'grade-5-flagged', rule: 'A fatal AE is graded 5.', check: { kind: 'code', runtime: 'python', source: 'print(1)' }, origin: 'assistant' },
       fixture.scope(),
     );
 
@@ -26,28 +26,28 @@ describe('Evaluators', () => {
   });
 
   it('refuses a second Evaluator of the same name on the step', async () => {
-    const input = { ...STEP, name: 'findings-present', rule: 'r', severity: 'major' as const, check: findingsSchema, origin: 'user' as const };
+    const input = { ...STEP, name: 'findings-present', rule: 'r' as const, check: findingsSchema, origin: 'user' as const };
     await createEvaluator(input, fixture.scope());
     await expect(createEvaluator(input, fixture.scope())).rejects.toBeInstanceOf(ConflictError);
   });
 
   it('makes a change a new version that carries over what it does not change', async () => {
     const { evaluator } = await createEvaluator(
-      { ...STEP, name: 'findings-present', rule: 'The result lists findings.', severity: 'critical', check: findingsSchema, origin: 'user' },
+      { ...STEP, name: 'findings-present', rule: 'The result lists findings.', check: findingsSchema, origin: 'user' },
       fixture.scope(),
     );
     const { evaluator: changed } = await addEvaluatorVersion(
-      { evaluatorId: evaluator.id, severity: 'minor', origin: 'user' },
+      { evaluatorId: evaluator.id, rule: 'The result lists every finding.', origin: 'user' },
       fixture.scope(),
     );
 
-    expect(changed.versions.map((version) => [version.version, version.severity])).toEqual([[1, 'critical'], [2, 'minor']]);
-    expect(changed.latest).toMatchObject({ rule: 'The result lists findings.', check: findingsSchema });
+    expect(changed.versions.map((version) => [version.version, version.rule])).toEqual([[1, 'The result lists findings.'], [2, 'The result lists every finding.']]);
+    expect(changed.latest).toMatchObject({ rule: 'The result lists every finding.', check: findingsSchema });
   });
 
   it('leaves archived Evaluators out of the list unless asked', async () => {
     const { evaluator } = await createEvaluator(
-      { ...STEP, name: 'findings-present', rule: 'r', severity: 'major', check: findingsSchema, origin: 'user' },
+      { ...STEP, name: 'findings-present', rule: 'r', check: findingsSchema, origin: 'user' },
       fixture.scope(),
     );
     await archiveEvaluator({ evaluatorId: evaluator.id, archived: true }, fixture.scope());
@@ -58,7 +58,7 @@ describe('Evaluators', () => {
 
   it('starts out of production and runs there once flagged, audited', async () => {
     const { evaluator } = await createEvaluator(
-      { ...STEP, name: 'findings-present', rule: 'r', severity: 'critical', check: findingsSchema, origin: 'user' },
+      { ...STEP, name: 'findings-present', rule: 'r', check: findingsSchema, origin: 'user' },
       fixture.scope(),
     );
     expect(evaluator).toMatchObject({ runInProduction: false, production: { active: false } });
@@ -73,7 +73,7 @@ describe('Evaluators', () => {
 
   it('never runs an expected-output check in production, and keeps it one', async () => {
     const check = { kind: 'expected_output' as const, model: 'anthropic/claude-haiku-4.5', minAgreement: 0.8, maxAgreement: 0.1 };
-    const input = { ...STEP, name: 'matches-expected', rule: 'The output matches the expected output.', severity: 'critical' as const, check, origin: 'user' as const };
+    const input = { ...STEP, name: 'matches-expected', rule: 'The output matches the expected output.' as const, check, origin: 'user' as const };
     await expect(createEvaluator({ ...input, runInProduction: true }, fixture.scope())).rejects.toThrow('never runs in production');
 
     const { evaluator } = await createEvaluator(input, fixture.scope());
@@ -86,7 +86,7 @@ describe('Evaluators', () => {
 
   it('refuses a judge on a moving model alias, so a scored version keeps meaning one model (ADR-0023 D7)', async () => {
     const judge = { kind: 'llm_judge' as const, model: '~anthropic/claude-sonnet-latest', rubric: 'Is every grade justified?', minConfidence: 0.8 };
-    const input = { ...STEP, name: 'grades-justified', rule: 'Every grade is justified.', severity: 'major' as const, check: judge, origin: 'user' as const };
+    const input = { ...STEP, name: 'grades-justified', rule: 'Every grade is justified.' as const, check: judge, origin: 'user' as const };
     await expect(createEvaluator(input, fixture.scope())).rejects.toBeInstanceOf(ValidationError);
 
     const { evaluator } = await createEvaluator({ ...input, check: { ...judge, model: 'anthropic/claude-sonnet-5.5' } }, fixture.scope());
@@ -95,7 +95,7 @@ describe('Evaluators', () => {
 
   it('says a flagged Evaluator that does not count yet waits for it', async () => {
     const { evaluator } = await createEvaluator(
-      { ...STEP, name: 'grade-5-flagged', rule: 'r', severity: 'critical', check: { kind: 'code', runtime: 'python', source: 'print(1)' }, origin: 'user', runInProduction: true },
+      { ...STEP, name: 'grade-5-flagged', rule: 'r', check: { kind: 'code', runtime: 'python', source: 'print(1)' }, origin: 'user', runInProduction: true },
       fixture.scope(),
     );
     expect(evaluator.production).toEqual({ active: false, reason: 'in production once it counts (source not approved)' });
@@ -103,7 +103,7 @@ describe('Evaluators', () => {
 
   it('needs the workflow edit right to flag an Evaluator for production', async () => {
     const { evaluator } = await createEvaluator(
-      { ...STEP, name: 'findings-present', rule: 'r', severity: 'major', check: findingsSchema, origin: 'user' },
+      { ...STEP, name: 'findings-present', rule: 'r', check: findingsSchema, origin: 'user' },
       fixture.scope(),
     );
     await expect(setEvaluatorProduction(
@@ -114,7 +114,7 @@ describe('Evaluators', () => {
 
   it('needs the workspace to write', async () => {
     await expect(createEvaluator(
-      { ...STEP, name: 'x', rule: 'r', severity: 'major', check: findingsSchema, origin: 'user' },
+      { ...STEP, name: 'x', rule: 'r', check: findingsSchema, origin: 'user' },
       fixture.scope(userCaller('outsider', ['pharma-b'])),
     )).rejects.toBeInstanceOf(NotFoundError);
   });

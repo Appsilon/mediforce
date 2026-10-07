@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-02
+last_reviewed: 2026-10-07
 ---
 
 # Step Evaluation
@@ -78,16 +78,16 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
 The step's Brief is sent to the assistant on every turn. What it can help with:
 
 - **Evaluation plan.** It reads the step, a few of its runs and the Brief, and
-  returns a plan card: the risks, highest first — what could go wrong, how bad,
+  returns a plan card: the risks, highest first — what could go wrong,
   why, the cheapest check that would catch it, the inputs worth trying it on —
-  and suggested Acceptance Criteria (minimum pass rates per severity). A plan creates nothing; **Draft this check** on a
+  and a suggested minimum pass rate for the Acceptance Criteria. A plan creates nothing; **Draft this check** on a
   risk asks the assistant to draft it, and **Use as Acceptance Criteria** sets
-  the suggested floors.
-- **Acceptance Criteria.** From the step's risks and Brief, it proposes floors
-  per severity — with pass^k where the step would run unreviewed — and says
+  the suggested floor.
+- **Acceptance Criteria.** From the step's risks and Brief, it proposes the
+  floor every Evaluator must reach — with pass^k where the step would run unreviewed — and says
   how many graded trials a floor needs to mean something (8 passes out of 10
   meet a 0.8 floor, but their Wilson 95% interval runs from 0.49 to 0.94).
-- **Routing.** It explains each criterion's verdict and recommends a Control
+- **Routing.** It explains the criteria's verdict and recommends a Control
   Mode and `confidenceThreshold` from the run's confidence calibration.
 - **Diagnosis.** After a run with failures the assistant reads them
   (`get_failures`: the run's trials where a counted Evaluator failed, a
@@ -287,11 +287,10 @@ confidence and autonomy routing, `AgentRunner` hands it to the gate
 (`executeAgentStep` installs it only when the step has a flagged Evaluator):
 
 - `schema` and `code` run synchronously and each writes a Score marked
-  `metadata.production: true` (no `evalRunId`). A failing **critical** one fails
+  `metadata.production: true` (no `evalRunId`). A failing one fails
   the run with reason `production_evaluator`: the step's `fallbackBehavior`
   applies as for low confidence, and the failure message is the run's
   `errorMessage`, an activity-log line and part of the `agent.run` audit event.
-  Failing `major` and `minor` ones only write Scores.
 - `llm_judge` runs asynchronously after the run has moved on and only writes a
   Score (`source: llm_judge`, its cost in `metadata.judgeCostUsd`, its
   confidence as in an Eval Run). Its errors
@@ -581,18 +580,18 @@ so it can lower pass@k and pass^k, never lift them. Evaluators that do not
 count are marked so. Tokens and duration come from the trials' runs; cost adds
 the judge calls. Then:
 
-- **Acceptance Criteria.** Each severity the frozen criteria set is `met` when
-  every counted Evaluator of that severity reaches its floor — the pass rate
-  itself, passes over graded trials (8 of 10 meets 80%), and pass^k where
-  set — `missed` when one does not,
-  and `not judged` when no counted Evaluator of that severity exists, one
-  graded nothing it counts (a judge whose every verdict was left out), or — for a floor the scored trials reached — some trial
-  failed or was skipped: a criterion is met on the whole Dataset. An Evaluator
+- **Acceptance Criteria.** The frozen criteria are `met` when every counted
+  Evaluator reaches the floor — the pass rate itself, passes over graded
+  trials (8 of 10 meets 80%), and pass^k where set — `missed` when one does
+  not, and `not judged` when no counted Evaluator exists, one graded nothing
+  it counts (a judge whose every verdict was left out), or — for a floor the
+  scored trials reached — some trial failed or was skipped: the criteria are
+  met on the whole Dataset. An Evaluator
   that grades no case of the run — an `expected_output` check while no case
   has an expected output, or one every case leaves unselected — is left out of
   the criteria, like one that does not count.
-  A run prepared before any criteria were set freezes the default — every
-  severity at 100%; one prepared before that default existed judges nothing.
+  A run prepared before any criteria were set freezes the default — 100%;
+  one prepared before that default existed judges nothing.
 - **Model verdicts.** Every judge verdict and agreement score per trial — case,
   pass or fail, the judge's confidence against its minimum or the agreement,
   whether it counts, the rationale
@@ -615,8 +614,8 @@ the judge calls. Then:
 - **Routing.** Once the trials are done, as the `autonomyLevel` to
   set: `L4` (Control Mode 4) with a `confidenceThreshold` — the lowest
   confidence at which the outputs at or above it (at least 5) passed every
-  counted Evaluator at a rate of at least the strictest criterion's floor; below it the step's `fallbackBehavior` applies — or `L3` (Control
-  Mode 3), a person reviewing every output, when there are no criteria, one could not be judged, the agent
+  counted Evaluator at a rate of at least the criteria's floor; below it the step's `fallbackBehavior` applies — or `L3` (Control
+  Mode 3), a person reviewing every output, when there are no criteria, they could not be judged, the agent
   reported no confidence, or no threshold holds. A recommendation to apply in
   the workflow editor.
 
@@ -639,8 +638,8 @@ acceptance, Dataset, trials, cost, Cancel while it runs, Start while
 prepared) and five views, from the whole run to one trial:
 
 - **Summary** — the report: Evaluators, criteria, verdict calibration, and **Approve step
-  configuration** (signs a Step Qualification). The criteria are a table per
-  severity: the floor required, how many counted Evaluators met it, the trials
+  configuration** (signs a Step Qualification). The criteria are one row: the
+  verdict, the floor required, how many counted Evaluators met it, the trials
   they passed and failed, and the pass rate. Routing and the MCP line are not
   shown here; `mediforce eval report` still carries both.
 - **Trials** — every trial with each Evaluator's grade, the agent's
@@ -679,23 +678,26 @@ an `[n]` in a code or schema check's comment is left as text.
 
 ## Acceptance Criteria
 
-The floors a step's Eval Runs are judged against, per severity: `minPassRate`
-on the pass rate itself — 8 of 10 meets a `minPassRate` of 0.8, and 1 needs
-every graded trial to pass — and optionally `minPassHatK`. Until
-a step's criteria are set, `DEFAULT_ACCEPTANCE_CRITERIA` applies: every
-severity at 100%. Every write is a new version; an Eval Run freezes the
+The floor a step's Eval Runs are judged against, the same for every counted
+Evaluator: `minPassRate` on the pass rate itself — 8 of 10 meets a
+`minPassRate` of 0.8, and 1 needs every graded trial to pass — and optionally
+`minPassHatK`. Until a step's criteria are set, `DEFAULT_ACCEPTANCE_CRITERIA`
+applies: 100%. Every write is a new version; an Eval Run freezes the
 version in force when it is prepared, so changing them never rejudges a run.
 `mediforce eval criteria-get|criteria-set --file`,
 `GET|POST /api/evaluation/acceptance-criteria`.
 
 In the Evaluation tab, the top row is the step's validation status (see
 Validation below) and **Set the threshold**, whose tooltip lists the floors in
-force. The button opens a dialog with a slider per severity — critical, major,
-minor — from 0% to 100% and a checkbox for whether the severity is judged.
-Nothing is saved until **Save**, which writes one new version and keeps each
-severity's `minPassHatK`, which only the CLI, the API and the assistant set.
-The tab shows no version. The last severity judged cannot be unchecked:
-criteria judge at least one.
+force. The button opens a dialog with one slider, from 0% to 100%. Nothing is
+saved until **Save**, which writes one new version and keeps `minPassHatK`,
+which only the CLI, the API and the assistant set. The tab shows no version.
+
+Criteria set before Evaluators lost their severity held one floor per
+severity (critical, major, minor). They read as the strictest of those floors
+— the highest `minPassRate` and `minPassHatK` — so no Evaluator is held to less
+than it was. A Step Qualification signed then keeps its per-severity verdicts
+and deviations as signed.
 
 ## Step Fingerprint
 
@@ -727,15 +729,15 @@ cannot sign, so the CLI has no command for it). The run must have Acceptance
 Criteria frozen into it; the Evaluation Brief plays no part. The signer reads
 what the signature means ("Approved: I reviewed this Eval Run and qualify this
 Step configuration as it ran in it."),
-writes a justification for each criterion the run missed or that could not
-be judged — recorded as a deviation; a justification for a criterion that was
+writes a justification when the run missed its criteria or they could not
+be judged — recorded as a deviation; a justification for criteria that were
 met is refused — and re-enters their password; a wrong one is refused and
 audited against the Eval Run as `step_qualification.signature_refused`. On a
 deployment without password sign-in the form asks for no password and the
 signature is recorded as made from the session; a user without a password on
 one with it must set one first. The qualification cites
 the Eval Run and what was frozen into it — its Fingerprint,
-the Evaluator versions, the MCP eval policy, the criteria and each verdict, and
+the Evaluator versions, the MCP eval policy, the criteria and their verdict, and
 is never changed; signing is audited as `step_qualification.signed`.
 
 The badge (`mediforce eval qualification [--version N]`,
@@ -754,8 +756,8 @@ workflow version (or the version asked for), read from the newest finished
 Eval Run of that version (`completed` or `budget_exceeded`; a cancelled run
 does not count):
 
-- **Passed** — that run met every Acceptance Criterion frozen into it.
-- **Failed** — a criterion was missed or could not be judged.
+- **Passed** — that run met the Acceptance Criteria frozen into it.
+- **Failed** — the criteria were missed or could not be judged.
 - **Not verified** — no Eval Run of the version has finished, or something the
   run rested on changed since: the step's Fingerprint, an Evaluator (added,
   archived or given a new version), the live Eval Cases (added, edited or

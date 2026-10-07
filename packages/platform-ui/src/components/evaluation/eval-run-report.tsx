@@ -30,15 +30,19 @@ function TableTitle({ children }: { children: React.ReactNode }) {
   return <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{children}</h4>;
 }
 
-/** Each Acceptance Criterion against the counted Evaluators of its severity: how many reached it, and the trials they graded. */
-function CriteriaTable({ report }: { report: EvalRunReport }) {
+/** The Acceptance Criteria against every counted Evaluator: how many reached them, and the trials they graded. */
+function CriteriaTable({ report, verdict }: { report: EvalRunReport; verdict: AcceptanceCriterionVerdict }) {
+  const counted = report.evaluators.filter((evaluator) => evaluator.counted === true);
+  const passes = counted.reduce((sum, evaluator) => sum + evaluator.passes, 0);
+  const failures = counted.reduce((sum, evaluator) => sum + evaluator.failures, 0);
+  const metCount = verdict.evaluators.filter((evaluator) => evaluator.met === true).length;
   return (
     <div>
     <TableTitle>Acceptance criteria</TableTitle>
     <table className="w-full text-xs" data-testid="criteria-verdicts">
       <thead className="text-muted-foreground">
         <tr className="text-left">
-          <th className="py-1 font-medium">Criterion</th>
+          <th className="py-1 font-medium">Verdict</th>
           <th className="py-1 font-medium">Required</th>
           <th className="py-1 font-medium">Evaluators met</th>
           <th className="py-1 font-medium">Passed</th>
@@ -48,30 +52,22 @@ function CriteriaTable({ report }: { report: EvalRunReport }) {
         </tr>
       </thead>
       <tbody>
-        {report.criteria.map((verdict) => {
-          const counted = report.evaluators.filter((evaluator) => evaluator.counted === true && evaluator.severity === verdict.severity);
-          const passes = counted.reduce((sum, evaluator) => sum + evaluator.passes, 0);
-          const failures = counted.reduce((sum, evaluator) => sum + evaluator.failures, 0);
-          const metCount = verdict.evaluators.filter((evaluator) => evaluator.met === true).length;
-          return (
-            <tr key={verdict.severity} className="border-t align-top" data-testid={`criterion-${verdict.severity}`}>
-              <td className="py-1.5">
-                <span className={cn('whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium', VERDICT_CLASSES[verdict.status])}>
-                  {verdict.severity} {verdict.status === 'not_evaluable' ? 'not judged' : verdict.status}
-                </span>
-              </td>
-              <td className="py-1.5">
-                pass rate ≥ {percent(verdict.criterion.minPassRate)}
-                {verdict.criterion.minPassHatK !== undefined && `, pass^k ≥ ${percent(verdict.criterion.minPassHatK)}`}
-              </td>
-              <td className="py-1.5">{metCount}/{verdict.evaluators.length}</td>
-              <td className="py-1.5">{passes}</td>
-              <td className="py-1.5">{failures}</td>
-              <td className="py-1.5">{percent(passes + failures === 0 ? null : passes / (passes + failures))}</td>
-              <td className="py-1.5 text-muted-foreground">{verdict.reason}</td>
-            </tr>
-          );
-        })}
+        <tr className="border-t align-top" data-testid="criteria-verdict">
+          <td className="py-1.5">
+            <span className={cn('whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium', VERDICT_CLASSES[verdict.status])}>
+              {verdict.status === 'not_evaluable' ? 'not judged' : verdict.status}
+            </span>
+          </td>
+          <td className="py-1.5">
+            pass rate ≥ {percent(verdict.criterion.minPassRate)}
+            {verdict.criterion.minPassHatK !== undefined && `, pass^k ≥ ${percent(verdict.criterion.minPassHatK)}`}
+          </td>
+          <td className="py-1.5">{metCount}/{verdict.evaluators.length}</td>
+          <td className="py-1.5">{passes}</td>
+          <td className="py-1.5">{failures}</td>
+          <td className="py-1.5">{percent(passes + failures === 0 ? null : passes / (passes + failures))}</td>
+          <td className="py-1.5 text-muted-foreground">{verdict.reason}</td>
+        </tr>
       </tbody>
     </table>
     </div>
@@ -104,7 +100,7 @@ function EvaluatorTable({ report }: { report: EvalRunReport }) {
           <tr key={evaluator.evaluatorId} className={cn('border-t', evaluator.counted === false && 'text-muted-foreground')}>
             <td className="py-1.5">
               <span className="font-medium">{evaluator.name}</span>
-              <span className="ml-1 text-xs text-muted-foreground">v{evaluator.version} · {evaluator.severity}</span>
+              <span className="ml-1 text-xs text-muted-foreground">v{evaluator.version}</span>
               {evaluator.counted === false && <div className="text-xs">not counted — {evaluator.reason}</div>}
             </td>
             <td className="py-1.5">{percent(evaluator.passRate)} <span className="text-xs text-muted-foreground">({evaluator.passes}/{evaluator.passes + evaluator.failures})</span></td>
@@ -148,43 +144,43 @@ function VerdictReviewSection({ verdicts }: { verdicts: readonly JudgeVerdict[] 
 /**
  * Signing a Step Qualification for a run (ADR-0023 D10), labelled as an
  * approval of the step configuration: the person
- * reads what the signature means, justifies every criterion the run did
- * not meet, and re-enters their password where password sign-in is enabled.
+ * reads what the signature means, justifies the criteria when the run did
+ * not meet them, and re-enters their password where password sign-in is enabled.
  */
-function SignQualificationForm({ step, evalRunId, criteria, onDone }: {
+function SignQualificationForm({ step, evalRunId, verdict, onDone }: {
   step: EvaluatedStep;
   evalRunId: string;
-  criteria: readonly AcceptanceCriterionVerdict[];
+  verdict: AcceptanceCriterionVerdict | null;
   onDone: () => void;
 }) {
-  const unmet = criteria.filter((verdict) => verdict.status !== 'met');
-  const [justifications, setJustifications] = React.useState<Record<string, string>>({});
+  const unmet = verdict !== null && verdict.status !== 'met' ? verdict : null;
+  const [justification, setJustification] = React.useState('');
   const [password, setPassword] = React.useState('');
   // Without password sign-in, signing re-authenticates by the session; the server ignores a password.
   const { passwordAuthEnabled } = useAuth();
   const sign = useStepEvaluationMutation(step, () => mediforce.evaluation.signQualification({
     evalRunId,
-    deviations: unmet.map((verdict) => ({ severity: verdict.severity, justification: (justifications[verdict.severity] ?? '').trim() })),
+    ...(unmet === null ? {} : { justification: justification.trim() }),
     ...(password === '' ? {} : { password }),
   }));
-  const justified = unmet.every((verdict) => (justifications[verdict.severity] ?? '').trim() !== '');
+  const justified = unmet === null || justification.trim() !== '';
   return (
     <div className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-xs" data-testid="sign-qualification-form">
       <p className="font-medium">Approve the step configuration (e-signature)</p>
       <p>{qualificationSignatureMeaning()}</p>
-      {unmet.map((verdict) => (
-        <label key={verdict.severity} className="block space-y-1">
+      {unmet !== null && (
+        <label className="block space-y-1">
           <span>
-            The {verdict.severity} criterion was {verdict.status === 'missed' ? 'missed' : 'not judged'} ({verdict.reason}). Signing records a deviation — why is that acceptable?
+            The Acceptance Criteria were {unmet.status === 'missed' ? 'missed' : 'not judged'} ({unmet.reason}). Signing records a deviation — why is that acceptable?
           </span>
           <textarea
-            aria-label={`Justification for the ${verdict.severity} criterion`}
+            aria-label="Justification for the deviation"
             className={cn(inputClass, 'w-full min-h-16 text-xs')}
-            value={justifications[verdict.severity] ?? ''}
-            onChange={(event) => setJustifications({ ...justifications, [verdict.severity]: event.target.value })}
+            value={justification}
+            onChange={(event) => setJustification(event.target.value)}
           />
         </label>
-      ))}
+      )}
       {passwordAuthEnabled !== false && (
         <label className="flex items-center gap-2">
           <span>Your password</span>
@@ -217,8 +213,8 @@ const APPROVE_EXPLANATION = 'Record your signed approval that this exact step co
 
 /**
  * An Eval Run's results (ADR-0023 D10): every Evaluator's pass rate with its
- * Wilson 95% interval, pass@k, pass^k and flakiness, the verdict on each
- * Acceptance Criterion, and how well the grading models' confidence matches a
+ * Wilson 95% interval, pass@k, pass^k and flakiness, the verdict on the
+ * Acceptance Criteria, and how well the grading models' confidence matches a
  * person's review of their verdicts. A person signs a Step Qualification from here.
  */
 export function EvalRunSummary({ output, step, mayEdit, editReason }: {
@@ -243,10 +239,10 @@ export function EvalRunSummary({ output, step, mayEdit, editReason }: {
         </span>
       </div>
       <EvaluatorTable report={report} />
-      {report.criteria.length > 0 && <CriteriaTable report={report} />}
+      {report.criteriaVerdict !== null && <CriteriaTable report={report} verdict={report.criteriaVerdict} />}
       <VerdictReviewSection verdicts={report.judgeVerdicts} />
       {signing ? (
-        <SignQualificationForm step={step} evalRunId={evalRun.id} criteria={report.criteria} onDone={() => setSigning(false)} />
+        <SignQualificationForm step={step} evalRunId={evalRun.id} verdict={report.criteriaVerdict} onDone={() => setSigning(false)} />
       ) : (
         <div className="flex flex-wrap items-start gap-2">
           <InstantTooltip label={blocked ?? APPROVE_EXPLANATION}>

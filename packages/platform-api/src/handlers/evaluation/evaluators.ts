@@ -70,7 +70,6 @@ export async function createEvaluator(
     evaluatorId: evaluator.id,
     version: 1,
     rule: input.rule,
-    severity: input.severity,
     check: input.check,
     origin: input.origin,
     sourceApproval: null,
@@ -79,7 +78,7 @@ export async function createEvaluator(
   });
   await appendEvaluationAudit(scope, {
     action: 'evaluator.created',
-    description: `Evaluator '${input.name}' (${input.check.kind}, ${input.severity}) created for step '${step.stepId}'`,
+    description: `Evaluator '${input.name}' (${input.check.kind}) created for step '${step.stepId}'`,
     namespace: step.namespace,
     entityType: 'evaluator',
     entityId: evaluator.id,
@@ -87,7 +86,6 @@ export async function createEvaluator(
       ...step,
       name: input.name,
       rule: input.rule,
-      severity: input.severity,
       check: input.check,
       origin: input.origin,
       runInProduction,
@@ -118,7 +116,6 @@ export async function addEvaluatorVersion(
     evaluatorId: evaluator.id,
     version: latest.version + 1,
     rule: input.rule ?? latest.rule,
-    severity: input.severity ?? latest.severity,
     check: input.check ?? latest.check,
     origin: input.origin,
     sourceApproval: null,
@@ -131,7 +128,7 @@ export async function addEvaluatorVersion(
     namespace: evaluator.namespace,
     entityType: 'evaluator',
     entityId: evaluator.id,
-    inputSnapshot: { rule: version.rule, severity: version.severity, check: version.check, origin: version.origin },
+    inputSnapshot: { rule: version.rule, check: version.check, origin: version.origin },
     outputSnapshot: { version: version.version, previousVersion: latest.version },
     basis: 'An Evaluator change is a new immutable version (ADR-0023 D7)',
   });
@@ -181,7 +178,7 @@ export async function setEvaluatorProduction(
     entityId: evaluator.id,
     inputSnapshot: { runInProduction: input.runInProduction },
     outputSnapshot: { production: view.production },
-    basis: 'A production Evaluator scores live Agent Runs while it counts; a failing critical deterministic one takes the step\'s fallback (ADR-0023 D13)',
+    basis: 'A production Evaluator scores live Agent Runs while it counts; a failing deterministic one takes the step\'s fallback (ADR-0023 D13)',
   });
   return { evaluator: view };
 }

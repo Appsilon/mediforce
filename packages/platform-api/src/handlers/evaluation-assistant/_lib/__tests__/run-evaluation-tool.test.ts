@@ -222,7 +222,7 @@ describe('executeEvaluationTool', () => {
 
   it('refuses the report of an Eval Run of the same step in another namespace', async () => {
     const { scope, context } = await setup();
-    await createEvaluator({ ...STEP, name: 'findings-present', rule: 'The result lists findings.', severity: 'critical', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
+    await createEvaluator({ ...STEP, name: 'findings-present', rule: 'The result lists findings.', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
     await createEvalCase({
       ...STEP,
       name: 'Grade 5 sepsis',
@@ -244,8 +244,8 @@ describe('executeEvaluationTool', () => {
 
   it('prepares a run of the step as the version it reads has it, under the Acceptance Criteria set now', async () => {
     const { fixture, scope, context } = await setup();
-    await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.9 } }, origin: 'user' }, scope);
-    await createEvaluator({ ...STEP, name: 'findings-present', rule: 'The result lists findings.', severity: 'critical', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
+    await setAcceptanceCriteria({ ...STEP, criteria: { minPassRate: 0.9 }, origin: 'user' }, scope);
+    await createEvaluator({ ...STEP, name: 'findings-present', rule: 'The result lists findings.', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
     await createEvalCase({
       ...STEP,
       name: 'Grade 5 sepsis',
@@ -264,14 +264,14 @@ describe('executeEvaluationTool', () => {
 
     const prepared = await executeEvaluationTool('prepare_eval_run', { trialsPerCase: 2, budgetUsd: 2 }, scope, context) as { prepared: { evalRunId: string } };
     expect(prepared).toMatchObject({
-      prepared: { trials: 2, budgetUsd: 2, acceptanceCriteria: { critical: { minPassRate: 0.9 } } },
+      prepared: { trials: 2, budgetUsd: 2, acceptanceCriteria: { minPassRate: 0.9 } },
     });
     expect((await scope.evaluation.getEvalRun(prepared.prepared.evalRunId))?.definitionVersion).toBe(1);
   });
 
   it('reads the step\'s qualification and the Acceptance Criteria set now', async () => {
     const { scope, context } = await setup();
-    await setAcceptanceCriteria({ ...STEP, criteria: { critical: { minPassRate: 0.95, minPassHatK: 0.9 } }, origin: 'user' }, scope);
+    await setAcceptanceCriteria({ ...STEP, criteria: { minPassRate: 0.95, minPassHatK: 0.9 }, origin: 'user' }, scope);
 
     expect(await executeEvaluationTool('get_qualification', {}, scope, context)).toEqual({
       validation: { status: 'not_verified', evalRunId: null, reason: 'No Eval Run of version 1 has finished yet.', runInProgress: false },
@@ -279,7 +279,7 @@ describe('executeEvaluationTool', () => {
       changedSinceQualified: [],
       evaluatorsChanged: [],
       qualification: null,
-      acceptanceCriteria: { version: 1, critical: { minPassRate: 0.95, minPassHatK: 0.9 } },
+      acceptanceCriteria: { version: 1, minPassRate: 0.95, minPassHatK: 0.9 },
     });
   });
 

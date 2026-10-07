@@ -25,7 +25,6 @@ import {
   EvaluatorCheckSchema,
   EvaluatorKindSchema,
   EvaluatorSchema,
-  EvaluatorSeveritySchema,
   EvaluatorVersionSchema,
   McpEvalPolicySchema,
   McpEvalServerPolicySchema,
@@ -98,7 +97,6 @@ export const EvaluatorOutputSchema = z.object({ evaluator: EvaluatorViewSchema }
 export const CreateEvaluatorInputSchema = EvaluatedStepSchema.extend({
   name: EvaluatorSchema.shape.name,
   rule: z.string().trim().min(1).max(2000),
-  severity: EvaluatorSeveritySchema,
   check: EvaluatorCheckSchema,
   origin: EvaluationOriginSchema.default('user'),
   runInProduction: z.boolean().optional(),
@@ -108,11 +106,10 @@ export const CreateEvaluatorInputSchema = EvaluatedStepSchema.extend({
 export const AddEvaluatorVersionInputSchema = z.object({
   evaluatorId: z.uuid(),
   rule: z.string().trim().min(1).max(2000).optional(),
-  severity: EvaluatorSeveritySchema.optional(),
   check: EvaluatorCheckSchema.optional(),
   origin: EvaluationOriginSchema.default('user'),
-}).refine((input) => input.rule !== undefined || input.severity !== undefined || input.check !== undefined, {
-  message: 'A new version changes at least one of rule, severity or check',
+}).refine((input) => input.rule !== undefined || input.check !== undefined, {
+  message: 'A new version changes at least one of rule or check',
 });
 
 export const ArchiveEvaluatorInputSchema = z.object({
@@ -442,7 +439,6 @@ export const GetEvalRunFailuresInputSchema = z.object({
 export const TrialEvaluatorFailureSchema = z.object({
   evaluatorId: z.uuid(),
   name: z.string(),
-  severity: EvaluatorSeveritySchema,
   kind: EvaluatorKindSchema,
   counted: z.boolean(),
   outcome: z.enum(['failed', 'errored']),
@@ -571,7 +567,6 @@ export const GetStepDriftInputSchema = EvaluatedStepSchema.extend({
 export const EvaluatorDriftSchema = z.object({
   evaluatorId: z.string(),
   name: z.string(),
-  severity: EvaluatorSeveritySchema,
   evaluatorVersion: z.number().int().positive(),
   /** Mean of the newest `window` Scores; null until there are that many. */
   recentMean: z.number().nullable(),
@@ -590,15 +585,15 @@ export const GetStepDriftOutputSchema = z.object({
 });
 
 /**
- * A person signs a Step Qualification for a finished Eval Run (D10). Each
- * criterion the run missed, or that could not be judged,
- * needs a deviation with a written justification. Where password sign-in is
+ * A person signs a Step Qualification for a finished Eval Run (D10). Criteria
+ * the run missed, or that could not be judged, need a deviation: a written
+ * justification. Where password sign-in is
  * enabled, the signer's password re-authenticates them (21 CFR 11.200); an
  * API key cannot sign.
  */
 export const SignStepQualificationInputSchema = z.object({
   evalRunId: z.uuid(),
-  deviations: z.array(QualificationDeviationSchema).default([]),
+  justification: QualificationDeviationSchema.shape.justification.optional(),
   password: z.string().min(1).optional(),
 });
 export const SignStepQualificationOutputSchema = z.object({ qualification: StepQualificationSchema });

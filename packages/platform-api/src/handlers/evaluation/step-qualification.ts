@@ -130,7 +130,7 @@ async function stepValidation(
 
   const acceptance = run.acceptance ?? await rebuildEvalRunAcceptance(scope, run);
   if (acceptance === null) return notVerified(`Eval Run ${run.id.slice(0, 8)} has not finished.`);
-  if (acceptance.status === 'met') return { status: 'passed', evalRunId: run.id, reason: `Eval Run ${run.id.slice(0, 8)} met every criterion.`, runInProgress };
+  if (acceptance.status === 'met') return { status: 'passed', evalRunId: run.id, reason: `Eval Run ${run.id.slice(0, 8)} met its Acceptance Criteria.`, runInProgress };
   return { status: 'failed', evalRunId: run.id, reason: `Eval Run ${run.id.slice(0, 8)}: ${acceptance.reason}.`, runInProgress };
 }
 
@@ -235,10 +235,10 @@ async function reauthenticate(scope: CallerScope, uid: string, password: string 
  * A person signs a Step Qualification for a finished Eval Run (ADR-0023
  * D10) — not a cancelled one. It binds the run's Step Fingerprint and cites the run,
  * the Evaluator versions, the MCP eval policy and the
- * Acceptance Criteria frozen into it, with the verdict on each criterion.
- * Signing despite a criterion missed or not judged records a deviation with a
- * written justification; one without it is refused, as is a justification for
- * a criterion that was met. Only a person signs — an API key cannot, and the
+ * Acceptance Criteria frozen into it, with the verdict on them. Signing
+ * despite criteria missed or not judged records a deviation with a written
+ * justification; one without it is refused, as is a justification for
+ * criteria that were met. Only a person signs — an API key cannot, and the
  * Evaluation Assistant has no tool for it (D15).
  */
 export async function signStepQualification(
@@ -267,23 +267,18 @@ export async function signStepQualification(
   }
 
   const report = await buildEvalRunReport(scope, run, trials);
-  const verdicts = report.criteria;
-  const justified = new Set<string>();
-  for (const deviation of input.deviations) {
-    if (justified.has(deviation.severity)) throw new ValidationError(`Give one justification for the ${deviation.severity} criterion`);
-    justified.add(deviation.severity);
-    const verdict = verdicts.find((candidate) => candidate.severity === deviation.severity);
-    if (verdict === undefined || verdict.status === 'met') {
-      throw new ValidationError(`The ${deviation.severity} criterion ${verdict === undefined ? 'was not set' : 'was met'}; there is no deviation to justify`);
-    }
+  const verdict = report.criteriaVerdict;
+  if (verdict === null) throw new ValidationError('No Acceptance Criteria were frozen into this Eval Run; set them and run the step again');
+  if (verdict.status === 'met' && input.justification !== undefined) {
+    throw new ValidationError('The Acceptance Criteria were met; there is no deviation to justify');
   }
-  for (const verdict of verdicts) {
-    if (verdict.status === 'met' || justified.has(verdict.severity)) continue;
+  if (verdict.status !== 'met' && input.justification === undefined) {
     throw new ValidationError(
-      `The ${verdict.severity} criterion was ${verdict.status === 'missed' ? 'missed' : 'not judged'} (${verdict.reason}); `
+      `The Acceptance Criteria were ${verdict.status === 'missed' ? 'missed' : 'not judged'} (${verdict.reason}); `
       + 'signing anyway records a deviation — give a written justification for it',
     );
   }
+  const deviations = input.justification === undefined ? [] : [{ justification: input.justification }];
 
   const reauthentication = await reauthenticate(scope, uid, input.password, run);
   const metadata = scope.system.userDirectory === null ? null : await scope.system.userDirectory.getUserMetadata(uid).catch(() => null);
@@ -296,8 +291,8 @@ export async function signStepQualification(
     evaluators: run.evaluators,
     mcpPolicy: run.mcpPolicy,
     acceptanceCriteria: run.acceptanceCriteria,
-    verdicts,
-    deviations: input.deviations,
+    verdicts: [verdict],
+    deviations,
     signature: {
       signerId: uid,
       signerName: metadata?.displayName ?? metadata?.email ?? uid,
@@ -309,14 +304,14 @@ export async function signStepQualification(
   await appendEvaluationAudit(scope, {
     action: 'step_qualification.signed',
     description: `Step Qualification signed for step '${step.stepId}' of '${step.workflowName}' by ${qualification.signature.signerName}`
-      + (qualification.deviations.length === 0 ? '' : ` with ${qualification.deviations.length} deviation(s)`),
+      + (deviations.length === 0 ? '' : ' with a deviation'),
     namespace: step.namespace,
     entityType: 'step_qualification',
     entityId: qualification.id,
-    inputSnapshot: { evalRunId: run.id, deviations: input.deviations },
+    inputSnapshot: { evalRunId: run.id, justification: input.justification ?? null },
     outputSnapshot: {
       fingerprint: qualification.fingerprint.hash,
-      verdicts: verdicts.map((verdict) => ({ severity: verdict.severity, status: verdict.status })),
+      verdict: verdict.status,
       signature: qualification.signature,
     },
     basis: 'A person signed the Step Qualification (ADR-0023 D10, 21 CFR 11.50)',

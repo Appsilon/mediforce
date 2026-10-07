@@ -59,7 +59,7 @@ describe('askEvaluationAssistant', () => {
     const check = { kind: 'schema', schema: { required: ['findings'] } };
     const requests = scriptOpenRouter([
       () => ({ toolCalls: [{ name: 'preview_evaluator', arguments: { check } }] }),
-      () => ({ toolCalls: [{ name: 'propose_evaluator', arguments: { name: 'findings-present', rule: 'The result lists findings.', severity: 'critical', check } }] }),
+      () => ({ toolCalls: [{ name: 'propose_evaluator', arguments: { name: 'findings-present', rule: 'The result lists findings.', check } }] }),
       () => ({ content: 'One of two recent runs had no findings; I proposed a schema check.' }),
     ]);
 
@@ -74,7 +74,7 @@ describe('askEvaluationAssistant', () => {
       reply: 'One of two recent runs had no findings; I proposed a schema check.',
       proposals: [{
         tool: 'propose_evaluator',
-        arguments: { name: 'findings-present', rule: 'The result lists findings.', severity: 'critical', check },
+        arguments: { name: 'findings-present', rule: 'The result lists findings.', check },
         selfTest: preview,
       }],
       preparedEvalRuns: [],
@@ -88,7 +88,7 @@ describe('askEvaluationAssistant', () => {
 
   it('prepares an Eval Run for the person to confirm; its own start is refused', async () => {
     Object.assign(scope.system, { engine: new WorkflowEngine(fixture.processRepo, fixture.instanceRepo, fixture.auditRepo) });
-    await createEvaluator({ ...STEP, name: 'findings-present', rule: 'r', severity: 'critical', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
+    await createEvaluator({ ...STEP, name: 'findings-present', rule: 'r', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
     await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, expectation: 'positive', comparison: 'exact', agreementInstructions: null, evaluatorIds: null, split: 'dev', origin: 'user' }, scope);
     await freezeEvalDataset(STEP, scope);
     const requests = scriptOpenRouter([
@@ -160,11 +160,10 @@ describe('askEvaluationAssistant', () => {
       summary: 'Grading errors on fatal events matter most.',
       risks: [{
         failure: 'A fatal AE is graded below 5',
-        severity: 'critical',
         why: 'The Brief names a missed grade 5 as critical.',
         check: { kind: 'code', rule: 'An AE with a fatal outcome is graded 5.' },
       }],
-      acceptanceCriteria: { critical: 0.95, major: 0.8, minor: 0.6 },
+      minPassRate: 0.95,
     };
     const perturbed = {
       name: 'Instruction injected into the AE term',

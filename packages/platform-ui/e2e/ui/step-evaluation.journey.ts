@@ -40,7 +40,7 @@ test.describe('Step Evaluation tab', () => {
       {
         toolCalls: [
           { name: 'propose_brief', arguments: { text: 'Grades **adverse events** for the DSMB; a missed grade 5 is critical.' } },
-          { name: 'propose_evaluator', arguments: { name: 'summary-present', rule: 'The result carries a summary.', severity: 'critical', check } },
+          { name: 'propose_evaluator', arguments: { name: 'summary-present', rule: 'The result carries a summary.', check } },
         ],
       },
       { content: 'The summary check passed on the recent run. I drafted a Brief and proposed the check.' },
@@ -115,8 +115,8 @@ test.describe('Step Evaluation tab', () => {
             name: 'propose_evaluation_plan',
             arguments: {
               summary: 'Wrong grades on fatal events matter most.',
-              risks: [{ failure: 'A fatal AE is graded below 5', severity: 'critical', why: 'A missed grade 5 hides a death.', check: { kind: 'code', rule: 'An AE with a fatal outcome is graded 5.' } }],
-              acceptanceCriteria: { critical: 0.95, major: 0.8, minor: 0.6 },
+              risks: [{ failure: 'A fatal AE is graded below 5', why: 'A missed grade 5 hides a death.', check: { kind: 'code', rule: 'An AE with a fatal outcome is graded 5.' } }],
+              minPassRate: 0.95,
             },
           },
         ],
@@ -153,7 +153,7 @@ test.describe('Step Evaluation tab', () => {
       autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' },
     }));
     await post('/api/evaluation/evaluators', {
-      ...step, name: 'summary-grounded', rule: 'The summary is grounded in the input.', severity: 'critical',
+      ...step, name: 'summary-grounded', rule: 'The summary is grounded in the input.',
       check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Is the summary grounded in the input?', minConfidence: 0.8 },
     });
     // The judge reads the step's input — the case's `extract-aes` output — so a marker there keys its scripted answer.
@@ -164,7 +164,7 @@ test.describe('Step Evaluation tab', () => {
       ...step, name: 'Unsure', input: { triggerPayload: {}, previousStepOutputs: { 'extract-aes': { events: [{ term: 'Sepsis' }], judgeKey } } },
     });
     await post('/api/evaluation/datasets', step);
-    await post('/api/evaluation/acceptance-criteria', { ...step, criteria: { critical: { minPassRate: 1 } } });
+    await post('/api/evaluation/acceptance-criteria', { ...step, criteria: { minPassRate: 1 } });
     const prepared = EvalRunOutputSchema.parse(await post('/api/evaluation/runs', { ...step, trialsPerCase: 1, budgetUsd: 1 }));
     await post(`/api/evaluation/runs/${prepared.evalRun.id}/start`, { confirmedBudgetUsd: 1 });
     await pollUntil(async () => {
@@ -174,12 +174,12 @@ test.describe('Step Evaluation tab', () => {
 
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
-    // Below its minimum confidence, the judge's only verdict is left out: the critical criterion cannot be judged.
+    // Below its minimum confidence, the judge's only verdict is left out: the criteria cannot be judged.
     const row = page.getByTestId('eval-run-row').filter({ hasText: prepared.evalRun.id.slice(0, 8) });
     await expect(row.getByTestId('eval-run-acceptance')).toHaveText('Not judged');
     await row.getByRole('link', { name: 'Details' }).click();
     await expect(page.getByTestId('eval-run-detail')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId('eval-run-report').getByTestId('criteria-verdicts')).toContainText('critical not judged');
+    await expect(page.getByTestId('eval-run-report').getByTestId('criteria-verdict')).toContainText('not judged');
 
     await page.getByTestId('eval-run-tab-verdicts').click();
     const verdict = page.getByTestId('judge-verdict');
@@ -205,7 +205,7 @@ test.describe('Step Evaluation tab', () => {
 
     await page.getByRole('link', { name: `Eval Run ${prepared.evalRun.id.slice(0, 8)}` }).click();
     await page.getByTestId('eval-run-tab-summary').click();
-    await expect(page.getByTestId('eval-run-report').getByTestId('criteria-verdicts')).toContainText('critical met');
+    await expect(page.getByTestId('eval-run-report').getByTestId('criteria-verdict')).toContainText('Every counted Evaluator reached it');
   });
 
   test('accepted criteria judge a run, and the person signs a Step Qualification from its report — no Brief needed', async ({ page, request }) => {
@@ -220,8 +220,8 @@ test.describe('Step Evaluation tab', () => {
       expect(res.status(), await res.text()).toBeLessThan(300);
       return res.json();
     };
-    await post('/api/evaluation/evaluators', { ...step, name: 'summary-present', rule: 'The result carries a summary.', severity: 'critical', check: { kind: 'schema', schema: { required: ['summary'] } } });
-    await post('/api/evaluation/evaluators', { ...step, name: 'findings-present', rule: 'The result lists findings.', severity: 'major', check: { kind: 'schema', schema: { required: ['findings'] } } });
+    await post('/api/evaluation/evaluators', { ...step, name: 'summary-present', rule: 'The result carries a summary.', check: { kind: 'schema', schema: { required: ['summary'] } } });
+    await post('/api/evaluation/evaluators', { ...step, name: 'findings-present', rule: 'The result lists findings.', check: { kind: 'schema', schema: { required: ['findings'] } } });
     await post('/api/evaluation/cases/from-agent-run', { agentRunId });
     await post('/api/evaluation/datasets', step);
 
@@ -230,10 +230,10 @@ test.describe('Step Evaluation tab', () => {
       {
         toolCalls: [{
           name: 'propose_acceptance_criteria',
-          arguments: { criteria: { critical: { minPassRate: 0.1 }, major: { minPassRate: 0.5 } }, rationale: 'A missed summary loses the whole grading.' },
+          arguments: { criteria: { minPassRate: 0.5 }, rationale: 'A missed summary loses the whole grading.' },
         }],
       },
-      { content: 'Here are floors for the critical and major checks.' },
+      { content: 'Here is a floor for every check.' },
     ]);
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
@@ -246,9 +246,7 @@ test.describe('Step Evaluation tab', () => {
     await expect(criteriaCard.getByText('Accepted')).toBeVisible({ timeout: 10_000 });
     await page.getByTestId('set-threshold').click();
     const thresholds = page.getByTestId('threshold-dialog');
-    await expect(thresholds.getByLabel('critical minimum pass rate')).toHaveValue('10');
-    await expect(thresholds.getByLabel('major minimum pass rate')).toHaveValue('50');
-    await expect(thresholds.getByLabel('judge minor')).not.toBeChecked();
+    await expect(thresholds.getByLabel('Minimum pass rate')).toHaveValue('50');
     await thresholds.getByRole('button', { name: 'Cancel' }).click();
 
     // The run is prepared and confirmed over the API; the report is read and signed in the tab.
@@ -260,17 +258,17 @@ test.describe('Step Evaluation tab', () => {
     }, { description: 'the Eval Run to complete', timeoutMs: 90_000 });
 
     await page.reload();
-    // The newest finished run of the version missed its major criterion: validation fails, signed or not.
+    // The newest finished run of the version missed its criteria on findings-present: validation fails, signed or not.
     await expect(page.getByTestId('validation-status')).toHaveAttribute('data-status', 'failed', { timeout: 10_000 });
     await page.getByTestId('eval-run-row').filter({ hasText: prepared.evalRun.id.slice(0, 8) }).getByRole('link', { name: 'Details' }).click();
     const report = page.getByTestId('eval-run-report');
-    await expect(report.getByTestId('criteria-verdicts')).toContainText('critical met', { timeout: 15_000 });
-    await expect(report.getByTestId('criteria-verdicts')).toContainText('major missed');
+    await expect(report.getByTestId('criteria-verdict')).toContainText('missed', { timeout: 15_000 });
+    await expect(report.getByTestId('criteria-verdict')).toContainText('findings-present: pass rate 0% < 50%');
     await report.getByTestId('sign-qualification').click();
     const form = page.getByTestId('sign-qualification-form');
     await expect(form).toContainText('qualify this Step configuration as it ran in it');
     await expect(form).not.toContainText('Brief');
-    await form.getByLabel('Justification for the major criterion').fill('Findings are listed downstream; a reviewer reads every grade.');
+    await form.getByLabel('Justification for the deviation').fill('Findings are listed downstream; a reviewer reads every grade.');
     await form.getByLabel('Your password').fill(TEST_USER_PASSWORD);
     await form.getByRole('button', { name: 'Sign' }).click();
     await expect(form).toBeHidden({ timeout: 10_000 });
@@ -278,9 +276,9 @@ test.describe('Step Evaluation tab', () => {
     await page.getByRole('link', { name: 'Evaluation · grade-aes' }).click();
     await expect(page.getByTestId('validation-status')).toHaveText('Validation failed', { timeout: 15_000 });
     await page.getByTestId('validation-status').click();
-    await expect(page.getByTestId('validation-reason')).toContainText('major missed');
+    await expect(page.getByTestId('validation-reason')).toContainText('findings-present: pass rate 0% < 50%');
     await expect(page.getByTestId('step-qualification')).toContainText(`Eval Run ${prepared.evalRun.id.slice(0, 8)}`);
-    await expect(page.getByTestId('step-qualification')).toContainText('Deviation (major): Findings are listed downstream');
+    await expect(page.getByTestId('step-qualification')).toContainText('Deviation: Findings are listed downstream');
 
     // The version reads Failed in the selector and on the Definitions tab; its agent step's box in the editor links back here.
     await expect(page.getByTestId('evaluation-version-select').locator('option:checked')).toHaveText(/v1.*Failed/);
@@ -334,7 +332,7 @@ test.describe('Step Evaluation tab', () => {
     await form.getByRole('button', { name: 'Create' }).click();
 
     const row = page.getByTestId('evaluator-row').filter({ hasText: 'summary-present' });
-    await expect(row).toContainText('v1 · Output schema · major', { timeout: 10_000 });
+    await expect(row).toContainText('v1 · Output schema', { timeout: 10_000 });
     await expect(row.getByText('Counts')).toBeVisible();
     await row.getByText('Details', { exact: true }).click();
     await expect(row.getByTestId('evaluator-details')).toContainText('"summary"');
@@ -343,10 +341,10 @@ test.describe('Step Evaluation tab', () => {
     const editForm = row.getByTestId('evaluator-form');
     await expect(editForm.getByLabel('Evaluator name')).toBeDisabled();
     await expect(editForm.getByLabel('Type')).toBeDisabled();
-    await editForm.getByLabel('Severity').selectOption('critical');
+    await editForm.getByLabel('Rule').fill('The result carries a non-empty summary.');
     await editForm.getByRole('button', { name: 'Save as v2' }).click();
 
-    await expect(row).toContainText('v2 · Output schema · critical', { timeout: 10_000 });
+    await expect(row).toContainText('v2 · Output schema', { timeout: 10_000 });
     await row.getByText('Details', { exact: true }).click();
     await expect(row.getByTestId('evaluator-details')).toContainText('v1 ·');
   });
@@ -362,9 +360,9 @@ test.describe('Step Evaluation tab', () => {
       return res.json();
     };
     await post(`/api/workflow-definitions?namespace=${EVALUATION_WORKSPACE}`, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }));
-    await post('/api/evaluation/evaluators', { ...step, name: 'findings-present', rule: 'The result lists findings.', severity: 'major', check: { kind: 'schema', schema: { required: ['findings'] } } });
+    await post('/api/evaluation/evaluators', { ...step, name: 'findings-present', rule: 'The result lists findings.', check: { kind: 'schema', schema: { required: ['findings'] } } });
     await post('/api/evaluation/evaluators', {
-      ...step, name: 'matches-expected', rule: 'The output matches what the case expects.', severity: 'critical',
+      ...step, name: 'matches-expected', rule: 'The output matches what the case expects.',
       check: { kind: 'expected_output', model: 'anthropic/claude-haiku-4.5', minAgreement: 0.8 },
     });
 

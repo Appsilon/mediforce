@@ -13,7 +13,6 @@ import {
   EvalCaseLabelSchema,
   EvalCaseSplitSchema,
   EvaluatorKindSchema,
-  EvaluatorSeveritySchema,
   describeAcceptanceCriteria,
   describeMcpPolicy,
   type AcceptanceCriteria,
@@ -26,7 +25,6 @@ import {
   type EvalDatasetVersion,
   type EvaluatedStep,
   type EvaluatorCheck,
-  type EvaluatorSeverity,
   type StepFingerprintComponent,
 } from '@mediforce/platform-core';
 import {
@@ -59,8 +57,6 @@ import {
 } from './evaluator-check-editor';
 
 type StepEvaluation = ReturnType<typeof useStepEvaluation>;
-
-const SEVERITIES = EvaluatorSeveritySchema.options;
 
 function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
@@ -104,10 +100,9 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
   const [editing, setEditing] = React.useState(false);
   const [unchanged, setUnchanged] = React.useState(false);
   const check = evaluator.latest.check;
-  const saveVersion = (values: { rule: string; severity: EvaluatorSeverity; check: EvaluatorCheck }) => {
+  const saveVersion = (values: { rule: string; check: EvaluatorCheck }) => {
     const changes = {
       ...(values.rule.trim() === evaluator.latest.rule ? {} : { rule: values.rule }),
-      ...(values.severity === evaluator.latest.severity ? {} : { severity: values.severity }),
       ...(JSON.stringify(values.check) === JSON.stringify(check) ? {} : { check: values.check }),
     };
     if (Object.keys(changes).length === 0) {
@@ -124,7 +119,7 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
           <div className="text-sm">
             <span className="font-medium">{evaluator.name}</span>
             <span className="ml-1.5 text-xs text-muted-foreground">
-              v{evaluator.latest.version} · {CHECK_KINDS[check.kind].label} · {evaluator.latest.severity}
+              v{evaluator.latest.version} · {CHECK_KINDS[check.kind].label}
               {check.kind === 'llm_judge' && ` · min confidence ${check.minConfidence}`}
               {check.kind === 'expected_output' && ` · agreement ≥ ${check.minAgreement} positive, ≤ ${check.maxAgreement} negative`}
               {evaluator.latest.origin === 'assistant' ? ' · from the assistant' : ''}
@@ -169,7 +164,7 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
             {check.kind === 'code' && ' The new version needs its source approved again before it counts, whatever changed.'}
           </p>
           <EvaluatorForm
-            initial={{ name: evaluator.name, rule: evaluator.latest.rule, severity: evaluator.latest.severity, draft: draftFromCheck(check) }}
+            initial={{ name: evaluator.name, rule: evaluator.latest.rule, draft: draftFromCheck(check) }}
             editing
             stepOutputSchema={stepOutputSchema}
             submitLabel={`Save as v${evaluator.latest.version + 1}`}
@@ -210,11 +205,10 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
 interface EvaluatorFormValues {
   name: string;
   rule: string;
-  severity: EvaluatorSeverity;
   draft: CheckDraft;
 }
 
-/** Name, severity, the kind of check and its fields. The kind comes from the dropdown, never typed. */
+/** Name, the kind of check and its fields. The kind comes from the dropdown, never typed. */
 function EvaluatorForm({ initial, editing = false, stepOutputSchema, submitLabel, pending, error, onSubmit, onCancel }: {
   initial: EvaluatorFormValues;
   /**
@@ -226,7 +220,7 @@ function EvaluatorForm({ initial, editing = false, stepOutputSchema, submitLabel
   submitLabel: string;
   pending: boolean;
   error: string | null;
-  onSubmit: (values: { name: string; rule: string; severity: EvaluatorSeverity; check: EvaluatorCheck }) => void;
+  onSubmit: (values: { name: string; rule: string; check: EvaluatorCheck }) => void;
   onCancel: () => void;
 }) {
   const [values, setValues] = React.useState(initial);
@@ -239,7 +233,7 @@ function EvaluatorForm({ initial, editing = false, stepOutputSchema, submitLabel
       return;
     }
     setDraftError(null);
-    onSubmit({ name: values.name.replace(/-+$/, ''), rule: values.rule, severity: values.severity, check: result.check });
+    onSubmit({ name: values.name.replace(/-+$/, ''), rule: values.rule, check: result.check });
   };
   const shownError = draftError ?? error;
   return (
@@ -254,9 +248,6 @@ function EvaluatorForm({ initial, editing = false, stepOutputSchema, submitLabel
           disabled={editing}
           onChange={(event) => setValues({ ...values, name: toEvaluatorName(event.target.value) })}
         />
-        <select aria-label="Severity" className={inputClass} value={values.severity} onChange={(event) => setValues({ ...values, severity: EvaluatorSeveritySchema.parse(event.target.value) })}>
-          {SEVERITIES.map((severity) => <option key={severity} value={severity}>{severity}</option>)}
-        </select>
         <select
           aria-label="Type"
           className={inputClass}
@@ -291,7 +282,7 @@ export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
   stepOutputSchema?: AgentOutputSchema;
 }) {
   const [adding, setAdding] = React.useState(false);
-  const create = useStepEvaluationMutation(step, (values: { name: string; rule: string; severity: EvaluatorSeverity; check: EvaluatorCheck }) =>
+  const create = useStepEvaluationMutation(step, (values: { name: string; rule: string; check: EvaluatorCheck }) =>
     mediforce.evaluation.createEvaluator({ ...step, ...values }));
 
   const evaluators = data.data?.evaluators ?? [];
@@ -304,7 +295,7 @@ export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
       )}
       {adding && (
         <EvaluatorForm
-          initial={{ name: '', rule: '', severity: 'major', draft: emptyCheckDraft('schema', stepOutputSchema) }}
+          initial={{ name: '', rule: '', draft: emptyCheckDraft('schema', stepOutputSchema) }}
           stepOutputSchema={stepOutputSchema}
           submitLabel="Create"
           pending={create.isPending}
@@ -416,7 +407,7 @@ function EvaluatorSelection({ evaluators, value, onChange }: {
                     ? evaluators.filter((candidate) => candidate.id === evaluator.id || chosen.has(candidate.id)).map((candidate) => candidate.id)
                     : value.filter((evaluatorId) => evaluatorId !== evaluator.id))}
                 />
-                {evaluator.name} <span className="text-muted-foreground">({CHECK_KINDS[evaluator.latest.check.kind].label}, {evaluator.latest.severity})</span>
+                {evaluator.name} <span className="text-muted-foreground">({CHECK_KINDS[evaluator.latest.check.kind].label})</span>
               </label>
             </li>
           ))}
@@ -1231,7 +1222,7 @@ export function DriftAlert({ data }: { data: StepEvaluation['drift'] }) {
       <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-200">Production Scores are drifting</h3>
       {drifting.map((evaluator) => (
         <p key={evaluator.evaluatorId}>
-          <span className="font-medium">{evaluator.name}</span> v{evaluator.evaluatorVersion} ({evaluator.severity}): mean {evaluator.recentMean?.toFixed(2)} over the last {drift.window} production Scores, down from {evaluator.baselineMean?.toFixed(2)} over the {drift.window} before.
+          <span className="font-medium">{evaluator.name}</span> v{evaluator.evaluatorVersion}: mean {evaluator.recentMean?.toFixed(2)} over the last {drift.window} production Scores, down from {evaluator.baselineMean?.toFixed(2)} over the {drift.window} before.
         </p>
       ))}
       <p className="text-muted-foreground">An alert is a drop of at least {drift.threshold}. Look at the recent runs, or ask the assistant to diagnose them.</p>
@@ -1239,25 +1230,14 @@ export function DriftAlert({ data }: { data: StepEvaluation['drift'] }) {
   );
 }
 
-const NOT_JUDGED = '';
-
-/** The criteria with one severity's pass rate changed — its pass^k kept — or, given `NOT_JUDGED`, dropped. */
-export function withPassRate(criteria: AcceptanceCriteria | undefined, severity: EvaluatorSeverity, choice: string): AcceptanceCriteria {
-  const { [severity]: previous, ...others } = criteria ?? {};
-  if (choice === NOT_JUDGED) return others;
-  return { ...others, [severity]: { ...previous, minPassRate: Number(choice) } };
-}
-
 function percent(rate: number): string {
   return `${Math.round(rate * 1000) / 10}%`;
 }
 
-/** One line per severity: its floor, or that it is not judged. */
-function describeThresholds(criteria: AcceptanceCriteria): string {
-  return SEVERITIES.map((severity) => {
-    const criterion = criteria[severity];
-    return `${severity} ${criterion === undefined ? 'not judged' : `≥ ${percent(criterion.minPassRate)}`}`;
-  }).join(' · ');
+/** The floor every counted Evaluator must reach, in words. */
+function describeThreshold(criteria: AcceptanceCriteria): string {
+  const passHatK = criteria.minPassHatK === undefined ? '' : ` and pass^k ≥ ${percent(criteria.minPassHatK)}`;
+  return `Every counted Evaluator must pass at least ${percent(criteria.minPassRate)} of its graded trials${passHatK}`;
 }
 
 /** What the Step's qualification rests on: the Eval Run it was signed from, and what changed since. */
@@ -1276,8 +1256,8 @@ function QualificationDetails({ status }: { status: GetStepQualificationOutput }
       <p className="text-muted-foreground">{qualification.signature.meaning} ({qualification.signature.reauthentication === 'password' ? 'password re-entered' : 'signed from the session'})</p>
       <p>Judged against: {describeAcceptanceCriteria(qualification.acceptanceCriteria)}</p>
       <p data-testid="qualification-mcp-policy">{describeMcpPolicy(qualification.mcpPolicy)}</p>
-      {qualification.deviations.map((deviation) => (
-        <p key={deviation.severity} className="text-amber-700 dark:text-amber-300">Deviation ({deviation.severity}): {deviation.justification}</p>
+      {qualification.deviations.map((deviation, index) => (
+        <p key={index} className="text-amber-700 dark:text-amber-300">Deviation{deviation.severity === undefined ? '' : ` (${deviation.severity})`}: {deviation.justification}</p>
       ))}
       {status.status === 'stale' && (
         <p className="text-red-700 dark:text-red-400" data-testid="qualification-changed">
@@ -1293,8 +1273,9 @@ function QualificationDetails({ status }: { status: GetStepQualificationOutput }
 }
 
 /**
- * Per severity: a slider for the minimum pass rate, and whether the severity is
- * judged at all. Nothing is saved until Save, which writes one new criteria version.
+ * A slider for the minimum pass rate every counted Evaluator must reach; a
+ * minimum pass^k set by the assistant or the CLI is kept. Nothing is saved
+ * until Save, which writes one new criteria version.
  */
 function ThresholdDialog({ onClose, criteria, onSave, saving, error }: {
   onClose: () => void;
@@ -1304,7 +1285,6 @@ function ThresholdDialog({ onClose, criteria, onSave, saving, error }: {
   error: Error | null;
 }) {
   const [draft, setDraft] = React.useState(criteria);
-  const judged = SEVERITIES.filter((severity) => draft[severity] !== undefined);
   const unchanged = JSON.stringify(draft) === JSON.stringify(criteria);
   return (
     <Dialog.Root open onOpenChange={(open) => { if (open === false) onClose(); }}>
@@ -1315,47 +1295,29 @@ function ThresholdDialog({ onClose, criteria, onSave, saving, error }: {
             <div>
               <Dialog.Title className="text-lg font-semibold">Pass thresholds</Dialog.Title>
               <Dialog.Description className="mt-1 text-xs text-muted-foreground">
-                Every counted Evaluator of a severity must pass at least this share of its graded trials: 8 of 10 meets 80%, and 100% means every graded trial passes.
+                Every counted Evaluator must pass at least this share of its graded trials: 8 of 10 meets 80%, and 100% means every graded trial passes.
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>
               <button type="button" aria-label="Close" className="rounded-sm p-1 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
             </Dialog.Close>
           </div>
-          <div className="space-y-4">
-            {SEVERITIES.map((severity) => {
-              const criterion = draft[severity];
-              // The schema needs one severity judged, so the last one judged cannot be cleared.
-              const lastJudged = judged.length === 1 && judged[0] === severity;
-              return (
-                <div key={severity} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-sm">
-                    <label className="flex items-center gap-2 capitalize">
-                      <input
-                        type="checkbox"
-                        aria-label={`judge ${severity}`}
-                        checked={criterion !== undefined}
-                        disabled={lastJudged}
-                        onChange={(event) => setDraft(withPassRate(draft, severity, event.target.checked ? '1' : NOT_JUDGED))}
-                      />
-                      {severity}
-                    </label>
-                    <span className="font-mono text-xs tabular-nums">{criterion === undefined ? 'not judged' : `≥ ${percent(criterion.minPassRate)}`}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    step={1}
-                    aria-label={`${severity} minimum pass rate`}
-                    className="w-full accent-primary disabled:opacity-40"
-                    value={Math.round((criterion?.minPassRate ?? 1) * 100)}
-                    disabled={criterion === undefined}
-                    onChange={(event) => setDraft(withPassRate(draft, severity, String(Number(event.target.value) / 100)))}
-                  />
-                </div>
-              );
-            })}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-sm">
+              <label htmlFor="minimum-pass-rate">Minimum pass rate</label>
+              <span className="font-mono text-xs tabular-nums">≥ {percent(draft.minPassRate)}</span>
+            </div>
+            <input
+              id="minimum-pass-rate"
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              className="w-full accent-primary"
+              value={Math.round(draft.minPassRate * 100)}
+              onChange={(event) => setDraft({ ...draft, minPassRate: Number(event.target.value) / 100 })}
+            />
+            {draft.minPassHatK !== undefined && <p className="text-xs text-muted-foreground">Also kept: pass^k ≥ {percent(draft.minPassHatK)}.</p>}
           </div>
           {error !== null && <p className="mt-3 text-xs text-destructive">{error.message}</p>}
           <div className="mt-6 flex justify-end gap-2">
@@ -1376,8 +1338,8 @@ function ThresholdDialog({ onClose, criteria, onSave, saving, error }: {
  * Whether the step is validated (D10): the newest finished Eval Run of the
  * workflow version, passed or failed on its Acceptance Criteria, not verified
  * once anything it rested on changed. The signed Step Qualification, if any,
- * opens from the same status. The thresholds — every severity at 100% until
- * set — are tuned in a dialog; the next Eval Run freezes the ones in force.
+ * opens from the same status. The threshold — 100% until set — is tuned in
+ * a dialog; the next Eval Run freezes the one in force.
  */
 export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEdit }: {
   step: EvaluatedStep;
@@ -1410,7 +1372,7 @@ export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEd
             </button>
           </InstantTooltip>
         )}
-        <InstantTooltip label={`${describeThresholds(effective)}. Every counted Evaluator of a severity must reach its rate.`}>
+        <InstantTooltip label={`${describeThreshold(effective)}.`}>
           <span>
             <button
               type="button"

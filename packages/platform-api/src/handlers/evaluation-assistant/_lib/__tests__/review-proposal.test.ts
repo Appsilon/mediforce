@@ -21,7 +21,7 @@ describe('reviewEvaluationProposal', () => {
   beforeEach(async () => { fixture = await evaluationFixture(); });
 
   const proposeEvaluator = (check: typeof findings | typeof judge, name = 'findings-present') =>
-    ({ name, rule: 'The result lists findings.', severity: 'critical' as const, check });
+    ({ name, rule: 'The result lists findings.' as const, check });
 
   it('self-tests a proposed check on the step\'s real outputs before the person sees it', async () => {
     const review = await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(findings), fixture.scope(), STEP, []);
@@ -68,9 +68,9 @@ describe('reviewEvaluationProposal', () => {
     const { evaluator } = await createEvaluator({ ...STEP, ...proposeEvaluator(findings), origin: 'user' }, fixture.scope());
     const refined = await reviewEvaluationProposal('propose_evaluator_version', { evaluatorId: evaluator.id, check: findings }, fixture.scope(), STEP, []);
     expect(refined).toMatchObject({ ok: true, evidence: { selfTest: { results: expect.any(Array) } } });
-    expect(await reviewEvaluationProposal('propose_evaluator_version', { evaluatorId: evaluator.id, severity: 'minor' }, fixture.scope(), STEP, []))
+    expect(await reviewEvaluationProposal('propose_evaluator_version', { evaluatorId: evaluator.id }, fixture.scope(), STEP, []))
       .toEqual({ ok: true });
-    await expect(reviewEvaluationProposal('propose_evaluator_version', { evaluatorId: evaluator.id, severity: 'minor' }, fixture.scope(), { ...STEP, stepId: 'extract-aes' }, []))
+    await expect(reviewEvaluationProposal('propose_evaluator_version', { evaluatorId: evaluator.id }, fixture.scope(), { ...STEP, stepId: 'extract-aes' }, []))
       .rejects.toThrow('is not an Evaluator of this step');
   });
 

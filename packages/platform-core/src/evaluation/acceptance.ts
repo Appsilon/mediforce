@@ -1,7 +1,5 @@
-import { EvaluatorSeveritySchema, type AcceptanceCriteria } from '../schemas/evaluation';
+import { LegacyEvaluatorSeveritySchema, type AcceptanceCriteria, type SignedAcceptanceCriteria } from '../schemas/evaluation';
 import type { AcceptanceCriterionVerdict, EvalRun, EvalRunAcceptance, EvalRunEvaluatorReport, EvalRunReport } from '../schemas/eval-run';
-
-const SEVERITIES = EvaluatorSeveritySchema.options;
 
 function percent(value: number): string {
   return `${Math.round(value * 1000) / 10}%`;
@@ -15,80 +13,75 @@ function notGraded(evaluator: EvalRunEvaluatorReport): string {
 }
 
 /**
- * Judges an Eval Run's Evaluator results against its Acceptance
- * Criteria (ADR-0023 D10). A criterion holds for a severity when every counted
- * Evaluator of that severity reaches it: its pass rate — passes over graded
- * trials, taken literally — at least `minPassRate`, and its pass^k at least
- * `minPassHatK` when set. One miss is a miss; otherwise a severity with no counted Evaluator, or
- * one that graded nothing it counts, cannot be judged. Evaluators that do not
- * count (D9) are left out.
+ * Judges an Eval Run's Evaluator results against its Acceptance Criteria
+ * (ADR-0023 D10). They hold when every counted Evaluator reaches them: its pass
+ * rate — passes over graded trials, taken literally — at least `minPassRate`,
+ * and its pass^k at least `minPassHatK` when set. One miss is a miss;
+ * otherwise no counted Evaluator, or one that graded nothing it counts, cannot
+ * be judged. Evaluators that do not count (D9) are left out.
  */
 export function judgeAcceptanceCriteria(
   criteria: AcceptanceCriteria | null,
   evaluators: readonly EvalRunEvaluatorReport[],
-): AcceptanceCriterionVerdict[] {
-  if (criteria === null) return [];
-  return SEVERITIES.flatMap((severity) => {
-    const criterion = criteria[severity];
-    if (criterion === undefined) return [];
-    const lines = evaluators
-      .filter((evaluator) => evaluator.counted === true && evaluator.severity === severity)
-      .map((evaluator) => {
-        const passRateMet = evaluator.passRate === null ? null : evaluator.passRate >= criterion.minPassRate;
-        const passHatKMet = criterion.minPassHatK === undefined
-          ? true
-          : evaluator.passHatK === null ? null : evaluator.passHatK >= criterion.minPassHatK;
-        const met = passRateMet === false || passHatKMet === false ? false : passRateMet === null || passHatKMet === null ? null : true;
-        const misses = [
-          passRateMet === false && `pass rate ${percent(evaluator.passRate!)} < ${percent(criterion.minPassRate)}`,
-          passHatKMet === false && `pass^k ${percent(evaluator.passHatK!)} < ${percent(criterion.minPassHatK!)}`,
-        ].filter((miss) => miss !== false);
-        return {
-          line: {
-            evaluatorId: evaluator.evaluatorId,
-            name: evaluator.name,
-            wilsonLower: evaluator.wilsonLower,
-            passHatK: evaluator.passHatK,
-            met,
-          },
-          explanation: met === false ? `${evaluator.name}: ${misses.join(', ')}` : met === null ? notGraded(evaluator) : null,
-        };
-      });
+): AcceptanceCriterionVerdict | null {
+  if (criteria === null) return null;
+  const lines = evaluators
+    .filter((evaluator) => evaluator.counted === true)
+    .map((evaluator) => {
+      const passRateMet = evaluator.passRate === null ? null : evaluator.passRate >= criteria.minPassRate;
+      const passHatKMet = criteria.minPassHatK === undefined
+        ? true
+        : evaluator.passHatK === null ? null : evaluator.passHatK >= criteria.minPassHatK;
+      const met = passRateMet === false || passHatKMet === false ? false : passRateMet === null || passHatKMet === null ? null : true;
+      const misses = [
+        passRateMet === false && `pass rate ${percent(evaluator.passRate!)} < ${percent(criteria.minPassRate)}`,
+        passHatKMet === false && `pass^k ${percent(evaluator.passHatK!)} < ${percent(criteria.minPassHatK!)}`,
+      ].filter((miss) => miss !== false);
+      return {
+        line: {
+          evaluatorId: evaluator.evaluatorId,
+          name: evaluator.name,
+          wilsonLower: evaluator.wilsonLower,
+          passHatK: evaluator.passHatK,
+          met,
+        },
+        explanation: met === false ? `${evaluator.name}: ${misses.join(', ')}` : met === null ? notGraded(evaluator) : null,
+      };
+    });
 
-    let status: AcceptanceCriterionVerdict['status'];
-    let reason: string;
-    if (lines.length === 0) {
-      status = 'not_evaluable';
-      reason = `No counted ${severity} Evaluator`;
-    } else if (lines.some(({ line }) => line.met === false)) {
-      status = 'missed';
-      reason = lines.filter(({ line }) => line.met === false).map(({ explanation }) => explanation).join('; ');
-    } else if (lines.some(({ line }) => line.met === null)) {
-      status = 'not_evaluable';
-      reason = lines.filter(({ line }) => line.met === null).map(({ explanation }) => explanation).join('; ');
-    } else {
-      status = 'met';
-      reason = `Every counted ${severity} Evaluator reached it`;
-    }
-    return [{ severity, criterion, status, evaluators: lines.map(({ line }) => line), reason }];
-  });
+  let status: AcceptanceCriterionVerdict['status'];
+  let reason: string;
+  if (lines.length === 0) {
+    status = 'not_evaluable';
+    reason = 'No counted Evaluator';
+  } else if (lines.some(({ line }) => line.met === false)) {
+    status = 'missed';
+    reason = lines.filter(({ line }) => line.met === false).map(({ explanation }) => explanation).join('; ');
+  } else if (lines.some(({ line }) => line.met === null)) {
+    status = 'not_evaluable';
+    reason = lines.filter(({ line }) => line.met === null).map(({ explanation }) => explanation).join('; ');
+  } else {
+    status = 'met';
+    reason = 'Every counted Evaluator reached it';
+  }
+  return { criterion: criteria, status, evaluators: lines.map(({ line }) => line), reason };
 }
 
-/** Until a Step's Acceptance Criteria are set, every severity must pass every graded trial. */
-export const DEFAULT_ACCEPTANCE_CRITERIA: AcceptanceCriteria = {
-  critical: { minPassRate: 1 },
-  major: { minPassRate: 1 },
-  minor: { minPassRate: 1 },
-};
+/** Until a Step's Acceptance Criteria are set, every Evaluator must pass every graded trial. */
+export const DEFAULT_ACCEPTANCE_CRITERIA: AcceptanceCriteria = { minPassRate: 1 };
 
-/** Acceptance Criteria in words: the pass-rate floor per severity, and pass^k where set. */
-export function describeAcceptanceCriteria(criteria: AcceptanceCriteria): string {
-  return SEVERITIES
+function describeFloor(criteria: AcceptanceCriteria): string {
+  const passHatK = criteria.minPassHatK === undefined ? '' : `, pass^k ≥ ${criteria.minPassHatK}`;
+  return `pass rate ≥ ${criteria.minPassRate}${passHatK}`;
+}
+
+/** Acceptance Criteria in words: the pass-rate floor, and pass^k where set — per severity on criteria signed while Evaluators had one. */
+export function describeAcceptanceCriteria(criteria: SignedAcceptanceCriteria): string {
+  if ('minPassRate' in criteria) return describeFloor(criteria);
+  return LegacyEvaluatorSeveritySchema.options
     .flatMap((severity) => {
-      const criterion = criteria[severity];
-      if (criterion === undefined) return [];
-      const passHatK = criterion.minPassHatK === undefined ? '' : `, pass^k ≥ ${criterion.minPassHatK}`;
-      return [`${severity}: pass rate ≥ ${criterion.minPassRate}${passHatK}`];
+      const floor = criteria[severity];
+      return floor === undefined ? [] : [`${severity}: ${describeFloor(floor)}`];
     })
     .join('; ');
 }
@@ -99,15 +92,14 @@ export function describeAcceptanceCriteria(criteria: AcceptanceCriteria): string
  * run is prepared or running.
  */
 export function evalRunAcceptance(
-  run: Pick<EvalRun, 'status' | 'acceptanceCriteria'>,
-  report: Pick<EvalRunReport, 'criteria'>,
+  run: Pick<EvalRun, 'status'>,
+  report: Pick<EvalRunReport, 'criteriaVerdict'>,
 ): EvalRunAcceptance | null {
   if (run.status === 'prepared' || run.status === 'running') return null;
-  if (run.acceptanceCriteria === null) return { status: 'no_criteria', reason: 'No Acceptance Criteria were frozen into this run.' };
-  const unmet = report.criteria.filter((verdict) => verdict.status !== 'met');
-  if (unmet.length === 0) return { status: 'met', reason: 'Every criterion met.' };
-  return {
-    status: unmet.some((verdict) => verdict.status === 'missed') ? 'missed' : 'not_judged',
-    reason: unmet.map((verdict) => `${verdict.severity} ${verdict.status === 'missed' ? 'missed' : 'not judged'}`).join(', '),
-  };
+  const verdict = report.criteriaVerdict;
+  if (verdict === null) return { status: 'no_criteria', reason: 'No Acceptance Criteria were frozen into this run.' };
+  if (verdict.status === 'met') return { status: 'met', reason: 'Acceptance Criteria met.' };
+  return verdict.status === 'missed'
+    ? { status: 'missed', reason: verdict.reason }
+    : { status: 'not_judged', reason: verdict.reason };
 }

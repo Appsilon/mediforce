@@ -80,11 +80,11 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
     const step = { namespace: TEST_ORG_HANDLE, workflowName, stepId: 'grade-aes' };
 
     await post(request, '/api/evaluation/evaluators', {
-      ...step, name: 'summary-present', rule: 'The result carries a summary.', severity: 'critical',
+      ...step, name: 'summary-present', rule: 'The result carries a summary.',
       check: { kind: 'schema', schema: { required: ['summary'] } },
     }, 201);
     await post(request, '/api/evaluation/evaluators', {
-      ...step, name: 'findings-present', rule: 'The result lists findings.', severity: 'major',
+      ...step, name: 'findings-present', rule: 'The result lists findings.',
       check: { kind: 'schema', schema: { required: ['findings'] } },
     }, 201);
     await post(request, '/api/evaluation/cases/from-agent-run', { agentRunId: production.id, expectation: 'positive' }, 201);
@@ -163,7 +163,7 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
     }), 201);
     const step = { namespace: TEST_ORG_HANDLE, workflowName, stepId: 'grade-aes' };
     await post(request, '/api/evaluation/evaluators', {
-      ...step, name: 'summary-present', rule: 'The result carries a summary.', severity: 'critical',
+      ...step, name: 'summary-present', rule: 'The result carries a summary.',
       check: { kind: 'schema', schema: { required: ['summary'] } },
     }, 201);
     await post(request, '/api/evaluation/cases', {
@@ -199,7 +199,7 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
     }), 201);
     const step = { namespace: TEST_ORG_HANDLE, workflowName, stepId: 'grade-aes' };
     await post(request, '/api/evaluation/evaluators', {
-      ...step, name: 'summary-present', rule: 'The result carries a summary.', severity: 'critical',
+      ...step, name: 'summary-present', rule: 'The result carries a summary.',
       check: { kind: 'schema', schema: { required: ['summary'] } },
     }, 201);
     await post(request, '/api/evaluation/cases', {
@@ -239,7 +239,7 @@ test.describe('Step Evaluation judge verdicts — API E2E', () => {
     const step = { namespace: EVALUATION_WORKSPACE, workflowName, stepId: 'grade-aes' };
 
     const { evaluator: judge } = await mediforce.evaluation.createEvaluator({
-      ...step, name: 'summary-grounded', rule: 'The summary is grounded in the input.', severity: 'critical',
+      ...step, name: 'summary-grounded', rule: 'The summary is grounded in the input.',
       check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'Is the summary grounded in the input?', minConfidence: 0.8 },
     });
     expect(judge.trust).toEqual({ trusted: true });
@@ -340,11 +340,11 @@ test.describe('Step Evaluation judge verdicts — API E2E', () => {
     const mockOutput = { mock: true, summary: 'Mock output for step grade-aes' };
 
     const { evaluator: expected } = await mediforce.evaluation.createEvaluator({
-      ...step, name: 'matches-expected', rule: 'The output matches what the case expects.', severity: 'critical',
+      ...step, name: 'matches-expected', rule: 'The output matches what the case expects.',
       check: { kind: 'expected_output', model: 'anthropic/claude-haiku-4.5', instructions: 'Wording of the summary is trivial.', minAgreement: 0.8 },
     });
     const { evaluator: findings } = await mediforce.evaluation.createEvaluator({
-      ...step, name: 'findings-present', rule: 'The result lists findings.', severity: 'major',
+      ...step, name: 'findings-present', rule: 'The result lists findings.',
       check: { kind: 'schema', schema: { required: ['findings'] } },
     });
     // It never scores production: a production run has no expected output.

@@ -21,7 +21,7 @@ function verdictOf(overrides: Partial<JudgeVerdict>): JudgeVerdict {
   return {
     trialId: '1e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', trialIndex: 0, variantId: 'champion',
     caseId: '2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', caseName: 'Sepsis, fatal', agentRunId: 'agent-run-1',
-    evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'grades-justified', severity: 'critical',
+    evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'grades-justified',
     scoreId: '4e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', passed: false, confidence: 0.6, minConfidence: 0.8, agreement: null,
     rationale: 'Log entry [4] reads the fatal outcome, yet the output grades sepsis 3.',
     review: null, counts: false,

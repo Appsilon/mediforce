@@ -21,8 +21,8 @@ function printRun(output: OutputSink, { evalRun, report }: EvalRunOutput): void 
     const excluded = evaluator.excluded === 0 ? '' : `  ${evaluator.excluded} model verdict(s) left out`;
     output.stdout(`${evaluator.name.padEnd(24)} ${percent(evaluator.passRate)}  ${interval}  ${percent(evaluator.passAtK)}  ${percent(evaluator.passHatK)} ${percent(evaluator.flakiness)}  ${String(evaluator.errors).padStart(3)}${counted}${excluded}`);
   }
-  for (const verdict of report.criteria) {
-    output.stdout(`criterion ${verdict.severity}: ${verdict.status.replace('_', ' ')} — ${verdict.reason}`);
+  if (report.criteriaVerdict !== null) {
+    output.stdout(`criteria: ${report.criteriaVerdict.status.replace('_', ' ')} — ${report.criteriaVerdict.reason}`);
   }
   if (report.confidence !== null) output.stdout(`confidence: ECE ${report.confidence.ece.toFixed(3)} over ${report.confidence.count} trial(s)`);
   if (report.recommendation !== null) {
@@ -197,7 +197,7 @@ export const evalRunFailuresCommand = defineCommand({
       if (failure.error !== null) output.stdout(`  error: ${failure.error}`);
       for (const evaluator of failure.evaluators) {
         const counted = evaluator.counted ? 'counted' : 'not counted';
-        output.stdout(`  ${evaluator.outcome} ${evaluator.name} (${evaluator.severity} ${evaluator.kind}, ${counted}): ${evaluator.error ?? evaluator.comment ?? ''}`);
+        output.stdout(`  ${evaluator.outcome} ${evaluator.name} (${evaluator.kind}, ${counted}): ${evaluator.error ?? evaluator.comment ?? ''}`);
       }
     }
     return 0;
@@ -227,7 +227,7 @@ export const evalTrialCommand = defineCommand({
     for (const entry of result.evaluators) {
       const { evaluator, score } = entry;
       const confidence = score?.confidence == null ? '' : `, confidence ${score.confidence}`;
-      output.stdout(`\n${entry.outcome ?? 'not graded'}  ${evaluator.name} v${evaluator.version} (${evaluator.severity} ${evaluator.kind}${evaluator.counted ? '' : ', not counted'}${confidence})`);
+      output.stdout(`\n${entry.outcome ?? 'not graded'}  ${evaluator.name} v${evaluator.version} (${evaluator.kind}${evaluator.counted ? '' : ', not counted'}${confidence})`);
       const said = entry.error ?? score?.comment ?? null;
       if (said !== null) output.stdout(`  ${said}`);
       if (args.prompts === true) {

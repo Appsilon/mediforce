@@ -72,7 +72,6 @@ export const evaluatorVersions = pgTable(
       .references(() => evaluators.id, { onDelete: 'cascade' }),
     version: integer('version').notNull(),
     rule: text('rule').notNull(),
-    severity: text('severity').notNull(),
     check: jsonb('check').notNull(),
     origin: text('origin').notNull(),
     sourceApproval: jsonb('source_approval'),

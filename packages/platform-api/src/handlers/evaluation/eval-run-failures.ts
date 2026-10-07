@@ -18,7 +18,6 @@ async function evaluatorFailures(scope: CallerScope, run: EvalRun, trial: EvalTr
     const base = {
       evaluatorId: evaluator.evaluatorId,
       name: evaluator.name,
-      severity: evaluator.severity,
       kind: evaluator.kind,
       counted: evaluator.counted,
     };

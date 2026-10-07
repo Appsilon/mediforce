@@ -12,9 +12,9 @@ const OUTPUT = {
     namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', id: RUN_ID, definitionVersion: 2,
     datasetVersionId: '1e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', caseIds: ['2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c'],
     trialsPerCase: 3, concurrency: 2,
-    evaluators: [{ evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true }],
+    evaluators: [{ evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', version: 1, kind: 'schema', counted: true }],
     fingerprint: null,
-    acceptanceCriteria: { critical: { minPassRate: 0.9 } },
+    acceptanceCriteria: { minPassRate: 0.9 },
     mcpPolicy: {}, estimate: { perTrialUsd: 0.2, totalUsd: 0.6, basis: 'history', sampleSize: 5 },
     budgetUsd: 0.9, spentUsd: 0, status: 'prepared', createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
     startedAt: null, completedAt: null, acceptance: null,
@@ -24,14 +24,14 @@ const OUTPUT = {
     k: 3, trials: { total: 3, scored: 0, failed: 0, skipped: 0, inProgress: 3 },
     mcp: { live: [], replayed: ['edc'], denied: [], recordedFirst: [], unrecordedCalls: [] },
     evaluators: [{
-      evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', version: 1, kind: 'schema', severity: 'critical', counted: true,
+      evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', version: 1, kind: 'schema', counted: true,
       passes: 0, failures: 0, errors: 0, excluded: 0, passRate: null, wilsonLower: null, wilsonUpper: null, passAtK: null, passHatK: null, flakiness: null,
     }],
-    criteria: [{
-      severity: 'critical', criterion: { minPassRate: 0.9 }, status: 'not_evaluable',
+    criteriaVerdict: {
+      criterion: { minPassRate: 0.9 }, status: 'not_evaluable',
       evaluators: [{ evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', wilsonLower: null, passHatK: null, met: null }],
       reason: 'findings-present graded no trial',
-    }],
+    },
     confidence: null, recommendation: null,
     judgeVerdicts: [],
     trialResults: [],
@@ -60,7 +60,7 @@ describe('mediforce eval runs', () => {
       namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', trialsPerCase: 3,
     });
     const printed = output.stdoutLines.join('\n');
-    expect(printed).toContain('criterion critical: not evaluable — findings-present graded no trial');
+    expect(printed).toContain('criteria: not evaluable — findings-present graded no trial');
     expect(printed).toContain('MCP servers: edc replayed. No trial made a live MCP call.');
     expect(printed).toContain(`mediforce eval run-start ${RUN_ID} --confirm-budget 0.9`);
   });
@@ -92,7 +92,7 @@ describe('mediforce eval runs', () => {
     const judgeId = '5e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
     const verdict = {
       trialId: TRIAL_ID, trialIndex: 0, caseId: '2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', caseName: 'Grade 5 sepsis',
-      agentRunId: 'agent-run-1', evaluatorId: judgeId, name: 'death-graded-5', severity: 'critical', scoreId: '7e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c',
+      agentRunId: 'agent-run-1', evaluatorId: judgeId, name: 'death-graded-5', scoreId: '7e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c',
       passed: false, confidence: 0.4, minConfidence: 0.8, agreement: null, rationale: 'Grade 4 given for a fatal AE.', review: null, counts: false,
     };
     const judgeReport = {
@@ -152,7 +152,7 @@ describe('mediforce eval failures', () => {
       trialId: TRIAL_ID, trialIndex: 0, status: 'scored', caseId: '2e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', caseName: 'Grade 5 sepsis',
       split: 'dev', expectation: 'negative', expectedOutput: { findings: [{ term: 'Sepsis', grade: 4 }] }, agentRunId: 'agent-run-1', error: null,
       evaluators: [{
-        evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', severity: 'critical', kind: 'schema',
+        evaluatorId: '3e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'findings-present', kind: 'schema',
         counted: true, outcome: 'failed', comment: 'findings missing', error: null,
       }],
     }],
@@ -169,7 +169,7 @@ describe('mediforce eval failures', () => {
     expect(printed).toContain('2 failing trial(s), showing 1');
     expect(printed).toContain('case "Grade 5 sepsis" (dev, negative)');
     expect(printed).toContain('expected output (to avoid): {"findings":[{"term":"Sepsis","grade":4}]}');
-    expect(printed).toContain('failed findings-present (critical schema, counted): findings missing');
+    expect(printed).toContain('failed findings-present (schema, counted): findings missing');
   });
 
   it('rejects a limit that is not a positive integer', async () => {
@@ -192,7 +192,7 @@ describe('mediforce eval trial', () => {
     reasoningSummary: 'Graded by CTCAE v5.',
     trajectory: [],
     evaluators: [{
-      evaluator: { evaluatorId: judgeId, name: 'death-graded-5', version: 2, kind: 'llm_judge', severity: 'critical', counted: true },
+      evaluator: { evaluatorId: judgeId, name: 'death-graded-5', version: 2, kind: 'llm_judge', counted: true },
       rule: 'A fatal AE is Grade 5.',
       check: { kind: 'llm_judge', model: 'anthropic/claude-haiku-4.5', rubric: 'A fatal AE is Grade 5.', minConfidence: 0.8 },
       outcome: 'fail',
@@ -212,7 +212,7 @@ describe('mediforce eval trial', () => {
     expect(fetchSpy.mock.calls[0]![0]).toBe(`http://localhost:5555/api/evaluation/runs/${RUN_ID}/trials/${TRIAL_ID}`);
     const printed = output.stdoutLines.join('\n');
     expect(printed).toContain('output: {"findings":[{"term":"Sepsis","grade":4}]}');
-    expect(printed).toContain('fail  death-graded-5 v2 (critical llm_judge, confidence 0.9)');
+    expect(printed).toContain('fail  death-graded-5 v2 (llm_judge, confidence 0.9)');
     expect(printed).toContain('Grade 4 given for a fatal AE.');
     expect(printed).not.toContain('Rubric:');
 

@@ -9,7 +9,6 @@ import {
   EvaluatorCheckSchema,
   EvaluatorKindSchema,
   EvaluatorSchema,
-  EvaluatorSeveritySchema,
   PerturbedEvalCaseSpecSchema,
   WorkspaceFilePathSchema,
   hasPerturbationChange,
@@ -51,12 +50,11 @@ const AssistantEvaluatorNameSchema = z.string()
 export const ProposeEvaluatorToolSchema = z.object({
   name: AssistantEvaluatorNameSchema,
   rule: z.string().min(1).max(2000),
-  severity: EvaluatorSeveritySchema,
   check: AssistantCheckSchema,
   /** Why this check, and what its preview showed. */
   rationale: z.string().max(1000).optional(),
   runInProduction: z.boolean().optional()
-    .describe('Also score live production runs of the step (a guardrail). A failing critical schema or code check sends the run to the step\'s fallbackBehavior; an llm_judge only writes Scores. A code check counts only once a person approves its source.'),
+    .describe('Also score live production runs of the step (a guardrail). A failing schema or code check sends the run to the step\'s fallbackBehavior; an llm_judge only writes Scores. A code check counts only once a person approves its source.'),
 });
 
 /** Propose an Eval Case: from a production Agent Run, or written out. */
@@ -80,14 +78,11 @@ export const ProposeBriefToolSchema = z.object({
   text: z.string().min(1).max(4000),
 });
 
-/** A minimum pass rate, judged on the pass rate itself (D10). */
-const PassRateFloorSchema = z.number().min(0).max(1);
-
 /**
  * An evaluation plan for the step: what could go wrong, the cheapest check
  * that would catch it, and the cases to try it on — plus the Acceptance
- * Criteria it suggests. `risks` is ranked by its order, highest risk first;
- * `severity` says how bad each one is. Nothing is created from a plan: each
+ * Criteria it suggests. `risks` is ranked by its order, highest risk first.
+ * Nothing is created from a plan: each
  * check is drafted, previewed and proposed on its own.
  */
 export const ProposeEvaluationPlanToolSchema = z.object({
@@ -95,30 +90,25 @@ export const ProposeEvaluationPlanToolSchema = z.object({
   risks: z.array(z.object({
     /** What could go wrong, in the step's own terms. */
     failure: z.string().min(1).max(500),
-    severity: EvaluatorSeveritySchema,
     /** Why it matters — the Brief, the step's config, what its runs show. */
     why: z.string().min(1).max(1000),
     check: z.object({ kind: EvaluatorKindSchema, rule: z.string().min(1).max(2000) }),
     /** Inputs worth running it on, in words. */
     cases: z.array(z.string().min(1).max(500)).max(5).optional(),
   })).min(1).max(12),
-  acceptanceCriteria: z.object({
-    critical: PassRateFloorSchema,
-    major: PassRateFloorSchema,
-    minor: PassRateFloorSchema,
-  }),
+  /** The minimum pass rate every counted Evaluator must reach, judged on the pass rate itself (D10). */
+  minPassRate: z.number().min(0).max(1),
 });
 
-/** Propose a new version of an existing Evaluator — a refined rule, rubric or severity. */
+/** Propose a new version of an existing Evaluator — a refined rule or rubric. */
 export const ProposeEvaluatorVersionToolSchema = z.object({
   evaluatorId: z.uuid(),
   rule: z.string().min(1).max(2000).optional(),
-  severity: EvaluatorSeveritySchema.optional(),
   check: EvaluatorCheckSchema.optional(),
   /** What changed and why — a judge rationale a person denied, a preview. */
   rationale: z.string().max(1000).optional(),
-}).refine((value) => value.rule !== undefined || value.severity !== undefined || value.check !== undefined, {
-  message: 'change at least one of rule, severity or check',
+}).refine((value) => value.rule !== undefined || value.check !== undefined, {
+  message: 'change at least one of rule or check',
 });
 
 /** Propose a case synthesized from a production run by changing its input or workspace. */
@@ -127,13 +117,13 @@ export const ProposePerturbedCaseToolSchema = PerturbedEvalCaseSpecSchema.extend
 }).refine(hasPerturbationChange, { message: 'give at least one inputChanges or fileChanges entry' });
 
 /**
- * Propose the step's Acceptance Criteria (D10): per severity, the minimum pass
- * rate, and optionally a minimum pass^k. Set
+ * Propose the step's Acceptance Criteria (D10): the minimum pass rate every
+ * counted Evaluator must reach, and optionally a minimum pass^k. Set
  * before the Eval Runs judged against them; accepting writes a new version.
  */
 export const ProposeAcceptanceCriteriaToolSchema = z.object({
   criteria: AcceptanceCriteriaSchema,
-  /** Why these floors: the risks behind each severity, the Brief, what a miss costs. */
+  /** Why these floors: the risks, the Brief, what a miss costs. */
   rationale: z.string().min(1).max(2000),
 });
 

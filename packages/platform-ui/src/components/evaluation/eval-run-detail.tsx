@@ -130,7 +130,7 @@ function TrialsTab({ output, trialHref }: RunContext) {
                 </th>
                 {evaluators.map((evaluator) => (
                   <th key={evaluator.evaluatorId} className="px-3 py-2 font-medium">
-                    <InstantTooltip label={`${evaluator.severity} · ${CHECK_KINDS[evaluator.kind].label}${evaluator.counted ? '' : ' · not counted'}`}>
+                    <InstantTooltip label={`${CHECK_KINDS[evaluator.kind].label}${evaluator.counted ? '' : ' · not counted'}`}>
                       <span className="font-mono">{evaluator.name}</span>
                     </InstantTooltip>
                   </th>
@@ -191,7 +191,7 @@ function EvaluatorCard({ evaluator, version, context }: {
     <div className="space-y-3 rounded-md border p-4" data-testid="eval-run-evaluator">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="font-mono text-sm font-medium">{evaluator.name}</span>
-        <span className="text-xs text-muted-foreground">v{evaluator.version} · {evaluator.severity} · {CHECK_KINDS[evaluator.kind].label}</span>
+        <span className="text-xs text-muted-foreground">v{evaluator.version} · {CHECK_KINDS[evaluator.kind].label}</span>
         {evaluator.counted === false && <span className="text-xs text-amber-700 dark:text-amber-300">not counted — {evaluator.reason}</span>}
       </div>
       {version !== undefined && (

@@ -59,7 +59,7 @@ test.describe('Evaluation Assistant — API E2E', () => {
     const question = `What should I check first? ${randomUUID()}`;
     await scriptOpenRouter(question, [
       { toolCalls: [{ name: 'preview_evaluator', arguments: { check } }] },
-      { toolCalls: [{ name: 'propose_evaluator', arguments: { name: 'findings-present', rule: 'The result lists findings.', severity: 'critical', check } }] },
+      { toolCalls: [{ name: 'propose_evaluator', arguments: { name: 'findings-present', rule: 'The result lists findings.', check } }] },
       { content: 'The recent run has no findings key; I proposed a schema check for it.' },
     ]);
 
@@ -73,7 +73,7 @@ test.describe('Evaluation Assistant — API E2E', () => {
     expect(lastToolResult(requests[1]!.messages)).toEqual(preview);
     expect(answer.proposals).toEqual([{
       tool: 'propose_evaluator',
-      arguments: { name: 'findings-present', rule: 'The result lists findings.', severity: 'critical', check },
+      arguments: { name: 'findings-present', rule: 'The result lists findings.', check },
       selfTest: preview,
     }]);
 
@@ -176,7 +176,7 @@ test.describe('Evaluation Assistant — API E2E', () => {
 
   test('returns the final proposal and a continuation summary when the tool budget is exhausted', async ({ request }) => {
     const question = `Prepare two checks. ${randomUUID()}`;
-    const proposal = { name: 'partial-check', rule: 'The result lists findings.', severity: 'critical', check };
+    const proposal = { name: 'partial-check', rule: 'The result lists findings.', check };
     await scriptOpenRouter(question, [
       ...Array.from({ length: 31 }, () => ({ toolCalls: [{ name: 'list_evaluators', arguments: {} }] })),
       { toolCalls: [{ name: 'propose_evaluator', arguments: proposal }] },
@@ -218,7 +218,7 @@ test.describe('Evaluation Assistant — API E2E', () => {
 
   test('stops repeated string-check failures before the round cap and keeps completed cards', async ({ request }) => {
     const question = `Stop the invalid-check retry loop. ${randomUUID()}`;
-    const proposal = { name: 'keep-check', rule: 'The result lists findings.', severity: 'critical', check };
+    const proposal = { name: 'keep-check', rule: 'The result lists findings.', check };
     await scriptOpenRouter(question, [
       { toolCalls: [{ name: 'preview_evaluator', arguments: { check, agentRunIds: [agentRunId] } }] },
       { toolCalls: [{ name: 'propose_evaluator', arguments: proposal }] },
