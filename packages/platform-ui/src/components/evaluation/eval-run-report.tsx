@@ -223,13 +223,6 @@ export function EvalRunSummary({ output, step, mayEdit, editReason }: {
       {evalRun.acceptanceCriteria === null && (
         <p className="text-xs text-muted-foreground">No Acceptance Criteria were frozen into this run, so nothing is judged.</p>
       )}
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        {evalRun.fingerprint !== null && <span className="font-mono text-[11px] text-muted-foreground">{evalRun.fingerprint.hash.slice(0, 12)}</span>}
-        <span className="text-xs text-muted-foreground">
-          {report.trials.scored}/{report.trials.total} scored · ${report.costUsd.toFixed(4)}
-          {report.meanDurationMs !== null && ` · mean ${(report.meanDurationMs / 1000).toFixed(1)}s`}
-        </span>
-      </div>
       {report.criteriaVerdict !== null && <CriteriaLine verdict={report.criteriaVerdict} />}
       <EvaluatorTable report={report} />
       <VerdictReviewSection verdicts={report.judgeVerdicts} />
