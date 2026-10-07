@@ -323,8 +323,9 @@ test.describe('Step Evaluation judge verdicts — API E2E', () => {
     expect(finished.report.trialResults.find((result) => result.trialId === unsure.trialId)).toMatchObject({
       caseName: 'Unsure', evaluators: [{ evaluatorId: judge.id, outcome: 'excluded' }],
     });
+    // With the unsure fail denied, the judge's one counted verdict passes: the default 100% floor is met.
     expect((await mediforce.evaluation.listRuns(step)).evalRuns.find((run) => run.id === evalRunId)?.acceptance)
-      .toEqual({ status: 'not_judged', reason: 'major not judged, minor not judged' });
+      .toEqual({ status: 'met', reason: 'Acceptance Criteria met.' });
   });
 
   test('an expected output compared exactly or by agreement, positive or negative; a case is graded only by the Evaluators it selects', async ({ request, baseURL }) => {
