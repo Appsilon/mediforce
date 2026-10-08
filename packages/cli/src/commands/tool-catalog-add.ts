@@ -7,7 +7,8 @@ import { printJson, printError } from '../output';
 export const toolCatalogAddCommand = defineCommand({
   name: 'mediforce tool-catalog add',
   description:
-    'Add an MCP server to a workspace Tool Catalog from a JSON file (id, command, args, env, description). Admin only.',
+    'Add an MCP server to a workspace Tool Catalog from a JSON file — stdio (type "stdio" or omitted; id, command, args, env, description) ' +
+    'or HTTP (type "http"; id, url, auth, description).',
   args: {
     file: {
       type: 'string',
@@ -45,14 +46,16 @@ export const toolCatalogAddCommand = defineCommand({
     // Advisory: a step runs this command in an image, and the default one may
     // not carry it. The add already succeeded, so a failed check says nothing.
     // The warning goes to stderr, which keeps `--json` stdout a single document.
+    const entry = result.entry;
+    if (entry.type !== 'stdio') return 0;
     const check = await mediforce.imageCatalog
-      .checkCommand({ namespace: parsed.data.namespace, image: DEFAULT_AGENT_IMAGE, command: result.entry.command })
+      .checkCommand({ namespace: parsed.data.namespace, image: DEFAULT_AGENT_IMAGE, command: entry.command })
       .catch(() => undefined);
     if (check?.status === 'known' && check.available === false) {
       output.stderr(
-        `Warning: \`${result.entry.command}\` is not available in the default agent image (${DEFAULT_AGENT_IMAGE}). ` +
+        `Warning: \`${entry.command}\` is not available in the default agent image (${DEFAULT_AGENT_IMAGE}). ` +
           'A step using an agent bound to this server needs an image that provides it — ' +
-          `\`mediforce images check-command --namespace ${parsed.data.namespace} --command ${result.entry.command} --image <image>\`.`,
+          `\`mediforce images check-command --namespace ${parsed.data.namespace} --command ${entry.command} --image <image>\`.`,
       );
     }
     return 0;

@@ -6,7 +6,7 @@ import {
   createTestScope,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope';
-import { adminRoles, memberRoles, sampleEntry } from './fixtures';
+import { adminRoles, memberRoles, sampleEntry, sampleHttpEntry } from './fixtures';
 
 describe('listToolCatalogEntries handler', () => {
   let repo: InMemoryToolCatalogRepository;
@@ -36,8 +36,10 @@ describe('listToolCatalogEntries handler', () => {
     expect(result.entries).toHaveLength(1);
   });
 
-  it('gives a member-role caller the command but not the args or env', async () => {
-    await repo.upsert('alpha', { ...sampleEntry, env: { TOKEN: 'secret' } });
+  it('gives a member-role caller whole entries of both types — members edit them too', async () => {
+    const withEnv = { ...sampleEntry, env: { TOKEN: '{{SECRET:token}}' } };
+    await repo.upsert('alpha', withEnv);
+    await repo.upsert('alpha', sampleHttpEntry);
     const scope = createTestScope({
       toolCatalogRepo: repo,
       caller: userCaller('u-member', ['alpha'], memberRoles),
@@ -45,10 +47,7 @@ describe('listToolCatalogEntries handler', () => {
 
     const result = await listToolCatalogEntries({ namespace: 'alpha' }, scope);
 
-    expect(result.entries).toHaveLength(1);
-    expect(result.entries[0].command).toBe(sampleEntry.command);
-    expect(result.entries[0]).not.toHaveProperty('args');
-    expect(result.entries[0]).not.toHaveProperty('env');
+    expect(result.entries).toEqual(expect.arrayContaining([withEnv, sampleHttpEntry]));
   });
 
   it('throws ForbiddenError for a non-member caller', async () => {

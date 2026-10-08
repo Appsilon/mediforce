@@ -3,6 +3,7 @@ import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
 import { assertAgentMayHoldSkills } from './agent-skills';
+import { assertBindingsTargetCatalogEntries } from './mcp-bindings';
 
 export async function createAgent(
   input: CreateAgentInput,
@@ -17,6 +18,7 @@ export async function createAgent(
   }
   scope.agentDefinitions.assertCanCreateIn(input.namespace);
   await assertAgentMayHoldSkills(input, scope);
+  await assertBindingsTargetCatalogEntries(scope, input.namespace, input.mcpServers);
   const agent = await scope.agentDefinitions.create(input);
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({

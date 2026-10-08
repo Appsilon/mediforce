@@ -80,6 +80,7 @@ function makePostRequest(namespace: string | null, body: unknown): NextRequest {
 
 const catalogEntry = {
   id: 'tealflow-mcp',
+  type: 'stdio' as const,
   command: 'npx',
   args: ['-y', 'tealflow-mcp'],
   description: 'TealFlow deployment MCP',
@@ -118,17 +119,16 @@ describe('GET /api/admin/tool-catalog', () => {
     expect(res.status).toBe(200);
   });
 
-  it('[AUTHZ] plain member reads entries without args and env', async () => {
+  it('[AUTHZ] plain member reads whole entries — members edit them too', async () => {
     mockResolveCallerIdentity.mockResolvedValue(memberCaller());
-    mockCatalogList.mockResolvedValue([{ ...catalogEntry, args: ['--token'], env: { KEY: 'secret' } }]);
+    const withEnv = { ...catalogEntry, env: { KEY: '{{SECRET:key}}' } };
+    mockCatalogList.mockResolvedValue([withEnv]);
 
     const res = await GET(makeGetRequest('appsilon'));
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.entries).toEqual([
-      { id: catalogEntry.id, command: catalogEntry.command, description: catalogEntry.description },
-    ]);
+    expect(json.entries).toEqual([withEnv]);
   });
 
   it('[AUTHZ] non-member (no role on namespace) gets 403', async () => {
@@ -207,6 +207,18 @@ describe('POST /api/admin/tool-catalog', () => {
     expect(res.status).toBe(400);
   });
 
+  it('[DATA] a plain member creates an http entry, id derived from the url host', async () => {
+    mockResolveCallerIdentity.mockResolvedValue(memberCaller());
+    mockCatalogGetById.mockResolvedValue(null);
+    mockCatalogUpsert.mockImplementation((_ns: string, entry: unknown) => Promise.resolve(entry));
+
+    const res = await POST(makePostRequest('appsilon', { type: 'http', url: 'https://api.githubcopilot.com/mcp/' }));
+    const json = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(json.entry).toEqual({ id: 'api-githubcopilot-com', type: 'http', url: 'https://api.githubcopilot.com/mcp/' });
+  });
+
   it('[ERROR] 409 on deterministic-slug collision', async () => {
     mockCatalogGetById.mockResolvedValue(catalogEntry);
 
@@ -218,8 +230,8 @@ describe('POST /api/admin/tool-catalog', () => {
     expect(mockCatalogUpsert).not.toHaveBeenCalled();
   });
 
-  it('[AUTHZ] plain member gets 403 on POST (bug fix)', async () => {
-    mockResolveCallerIdentity.mockResolvedValue(memberCaller());
+  it('[AUTHZ] a caller outside the namespace gets 403 on POST', async () => {
+    mockResolveCallerIdentity.mockResolvedValue(memberCaller('other-ns'));
 
     const res = await POST(makePostRequest('appsilon', catalogEntry));
 

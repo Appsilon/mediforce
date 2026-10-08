@@ -34,7 +34,7 @@ describe('DeleteProviderDialog', () => {
       />,
     );
 
-    expect(screen.queryByText(/binding references/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/server references/i)).not.toBeInTheDocument();
   });
 
   it('renders reference count warning when at least one binding references the provider', () => {
@@ -49,7 +49,7 @@ describe('DeleteProviderDialog', () => {
       />,
     );
 
-    expect(screen.getByText(/3 agent bindings reference/i)).toBeInTheDocument();
+    expect(screen.getByText(/3 MCP servers reference/i)).toBeInTheDocument();
   });
 
   it('uses singular form when referenceCount is exactly 1', () => {
@@ -64,7 +64,7 @@ describe('DeleteProviderDialog', () => {
       />,
     );
 
-    expect(screen.getByText(/1 agent binding references/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 MCP server references/i)).toBeInTheDocument();
   });
 
   it('closes dialog BEFORE awaiting onConfirm (Radix deadlock rule)', async () => {

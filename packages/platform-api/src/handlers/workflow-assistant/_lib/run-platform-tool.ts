@@ -45,9 +45,9 @@ async function executeWorkflowPlatformTool(
       const agents = await scope.agentDefinitions.list(namespace);
       return {
         agents: agents.map((agent) => {
-          // The MCP servers each agent is bound to, named by what a binding points at: a catalog id for stdio, the URL for http.
+          // The MCP servers each agent is bound to, named by the catalog id each binding points at.
           const bindings = Object.entries(agent.mcpServers ?? {}).map(
-            ([name, binding]) => [name, binding.type === 'stdio' ? binding.catalogId : binding.url] as const,
+            ([name, binding]) => [name, binding.catalogId] as const,
           );
           return {
             id: agent.id,
@@ -64,6 +64,7 @@ async function executeWorkflowPlatformTool(
       return {
         servers: entries.map((entry) => ({
           id: entry.id,
+          type: entry.type,
           ...(entry.description === undefined ? {} : { description: entry.description }),
         })),
       };
@@ -122,7 +123,7 @@ async function executeWorkflowPlatformTool(
     }
     case 'create_tool_catalog_entry': {
       const input = args as z.infer<typeof WORKFLOW_ASSISTANT_PLATFORM_TOOLS['create_tool_catalog_entry']>;
-      const { entry } = await createToolCatalogEntry({ ...input, namespace }, scope);
+      const { entry } = await createToolCatalogEntry({ ...input, type: 'stdio', namespace }, scope);
       return { created: { id: entry.id } };
     }
   }

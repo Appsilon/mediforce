@@ -23,7 +23,7 @@ async function add(command: string, commandCheck: Response | Error, extraArgs: s
       if (commandCheck instanceof Error) throw commandCheck;
       return commandCheck;
     }
-    return jsonResponse({ entry: { id: 'biomcp', command, args: ['serve'] } }, 201);
+    return jsonResponse({ entry: { id: 'biomcp', type: 'stdio', command, args: ['serve'] } }, 201);
   });
   const output = captureOutput();
   const code = await toolCatalogAddCommand({
@@ -60,7 +60,32 @@ describe('tool-catalog add', () => {
   it('still warns under --json, on stderr, leaving stdout a single JSON document', async () => {
     const { text, warnings } = await add('uvx', jsonResponse({ status: 'known', available: false }), ['--json']);
 
-    expect(JSON.parse(text)).toEqual({ entry: { id: 'biomcp', command: 'uvx', args: ['serve'] } });
+    expect(JSON.parse(text)).toEqual({ entry: { id: 'biomcp', type: 'stdio', command: 'uvx', args: ['serve'] } });
     expect(warnings).toContain('Warning: `uvx` is not available in the default agent image');
+  });
+});
+
+describe('tool-catalog add — http', () => {
+  it('sends an http entry and skips the image command check', async () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'catalog-')), 'entry.json');
+    writeFileSync(file, JSON.stringify({ type: 'http', url: 'https://api.githubcopilot.com/mcp/' }));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      jsonResponse({ entry: { id: 'api-githubcopilot-com', type: 'http', url: 'https://api.githubcopilot.com/mcp/' } }, 201),
+    );
+    const output = captureOutput();
+
+    const code = await toolCatalogAddCommand({
+      argv: ['--file', file, '--namespace', 'alpha', '--base-url', 'http://test:9000'],
+      env: BASE_ENV,
+      output,
+    });
+
+    expect(code).toBe(0);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))).toEqual({
+      type: 'http',
+      url: 'https://api.githubcopilot.com/mcp/',
+    });
+    expect(output.stdoutLines.join('\n')).toContain("Added 'api-githubcopilot-com' to the alpha Tool Catalog.");
   });
 });

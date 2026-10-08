@@ -10,6 +10,7 @@ import type {
   AgentOAuthToken,
   McpEvalServerPolicy,
   OAuthProviderConfig,
+  ToolCatalogEntry,
   WorkflowStep,
   WorkflowDefinition,
 } from '@mediforce/platform-core';
@@ -91,8 +92,24 @@ const mockAgentDefinitionRepo = {
   update: vi.fn(),
   delete: vi.fn(),
 };
+// HTTP MCP servers the fixture agents below bind to by catalog id.
+const HTTP_CATALOG: Record<string, ToolCatalogEntry> = {
+  edc: {
+    id: 'edc',
+    type: 'http',
+    url: 'https://edc.example.com/mcp',
+    auth: { type: 'oauth', provider: 'edc-idp', headerName: 'Authorization', headerValueTemplate: 'Bearer {token}' },
+  },
+  meddra: { id: 'meddra', type: 'http', url: 'https://meddra.example.com/mcp' },
+  github: {
+    id: 'github',
+    type: 'http',
+    url: 'https://api.github.com/mcp',
+    auth: { type: 'oauth', provider: 'github', headerName: 'Authorization', headerValueTemplate: 'Bearer {token}' },
+  },
+};
 const mockToolCatalogRepo = {
-  getById: vi.fn(),
+  getById: vi.fn((_namespace: string, id: string) => Promise.resolve(HTTP_CATALOG[id] ?? null)),
   list: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
@@ -314,8 +331,8 @@ describe('executeAgentStep', () => {
         id: 'edc-agent', systemPrompt: 'Read the EDC.',
         mcpServers: {
           // An OAuth server with no token connected: a replay must never need one.
-          edc: { type: 'http', url: 'https://edc.example.com/mcp', auth: { type: 'oauth', provider: 'edc-idp', headerName: 'Authorization', headerValueTemplate: 'Bearer {token}' } },
-          meddra: { type: 'http', url: 'https://meddra.example.com/mcp' },
+          edc: { type: 'http', catalogId: 'edc' },
+          meddra: { type: 'http', catalogId: 'meddra' },
         },
       });
       await evaluationRepo.createEvalRun({
@@ -1299,16 +1316,7 @@ describe('executeAgentStep', () => {
       name: 'GitHub agent',
       image: 'mediforce-agent:test',
       mcpServers: {
-        github: {
-          type: 'http',
-          url: 'https://api.github.com/mcp',
-          auth: {
-            type: 'oauth',
-            provider: 'github',
-            headerName: 'Authorization',
-            headerValueTemplate: 'Bearer {token}',
-          },
-        },
+        github: { type: 'http', catalogId: 'github' },
       },
     };
 

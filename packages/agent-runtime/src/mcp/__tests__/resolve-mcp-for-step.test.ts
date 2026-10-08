@@ -81,6 +81,7 @@ describe('resolveMcpForStep', () => {
   it('resolves stdio bindings via the catalog', async () => {
     await catalogRepo.upsert(NS, {
       id: 'tealflow-mcp',
+      type: 'stdio',
       command: 'tealflow-mcp',
       args: ['--stdio'],
       description: 'Tealflow MCP',
@@ -143,8 +144,8 @@ describe('resolveMcpForStep', () => {
   });
 
   it('applies step-level denyTools and disable restrictions', async () => {
-    await catalogRepo.upsert(NS, { id: 'github-mcp', command: 'github-mcp' });
-    await catalogRepo.upsert(NS, { id: 'cdisc-mcp', command: 'cdisc-mcp' });
+    await catalogRepo.upsert(NS, { id: 'github-mcp', type: 'stdio', command: 'github-mcp' });
+    await catalogRepo.upsert(NS, { id: 'cdisc-mcp', type: 'stdio', command: 'cdisc-mcp' });
     await agentRepo.upsert('analyst', {
       kind: 'plugin',
       runtimeId: 'claude-code-agent',
@@ -185,7 +186,8 @@ describe('resolveMcpForStep', () => {
       .toEqual(['search_code', 'get_file_contents']);
   });
 
-  it('passes http bindings through without touching the catalog', async () => {
+  it('resolves http bindings through the catalog', async () => {
+    await catalogRepo.upsert(NS, { id: 'webmcp', type: 'http', url: 'https://mcp.example.com/v1' });
     await agentRepo.upsert('remote-agent', {
       kind: 'plugin',
       runtimeId: 'claude-code-agent',
@@ -197,7 +199,7 @@ describe('resolveMcpForStep', () => {
       inputDescription: '',
       outputDescription: '',
       mcpServers: {
-        webmcp: { type: 'http', url: 'https://mcp.example.com/v1' },
+        webmcp: { type: 'http', catalogId: 'webmcp' },
       },
       visibility: 'private',
     });

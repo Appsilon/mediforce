@@ -1981,21 +1981,31 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
   };
 
-  // Namespace-scoped tool catalog — seed entries under
-  // `namespaces/{TEST_ORG_HANDLE}/toolCatalog/{entryId}`. Doc id IS the entry id,
-  // so we strip `id` from the payload to match FirestoreToolCatalogRepository
-  // (see packages/platform-infra/src/firestore/tool-catalog-repository.ts).
+  // Workspace tool catalog for TEST_ORG_HANDLE, keyed by entry id.
   const toolCatalog: Record<string, Record<string, unknown>> = {
     filesystem: {
+      type: 'stdio',
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-filesystem', '/data'],
       description: 'Read and write files in a scoped directory.',
     },
     postgres: {
+      type: 'stdio',
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-postgres'],
       env: { DATABASE_URL: '{{SECRET:DATABASE_URL}}' },
       description: 'Execute read-only SQL queries against a PostgreSQL database.',
+    },
+    'github-mcp': {
+      type: 'http',
+      url: 'https://api.example.com/mcp',
+      auth: {
+        type: 'oauth',
+        provider: 'github-mock',
+        headerName: 'Authorization',
+        headerValueTemplate: 'Bearer {token}',
+      },
+      description: 'GitHub MCP behind the mock OAuth provider.',
     },
   };
 
@@ -2042,8 +2052,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       updatedAt: twoDaysAgo,
     },
     // Fixture agent for the OAuth journey (Step 5). Ships with a pre-bound
-    // HTTP binding named `github-mcp` configured for OAuth via the
-    // `github-mock` provider, so the journey opens the editor and jumps
+    // HTTP binding named `github-mcp` to the catalog entry of that name,
+    // which authenticates via the `github-mock` OAuth provider, so the journey opens the editor and jumps
     // straight to "Connect" without first editing the agent.
     'oauth-test-agent': {
       kind: 'plugin',
@@ -2057,16 +2067,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       foundationModel: 'anthropic/claude-sonnet-4',
       systemPrompt: '',
       mcpServers: {
-        'github-mcp': {
-          type: 'http',
-          url: 'https://api.example.com/mcp',
-          auth: {
-            type: 'oauth',
-            provider: 'github-mock',
-            headerName: 'Authorization',
-            headerValueTemplate: 'Bearer {token}',
-          },
-        },
+        'github-mcp': { type: 'http', catalogId: 'github-mcp' },
       },
       createdAt: twoDaysAgo,
       updatedAt: twoDaysAgo,

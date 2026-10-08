@@ -21,7 +21,7 @@ function buildScope(overrides: Record<string, unknown> = {}): CallerScope {
           namespace: 'acme',
           mcpServers: {
             github: { type: 'stdio', catalogId: 'github' },
-            docs: { type: 'http', url: 'https://mcp.example.com/docs' },
+            docs: { type: 'http', catalogId: 'docs' },
           },
         },
       ]),
@@ -93,7 +93,7 @@ describe('runWorkflowPlatformTool', () => {
           name: 'Issue filer',
           description: 'Files issues',
           foundationModel: 'anthropic/claude-sonnet-4.6',
-          mcpServers: { github: 'github', docs: 'https://mcp.example.com/docs' },
+          mcpServers: { github: 'github', docs: 'docs' },
         },
       ],
     });
@@ -182,7 +182,7 @@ describe('runWorkflowPlatformTool', () => {
 describe('runWorkflowPlatformTool — the Tool Catalog', () => {
   it('adds a server an agent can then bind to', async () => {
     const scope = buildScope({
-      caller: { kind: 'user', userId: 'u1', email: 'admin@example.com', isSystemActor: false, namespaces: ['acme'], namespaceRoles: new Map([['acme', 'admin']]) },
+      caller: { kind: 'user', userId: 'u1', email: 'admin@example.com', isSystemActor: false, namespaces: new Set(['acme']), namespaceRoles: new Map([['acme', 'admin']]) },
       toolCatalog: {
         list: vi.fn().mockResolvedValue([]),
         // The handler refuses to overwrite an existing id, so it looks first.
@@ -199,11 +199,11 @@ describe('runWorkflowPlatformTool — the Tool Catalog', () => {
     expect(result).toMatchObject({ created: { id: expect.any(String) } });
   });
 
-  it('tells a member an admin is needed, rather than adding it anyway', async () => {
-    // The Tool Catalog is admin-only on the platform. Running as the user is
-    // what makes that gate hold for the assistant too.
+  it('refuses a caller outside the workspace, rather than adding it anyway', async () => {
+    // Running as the user is what makes the platform's namespace gate hold
+    // for the assistant too.
     const scope = buildScope({
-      caller: { kind: 'user', userId: 'u1', email: 'member@example.com', isSystemActor: false, namespaces: ['acme'], namespaceRoles: new Map([['acme', 'member']]) },
+      caller: { kind: 'user', userId: 'u1', email: 'outsider@example.com', isSystemActor: false, namespaces: new Set(['other']), namespaceRoles: new Map([['other', 'member']]) },
       toolCatalog: { list: vi.fn(), getById: vi.fn(), upsert: vi.fn() },
     });
 
@@ -211,7 +211,7 @@ describe('runWorkflowPlatformTool — the Tool Catalog', () => {
       command: 'npx -y @modelcontextprotocol/server-github',
     }, scope, 'acme');
 
-    expect(result).toMatchObject({ needsAdmin: true });
+    expect(result).toMatchObject({ error: expect.any(String) });
     expect(vi.mocked(scope.toolCatalog.upsert)).not.toHaveBeenCalled();
   });
 });

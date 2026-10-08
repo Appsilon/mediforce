@@ -9,6 +9,7 @@ const mockResolveSessionUserId = vi.fn();
 const mockAgentGetById = vi.fn();
 const mockProviderGet = vi.fn();
 const mockGetMember = vi.fn();
+const mockCatalogGetById = vi.fn();
 
 vi.mock('@mediforce/platform-infra', () => ({
   getSharedPostgresClient: () => ({ db: {} }),
@@ -24,6 +25,7 @@ vi.mock('@/lib/platform-services', () => ({
     agentDefinitionRepo: { getById: mockAgentGetById },
     oauthProviderRepo: { get: mockProviderGet },
     namespaceRepo: { getMember: mockGetMember },
+    toolCatalogRepo: { getById: mockCatalogGetById },
   }),
 }));
 
@@ -77,6 +79,13 @@ function makeAgentWithOAuthBinding(
 ): AgentDefinition {
   const serverName = overrides.serverName ?? 'gh';
   const provider = overrides.provider ?? 'github';
+  // The binding points at a catalog entry, which carries the OAuth config.
+  mockCatalogGetById.mockResolvedValue({
+    id: 'github-mcp',
+    type: 'http',
+    url: 'https://api.example.com/mcp',
+    auth: { type: 'oauth', provider, headerName: 'Authorization', headerValueTemplate: 'Bearer {token}' },
+  });
   return {
     id: 'agent-1',
     kind: 'plugin',
@@ -89,16 +98,7 @@ function makeAgentWithOAuthBinding(
     inputDescription: '',
     outputDescription: '',
     mcpServers: {
-      [serverName]: {
-        type: 'http',
-        url: 'https://api.example.com/mcp',
-        auth: {
-          type: 'oauth',
-          provider,
-          headerName: 'Authorization',
-          headerValueTemplate: 'Bearer {token}',
-        },
-      },
+      [serverName]: { type: 'http', catalogId: 'github-mcp' },
     },
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',

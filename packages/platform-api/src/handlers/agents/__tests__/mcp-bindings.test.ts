@@ -4,6 +4,7 @@ import {
   InMemoryAuditRepository,
   InMemoryNamespaceRepository,
   InMemoryProcessInstanceRepository,
+  InMemoryToolCatalogRepository,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { upsertAgentMcpBinding, deleteAgentMcpBinding } from '../mcp-bindings';
@@ -16,8 +17,12 @@ describe('agent MCP binding handlers', () => {
   let agentDefinitionRepo: InMemoryAgentDefinitionRepository;
   let auditRepo: InMemoryAuditRepository;
   let namespaceRepo: InMemoryNamespaceRepository;
+  let toolCatalogRepo: InMemoryToolCatalogRepository;
 
   beforeEach(async () => {
+    toolCatalogRepo = new InMemoryToolCatalogRepository();
+    await toolCatalogRepo.upsert('team-alpha', { id: 'example', type: 'http', url: 'https://example.com' });
+    await toolCatalogRepo.upsert('team-alpha', { id: 'filesystem', type: 'stdio', command: 'mcp-fs' });
     resetFactorySequence();
     agentDefinitionRepo = new InMemoryAgentDefinitionRepository();
     const instanceRepo = new InMemoryProcessInstanceRepository();
@@ -42,6 +47,7 @@ describe('agent MCP binding handlers', () => {
       agentDefinitionRepo,
       auditRepo,
       namespaceRepo,
+      toolCatalogRepo,
       caller: userCaller('u-1', namespaces),
     });
   }
@@ -64,11 +70,47 @@ describe('agent MCP binding handlers', () => {
       {
         id: created.id,
         name: 'github',
-        binding: { type: 'http', url: 'https://example.com' },
+        binding: { type: 'http', catalogId: 'example' },
       },
       scope,
     );
     expect(Object.keys(mcpServers)).toContain('github');
+  });
+
+  async function createTeamAgent() {
+    return agentDefinitionRepo.create({
+      kind: 'plugin',
+      name: 'Bob',
+      iconName: 'Bot',
+      description: 'd',
+      foundationModel: 'm',
+      systemPrompt: 'p',
+      inputDescription: 'i',
+      outputDescription: 'o',
+      namespace: 'team-alpha',
+      visibility: 'private',
+    });
+  }
+
+  it('upsertAgentMcpBinding rejects a binding to a server missing from the catalog', async () => {
+    const created = await createTeamAgent();
+    await expect(
+      upsertAgentMcpBinding(
+        { id: created.id, name: 'ghost', binding: { type: 'http', catalogId: 'not-there' } },
+        buildScope(),
+      ),
+    ).rejects.toThrow(/no MCP server "not-there"/);
+    expect((await agentDefinitionRepo.getById(created.id))?.mcpServers).toBeUndefined();
+  });
+
+  it('upsertAgentMcpBinding rejects a binding whose type differs from the catalog entry', async () => {
+    const created = await createTeamAgent();
+    await expect(
+      upsertAgentMcpBinding(
+        { id: created.id, name: 'fs', binding: { type: 'http', catalogId: 'filesystem' } },
+        buildScope(),
+      ),
+    ).rejects.toThrow(/is stdio, but the binding declares http/);
   });
 
   it('upsertAgentMcpBinding succeeds for a non-system caller on a namespace-less agent', async () => {
@@ -89,7 +131,7 @@ describe('agent MCP binding handlers', () => {
       {
         id: created.id,
         name: 'github',
-        binding: { type: 'http', url: 'https://example.com' },
+        binding: { type: 'http', catalogId: 'example' },
       },
       scope,
     );
@@ -108,7 +150,7 @@ describe('agent MCP binding handlers', () => {
       outputDescription: 'o',
       namespace: undefined,
       visibility: 'public',
-      mcpServers: { github: { type: 'http', url: 'https://example.com' } },
+      mcpServers: { github: { type: 'http', catalogId: 'example' } },
     });
     const scope = buildScope(['team-alpha']);
     const { mcpServers } = await deleteAgentMcpBinding(
@@ -136,7 +178,7 @@ describe('agent MCP binding handlers', () => {
     const scope = createTestScope({ agentDefinitionRepo, auditRepo, namespaceRepo });
     await expect(
       upsertAgentMcpBinding(
-        { id: created.id, name: 'github', binding: { type: 'http', url: 'https://example.com' } },
+        { id: created.id, name: 'github', binding: { type: 'http', catalogId: 'example' } },
         scope,
       ),
     ).rejects.toThrow(/no namespace/i);
@@ -154,7 +196,7 @@ describe('agent MCP binding handlers', () => {
       outputDescription: 'o',
       namespace: 'team-alpha',
       visibility: 'private',
-      mcpServers: { github: { type: 'http', url: 'https://example.com' } },
+      mcpServers: { github: { type: 'http', catalogId: 'example' } },
     });
     const scope = buildScope();
     const { mcpServers } = await deleteAgentMcpBinding(

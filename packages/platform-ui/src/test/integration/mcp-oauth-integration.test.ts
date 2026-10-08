@@ -49,6 +49,18 @@ const fake = vi.hoisted(() => {
     agentDefinitionRepo: {
       getById: async (id: string) => agents.get(id) ?? null,
     },
+    // The HTTP server the journey agent binds to; its auth names the provider.
+    toolCatalogRepo: {
+      getById: async (_namespace: string, id: string) =>
+        id === 'github-mcp'
+          ? {
+              id,
+              type: 'http',
+              url: 'https://api.example.com/mcp',
+              auth: { type: 'oauth', provider: 'github', headerName: 'Authorization', headerValueTemplate: 'Bearer {token}' },
+            }
+          : null,
+    },
     auditRepo: {
       append: async (_event: unknown) => undefined,
     },
@@ -147,16 +159,7 @@ function buildAgentWithOAuthBinding(): AgentDefinition {
     inputDescription: '',
     outputDescription: '',
     mcpServers: {
-      gh: {
-        type: 'http',
-        url: 'https://api.example.com/mcp',
-        auth: {
-          type: 'oauth',
-          provider: 'github',
-          headerName: 'Authorization',
-          headerValueTemplate: 'Bearer {token}',
-        },
-      },
+      gh: { type: 'http', catalogId: 'github-mcp' },
     },
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',

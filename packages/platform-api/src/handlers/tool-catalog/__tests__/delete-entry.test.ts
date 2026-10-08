@@ -58,11 +58,23 @@ describe('deleteToolCatalogEntry handler', () => {
     expect(events).toHaveLength(0);
   });
 
-  it('throws ForbiddenError for a member-role caller (bug fix)', async () => {
+  it('deletes an entry for a member-role caller', async () => {
     const scope = createTestScope({
       toolCatalogRepo: repo,
       auditRepo,
       caller: userCaller('u-member', ['alpha'], memberRoles),
+    });
+
+    await deleteToolCatalogEntry({ namespace: 'alpha', id: 'tealflow-mcp' }, scope);
+
+    expect(await repo.getById('alpha', 'tealflow-mcp')).toBeNull();
+  });
+
+  it('throws ForbiddenError for a caller outside the namespace', async () => {
+    const scope = createTestScope({
+      toolCatalogRepo: repo,
+      auditRepo,
+      caller: userCaller('u-other', ['beta']),
     });
 
     await expect(

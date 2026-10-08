@@ -654,7 +654,7 @@ describe('StepEditor', () => {
 
     function renderPharmaStep(step: Partial<WorkflowStep> = {}) {
       agentState.response = { agents: [biomcpAgent] };
-      mcpState.catalog = [{ id: 'biomcp', command: 'uvx', args: ['serve'] }];
+      mcpState.catalog = [{ id: 'biomcp', type: 'stdio', command: 'uvx', args: ['serve'] }];
       render(
         <StepEditor
           step={buildStep({ executor: 'agent', agentId: 'pharma', ...step })}

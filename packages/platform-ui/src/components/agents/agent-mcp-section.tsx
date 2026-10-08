@@ -128,8 +128,8 @@ export function AgentMcpSection({ agentId, handle, draft }: AgentMcpSectionProps
       </header>
 
       <p className="text-xs text-muted-foreground">
-        Tools this agent can invoke via MCP. Stdio bindings pull from the namespace catalog; HTTP
-        bindings point at external endpoints. Workflow steps may further narrow via{' '}
+        Tools this agent can invoke via MCP, picked from the workspace&apos;s MCP servers. Workflow steps may
+        further narrow via{' '}
         <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">denyTools</code>.
       </p>
 
@@ -157,6 +157,7 @@ export function AgentMcpSection({ agentId, handle, draft }: AgentMcpSectionProps
               key={name}
               name={name}
               binding={binding}
+              entry={catalog.find((candidate) => candidate.id === binding.catalogId)}
               agentId={agentId}
               namespace={handle}
               onEdit={() => setDialog({ kind: 'edit', name, binding })}
@@ -199,7 +200,6 @@ export function AgentMcpSection({ agentId, handle, draft }: AgentMcpSectionProps
                   existing={dialog.kind === 'edit' ? { name: dialog.name, binding: dialog.binding } : null}
                   existingNames={existingNames}
                   catalogEntries={catalog}
-                  agentId={agentId ?? ''}
                   namespace={handle}
                   onSubmit={handleSubmit}
                   onCancel={() => setDialog({ kind: 'closed' })}
@@ -267,6 +267,7 @@ export function AgentMcpSection({ agentId, handle, draft }: AgentMcpSectionProps
 function BindingRow({
   name,
   binding,
+  entry,
   agentId,
   namespace,
   onEdit,
@@ -274,6 +275,7 @@ function BindingRow({
 }: {
   name: string;
   binding: AgentMcpBinding;
+  entry: ToolCatalogEntry | undefined;
   agentId: string | undefined;
   namespace: string;
   onEdit: () => void;
@@ -281,12 +283,9 @@ function BindingRow({
 }) {
   const transportLabel = binding.type === 'stdio' ? 'stdio' : 'HTTP';
   const detail =
-    binding.type === 'stdio'
-      ? `catalogId: ${binding.catalogId}`
-      : truncateUrl(binding.url);
+    entry?.type === 'http' ? `${binding.catalogId} · ${truncateUrl(entry.url)}` : `catalogId: ${binding.catalogId}`;
   const allowedCount = binding.allowedTools?.length ?? 0;
-  const oauthProvider =
-    binding.type === 'http' && binding.auth?.type === 'oauth' ? binding.auth.provider : null;
+  const oauthProvider = entry?.type === 'http' && entry.auth?.type === 'oauth' ? entry.auth.provider : null;
   return (
     <li className="flex flex-col gap-2 rounded-md border bg-background px-3 py-2">
       <div className="flex flex-wrap items-center gap-3">

@@ -23,7 +23,7 @@ import { formatStepName } from '@/lib/format';
 const NAV_ITEMS = [
   { href: '', label: 'Workflows', icon: GitBranch, badge: null, exact: true },
   { href: '/agents', label: 'Agents', icon: Bot, badge: null, exact: false },
-  { href: '/tools', label: 'Tools', icon: Wrench, badge: null, exact: false },
+  { href: '/mcp', label: 'MCP', icon: Wrench, badge: null, exact: false },
   { href: '/skills', label: 'Skills', icon: BookOpen, badge: null, exact: false },
   { href: '/images', label: 'Images', icon: Layers, badge: null, exact: false },
   { href: '/tasks', label: 'Human actions', icon: User, badge: null, exact: false },

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Plus } from 'lucide-react';
-import type { AgentDefinition, OAuthProviderConfig } from '@mediforce/platform-core';
+import type { OAuthProviderConfig, ToolCatalogEntry } from '@mediforce/platform-core';
 import { OAUTH_PROVIDER_PRESETS } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { mediforce } from '@/lib/mediforce';
@@ -36,7 +36,7 @@ export default function AdminOAuthProvidersPage() {
   const { canAdmin, loading: roleLoading } = useNamespaceRole(handle);
 
   const [providers, setProviders] = useState<OAuthProviderConfig[]>([]);
-  const [agents, setAgents] = useState<AgentDefinition[]>([]);
+  const [catalog, setCatalog] = useState<ToolCatalogEntry[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -53,12 +53,12 @@ export default function AdminOAuthProvidersPage() {
     setListLoading(true);
     setListError(null);
     try {
-      const [listRes, agentRes] = await Promise.all([
+      const [listRes, catalogRes] = await Promise.all([
         mediforce.oauthProviders.list({ namespace: handle }),
-        mediforce.agents.list().then((res) => res.agents),
+        mediforce.toolCatalog.list({ namespace: handle }),
       ]);
       setProviders(listRes.providers as OAuthProviderConfig[]);
-      setAgents(agentRes);
+      setCatalog(catalogRes.entries);
     } catch (err: unknown) {
       setListError(err instanceof Error ? err.message : 'Failed to load providers.');
     } finally {
@@ -147,20 +147,10 @@ export default function AdminOAuthProvidersPage() {
 
   const referenceCount = useMemo(() => {
     if (deleteTarget === null) return 0;
-    return agents.reduce((count, agent) => {
-      const bindings = agent.mcpServers ?? {};
-      for (const binding of Object.values(bindings)) {
-        if (
-          binding.type === 'http' &&
-          binding.auth?.type === 'oauth' &&
-          binding.auth.provider === deleteTarget.id
-        ) {
-          return count + 1;
-        }
-      }
-      return count;
-    }, 0);
-  }, [agents, deleteTarget]);
+    return catalog.filter(
+      (entry) => entry.type === 'http' && entry.auth?.type === 'oauth' && entry.auth.provider === deleteTarget.id,
+    ).length;
+  }, [catalog, deleteTarget]);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (deleteTarget === null) return;

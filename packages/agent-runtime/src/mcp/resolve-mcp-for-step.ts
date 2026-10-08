@@ -38,12 +38,12 @@ export interface ResolveMcpForStepDeps {
  *     AgentDefinitionNotFoundError (rotten reference must surface, not
  *     silently degrade to no-MCP).
  *   - AgentDefinition has no mcpServers → returns { servers: {} }.
- *   - AgentDefinition has stdio bindings → their catalogIds are fetched
- *     from the namespace-scoped tool catalog; missing entries surface
- *     as CatalogEntryNotFoundError from resolveEffectiveMcp.
+ *   - AgentDefinition has bindings → their catalogIds are fetched from
+ *     the namespace-scoped tool catalog; missing entries surface as
+ *     CatalogEntryNotFoundError from resolveEffectiveMcp.
  *
- *  Only catalog entries actually referenced by the agent's stdio
- *  bindings are fetched (O(#stdio bindings), not O(#catalog)). */
+ *  Only catalog entries actually referenced by the agent's bindings are
+ *  fetched (O(#bindings), not O(#catalog)). */
 export async function resolveMcpForStep(
   step: WorkflowStep,
   deps: ResolveMcpForStepDeps,
@@ -58,9 +58,7 @@ export async function resolveMcpForStep(
   const bindings = agent.mcpServers ?? {};
   const catalogIds = new Set<string>();
   for (const binding of Object.values(bindings)) {
-    if (binding.type === 'stdio') {
-      catalogIds.add(binding.catalogId);
-    }
+    catalogIds.add(binding.catalogId);
   }
 
   const catalog = new Map<string, ToolCatalogEntry>();

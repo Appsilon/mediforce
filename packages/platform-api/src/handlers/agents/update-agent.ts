@@ -2,6 +2,7 @@ import type { UpdateAgentInput, UpdateAgentBody, UpdateAgentOutput } from '../..
 import type { CallerScope } from '../../repositories/index';
 import { actorFromCaller } from '../_helpers';
 import { assertAgentMayHoldSkills } from './agent-skills';
+import { assertBindingsTargetCatalogEntries } from './mcp-bindings';
 
 // Body is merged into input by the route adapter — see route.ts for the
 // inputFromRequest shape. Wrapper enforces namespace-write on the existing
@@ -15,6 +16,13 @@ export async function updateAgent(
   if (input.body.skills !== undefined || input.body.visibility !== undefined || input.body.namespace !== undefined) {
     const existing = await scope.agentDefinitions.getForUpdate(input.id);
     await assertAgentMayHoldSkills({ ...existing, ...input.body }, scope);
+  }
+  // Moving the agent to another workspace re-points every binding at that
+  // workspace's catalog, so either change re-checks them all.
+  if (input.body.mcpServers !== undefined || input.body.namespace !== undefined) {
+    const existing = await scope.agentDefinitions.getForUpdate(input.id);
+    const merged = { ...existing, ...input.body };
+    await assertBindingsTargetCatalogEntries(scope, merged.namespace, merged.mcpServers);
   }
   const agent = await scope.agentDefinitions.update(input.id, input.body);
   const actor = actorFromCaller(scope);

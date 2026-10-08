@@ -68,6 +68,17 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  // The Tools page became the MCP page, and it absorbed the admin tool-catalog
+  // page and the per-tool detail page (an entry opens as a dialog there).
+  // `handle` excludes `api`, or `/api/admin/tool-catalog` would match too.
+  async redirects() {
+    const handle = ':handle((?!api(?![^/]))[^/]+)';
+    return [
+      { source: `/${handle}/tools`, destination: '/:handle/mcp', permanent: true },
+      { source: `/${handle}/tools/:toolId`, destination: '/:handle/mcp?id=:toolId', permanent: true },
+      { source: `/${handle}/admin/tool-catalog`, destination: '/:handle/mcp', permanent: true },
+    ];
+  },
   devIndicators: {
     position: 'bottom-right',
   },

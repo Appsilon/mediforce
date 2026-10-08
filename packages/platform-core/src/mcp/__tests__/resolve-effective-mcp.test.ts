@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   CatalogEntryNotFoundError,
+  CatalogEntryTypeMismatchError,
   DenyToolsWithoutAllowedToolsError,
   UnknownRestrictionTargetError,
   resolveEffectiveMcp,
@@ -76,6 +77,7 @@ describe('resolveEffectiveMcp', () => {
       const catalog = makeCatalog([
         {
           id: 'cdisc-library',
+          type: 'stdio',
           command: 'npx',
           args: ['-y', '@cdisc/mcp-server'],
           env: { API_KEY: '{{SECRET:cdisc_key}}' },
@@ -92,15 +94,17 @@ describe('resolveEffectiveMcp', () => {
       expect(cdisc.env).toEqual({ API_KEY: '{{SECRET:cdisc_key}}' });
     });
 
-    it('resolves http bindings without catalog lookup (headers auth)', () => {
-      const agent = makeAgent({
-        remote: {
+    it('resolves http bindings from catalog (headers auth)', () => {
+      const catalog = makeCatalog([
+        {
+          id: 'example',
           type: 'http',
           url: 'https://mcp.example.com/v1',
           auth: { type: 'headers', headers: { Authorization: 'Bearer {{SECRET:tok}}' } },
         },
-      });
-      const result = resolveEffectiveMcp(agent, makeStep(), new Map());
+      ]);
+      const agent = makeAgent({ remote: { type: 'http', catalogId: 'example' } });
+      const result = resolveEffectiveMcp(agent, makeStep(), catalog);
       const remote = asHttp(result.servers.remote);
       expect(remote.url).toBe('https://mcp.example.com/v1');
       expect(remote.auth?.type).toBe('headers');
@@ -110,8 +114,9 @@ describe('resolveEffectiveMcp', () => {
     });
 
     it('resolves http bindings with oauth auth variant', () => {
-      const agent = makeAgent({
-        gh: {
+      const catalog = makeCatalog([
+        {
+          id: 'github',
           type: 'http',
           url: 'https://api.github.com/mcp',
           auth: {
@@ -121,8 +126,9 @@ describe('resolveEffectiveMcp', () => {
             headerValueTemplate: 'Bearer {token}',
           },
         },
-      });
-      const result = resolveEffectiveMcp(agent, makeStep(), new Map());
+      ]);
+      const agent = makeAgent({ gh: { type: 'http', catalogId: 'github' } });
+      const result = resolveEffectiveMcp(agent, makeStep(), catalog);
       const gh = asHttp(result.servers.gh);
       expect(gh.auth?.type).toBe('oauth');
       if (gh.auth?.type === 'oauth') {
@@ -134,13 +140,14 @@ describe('resolveEffectiveMcp', () => {
 
     it('resolves a mix of 2 stdio + 1 http servers', () => {
       const catalog = makeCatalog([
-        { id: 'a', command: 'cmd-a' },
-        { id: 'b', command: 'cmd-b' },
+        { id: 'a', type: 'stdio', command: 'cmd-a' },
+        { id: 'b', type: 'stdio', command: 'cmd-b' },
+        { id: 'c', type: 'http', url: 'https://example.com' },
       ]);
       const agent = makeAgent({
         alpha: { type: 'stdio', catalogId: 'a' },
         beta: { type: 'stdio', catalogId: 'b' },
-        gamma: { type: 'http', url: 'https://example.com' },
+        gamma: { type: 'http', catalogId: 'c' },
       });
       const result = resolveEffectiveMcp(agent, makeStep(), catalog);
       expect(Object.keys(result.servers)).toHaveLength(3);
@@ -150,7 +157,7 @@ describe('resolveEffectiveMcp', () => {
     });
 
     it('carries binding.allowedTools through when no step restriction', () => {
-      const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
+      const catalog = makeCatalog([{ id: 'gh', type: 'stdio', command: 'gh-mcp' }]);
       const agent = makeAgent({
         github: {
           type: 'stdio',
@@ -167,8 +174,8 @@ describe('resolveEffectiveMcp', () => {
   describe('step-level disable', () => {
     it('omits a server disabled by step restriction', () => {
       const catalog = makeCatalog([
-        { id: 'a', command: 'cmd-a' },
-        { id: 'b', command: 'cmd-b' },
+        { id: 'a', type: 'stdio', command: 'cmd-a' },
+        { id: 'b', type: 'stdio', command: 'cmd-b' },
       ]);
       const agent = makeAgent({
         alpha: { type: 'stdio', catalogId: 'a' },
@@ -181,7 +188,7 @@ describe('resolveEffectiveMcp', () => {
     });
 
     it('treats disable: false as a noop', () => {
-      const catalog = makeCatalog([{ id: 'a', command: 'cmd-a' }]);
+      const catalog = makeCatalog([{ id: 'a', type: 'stdio', command: 'cmd-a' }]);
       const agent = makeAgent({ alpha: { type: 'stdio', catalogId: 'a' } });
       const step = makeStep({ alpha: { disable: false } });
       const result = resolveEffectiveMcp(agent, step, catalog);
@@ -191,7 +198,7 @@ describe('resolveEffectiveMcp', () => {
 
   describe('step-level denyTools (subtractive)', () => {
     it('subtracts denyTools from binding.allowedTools', () => {
-      const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
+      const catalog = makeCatalog([{ id: 'gh', type: 'stdio', command: 'gh-mcp' }]);
       const agent = makeAgent({
         github: {
           type: 'stdio',
@@ -206,7 +213,7 @@ describe('resolveEffectiveMcp', () => {
     });
 
     it('drops server entirely when denyTools empties the allowlist', () => {
-      const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
+      const catalog = makeCatalog([{ id: 'gh', type: 'stdio', command: 'gh-mcp' }]);
       const agent = makeAgent({
         github: {
           type: 'stdio',
@@ -223,8 +230,8 @@ describe('resolveEffectiveMcp', () => {
 
     it('drops only the emptied server, keeps siblings intact', () => {
       const catalog = makeCatalog([
-        { id: 'gh', command: 'gh-mcp' },
-        { id: 'pg', command: 'pg-mcp' },
+        { id: 'gh', type: 'stdio', command: 'gh-mcp' },
+        { id: 'pg', type: 'stdio', command: 'pg-mcp' },
       ]);
       const agent = makeAgent({
         github: { type: 'stdio', catalogId: 'gh', allowedTools: ['search'] },
@@ -237,15 +244,12 @@ describe('resolveEffectiveMcp', () => {
     });
 
     it('applies denyTools to http bindings the same way', () => {
+      const catalog = makeCatalog([{ id: 'example', type: 'http', url: 'https://example.com' }]);
       const agent = makeAgent({
-        remote: {
-          type: 'http',
-          url: 'https://example.com',
-          allowedTools: ['fetch', 'push'],
-        },
+        remote: { type: 'http', catalogId: 'example', allowedTools: ['fetch', 'push'] },
       });
       const step = makeStep({ remote: { denyTools: ['push'] } });
-      const result = resolveEffectiveMcp(agent, step, new Map());
+      const result = resolveEffectiveMcp(agent, step, catalog);
       expect(asHttp(result.servers.remote).allowedTools).toEqual(['fetch']);
     });
 
@@ -255,7 +259,7 @@ describe('resolveEffectiveMcp', () => {
       // (mcp-config.json / McpServerConfig) have no way to express the
       // "all-minus-X" state. Rejecting at resolution time forces the author
       // to either add allowedTools to the binding or use disable: true.
-      const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
+      const catalog = makeCatalog([{ id: 'gh', type: 'stdio', command: 'gh-mcp' }]);
       const agent = makeAgent({
         github: { type: 'stdio', catalogId: 'gh' },
       });
@@ -266,7 +270,7 @@ describe('resolveEffectiveMcp', () => {
     });
 
     it('DenyToolsWithoutAllowedToolsError exposes serverName and denyTools', () => {
-      const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
+      const catalog = makeCatalog([{ id: 'gh', type: 'stdio', command: 'gh-mcp' }]);
       const agent = makeAgent({
         github: { type: 'stdio', catalogId: 'gh' },
       });
@@ -285,7 +289,7 @@ describe('resolveEffectiveMcp', () => {
 
     it('does not throw when denyTools is empty on a binding without allowedTools', () => {
       // denyTools=[] is a no-op — no authorization gap, nothing to reject.
-      const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
+      const catalog = makeCatalog([{ id: 'gh', type: 'stdio', command: 'gh-mcp' }]);
       const agent = makeAgent({
         github: { type: 'stdio', catalogId: 'gh' },
       });
@@ -295,7 +299,7 @@ describe('resolveEffectiveMcp', () => {
 
     it('does not throw when denyTools accompanies disable:true on a binding without allowedTools', () => {
       // disable short-circuits the server — denyTools is moot, so no error.
-      const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
+      const catalog = makeCatalog([{ id: 'gh', type: 'stdio', command: 'gh-mcp' }]);
       const agent = makeAgent({
         github: { type: 'stdio', catalogId: 'gh' },
       });
@@ -312,6 +316,23 @@ describe('resolveEffectiveMcp', () => {
       });
       expect(() => resolveEffectiveMcp(agent, makeStep(), new Map())).toThrow(
         CatalogEntryNotFoundError,
+      );
+    });
+
+    it('throws CatalogEntryNotFoundError when http catalogId is missing', () => {
+      const agent = makeAgent({
+        ghost: { type: 'http', catalogId: 'not-in-catalog' },
+      });
+      expect(() => resolveEffectiveMcp(agent, makeStep(), new Map())).toThrow(
+        CatalogEntryNotFoundError,
+      );
+    });
+
+    it('throws CatalogEntryTypeMismatchError when the binding type differs from the entry type', () => {
+      const catalog = makeCatalog([{ id: 'gh', type: 'stdio', command: 'gh-mcp' }]);
+      const agent = makeAgent({ github: { type: 'http', catalogId: 'gh' } });
+      expect(() => resolveEffectiveMcp(agent, makeStep(), catalog)).toThrow(
+        CatalogEntryTypeMismatchError,
       );
     });
 
@@ -343,7 +364,7 @@ describe('resolveEffectiveMcp', () => {
 
   describe('unknown restriction targets', () => {
     it('throws UnknownRestrictionTargetError when restriction references unknown server', () => {
-      const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
+      const catalog = makeCatalog([{ id: 'gh', type: 'stdio', command: 'gh-mcp' }]);
       const agent = makeAgent({ github: { type: 'stdio', catalogId: 'gh' } });
       const step = makeStep({ githuub: { disable: true } });
       expect(() => resolveEffectiveMcp(agent, step, catalog)).toThrow(
@@ -353,8 +374,8 @@ describe('resolveEffectiveMcp', () => {
 
     it('UnknownRestrictionTargetError exposes serverName and knownServerNames', () => {
       const catalog = makeCatalog([
-        { id: 'gh', command: 'gh-mcp' },
-        { id: 'pg', command: 'pg-mcp' },
+        { id: 'gh', type: 'stdio', command: 'gh-mcp' },
+        { id: 'pg', type: 'stdio', command: 'pg-mcp' },
       ]);
       const agent = makeAgent({
         github: { type: 'stdio', catalogId: 'gh' },
@@ -395,7 +416,7 @@ describe('resolveEffectiveMcp', () => {
 
   describe('purity', () => {
     it('does not mutate the input agent.mcpServers', () => {
-      const catalog = makeCatalog([{ id: 'gh', command: 'gh-mcp' }]);
+      const catalog = makeCatalog([{ id: 'gh', type: 'stdio', command: 'gh-mcp' }]);
       const mcpServers: AgentMcpBindingMap = {
         github: {
           type: 'stdio',

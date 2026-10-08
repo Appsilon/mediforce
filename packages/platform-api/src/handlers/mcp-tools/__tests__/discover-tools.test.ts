@@ -79,10 +79,10 @@ describe('discoverMcpTools handler', () => {
     expect(mcpClient.disconnect).toHaveBeenCalledOnce();
   });
 
-  it('rejects a non-admin member', async () => {
+  it('rejects a caller outside the namespace', async () => {
     const scope = createTestScope({
       toolCatalogRepo: repo,
-      caller: userCaller('u-member', ['alpha'], memberRoles),
+      caller: userCaller('u-other', ['beta']),
     });
 
     await expect(

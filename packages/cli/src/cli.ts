@@ -274,8 +274,8 @@ export const TREE: Record<string, BranchEntry> = {
     description: 'MCP servers an agent can bind to (list, add, discover)',
     leaves: {
       list: { description: 'List a workspace Tool Catalog', fn: toolCatalogListCommand },
-      add: { description: 'Add an MCP server from a JSON file (admin)', fn: toolCatalogAddCommand },
-      discover: { description: 'List the tools an MCP server exposes (admin)', fn: toolCatalogDiscoverCommand },
+      add: { description: 'Add a stdio or HTTP MCP server from a JSON file', fn: toolCatalogAddCommand },
+      discover: { description: 'List the tools an MCP server exposes', fn: toolCatalogDiscoverCommand },
     },
   },
   skill: {

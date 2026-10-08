@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryToolCatalogRepository } from '../in-memory-tool-catalog-repository';
-import type { ToolCatalogEntry } from '../../schemas/agent-mcp-binding';
+import type { StdioToolCatalogEntry } from '../../schemas/agent-mcp-binding';
 
-function makeEntry(overrides: Partial<ToolCatalogEntry> = {}): ToolCatalogEntry {
+function makeEntry(overrides: Partial<StdioToolCatalogEntry> = {}): StdioToolCatalogEntry {
   return {
     id: 'tealflow-mcp',
+    type: 'stdio',
     command: 'tealflow-mcp',
     args: [],
     description: 'Tealflow MCP — lists and describes teal modules',
@@ -31,9 +32,9 @@ describe('InMemoryToolCatalogRepository', () => {
     const retrieved = await repo.getById('appsilon', 'tealflow-mcp');
     expect(retrieved).toEqual(entry);
     // Mutating the retrieved copy must not affect storage
-    retrieved!.command = 'hacked';
+    if (retrieved?.type === 'stdio') retrieved.command = 'hacked';
     const retrievedAgain = await repo.getById('appsilon', 'tealflow-mcp');
-    expect(retrievedAgain!.command).toBe('tealflow-mcp');
+    expect(retrievedAgain).toMatchObject({ command: 'tealflow-mcp' });
   });
 
   it('upsert replaces existing entry with same id', async () => {
@@ -41,7 +42,7 @@ describe('InMemoryToolCatalogRepository', () => {
     await repo.upsert('appsilon', makeEntry({ command: 'v2' }));
 
     const retrieved = await repo.getById('appsilon', 'tealflow-mcp');
-    expect(retrieved!.command).toBe('v2');
+    expect(retrieved).toMatchObject({ command: 'v2' });
   });
 
   it('isolates entries by namespace', async () => {
@@ -50,8 +51,8 @@ describe('InMemoryToolCatalogRepository', () => {
 
     const appsilon = await repo.getById('appsilon', 'shared-id');
     const otherOrg = await repo.getById('other-org', 'shared-id');
-    expect(appsilon!.command).toBe('cmd-a');
-    expect(otherOrg!.command).toBe('cmd-b');
+    expect(appsilon).toMatchObject({ command: 'cmd-a' });
+    expect(otherOrg).toMatchObject({ command: 'cmd-b' });
   });
 
   it('list returns only entries in the given namespace', async () => {

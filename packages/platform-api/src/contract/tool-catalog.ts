@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { ToolCatalogEntrySchema } from '@mediforce/platform-core';
+import {
+  HttpAuthConfigSchema,
+  HttpToolCatalogEntrySchema,
+  StdioToolCatalogEntrySchema,
+  ToolCatalogEntrySchema,
+} from '@mediforce/platform-core';
 
 const NamespaceQuery = z.object({ namespace: z.string().min(1) });
 
@@ -15,28 +20,36 @@ export const GetToolCatalogEntryOutputSchema = z.object({
   entry: ToolCatalogEntrySchema,
 });
 
-/** POST input: id is optional — server derives via `slugifyCommand(command)`
- *  when absent. Strict + partial on `id` keeps the wire schema honest about
- *  what the client may send while letting the create handler reject empty
- *  derivations as a validation error. */
-export const CreateToolCatalogEntryInputApiSchema = NamespaceQuery.merge(
-  ToolCatalogEntrySchema.partial({ id: true }),
+/** POST input: id is optional — the server derives it from the command
+ *  (stdio) or the URL host (http) when absent. `type` defaults to `stdio`, so
+ *  entry files written before HTTP entries existed still create stdio servers. */
+export const CreateToolCatalogEntryInputApiSchema = z.preprocess(
+  (value) =>
+    typeof value === 'object' && value !== null && !('type' in value) ? { ...value, type: 'stdio' } : value,
+  z.discriminatedUnion('type', [
+    NamespaceQuery.extend(StdioToolCatalogEntrySchema.partial({ id: true }).shape).strict(),
+    NamespaceQuery.extend(HttpToolCatalogEntrySchema.partial({ id: true }).shape).strict(),
+  ]),
 );
 export const CreateToolCatalogEntryOutputSchema = z.object({
   entry: ToolCatalogEntrySchema,
 });
 
-/** PATCH input: id from URL, partial body, id cannot be renamed (bindings
- *  reference it). An optional field left out keeps its value; sent as `null`
- *  it is cleared. */
-const catalogFields = ToolCatalogEntrySchema.shape;
+/** PATCH input: id from URL, partial body. Neither id nor type can change —
+ *  bindings reference the id and promise the type. An optional field left out
+ *  keeps its value; sent as `null` it is cleared. Fields of the other
+ *  transport are rejected by the handler. */
+const stdioFields = StdioToolCatalogEntrySchema.shape;
+const httpFields = HttpToolCatalogEntrySchema.shape;
 export const UpdateToolCatalogEntryInputApiSchema = NamespaceQuery
   .extend({ id: z.string().min(1) })
   .merge(z.object({
-    command: catalogFields.command.optional(),
-    args: catalogFields.args.nullable(),
-    env: catalogFields.env.nullable(),
-    description: catalogFields.description.nullable(),
+    command: stdioFields.command.optional(),
+    args: stdioFields.args.nullable(),
+    env: stdioFields.env.nullable(),
+    url: httpFields.url.optional(),
+    auth: HttpAuthConfigSchema.nullable().optional(),
+    description: stdioFields.description.nullable(),
   }).strict());
 export const UpdateToolCatalogEntryOutputSchema = z.object({
   entry: ToolCatalogEntrySchema,

@@ -51,9 +51,12 @@ export class PostgresToolCatalogRepository implements ToolCatalogRepository {
     const values = {
       workspace: namespace,
       id: parsed.id,
-      command: parsed.command,
-      args: parsed.args ?? null,
-      env: parsed.env ?? null,
+      type: parsed.type,
+      command: parsed.type === 'stdio' ? parsed.command : null,
+      args: parsed.type === 'stdio' ? parsed.args ?? null : null,
+      env: parsed.type === 'stdio' ? parsed.env ?? null : null,
+      url: parsed.type === 'http' ? parsed.url : null,
+      auth: parsed.type === 'http' ? parsed.auth ?? null : null,
       description: parsed.description ?? null,
       // updated_at is set by the set_updated_at() trigger on every UPDATE;
       // for INSERTs the column default `now()` fires.
@@ -64,9 +67,12 @@ export class PostgresToolCatalogRepository implements ToolCatalogRepository {
       .onConflictDoUpdate({
         target: [toolCatalogEntries.workspace, toolCatalogEntries.id],
         set: {
+          type: values.type,
           command: values.command,
           args: values.args,
           env: values.env,
+          url: values.url,
+          auth: values.auth,
           description: values.description,
         },
       });
@@ -86,11 +92,22 @@ export class PostgresToolCatalogRepository implements ToolCatalogRepository {
 }
 
 function toEntry(row: typeof toolCatalogEntries.$inferSelect): ToolCatalogEntry {
+  const description = row.description ?? undefined;
+  if (row.type === 'http') {
+    return parseRow(ToolCatalogEntrySchema, {
+      id: row.id,
+      type: 'http',
+      url: row.url,
+      auth: row.auth ?? undefined,
+      description,
+    });
+  }
   return parseRow(ToolCatalogEntrySchema, {
     id: row.id,
+    type: 'stdio',
     command: row.command,
     args: row.args ?? undefined,
     env: row.env ?? undefined,
-    description: row.description ?? undefined,
+    description,
   });
 }

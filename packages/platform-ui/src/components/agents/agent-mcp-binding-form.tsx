@@ -1,22 +1,18 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Info, Plus, Trash2 } from 'lucide-react';
-import type {
-  AgentMcpBinding,
-  OAuthProviderConfig,
-  ToolCatalogEntry,
-} from '@mediforce/platform-core';
-import { cn } from '@/lib/utils';
+import Link from 'next/link';
+import { Info } from 'lucide-react';
+import type { AgentMcpBinding, ToolCatalogEntry } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
+import { routes } from '@/lib/routes';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 
-function deriveBindingName(binding: AgentMcpBinding, existingNames: string[]): string {
-  const source = binding.type === 'stdio' ? binding.catalogId : new URL(binding.url).hostname;
-  const base = source.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^[-_]+|[-_]+$/g, '') || 'mcp';
+function deriveBindingName(catalogId: string, existingNames: string[]): string {
+  const base = catalogId.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^[-_]+|[-_]+$/g, '') || 'mcp';
   let candidate = base;
   for (let suffix = 2; existingNames.includes(candidate); suffix += 1) {
     candidate = `${base}-${suffix}`;
@@ -24,218 +20,94 @@ function deriveBindingName(binding: AgentMcpBinding, existingNames: string[]): s
   return candidate;
 }
 
-const StdioFormSchema = z.object({
-  catalogId: z.string().min(1, 'Choose a catalog entry'),
+const BindingFormSchema = z.object({
+  catalogId: z.string().min(1, 'Choose an MCP server'),
   allowedTools: z.array(z.string()),
 });
-type StdioFormValues = z.infer<typeof StdioFormSchema>;
-
-const HttpFormSchema = z
-  .object({
-    url: z.string().url('Must be a valid URL'),
-    allowedTools: z.array(z.string()),
-    authMode: z.enum(['none', 'headers', 'oauth']),
-    headers: z.array(
-      z.object({
-        key: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/, 'Header name'),
-        value: z.string(),
-      }),
-    ),
-    oauthProvider: z.string().optional(),
-    oauthHeaderName: z.string().optional(),
-    oauthHeaderValueTemplate: z.string().optional(),
-  })
-  .superRefine((values, ctx) => {
-    if (values.authMode !== 'oauth') return;
-    if (values.oauthProvider === undefined || values.oauthProvider === '') {
-      ctx.addIssue({
-        path: ['oauthProvider'],
-        code: z.ZodIssueCode.custom,
-        message: 'Select a provider',
-      });
-    }
-    if (values.oauthHeaderName === undefined || values.oauthHeaderName.trim() === '') {
-      ctx.addIssue({
-        path: ['oauthHeaderName'],
-        code: z.ZodIssueCode.custom,
-        message: 'Header name is required',
-      });
-    }
-    if (
-      values.oauthHeaderValueTemplate === undefined ||
-      !values.oauthHeaderValueTemplate.includes('{token}')
-    ) {
-      ctx.addIssue({
-        path: ['oauthHeaderValueTemplate'],
-        code: z.ZodIssueCode.custom,
-        message: 'Template must include {token}',
-      });
-    }
-  });
-type HttpFormValues = z.infer<typeof HttpFormSchema>;
+type BindingFormValues = z.infer<typeof BindingFormSchema>;
 
 interface AgentMcpBindingFormProps {
   existing: { name: string; binding: AgentMcpBinding } | null;
   existingNames: string[];
   catalogEntries: ToolCatalogEntry[];
-  agentId: string;
   namespace: string;
   onSubmit: (name: string, binding: AgentMcpBinding) => Promise<void>;
   onCancel: () => void;
 }
 
+function discoveryFor(entry: ToolCatalogEntry | undefined, namespace: string): ToolDiscovery {
+  if (entry === undefined) return { unavailableReason: 'Choose an MCP server first.' };
+  if (entry.type === 'stdio') {
+    return { unavailableReason: 'Tool discovery is not available for stdio servers. Enter tool names manually.' };
+  }
+  if (entry.auth !== undefined) {
+    return { unavailableReason: 'Tool discovery is only available for servers without authentication.' };
+  }
+  return {
+    run: async () => (await mediforce.toolCatalog.discoverTools({ namespace, type: 'http', url: entry.url })).tools,
+  };
+}
+
+/** Binds one MCP server from the workspace catalog to an agent. The agent can
+ *  only pick a server that already exists there — servers are added on the MCP
+ *  page — and can narrow its tools with an allowlist. */
 export function AgentMcpBindingForm({
   existing,
   existingNames,
   catalogEntries,
-  agentId,
   namespace,
   onSubmit,
   onCancel,
 }: AgentMcpBindingFormProps) {
   const isEdit = existing !== null;
-  const [transport, setTransport] = useState<'stdio' | 'http'>(existing?.binding.type ?? 'stdio');
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  function submitBinding(payload: AgentMcpBinding): Promise<void> {
-    const name = existing?.name ?? deriveBindingName(payload, existingNames);
-    return onSubmit(name, payload);
-  }
-
-  return (
-    <div className="flex flex-col gap-5">
-      {/* Transport -------------------------------------------------------- */}
-      <fieldset className="flex flex-col gap-2" disabled={isEdit} aria-label="Transport">
-        <legend className="text-sm font-medium">Transport</legend>
-        <div className="flex gap-2">
-          {(['stdio', 'http'] as const).map((option) => (
-            <label
-              key={option}
-              className={cn(
-                'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
-                transport === option
-                  ? 'border-primary bg-primary/5 text-primary'
-                  : 'border-border hover:border-primary/40',
-                isEdit && 'opacity-60 cursor-not-allowed',
-              )}
-            >
-              <input
-                type="radio"
-                name="transport"
-                value={option}
-                checked={transport === option}
-                onChange={() => setTransport(option)}
-                className="h-3.5 w-3.5"
-              />
-              {option === 'stdio' ? 'stdio' : 'HTTP'}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      {transport === 'stdio' ? (
-        <StdioFields
-          key="stdio-fields"
-          initial={existing?.binding.type === 'stdio' ? existing.binding : null}
-          catalogEntries={catalogEntries}
-          namespace={namespace}
-          onSubmit={async (payload) => {
-            setSubmitError(null);
-            try {
-              await submitBinding(payload);
-            } catch (err: unknown) {
-              const message = err instanceof Error ? err.message : 'Save failed.';
-              setSubmitError(message);
-              throw err;
-            }
-          }}
-          onCancel={onCancel}
-          submitError={submitError}
-          submitLabel={isEdit ? 'Save' : 'Create binding'}
-        />
-      ) : (
-        <HttpFields
-          key="http-fields"
-          initial={existing?.binding.type === 'http' ? existing.binding : null}
-          agentId={agentId}
-          namespace={namespace}
-          existingServerName={existing?.name ?? null}
-          onSubmit={async (payload) => {
-            setSubmitError(null);
-            try {
-              await submitBinding(payload);
-            } catch (err: unknown) {
-              const message = err instanceof Error ? err.message : 'Save failed.';
-              setSubmitError(message);
-              throw err;
-            }
-          }}
-          onCancel={onCancel}
-          submitError={submitError}
-          submitLabel={isEdit ? 'Save' : 'Create binding'}
-        />
-      )}
-    </div>
-  );
-}
-
-// ── Stdio subform ───────────────────────────────────────────────────────────
-
-function StdioFields({
-  initial,
-  catalogEntries,
-  namespace,
-  onSubmit,
-  onCancel,
-  submitError,
-  submitLabel,
-}: {
-  initial: { type: 'stdio'; catalogId: string; allowedTools?: string[] } | null;
-  catalogEntries: ToolCatalogEntry[];
-  namespace: string;
-  onSubmit: (binding: AgentMcpBinding) => Promise<void>;
-  onCancel: () => void;
-  submitError: string | null;
-  submitLabel: string;
-}) {
-  const form = useForm<StdioFormValues>({
-    resolver: zodResolver(StdioFormSchema),
+  const form = useForm<BindingFormValues>({
+    resolver: zodResolver(BindingFormSchema),
     defaultValues: {
-      catalogId: initial?.catalogId ?? '',
-      allowedTools: initial?.allowedTools ?? [],
+      catalogId: existing?.binding.catalogId ?? '',
+      allowedTools: existing?.binding.allowedTools ?? [],
     },
   });
   const catalogId = form.watch('catalogId');
+  const selected = catalogEntries.find((entry) => entry.id === catalogId);
 
   const handleSubmit = form.handleSubmit(async (values) => {
-    const allowed = values.allowedTools;
+    const entry = catalogEntries.find((candidate) => candidate.id === values.catalogId);
+    if (entry === undefined) return;
     const binding: AgentMcpBinding = {
-      type: 'stdio',
-      catalogId: values.catalogId,
-      ...(allowed.length > 0 ? { allowedTools: allowed } : {}),
+      type: entry.type,
+      catalogId: entry.id,
+      ...(values.allowedTools.length > 0 ? { allowedTools: values.allowedTools } : {}),
     };
-    await onSubmit(binding);
+    setSubmitError(null);
+    try {
+      await onSubmit(existing?.name ?? deriveBindingName(entry.id, existingNames), binding);
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : 'Save failed.');
+      throw err;
+    }
   });
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <Field label="Catalog entry" error={form.formState.errors.catalogId?.message}>
+      <Field label="MCP server" error={form.formState.errors.catalogId?.message}>
         <select
-          aria-label="Catalog entry"
+          aria-label="MCP server"
           {...form.register('catalogId')}
           className="rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
         >
-          <option value="">Select a catalog entry…</option>
+          <option value="">Select an MCP server…</option>
           {catalogEntries.map((entry) => (
             <option key={entry.id} value={entry.id}>
-              {entry.id}
+              {entry.id} ({entry.type === 'stdio' ? 'stdio' : 'HTTP'})
               {entry.description !== undefined ? ` — ${entry.description}` : ''}
             </option>
           ))}
         </select>
         {catalogEntries.length === 0 && (
           <span className="mt-1 text-xs text-muted-foreground">
-            No catalog entries in this namespace yet. Ask an admin to add one from the Tools page (Add MCP).
+            No MCP servers in this workspace yet. Add one on the{' '}
+            <Link href={routes.mcp(namespace, { create: true })} className="underline">MCP page</Link>.
           </span>
         )}
       </Field>
@@ -244,314 +116,14 @@ function StdioFields({
         selected={form.watch('allowedTools')}
         onChange={(tools) => form.setValue('allowedTools', tools)}
         discoveryKey={catalogId}
-        discover={{
-          unavailableReason:
-            'Tool discovery is not available for catalog (stdio) servers. Enter tool names manually.',
-        }}
+        discover={discoveryFor(selected, namespace)}
       />
 
       <FormFooter
         submitError={submitError}
         onCancel={onCancel}
         submitting={form.formState.isSubmitting}
-        submitLabel={submitLabel}
-      />
-    </form>
-  );
-}
-
-// ── HTTP subform ────────────────────────────────────────────────────────────
-
-function HttpFields({
-  initial,
-  agentId,
-  namespace,
-  existingServerName,
-  onSubmit,
-  onCancel,
-  submitError,
-  submitLabel,
-}: {
-  initial: Extract<AgentMcpBinding, { type: 'http' }> | null;
-  agentId: string;
-  namespace: string;
-  existingServerName: string | null;
-  onSubmit: (binding: AgentMcpBinding) => Promise<void>;
-  onCancel: () => void;
-  submitError: string | null;
-  submitLabel: string;
-}) {
-  const initialHeaders = useMemo(() => {
-    if (initial?.auth?.type !== 'headers') return [];
-    return Object.entries(initial.auth.headers).map(([key, value]) => ({ key, value }));
-  }, [initial]);
-
-  const initialAuthMode: 'none' | 'headers' | 'oauth' = useMemo(() => {
-    if (initial?.auth?.type === 'oauth') return 'oauth';
-    if (initial?.auth?.type === 'headers') return 'headers';
-    return 'none';
-  }, [initial]);
-
-  const form = useForm<HttpFormValues>({
-    resolver: zodResolver(HttpFormSchema),
-    defaultValues: {
-      url: initial?.url ?? '',
-      allowedTools: initial?.allowedTools ?? [],
-      authMode: initialAuthMode,
-      headers: initialHeaders,
-      oauthProvider: initial?.auth?.type === 'oauth' ? initial.auth.provider : '',
-      oauthHeaderName:
-        initial?.auth?.type === 'oauth' ? initial.auth.headerName : 'Authorization',
-      oauthHeaderValueTemplate:
-        initial?.auth?.type === 'oauth' ? initial.auth.headerValueTemplate : 'Bearer {token}',
-    },
-  });
-  const headersArray = useFieldArray({ control: form.control, name: 'headers' });
-  const authMode = form.watch('authMode');
-  const oauthProviderId = form.watch('oauthProvider');
-  const serverUrl = form.watch('url');
-
-  const [providers, setProviders] = useState<OAuthProviderConfig[]>([]);
-  const [providersError, setProvidersError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const { providers: list } = await mediforce.oauthProviders.list({ namespace });
-        if (!cancelled) setProviders(list as OAuthProviderConfig[]);
-      } catch (err: unknown) {
-        if (!cancelled) {
-          setProvidersError(err instanceof Error ? err.message : 'Failed to load providers.');
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [namespace]);
-
-  const selectedProvider = useMemo(
-    () => providers.find((p) => p.id === oauthProviderId) ?? null,
-    [providers, oauthProviderId],
-  );
-
-  const handleSubmit = form.handleSubmit(async (values) => {
-    const allowed = values.allowedTools;
-    const headers = values.headers.filter((header) => header.key !== '');
-
-    let auth: Extract<AgentMcpBinding, { type: 'http' }>['auth'];
-    if (values.authMode === 'headers' && headers.length > 0) {
-      auth = {
-        type: 'headers' as const,
-        headers: Object.fromEntries(headers.map((header) => [header.key, header.value])),
-      };
-    } else if (values.authMode === 'oauth') {
-      auth = {
-        type: 'oauth' as const,
-        provider: values.oauthProvider ?? '',
-        headerName: (values.oauthHeaderName ?? 'Authorization').trim(),
-        headerValueTemplate: (values.oauthHeaderValueTemplate ?? 'Bearer {token}').trim(),
-      };
-    }
-
-    const binding: AgentMcpBinding = {
-      type: 'http',
-      url: values.url,
-      ...(allowed.length > 0 ? { allowedTools: allowed } : {}),
-      ...(auth !== undefined ? { auth } : {}),
-    };
-    await onSubmit(binding);
-  });
-
-  return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <Field label="URL" error={form.formState.errors.url?.message}>
-        <input
-          aria-label="URL"
-          {...form.register('url')}
-          placeholder="https://api.example.com/mcp"
-          className="rounded-md border bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
-          autoComplete="off"
-        />
-      </Field>
-
-      <fieldset className="flex flex-col gap-2" aria-label="Authentication">
-        <legend className="text-sm font-medium">Authentication</legend>
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              { value: 'none', label: 'None' },
-              { value: 'headers', label: 'Static headers' },
-              { value: 'oauth', label: 'OAuth' },
-            ] as const
-          ).map((option) => (
-            <label
-              key={option.value}
-              className={cn(
-                'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
-                authMode === option.value
-                  ? 'border-primary bg-primary/5 text-primary'
-                  : 'border-border hover:border-primary/40',
-              )}
-            >
-              <input
-                type="radio"
-                value={option.value}
-                checked={authMode === option.value}
-                onChange={() => form.setValue('authMode', option.value)}
-                className="h-3.5 w-3.5"
-              />
-              {option.label}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      {authMode === 'headers' && (
-        <div className="flex flex-col gap-2 rounded-md border bg-card px-3 py-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium">Headers</span>
-            <button
-              type="button"
-              onClick={() => headersArray.append({ key: '', value: '' })}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <Plus className="h-3 w-3" />
-              Add header
-            </button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Values support{' '}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">{'{{SECRET:name}}'}</code> — resolved at spawn
-            time from the workflow secrets that trigger the run.
-          </p>
-          {headersArray.fields.length === 0 && (
-            <p className="text-xs text-muted-foreground">No headers.</p>
-          )}
-          {headersArray.fields.map((field, index) => (
-            <div key={field.id} className="flex items-center gap-2">
-              <input
-                aria-label={`Header key ${index + 1}`}
-                {...form.register(`headers.${index}.key` as const)}
-                placeholder="Authorization"
-                className="w-40 rounded-md border bg-background px-3 py-1.5 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
-                autoComplete="off"
-              />
-              <input
-                aria-label={`Header value ${index + 1}`}
-                {...form.register(`headers.${index}.value` as const)}
-                placeholder="Bearer {{SECRET:api-key}}"
-                className="flex-1 rounded-md border bg-background px-3 py-1.5 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
-                autoComplete="off"
-              />
-              <button
-                type="button"
-                onClick={() => headersArray.remove(index)}
-                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
-                aria-label={`Remove header ${index + 1}`}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {authMode === 'oauth' && (
-        <div className="flex flex-col gap-3 rounded-md border bg-card px-3 py-3">
-          <Field label="Provider" error={form.formState.errors.oauthProvider?.message}>
-            <select
-              aria-label="OAuth provider"
-              {...form.register('oauthProvider')}
-              className="rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="">Select a provider…</option>
-              {providers.map((provider) => (
-                <option key={provider.id} value={provider.id}>
-                  {provider.name}
-                </option>
-              ))}
-            </select>
-            {providersError !== null && (
-              <span className="mt-1 text-xs text-destructive">{providersError}</span>
-            )}
-            {providers.length === 0 && providersError === null && (
-              <span className="mt-1 text-xs text-muted-foreground">
-                No OAuth providers configured for this namespace. Ask an admin to add one via
-                OAuth providers.
-              </span>
-            )}
-          </Field>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Header name" error={form.formState.errors.oauthHeaderName?.message}>
-              <input
-                aria-label="OAuth header name"
-                {...form.register('oauthHeaderName')}
-                placeholder="Authorization"
-                className="rounded-md border bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
-                autoComplete="off"
-              />
-            </Field>
-            <Field
-              label="Header value template"
-              error={form.formState.errors.oauthHeaderValueTemplate?.message}
-            >
-              <input
-                aria-label="OAuth header value template"
-                {...form.register('oauthHeaderValueTemplate')}
-                placeholder="Bearer {token}"
-                className="rounded-md border bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
-                autoComplete="off"
-              />
-            </Field>
-          </div>
-
-          {selectedProvider !== null && (
-            <p className="text-xs text-muted-foreground">
-              Scopes:{' '}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
-                {selectedProvider.scopes.join(' ')}
-              </code>
-            </p>
-          )}
-
-          {existingServerName === null ? (
-            <p className="text-xs text-muted-foreground">
-              Save the binding first, then use Connect on the binding row to start the OAuth flow.
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Close this dialog — the Connect / Disconnect / Revoke actions live inline on the
-              binding row.
-            </p>
-          )}
-        </div>
-      )}
-
-      <AllowedToolsSection
-        selected={form.watch('allowedTools')}
-        onChange={(tools) => form.setValue('allowedTools', tools)}
-        discoveryKey={serverUrl}
-        discover={
-          authMode !== 'none'
-            ? { unavailableReason: 'Tool discovery is only available for servers without authentication.' }
-            : !z.string().url().safeParse(serverUrl).success
-              ? { unavailableReason: 'Enter a valid URL first.' }
-              : {
-                  run: async () =>
-                    (await mediforce.toolCatalog.discoverTools({ namespace, type: 'http', url: serverUrl }))
-                      .tools,
-                }
-        }
-      />
-
-      <FormFooter
-        submitError={submitError}
-        onCancel={onCancel}
-        submitting={form.formState.isSubmitting}
-        submitLabel={submitLabel}
+        submitLabel={isEdit ? 'Save' : 'Create binding'}
       />
     </form>
   );

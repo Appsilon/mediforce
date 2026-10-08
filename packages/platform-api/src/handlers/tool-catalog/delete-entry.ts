@@ -1,4 +1,4 @@
-import { assertCallerIsNamespaceAdmin } from '../../auth';
+import { assertNamespaceAccess } from '../../auth';
 import type { CallerScope } from '../../repositories/index';
 import type {
   DeleteToolCatalogEntryInput,
@@ -10,7 +10,7 @@ export async function deleteToolCatalogEntry(
   input: DeleteToolCatalogEntryInput,
   scope: CallerScope,
 ): Promise<DeleteToolCatalogEntryOutput> {
-  assertCallerIsNamespaceAdmin(scope.caller, input.namespace);
+  assertNamespaceAccess(scope.caller, input.namespace);
 
   // Fetch-before-delete so the idempotent no-op case (id absent) doesn't
   // emit a misleading audit entry. The repo's `delete` returns void, hence

@@ -82,17 +82,21 @@ export async function POST(
       { status: 404 },
     );
   }
-  if (binding.type !== 'http' || binding.auth?.type !== 'oauth') {
+  // The server's auth lives on its catalog entry; the binding only points at it.
+  const entry = binding.type === 'http'
+    ? await services.toolCatalogRepo.getById(namespace, binding.catalogId)
+    : null;
+  if (entry?.type !== 'http' || entry.auth?.type !== 'oauth') {
     return NextResponse.json(
       { error: `Binding "${serverName}" is not configured for OAuth` },
       { status: 400 },
     );
   }
-  if (binding.auth.provider !== providerSlug) {
+  if (entry.auth.provider !== providerSlug) {
     return NextResponse.json(
       {
         error:
-          `Binding "${serverName}" is configured for provider "${binding.auth.provider}", ` +
+          `Binding "${serverName}" is configured for provider "${entry.auth.provider}", ` +
           `not "${providerSlug}"`,
       },
       { status: 400 },

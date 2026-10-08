@@ -9,7 +9,7 @@ import {
   createTestScope,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope';
-import { adminRoles, memberRoles, sampleEntry } from './fixtures';
+import { adminRoles, memberRoles, sampleEntry, sampleHttpEntry } from './fixtures';
 
 describe('updateToolCatalogEntry handler', () => {
   let repo: InMemoryToolCatalogRepository;
@@ -34,7 +34,7 @@ describe('updateToolCatalogEntry handler', () => {
     );
 
     expect(result.entry.description).toBe('updated');
-    expect(result.entry.command).toBe('npx'); // unchanged
+    expect(result.entry).toMatchObject({ command: 'npx' }); // unchanged
 
     const events = await auditRepo.getByEntity('toolCatalogEntry', 'tealflow-mcp');
     expect(events).toHaveLength(1);
@@ -54,8 +54,8 @@ describe('updateToolCatalogEntry handler', () => {
       scope,
     );
 
-    expect(result.entry.args).toBeUndefined();
-    expect(result.entry.env).toBeUndefined();
+    expect(result.entry).not.toHaveProperty('args');
+    expect(result.entry).not.toHaveProperty('env');
     expect(result.entry.description).toBe('TealFlow deployment MCP');
     expect(await repo.getById('alpha', 'tealflow-mcp')).toEqual(result.entry);
   });
@@ -75,11 +75,26 @@ describe('updateToolCatalogEntry handler', () => {
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it('throws ForbiddenError for a member-role caller (bug fix)', async () => {
+  it('updates an entry for a member-role caller', async () => {
     const scope = createTestScope({
       toolCatalogRepo: repo,
       auditRepo,
       caller: userCaller('u-member', ['alpha'], memberRoles),
+    });
+
+    const result = await updateToolCatalogEntry(
+      { namespace: 'alpha', id: 'tealflow-mcp', description: 'x' },
+      scope,
+    );
+
+    expect(result.entry.description).toBe('x');
+  });
+
+  it('throws ForbiddenError for a caller outside the namespace', async () => {
+    const scope = createTestScope({
+      toolCatalogRepo: repo,
+      auditRepo,
+      caller: userCaller('u-other', ['beta']),
     });
 
     await expect(
@@ -88,5 +103,29 @@ describe('updateToolCatalogEntry handler', () => {
         scope,
       ),
     ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('updates the url and clears the auth of an http entry', async () => {
+    await repo.upsert('alpha', sampleHttpEntry);
+    const scope = createTestScope({ toolCatalogRepo: repo, auditRepo });
+
+    const result = await updateToolCatalogEntry(
+      { namespace: 'alpha', id: 'github', url: 'https://example.com/mcp', auth: null },
+      scope,
+    );
+
+    expect(result.entry).toEqual({ id: 'github', type: 'http', url: 'https://example.com/mcp' });
+  });
+
+  it('rejects an http field on a stdio entry as a validation error', async () => {
+    const scope = createTestScope({ toolCatalogRepo: repo, auditRepo });
+
+    await expect(
+      updateToolCatalogEntry(
+        { namespace: 'alpha', id: 'tealflow-mcp', url: 'https://example.com/mcp' },
+        scope,
+      ),
+    ).rejects.toMatchObject({ code: 'validation' });
+    expect(await repo.getById('alpha', 'tealflow-mcp')).toEqual(sampleEntry);
   });
 });

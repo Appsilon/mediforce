@@ -1,7 +1,7 @@
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { McpClientManager } from '@mediforce/mcp-client';
-import { assertCallerIsNamespaceAdmin } from '../../auth';
+import { assertNamespaceAccess } from '../../auth';
 import { ValidationError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type {
@@ -48,7 +48,7 @@ export async function discoverMcpTools(
   input: DiscoverMcpToolsInputApi,
   scope: CallerScope,
 ): Promise<DiscoverMcpToolsOutput> {
-  assertCallerIsNamespaceAdmin(scope.caller, input.namespace);
+  assertNamespaceAccess(scope.caller, input.namespace);
   await assertPublicHttpTarget(input.url);
   const manager = new McpClientManager([
     { name: PROBE_SERVER_NAME, args: [], url: input.url },

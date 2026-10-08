@@ -19,8 +19,8 @@ export const toolCatalogListCommand = defineCommand({
     }
     output.stdout(`Found ${String(result.entries.length)} entr(ies):`);
     for (const entry of result.entries) {
-      const command = [entry.command, ...(entry.args ?? [])].join(' ');
-      output.stdout(`  ${entry.id}  ${command}${entry.description === undefined ? '' : `  — ${entry.description}`}`);
+      const target = entry.type === 'stdio' ? [entry.command, ...(entry.args ?? [])].join(' ') : entry.url;
+      output.stdout(`  ${entry.id}  ${entry.type}  ${target}${entry.description === undefined ? '' : `  — ${entry.description}`}`);
     }
     return 0;
   },

@@ -8,7 +8,7 @@ import {
   DcrError,
 } from '@mediforce/agent-runtime';
 import {
-  AgentMcpBindingSchema,
+  ToolCatalogEntrySchema,
   type CreateOAuthProviderInput,
 } from '@mediforce/platform-core';
 import { getPlatformServices } from '@/lib/platform-services';
@@ -22,10 +22,11 @@ interface DiscoverBody {
 
 /** POST /api/agents/:id/mcp-servers/:name/oauth-discover
  *
- *  Given an existing HTTP binding on this agent, probe the URL for OAuth
- *  metadata, dynamically register a client with the discovered
- *  authorization server, persist the resulting provider under the
- *  requested namespace, and rewrite the binding's `auth` to point at it.
+ *  Given an existing HTTP binding on this agent, probe its catalog entry's
+ *  URL for OAuth metadata, dynamically register a client with the
+ *  discovered authorization server, persist the resulting provider under
+ *  the requested namespace, and rewrite the catalog entry's `auth` to point
+ *  at it — so every agent bound to that server uses the provider.
  *  After this runs successfully, `/api/agents/:id/oauth/:provider/start`
  *  will mint a consent URL using the DCR-registered credentials.
  *
@@ -67,10 +68,17 @@ export async function POST(
       { status: 400 },
     );
   }
+  const entry = await services.toolCatalogRepo.getById(namespace, binding.catalogId);
+  if (entry?.type !== 'http') {
+    return NextResponse.json(
+      { error: `Tool catalog of "${namespace}" has no HTTP MCP server "${binding.catalogId}"` },
+      { status: 404 },
+    );
+  }
 
   let discovered;
   try {
-    discovered = await discoverMcpAuthServer(binding.url);
+    discovered = await discoverMcpAuthServer(entry.url);
   } catch (err) {
     if (err instanceof McpDiscoveryError) {
       return NextResponse.json(
@@ -95,8 +103,8 @@ export async function POST(
     );
   }
 
-  const redirectUri = buildOAuthCallbackUrl(request, existingProviderSlug(binding, authServer.issuer));
-  const providerSlug = existingProviderSlug(binding, authServer.issuer);
+  const redirectUri = buildOAuthCallbackUrl(request, existingProviderSlug(entry, authServer.issuer));
+  const providerSlug = existingProviderSlug(entry, authServer.issuer);
   const authMethod = pickAuthMethod(authServer.token_endpoint_auth_methods_supported);
   const scopes = chooseScopes(resourceMetadata.scopes_supported, authServer.scopes_supported);
 
@@ -140,7 +148,7 @@ export async function POST(
     tokenEndpointAuthMethod: actualAuthMethod,
     issuer: authServer.issuer,
     registrationEndpoint: authServer.registration_endpoint,
-    resourceUrl: binding.url,
+    resourceUrl: entry.url,
   };
 
   const existing = await services.oauthProviderRepo.get(namespace, providerSlug);
@@ -150,14 +158,12 @@ export async function POST(
     await services.oauthProviderRepo.update(namespace, providerSlug, providerInput);
   }
 
-  // Rewrite the binding so the resolver picks up the new provider slug +
+  // Rewrite the catalog entry so the resolver picks up the new provider slug +
   // the default header shape expected by MCP bearer-token transports.
-  const headerName = existingHeaderName(binding) ?? 'Authorization';
-  const headerValueTemplate = existingHeaderValueTemplate(binding) ?? 'Bearer {token}';
-  const updatedBinding = AgentMcpBindingSchema.parse({
-    type: 'http',
-    url: binding.url,
-    ...(binding.allowedTools !== undefined ? { allowedTools: binding.allowedTools } : {}),
+  const headerName = existingHeaderName(entry) ?? 'Authorization';
+  const headerValueTemplate = existingHeaderValueTemplate(entry) ?? 'Bearer {token}';
+  const updatedEntry = ToolCatalogEntrySchema.parse({
+    ...entry,
     auth: {
       type: 'oauth',
       provider: providerSlug,
@@ -166,8 +172,7 @@ export async function POST(
       ...(scopes.length > 0 ? { scopes } : {}),
     },
   });
-  const nextMcpServers = { ...(agent.mcpServers ?? {}), [serverName]: updatedBinding };
-  await services.agentDefinitionRepo.update(agentId, { mcpServers: nextMcpServers });
+  await services.toolCatalogRepo.upsert(namespace, updatedEntry);
 
   return NextResponse.json(
     {
@@ -181,7 +186,7 @@ export async function POST(
       clientId: registration.client_id,
       clientSecretPresent: registration.client_secret !== undefined,
       redirectUri,
-      binding: updatedBinding,
+      entry: updatedEntry,
     },
     { status: 200 },
   );

@@ -40,6 +40,7 @@ import { GET, PATCH, DELETE } from '../route';
 
 const catalogEntry = {
   id: 'tealflow-mcp',
+  type: 'stdio' as const,
   command: 'npx',
   args: ['-y', 'tealflow-mcp'],
   description: 'TealFlow deployment MCP',
@@ -120,8 +121,8 @@ describe('GET /api/admin/tool-catalog/:id', () => {
     expect(res.status).toBe(404);
   });
 
-  it('[AUTHZ] plain member gets 403 (bug fix)', async () => {
-    mockResolveCallerIdentity.mockResolvedValue(memberCaller());
+  it('[AUTHZ] a caller outside the namespace gets 403', async () => {
+    mockResolveCallerIdentity.mockResolvedValue(memberCaller('other-ns'));
 
     const res = await GET(
       makeGetRequest('tealflow-mcp', 'appsilon'),
@@ -204,8 +205,8 @@ describe('PATCH /api/admin/tool-catalog/:id', () => {
     expect(res.status).toBe(404);
   });
 
-  it('[AUTHZ] plain member gets 403 (bug fix)', async () => {
-    mockResolveCallerIdentity.mockResolvedValue(memberCaller());
+  it('[AUTHZ] a caller outside the namespace gets 403', async () => {
+    mockResolveCallerIdentity.mockResolvedValue(memberCaller('other-ns'));
 
     const res = await PATCH(
       makePatchRequest('tealflow-mcp', 'appsilon', { description: 'x' }),
@@ -252,8 +253,8 @@ describe('DELETE /api/admin/tool-catalog/:id', () => {
     expect(mockCatalogDelete).toHaveBeenCalledWith('appsilon', 'unknown');
   });
 
-  it('[AUTHZ] plain member gets 403 (bug fix)', async () => {
-    mockResolveCallerIdentity.mockResolvedValue(memberCaller());
+  it('[AUTHZ] a caller outside the namespace gets 403', async () => {
+    mockResolveCallerIdentity.mockResolvedValue(memberCaller('other-ns'));
 
     const res = await DELETE(
       makeDeleteRequest('tealflow-mcp', 'appsilon'),

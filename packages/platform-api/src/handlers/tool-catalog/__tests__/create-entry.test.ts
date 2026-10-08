@@ -9,7 +9,7 @@ import {
   createTestScope,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope';
-import { adminRoles, memberRoles, ownerRoles, sampleEntry } from './fixtures';
+import { adminRoles, memberRoles, ownerRoles, sampleEntry, sampleHttpEntry } from './fixtures';
 
 describe('createToolCatalogEntry handler', () => {
   let repo: InMemoryToolCatalogRepository;
@@ -73,7 +73,7 @@ describe('createToolCatalogEntry handler', () => {
     const scope = createTestScope({ toolCatalogRepo: repo, auditRepo });
 
     const result = await createToolCatalogEntry(
-      { namespace: 'alpha', command: '/usr/local/bin/MyTool', args: [] },
+      { namespace: 'alpha', type: 'stdio', command: '/usr/local/bin/MyTool', args: [] },
       scope,
     );
 
@@ -84,15 +84,27 @@ describe('createToolCatalogEntry handler', () => {
     const scope = createTestScope({ toolCatalogRepo: repo, auditRepo });
 
     await expect(
-      createToolCatalogEntry({ namespace: 'alpha', command: '/' }, scope),
+      createToolCatalogEntry({ namespace: 'alpha', type: 'stdio', command: '/' }, scope),
     ).rejects.toMatchObject({ code: 'validation' });
   });
 
-  it('throws ForbiddenError for a member-role caller (bug fix)', async () => {
+  it('creates an entry for a member-role caller', async () => {
     const scope = createTestScope({
       toolCatalogRepo: repo,
       auditRepo,
       caller: userCaller('u-member', ['alpha'], memberRoles),
+    });
+
+    await createToolCatalogEntry({ namespace: 'alpha', ...sampleEntry }, scope);
+
+    expect(await repo.getById('alpha', 'tealflow-mcp')).toEqual(sampleEntry);
+  });
+
+  it('throws ForbiddenError for a caller outside the namespace', async () => {
+    const scope = createTestScope({
+      toolCatalogRepo: repo,
+      auditRepo,
+      caller: userCaller('u-other', ['beta']),
     });
 
     await expect(
@@ -100,6 +112,17 @@ describe('createToolCatalogEntry handler', () => {
     ).rejects.toBeInstanceOf(ForbiddenError);
 
     expect(await repo.getById('alpha', 'tealflow-mcp')).toBeNull();
+  });
+
+  it('creates an http entry and derives its id from the url host', async () => {
+    const scope = createTestScope({ toolCatalogRepo: repo, auditRepo });
+    const { id: _id, ...withoutId } = sampleHttpEntry;
+
+    const result = await createToolCatalogEntry({ namespace: 'alpha', ...withoutId }, scope);
+
+    expect(result.entry).toEqual({ ...sampleHttpEntry, id: 'api-githubcopilot-com' });
+    const events = await auditRepo.getByEntity('toolCatalogEntry', 'api-githubcopilot-com');
+    expect(events[0].inputSnapshot).toMatchObject({ type: 'http', url: sampleHttpEntry.url });
   });
 
   it('throws conflict HandlerError when the id is already taken', async () => {

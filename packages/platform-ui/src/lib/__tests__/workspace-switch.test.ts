@@ -5,7 +5,7 @@ describe('workspaceSwitchHref', () => {
   it('preserves the section when on a stable list route', () => {
     expect(workspaceSwitchHref('/acme/runs', 'acme', 'beta')).toBe('/beta/runs');
     expect(workspaceSwitchHref('/acme/agents', 'acme', 'beta')).toBe('/beta/agents');
-    expect(workspaceSwitchHref('/acme/tools', 'acme', 'beta')).toBe('/beta/tools');
+    expect(workspaceSwitchHref('/acme/mcp', 'acme', 'beta')).toBe('/beta/mcp');
     expect(workspaceSwitchHref('/acme/skills', 'acme', 'beta')).toBe('/beta/skills');
     expect(workspaceSwitchHref('/acme/tasks', 'acme', 'beta')).toBe('/beta/tasks');
     expect(workspaceSwitchHref('/acme/monitoring', 'acme', 'beta')).toBe('/beta/monitoring');

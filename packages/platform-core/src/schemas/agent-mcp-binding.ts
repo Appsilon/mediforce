@@ -40,7 +40,7 @@ export const HttpAuthConfigSchema = z.discriminatedUnion('type', [
 export type HttpAuthConfig = z.infer<typeof HttpAuthConfigSchema>;
 
 /** Normalizes legacy HTTP auth shapes into the discriminated form.
- *  Pre-Step 5, bindings stored `{ headers: {...} }` without a `type`
+ *  Pre-Step 5, HTTP bindings stored `{ headers: {...} }` without a `type`
  *  discriminator. After this step, all authed HTTP bindings must carry
  *  `type: 'headers' | 'oauth'`. Lazy read-time migration: legacy shapes
  *  are normalized here, writes always emit the new form. */
@@ -57,7 +57,7 @@ function normalizeLegacyAuth(val: unknown): unknown {
   return undefined;
 }
 
-/** Stdio binding — must reference a curated ToolCatalogEntry by id.
+/** Stdio binding — must reference a curated stdio ToolCatalogEntry by id.
  *  Inline command/args are NOT accepted on bindings: that would re-open
  *  the RCE surface this refactor is closing. */
 export const StdioAgentMcpBindingSchema = z.object({
@@ -68,13 +68,13 @@ export const StdioAgentMcpBindingSchema = z.object({
 
 export type StdioAgentMcpBinding = z.infer<typeof StdioAgentMcpBindingSchema>;
 
-/** HTTP binding — free-form URL. Domain allowlist validation arrives
- *  in Step 2 (not enforced at schema level). */
+/** HTTP binding — must reference a curated HTTP ToolCatalogEntry by id.
+ *  The URL and auth live on the catalog entry, so an agent can only reach
+ *  servers that exist in its workspace catalog. */
 export const HttpAgentMcpBindingSchema = z.object({
   type: z.literal('http'),
-  url: z.string().url(),
+  catalogId: z.string().min(1),
   allowedTools: z.array(z.string()).min(1).optional(),
-  auth: z.preprocess(normalizeLegacyAuth, HttpAuthConfigSchema.optional()),
 }).strict();
 
 export type HttpAgentMcpBinding = z.infer<typeof HttpAgentMcpBindingSchema>;
@@ -107,14 +107,36 @@ export const StepMcpRestrictionSchema = z.record(z.string().min(1), StepMcpRestr
 
 export type StepMcpRestriction = z.infer<typeof StepMcpRestrictionSchema>;
 
-/** Admin-curated stdio MCP server definition, referenced by AgentMcpBinding.catalogId.
- *  Env values support {{SECRET:name}} template syntax. */
-export const ToolCatalogEntrySchema = z.object({
+/** Curated stdio MCP server — the command the platform launches next to the
+ *  agent. Env values support {{SECRET:name}} template syntax. */
+export const StdioToolCatalogEntrySchema = z.object({
   id: z.string().min(1),
+  type: z.literal('stdio'),
   command: z.string().min(1),
   args: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
   description: z.string().optional(),
 }).strict();
+
+export type StdioToolCatalogEntry = z.infer<typeof StdioToolCatalogEntrySchema>;
+
+/** Curated remote MCP server reached over HTTP. Header values support
+ *  {{SECRET:name}} template syntax. */
+export const HttpToolCatalogEntrySchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('http'),
+  url: z.string().url(),
+  auth: z.preprocess(normalizeLegacyAuth, HttpAuthConfigSchema.optional()),
+  description: z.string().optional(),
+}).strict();
+
+export type HttpToolCatalogEntry = z.infer<typeof HttpToolCatalogEntrySchema>;
+
+/** Workspace-curated MCP server definition, referenced by AgentMcpBinding.catalogId.
+ *  A binding's `type` must match the entry's `type`. */
+export const ToolCatalogEntrySchema = z.discriminatedUnion('type', [
+  StdioToolCatalogEntrySchema,
+  HttpToolCatalogEntrySchema,
+]);
 
 export type ToolCatalogEntry = z.infer<typeof ToolCatalogEntrySchema>;

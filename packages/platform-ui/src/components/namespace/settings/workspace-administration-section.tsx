@@ -11,9 +11,9 @@ export function WorkspaceAdministrationSection({ handle }: { handle: string }) {
       description: 'Docker images and disk usage',
     },
     {
-      href: routes.adminToolCatalog(handle, { from: 'settings' }),
-      title: 'Tool catalog',
-      description: 'MCP servers available to agents',
+      href: routes.mcp(handle),
+      title: 'MCP servers',
+      description: 'Stdio and HTTP MCP servers available to agents',
     },
     {
       href: routes.adminOAuthProviders(handle, { from: 'settings' }),

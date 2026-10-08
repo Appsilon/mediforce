@@ -1,6 +1,6 @@
 import { ToolCatalogEntrySchema } from '@mediforce/platform-core';
-import { assertCallerIsNamespaceAdmin } from '../../auth';
-import { NotFoundError } from '../../errors';
+import { assertNamespaceAccess } from '../../auth';
+import { HandlerError, NotFoundError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type {
   UpdateToolCatalogEntryInputApi,
@@ -12,7 +12,7 @@ export async function updateToolCatalogEntry(
   input: UpdateToolCatalogEntryInputApi,
   scope: CallerScope,
 ): Promise<UpdateToolCatalogEntryOutput> {
-  assertCallerIsNamespaceAdmin(scope.caller, input.namespace);
+  assertNamespaceAccess(scope.caller, input.namespace);
   const { namespace, id, ...patch } = input;
 
   const existing = await scope.toolCatalog.getById(namespace, id);
@@ -20,10 +20,20 @@ export async function updateToolCatalogEntry(
     throw new NotFoundError(`Tool catalog entry '${id}' not found`);
   }
 
-  const merged = ToolCatalogEntrySchema.parse(
-    Object.fromEntries(Object.entries({ ...existing, ...patch, id }).filter(([, value]) => value !== null)),
+  const sentPatch = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
+  const merged = ToolCatalogEntrySchema.safeParse(
+    Object.fromEntries(
+      Object.entries({ ...existing, ...sentPatch, id, type: existing.type }).filter(([, value]) => value !== null),
+    ),
   );
-  const entry = await scope.toolCatalog.upsert(namespace, merged);
+  if (!merged.success) {
+    throw new HandlerError(
+      'validation',
+      merged.error.issues[0]?.message ?? 'Invalid input',
+      merged.error.issues,
+    );
+  }
+  const entry = await scope.toolCatalog.upsert(namespace, merged.data);
 
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({

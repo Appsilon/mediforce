@@ -98,3 +98,4 @@ appendix can capture what actually shipped vs the original decision body.
 | [0023](./0023-step-evaluation.md) | Step Evaluation: Evaluators, single-step Eval Runs, Step Qualification (partially supersedes [0007](./0007-llm-evaluation-observability.md) § Deferred; optimisation parked in [0024](./0024-optimisation.md)) | Accepted |
 | [0024](./0024-optimisation.md) | Optimisation — challengers, fix variants, GEPA, case expectations — parked outside Step Evaluation; reference code pinned at `aa8ac636` | Proposed |
 | [0025](./0025-skill-catalog.md) | A Skill is a Namespace resource an Agent owns (private or public), offered to Claude Code through the plugin folder; not something a Workflow carries | Accepted |
+| [0026](./0026-mcp-servers-live-in-the-catalog.md) | Every MCP server (stdio and HTTP) lives in the workspace catalog any member manages; an agent binding only references one | Accepted |

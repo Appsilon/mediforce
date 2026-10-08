@@ -7,9 +7,9 @@ import { useState } from 'react';
 interface DeleteProviderDialogProps {
   providerId: string;
   providerName: string;
-  /** Count of agent bindings still referencing this provider. Non-blocking —
-   *  admin can delete anyway; those bindings will fail at connect time until
-   *  the provider is re-created or the bindings are repointed. */
+  /** Count of MCP servers still referencing this provider. Non-blocking —
+   *  admin can delete anyway; those servers will fail at connect time until
+   *  the provider is re-created or the servers are repointed. */
   referenceCount: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -78,11 +78,11 @@ export function DeleteProviderDialog({
           {referenceCount > 0 && (
             <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
               <p className="font-medium text-amber-700 dark:text-amber-300">
-                {referenceCount} agent {referenceCount === 1 ? 'binding references' : 'bindings reference'} this provider.
+                {referenceCount} MCP {referenceCount === 1 ? 'server references' : 'servers reference'} this provider.
               </p>
               <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-200/80">
                 Previously-connected tokens continue to work at spawn time, but no new OAuth flow can
-                start for those bindings until the provider is re-added.
+                start for those servers until the provider is re-added.
               </p>
             </div>
           )}

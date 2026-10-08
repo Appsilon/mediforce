@@ -4,7 +4,7 @@ import { printJson } from '../output';
 export const toolCatalogDiscoverCommand = defineCommand({
   name: 'mediforce tool-catalog discover',
   description:
-    'List the tools an unauthenticated, publicly reachable HTTP MCP server exposes. Admin only.',
+    'List the tools an unauthenticated, publicly reachable HTTP MCP server exposes.',
   args: {
     namespace: { type: 'string', required: true, description: 'Workspace handle' },
     url: { type: 'string', required: true, description: 'URL of an unauthenticated HTTP MCP server' },

@@ -61,6 +61,13 @@ test.describe('Step Evaluation MCP replay — API E2E', () => {
     test.setTimeout(180_000);
     const suffix = randomUUID().slice(0, 8);
 
+    // The agent binds HTTP servers from the workspace catalog, so they go there first.
+    for (const server of ['meddra', 'email']) {
+      await post(request, `/api/admin/tool-catalog?namespace=${TEST_ORG_HANDLE}`, {
+        id: `${server}-${suffix}`, type: 'http', url: `https://mcp.example.com/${server}`,
+      }, 201);
+    }
+
     const agentRes = await request.post('/api/agents', {
       headers: JSON_HEADERS,
       data: {
@@ -73,8 +80,8 @@ test.describe('Step Evaluation MCP replay — API E2E', () => {
         outputDescription: 'Coded AEs',
         namespace: TEST_ORG_HANDLE,
         mcpServers: {
-          meddra: { type: 'http', url: 'https://mcp.example.com/meddra' },
-          email: { type: 'http', url: 'https://mcp.example.com/email' },
+          meddra: { type: 'http', catalogId: `meddra-${suffix}` },
+          email: { type: 'http', catalogId: `email-${suffix}` },
         },
       },
     });
