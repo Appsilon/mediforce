@@ -4,12 +4,20 @@ import { useEffect, useMemo, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Trash2 } from 'lucide-react';
 import type { HttpToolCatalogEntry, OAuthProviderConfig } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { mediforce } from '@/lib/mediforce';
 import type { CatalogFormProps } from './catalog-form';
-import { CatalogFormFooter, DescriptionField, Field, catalogIdSchema, inputClass } from './form-fields';
+import {
+  CatalogFormFooter,
+  DescriptionField,
+  Field,
+  FieldGroup,
+  KeyValueRow,
+  PillRadioGroup,
+  catalogIdSchema,
+  inputClass,
+} from './form-fields';
 
 const HttpFormSchema = z
   .object({
@@ -44,6 +52,12 @@ const HttpFormSchema = z
     }
   });
 type HttpFormValues = z.infer<typeof HttpFormSchema>;
+
+const AUTH_OPTIONS = [
+  { value: 'none', label: 'None' },
+  { value: 'headers', label: 'Static headers' },
+  { value: 'oauth', label: 'OAuth' },
+] as const;
 
 function valuesFromEntry(entry: HttpToolCatalogEntry | null): HttpFormValues {
   const auth = entry?.auth;
@@ -152,84 +166,41 @@ export function HttpCatalogFields({
         </Field>
       </div>
 
-      <fieldset className="flex flex-col gap-2" aria-label="Authentication">
-        <legend className="text-sm font-medium">Authentication</legend>
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              { value: 'none', label: 'None' },
-              { value: 'headers', label: 'Static headers' },
-              { value: 'oauth', label: 'OAuth' },
-            ] as const
-          ).map((option) => (
-            <label
-              key={option.value}
-              className={cn(
-                'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
-                authMode === option.value
-                  ? 'border-primary bg-primary/5 text-primary'
-                  : 'border-border hover:border-primary/40',
-              )}
-            >
-              <input
-                type="radio"
-                value={option.value}
-                checked={authMode === option.value}
-                onChange={() => form.setValue('authMode', option.value)}
-                className="h-3.5 w-3.5"
-              />
-              {option.label}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <PillRadioGroup
+        legend="Authentication"
+        name="authMode"
+        options={AUTH_OPTIONS}
+        value={authMode}
+        onChange={(mode) => form.setValue('authMode', mode)}
+      />
 
       {authMode === 'headers' && (
-        <div className="flex flex-col gap-2 rounded-md border bg-card px-3 py-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium">Headers</span>
-            <button
-              type="button"
-              onClick={() => headersArray.append({ key: '', value: '' })}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <Plus className="h-3 w-3" />
-              Add header
-            </button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Values support{' '}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">{'{{SECRET:name}}'}</code> — resolved at spawn
-            time from the workflow secrets that trigger the run.
-          </p>
+        <FieldGroup
+          label="Headers"
+          hint={
+            <>
+              Values support{' '}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">{'{{SECRET:name}}'}</code> — resolved at
+              spawn time from the workflow secrets that trigger the run.
+            </>
+          }
+          onAdd={() => headersArray.append({ key: '', value: '' })}
+        >
           {headersArray.fields.length === 0 && <p className="text-xs text-muted-foreground">No headers.</p>}
           {headersArray.fields.map((field, index) => (
-            <div key={field.id} className="flex items-center gap-2">
-              <input
-                aria-label={`Header key ${index + 1}`}
-                {...form.register(`headers.${index}.key` as const)}
-                placeholder="Authorization"
-                className="w-40 rounded-md border bg-background px-3 py-1.5 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
-                autoComplete="off"
-              />
-              <input
-                aria-label={`Header value ${index + 1}`}
-                {...form.register(`headers.${index}.value` as const)}
-                placeholder="Bearer {{SECRET:api-key}}"
-                className="flex-1 rounded-md border bg-background px-3 py-1.5 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
-                autoComplete="off"
-              />
-              <button
-                type="button"
-                onClick={() => headersArray.remove(index)}
-                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
-                aria-label={`Remove header ${index + 1}`}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
+            <KeyValueRow
+              key={field.id}
+              keyField={form.register(`headers.${index}.key` as const)}
+              valueField={form.register(`headers.${index}.value` as const)}
+              keyLabel={`Header key ${index + 1}`}
+              valueLabel={`Header value ${index + 1}`}
+              keyPlaceholder="Authorization"
+              valuePlaceholder="Bearer {{SECRET:api-key}}"
+              removeLabel={`Remove header ${index + 1}`}
+              onRemove={() => headersArray.remove(index)}
+            />
           ))}
-        </div>
+        </FieldGroup>
       )}
 
       {authMode === 'oauth' && (

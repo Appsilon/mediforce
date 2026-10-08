@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react';
 import type { UseFormRegisterReturn } from 'react-hook-form';
 import { z } from 'zod';
+import { cn } from '@/lib/utils';
 
 export function Field({
   label,
@@ -46,6 +47,89 @@ export function FieldGroup({
       </div>
       {hint !== undefined && <p className="text-xs text-muted-foreground">{hint}</p>}
       <div className="flex flex-col gap-2">{children}</div>
+    </div>
+  );
+}
+
+export function PillRadioGroup<Value extends string>({
+  legend,
+  name,
+  options,
+  value,
+  onChange,
+  disabled = false,
+}: {
+  legend: string;
+  name: string;
+  options: readonly { value: Value; label: string }[];
+  value: Value;
+  onChange: (value: Value) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-2" disabled={disabled} aria-label={legend}>
+      <legend className="text-sm font-medium">{legend}</legend>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => (
+          <label
+            key={option.value}
+            className={cn(
+              'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
+              value === option.value ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-primary/40',
+              disabled && 'opacity-60 cursor-not-allowed',
+            )}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={option.value}
+              checked={value === option.value}
+              onChange={() => onChange(option.value)}
+              className="h-3.5 w-3.5"
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+const rowInputClass =
+  'rounded-md border bg-background px-3 py-1.5 font-mono text-sm outline-none focus:ring-2 focus:ring-ring';
+
+/** One name/value pair inside a `FieldGroup` — an env var or a header. */
+export function KeyValueRow({
+  keyField,
+  valueField,
+  keyLabel,
+  valueLabel,
+  keyPlaceholder,
+  valuePlaceholder,
+  removeLabel,
+  onRemove,
+}: {
+  keyField: UseFormRegisterReturn;
+  valueField: UseFormRegisterReturn;
+  keyLabel: string;
+  valueLabel: string;
+  keyPlaceholder: string;
+  valuePlaceholder: string;
+  removeLabel: string;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <input aria-label={keyLabel} {...keyField} placeholder={keyPlaceholder} className={cn(rowInputClass, 'w-40')} autoComplete="off" />
+      <input aria-label={valueLabel} {...valueField} placeholder={valuePlaceholder} className={cn(rowInputClass, 'flex-1')} autoComplete="off" />
+      <button
+        type="button"
+        onClick={onRemove}
+        className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
+        aria-label={removeLabel}
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
     </div>
   );
 }

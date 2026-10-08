@@ -8,6 +8,10 @@ last_reviewed: 2026-10-07
 
 **Date:** 2026-10-07
 **Deciders:** Krystian Zieliński
+**Partially supersedes:** [ADR-0022](./0022-image-catalog.md) §3, the sentences
+contrasting the Image Catalog with an admin-gated Tool Catalog, and §4, the last
+paragraph's claim that the two catalogs have different write gates. Both
+catalogs are now written by any workspace member. The rest of ADR-0022 stands.
 
 ## Context
 
@@ -38,7 +42,9 @@ had nowhere to add or edit one: clicking an HTTP card sent you to the agent.
    references resolved at spawn time.
 4. **OAuth stays per agent.** The provider, header name and template live on
    the http entry; the token is still stored per (agent, binding name), so
-   each agent connects its own account.
+   each agent connects its own account. Creating an OAuth provider stays
+   admin-only, since it holds a client secret; any member can list the
+   workspace's providers by id and name to pick one for an entry.
 5. **The Tools page becomes the MCP page** (`/{handle}/mcp`). It lists the
    catalog by transport and edits an entry in a dialog. It absorbs the admin
    Tool Catalog page and the per-tool detail page; the old URLs redirect.
@@ -47,7 +53,9 @@ Migration `0077` moves every inline HTTP binding into an http entry in the
 agent's workspace — reusing an entry with the same url and auth, otherwise a
 new one with an id slugged from the host — and rewrites the binding to
 reference it. Binding names do not change, so connected OAuth tokens keep
-resolving.
+resolving. An agent with no live workspace (platform-global, or its workspace
+deleted) has nowhere to put the entry: its HTTP bindings are dropped and the
+migration logs a WARNING naming each one, instead of failing the deploy.
 
 ## Consequences
 
@@ -58,7 +66,7 @@ resolving.
   kept inline commands out of agents; the gate now sits at workspace
   membership. Agents still cannot carry a command inline, and every catalog
   write is audited (`tool_catalog_entry.*`).
-- Changing an http entry's auth (including the OAuth discovery route, which
-  now rewrites the entry) changes it for every agent bound to that server.
+- Changing an http entry's auth changes it for every agent bound to that
+  server. The edit dialog says how many agents that is.
 - A platform-global agent has no workspace catalog; its bindings are checked
   against the running workflow's namespace at resolution time only.

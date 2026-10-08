@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
+  ArrowLeft,
   Database,
   FlaskConical,
   Globe,
@@ -165,8 +166,10 @@ export default function McpPage() {
 
   const selectedId = search.get('id');
   const creating = search.get('new') === '1';
+  const from = search.get('from') === 'settings' ? 'settings' : undefined;
   const editing = selectedId === null ? null : (entries.find((entry) => entry.id === selectedId) ?? null);
   const dialogOpen = creating || editing !== null;
+  const missingId = !loading && error === null && selectedId !== null && editing === null ? selectedId : null;
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -195,15 +198,15 @@ export default function McpPage() {
   const openEntry = useCallback(
     (id: string) => {
       setFormError(null);
-      router.replace(routes.mcp(handle, { id }));
+      router.replace(routes.mcp(handle, { id, from }));
     },
-    [handle, router],
+    [handle, from, router],
   );
   const openCreate = useCallback(() => {
     setFormError(null);
-    router.replace(routes.mcp(handle, { create: true }));
-  }, [handle, router]);
-  const closeDialog = useCallback(() => router.replace(routes.mcp(handle)), [handle, router]);
+    router.replace(routes.mcp(handle, { create: true, from }));
+  }, [handle, from, router]);
+  const closeDialog = useCallback(() => router.replace(routes.mcp(handle, { from })), [handle, from, router]);
 
   const handleSubmit = useCallback(
     async (entry: ToolCatalogEntry) => {
@@ -240,6 +243,7 @@ export default function McpPage() {
     () => new Map(entries.map((entry) => [entry.id, findCatalogUsage(agents, entry.id)])),
     [entries, agents],
   );
+  const editingUsages = editing === null ? [] : (usageById.get(editing.id) ?? []);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -276,23 +280,34 @@ export default function McpPage() {
   return (
     <div className="flex flex-1 flex-col p-6">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-1.5">
-            <h1 className="text-xl font-headline font-semibold" data-tour="mcp-header">MCP</h1>
-            <ConceptPopover label="What is an MCP server?">
-              <p>
-                <strong>An MCP server is an external tool host an agent can call while it runs.</strong>{' '}
-                <span className="font-medium text-foreground">Stdio</span> servers are commands the platform launches
-                alongside the agent; <span className="font-medium text-foreground">HTTP</span> servers are remote
-                endpoints. Both are added here once and bound to agents by id.
-              </p>
-              <p>
-                An agent reaches only the servers bound to it, and a workflow step can narrow that set further —
-                never widen it.
-              </p>
-            </ConceptPopover>
+        <div className="flex items-start gap-3">
+          {from === 'settings' && (
+            <Link
+              href={routes.settings(handle)}
+              className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              aria-label="Back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          )}
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-xl font-headline font-semibold" data-tour="mcp-header">MCP</h1>
+              <ConceptPopover label="What is an MCP server?">
+                <p>
+                  <strong>An MCP server is an external tool host an agent can call while it runs.</strong>{' '}
+                  <span className="font-medium text-foreground">Stdio</span> servers are commands the platform launches
+                  alongside the agent; <span className="font-medium text-foreground">HTTP</span> servers are remote
+                  endpoints. Both are added here once and bound to agents by id.
+                </p>
+                <p>
+                  An agent reaches only the servers bound to it, and a workflow step can narrow that set further —
+                  never widen it.
+                </p>
+              </ConceptPopover>
+            </div>
+            <p className="text-sm text-muted-foreground mt-0.5">MCP servers available to agents in @{handle}.</p>
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">MCP servers available to agents in @{handle}.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -329,6 +344,12 @@ export default function McpPage() {
       {error !== null && (
         <div className="mb-4 rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
+        </div>
+      )}
+
+      {missingId !== null && (
+        <div className="mb-4 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+          MCP server “{missingId}” not found in @{handle}.
         </div>
       )}
 
@@ -385,6 +406,11 @@ export default function McpPage() {
               </Dialog.Close>
             </div>
             <div className="overflow-y-auto px-5 py-4">
+              {editingUsages.length > 0 && (
+                <p className="mb-4 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                  Saving changes this server for every agent that uses it ({editingUsages.length}).
+                </p>
+              )}
               {dialogOpen && (
                 <CatalogForm
                   key={editing?.id ?? 'create'}
@@ -396,7 +422,7 @@ export default function McpPage() {
                   submitError={formError}
                 />
               )}
-              {editing !== null && <UsedBy handle={handle} usages={usageById.get(editing.id) ?? []} />}
+              {editing !== null && <UsedBy handle={handle} usages={editingUsages} />}
             </div>
           </Dialog.Content>
         </Dialog.Portal>

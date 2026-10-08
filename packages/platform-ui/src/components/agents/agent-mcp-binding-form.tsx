@@ -10,6 +10,7 @@ import type { AgentMcpBinding, ToolCatalogEntry } from '@mediforce/platform-core
 import { mediforce } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
+import { Field } from '@/components/admin/tool-catalog/form-fields';
 
 function deriveBindingName(catalogId: string, existingNames: string[]): string {
   const base = catalogId.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^[-_]+|[-_]+$/g, '') || 'mcp';
@@ -324,23 +325,5 @@ function FormFooter({
         </button>
       </div>
     </>
-  );
-}
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string | null;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium">{label}</span>
-      {children}
-      {error !== undefined && error !== null && <span className="text-xs text-destructive">{error}</span>}
-    </label>
   );
 }

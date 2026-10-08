@@ -11,7 +11,7 @@ export function WorkspaceAdministrationSection({ handle }: { handle: string }) {
       description: 'Docker images and disk usage',
     },
     {
-      href: routes.mcp(handle),
+      href: routes.mcp(handle, { from: 'settings' }),
       title: 'MCP servers',
       description: 'Stdio and HTTP MCP servers available to agents',
     },

@@ -1,12 +1,15 @@
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
+import { createTestUser, signInAndGetSessionCookie } from '../helpers/emulator';
+import { sessionCookieHeaders, type UserCaller } from '../helpers/multi-namespace';
+import { seedPostgresWorkspaceMember } from '../helpers/postgres-seed';
 
 /**
- * L3 API journey for the tool-catalog admin endpoints. Runs against
+ * L3 API journey for the tool-catalog endpoints. Runs against
  * Postgres: route handler → AuthorizedToolCatalogRepository →
  * PostgresToolCatalogRepository → Drizzle → live Postgres container.
  */
-test.describe('tool-catalog admin API journey', () => {
+test.describe('tool-catalog API journey', () => {
   const apiKey = process.env.PLATFORM_API_KEY ?? 'test-api-key';
   const authHeaders = { 'X-Api-Key': apiKey };
 
@@ -175,6 +178,45 @@ test.describe('tool-catalog admin API journey', () => {
 
     await request.delete(`/api/agents/${agent.id}`, { headers: authHeaders });
     await request.delete(`/api/admin/tool-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, { headers: authHeaders });
+  });
+
+  test('a plain member manages catalog entries and picks OAuth providers, but cannot create one', async ({ request }) => {
+    const email = 'tool-catalog-member@mediforce.dev';
+    const password = 'toolcatalog123456';
+    const uid = await createTestUser(email, password, 'Tool Catalog Member');
+    await seedPostgresWorkspaceMember(TEST_ORG_HANDLE, uid, 'member', 'Tool Catalog Member');
+    const member: UserCaller = { uid, sessionCookie: await signInAndGetSessionCookie(email, password) };
+    const headers = sessionCookieHeaders(member);
+    const entryId = `e2e-member-${Date.now()}`;
+
+    const createRes = await request.post(`/api/admin/tool-catalog?namespace=${TEST_ORG_HANDLE}`, {
+      headers,
+      data: { id: entryId, type: 'http', url: 'https://mcp.example.com/mcp' },
+    });
+    expect(createRes.status(), await createRes.text()).toBe(201);
+
+    const providersRes = await request.get(`/api/admin/oauth-providers?namespace=${TEST_ORG_HANDLE}`, { headers });
+    expect(providersRes.ok(), await providersRes.text()).toBe(true);
+    const { providers } = (await providersRes.json()) as { providers: Array<Record<string, unknown>> };
+    expect(providers.map((provider) => provider.id)).toContain('github-mock');
+    expect(providers.every((provider) => !('clientSecret' in provider))).toBe(true);
+
+    const createProviderRes = await request.post(`/api/admin/oauth-providers?namespace=${TEST_ORG_HANDLE}`, {
+      headers,
+      data: {
+        id: `member-${Date.now()}`,
+        name: 'Member provider',
+        clientId: 'id',
+        clientSecret: 'secret',
+        authorizeUrl: 'https://auth.example.com/authorize',
+        tokenUrl: 'https://auth.example.com/token',
+        scopes: ['read'],
+      },
+    });
+    expect(createProviderRes.status()).toBe(403);
+
+    const deleteRes = await request.delete(`/api/admin/tool-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, { headers });
+    expect(deleteRes.ok(), await deleteRes.text()).toBe(true);
   });
 
   test('discover rejects private targets and unauthenticated callers', async ({ request }) => {

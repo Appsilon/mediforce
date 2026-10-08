@@ -27,7 +27,8 @@ function withAdminParams(path: string, params: AdminPageParams | undefined): str
 }
 
 export function adminBackHref(handle: string, from: string | null): string {
-  return from === 'mcp' ? routes.mcp(handle) : routes.settings(handle);
+  // `tools` is what links read before the Tools page became the MCP page.
+  return from === 'mcp' || from === 'tools' ? routes.mcp(handle) : routes.settings(handle);
 }
 
 export const routes = {
@@ -94,11 +95,13 @@ export const routes = {
 
   // ── Models & MCP ───────────────────────────────────────────────
   models: (handle: string) => `/${handle}/models`,
-  /** The MCP page; `id` opens that catalog entry's edit dialog, `create` the add dialog. */
-  mcp: (handle: string, params?: { id?: string; create?: boolean }) => {
+  /** The MCP page; `id` opens that catalog entry's edit dialog, `create` the add dialog,
+   *  `from: 'settings'` shows a back arrow to Settings. */
+  mcp: (handle: string, params?: { id?: string; create?: boolean; from?: 'settings' }) => {
     const query = new URLSearchParams();
     if (params?.id !== undefined) query.set('id', params.id);
     if (params?.create === true) query.set('new', '1');
+    if (params?.from !== undefined) query.set('from', params.from);
     const qs = query.toString();
     return qs === '' ? `/${handle}/mcp` : `/${handle}/mcp?${qs}`;
   },

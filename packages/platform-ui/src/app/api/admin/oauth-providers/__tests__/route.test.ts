@@ -148,13 +148,13 @@ describe('GET /api/admin/oauth-providers', () => {
     expect(res.status).toBe(200);
   });
 
-  it('[AUTHZ] plain member gets 403', async () => {
+  it('[AUTHZ] plain member lists providers to pick one for an MCP server', async () => {
     mockResolveCallerIdentity.mockResolvedValue(memberCaller());
 
     const res = await GET(makeGetRequest('appsilon'));
 
-    expect(res.status).toBe(403);
-    expect(mockProviderList).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(mockProviderList).toHaveBeenCalledWith('appsilon');
   });
 
   it('[AUTHZ] non-member (no role on namespace) gets 403', async () => {

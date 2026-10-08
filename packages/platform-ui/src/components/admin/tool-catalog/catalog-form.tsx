@@ -9,7 +9,16 @@ import { cn } from '@/lib/utils';
 import type { StdioToolCatalogEntry, ToolCatalogEntry } from '@mediforce/platform-core';
 import { CommandAvailability } from './command-availability';
 import { COMMAND_SUGGESTIONS } from './command-check';
-import { CatalogFormFooter, DescriptionField, Field, FieldGroup, catalogIdSchema, inputClass } from './form-fields';
+import {
+  CatalogFormFooter,
+  DescriptionField,
+  Field,
+  FieldGroup,
+  KeyValueRow,
+  PillRadioGroup,
+  catalogIdSchema,
+  inputClass,
+} from './form-fields';
 import { HttpCatalogFields } from './http-catalog-fields';
 
 const StdioFormSchema = z.object({
@@ -54,6 +63,11 @@ function valuesToEntry(values: StdioFormValues, existingId?: string): StdioToolC
   };
 }
 
+const TRANSPORT_OPTIONS = [
+  { value: 'stdio', label: 'stdio' },
+  { value: 'http', label: 'HTTP' },
+] as const;
+
 export interface CatalogFormProps {
   namespace: string;
   entry: ToolCatalogEntry | null;
@@ -71,31 +85,14 @@ export function CatalogForm(props: CatalogFormProps) {
 
   return (
     <div className="flex flex-col gap-5">
-      <fieldset className="flex flex-col gap-2" disabled={entry !== null} aria-label="Transport">
-        <legend className="text-sm font-medium">Transport</legend>
-        <div className="flex gap-2">
-          {(['stdio', 'http'] as const).map((option) => (
-            <label
-              key={option}
-              className={cn(
-                'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
-                transport === option ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-primary/40',
-                entry !== null && 'opacity-60 cursor-not-allowed',
-              )}
-            >
-              <input
-                type="radio"
-                name="transport"
-                value={option}
-                checked={transport === option}
-                onChange={() => setTransport(option)}
-                className="h-3.5 w-3.5"
-              />
-              {option === 'stdio' ? 'stdio' : 'HTTP'}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <PillRadioGroup
+        legend="Transport"
+        name="transport"
+        options={TRANSPORT_OPTIONS}
+        value={transport}
+        onChange={setTransport}
+        disabled={entry !== null}
+      />
 
       {transport === 'stdio' ? (
         <StdioCatalogFields {...props} entry={entry?.type === 'stdio' ? entry : null} />
@@ -200,30 +197,17 @@ function StdioCatalogFields({
           <p className="text-xs text-muted-foreground">No env.</p>
         )}
         {envArray.fields.map((field, index) => (
-          <div key={field.id} className="flex items-center gap-2">
-            <input
-              aria-label={`Env key ${index + 1}`}
-              {...form.register(`env.${index}.key` as const)}
-              placeholder="API_KEY"
-              className="w-40 rounded-md border bg-background px-3 py-1.5 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
-              autoComplete="off"
-            />
-            <input
-              aria-label={`Env value ${index + 1}`}
-              {...form.register(`env.${index}.value` as const)}
-              placeholder="{{SECRET:api-key}}"
-              className="flex-1 rounded-md border bg-background px-3 py-1.5 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
-              autoComplete="off"
-            />
-            <button
-              type="button"
-              onClick={() => envArray.remove(index)}
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
-              aria-label="Remove env var"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
+          <KeyValueRow
+            key={field.id}
+            keyField={form.register(`env.${index}.key` as const)}
+            valueField={form.register(`env.${index}.value` as const)}
+            keyLabel={`Env key ${index + 1}`}
+            valueLabel={`Env value ${index + 1}`}
+            keyPlaceholder="API_KEY"
+            valuePlaceholder="{{SECRET:api-key}}"
+            removeLabel="Remove env var"
+            onRemove={() => envArray.remove(index)}
+          />
         ))}
       </FieldGroup>
 

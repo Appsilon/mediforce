@@ -16,12 +16,15 @@ describe('mcp route', () => {
     expect(routes.mcp('acme')).toBe('/acme/mcp');
     expect(routes.mcp('acme', { id: 'github mcp' })).toBe('/acme/mcp?id=github+mcp');
     expect(routes.mcp('acme', { create: true })).toBe('/acme/mcp?new=1');
+    expect(routes.mcp('acme', { from: 'settings', id: 'github' })).toBe('/acme/mcp?id=github&from=settings');
   });
 });
 
 describe('adminBackHref', () => {
   it('returns to the MCP page when that is where the user came from', () => {
     expect(adminBackHref('acme', 'mcp')).toBe('/acme/mcp');
+    // Bookmarked links from before the Tools page became the MCP page.
+    expect(adminBackHref('acme', 'tools')).toBe('/acme/mcp');
   });
 
   it('falls back to settings for a direct visit or an unknown entry point', () => {

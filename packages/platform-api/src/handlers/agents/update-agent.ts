@@ -12,17 +12,15 @@ export async function updateAgent(
   scope: CallerScope,
 ): Promise<UpdateAgentOutput> {
   // A patch to skills, visibility or namespace can each break the rule on
-  // which Skills the agent may hold, so the merged result is checked.
-  if (input.body.skills !== undefined || input.body.visibility !== undefined || input.body.namespace !== undefined) {
-    const existing = await scope.agentDefinitions.getForUpdate(input.id);
-    await assertAgentMayHoldSkills({ ...existing, ...input.body }, scope);
-  }
-  // Moving the agent to another workspace re-points every binding at that
-  // workspace's catalog, so either change re-checks them all.
-  if (input.body.mcpServers !== undefined || input.body.namespace !== undefined) {
-    const existing = await scope.agentDefinitions.getForUpdate(input.id);
-    const merged = { ...existing, ...input.body };
-    await assertBindingsTargetCatalogEntries(scope, merged.namespace, merged.mcpServers);
+  // which Skills the agent may hold. Moving the agent to another workspace
+  // re-points every binding at that workspace's catalog, so a namespace or
+  // mcpServers change re-checks them all. Both checks run on the merged result.
+  const touchesSkills = input.body.skills !== undefined || input.body.visibility !== undefined || input.body.namespace !== undefined;
+  const touchesBindings = input.body.mcpServers !== undefined || input.body.namespace !== undefined;
+  if (touchesSkills || touchesBindings) {
+    const merged = { ...(await scope.agentDefinitions.getForUpdate(input.id)), ...input.body };
+    if (touchesSkills) await assertAgentMayHoldSkills(merged, scope);
+    if (touchesBindings) await assertBindingsTargetCatalogEntries(scope, merged.namespace, merged.mcpServers);
   }
   const agent = await scope.agentDefinitions.update(input.id, input.body);
   const actor = actorFromCaller(scope);

@@ -515,7 +515,7 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
     expect(body.providers[0]).not.toHaveProperty('clientSecret');
   });
 
-  it('[AUTHZ] admin routes reject plain (non-admin) member with 403', async () => {
+  it('[AUTHZ] a plain (non-admin) member lists providers but cannot create one', async () => {
     const plainUid = 'plain-member-uid';
     fake.addMember('appsilon', plainUid, 'member');
     mockResolveSessionUserId.mockResolvedValue(plainUid);
@@ -524,7 +524,7 @@ describe('MCP OAuth journey — admin CRUD + user connect flow + disconnect/revo
     expect(createRes.status).toBe(403);
 
     const listRes = await adminListProviders('appsilon');
-    expect(listRes.status).toBe(403);
+    expect(listRes.status).toBe(200);
   });
 
   it('[AUTHZ] start rejects cross-namespace caller with 404', async () => {

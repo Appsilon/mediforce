@@ -15,9 +15,12 @@
 -- by (agent, server name) keep resolving. Idempotent: migrated bindings carry
 -- no `url` and match nothing.
 --
--- An agent with no workspace (namespace and workspace both null) has no
--- catalog to move its binding into; the migration fails loudly rather than
--- dropping the binding.
+-- The target workspace is the agent's `workspace` column, else its
+-- `namespace` when that still names a live workspace. An agent with neither
+-- (a platform-global agent, or one whose workspace was deleted) has no
+-- catalog to hold the server: its http bindings are dropped with a WARNING
+-- naming the agent, binding and url, so an inline binding never survives to
+-- fail the strict schema on read.
 
 ALTER TABLE "tool_catalog_entries" ADD COLUMN "type" text DEFAULT 'stdio' NOT NULL;--> statement-breakpoint
 ALTER TABLE "tool_catalog_entries" ALTER COLUMN "command" DROP NOT NULL;--> statement-breakpoint
@@ -45,15 +48,22 @@ BEGIN
         WHERE server.value->>'type' = 'http' AND server.value ? 'url'
       )
   LOOP
-    target_workspace := COALESCE(agent_row."namespace", agent_row."workspace");
-    IF target_workspace IS NULL THEN
-      RAISE EXCEPTION 'Agent % has inline HTTP MCP bindings but no workspace to hold their catalog entries', agent_row."id";
-    END IF;
+    target_workspace := COALESCE(
+      agent_row."workspace",
+      (SELECT "handle" FROM "workspaces" WHERE "handle" = agent_row."namespace")
+    );
 
     next_servers := agent_row."mcp_servers";
     FOR binding_name, binding IN SELECT server.name, server.value FROM jsonb_each(agent_row."mcp_servers") AS server(name, value)
     LOOP
       CONTINUE WHEN binding->>'type' IS DISTINCT FROM 'http' OR NOT (binding ? 'url');
+
+      IF target_workspace IS NULL THEN
+        RAISE WARNING 'Dropping HTTP MCP binding "%" (url %) from agent %: no workspace catalog to hold it',
+          binding_name, binding->>'url', agent_row."id";
+        next_servers := next_servers - binding_name;
+        CONTINUE;
+      END IF;
 
       normalized_auth := CASE
         WHEN jsonb_typeof(binding->'auth') IS DISTINCT FROM 'object' THEN NULL

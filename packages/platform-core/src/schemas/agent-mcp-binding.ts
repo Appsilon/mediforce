@@ -39,24 +39,6 @@ export const HttpAuthConfigSchema = z.discriminatedUnion('type', [
 
 export type HttpAuthConfig = z.infer<typeof HttpAuthConfigSchema>;
 
-/** Normalizes legacy HTTP auth shapes into the discriminated form.
- *  Pre-Step 5, HTTP bindings stored `{ headers: {...} }` without a `type`
- *  discriminator. After this step, all authed HTTP bindings must carry
- *  `type: 'headers' | 'oauth'`. Lazy read-time migration: legacy shapes
- *  are normalized here, writes always emit the new form. */
-function normalizeLegacyAuth(val: unknown): unknown {
-  if (val === null || val === undefined) return val;
-  if (typeof val !== 'object') return val;
-  const record = val as Record<string, unknown>;
-  if ('type' in record) return val;
-  if ('headers' in record && record.headers !== null && record.headers !== undefined) {
-    return { type: 'headers', headers: record.headers };
-  }
-  // Empty legacy object (`{}` or `{ headers: undefined }`) carried no auth
-  // intent — drop it so the field becomes undefined.
-  return undefined;
-}
-
 /** Stdio binding — must reference a curated stdio ToolCatalogEntry by id.
  *  Inline command/args are NOT accepted on bindings: that would re-open
  *  the RCE surface this refactor is closing. */
@@ -126,7 +108,7 @@ export const HttpToolCatalogEntrySchema = z.object({
   id: z.string().min(1),
   type: z.literal('http'),
   url: z.string().url(),
-  auth: z.preprocess(normalizeLegacyAuth, HttpAuthConfigSchema.optional()),
+  auth: HttpAuthConfigSchema.optional(),
   description: z.string().optional(),
 }).strict();
 

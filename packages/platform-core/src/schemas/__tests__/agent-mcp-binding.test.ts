@@ -304,30 +304,14 @@ describe('ToolCatalogEntrySchema', () => {
       }
     });
 
-    it('normalizes legacy { headers } auth shape into discriminated form', () => {
+    it('rejects auth without a type discriminator', () => {
       const result = HttpToolCatalogEntrySchema.safeParse({
-        id: 'legacy',
+        id: 'untyped',
         type: 'http',
         url: 'https://mcp.example.com/v1',
-        auth: { headers: { Authorization: 'Bearer {{SECRET:legacy_tok}}' } },
+        auth: { headers: { Authorization: 'Bearer {{SECRET:tok}}' } },
       });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.auth?.type).toBe('headers');
-      }
-    });
-
-    it('drops legacy empty auth object ({}) during normalization', () => {
-      const result = HttpToolCatalogEntrySchema.safeParse({
-        id: 'legacy',
-        type: 'http',
-        url: 'https://mcp.example.com/v1',
-        auth: {},
-      });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.auth).toBeUndefined();
-      }
+      expect(result.success).toBe(false);
     });
 
     it('rejects a non-URL string', () => {

@@ -9,7 +9,7 @@ test.describe('MCP Journey', () => {
     await expect(page.getByRole('heading', { name: 'MCP', exact: true })).toBeVisible({ timeout: 10_000 });
 
     // Seeded stdio entries and the seeded HTTP entry, each in its section.
-    // Long timeout covers the initial admin API fetch + hydration on cold server.
+    // Long timeout covers the initial catalog fetch + hydration on cold server.
     await expect(page.getByRole('heading', { level: 2, name: /stdio servers/i })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('heading', { level: 2, name: /http servers/i })).toBeVisible();
     await expect(page.getByRole('heading', { level: 3, name: 'filesystem' })).toBeVisible();

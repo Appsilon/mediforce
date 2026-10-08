@@ -40,9 +40,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
-  ),
+  default: ({ children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a {...props}>{children}</a>,
 }));
 
 vi.mock('@/components/admin/tool-catalog/command-availability', () => ({
@@ -127,6 +125,30 @@ describe('McpPage', () => {
     expect(routerReplaceMock).toHaveBeenCalledWith('/acme/mcp');
   });
 
+  it('warns that an edit changes the server for every agent using it', async () => {
+    searchParams = new URLSearchParams('id=github');
+    listToolCatalogMock.mockResolvedValue({ entries: [githubEntry] });
+    listAgentsMock.mockResolvedValue({
+      agents: [
+        { id: 'a1', name: 'Reviewer', mcpServers: { gh: { type: 'http', catalogId: 'github' } } },
+        { id: 'a2', name: 'Writer', mcpServers: { github: { type: 'http', catalogId: 'github' } } },
+      ],
+    });
+    render(<McpPage />);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Saving changes this server for every agent that uses it (2).')).toBeInTheDocument();
+  });
+
+  it('says when the server in the URL does not exist', async () => {
+    searchParams = new URLSearchParams('id=gone');
+    listToolCatalogMock.mockResolvedValue({ entries: [githubEntry] });
+    render(<McpPage />);
+
+    expect(await screen.findByText('MCP server “gone” not found in @acme.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('lets a member add an HTTP server with the transport switch', async () => {
     canAdmin = false;
     searchParams = new URLSearchParams('new=1');
@@ -146,6 +168,23 @@ describe('McpPage', () => {
       type: 'http',
       url: 'https://api.githubcopilot.com/mcp/',
     });
+  });
+
+  it('returns to settings when opened from there, keeping that through the dialog', async () => {
+    searchParams = new URLSearchParams('from=settings');
+    listToolCatalogMock.mockResolvedValue({ entries: [githubEntry] });
+    render(<McpPage />);
+
+    expect(await screen.findByRole('link', { name: 'Back' })).toHaveAttribute('href', '/acme/settings');
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit github' }));
+    expect(routerReplaceMock).toHaveBeenCalledWith('/acme/mcp?id=github&from=settings');
+  });
+
+  it('has no back arrow when reached from the sidebar', async () => {
+    render(<McpPage />);
+
+    await screen.findByText(/No MCP servers configured yet/);
+    expect(screen.queryByRole('link', { name: 'Back' })).not.toBeInTheDocument();
   });
 
   it('opens the add dialog from the Add MCP button', async () => {
