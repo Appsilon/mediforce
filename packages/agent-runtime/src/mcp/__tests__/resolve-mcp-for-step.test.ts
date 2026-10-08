@@ -215,4 +215,36 @@ describe('resolveMcpForStep', () => {
       url: 'https://mcp.example.com/v1',
     });
   });
+
+  it("reads a public agent's catalog from its owning workspace, not the workflow's", async () => {
+    await catalogRepo.upsert('owner-ws', { id: 'webmcp', type: 'http', url: 'https://owner.example.com/mcp' });
+    await catalogRepo.upsert(NS, { id: 'webmcp', type: 'http', url: 'https://unrelated.example.com/mcp' });
+    await agentRepo.upsert('shared-agent', {
+      kind: 'plugin',
+      runtimeId: 'claude-code-agent',
+      name: 'Shared',
+      iconName: 'Bot',
+      description: '',
+      foundationModel: 'sonnet',
+      systemPrompt: '',
+      inputDescription: '',
+      outputDescription: '',
+      mcpServers: {
+        webmcp: { type: 'http', catalogId: 'webmcp' },
+      },
+      namespace: 'owner-ws',
+      visibility: 'public',
+    });
+    const step = makeStep({ agentId: 'shared-agent' });
+
+    const result = await resolveMcpForStep(step, {
+      agentDefinitionRepo: agentRepo,
+      toolCatalogRepo: catalogRepo,
+      namespace: NS,
+    });
+    expect(result!.servers.webmcp).toMatchObject({
+      type: 'http',
+      url: 'https://owner.example.com/mcp',
+    });
+  });
 });

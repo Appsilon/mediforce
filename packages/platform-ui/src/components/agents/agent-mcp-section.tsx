@@ -56,10 +56,7 @@ export function AgentMcpSection({ agentId, handle, draft }: AgentMcpSectionProps
     try {
       const [serverBindings, catalogEntries] = await Promise.all([
         agentId !== undefined ? listAgentBindings(agentId) : Promise.resolve(null),
-        mediforce.toolCatalog
-          .list({ namespace: handle })
-          .then((res) => res.entries)
-          .catch(() => [] as ToolCatalogEntry[]),
+        mediforce.toolCatalog.list({ namespace: handle }).then((res) => res.entries),
       ]);
       if (serverBindings !== null) setPersistedBindings(serverBindings);
       setCatalog(catalogEntries);

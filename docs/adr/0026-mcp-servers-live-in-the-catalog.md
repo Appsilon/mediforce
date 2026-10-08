@@ -35,7 +35,12 @@ had nowhere to add or edit one: clicking an HTTP card sent you to the agent.
    `{ type, catalogId, allowedTools? }`. The binding's `type` must equal the
    entry's — the resolver throws `CatalogEntryTypeMismatchError` otherwise.
    Creating or updating an agent, or upserting one binding, rejects a
-   `catalogId` the agent's workspace catalog does not hold.
+   `catalogId` the agent's workspace catalog does not hold. At run time a
+   binding resolves in that same catalog — the agent's own workspace, not
+   the running workflow's — so a public agent used from another workspace
+   reaches the servers it was bound to, as it did when the URL lived on the
+   binding. This replaces ADR-0025's note that MCP lookups resolve in the
+   Workflow's Namespace.
 3. **Any workspace member manages the catalog.** Create, update, delete,
    list (whole entries, `args`/`env` included) and tool discovery check
    namespace membership, not the admin role. Secrets stay `{{SECRET:name}}`
@@ -70,3 +75,6 @@ migration logs a WARNING naming each one, instead of failing the deploy.
   server. The edit dialog says how many agents that is.
 - A platform-global agent has no workspace catalog; its bindings are checked
   against the running workflow's namespace at resolution time only.
+- Evaluation handlers read the catalog through the caller's workspace-scoped
+  repository, so evaluating a step whose public agent belongs to a workspace
+  the caller is not a member of reports its MCP servers as unresolvable.

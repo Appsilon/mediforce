@@ -26,7 +26,8 @@ export class AgentDefinitionNotFoundError extends Error {
 export interface ResolveMcpForStepDeps {
   agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>;
   toolCatalogRepo: Pick<ToolCatalogRepository, 'getById'>;
-  /** Namespace used to scope toolCatalog lookups. */
+  /** The workflow's namespace — the catalog used for an agent that has no
+   *  owning workspace of its own (a platform-global agent). */
   namespace: string;
 }
 
@@ -39,8 +40,11 @@ export interface ResolveMcpForStepDeps {
  *     silently degrade to no-MCP).
  *   - AgentDefinition has no mcpServers → returns { servers: {} }.
  *   - AgentDefinition has bindings → their catalogIds are fetched from
- *     the namespace-scoped tool catalog; missing entries surface as
- *     CatalogEntryNotFoundError from resolveEffectiveMcp.
+ *     the catalog of the agent's own workspace (where its bindings were
+ *     authored), so a public agent used from another workspace keeps its
+ *     servers; a platform-global agent falls back to the workflow's
+ *     namespace. Missing entries surface as CatalogEntryNotFoundError from
+ *     resolveEffectiveMcp.
  *
  *  Only catalog entries actually referenced by the agent's bindings are
  *  fetched (O(#bindings), not O(#catalog)). */
@@ -61,10 +65,11 @@ export async function resolveMcpForStep(
     catalogIds.add(binding.catalogId);
   }
 
+  const catalogNamespace = agent.namespace ?? deps.namespace;
   const catalog = new Map<string, ToolCatalogEntry>();
   await Promise.all(
     [...catalogIds].map(async (id) => {
-      const entry = await deps.toolCatalogRepo.getById(deps.namespace, id);
+      const entry = await deps.toolCatalogRepo.getById(catalogNamespace, id);
       if (entry !== null) catalog.set(id, entry);
     }),
   );

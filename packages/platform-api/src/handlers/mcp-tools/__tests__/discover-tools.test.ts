@@ -18,10 +18,17 @@ vi.mock('node:dns/promises', () => ({
   lookup: vi.fn(async () => [{ address: '93.184.216.34', family: 4 }]),
 }));
 
+vi.mock('node:dns', () => ({
+  lookup: vi.fn(
+    (_hostname: string, _options: unknown, callback: (err: null, addresses: { address: string; family: number }[]) => void) =>
+      callback(null, [{ address: '127.0.0.1', family: 4 }]),
+  ),
+}));
+
 vi.mock('@mediforce/mcp-client', () => ({
   McpClientManager: class {
-    constructor(servers: unknown) {
-      mcpClient.constructed(servers);
+    constructor(servers: unknown, options: unknown) {
+      mcpClient.constructed(servers, options);
     }
     connect = mcpClient.connect;
     disconnect = mcpClient.disconnect;
@@ -49,9 +56,23 @@ describe('discoverMcpTools handler', () => {
       scope,
     );
 
-    expect(mcpClient.constructed).toHaveBeenCalledWith([
-      expect.objectContaining({ url: 'https://mcp.example.com/mcp' }),
-    ]);
+    expect(mcpClient.constructed).toHaveBeenCalledWith(
+      [expect.objectContaining({ url: 'https://mcp.example.com/mcp' })],
+      expect.objectContaining({ fetch: expect.any(Function) }),
+    );
+  });
+
+  it('refuses a host that resolves to a private address at connect time (DNS rebinding)', async () => {
+    const scope = createTestScope({ toolCatalogRepo: repo });
+    await discoverMcpTools(
+      { namespace: 'alpha', type: 'http', url: 'http://rebind.example.com/mcp' },
+      scope,
+    );
+    const [, options] = mcpClient.constructed.mock.calls[0] as [unknown, { fetch: typeof fetch }];
+
+    await expect(options.fetch('http://rebind.example.com/mcp')).rejects.toMatchObject({
+      cause: { message: 'Tool discovery is limited to publicly reachable servers' },
+    });
   });
 
   it.each([

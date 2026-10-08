@@ -123,6 +123,7 @@ export class McpClientManager {
     } else if (serverConfig.url) {
       transport = new StreamableHTTPClientTransport(
         new URL(serverConfig.url),
+        this.options.fetch !== undefined ? { fetch: this.options.fetch } : undefined,
       );
     } else {
       throw new Error(`MCP server '${serverConfig.name}': either command or url must be provided`);
