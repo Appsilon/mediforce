@@ -49,6 +49,13 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
     const suffix = randomUUID().slice(0, 8);
 
     // An agent bound to two MCP servers; only `meddra` will be declared safe for trials.
+    // It binds HTTP servers from the workspace catalog, so they go there first.
+    for (const server of ['meddra', 'email']) {
+      await post(request, `/api/admin/tool-catalog?namespace=${TEST_ORG_HANDLE}`, {
+        id: `${server}-${suffix}`, type: 'http', url: `https://mcp.example.com/${server}`,
+      }, 201);
+    }
+
     const agentRes = await request.post('/api/agents', {
       headers: JSON_HEADERS,
       data: {
@@ -61,8 +68,8 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
         outputDescription: 'Graded AEs',
         namespace: TEST_ORG_HANDLE,
         mcpServers: {
-          meddra: { type: 'http', url: 'https://mcp.example.com/meddra' },
-          email: { type: 'http', url: 'https://mcp.example.com/email' },
+          meddra: { type: 'http', catalogId: `meddra-${suffix}` },
+          email: { type: 'http', catalogId: `email-${suffix}` },
         },
       },
     });
