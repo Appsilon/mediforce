@@ -1,9 +1,9 @@
 import {
   resolveEffectiveMcp,
+  type AgentDefinition,
   type AgentDefinitionRepository,
   type ResolvedMcpConfig,
   type ToolCatalogEntry,
-  type ToolCatalogRepository,
   type WorkflowStep,
 } from '@mediforce/platform-core';
 
@@ -25,8 +25,13 @@ export class AgentDefinitionNotFoundError extends Error {
 
 export interface ResolveMcpForStepDeps {
   agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>;
-  toolCatalogRepo: Pick<ToolCatalogRepository, 'getById'>;
-  /** Namespace used to scope toolCatalog lookups. */
+  /** Receives the agent whose bindings are resolved, so a caller-scoped
+   *  repository can admit a public agent's own workspace entries. */
+  toolCatalogRepo: {
+    getById(namespace: string, entryId: string, boundBy: AgentDefinition): Promise<ToolCatalogEntry | null>;
+  };
+  /** The workflow's namespace — the catalog used for an agent that has no
+   *  owning workspace of its own (a platform-global agent). */
   namespace: string;
 }
 
@@ -38,12 +43,15 @@ export interface ResolveMcpForStepDeps {
  *     AgentDefinitionNotFoundError (rotten reference must surface, not
  *     silently degrade to no-MCP).
  *   - AgentDefinition has no mcpServers → returns { servers: {} }.
- *   - AgentDefinition has stdio bindings → their catalogIds are fetched
- *     from the namespace-scoped tool catalog; missing entries surface
- *     as CatalogEntryNotFoundError from resolveEffectiveMcp.
+ *   - AgentDefinition has bindings → their catalogIds are fetched from
+ *     the catalog of the agent's own workspace (where its bindings were
+ *     authored), so a public agent used from another workspace keeps its
+ *     servers; a platform-global agent falls back to the workflow's
+ *     namespace. Missing entries surface as CatalogEntryNotFoundError from
+ *     resolveEffectiveMcp.
  *
- *  Only catalog entries actually referenced by the agent's stdio
- *  bindings are fetched (O(#stdio bindings), not O(#catalog)). */
+ *  Only catalog entries actually referenced by the agent's bindings are
+ *  fetched (O(#bindings), not O(#catalog)). */
 export async function resolveMcpForStep(
   step: WorkflowStep,
   deps: ResolveMcpForStepDeps,
@@ -58,15 +66,14 @@ export async function resolveMcpForStep(
   const bindings = agent.mcpServers ?? {};
   const catalogIds = new Set<string>();
   for (const binding of Object.values(bindings)) {
-    if (binding.type === 'stdio') {
-      catalogIds.add(binding.catalogId);
-    }
+    catalogIds.add(binding.catalogId);
   }
 
+  const catalogNamespace = agent.namespace ?? deps.namespace;
   const catalog = new Map<string, ToolCatalogEntry>();
   await Promise.all(
     [...catalogIds].map(async (id) => {
-      const entry = await deps.toolCatalogRepo.getById(deps.namespace, id);
+      const entry = await deps.toolCatalogRepo.getById(catalogNamespace, id, agent);
       if (entry !== null) catalog.set(id, entry);
     }),
   );

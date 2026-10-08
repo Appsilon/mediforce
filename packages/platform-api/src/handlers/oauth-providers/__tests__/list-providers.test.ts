@@ -45,15 +45,16 @@ describe('listOAuthProviders handler', () => {
     expect(result.providers).toHaveLength(1);
   });
 
-  it('throws ForbiddenError for a member-role caller', async () => {
+  it('returns providers without clientSecret for a member-role caller', async () => {
     const scope = createTestScope({
       oauthProviderRepo: repo,
       caller: userCaller('u-member', ['alpha'], memberRoles),
     });
 
-    await expect(
-      listOAuthProviders({ namespace: 'alpha' }, scope),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    const result = await listOAuthProviders({ namespace: 'alpha' }, scope);
+
+    expect(result.providers).toHaveLength(1);
+    expect(JSON.stringify(result)).not.toContain('client-secret-xyz');
   });
 
   it('throws ForbiddenError for a non-member caller', async () => {

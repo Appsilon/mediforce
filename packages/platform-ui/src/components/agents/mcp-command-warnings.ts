@@ -31,7 +31,7 @@ export function stdioServerCommands(
       if (binding.allowedTools.every((tool) => denied.has(tool))) continue;
     }
     const entry = catalog.find((candidate) => candidate.id === binding.catalogId);
-    if (entry === undefined) continue;
+    if (entry?.type !== 'stdio') continue;
     commands.push({ server, command: entry.command });
   }
   return commands;

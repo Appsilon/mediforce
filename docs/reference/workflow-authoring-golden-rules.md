@@ -216,14 +216,12 @@ visible, reviewable, scoped, or auditable in Mediforce.
 Definition binding are platform setup a person does. The in-app **AI Assistant**
 does both itself, as the person asking: it lists the catalog, lists the agents
 with the servers each is bound to, reuses one or creates an agent bound to the
-entry, and points the step at it with `agentId`. Adding a Tool Catalog entry is
-admin-only, so a member is told who can add the server rather than being given a
-workflow that quietly has no MCP.
+entry, and points the step at it with `agentId`.
 
 MUST for governable MCPs:
 
 1. Add the executable to the Docker image if runtime needs it.
-2. Add a namespace Tool Catalog entry in `/{handle}/admin/tool-catalog` — shape:
+2. Add a namespace Tool Catalog entry on the MCP page (`/{handle}/mcp`) — shape:
    [`setup/tool-catalog-entry.json`](../../apps/golden-standard-workflow/setup/tool-catalog-entry.json).
 3. Bind that entry to an Agent Definition through `mcpServers.<name>.catalogId` —
    [`setup/agent-definition.json`](../../apps/golden-standard-workflow/setup/agent-definition.json).
@@ -234,8 +232,8 @@ MUST for governable MCPs:
    [`golden-standard-workflow.wd.json`](../../apps/golden-standard-workflow/src/golden-standard-workflow.wd.json).
 7. Document setup, secrets, OAuth/scopes, and affected steps in `README.md`.
 
-HTTP MCPs can be bound directly on the Agent Definition; stdio MCPs SHOULD use
-Tool Catalog entries. Do not put MCP definitions inside workflow step `agent` or
+Both stdio and HTTP MCPs live in the Tool Catalog; an Agent Definition binding
+only references an entry by `catalogId`. Do not put MCP definitions inside workflow step `agent` or
 `cowork` config in new workflows — those step-level fields are deprecated,
 `AgentDefinition.mcpServers` is current.
 

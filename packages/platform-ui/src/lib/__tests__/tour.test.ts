@@ -18,7 +18,7 @@ describe('matchesRoute', () => {
   it('matches a literal segment exactly and a :param loosely', () => {
     expect(matchesRoute('/:handle/agents', '/test/agents')).toBe(true);
     expect(matchesRoute('/:handle/agents', '/other/agents')).toBe(true);
-    expect(matchesRoute('/:handle/agents', '/test/tools')).toBe(false);
+    expect(matchesRoute('/:handle/agents', '/test/mcp')).toBe(false);
   });
 
   it('requires the same segment count unless the pattern ends in a wildcard', () => {
@@ -147,7 +147,7 @@ describe('tour content', () => {
       '/test/agents',
       '/test/models',
       '/test/agents/new',
-      '/test/tools',
+      '/test/mcp',
       '/test/images',
       '/test/tasks',
       '/test/monitoring',

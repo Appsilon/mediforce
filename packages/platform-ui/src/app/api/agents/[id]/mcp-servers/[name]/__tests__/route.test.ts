@@ -6,6 +6,12 @@ const mockAgentGetByIdVisibleTo = vi.fn();
 const mockAgentUpdate = vi.fn();
 const mockAuditAppend = vi.fn();
 const mockGetNamespacesByUser = vi.fn().mockResolvedValue([]);
+const catalogEntries: Record<string, { id: string; type: 'stdio' | 'http' } & Record<string, unknown>> = {
+  'existing-mcp': { id: 'existing-mcp', type: 'stdio', command: 'existing' },
+  'new-mcp': { id: 'new-mcp', type: 'stdio', command: 'new' },
+  'example-server': { id: 'example-server', type: 'http', url: 'https://mcp.example.com/server' },
+  'other-server': { id: 'other-server', type: 'http', url: 'https://other.example.com' },
+};
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
@@ -16,6 +22,9 @@ vi.mock('@/lib/platform-services', () => ({
     },
     auditRepo: { append: mockAuditAppend },
     namespaceRepo: { getNamespacesByUser: mockGetNamespacesByUser },
+    toolCatalogRepo: {
+      getById: (_namespace: string, id: string) => Promise.resolve(catalogEntries[id] ?? null),
+    },
   }),
 }));
 
@@ -79,7 +88,7 @@ const pluginAgent = {
 };
 
 const stdioBinding = { type: 'stdio', catalogId: 'new-mcp' };
-const httpBinding = { type: 'http', url: 'https://mcp.example.com/server' };
+const httpBinding = { type: 'http', catalogId: 'example-server' };
 
 // ---- PUT ----
 
@@ -133,7 +142,7 @@ describe('PUT /api/agents/:id/mcp-servers/:name', () => {
       Promise.resolve({ ...coworkAgent, mcpServers: patch.mcpServers }),
     );
 
-    const replacement = { type: 'http', url: 'https://other.example.com' };
+    const replacement = { type: 'http', catalogId: 'other-server' };
     const res = await PUT(
       makePutRequest('tealflow-cowork-chat', 'existing', replacement),
       { params: makeParams('tealflow-cowork-chat', 'existing') },

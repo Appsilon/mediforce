@@ -1,5 +1,5 @@
 import { ToolCatalogEntrySchema } from '@mediforce/platform-core';
-import { assertCallerIsNamespaceAdmin } from '../../auth';
+import { assertNamespaceAccess } from '../../auth';
 import { HandlerError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type {
@@ -7,25 +7,25 @@ import type {
   CreateToolCatalogEntryOutput,
 } from '../../contract/tool-catalog';
 import { actorFromCaller } from '../_helpers';
-import { slugifyCommand } from './_helpers';
+import { slugifyCommand, slugifyUrl } from './_helpers';
 
 export async function createToolCatalogEntry(
   input: CreateToolCatalogEntryInputApi,
   scope: CallerScope,
 ): Promise<CreateToolCatalogEntryOutput> {
-  assertCallerIsNamespaceAdmin(scope.caller, input.namespace);
+  assertNamespaceAccess(scope.caller, input.namespace);
   const { namespace, ...rest } = input;
 
   const derivedId =
     typeof rest.id === 'string' && rest.id.length > 0
       ? rest.id
-      : typeof rest.command === 'string'
+      : rest.type === 'stdio'
         ? slugifyCommand(rest.command)
-        : '';
+        : slugifyUrl(rest.url);
   if (derivedId === '') {
     throw new HandlerError(
       'validation',
-      'Unable to derive id: supply `id` or a non-empty `command`.',
+      'Unable to derive id: supply `id`, a non-empty `command` or a valid `url`.',
     );
   }
 
@@ -54,12 +54,10 @@ export async function createToolCatalogEntry(
     action: 'tool_catalog_entry.created',
     description: `Tool catalog entry '${entry.id}' created in namespace '${namespace}'`,
     timestamp: new Date().toISOString(),
-    inputSnapshot: {
-      namespace,
-      id: entry.id,
-      command: entry.command,
-      args: entry.args,
-    },
+    inputSnapshot:
+      entry.type === 'stdio'
+        ? { namespace, id: entry.id, type: entry.type, command: entry.command, args: entry.args }
+        : { namespace, id: entry.id, type: entry.type, url: entry.url },
     outputSnapshot: { id: entry.id },
     basis: 'Tool catalog entry created via API',
     entityType: 'toolCatalogEntry',

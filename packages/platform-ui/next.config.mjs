@@ -68,6 +68,16 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  // Retired page URLs land on the MCP page; `?id=` opens that entry's dialog.
+  // `handle` excludes `api`, or `/api/admin/tool-catalog` would match too.
+  async redirects() {
+    const handle = ':handle((?!api(?![^/]))[^/]+)';
+    return [
+      { source: `/${handle}/tools`, destination: '/:handle/mcp', permanent: true },
+      { source: `/${handle}/tools/:toolId`, destination: '/:handle/mcp?id=:toolId', permanent: true },
+      { source: `/${handle}/admin/tool-catalog`, destination: '/:handle/mcp', permanent: true },
+    ];
+  },
   devIndicators: {
     position: 'bottom-right',
   },

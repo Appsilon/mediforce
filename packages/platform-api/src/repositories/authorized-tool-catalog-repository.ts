@@ -1,4 +1,5 @@
 import type {
+  AgentDefinition,
   ToolCatalogEntry,
   ToolCatalogRepository,
 } from '@mediforce/platform-core';
@@ -19,8 +20,16 @@ export class AuthorizedToolCatalogRepository extends AuthorizedScope {
     super(caller);
   }
 
-  getById = async (namespace: string, entryId: string): Promise<ToolCatalogEntry | null> => {
-    if (!this.canSeeNamespace(namespace)) return null;
+  /** `boundBy` is the agent being resolved, already read through the caller's
+   *  scope. A public agent runs with its own workspace's servers wherever it
+   *  is used, so the entries it binds there are readable to any caller who
+   *  can see the agent. */
+  getById = async (
+    namespace: string,
+    entryId: string,
+    boundBy?: Pick<AgentDefinition, 'namespace' | 'visibility' | 'mcpServers'>,
+  ): Promise<ToolCatalogEntry | null> => {
+    if (!this.canSeeNamespace(namespace) && !publicAgentBinds(boundBy, namespace, entryId)) return null;
     return this.raw.getById(namespace, entryId);
   };
 
@@ -38,4 +47,13 @@ export class AuthorizedToolCatalogRepository extends AuthorizedScope {
     this.assertNamespaceWrite(namespace);
     await this.raw.delete(namespace, entryId);
   };
+}
+
+function publicAgentBinds(
+  agent: Pick<AgentDefinition, 'namespace' | 'visibility' | 'mcpServers'> | undefined,
+  namespace: string,
+  entryId: string,
+): boolean {
+  if (agent === undefined || agent.visibility !== 'public' || agent.namespace !== namespace) return false;
+  return Object.values(agent.mcpServers ?? {}).some((binding) => binding.catalogId === entryId);
 }

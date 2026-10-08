@@ -38,7 +38,7 @@ describe('getToolCatalogEntry handler', () => {
       scope,
     );
 
-    expect(result.entry.command).toBe('npx');
+    expect(result.entry).toMatchObject({ command: 'npx' });
   });
 
   it('throws NotFoundError when entry does not exist', async () => {
@@ -49,10 +49,21 @@ describe('getToolCatalogEntry handler', () => {
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it('throws ForbiddenError for a member-role caller (bug fix)', async () => {
+  it('returns the entry for a member-role caller', async () => {
     const scope = createTestScope({
       toolCatalogRepo: repo,
       caller: userCaller('u-member', ['alpha'], memberRoles),
+    });
+
+    const result = await getToolCatalogEntry({ namespace: 'alpha', id: 'tealflow-mcp' }, scope);
+
+    expect(result.entry).toEqual(sampleEntry);
+  });
+
+  it('throws ForbiddenError for a caller outside the namespace', async () => {
+    const scope = createTestScope({
+      toolCatalogRepo: repo,
+      caller: userCaller('u-other', ['beta']),
     });
 
     await expect(

@@ -49,6 +49,11 @@ test.describe('Step Evaluation qualification — API E2E', () => {
     test.setTimeout(150_000);
     const suffix = randomUUID().slice(0, 8);
 
+    // The agent binds an HTTP server from the workspace catalog, so it goes there first.
+    await post(request, `/api/admin/tool-catalog?namespace=${TEST_ORG_HANDLE}`, {
+      id: `meddra-${suffix}`, type: 'http', url: 'https://mcp.example.com/meddra',
+    }, 201);
+
     const agentRes = await request.post('/api/agents', {
       headers: JSON_HEADERS,
       data: {
@@ -60,7 +65,7 @@ test.describe('Step Evaluation qualification — API E2E', () => {
         inputDescription: 'Extracted AEs',
         outputDescription: 'Graded AEs',
         namespace: TEST_ORG_HANDLE,
-        mcpServers: { meddra: { type: 'http', url: 'https://mcp.example.com/meddra' } },
+        mcpServers: { meddra: { type: 'http', catalogId: `meddra-${suffix}` } },
       },
     });
     expect(agentRes.status(), await agentRes.text()).toBe(201);

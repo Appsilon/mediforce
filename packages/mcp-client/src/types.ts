@@ -1,3 +1,5 @@
+import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
+
 /**
  * OpenRouter / OpenAI compatible function tool definition.
  * Produced by McpClientManager.connect() from MCP tool schemas.
@@ -27,4 +29,6 @@ export interface McpClientManagerOptions {
   timeoutMs?: number;
   /** Workflow secrets for resolving {{SECRET}} templates in server env vars */
   workflowSecrets?: Record<string, string>;
+  /** fetch used by HTTP transports (default: global fetch) */
+  fetch?: FetchLike;
 }

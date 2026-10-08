@@ -1,0 +1,169 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import postgres from 'postgres';
+import { randomBytes } from 'node:crypto';
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const MIGRATIONS_DIR = resolve(__dirname, '..', 'migrations');
+const MIGRATION = '0077_tool_catalog_http_entries.sql';
+
+const DATABASE_URL = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+const skipPg = !DATABASE_URL;
+
+type AgentRow = { id: string; mcp_servers: Record<string, Record<string, unknown>> };
+type CatalogRow = { workspace: string; id: string; type: string; url: string | null; auth: unknown };
+
+/**
+ * Migration 0077 moves every inline HTTP MCP binding into the workspace tool
+ * catalog and rewrites the binding to reference it. It runs once against real
+ * agents, so it gets its own test: applies 0000…0076, seeds agents in the
+ * pre-0077 shape, then applies 0077 alone.
+ */
+describe.skipIf(skipPg)('migration 0077 — HTTP MCP servers move into the tool catalog', () => {
+  const schemaName = `mig77_${randomBytes(8).toString('hex')}`;
+  let adminClient: ReturnType<typeof postgres>;
+  let sql: ReturnType<typeof postgres>;
+
+  const agent = (
+    id: string,
+    owner: { namespace: string | null; workspace?: string | null },
+    mcpServers: Record<string, unknown>,
+  ) => sql`
+    INSERT INTO agents (id, namespace, workspace, name, icon_name, description, foundation_model,
+      system_prompt, input_description, output_description, mcp_servers)
+    VALUES (${id}, ${owner.namespace}, ${owner.workspace ?? null}, ${id}, 'bot', '', 'sonnet', '', '', '',
+      ${sql.json(mcpServers as never)})
+  `;
+
+  beforeAll(async () => {
+    adminClient = postgres(DATABASE_URL!, { max: 1, onnotice: () => {} });
+    await adminClient.unsafe(`CREATE SCHEMA "${schemaName}"`);
+    sql = postgres(DATABASE_URL!, {
+      max: 1,
+      onnotice: () => {},
+      connection: { search_path: schemaName },
+    });
+
+    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    expect(files).toContain(MIGRATION);
+    for (const file of files.slice(0, files.indexOf(MIGRATION))) {
+      await sql.unsafe(readFileSync(join(MIGRATIONS_DIR, file), 'utf-8'));
+    }
+
+    await sql`
+      INSERT INTO workspaces (handle, type, display_name)
+      VALUES ('ws-a', 'team', 'A'), ('ws-b', 'team', 'B'), ('ws-c', 'team', 'C')
+    `;
+    // An existing stdio entry whose id collides with a host slug.
+    await sql`
+      INSERT INTO tool_catalog_entries (workspace, id, command)
+      VALUES ('ws-a', 'api-github-com', 'gh-mcp')
+    `;
+    await agent('agent-1', { namespace: 'ws-a' }, {
+      fs: { type: 'stdio', catalogId: 'filesystem' },
+      github: {
+        type: 'http',
+        url: 'https://api.github.com/mcp',
+        allowedTools: ['search_code'],
+        auth: { type: 'oauth', provider: 'github', headerName: 'Authorization', headerValueTemplate: 'Bearer {token}' },
+      },
+      legacy: {
+        type: 'http',
+        url: 'https://mcp.example.com/v1',
+        auth: { headers: { Authorization: 'Bearer {{SECRET:tok}}' } },
+      },
+    });
+    // Same url + auth as agent-1's github binding → reuses its entry.
+    await agent('agent-2', { namespace: 'ws-a' }, {
+      gh: {
+        type: 'http',
+        url: 'https://api.github.com/mcp',
+        auth: { type: 'oauth', provider: 'github', headerName: 'Authorization', headerValueTemplate: 'Bearer {token}' },
+      },
+      open: { type: 'http', url: 'https://mcp.example.com/v1', auth: {} },
+    });
+    // Same url in another workspace → its own entry there.
+    await agent('agent-3', { namespace: 'ws-b' }, { gh: { type: 'http', url: 'https://api.github.com/mcp' } });
+    // The workspace column wins over a stale namespace; a url with no host slugs to `mcp`.
+    await agent('agent-4', { namespace: 'ws-gone', workspace: 'ws-c' }, {
+      local: { type: 'http', url: 'file:///tmp/mcp.sock' },
+    });
+    // The workspace was deleted (FK set it null) and the namespace names no live
+    // workspace: the http binding is dropped, the rest of the agent survives.
+    await agent('agent-5', { namespace: 'ws-gone' }, {
+      fs: { type: 'stdio', catalogId: 'filesystem' },
+      gh: { type: 'http', url: 'https://api.github.com/mcp' },
+    });
+    // A platform-global agent has no catalog either.
+    await agent('agent-6', { namespace: null }, { gh: { type: 'http', url: 'https://api.github.com/mcp' } });
+
+    await sql.unsafe(readFileSync(join(MIGRATIONS_DIR, MIGRATION), 'utf-8'));
+  });
+
+  afterAll(async () => {
+    if (sql) await sql.end();
+    if (adminClient) {
+      await adminClient.unsafe(`DROP SCHEMA "${schemaName}" CASCADE`);
+      await adminClient.end();
+    }
+  });
+
+  const agents = async () =>
+    Object.fromEntries(
+      (await sql<AgentRow[]>`SELECT id, mcp_servers FROM agents ORDER BY id`).map((row) => [row.id, row.mcp_servers]),
+    );
+  const catalog = () =>
+    sql<CatalogRow[]>`SELECT workspace, id, type, url, auth FROM tool_catalog_entries ORDER BY workspace, id`;
+
+  it('rewrites inline HTTP bindings to catalog references and leaves stdio bindings alone', async () => {
+    const byId = await agents();
+    expect(byId['agent-1']).toEqual({
+      fs: { type: 'stdio', catalogId: 'filesystem' },
+      github: { type: 'http', catalogId: 'api-github-com-2', allowedTools: ['search_code'] },
+      legacy: { type: 'http', catalogId: 'mcp-example-com' },
+    });
+    expect(byId['agent-2']).toEqual({
+      gh: { type: 'http', catalogId: 'api-github-com-2' },
+      open: { type: 'http', catalogId: 'mcp-example-com-2' },
+    });
+    expect(byId['agent-3']).toEqual({ gh: { type: 'http', catalogId: 'api-github-com' } });
+    expect(byId['agent-4']).toEqual({ local: { type: 'http', catalogId: 'mcp' } });
+  });
+
+  it('drops http bindings of an agent with no live workspace instead of aborting', async () => {
+    const byId = await agents();
+    expect(byId['agent-5']).toEqual({ fs: { type: 'stdio', catalogId: 'filesystem' } });
+    expect(byId['agent-6']).toEqual({});
+  });
+
+  it('creates one http entry per distinct url + auth in each workspace', async () => {
+    expect(await catalog()).toEqual([
+      { workspace: 'ws-a', id: 'api-github-com', type: 'stdio', url: null, auth: null },
+      {
+        workspace: 'ws-a',
+        id: 'api-github-com-2',
+        type: 'http',
+        url: 'https://api.github.com/mcp',
+        auth: { type: 'oauth', provider: 'github', headerName: 'Authorization', headerValueTemplate: 'Bearer {token}' },
+      },
+      {
+        workspace: 'ws-a',
+        id: 'mcp-example-com',
+        type: 'http',
+        url: 'https://mcp.example.com/v1',
+        auth: { type: 'headers', headers: { Authorization: 'Bearer {{SECRET:tok}}' } },
+      },
+      { workspace: 'ws-a', id: 'mcp-example-com-2', type: 'http', url: 'https://mcp.example.com/v1', auth: null },
+      { workspace: 'ws-b', id: 'api-github-com', type: 'http', url: 'https://api.github.com/mcp', auth: null },
+      { workspace: 'ws-c', id: 'mcp', type: 'http', url: 'file:///tmp/mcp.sock', auth: null },
+    ]);
+  });
+
+  it('is idempotent', async () => {
+    const before = { agents: await agents(), catalog: await catalog() };
+    await sql.unsafe(readFileSync(join(MIGRATIONS_DIR, MIGRATION), 'utf-8').split('--> statement-breakpoint').pop()!);
+    expect({ agents: await agents(), catalog: await catalog() }).toEqual(before);
+  });
+});

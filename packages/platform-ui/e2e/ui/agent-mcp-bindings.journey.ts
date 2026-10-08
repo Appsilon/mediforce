@@ -5,16 +5,16 @@ import { trackPageErrors } from '../helpers/page-errors';
 /**
  * Journey 2 — Agent MCP bindings
  *
- * A namespace member opens the agent editor, adds one stdio binding (via
- * catalog dropdown) and one HTTP binding (URL + header), removes the stdio
- * one, then reloads to verify the http binding persists.
+ * A namespace member opens the agent editor, binds one stdio and one HTTP
+ * server — both picked from the workspace catalog, never typed in — removes
+ * the stdio one, then reloads to verify the http binding persists.
  *
  * Agent: `claude-code-agent` (plugin kind — with J1 gate removed in
  * `60ca453`, plugin agents may carry MCP bindings).
  */
 
 test.describe('Agent MCP Bindings Journey', () => {
-  test('add stdio + http bindings, delete stdio, reload confirms http persists', async ({ page }) => {
+  test('bind stdio + http servers from the catalog, delete stdio, reload confirms http persists', async ({ page }) => {
     trackPageErrors(page);
 
     await page.goto(`/${TEST_ORG_HANDLE}/agents/definitions/claude-code-agent`);
@@ -23,46 +23,29 @@ test.describe('Agent MCP Bindings Journey', () => {
     // the load signal, and it survives copy edits to the page header.
     await expect(page.getByRole('button', { name: /save changes/i })).toBeVisible({ timeout: 30_000 });
 
-    // MCP Servers section visible (any kind — no warning copy)
     const mcpHeading = page.getByRole('heading', { name: /mcp servers/i });
     await expect(mcpHeading).toBeVisible();
     await expect(page.getByText(/no mcp bindings yet|add a server/i).first()).toBeVisible();
 
-    // ── Add stdio binding ────────────────────────────────────────────────
-    await page.getByRole('button', { name: /add server|add mcp server/i }).first().click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    // ── Bind the stdio server ────────────────────────────────────────────
+    await page.getByRole('button', { name: /add server/i }).first().click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    // Only catalog servers can be bound — there is nowhere to type a URL or command.
+    await expect(dialog.getByLabel(/^url$/i)).toHaveCount(0);
+    await dialog.getByLabel('MCP server').selectOption('filesystem');
+    await dialog.getByRole('button', { name: /create binding/i }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: 'Remove filesystem' })).toBeVisible();
 
-    // Default transport is stdio — pick the catalog entry; the binding is named after it
-    await page.getByLabel(/catalog entry|catalog id/i).selectOption('filesystem');
-
-    await page.getByRole('button', { name: /^save$|create binding/i }).last().click();
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
-
-    // Binding shows up in the list
-    await expect(page.getByText('filesystem').first()).toBeVisible();
-    await expect(page.getByText(/stdio/i).first()).toBeVisible();
-
-    // ── Add HTTP binding ─────────────────────────────────────────────────
-    await page.getByRole('button', { name: /add server|add mcp server/i }).first().click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-
-    await page.getByRole('radio', { name: /^http$/i }).click();
-    await page.getByLabel(/^url$/i).fill('https://api.example.com/mcp');
-
-    // Step 5 added a three-way Authentication radio (None / Static headers /
-    // OAuth). Default is None, so pick Static headers before adding rows.
-    await page.getByRole('radio', { name: /^static headers$/i }).click();
-
-    // One header row
-    await page.getByRole('button', { name: /add header/i }).click();
-    await page.getByLabel(/header key 1|header name 1/i).fill('Authorization');
-    await page.getByLabel(/header value 1/i).fill('Bearer {{SECRET:ANALYTICS_TOKEN}}');
-
-    await page.getByRole('button', { name: /^save$|create binding/i }).last().click();
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
-
-    await expect(page.getByText('api-example-com').first()).toBeVisible();
-    await expect(page.getByText(/http/i).first()).toBeVisible();
+    // ── Bind the HTTP server ─────────────────────────────────────────────
+    await page.getByRole('button', { name: /add server/i }).first().click();
+    await expect(dialog).toBeVisible();
+    await dialog.getByLabel('MCP server').selectOption('github-mcp');
+    await dialog.getByRole('button', { name: /create binding/i }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: 'Remove github-mcp' })).toBeVisible();
+    await expect(page.getByText(/api\.example\.com\/mcp/).first()).toBeVisible();
 
     // ── Delete stdio binding ─────────────────────────────────────────────
     await page.getByRole('button', { name: 'Remove filesystem' }).click();
@@ -70,16 +53,16 @@ test.describe('Agent MCP Bindings Journey', () => {
     await page.getByRole('button', { name: /^(delete|confirm|remove)/i }).last().click();
 
     await expect(page.getByRole('button', { name: 'Remove filesystem' })).toHaveCount(0, { timeout: 10_000 });
-    await expect(page.getByRole('button', { name: 'Remove api-example-com' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Remove github-mcp' })).toBeVisible();
 
     // ── Reload confirms http binding persists ─────────────────────────────
     await page.reload();
     await expect(page.getByRole('heading', { name: /mcp servers/i })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole('button', { name: 'Remove api-example-com' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Remove github-mcp' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Remove filesystem' })).toHaveCount(0);
 
-    // ── Cleanup — remove the persisted api-example-com binding so the test is rerunnable ──
-    await page.getByRole('button', { name: 'Remove api-example-com' }).click();
+    // ── Cleanup — remove the persisted binding so the test is rerunnable ──
+    await page.getByRole('button', { name: 'Remove github-mcp' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByRole('button', { name: /^(delete|confirm|remove)/i }).last().click();
   });

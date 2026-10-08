@@ -3,8 +3,8 @@ import type { AgentMcpBindingMap, ToolCatalogEntry } from '@mediforce/platform-c
 import { missingCommandWarnings, stdioServerCommands } from '../mcp-command-warnings';
 
 const CATALOG: ToolCatalogEntry[] = [
-  { id: 'biomcp', command: 'uvx', args: ['--from', 'biomcp-cli', 'biomcp', 'serve'] },
-  { id: 'github', command: 'npx', args: ['-y', '@modelcontextprotocol/server-github'] },
+  { id: 'biomcp', type: 'stdio', command: 'uvx', args: ['--from', 'biomcp-cli', 'biomcp', 'serve'] },
+  { id: 'github', type: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-github'] },
 ];
 
 describe('stdioServerCommands', () => {
@@ -22,7 +22,7 @@ describe('stdioServerCommands', () => {
 
   it('skips http bindings, which run nothing in the image', () => {
     const bindings: AgentMcpBindingMap = {
-      remote: { type: 'http', url: 'https://example.com/mcp' },
+      remote: { type: 'http', catalogId: 'remote' },
     };
 
     expect(stdioServerCommands(bindings, CATALOG)).toEqual([]);

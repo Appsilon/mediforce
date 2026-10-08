@@ -6,7 +6,7 @@ import type {
 import type { AgentDefinition } from '../schemas/agent-definition';
 import type { WorkflowStep } from '../schemas/workflow-definition';
 
-/** Raised when a stdio AgentMcpBinding references a catalogId that is
+/** Raised when an AgentMcpBinding references a catalogId that is
  *  not present in the provided catalog. Carries the server name and the
  *  missing catalogId so callers can produce actionable errors. */
 export class CatalogEntryNotFoundError extends Error {
@@ -18,6 +18,24 @@ export class CatalogEntryNotFoundError extends Error {
       `Tool catalog has no entry for catalogId "${catalogId}" (referenced by MCP server "${serverName}")`,
     );
     this.name = 'CatalogEntryNotFoundError';
+    this.serverName = serverName;
+    this.catalogId = catalogId;
+  }
+}
+
+/** Raised when a binding's transport differs from its catalog entry's —
+ *  e.g. an `http` binding pointing at a stdio entry. The binding's `type`
+ *  is a promise about what the entry is; a mismatch means the entry was
+ *  replaced under the binding. */
+export class CatalogEntryTypeMismatchError extends Error {
+  public readonly serverName: string;
+  public readonly catalogId: string;
+
+  constructor(serverName: string, catalogId: string, bindingType: string, entryType: string) {
+    super(
+      `MCP server "${serverName}" is bound as ${bindingType}, but tool catalog entry "${catalogId}" is ${entryType}`,
+    );
+    this.name = 'CatalogEntryTypeMismatchError';
     this.serverName = serverName;
     this.catalogId = catalogId;
   }
@@ -160,26 +178,18 @@ function resolveBinding(
   binding: AgentMcpBinding,
   catalog: Map<string, ToolCatalogEntry>,
 ): ResolvedMcpServer {
-  if (binding.type === 'stdio') {
-    const entry = catalog.get(binding.catalogId);
-    if (entry === undefined) {
-      throw new CatalogEntryNotFoundError(name, binding.catalogId);
-    }
-    return {
-      type: 'stdio',
-      command: entry.command,
-      args: entry.args,
-      env: entry.env,
-      allowedTools: binding.allowedTools ? [...binding.allowedTools] : undefined,
-    };
+  const entry = catalog.get(binding.catalogId);
+  if (entry === undefined) {
+    throw new CatalogEntryNotFoundError(name, binding.catalogId);
   }
-
-  return {
-    type: 'http',
-    url: binding.url,
-    auth: binding.auth,
-    allowedTools: binding.allowedTools ? [...binding.allowedTools] : undefined,
-  };
+  if (entry.type !== binding.type) {
+    throw new CatalogEntryTypeMismatchError(name, binding.catalogId, binding.type, entry.type);
+  }
+  const allowedTools = binding.allowedTools ? [...binding.allowedTools] : undefined;
+  if (entry.type === 'stdio') {
+    return { type: 'stdio', command: entry.command, args: entry.args, env: entry.env, allowedTools };
+  }
+  return { type: 'http', url: entry.url, auth: entry.auth, allowedTools };
 }
 
 /** Apply a step-level denyTools subtraction to a resolved server. Safe

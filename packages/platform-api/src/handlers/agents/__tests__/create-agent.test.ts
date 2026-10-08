@@ -3,6 +3,7 @@ import {
   InMemoryAgentDefinitionRepository,
   InMemoryAuditRepository,
   InMemoryProcessInstanceRepository,
+  InMemoryToolCatalogRepository,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { createAgent } from '../create-agent';
@@ -48,6 +49,35 @@ describe('createAgent handler', () => {
       scope,
     );
     expect(agent.name).toBe('Bob');
+  });
+
+  it('binds only MCP servers the workspace catalog holds', async () => {
+    const toolCatalogRepo = new InMemoryToolCatalogRepository();
+    await toolCatalogRepo.upsert('team-alpha', { id: 'github', type: 'http', url: 'https://api.githubcopilot.com/mcp/' });
+    const scope = createTestScope({ agentDefinitionRepo, auditRepo, toolCatalogRepo, caller: userCaller('u-1', ['team-alpha']) });
+    const base = {
+      kind: 'plugin' as const,
+      name: 'Bob',
+      iconName: 'Bot',
+      description: 'd',
+      foundationModel: 'm',
+      systemPrompt: 'p',
+      inputDescription: 'in',
+      outputDescription: 'out',
+      namespace: 'team-alpha',
+      visibility: 'private' as const,
+    };
+
+    const { agent } = await createAgent(
+      { ...base, mcpServers: { gh: { type: 'http', catalogId: 'github' } } },
+      scope,
+    );
+    expect(agent.mcpServers).toEqual({ gh: { type: 'http', catalogId: 'github' } });
+
+    await expect(
+      createAgent({ ...base, mcpServers: { ghost: { type: 'http', catalogId: 'not-there' } } }, scope),
+    ).rejects.toMatchObject({ code: 'validation' });
+    expect(await agentDefinitionRepo.listAll()).toHaveLength(1);
   });
 
   it('rejects an agent with no namespace instead of half-writing it', async () => {

@@ -54,6 +54,33 @@ describe('computeStepFingerprint', () => {
     expect(await fingerprint({})).toEqual(first);
   });
 
+  it('resolves a public agent from another workspace the way the runtime does', async () => {
+    const { fixture, scope, definition, step } = await loaded();
+    const agent = (await fixture.agentDefinitionRepo.getById('ae-grader'))!;
+    await fixture.agentDefinitionRepo.upsert('ae-grader', { ...agent, namespace: 'owner-ws', visibility: 'public' });
+    await fixture.toolCatalogRepo.upsert('owner-ws', { id: 'edc', type: 'stdio', command: 'owner-edc-mcp' });
+    await fixture.toolCatalogRepo.upsert('owner-ws', { id: 'email', type: 'http', url: 'https://owner.example.com/email' });
+
+    const runtime = await computeStepFingerprint(
+      { agentDefinitions: fixture.agentDefinitionRepo, toolCatalog: fixture.toolCatalogRepo, skills: scope.skills },
+      definition,
+      step,
+    );
+    expect((await computeStepFingerprint(scope, definition, step)).components.mcpServers).toBe(runtime.components.mcpServers);
+  });
+
+  it('opens another workspace\'s catalog only for entries the public agent binds', async () => {
+    const { fixture, scope } = await loaded();
+    await fixture.toolCatalogRepo.upsert('owner-ws', { id: 'email', type: 'http', url: 'https://owner.example.com/email' });
+    await fixture.toolCatalogRepo.upsert('owner-ws', { id: 'billing', type: 'http', url: 'https://owner.example.com/billing' });
+    const agent = { ...(await fixture.agentDefinitionRepo.getById('ae-grader'))!, namespace: 'owner-ws' };
+
+    expect(await scope.toolCatalog.getById('owner-ws', 'email', { ...agent, visibility: 'public' })).not.toBeNull();
+    expect(await scope.toolCatalog.getById('owner-ws', 'billing', { ...agent, visibility: 'public' })).toBeNull();
+    expect(await scope.toolCatalog.getById('owner-ws', 'email', { ...agent, visibility: 'private' })).toBeNull();
+    expect(await scope.toolCatalog.getById('owner-ws', 'email')).toBeNull();
+  });
+
   it('covers the skill files the workflow carries', async () => {
     const { fingerprint, step } = await loaded();
     const skillStep = { agent: { ...step.agent, skill: 'grading', skillsDir: 'skills' } };

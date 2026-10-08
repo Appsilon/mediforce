@@ -35,6 +35,7 @@ export interface EvaluationFixture {
   readonly evaluationRepo: InMemoryEvaluationRepository;
   readonly auditRepo: InMemoryAuditRepository;
   readonly agentDefinitionRepo: InMemoryAgentDefinitionRepository;
+  readonly toolCatalogRepo: InMemoryToolCatalogRepository;
   scope(caller?: CallerIdentity, overrides?: TestScopeOverrides): CallerScope;
 }
 
@@ -51,7 +52,8 @@ export async function evaluationFixture(): Promise<EvaluationFixture> {
   const auditRepo = new InMemoryAuditRepository(instanceRepo);
   const agentDefinitionRepo = new InMemoryAgentDefinitionRepository();
   const toolCatalogRepo = new InMemoryToolCatalogRepository();
-  await toolCatalogRepo.upsert(NAMESPACE, { id: 'edc', command: 'edc-mcp' });
+  await toolCatalogRepo.upsert(NAMESPACE, { id: 'edc', type: 'stdio', command: 'edc-mcp' });
+  await toolCatalogRepo.upsert(NAMESPACE, { id: 'email', type: 'http', url: 'https://mcp.example.com/email' });
   const modelRegistryRepo = new InMemoryModelRegistryRepository();
   for (const [id, provider] of [['anthropic/claude-sonnet-5', 'anthropic'], ['openai/gpt-5', 'openai']]) {
     await modelRegistryRepo.upsert({
@@ -73,7 +75,7 @@ export async function evaluationFixture(): Promise<EvaluationFixture> {
     outputDescription: 'Graded AEs',
     mcpServers: {
       edc: { type: 'stdio', catalogId: 'edc', allowedTools: ['read_record', 'write_record'] },
-      email: { type: 'http', url: 'https://mcp.example.com/email' },
+      email: { type: 'http', catalogId: 'email' },
     },
     namespace: NAMESPACE,
     visibility: 'private',
@@ -97,6 +99,7 @@ export async function evaluationFixture(): Promise<EvaluationFixture> {
     evaluationRepo,
     auditRepo,
     agentDefinitionRepo,
+    toolCatalogRepo,
     scope: (caller = userCaller('author-1', [NAMESPACE]), overrides = {}) => createTestScope({
       ...overrides,
       processRepo,

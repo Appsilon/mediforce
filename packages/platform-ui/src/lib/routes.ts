@@ -14,7 +14,7 @@ function encode(segment: string): string {
  * Admin pages are reachable from more than one section, so their entry point
  * travels in `?from=` and drives where the in-page back arrow returns to.
  */
-export type AdminEntryPoint = 'tools' | 'settings';
+export type AdminEntryPoint = 'mcp' | 'settings';
 
 type AdminPageParams = { from?: AdminEntryPoint; create?: boolean };
 
@@ -27,7 +27,8 @@ function withAdminParams(path: string, params: AdminPageParams | undefined): str
 }
 
 export function adminBackHref(handle: string, from: string | null): string {
-  return from === 'tools' ? routes.tools(handle) : routes.settings(handle);
+  // `tools` is what links read before the Tools page became the MCP page.
+  return from === 'mcp' || from === 'tools' ? routes.mcp(handle) : routes.settings(handle);
 }
 
 export const routes = {
@@ -92,10 +93,18 @@ export const routes = {
     return qs ? `${base}?${qs}` : base;
   },
 
-  // ── Tools ──────────────────────────────────────────────────────
+  // ── Models & MCP ───────────────────────────────────────────────
   models: (handle: string) => `/${handle}/models`,
-  tools: (handle: string) => `/${handle}/tools`,
-  tool: (handle: string, toolId: string) => `/${handle}/tools/${encode(toolId)}`,
+  /** The MCP page; `id` opens that catalog entry's edit dialog, `create` the add dialog,
+   *  `from: 'settings'` shows a back arrow to Settings. */
+  mcp: (handle: string, params?: { id?: string; create?: boolean; from?: 'settings' }) => {
+    const query = new URLSearchParams();
+    if (params?.id !== undefined) query.set('id', params.id);
+    if (params?.create === true) query.set('new', '1');
+    if (params?.from !== undefined) query.set('from', params.from);
+    const qs = query.toString();
+    return qs === '' ? `/${handle}/mcp` : `/${handle}/mcp?${qs}`;
+  },
 
   // ── Skills ─────────────────────────────────────────────────────
   skills: (handle: string) => `/${handle}/skills`,
@@ -127,8 +136,6 @@ export const routes = {
   settings: (handle: string) => `/${handle}/settings`,
 
   // ── Admin ──────────────────────────────────────────────────────
-  adminToolCatalog: (handle: string, params?: AdminPageParams) =>
-    withAdminParams(`/${handle}/admin/tool-catalog`, params),
   adminOAuthProviders: (handle: string, params?: AdminPageParams) =>
     withAdminParams(`/${handle}/admin/oauth-providers`, params),
   adminInfrastructure: (handle: string) => `/${handle}/admin/infrastructure`,

@@ -325,6 +325,8 @@ export {
   StepMcpRestrictionSchema,
   StepMcpRestrictionEntrySchema,
   ToolCatalogEntrySchema,
+  StdioToolCatalogEntrySchema,
+  HttpToolCatalogEntrySchema,
   type AgentMcpBinding,
   type AgentMcpBindingMap,
   type StdioAgentMcpBinding,
@@ -335,6 +337,8 @@ export {
   type StepMcpRestriction,
   type StepMcpRestrictionEntry,
   type ToolCatalogEntry,
+  type StdioToolCatalogEntry,
+  type HttpToolCatalogEntry,
 } from './agent-mcp-binding';
 
 export {

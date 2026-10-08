@@ -1,18 +1,28 @@
 'use client';
 
+import { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { ToolCatalogEntry } from '@mediforce/platform-core';
+import type { StdioToolCatalogEntry, ToolCatalogEntry } from '@mediforce/platform-core';
 import { CommandAvailability } from './command-availability';
 import { COMMAND_SUGGESTIONS } from './command-check';
+import {
+  CatalogFormFooter,
+  DescriptionField,
+  Field,
+  FieldGroup,
+  KeyValueRow,
+  PillRadioGroup,
+  catalogIdSchema,
+  inputClass,
+} from './form-fields';
+import { HttpCatalogFields } from './http-catalog-fields';
 
-const slugPattern = /^[a-z0-9][a-z0-9_-]*$/;
-
-const FormSchema = z.object({
-  id: z.string().regex(slugPattern, 'Lowercase letters, numbers, dashes, underscores'),
+const StdioFormSchema = z.object({
+  id: catalogIdSchema,
   command: z.string().min(1, 'Required'),
   args: z.array(z.object({ value: z.string() })),
   env: z.array(z.object({
@@ -22,9 +32,9 @@ const FormSchema = z.object({
   description: z.string(),
 });
 
-type CatalogFormValues = z.infer<typeof FormSchema>;
+type StdioFormValues = z.infer<typeof StdioFormSchema>;
 
-function valuesFromEntry(entry: ToolCatalogEntry | null): CatalogFormValues {
+function valuesFromEntry(entry: StdioToolCatalogEntry | null): StdioFormValues {
   if (entry === null) {
     return { id: '', command: '', args: [], env: [], description: '' };
   }
@@ -37,12 +47,13 @@ function valuesFromEntry(entry: ToolCatalogEntry | null): CatalogFormValues {
   };
 }
 
-function valuesToEntry(values: CatalogFormValues, existingId?: string): ToolCatalogEntry {
+function valuesToEntry(values: StdioFormValues, existingId?: string): StdioToolCatalogEntry {
   const args = values.args.map((arg) => arg.value).filter((value) => value !== '');
   const envEntries = values.env.filter((envVar) => envVar.key !== '');
   const description = values.description.trim();
   return {
     id: existingId ?? values.id.trim(),
+    type: 'stdio',
     command: values.command.trim(),
     ...(args.length > 0 ? { args } : {}),
     ...(envEntries.length > 0
@@ -52,29 +63,65 @@ function valuesToEntry(values: CatalogFormValues, existingId?: string): ToolCata
   };
 }
 
-interface CatalogFormProps {
+const TRANSPORT_OPTIONS = [
+  { value: 'stdio', label: 'stdio' },
+  { value: 'http', label: 'HTTP' },
+] as const;
+
+export interface CatalogFormProps {
   namespace: string;
   entry: ToolCatalogEntry | null;
   onSubmit: (entry: ToolCatalogEntry) => Promise<void>;
   onDelete?: () => void;
+  onCancel?: () => void;
   submitError?: string | null;
 }
 
-export function CatalogForm({ namespace, entry, onSubmit, onDelete, submitError }: CatalogFormProps) {
+/** Add or edit one MCP server in the workspace catalog. A new entry picks its
+ *  transport; an existing one keeps it, because agent bindings declare it. */
+export function CatalogForm(props: CatalogFormProps) {
+  const { entry } = props;
+  const [transport, setTransport] = useState<ToolCatalogEntry['type']>(entry?.type ?? 'stdio');
+
+  return (
+    <div className="flex flex-col gap-5">
+      <PillRadioGroup
+        legend="Transport"
+        name="transport"
+        options={TRANSPORT_OPTIONS}
+        value={transport}
+        onChange={setTransport}
+        disabled={entry !== null}
+      />
+
+      {transport === 'stdio' ? (
+        <StdioCatalogFields {...props} entry={entry?.type === 'stdio' ? entry : null} />
+      ) : (
+        <HttpCatalogFields {...props} entry={entry?.type === 'http' ? entry : null} />
+      )}
+    </div>
+  );
+}
+
+function StdioCatalogFields({
+  namespace,
+  entry,
+  onSubmit,
+  onDelete,
+  onCancel,
+  submitError,
+}: Omit<CatalogFormProps, 'entry'> & { entry: StdioToolCatalogEntry | null }) {
   const isEditing = entry !== null;
-  const form = useForm<CatalogFormValues>({
-    resolver: zodResolver(FormSchema),
+  const form = useForm<StdioFormValues>({
+    resolver: zodResolver(StdioFormSchema),
     defaultValues: valuesFromEntry(entry),
   });
   const argsArray = useFieldArray({ control: form.control, name: 'args' });
   const envArray = useFieldArray({ control: form.control, name: 'env' });
 
   const handleSubmit = form.handleSubmit(async (values) => {
-    const payload = valuesToEntry(values, isEditing ? entry!.id : undefined);
-    await onSubmit(payload);
+    await onSubmit(valuesToEntry(values, entry?.id));
   });
-
-  const submitting = form.formState.isSubmitting;
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
@@ -85,10 +132,7 @@ export function CatalogForm({ namespace, entry, onSubmit, onDelete, submitError 
             {...form.register('id')}
             readOnly={isEditing}
             placeholder="github-mcp"
-            className={cn(
-              'rounded-md border bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-ring',
-              isEditing && 'bg-muted text-muted-foreground cursor-not-allowed',
-            )}
+            className={cn(inputClass, isEditing && 'bg-muted text-muted-foreground cursor-not-allowed')}
             autoComplete="off"
           />
         </Field>
@@ -98,7 +142,7 @@ export function CatalogForm({ namespace, entry, onSubmit, onDelete, submitError 
             {...form.register('command')}
             placeholder="npx"
             list="entry-command-suggestions"
-            className="rounded-md border bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
+            className={inputClass}
             autoComplete="off"
           />
           <datalist id="entry-command-suggestions">
@@ -153,118 +197,29 @@ export function CatalogForm({ namespace, entry, onSubmit, onDelete, submitError 
           <p className="text-xs text-muted-foreground">No env.</p>
         )}
         {envArray.fields.map((field, index) => (
-          <div key={field.id} className="flex items-center gap-2">
-            <input
-              aria-label={`Env key ${index + 1}`}
-              {...form.register(`env.${index}.key` as const)}
-              placeholder="API_KEY"
-              className="w-40 rounded-md border bg-background px-3 py-1.5 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
-              autoComplete="off"
-            />
-            <input
-              aria-label={`Env value ${index + 1}`}
-              {...form.register(`env.${index}.value` as const)}
-              placeholder="{{SECRET:api-key}}"
-              className="flex-1 rounded-md border bg-background px-3 py-1.5 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
-              autoComplete="off"
-            />
-            <button
-              type="button"
-              onClick={() => envArray.remove(index)}
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
-              aria-label="Remove env var"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
+          <KeyValueRow
+            key={field.id}
+            keyField={form.register(`env.${index}.key` as const)}
+            valueField={form.register(`env.${index}.value` as const)}
+            keyLabel={`Env key ${index + 1}`}
+            valueLabel={`Env value ${index + 1}`}
+            keyPlaceholder="API_KEY"
+            valuePlaceholder="{{SECRET:api-key}}"
+            removeLabel="Remove env var"
+            onRemove={() => envArray.remove(index)}
+          />
         ))}
       </FieldGroup>
 
-      <Field label="Description" error={form.formState.errors.description?.message}>
-        <textarea
-          id="entry-description"
-          {...form.register('description')}
-          rows={3}
-          className="resize-none rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-          placeholder="What this MCP server exposes."
-        />
-      </Field>
+      <DescriptionField register={form.register('description')} error={form.formState.errors.description?.message} />
 
-      {submitError !== undefined && submitError !== null && (
-        <div className="rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {submitError}
-        </div>
-      )}
-
-      <div className="flex items-center justify-between gap-2 pt-2">
-        {onDelete !== undefined ? (
-          <button
-            type="button"
-            onClick={onDelete}
-            className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete
-          </button>
-        ) : (
-          <div />
-        )}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
-          {submitting ? 'Saving…' : isEditing ? 'Save' : 'Create'}
-        </button>
-      </div>
+      <CatalogFormFooter
+        isEditing={isEditing}
+        submitting={form.formState.isSubmitting}
+        submitError={submitError}
+        onDelete={onDelete}
+        onCancel={onCancel}
+      />
     </form>
-  );
-}
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium">{label}</span>
-      {children}
-      {error !== undefined && <span className="text-xs text-destructive">{error}</span>}
-    </label>
-  );
-}
-
-function FieldGroup({
-  label,
-  hint,
-  onAdd,
-  children,
-}: {
-  label: string;
-  hint?: React.ReactNode;
-  onAdd: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-2 rounded-md border bg-card px-3 py-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium">{label}</span>
-        <button
-          type="button"
-          onClick={onAdd}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <Plus className="h-3 w-3" />
-          Add {label.toLowerCase().replace(/s$/, '')}
-        </button>
-      </div>
-      {hint !== undefined && <p className="text-xs text-muted-foreground">{hint}</p>}
-      <div className="flex flex-col gap-2">{children}</div>
-    </div>
   );
 }

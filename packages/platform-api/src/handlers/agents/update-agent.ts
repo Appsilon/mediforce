@@ -2,6 +2,7 @@ import type { UpdateAgentInput, UpdateAgentBody, UpdateAgentOutput } from '../..
 import type { CallerScope } from '../../repositories/index';
 import { actorFromCaller } from '../_helpers';
 import { assertAgentMayHoldSkills } from './agent-skills';
+import { assertBindingsTargetCatalogEntries } from './mcp-bindings';
 
 // Body is merged into input by the route adapter — see route.ts for the
 // inputFromRequest shape. Wrapper enforces namespace-write on the existing
@@ -11,10 +12,15 @@ export async function updateAgent(
   scope: CallerScope,
 ): Promise<UpdateAgentOutput> {
   // A patch to skills, visibility or namespace can each break the rule on
-  // which Skills the agent may hold, so the merged result is checked.
-  if (input.body.skills !== undefined || input.body.visibility !== undefined || input.body.namespace !== undefined) {
-    const existing = await scope.agentDefinitions.getForUpdate(input.id);
-    await assertAgentMayHoldSkills({ ...existing, ...input.body }, scope);
+  // which Skills the agent may hold. Moving the agent to another workspace
+  // re-points every binding at that workspace's catalog, so a namespace or
+  // mcpServers change re-checks them all. Both checks run on the merged result.
+  const touchesSkills = input.body.skills !== undefined || input.body.visibility !== undefined || input.body.namespace !== undefined;
+  const touchesBindings = input.body.mcpServers !== undefined || input.body.namespace !== undefined;
+  if (touchesSkills || touchesBindings) {
+    const merged = { ...(await scope.agentDefinitions.getForUpdate(input.id)), ...input.body };
+    if (touchesSkills) await assertAgentMayHoldSkills(merged, scope);
+    if (touchesBindings) await assertBindingsTargetCatalogEntries(scope, merged.namespace, merged.mcpServers);
   }
   const agent = await scope.agentDefinitions.update(input.id, input.body);
   const actor = actorFromCaller(scope);

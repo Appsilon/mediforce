@@ -540,6 +540,13 @@
       "when": 1789641802300,
       "tag": "0076_drop_evaluator_severity",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1789641802400,
+      "tag": "0077_tool_catalog_http_entries",
+      "breakpoints": true
     }
   ]
 }

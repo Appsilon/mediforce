@@ -7,6 +7,7 @@ import {
   HttpOAuthAuthSchema,
   StepMcpRestrictionSchema,
   ToolCatalogEntrySchema,
+  HttpToolCatalogEntrySchema,
 } from '../agent-mcp-binding';
 import { AgentDefinitionSchema } from '../agent-definition';
 import { WorkflowDefinitionSchema } from '../workflow-definition';
@@ -78,138 +79,36 @@ describe('AgentMcpBindingSchema', () => {
   });
 
   describe('http variant', () => {
-    it('parses a valid http binding with url only', () => {
-      const result = AgentMcpBindingSchema.safeParse({
-        type: 'http',
-        url: 'https://mcp.example.com/v1',
-      });
+    it('parses an http binding that references a catalog entry', () => {
+      const result = AgentMcpBindingSchema.safeParse({ type: 'http', catalogId: 'github-mcp' });
       expect(result.success).toBe(true);
       if (result.success && result.data.type === 'http') {
-        expect(result.data.url).toBe('https://mcp.example.com/v1');
-      }
-    });
-
-    it('parses http binding with discriminated headers auth', () => {
-      const result = AgentMcpBindingSchema.safeParse({
-        type: 'http',
-        url: 'https://mcp.example.com/v1',
-        auth: {
-          type: 'headers',
-          headers: {
-            Authorization: 'Bearer {{SECRET:mcp_token}}',
-            'X-Workspace': 'acme',
-          },
-        },
-      });
-      expect(result.success).toBe(true);
-      if (result.success && result.data.type === 'http') {
-        expect(result.data.auth?.type).toBe('headers');
-        if (result.data.auth?.type === 'headers') {
-          expect(result.data.auth.headers.Authorization).toBe(
-            'Bearer {{SECRET:mcp_token}}',
-          );
-        }
-      }
-    });
-
-    it('parses http binding with discriminated oauth auth', () => {
-      const result = AgentMcpBindingSchema.safeParse({
-        type: 'http',
-        url: 'https://mcp.example.com/v1',
-        auth: {
-          type: 'oauth',
-          provider: 'github',
-        },
-      });
-      expect(result.success).toBe(true);
-      if (result.success && result.data.type === 'http' && result.data.auth?.type === 'oauth') {
-        expect(result.data.auth.provider).toBe('github');
-        expect(result.data.auth.headerName).toBe('Authorization');
-        expect(result.data.auth.headerValueTemplate).toBe('Bearer {token}');
-      }
-    });
-
-    it('parses http binding with oauth auth and custom header override', () => {
-      const result = AgentMcpBindingSchema.safeParse({
-        type: 'http',
-        url: 'https://mcp.example.com/v1',
-        auth: {
-          type: 'oauth',
-          provider: 'github',
-          headerName: 'X-API-Token',
-          headerValueTemplate: '{token}',
-          scopes: ['repo', 'read:user'],
-        },
-      });
-      expect(result.success).toBe(true);
-      if (result.success && result.data.type === 'http' && result.data.auth?.type === 'oauth') {
-        expect(result.data.auth.headerName).toBe('X-API-Token');
-        expect(result.data.auth.headerValueTemplate).toBe('{token}');
-        expect(result.data.auth.scopes).toEqual(['repo', 'read:user']);
-      }
-    });
-
-    it('normalizes legacy { headers } auth shape into discriminated form', () => {
-      // Pre-Step-5 bindings stored auth as `{ headers: {...} }` without
-      // a type discriminator. Lazy read-time migration converts them.
-      const result = HttpAgentMcpBindingSchema.safeParse({
-        type: 'http',
-        url: 'https://mcp.example.com/v1',
-        auth: {
-          headers: { Authorization: 'Bearer {{SECRET:legacy_tok}}' },
-        },
-      });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.auth?.type).toBe('headers');
-        if (result.data.auth?.type === 'headers') {
-          expect(result.data.auth.headers.Authorization).toBe('Bearer {{SECRET:legacy_tok}}');
-        }
-      }
-    });
-
-    it('drops legacy empty auth object ({}) during normalization', () => {
-      // `auth: {}` carried no meaningful state; preprocess drops it.
-      const result = HttpAgentMcpBindingSchema.safeParse({
-        type: 'http',
-        url: 'https://mcp.example.com/v1',
-        auth: {},
-      });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.auth).toBeUndefined();
+        expect(result.data.catalogId).toBe('github-mcp');
       }
     });
 
     it('parses http binding with allowedTools', () => {
       const result = AgentMcpBindingSchema.safeParse({
         type: 'http',
-        url: 'https://mcp.example.com/v1',
+        catalogId: 'github-mcp',
         allowedTools: ['fetch'],
       });
       expect(result.success).toBe(true);
     });
 
-    it('rejects http binding without url', () => {
-      const result = AgentMcpBindingSchema.safeParse({
-        type: 'http',
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it('rejects http binding with non-URL string', () => {
-      const result = AgentMcpBindingSchema.safeParse({
-        type: 'http',
-        url: 'not-a-url',
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it('rejects http binding with stdio-only catalogId field', () => {
+    it('rejects http binding with an inline url (servers live in the catalog)', () => {
       const result = AgentMcpBindingSchema.safeParse({
         type: 'http',
         url: 'https://mcp.example.com/v1',
-        catalogId: 'oops',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects http binding with inline auth', () => {
+      const result = HttpAgentMcpBindingSchema.safeParse({
+        type: 'http',
+        catalogId: 'github-mcp',
+        auth: { type: 'oauth', provider: 'github' },
       });
       expect(result.success).toBe(false);
     });
@@ -217,7 +116,7 @@ describe('AgentMcpBindingSchema', () => {
     it('rejects http binding with empty allowedTools array', () => {
       const result = AgentMcpBindingSchema.safeParse({
         type: 'http',
-        url: 'https://mcp.example.com/v1',
+        catalogId: 'github-mcp',
         allowedTools: [],
       });
       expect(result.success).toBe(false);
@@ -328,42 +227,110 @@ describe('HttpHeadersAuthSchema + HttpOAuthAuthSchema (sub-schema exports)', () 
 });
 
 describe('ToolCatalogEntrySchema', () => {
-  it('parses a minimal catalog entry', () => {
-    const result = ToolCatalogEntrySchema.safeParse({
-      id: 'cdisc-library',
-      command: 'npx',
+  describe('stdio variant', () => {
+    it('parses a minimal entry', () => {
+      const result = ToolCatalogEntrySchema.safeParse({ id: 'cdisc-library', type: 'stdio', command: 'npx' });
+      expect(result.success).toBe(true);
+      if (result.success && result.data.type === 'stdio') {
+        expect(result.data.args).toBeUndefined();
+      }
     });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.args).toBeUndefined();
-    }
+
+    it('parses a full entry', () => {
+      const result = ToolCatalogEntrySchema.safeParse({
+        id: 'postgres-readonly',
+        type: 'stdio',
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-postgres'],
+        env: { PGURL: '{{SECRET:pg_url}}' },
+        description: 'Read-only Postgres MCP server',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects empty id', () => {
+      expect(ToolCatalogEntrySchema.safeParse({ id: '', type: 'stdio', command: 'npx' }).success).toBe(false);
+    });
+
+    it('rejects empty command', () => {
+      expect(ToolCatalogEntrySchema.safeParse({ id: 'cdisc', type: 'stdio', command: '' }).success).toBe(false);
+    });
+
+    it('rejects a url on a stdio entry', () => {
+      const result = ToolCatalogEntrySchema.safeParse({
+        id: 'cdisc',
+        type: 'stdio',
+        command: 'npx',
+        url: 'https://example.com',
+      });
+      expect(result.success).toBe(false);
+    });
   });
 
-  it('parses a full catalog entry', () => {
-    const result = ToolCatalogEntrySchema.safeParse({
-      id: 'postgres-readonly',
-      command: 'npx',
-      args: ['-y', '@modelcontextprotocol/server-postgres'],
-      env: { PGURL: '{{SECRET:pg_url}}' },
-      description: 'Read-only Postgres MCP server',
+  describe('http variant', () => {
+    it('parses an entry with url only', () => {
+      const result = ToolCatalogEntrySchema.safeParse({
+        id: 'example',
+        type: 'http',
+        url: 'https://mcp.example.com/v1',
+      });
+      expect(result.success).toBe(true);
     });
-    expect(result.success).toBe(true);
+
+    it('parses headers auth', () => {
+      const result = HttpToolCatalogEntrySchema.safeParse({
+        id: 'example',
+        type: 'http',
+        url: 'https://mcp.example.com/v1',
+        auth: { type: 'headers', headers: { Authorization: 'Bearer {{SECRET:mcp_token}}' } },
+      });
+      expect(result.success).toBe(true);
+      if (result.success && result.data.auth?.type === 'headers') {
+        expect(result.data.auth.headers.Authorization).toBe('Bearer {{SECRET:mcp_token}}');
+      }
+    });
+
+    it('parses oauth auth with defaults', () => {
+      const result = HttpToolCatalogEntrySchema.safeParse({
+        id: 'github',
+        type: 'http',
+        url: 'https://api.github.com/mcp',
+        auth: { type: 'oauth', provider: 'github' },
+      });
+      expect(result.success).toBe(true);
+      if (result.success && result.data.auth?.type === 'oauth') {
+        expect(result.data.auth.headerName).toBe('Authorization');
+        expect(result.data.auth.headerValueTemplate).toBe('Bearer {token}');
+      }
+    });
+
+    it('rejects auth without a type discriminator', () => {
+      const result = HttpToolCatalogEntrySchema.safeParse({
+        id: 'untyped',
+        type: 'http',
+        url: 'https://mcp.example.com/v1',
+        auth: { headers: { Authorization: 'Bearer {{SECRET:tok}}' } },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects a non-URL string', () => {
+      expect(ToolCatalogEntrySchema.safeParse({ id: 'x', type: 'http', url: 'not-a-url' }).success).toBe(false);
+    });
+
+    it('rejects a command on an http entry', () => {
+      const result = ToolCatalogEntrySchema.safeParse({
+        id: 'x',
+        type: 'http',
+        url: 'https://example.com',
+        command: 'npx',
+      });
+      expect(result.success).toBe(false);
+    });
   });
 
-  it('rejects empty id', () => {
-    const result = ToolCatalogEntrySchema.safeParse({
-      id: '',
-      command: 'npx',
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects empty command', () => {
-    const result = ToolCatalogEntrySchema.safeParse({
-      id: 'cdisc',
-      command: '',
-    });
-    expect(result.success).toBe(false);
+  it('rejects an entry without type', () => {
+    expect(ToolCatalogEntrySchema.safeParse({ id: 'cdisc', command: 'npx' }).success).toBe(false);
   });
 });
 
@@ -432,56 +399,20 @@ describe('AgentDefinitionSchema with mcpServers', () => {
     }
   });
 
-  it('parses agent definition with mixed stdio + http mcpServers (discriminated auth)', () => {
+  it('parses agent definition with mixed stdio + http mcpServers', () => {
     const result = AgentDefinitionSchema.safeParse({
       ...base,
       mcpServers: {
         github: { type: 'stdio', catalogId: 'github' },
         cdisc: { type: 'stdio', catalogId: 'cdisc-library', allowedTools: ['search'] },
-        remote: {
-          type: 'http',
-          url: 'https://mcp.example.com/v1',
-          auth: { type: 'headers', headers: { Authorization: 'Bearer {{SECRET:token}}' } },
-        },
-        remote_oauth: {
-          type: 'http',
-          url: 'https://api.github.com/mcp',
-          auth: { type: 'oauth', provider: 'github' },
-        },
+        remote: { type: 'http', catalogId: 'example' },
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(Object.keys(result.data.mcpServers ?? {})).toHaveLength(4);
+      expect(Object.keys(result.data.mcpServers ?? {})).toHaveLength(3);
       expect(result.data.mcpServers?.github?.type).toBe('stdio');
       expect(result.data.mcpServers?.remote?.type).toBe('http');
-      const remoteOauth = result.data.mcpServers?.remote_oauth;
-      if (remoteOauth?.type === 'http' && remoteOauth.auth?.type === 'oauth') {
-        expect(remoteOauth.auth.provider).toBe('github');
-      }
-    }
-  });
-
-  it('normalizes legacy auth shapes when parsing AgentDefinition with mcpServers', () => {
-    const result = AgentDefinitionSchema.safeParse({
-      ...base,
-      mcpServers: {
-        legacy: {
-          type: 'http',
-          url: 'https://mcp.example.com/v1',
-          auth: { headers: { Authorization: 'Bearer {{SECRET:tok}}' } },
-        },
-      },
-    });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      const legacy = result.data.mcpServers?.legacy;
-      if (legacy?.type === 'http') {
-        expect(legacy.auth?.type).toBe('headers');
-        if (legacy.auth?.type === 'headers') {
-          expect(legacy.auth.headers.Authorization).toBe('Bearer {{SECRET:tok}}');
-        }
-      }
     }
   });
 

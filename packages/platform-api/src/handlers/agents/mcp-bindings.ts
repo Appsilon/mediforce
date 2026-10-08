@@ -1,3 +1,4 @@
+import type { AgentMcpBinding, AgentMcpBindingMap } from '@mediforce/platform-core';
 import type {
   UpsertAgentMcpBindingInput,
   UpsertAgentMcpBindingOutput,
@@ -7,7 +8,7 @@ import type {
   ListAgentMcpBindingsOutput,
 } from '../../contract/agents';
 import type { CallerScope } from '../../repositories/index';
-import { PreconditionFailedError } from '../../errors';
+import { HandlerError, PreconditionFailedError } from '../../errors';
 import { actorFromCaller, loadOr404, resolvePersonalNamespace } from '../_helpers';
 
 /**
@@ -32,6 +33,43 @@ async function actingNamespace(
   );
 }
 
+/**
+ * A binding may only point at a server that already exists in the agent's
+ * workspace catalog, with the transport it declares. Platform-global agents
+ * have no workspace catalog to check against; the runtime resolver checks
+ * them against the running workflow's namespace.
+ */
+export async function assertBindingsTargetCatalogEntries(
+  scope: CallerScope,
+  namespace: string | undefined,
+  bindings: AgentMcpBindingMap | undefined,
+): Promise<void> {
+  if (namespace === undefined) return;
+  for (const binding of Object.values(bindings ?? {})) {
+    await assertBindingTargetsCatalogEntry(scope, namespace, binding);
+  }
+}
+
+async function assertBindingTargetsCatalogEntry(
+  scope: CallerScope,
+  namespace: string,
+  binding: AgentMcpBinding,
+): Promise<void> {
+  const entry = await scope.toolCatalog.getById(namespace, binding.catalogId);
+  if (entry === null) {
+    throw new HandlerError(
+      'validation',
+      `Tool catalog of "${namespace}" has no MCP server "${binding.catalogId}". Add it on the MCP page first.`,
+    );
+  }
+  if (entry.type !== binding.type) {
+    throw new HandlerError(
+      'validation',
+      `MCP server "${binding.catalogId}" is ${entry.type}, but the binding declares ${binding.type}.`,
+    );
+  }
+}
+
 export async function listAgentMcpBindings(
   input: ListAgentMcpBindingsInput,
   scope: CallerScope,
@@ -45,6 +83,7 @@ export async function upsertAgentMcpBinding(
   scope: CallerScope,
 ): Promise<UpsertAgentMcpBindingOutput> {
   const agent = await loadOr404(scope.agentDefinitions.getById(input.id), 'Agent not found');
+  await assertBindingsTargetCatalogEntries(scope, agent.namespace, { [input.name]: input.binding });
   const nextMcpServers = { ...(agent.mcpServers ?? {}), [input.name]: input.binding };
   const updated = await scope.agentDefinitions.updateMcpServers(input.id, nextMcpServers);
   const actor = actorFromCaller(scope);

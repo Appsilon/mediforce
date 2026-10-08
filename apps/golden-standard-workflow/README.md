@@ -99,7 +99,7 @@ Human business decisions use `type: review` with explicit `verdicts`.
 The Dockerfile copies `mcp/readonly_context_mcp.py`, so the command exists in
 the container. That is not enough. To make the MCP governable:
 
-1. Add `setup/tool-catalog-entry.json` in `/{handle}/admin/tool-catalog`.
+1. Add `setup/tool-catalog-entry.json` on the MCP page (`/{handle}/mcp`), or with `mediforce tool-catalog add`.
 2. Add or update an Agent using `setup/agent-definition.json`.
 3. Reference that Agent from workflow steps with `agentId`.
 4. Narrow step access with `mcpRestrictions`.

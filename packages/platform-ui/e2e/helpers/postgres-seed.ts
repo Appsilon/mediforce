@@ -63,7 +63,7 @@ export async function seedPostgresNamespace(
     //                branding-org-* (namespace-branding.journey, per-test org),
     //                import-org-* (workflow-import.journey, per-test org),
     //                journey-examples-* (import-example-workflows.journey, timestamp suffix),
-    //                tool-catalog-empty-* (admin-tool-catalog.journey, timestamp suffix),
+    //                tool-catalog-empty-* (mcp-crud.journey, timestamp suffix),
     //                invitee-password-off* (invite-password-gate.journey — the
     //                  personal workspace `ensurePersonalNamespace` bootstraps
     //                  for the invitee outlives the `deleteAuthUser` teardown,
@@ -512,13 +512,16 @@ export async function seedPostgresNamespace(
     for (const [id, entry] of Object.entries(data.toolCatalog)) {
       await sql`
         INSERT INTO tool_catalog_entries (
-          workspace, id, command, args, env, description
+          workspace, id, type, command, args, env, url, auth, description
         ) VALUES (
           ${TEST_ORG_HANDLE},
           ${id},
-          ${entry.command as string},
+          ${entry.type as string},
+          ${(entry.command as string | undefined) ?? null},
           ${entry.args ? sql.json(entry.args as unknown) : null},
           ${entry.env ? sql.json(entry.env as unknown) : null},
+          ${(entry.url as string | undefined) ?? null},
+          ${entry.auth ? sql.json(entry.auth as unknown) : null},
           ${(entry.description as string | undefined) ?? null}
         )
         ON CONFLICT (workspace, id) DO NOTHING

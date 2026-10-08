@@ -94,7 +94,8 @@ appendix can capture what actually shipped vs the original decision body.
 | [0019](./0019-workspace-scoped-roles.md) | Process roles are workspace-scoped (partially supersedes [0002](./0002-firebase-auth-to-nextauth.md) §5) | Accepted |
 | [0020](./0020-built-in-roles-and-default-workflow-access.md) | Built-in roles carry their privilege as a default, not as an override (extends [0019](./0019-workspace-scoped-roles.md)) | Accepted |
 | [0021](./0021-workspace-join-links.md) | A join link authorizes membership; the mailbox still authorizes the session (amends [0002](./0002-firebase-auth-to-nextauth.md) §4a) | Accepted |
-| [0022](./0022-image-catalog.md) | The Image Catalog is an image the platform offers, keyed on its source | Accepted |
+| [0022](./0022-image-catalog.md) | The Image Catalog is an image the platform offers, keyed on its source | Partially superseded by [0026](./0026-mcp-servers-live-in-the-catalog.md) (§3–§4, Tool Catalog write gate) |
 | [0023](./0023-step-evaluation.md) | Step Evaluation: Evaluators, single-step Eval Runs, Step Qualification (partially supersedes [0007](./0007-llm-evaluation-observability.md) § Deferred; optimisation parked in [0024](./0024-optimisation.md)) | Accepted |
 | [0024](./0024-optimisation.md) | Optimisation — challengers, fix variants, GEPA, case expectations — parked outside Step Evaluation; reference code pinned at `aa8ac636` | Proposed |
 | [0025](./0025-skill-catalog.md) | A Skill is a Namespace resource an Agent owns (private or public), offered to Claude Code through the plugin folder; not something a Workflow carries | Accepted |
+| [0026](./0026-mcp-servers-live-in-the-catalog.md) | Every MCP server (stdio and HTTP) lives in the workspace catalog any member manages; an agent binding only references one (partially supersedes [0022](./0022-image-catalog.md) §3–§4) | Accepted |

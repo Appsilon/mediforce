@@ -248,8 +248,10 @@ Protocol. Attached to an Agent via Agent MCP Binding; narrowed
 per-step via Step MCP Restriction (subtractive).
 
 **Tool Catalog Entry**:
-Admin-curated stdio MCP server definition that agents reference by `catalogId`
-(prevents inline RCE). Namespace-scoped.
+Workspace-curated MCP server definition — stdio (command, args, env) or HTTP
+(url, auth) — that agents reference by `catalogId`. An agent binding cannot
+spell out a command or URL of its own, only point at an entry (prevents inline
+RCE). Any workspace member manages entries on the MCP page. Namespace-scoped.
 
 **Image Catalog**:
 The per-namespace set of Image Catalog Entries — the curated shelf of container

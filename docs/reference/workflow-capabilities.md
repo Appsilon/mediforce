@@ -257,9 +257,9 @@ platform setup (`MANUAL`) — the production checklist is golden-rules §7.
 | Capability | Field / schema | Source |
 |-----------|----------------|--------|
 | Reference a governed agent from a step | `step.agentId` | `WorkflowStepSchema` ([`workflow-definition.ts`](../../packages/platform-core/src/schemas/workflow-definition.ts)) |
-| Agent's canonical MCP bindings (stdio via `catalogId`, or http with `headers`/`oauth` auth) | `AgentDefinition.mcpServers` | [`agent-definition.ts`](../../packages/platform-core/src/schemas/agent-definition.ts) + [`agent-mcp-binding.ts`](../../packages/platform-core/src/schemas/agent-mcp-binding.ts) |
+| Agent's canonical MCP bindings (stdio or http, each a `catalogId` reference) | `AgentDefinition.mcpServers` | [`agent-definition.ts`](../../packages/platform-core/src/schemas/agent-definition.ts) + [`agent-mcp-binding.ts`](../../packages/platform-core/src/schemas/agent-mcp-binding.ts) |
 | Per-step narrowing (subtractive only — `disable` server or `denyTools`) | `step.mcpRestrictions` | `StepMcpRestrictionSchema` ([`agent-mcp-binding.ts`](../../packages/platform-core/src/schemas/agent-mcp-binding.ts)) |
-| Admin-curated stdio server catalog | `ToolCatalogEntrySchema` | [`agent-mcp-binding.ts`](../../packages/platform-core/src/schemas/agent-mcp-binding.ts) |
+| Workspace MCP server catalog (stdio command, or http url with `headers`/`oauth` auth) | `ToolCatalogEntrySchema` | [`agent-mcp-binding.ts`](../../packages/platform-core/src/schemas/agent-mcp-binding.ts) |
 | OAuth providers for http MCP servers | `OAuthProviderConfigSchema` | [`oauth-provider.ts`](../../packages/platform-core/src/schemas/oauth-provider.ts) |
 | Inline step-level MCP (**deprecated** — use `agentId`) | `agent.mcpServers` / `cowork.mcpServers` | `McpServerConfigSchema` ([`mcp-server-config.ts`](../../packages/platform-core/src/schemas/mcp-server-config.ts)) |
 
