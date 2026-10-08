@@ -63,6 +63,7 @@ const config: Config = {
         },
         blog: false,
         theme: { customCss: './src/css/custom.css' },
+        googleTagManager: { containerId: 'GTM-MLDWFWKK' },
       } satisfies Preset.Options,
     ],
   ],
