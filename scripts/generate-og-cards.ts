@@ -20,6 +20,7 @@ import sharp from 'sharp';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const DOCS = path.join(ROOT, 'docs');
+const GTM_CONTAINER = 'GTM-MLDWFWKK';
 const OUT = path.join(DOCS, 'images', 'og');
 const FONTS = path.join(ROOT, 'scripts', 'assets', 'fonts');
 
@@ -316,6 +317,15 @@ async function main() {
   // nav.js and theme.css are cached for four hours at the edge, and the pages
   // that depend on them are not. A stale nav.js paired with fresh HTML prepends
   // a second header to every page, which is what shipping without this did.
+  for (const file of await htmlFiles(DOCS)) {
+    const html = await readFile(file, 'utf-8');
+    const loader = html.includes(`'dataLayer','${GTM_CONTAINER}')`);
+    const noscript = html.includes(`ns.html?id=${GTM_CONTAINER}`);
+    if (loader === false || noscript === false) {
+      throw new Error(`${path.relative(ROOT, file)}: missing the ${GTM_CONTAINER} Google Tag Manager snippets`);
+    }
+  }
+
   for (const asset of ['nav.js', 'theme.css']) {
     const bytes = await readFile(path.join(DOCS, asset));
     const want = createHash('sha256').update(bytes).digest('hex').slice(0, 8);
