@@ -35,6 +35,7 @@ export interface EvaluationFixture {
   readonly evaluationRepo: InMemoryEvaluationRepository;
   readonly auditRepo: InMemoryAuditRepository;
   readonly agentDefinitionRepo: InMemoryAgentDefinitionRepository;
+  readonly toolCatalogRepo: InMemoryToolCatalogRepository;
   scope(caller?: CallerIdentity, overrides?: TestScopeOverrides): CallerScope;
 }
 
@@ -98,6 +99,7 @@ export async function evaluationFixture(): Promise<EvaluationFixture> {
     evaluationRepo,
     auditRepo,
     agentDefinitionRepo,
+    toolCatalogRepo,
     scope: (caller = userCaller('author-1', [NAMESPACE]), overrides = {}) => createTestScope({
       ...overrides,
       processRepo,

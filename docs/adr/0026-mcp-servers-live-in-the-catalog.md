@@ -75,6 +75,6 @@ migration logs a WARNING naming each one, instead of failing the deploy.
   server. The edit dialog says how many agents that is.
 - A platform-global agent has no workspace catalog; its bindings are checked
   against the running workflow's namespace at resolution time only.
-- Evaluation handlers read the catalog through the caller's workspace-scoped
-  repository, so evaluating a step whose public agent belongs to a workspace
-  the caller is not a member of reports its MCP servers as unresolvable.
+- A caller's workspace-scoped catalog reads another workspace's entry only
+  when resolving a public agent that belongs to that workspace and binds that
+  entry, so evaluation handlers resolve the same servers the runtime does.

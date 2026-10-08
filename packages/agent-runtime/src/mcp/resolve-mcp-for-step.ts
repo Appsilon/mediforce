@@ -1,9 +1,9 @@
 import {
   resolveEffectiveMcp,
+  type AgentDefinition,
   type AgentDefinitionRepository,
   type ResolvedMcpConfig,
   type ToolCatalogEntry,
-  type ToolCatalogRepository,
   type WorkflowStep,
 } from '@mediforce/platform-core';
 
@@ -25,7 +25,11 @@ export class AgentDefinitionNotFoundError extends Error {
 
 export interface ResolveMcpForStepDeps {
   agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>;
-  toolCatalogRepo: Pick<ToolCatalogRepository, 'getById'>;
+  /** Receives the agent whose bindings are resolved, so a caller-scoped
+   *  repository can admit a public agent's own workspace entries. */
+  toolCatalogRepo: {
+    getById(namespace: string, entryId: string, boundBy: AgentDefinition): Promise<ToolCatalogEntry | null>;
+  };
   /** The workflow's namespace — the catalog used for an agent that has no
    *  owning workspace of its own (a platform-global agent). */
   namespace: string;
@@ -69,7 +73,7 @@ export async function resolveMcpForStep(
   const catalog = new Map<string, ToolCatalogEntry>();
   await Promise.all(
     [...catalogIds].map(async (id) => {
-      const entry = await deps.toolCatalogRepo.getById(catalogNamespace, id);
+      const entry = await deps.toolCatalogRepo.getById(catalogNamespace, id, agent);
       if (entry !== null) catalog.set(id, entry);
     }),
   );
