@@ -4,6 +4,39 @@ All notable changes to Mediforce are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Step Evaluation:** Check that an agent step can be trusted before you rely on it. The Evaluation tab lets you write rules for a step's output, build test cases, run the step against them many times and read the report, with an Evaluation Assistant to help at each stage ([#1403](https://github.com/Appsilon/mediforce/pull/1403), [#1406](https://github.com/Appsilon/mediforce/pull/1406), [#1407](https://github.com/Appsilon/mediforce/pull/1407), [#1408](https://github.com/Appsilon/mediforce/pull/1408), [#1415](https://github.com/Appsilon/mediforce/pull/1415), [#1442](https://github.com/Appsilon/mediforce/pull/1442), [#1450](https://github.com/Appsilon/mediforce/pull/1450), [#1452](https://github.com/Appsilon/mediforce/pull/1452)).
+- **Acceptance Criteria And Sign-Off:** Set the pass rate a step must reach. A person can then approve the step's configuration from a finished test run that meets it ([#1416](https://github.com/Appsilon/mediforce/pull/1416), [#1479](https://github.com/Appsilon/mediforce/pull/1479)).
+- **Watch Steps In Production:** Switch on "Also run in production" for a rule and it scores the step's live runs too, with an alert when the scores drop ([#1417](https://github.com/Appsilon/mediforce/pull/1417), [#1424](https://github.com/Appsilon/mediforce/pull/1424)).
+- **Replay MCP Tools In Tests:** Test runs can replay recorded MCP tool calls instead of calling the real server, or block a server entirely ([#1428](https://github.com/Appsilon/mediforce/pull/1428)).
+- **Result Shape Checks:** An agent step can declare the shape its result must have. Mediforce checks it and gives the agent one retry, with the problem explained ([#1403](https://github.com/Appsilon/mediforce/pull/1403)).
+- **MCP Page:** The Tools page is now the MCP page. A workspace's catalog holds both local and HTTP servers, and editing a server shows every agent that uses it ([#1483](https://github.com/Appsilon/mediforce/pull/1483)).
+- **Pick MCP Tools On An Agent:** Attach an MCP server to an agent and choose which of its tools the agent may use, from the list the server reports. Agent cards list their servers ([#1453](https://github.com/Appsilon/mediforce/pull/1453), [#1457](https://github.com/Appsilon/mediforce/pull/1457)).
+- **Missing Command Warnings:** The step editor warns when an MCP server needs a command the step's image doesn't have, and a run names any MCP server that failed to start ([#1454](https://github.com/Appsilon/mediforce/pull/1454), [#1456](https://github.com/Appsilon/mediforce/pull/1456)).
+- **OpenCode Agents Catch Up:** OpenCode steps now get MCP servers, tool limits and skills, the same as Claude Code steps ([#1478](https://github.com/Appsilon/mediforce/pull/1478)).
+
+### Changed
+
+- **Agent Logs Are Kept:** An agent's log is stored with the run, so it survives a server restart. By default it shows which tools the agent used, not their inputs and outputs; set `MEDIFORCE_OTEL_CAPTURE_CONTENT=true` to include them. Logs from earlier runs aren't shown ([#1403](https://github.com/Appsilon/mediforce/pull/1403)).
+- **Models Tab:** Models has its own place in the sidebar ([#1455](https://github.com/Appsilon/mediforce/pull/1455)).
+- **Newest Sonnet By Default:** When no model is named, Mediforce uses the newest Claude Sonnet, and a new agent starts with it selected ([#1475](https://github.com/Appsilon/mediforce/pull/1475)).
+- **Patient With Slow MCP Servers:** An agent waits up to two minutes for an MCP server that installs on first run, instead of starting without its tools ([#1476](https://github.com/Appsilon/mediforce/pull/1476)).
+- **Agent HTTP Servers Move To The Catalog:** On upgrade, an HTTP MCP server set directly on an agent becomes an entry in its workspace's catalog. An agent that belongs to no workspace loses it, and the upgrade log names each one ([#1483](https://github.com/Appsilon/mediforce/pull/1483)).
+
+### Fixed
+
+- Agents running in containers can find the files you upload, because they're given the path inside the container instead of the server's ([#1470](https://github.com/Appsilon/mediforce/pull/1470)).
+- OpenCode agent steps can find their input file ([#1468](https://github.com/Appsilon/mediforce/pull/1468)).
+- The Agents page lists only the agents of the workspace you're in ([#1480](https://github.com/Appsilon/mediforce/pull/1480)).
+- Batch-only models no longer appear in the model list ([#1474](https://github.com/Appsilon/mediforce/pull/1474)).
+
+### Security
+
+- Any workspace member can now add, edit and remove MCP servers, including the commands agents run. Every change is recorded in the audit trail ([#1483](https://github.com/Appsilon/mediforce/pull/1483)).
+- Patched known vulnerabilities in Next.js and other dependencies ([#1451](https://github.com/Appsilon/mediforce/pull/1451), [#1467](https://github.com/Appsilon/mediforce/pull/1467)).
 
 ## [1.2.0] - 2026-09-28
 
