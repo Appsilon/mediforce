@@ -142,7 +142,12 @@ Runtimes and how each is launched are the `RUNTIME_CONFIG` map in
 | Command | `command` + a file the workflow carries, `image`, or `dockerfile` (carried, or `repo`+`commit`) | the named/built image | any shell command in that image |
 
 Every script reads `/output/input.json` and writes `/output/result.json`. The
-working directory is `/workspace` (the per-run git worktree).
+working directory is `/workspace` (the per-run git worktree). A script directly
+after a `file-upload` step gets the uploads as top-level `files` in `input.json`;
+each is downloaded to `/data/<name>` (read-only) and its path set in
+`files[].localPath`, the same as for agent steps. A human step's uploads are
+never in `/workspace/.mediforce/output/` — that holds only what container steps
+wrote to `/output`.
 
 **`/output` does not survive the step.** It is an ephemeral host-container
 channel, deleted when the step ends: what a step leaves there becomes a

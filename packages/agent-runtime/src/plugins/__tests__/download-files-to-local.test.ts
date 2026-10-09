@@ -83,4 +83,16 @@ describe('downloadFilesToLocal', () => {
       }),
     ).rejects.toThrow(/missing\.json.*HTTP 404/);
   });
+
+  it('keeps a traversing file name inside the temp dir', async () => {
+    stubFetch('payload');
+    const { updatedInput, tempDir: td } = await downloadFilesToLocal({
+      files: [{ name: '../../escape.txt', downloadUrl: '/api/attachments/abc-123/blob' }],
+    });
+    tempDir = td;
+
+    const file = (updatedInput as { files: Array<{ localPath: string }> }).files[0];
+    expect(file.localPath).toBe(join(td!, 'escape.txt'));
+    expect(await readFile(file.localPath, 'utf8')).toBe('payload');
+  });
 });

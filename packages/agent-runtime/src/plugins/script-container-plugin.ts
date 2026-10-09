@@ -7,7 +7,13 @@ import type { AgentConfig, ScriptStepConfig, StepConfig, PluginCapabilityMetadat
 import { DEFAULT_SCRIPT_RUNTIME_IMAGES, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
-import { isLocalExecutionAllowed } from './base-container-agent-plugin';
+import {
+  isLocalExecutionAllowed,
+  downloadFilesToLocal,
+  toContainerFilePaths,
+  cleanupTempDir,
+  CONTAINER_DATA_MOUNT,
+} from './base-container-agent-plugin';
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 
 // Last-resort for the legacy process-mode path only; the workflow path resolves
@@ -71,7 +77,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
   readonly metadata: PluginCapabilityMetadata = {
     name: 'Script Container',
     description: 'Runs a deterministic script or inline code inside a Docker container — no LLM involved.',
-    inputDescription: 'Step input JSON at /output/input.json; carry-over from WD inputForNextRun (when declared) at /output/previous_run.json.',
+    inputDescription: 'Step input JSON at /output/input.json (uploaded files downloaded to /data, path in files[].localPath); carry-over from WD inputForNextRun (when declared) at /output/previous_run.json.',
     outputDescription: 'Container writes result to /output/result.json; parsed and emitted as the step result.',
     roles: ['executor'],
   };
@@ -195,6 +201,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
     });
 
     let outputDir: string | null = null;
+    let downloadDir: string | null = null;
 
     try {
       // Every run gets a shared git worktree; mounted into the container at /workspace.
@@ -204,9 +211,22 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       const rawOutputDir = await mkdtemp(join(tmpdir(), 'mediforce-script-output-'));
       outputDir = await realpath(rawOutputDir);
 
+      // Uploaded files arrive as references (downloadUrl); fetch them so the
+      // script can open them at files[].localPath, same as agent steps.
+      const { updatedInput, tempDir } = await downloadFilesToLocal(this.context.stepInput);
+      downloadDir = tempDir;
+      if (downloadDir) {
+        await emit({
+          type: 'status',
+          payload: `downloaded ${(updatedInput as { files: unknown[] }).files.length} file(s) to ${CONTAINER_DATA_MOUNT}`,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      const scriptInput = this.isLocalMode ? updatedInput : toContainerFilePaths(updatedInput);
+
       // Write step input as /output/input.json
       const inputPath = join(outputDir, 'input.json');
-      await writeFile(inputPath, JSON.stringify(this.context.stepInput, null, 2), 'utf-8');
+      await writeFile(inputPath, JSON.stringify(scriptInput, null, 2), 'utf-8');
 
       // Write carry-over snapshot as /output/previous_run.json when the
       // workflow declares inputForNextRun. Always an object — `{}` on first
@@ -323,6 +343,9 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           ...(artifactsHostDir === null
             ? []
             : ['-v', `${artifactsHostDir}:${CONTAINER_ARTIFACTS_MOUNT}:ro`]),
+          ...(downloadDir === null
+            ? []
+            : ['-v', `${downloadDir}:${CONTAINER_DATA_MOUNT}:ro`]),
           '-w', '/workspace',
           ...envFlags,
           this.image,
@@ -507,6 +530,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       if (outputDir) {
         await rm(outputDir, { recursive: true, force: true }).catch(() => {});
       }
+      await cleanupTempDir(downloadDir);
     }
   }
 
