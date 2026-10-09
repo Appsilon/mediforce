@@ -30,6 +30,7 @@ on:
       - 'scripts/generate-og-cards.ts'
       - 'scripts/assets/**'
       - 'scripts/build-news.ts'
+      - 'scripts/clean_site_urls.py'
       - 'scripts/news/**'
       - '.github/workflows/pages.yml'
   schedule:
@@ -48,6 +49,7 @@ on:
       - 'scripts/generate-og-cards.ts'
       - 'scripts/assets/**'
       - 'scripts/build-news.ts'
+      - 'scripts/clean_site_urls.py'
       - 'scripts/news/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
@@ -101,6 +103,11 @@ jobs:
       # and the later copy would be denied.
       - name: Take ownership of the Jekyll output
         run: sudo chown -R "$(id -u):$(id -g)" _site
+
+      # Links read /security, not /security.html. GitHub Pages serves both, so
+      # the files stay put and old .html links keep working.
+      - name: Drop .html from the marketing site's links
+        run: python3 scripts/clean_site_urls.py _site
 
       # `docusaurus build` transpiles without type-checking, and the root
       # `tsc -b` has no `website` reference, so this is the only thing in CI

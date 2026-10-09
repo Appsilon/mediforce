@@ -48,8 +48,6 @@
       --bg: #FFFFFF;
       --bg-dark: #F8F9FA;
       --bg-card: #F8F9FA;
-      --discord: #5865F2;
-      --discord-hover: #4752C4;
       --accent: hsl(161 94% 30%);
       --accent-dim: hsl(161 94% 30% / 0.08);
       --accent-dark: hsl(161 94% 24%);
@@ -141,7 +139,6 @@
     }
     .hero-subtitle {
       position: relative;
-      max-width: 40rem;
       margin: 1.25rem auto 0;
       font-size: 1.125rem;
       color: var(--text-60);
@@ -181,8 +178,8 @@
       cursor: pointer;
     }
     .btn svg { width: 1.125rem; height: 1.125rem; flex-shrink: 0; }
-    .btn--discord { background: var(--accent-dark); color: #fff; }
-    .btn--discord:hover { background: var(--accent-darker); }
+    .btn--cta { background: var(--accent-dark); color: #fff; }
+    .btn--cta:hover { background: var(--accent-darker); }
     .btn--outline { background: transparent; color: var(--text-90); border-color: var(--text-30); }
     .btn--outline:hover { background: #F1F3F5; border-color: var(--text-50); }
     .btn--accent { background: var(--accent); color: #fff; }
@@ -195,6 +192,9 @@
     /* ── Section base ── */
     .section { padding: 5rem 0; }
     .section--alt { background: var(--bg-dark); }
+    .walkthrough .container { text-align: center; }
+    .walkthrough .section-subtitle { margin-left: auto; margin-right: auto; }
+    .walkthrough .btn { margin-top: 2rem; }
     .section-label {
       display: inline-block;
       font-size: 0.6875rem;
@@ -429,199 +429,6 @@
     .c-badge--r     { background: rgba(210,168,255,0.12); color: #d2a8ff; }
     .c-badge--py    { background: rgba(80,200,120,0.12);  color: #4fc88c; }
 
-    /* ── Demo form ── */
-    .demo-section {
-      padding: 5rem 0;
-    }
-    .demo-layout {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 3rem;
-      margin-top: 3rem;
-      align-items: start;
-    }
-    @media (min-width: 768px) {
-      .demo-layout { grid-template-columns: 1fr 1fr; gap: 4rem; }
-    }
-    .demo-pitch { }
-    .demo-pitch-item {
-      display: flex;
-      gap: 0.875rem;
-      padding: 1rem 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .demo-pitch-item:first-child { padding-top: 0; }
-    .demo-pitch-item:last-child { border-bottom: none; padding-bottom: 0; }
-    .demo-pitch-icon {
-      width: 2rem; height: 2rem;
-      border-radius: 0.5rem;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-      margin-top: 0.125rem;
-      background: var(--accent-dim);
-      color: var(--accent);
-    }
-    .demo-pitch-icon svg { width: 1rem; height: 1rem; }
-    .demo-pitch-item p {
-      font-size: 0.9375rem;
-      color: var(--text-70);
-      line-height: 1.65;
-    }
-    .demo-pitch-item strong { color: var(--text); font-weight: 600; }
-
-    .demo-form-card {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 1rem;
-      padding: 2rem;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.04);
-    }
-    .demo-form-card h3 {
-      font-size: 1.125rem;
-      font-weight: 700;
-      margin-bottom: 0.375rem;
-      letter-spacing: -0.02em;
-    }
-    .demo-form-card > p {
-      font-size: 0.875rem;
-      color: var(--text-60);
-      margin-bottom: 1.75rem;
-      line-height: 1.6;
-    }
-    .form-field {
-      margin-bottom: 1rem;
-    }
-    .form-field label {
-      display: block;
-      font-size: 0.8125rem;
-      font-weight: 500;
-      color: var(--text-80);
-      margin-bottom: 0.375rem;
-    }
-    .form-field input,
-    .form-field textarea {
-      width: 100%;
-      padding: 0.625rem 0.875rem;
-      font-size: 0.9375rem;
-      font-family: inherit;
-      color: var(--text);
-      background: var(--bg);
-      border: 1px solid var(--border-light);
-      border-radius: 0.5rem;
-      outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
-      -webkit-appearance: none;
-    }
-    .form-field input:focus,
-    .form-field textarea:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px hsl(161 94% 30% / 0.1);
-    }
-    .form-field textarea {
-      resize: vertical;
-      min-height: 6rem;
-      line-height: 1.6;
-    }
-    .form-field input::placeholder,
-    .form-field textarea::placeholder { color: var(--text-50); }
-    .form-submit {
-      width: 100%;
-      padding: 0.75rem 1.5rem;
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 0.5rem;
-      font-size: 0.9375rem;
-      font-weight: 600;
-      font-family: inherit;
-      cursor: pointer;
-      transition: background 0.15s;
-      margin-top: 0.5rem;
-    }
-    .form-submit:hover { background: var(--accent-dark); }
-    .form-note {
-      margin-top: 0.875rem;
-      font-size: 0.75rem;
-      color: var(--text-50);
-      text-align: center;
-      line-height: 1.5;
-    }
-    .form-submit:disabled { opacity: 0.65; cursor: not-allowed; }
-    .form-success {
-      padding: 1.5rem;
-      border-radius: 0.75rem;
-      background: hsl(161 94% 30% / 0.08);
-      border: 1px solid hsl(161 94% 30% / 0.2);
-      text-align: center;
-    }
-    .form-success p { font-size: 0.9375rem; color: var(--text-80); line-height: 1.6; margin: 0; }
-    .form-success strong { color: var(--accent); }
-    /* Honeypot — moved off-screen so real users never see it; bots fill it */
-    .form-hp { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; }
-    .form-error-msg {
-      display: none;
-      margin-top: 0.75rem;
-      padding: 0.625rem 0.875rem;
-      border-radius: 0.5rem;
-      background: rgba(239,68,68,0.07);
-      border: 1px solid rgba(239,68,68,0.2);
-      font-size: 0.8125rem;
-      color: #DC2626;
-      text-align: center;
-    }
-
-    /* ── Author avatars ── */
-    .demo-authors {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 1.5rem;
-    }
-    .demo-author-stack {
-      display: flex;
-    }
-    .demo-author-avatar {
-      width: 3rem;
-      height: 3rem;
-      border-radius: 50%;
-      border: 2.5px solid var(--bg);
-      object-fit: cover;
-      margin-left: -0.75rem;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.12);
-    }
-    .demo-author-avatar:first-child { margin-left: 0; }
-    .demo-authors-label {
-      font-size: 0.875rem;
-      color: var(--text-60);
-      line-height: 1.4;
-    }
-    .demo-authors-label strong {
-      display: block;
-      color: var(--text-80);
-      font-weight: 600;
-    }
-
-    /* ── Footer ── */
-    .footer {
-      border-top: 1px solid var(--border);
-      background: var(--bg-dark);
-    }
-    .footer-inner {
-      max-width: 68rem;
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1.5rem;
-      font-size: 0.8125rem;
-      color: var(--text-60);
-    }
-    .footer-links { display: flex; gap: 1.5rem; }
-    .footer-links a { transition: color 0.15s; }
-    .footer-links a:hover { color: var(--text-70); }
-    @media (max-width: 639px) {
-      .footer-inner { flex-direction: column; gap: 0.75rem; text-align: center; }
-    }
 
     /* ── Hero preview ── */
     .hero-preview {
@@ -745,7 +552,7 @@
 
     /* Mobile navigation injected by nav.js */
   </style>
-  <link rel="stylesheet" href="../../theme.css?v=c85f62e4" />
+  <link rel="stylesheet" href="../../theme.css?v=68154e4b" />
 </head>
 <body>
 <!-- Google Tag Manager (noscript) -->
@@ -767,11 +574,11 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         <a href="../../setup/" class="header-link">Self-host</a>
         <a href="https://mediforce.ai/docs/" class="header-link" target="_blank" rel="noopener noreferrer">Docs</a>
         <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer" class="header-link">GitHub</a>
-        <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer" class="header-link">Join Discord</a>
+        <a href="../../contact.html" class="header-link">Talk to Our Experts</a>
       </div>
     </div>
   </header>
-  <script src="../../nav.js?v=34ac4713" defer></script>
+  <script src="../../nav.js?v=c8226c70" defer></script>
 
   <!-- Hero -->
   <section class="hero">
@@ -1006,71 +813,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
 
   <!-- Demo Request Form -->
-  <section class="demo-section section--alt">
+  <section class="section section--alt walkthrough">
     <div class="container">
       <div class="section-label">See It Live</div>
       <h2 class="section-title">Book a live walkthrough</h2>
-      <p class="section-subtitle">We'll run the full workflow - request email to completed package - and walk you through each step so you can see exactly how it fits your team's process.</p>
-      <div class="demo-layout">
-
-        <div class="demo-pitch">
-          <div class="demo-pitch-item">
-            <div class="demo-pitch-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.72 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.63 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.61a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-            </div>
-            <p><strong>30-minute video call.</strong> We run a live demo of the document collection workflow - real stakeholder emails, real AI file review, real wait / remind / request-fix decision flow.</p>
-          </div>
-          <div class="demo-pitch-item">
-            <div class="demo-pitch-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            </div>
-            <p><strong>Tailored to your workflow.</strong> Tell us which stakeholder teams and file types are involved and we'll show you how the config maps to your submission structure.</p>
-          </div>
-          <div class="demo-pitch-item">
-            <div class="demo-pitch-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            </div>
-            <p><strong>No sales pressure.</strong> This is a technical walkthrough by the people who built it. We want you to understand the architecture, not just see a polished slide deck.</p>
-          </div>
-        </div>
-
-        <div class="demo-form-card">
-          <div class="demo-authors">
-            <div class="demo-author-stack">
-              <img class="demo-author-avatar" src="../../images/marek-rogala.jpg" alt="Marek Rogala" width="400" height="400" />
-              <img class="demo-author-avatar" src="../../images/filip-stachura.jpg" alt="Filip Stachura" width="200" height="200" />
-              <img class="demo-author-avatar" src="../../images/pawel-przytula.jpg" alt="Paweł Przytuła" width="200" height="200" />
-            </div>
-            <div class="demo-authors-label">
-              <strong>Meet the team</strong>
-              Marek Rogala, Filip Stachura and Paweł Przytuła — the people who built this.
-            </div>
-          </div>
-          <h3>Request a demo call</h3>
-          <p>Leave your email and a short note about your setup. We'll reply within one business day to schedule a time.</p>
-          <div id="demo-form-wrap">
-            <form id="demo-form" novalidate>
-              <!-- Honeypot: hidden from real users, bots fill it → submission silently dropped -->
-              <div class="form-hp" aria-hidden="true">
-                <label for="demo-hp">Leave this empty</label>
-                <input type="text" id="demo-hp" name="website" tabindex="-1" autocomplete="off" />
-              </div>
-              <div class="form-field">
-                <label for="demo-email">Work email <span style="color:#EF4444;">*</span></label>
-                <input type="email" id="demo-email" name="sender" placeholder="name@company.com" required />
-              </div>
-              <div class="form-field">
-                <label for="demo-message">Tell us about your setup</label>
-                <textarea id="demo-message" name="message" placeholder="e.g. We collect submission documents from 6 stakeholder teams per study, currently tracked over email and a shared drive."></textarea>
-              </div>
-              <button type="submit" id="demo-submit" class="form-submit">Request a Demo Call</button>
-              <div id="demo-error" class="form-error-msg">Something went wrong - please try again or email us directly at mediforce@appsilon.com.</div>
-            </form>
-          </div>
-          <p class="form-note">We don't share your contact details. No newsletter, no drip campaign - just a reply to book the call.</p>
-        </div>
-
-      </div>
+      <p class="section-subtitle">We'll show you the platform and its workflows, and tailor them to how your team works.</p>
+      <a href="../../contact.html" class="btn btn--cta">Talk to Our Experts</a>
     </div>
   </section>
 
@@ -1079,83 +827,20 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <div class="footer-inner">
       <span>Mediforce</span>
       <nav class="footer-links">
-        <a href="../data-delivery/">Data Delivery</a>
-        <a href="../collecting-documents/">Collecting Documents</a>
+        <a href="../../index.html">Home</a>
+        <a href="../../case-studies/data-delivery/">Data Delivery</a>
+        <a href="../../case-studies/collecting-documents/">Collecting Documents</a>
         <a href="../../validated-ai.html">Validation</a>
         <a href="../../security.html">Security</a>
         <a href="../../fda-principles.html">FDA Alignment</a>
+        <a href="../../news.html">News</a>
+        <a href="../../setup/">Self-host</a>
         <a href="https://github.com/Appsilon/mediforce" target="_blank" rel="noopener noreferrer">GitHub</a>
-        <a href="https://discord.gg/TVx4VkG3C2" target="_blank" rel="noopener noreferrer">Discord</a>
+        <a href="../../contact.html">Talk to Our Experts</a>
         <a href="https://appsilon.com" target="_blank" rel="noopener noreferrer">Appsilon.com</a>
       </nav>
     </div>
   </footer>
 
-  <!-- EmailJS — https://emailjs.com
-       Setup (one time):
-         1. Create a free EmailJS account at https://emailjs.com
-         2. Add Service: connect your Mailgun account (Email Services → Add New Service → Mailgun)
-            Set "From Email" to a Mailgun-verified sender, e.g. noreply@mg.appsilon.com
-         3. Template variables used: {{sender}} (email field), {{message}} (textarea)
-         4. Fill in the three constants below (Account → API Keys)
-  -->
-  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-  <script>
-    const EMAILJS_PUBLIC_KEY  = 'zCRF_qcxPtPiyJCni';
-    const EMAILJS_SERVICE_ID  = 'service_2ai2vc8';
-    const EMAILJS_TEMPLATE_ID = 'template_mpo2zqf';
-
-    emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
-
-    var COOLDOWN_MS = 300000;
-    var COOLDOWN_KEY = 'demo_last_submit';
-
-    document.getElementById('demo-form').addEventListener('submit', function (e) {
-      e.preventDefault();
-
-      // Honeypot: real users leave this blank; bots fill it
-      if (document.getElementById('demo-hp').value) return;
-
-      const btn   = document.getElementById('demo-submit');
-      const error = document.getElementById('demo-error');
-
-      // Cooldown: persisted in localStorage so page refresh doesn't reset it
-      var lastSubmitAt = parseInt(localStorage.getItem(COOLDOWN_KEY) || '0', 10);
-      if (Date.now() - lastSubmitAt < COOLDOWN_MS) {
-        error.textContent = 'Please wait 5 minutes before trying again or send us email to mediforce@appsilon.com';
-        error.style.display = 'block';
-        return;
-      }
-
-      const emailInput = document.getElementById('demo-email');
-      if (!emailInput.checkValidity()) {
-        emailInput.reportValidity();
-        return;
-      }
-
-      localStorage.setItem(COOLDOWN_KEY, Date.now().toString());
-      btn.textContent = 'Sending…';
-      btn.disabled    = true;
-      error.style.display = 'none';
-
-      emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-          sender:  document.getElementById('demo-email').value,
-          message: document.getElementById('demo-message').value,
-        })
-        .then(function () {
-          document.getElementById('demo-form-wrap').innerHTML =
-            '<div class="form-success">' +
-              '<p>✓ <strong>Request received.</strong> We\'ll reply within one business day to schedule a time.</p>' +
-            '</div>';
-        })
-        .catch(function (err) {
-          console.error('EmailJS error status:', err.status, '— text:', err.text);
-          btn.textContent    = 'Request a Demo Call';
-          btn.disabled       = false;
-          error.textContent  = 'Something went wrong - please try again or email us directly at mediforce@appsilon.com.';
-          error.style.display = 'block';
-        });
-    });
-  </script>
 </body>
 </html>

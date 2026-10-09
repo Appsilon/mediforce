@@ -44,7 +44,7 @@ We're in early stages and actively looking for:
 
 The best ways in:
 
-1. **[Join our Discord](https://discord.gg/TVx4VkG3C2)** — where the conversation happens: questions, progress updates, and the direction of the project.
+1. **[Join GitHub Discussions](https://github.com/Appsilon/mediforce/discussions)**, where the conversation happens: questions, progress updates, and the direction of the project.
 2. **[Open an issue](https://github.com/Appsilon/mediforce/issues)** describing a process you'd want to see on the platform.
 3. **[Run it locally](../../GETTING-STARTED.md)** — demo data, no setup required — then read [the architecture](architecture.md).
 
