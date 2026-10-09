@@ -61,15 +61,15 @@ pnpm dev:mock
 
 ## Test levels
 
-| Command              | Scope                               |
-|----------------------|-------------------------------------|
-| `pnpm typecheck`     | `tsc -b --noEmit`                   |
-| `pnpm test:affected` | vitest `--changed` only             |
-| `pnpm test:unit`     | vitest L1 + L2 (unit + integration) |
-| `pnpm test:e2e:api`  | L3 API E2E, no browser              |
-| `pnpm test:e2e:ui`   | L4 UI E2E (Chromium)                |
-| `pnpm test:e2e`      | L3 + L4 (NextAuth on :9007)         |
-| `pnpm test`          | Everything (unit + e2e)             |
+| Command              | Scope                                                                              |
+|----------------------|------------------------------------------------------------------------------------|
+| `pnpm typecheck`     | `tsc -b --noEmit`                                                                  |
+| `pnpm test:affected` | vitest on files changed vs merge base with `origin/main` (committed + uncommitted) |
+| `pnpm test:unit`     | vitest L1 + L2 (unit + integration)                                                |
+| `pnpm test:e2e:api`  | L3 API E2E, no browser                                                             |
+| `pnpm test:e2e:ui`   | L4 UI E2E (Chromium)                                                               |
+| `pnpm test:e2e`      | L3 + L4 (NextAuth on :9007)                                                        |
+| `pnpm test`          | Everything (unit + e2e)                                                            |
 
 Level definitions (L1–L5) + the rules: [e2e-strategy.md](../testing/e2e-strategy.md).
 Product features must land at **L3**.
