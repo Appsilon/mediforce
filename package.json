@@ -19,7 +19,7 @@
     "test:e2e:api": "pnpm --filter @mediforce/platform-ui test:e2e --project=api",
     "test:e2e:ui": "pnpm --filter @mediforce/platform-ui test:e2e --project=authenticated",
     "test:watch": "vitest",
-    "test:affected": "vitest run --changed",
+    "test:affected": "vitest run --changed origin/main",
     "test:coverage": "vitest run --coverage",
     "test:external": "pnpm --filter @mediforce/platform-ui test:external",
     "seed": "pnpm --filter @mediforce/platform-ui seed:dev",
