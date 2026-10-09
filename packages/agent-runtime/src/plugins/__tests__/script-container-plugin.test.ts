@@ -656,6 +656,46 @@ describe('ScriptContainerPlugin', () => {
       expect((error as Error).message).toContain('env=[RUN_ID,STEP_ID,MEDIFORCE_RUN_NAMESPACE]');
     });
 
+    it('[DATA] downloads uploaded files and mounts them read-only at /data, with localPath in input.json', async () => {
+      // A file-upload step's output carries only a reference (downloadUrl), not
+      // the bytes — the script must get the file the same way agent steps do.
+      vi.stubGlobal('fetch', vi.fn(async () => new Response('sap-bytes', { status: 200 })));
+      try {
+        const context = buildMockContext({
+          stepInput: { files: [{ name: 'sap.pdf', downloadUrl: '/api/attachments/abc-123/blob' }] },
+        });
+        await plugin.initialize(context);
+
+        const { emit } = buildEmitSpy();
+        const mockChild = createMockChild();
+        let inputJson: { files: Array<{ localPath: string }> } | null = null;
+        let dataFile: string | null = null;
+
+        spawnMock.mockImplementation((_cmd, args) => {
+          const argsArr = args as string[];
+          const outputMount = argsArr.find((arg) => arg.endsWith(':/output'))!;
+          const dataMount = argsArr.find((arg) => arg.endsWith(':/data:ro'));
+          setTimeout(async () => {
+            inputJson = JSON.parse(await readFile(join(outputMount.split(':')[0], 'input.json'), 'utf-8'));
+            if (dataMount) {
+              dataFile = await readFile(join(dataMount.split(':')[0], '0', 'sap.pdf'), 'utf-8');
+            }
+            (mockChild.stdout as Readable).push(null);
+            (mockChild.stderr as Readable).push(null);
+            mockChild.emit('close', 0, null);
+          }, 10);
+          return mockChild;
+        });
+
+        await plugin.run(emit);
+
+        expect(inputJson!.files[0].localPath).toBe('/data/0/sap.pdf');
+        expect(dataFile).toBe('sap-bytes');
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
     it('[DATA] writes input.json to the output directory', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);

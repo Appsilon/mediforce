@@ -1,4 +1,5 @@
-import { readFile, rm } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { downloadFilesToLocal, cleanupTempDir } from '../base-container-agent-plugin';
@@ -49,7 +50,7 @@ describe('downloadFilesToLocal', () => {
     expect(calls[0].headers['X-Api-Key']).toBe('test-key');
 
     const file = (updatedInput as { files: Array<{ localPath: string }> }).files[0];
-    expect(file.localPath).toBe(join(td!, 'study.json'));
+    expect(file.localPath).toBe(join(td!, '0', 'study.json'));
     expect(await readFile(file.localPath, 'utf8')).toBe('usdm-bytes');
   });
 
@@ -82,5 +83,51 @@ describe('downloadFilesToLocal', () => {
         files: [{ name: 'missing.json', downloadUrl: '/api/attachments/gone/blob' }],
       }),
     ).rejects.toThrow(/missing\.json.*HTTP 404/);
+  });
+
+  it('keeps a traversing file name inside the temp dir', async () => {
+    stubFetch('payload');
+    const { updatedInput, tempDir: td } = await downloadFilesToLocal({
+      files: [{ name: '../../escape.txt', downloadUrl: '/api/attachments/abc-123/blob' }],
+    });
+    tempDir = td;
+
+    const file = (updatedInput as { files: Array<{ localPath: string }> }).files[0];
+    expect(file.localPath).toBe(join(td!, '0', 'escape.txt'));
+    expect(await readFile(file.localPath, 'utf8')).toBe('payload');
+  });
+
+  it('gives duplicate file names distinct local paths with their own bytes', async () => {
+    let call = 0;
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(`bytes-${call++}`, { status: 200 })));
+    const { updatedInput, tempDir: td } = await downloadFilesToLocal({
+      files: [
+        { name: 'data.csv', downloadUrl: '/api/attachments/a/blob' },
+        { name: 'data.csv', downloadUrl: '/api/attachments/b/blob' },
+      ],
+    });
+    tempDir = td;
+
+    const files = (updatedInput as { files: Array<{ localPath: string }> }).files;
+    expect(files[0].localPath).not.toBe(files[1].localPath);
+    expect(await readFile(files[0].localPath, 'utf8')).toBe('bytes-0');
+    expect(await readFile(files[1].localPath, 'utf8')).toBe('bytes-1');
+  });
+
+  it('removes the temp directory when a later download fails', async () => {
+    const before = new Set((await readdir(tmpdir())).filter((entry) => entry.startsWith('mediforce-agent-')));
+    let call = 0;
+    vi.stubGlobal('fetch', vi.fn(async () => (call++ === 0 ? new Response('ok') : new Response('nope', { status: 500 }))));
+    await expect(
+      downloadFilesToLocal({
+        files: [
+          { name: 'one.json', downloadUrl: '/api/attachments/a/blob' },
+          { name: 'two.json', downloadUrl: '/api/attachments/b/blob' },
+        ],
+      }),
+    ).rejects.toThrow(/two\.json.*HTTP 500/);
+
+    const leaked = (await readdir(tmpdir())).filter((entry) => entry.startsWith('mediforce-agent-') && !before.has(entry));
+    expect(leaked).toEqual([]);
   });
 });

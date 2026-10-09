@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { readFile, readdir, mkdtemp, writeFile, rm, mkdir, appendFile, realpath, cp } from 'node:fs/promises';
-import { join, dirname, isAbsolute, resolve, posix } from 'node:path';
+import { join, dirname, isAbsolute, resolve, posix, basename } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
@@ -200,17 +200,22 @@ function resolveDownload(downloadUrl: string): { url: string; headers: Record<st
 /** Re-point each downloaded file's `localPath` at the container mount, so the
  *  path the agent is told about is one it can open. The host temp dir only
  *  exists outside the container. */
-function toContainerFilePaths(stepInput: Record<string, unknown>): Record<string, unknown> {
+export function toContainerFilePaths(stepInput: Record<string, unknown>): Record<string, unknown> {
   if (!hasFiles(stepInput)) {
     return stepInput;
   }
   return {
     ...stepInput,
-    files: stepInput.files.map((file) => ({ ...file, localPath: posix.join(CONTAINER_DATA_MOUNT, file.name) })),
+    files: stepInput.files.map((file, index) => ({
+      ...file,
+      localPath: posix.join(CONTAINER_DATA_MOUNT, String(index), basename(file.name)),
+    })),
   };
 }
 
-/** Download remote files to a temp directory and return updated input with localPath fields. */
+/** Download remote files to a temp directory and return updated input with localPath fields.
+ *  Each file lands in its own `<index>/` subdirectory so duplicate names never overwrite
+ *  each other. A failed download removes the temp directory before rethrowing. */
 export async function downloadFilesToLocal(
   stepInput: Record<string, unknown>,
 ): Promise<{ updatedInput: Record<string, unknown>; tempDir: string | null }> {
@@ -223,16 +228,23 @@ export async function downloadFilesToLocal(
   const tempDir = await realpath(rawTempDir);
   const updatedFiles: FileEntry[] = [];
 
-  for (const file of stepInput.files) {
-    const localPath = join(tempDir, file.name);
-    const { url, headers } = resolveDownload(file.downloadUrl);
-    const response = await fetch(url, { headers });
-    if (!response.ok) {
-      throw new Error(`Failed to download '${file.name}': HTTP ${response.status}`);
+  try {
+    for (const [index, file] of stepInput.files.entries()) {
+      const fileDir = join(tempDir, String(index));
+      await mkdir(fileDir);
+      const localPath = join(fileDir, basename(file.name));
+      const { url, headers } = resolveDownload(file.downloadUrl);
+      const response = await fetch(url, { headers });
+      if (!response.ok) {
+        throw new Error(`Failed to download '${file.name}': HTTP ${response.status}`);
+      }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      await writeFile(localPath, buffer);
+      updatedFiles.push({ ...file, localPath });
     }
-    const buffer = Buffer.from(await response.arrayBuffer());
-    await writeFile(localPath, buffer);
-    updatedFiles.push({ ...file, localPath });
+  } catch (error) {
+    await cleanupTempDir(tempDir);
+    throw error;
   }
 
   return {
