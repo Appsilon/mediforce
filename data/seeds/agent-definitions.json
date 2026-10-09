@@ -17,10 +17,10 @@
     "runtimeId": "opencode-agent",
     "name": "OpenCode Agent",
     "iconName": "Cpu",
-    "description": "Open-source code execution agent powered by DeepSeek for cost-efficient automated development tasks.",
+    "description": "Open-source code execution agent that runs any OpenRouter model, Claude Sonnet by default.",
     "inputDescription": "Code task description and project context",
     "outputDescription": "Implemented code changes and execution results",
-    "foundationModel": "deepseek/deepseek-chat",
+    "foundationModel": "~anthropic/claude-sonnet-latest",
     "systemPrompt": ""
   },
   "script-container": {

@@ -1,6 +1,6 @@
 import { writeFile, mkdir, readdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { type AgentLogFormat, type PluginCapabilityMetadata, normaliseModelId } from '@mediforce/platform-core';
+import { type AgentLogFormat, type PluginCapabilityMetadata, DEFAULT_MODEL, normaliseModelId } from '@mediforce/platform-core';
 export { normaliseModelId };
 import {
   BaseContainerAgentPlugin,
@@ -11,9 +11,6 @@ import {
   type AgentCommandSpec,
 } from './base-container-agent-plugin';
 import { isWorkflowAgentContext } from './container-plugin';
-
-/** Default model used when agentConfig.model is not set. */
-const OPENCODE_DEFAULT_MODEL = 'deepseek/deepseek-chat';
 
 const OPENCODE_ERROR_PREFIX = '[OpenCode error] ';
 
@@ -134,7 +131,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       'Skill-dependent structured JSON with confidence scoring. ' +
       'Examples: extracted metadata, generated code, analysis reports.',
     roles: ['executor'],
-    foundationModel: 'DeepSeek Chat',
+    foundationModel: 'Claude Sonnet',
     requiredEnv: [['OPENROUTER_API_KEY']],
   };
 
@@ -197,7 +194,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     // For long prompts, we read from the prompt file using $(cat ...) to avoid
     // shell argument length limits on the docker run command itself.
     // The expansion happens inside the container's bash, where ARG_MAX is ~2MB.
-    const model = this.agentConfig.model ?? OPENCODE_DEFAULT_MODEL;
+    const model = this.agentConfig.model ?? DEFAULT_MODEL;
 
     // OpenCode's --model flag format is "providerID/modelID" — the first path
     // segment is the provider, the rest is the model ID within that provider.
@@ -363,7 +360,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
   }
 
   protected override async writeAgentConfig(outputDir: string, agentOptions?: SpawnCliOptions): Promise<void> {
-    const model = normaliseModelId(this.agentConfig.model ?? OPENCODE_DEFAULT_MODEL);
+    const model = normaliseModelId(this.agentConfig.model ?? DEFAULT_MODEL);
     const mcpServers = await this.buildMcpServers(outputDir);
     const config: Record<string, unknown> = {
       $schema: 'https://opencode.ai/config.json',

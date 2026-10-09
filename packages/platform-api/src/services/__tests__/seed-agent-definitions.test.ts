@@ -28,7 +28,7 @@ function makeEntry(id: string): CreateModelRegistryEntryInput {
 }
 
 describe('seedBuiltinAgentDefinitions', () => {
-  it('[DATA] pins a seed on the default model to the newest Sonnet the registry lists, leaving explicit models alone', async () => {
+  it('[DATA] pins a seed on the default model to the newest Sonnet the registry lists, ', async () => {
     const agents = new InMemoryAgentDefinitionRepository();
     const models = new InMemoryModelRegistryRepository();
     await models.bulkUpsert([makeEntry(DEFAULT_MODEL), makeEntry('anthropic/claude-sonnet-5'), makeEntry('anthropic/claude-sonnet-5.5')]);
@@ -36,7 +36,7 @@ describe('seedBuiltinAgentDefinitions', () => {
     await seedBuiltinAgentDefinitions(agents, models);
 
     expect((await agents.getById('claude-code-agent'))?.foundationModel).toBe('anthropic/claude-sonnet-5.5');
-    expect((await agents.getById('opencode-agent'))?.foundationModel).toBe('deepseek/deepseek-chat');
+    expect((await agents.getById('opencode-agent'))?.foundationModel).toBe('anthropic/claude-sonnet-5.5');
   });
 
   it('[DATA] pins to the fallback Sonnet, never the moving alias, when the registry has not synced yet', async () => {
