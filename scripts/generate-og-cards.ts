@@ -120,7 +120,8 @@ function stripBrand(title: string): string {
 }
 
 function displayUrl(url: string): string {
-  const { host, pathname } = new URL(url);
+  const { host } = new URL(url);
+  const pathname = new URL(url).pathname.replace(/(index)?\.html$/, '');
   return pathname === '/' ? host : host + pathname;
 }
 
