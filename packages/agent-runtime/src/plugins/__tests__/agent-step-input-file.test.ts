@@ -150,8 +150,8 @@ describe.each(plugins)('a $pluginId step reads its input from /output/input.json
     await plugin.run(noopEmit);
 
     const seededFiles = (seeded as { files: Array<{ localPath: string }> }).files;
-    expect(seededFiles[0].localPath).toBe('/data/ae.xpt');
-    expect(seededPrompt).toContain('"localPath": "/data/ae.xpt"');
+    expect(seededFiles[0].localPath).toBe('/data/0/ae.xpt');
+    expect(seededPrompt).toContain('"localPath": "/data/0/ae.xpt"');
     expect(seededPrompt).not.toContain('mediforce-agent-');
     expect(dockerArgs.some((arg) => arg.endsWith(':/data:ro'))).toBe(true);
   });

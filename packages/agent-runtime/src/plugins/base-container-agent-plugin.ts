@@ -206,11 +206,16 @@ export function toContainerFilePaths(stepInput: Record<string, unknown>): Record
   }
   return {
     ...stepInput,
-    files: stepInput.files.map((file) => ({ ...file, localPath: posix.join(CONTAINER_DATA_MOUNT, basename(file.name)) })),
+    files: stepInput.files.map((file, index) => ({
+      ...file,
+      localPath: posix.join(CONTAINER_DATA_MOUNT, String(index), basename(file.name)),
+    })),
   };
 }
 
-/** Download remote files to a temp directory and return updated input with localPath fields. */
+/** Download remote files to a temp directory and return updated input with localPath fields.
+ *  Each file lands in its own `<index>/` subdirectory so duplicate names never overwrite
+ *  each other. A failed download removes the temp directory before rethrowing. */
 export async function downloadFilesToLocal(
   stepInput: Record<string, unknown>,
 ): Promise<{ updatedInput: Record<string, unknown>; tempDir: string | null }> {
@@ -223,16 +228,23 @@ export async function downloadFilesToLocal(
   const tempDir = await realpath(rawTempDir);
   const updatedFiles: FileEntry[] = [];
 
-  for (const file of stepInput.files) {
-    const localPath = join(tempDir, basename(file.name));
-    const { url, headers } = resolveDownload(file.downloadUrl);
-    const response = await fetch(url, { headers });
-    if (!response.ok) {
-      throw new Error(`Failed to download '${file.name}': HTTP ${response.status}`);
+  try {
+    for (const [index, file] of stepInput.files.entries()) {
+      const fileDir = join(tempDir, String(index));
+      await mkdir(fileDir);
+      const localPath = join(fileDir, basename(file.name));
+      const { url, headers } = resolveDownload(file.downloadUrl);
+      const response = await fetch(url, { headers });
+      if (!response.ok) {
+        throw new Error(`Failed to download '${file.name}': HTTP ${response.status}`);
+      }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      await writeFile(localPath, buffer);
+      updatedFiles.push({ ...file, localPath });
     }
-    const buffer = Buffer.from(await response.arrayBuffer());
-    await writeFile(localPath, buffer);
-    updatedFiles.push({ ...file, localPath });
+  } catch (error) {
+    await cleanupTempDir(tempDir);
+    throw error;
   }
 
   return {

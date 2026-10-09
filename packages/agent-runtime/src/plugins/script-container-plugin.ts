@@ -77,7 +77,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
   readonly metadata: PluginCapabilityMetadata = {
     name: 'Script Container',
     description: 'Runs a deterministic script or inline code inside a Docker container — no LLM involved.',
-    inputDescription: 'Step input JSON at /output/input.json (uploaded files downloaded to /data, path in files[].localPath); carry-over from WD inputForNextRun (when declared) at /output/previous_run.json.',
+    inputDescription: 'Step input JSON at /output/input.json (uploaded files downloaded to /data/<index>/<name>, path in files[].localPath); carry-over from WD inputForNextRun (when declared) at /output/previous_run.json.',
     outputDescription: 'Container writes result to /output/result.json; parsed and emitted as the step result.',
     roles: ['executor'],
   };

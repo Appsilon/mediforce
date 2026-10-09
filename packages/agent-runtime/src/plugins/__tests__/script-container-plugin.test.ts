@@ -678,7 +678,7 @@ describe('ScriptContainerPlugin', () => {
           setTimeout(async () => {
             inputJson = JSON.parse(await readFile(join(outputMount.split(':')[0], 'input.json'), 'utf-8'));
             if (dataMount) {
-              dataFile = await readFile(join(dataMount.split(':')[0], 'sap.pdf'), 'utf-8');
+              dataFile = await readFile(join(dataMount.split(':')[0], '0', 'sap.pdf'), 'utf-8');
             }
             (mockChild.stdout as Readable).push(null);
             (mockChild.stderr as Readable).push(null);
@@ -689,7 +689,7 @@ describe('ScriptContainerPlugin', () => {
 
         await plugin.run(emit);
 
-        expect(inputJson!.files[0].localPath).toBe('/data/sap.pdf');
+        expect(inputJson!.files[0].localPath).toBe('/data/0/sap.pdf');
         expect(dataFile).toBe('sap-bytes');
       } finally {
         vi.unstubAllGlobals();
