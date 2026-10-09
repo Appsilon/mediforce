@@ -21,6 +21,10 @@ import sharp from 'sharp';
 const ROOT = path.resolve(import.meta.dirname, '..');
 const DOCS = path.join(ROOT, 'docs');
 const GTM_CONTAINER = 'GTM-MLDWFWKK';
+const FOOTER_LINKS = [
+  'Home', 'Data Delivery', 'Collecting Documents', 'Validation', 'Security', 'FDA Alignment',
+  'News', 'Self-host', 'GitHub', 'Talk to Our Experts', 'Appsilon.com',
+];
 const OUT = path.join(DOCS, 'images', 'og');
 const FONTS = path.join(ROOT, 'scripts', 'assets', 'fonts');
 
@@ -317,6 +321,15 @@ async function main() {
   // nav.js and theme.css are cached for four hours at the edge, and the pages
   // that depend on them are not. A stale nav.js paired with fresh HTML prepends
   // a second header to every page, which is what shipping without this did.
+  for (const file of await htmlFiles(DOCS)) {
+    const html = await readFile(file, 'utf-8');
+    const footer = html.match(/<footer class="footer">([\s\S]*?)<\/footer>/);
+    const labels = footer === null ? [] : [...footer[1].matchAll(/<a [^>]*>([^<]+)<\/a>/g)].map((link) => link[1]);
+    if (labels.join('|') !== FOOTER_LINKS.join('|')) {
+      throw new Error(`${path.relative(ROOT, file)}: footer links are [${labels.join(', ')}], expected [${FOOTER_LINKS.join(', ')}]`);
+    }
+  }
+
   for (const file of await htmlFiles(DOCS)) {
     const html = await readFile(file, 'utf-8');
     const loader = html.includes(`'dataLayer','${GTM_CONTAINER}')`);
