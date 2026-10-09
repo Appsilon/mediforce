@@ -191,6 +191,10 @@
     .section { padding: 5rem 0; }
     .section--alt { background: var(--bg-dark); }
     .walkthrough .container { text-align: center; }
+    .workflow-diagram .container { text-align: center; }
+    .workflow-diagram .section-subtitle { margin-left: auto; margin-right: auto; }
+    .diagram-figure { max-width: 44rem; margin: 2.5rem auto 0; }
+    .diagram-figure img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 0.75rem; cursor: zoom-in; }
     .walkthrough .section-subtitle { margin-left: auto; margin-right: auto; }
     .walkthrough .btn { margin-top: 2rem; }
     .section-label {
@@ -576,7 +580,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </div>
     </div>
   </header>
-  <script src="../../nav.js?v=c8226c70" defer></script>
+  <script src="../../nav.js?v=f63efa2b" defer></script>
 
   <!-- Hero -->
   <section class="hero">
@@ -630,6 +634,17 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           allowfullscreen
         ></iframe>
       </div>
+    </div>
+  </section>
+
+  <section class="section workflow-diagram">
+    <div class="container">
+      <div class="section-label">The Workflow</div>
+      <h2 class="section-title">Every step, and who does it</h2>
+      <p class="section-subtitle">Scripts, agents and people each take the part they're best at. Click the diagram to see it full size, or read the <a href="https://www.appsilon.com/post/landing-zone-cro-data-deliveries" target="_blank" rel="noopener noreferrer">full write-up on the Appsilon blog</a>.</p>
+      <figure class="diagram-figure">
+        <img src="workflow-diagram.webp" alt="Workflow diagram of the CRO data delivery landing zone, showing which steps are scripts, agents and human decisions" class="showcase-img" width="1600" height="1600" loading="lazy" decoding="async" />
+      </figure>
     </div>
   </section>
 

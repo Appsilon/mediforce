@@ -14,7 +14,7 @@ New here: [`../GETTING-STARTED.md`](../GETTING-STARTED.md), then
 [`start/dev-quickref.md`](start/dev-quickref.md).
 
 > This folder also serves the public website at **mediforce.ai**: the `.html`
-> files, `nav.js` and `theme.css` at this level, plus `CNAME`, `robots.txt`, `sitemap.xml`, `llms.txt`, `setup/`,
+> files, `nav.js` and `theme.css` at this level, plus `CNAME`, `robots.txt`, `llms.txt`, `setup/`,
 > `case-studies/`, `images/`, `features/` and the loose images. Those
 > back live URLs and never move. GitHub Pages serves `index.html`; GitHub renders
 > this README when you browse the folder. Everything below is engineering
@@ -27,6 +27,8 @@ New here: [`../GETTING-STARTED.md`](../GETTING-STARTED.md), then
 > Which posts count is `POST_FILTERS` in [`scripts/news/feeds.ts`](../scripts/news/feeds.ts), matched against the title, the description and the URL slug — adding a series is one line there. The feed writes apostrophes three ways (curly in titles, `&#39;` in descriptions, hyphens in slugs), so matching goes through `normalise()`; a straight-quoted needle compared directly finds nothing and fails silently. A post's description is the feed's own field, capped at 220 characters on the way in — 18 of the feed's 100 run past what a card can hold. `news.json` is committed, so an unreachable feed costs freshness rather than the page: the script exits 0 and the previous file stays.
 >
 > Pages link to each other as `security.html` so any local server finds them, and the deploy drops the extension: [`scripts/clean_site_urls.py`](../scripts/clean_site_urls.py) rewrites the built site's links, canonical URLs, sitemap and `nav.js` to `/security`, which GitHub Pages serves from the same file. Old `.html` links still load, and `nav.js` tidies the address bar when they do.
+>
+> `sitemap.xml` isn't in this folder: [`scripts/build_sitemap.py`](../scripts/build_sitemap.py) writes it during the deploy from every built page with a canonical URL, dated by each page's last commit.
 >
 > `theme.css` holds the shared palette, copied from the app's `globals.css`, and
 > every page links it **after** its own `<style>` so it wins the cascade. A page

@@ -16,6 +16,8 @@
       children: [
         { href: 'case-studies/data-delivery/', label: 'Data Delivery' },
         { href: 'case-studies/collecting-documents/', label: 'Collecting Documents' },
+        { href: 'case-studies/synthetic-sdtm/', label: 'Synthetic SDTM' },
+        { href: 'case-studies/traceable-tfls/', label: 'Traceable TFLs' },
       ],
     },
     { href: 'validated-ai.html', label: 'Validation' },

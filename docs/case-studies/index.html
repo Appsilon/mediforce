@@ -11,7 +11,7 @@
   <!-- End Google Tag Manager -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Case Studies | Mediforce</title>
-  <meta name="description" content="Two clinical workflows running on Mediforce end to end: an autonomous CRO data ingest, and submission document collection across stakeholder teams." />
+  <meta name="description" content="Clinical workflows running on Mediforce end to end, from CRO data ingest and submission document chasing to synthetic SDTM and traceable TFLs, each with a Control Mode on every step." />
   <link rel="canonical" href="https://mediforce.ai/case-studies/" />
   <link rel="icon" type="image/x-icon" href="../favicon.ico" />
   <meta property="og:type" content="website" />
@@ -19,14 +19,14 @@
   <meta property="og:locale" content="en_US" />
   <meta property="og:url" content="https://mediforce.ai/case-studies/" />
   <meta property="og:title" content="Case Studies | Mediforce" />
-  <meta property="og:description" content="Two clinical workflows running on Mediforce end to end: an autonomous CRO data ingest, and submission document collection across stakeholder teams." />
+  <meta property="og:description" content="Clinical workflows running on Mediforce end to end, from CRO data ingest and submission document chasing to synthetic SDTM and traceable TFLs, each with a Control Mode on every step." />
   <meta property="og:image" content="https://mediforce.ai/images/og/case-studies.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="Case Studies — Mediforce social card" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Case Studies | Mediforce" />
-  <meta name="twitter:description" content="Two clinical workflows running on Mediforce end to end: an autonomous CRO data ingest, and submission document collection across stakeholder teams." />
+  <meta name="twitter:description" content="Clinical workflows running on Mediforce end to end, from CRO data ingest and submission document chasing to synthetic SDTM and traceable TFLs, each with a Control Mode on every step." />
   <meta name="twitter:image" content="https://mediforce.ai/images/og/case-studies.png" />
   <meta name="twitter:image:alt" content="Case Studies — Mediforce social card" />
   <script type="application/ld+json">
@@ -109,7 +109,7 @@
       box-shadow: 0 4px 6px -1px hsl(222 47% 11% / 0.1), 0 2px 4px -2px hsl(222 47% 11% / 0.1);
     }
 
-    .cs-card img { display: block; width: 100%; height: auto; border-bottom: 1px solid var(--border); }
+    .cs-card img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; object-position: top; border-bottom: 1px solid var(--border); }
 
     .cs-card-body { padding: 1.5rem; display: flex; flex-direction: column; flex: 1; }
 
@@ -166,13 +166,13 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </div>
     </div>
   </header>
-  <script src="../nav.js?v=c8226c70" defer></script>
+  <script src="../nav.js?v=f63efa2b" defer></script>
 
   <main>
     <section class="cs-hero">
       <div class="container">
         <div class="cs-label">Case Studies</div>
-        <h1>Two clinical workflows, running end to end.</h1>
+        <h1>Clinical workflows, running end to end.</h1>
         <p>
           Each one is a real process with a Control Mode on every step, so you can see exactly
           where an agent acts alone, where it drafts for review, and where a human has to decide.
@@ -182,18 +182,14 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
     <div class="container">
       <div class="cs-grid">
-
         <a class="cs-card" href="data-delivery/">
-          <img src="../images/mediforce-lz-validation-report.webp"
-               alt="Validation report in Mediforce with the Accept or Reject decision"
-               loading="lazy" decoding="async" width="1400" height="698" />
+          <img src="data-delivery/workflow-diagram.webp"
+               alt="Workflow diagram of the CRO data delivery landing zone"
+               loading="lazy" decoding="async" width="1600" height="1600" />
           <div class="cs-card-body">
             <h2>Automated Clinical Data Delivery</h2>
             <p>
-              A CRO drops files on an SFTP endpoint on no fixed schedule. The workflow notices,
-              validates against CDISC standards, and produces a report a data manager either
-              accepts or rejects. On a clean delivery the human sees one screen; on a bad one an
-              agent drafts the note back to the CRO.
+              A CRO drops files on an SFTP endpoint on no fixed schedule. The workflow notices, validates against CDISC standards, and produces a report a data manager either accepts or rejects. On a clean delivery the human sees one screen; on a bad one an agent drafts the note back to the CRO.
             </p>
             <div class="cs-meta">
               <span class="cs-tag">CDISC CORE</span>
@@ -203,17 +199,14 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             <div class="cs-more">Read the walkthrough &rarr;</div>
           </div>
         </a>
-
         <a class="cs-card" href="collecting-documents/">
-          <img src="collecting-documents/submission-docs-workflow.webp"
-               alt="Submission document collection workflow in the Mediforce designer"
-               loading="lazy" decoding="async" width="1800" height="905" />
+          <img src="collecting-documents/workflow-diagram.webp"
+               alt="Workflow diagram of the submission document chase"
+               loading="lazy" decoding="async" width="1600" height="1600" />
           <div class="cs-card-body">
             <h2>Automated Submission Document Collection</h2>
             <p>
-              A submission needs documents from a dozen teams who all have other priorities.
-              The workflow asks, tracks what has arrived, reviews what it gets, and writes every
-              chase-up itself &mdash; leaving the deadline as the only thing a human has to care about.
+              A submission needs documents from a dozen teams who all have other priorities. The workflow asks, tracks what has arrived, reviews what it gets, and writes every chase-up itself, leaving the deadline as the only thing a human has to care about.
             </p>
             <div class="cs-meta">
               <span class="cs-tag">Stakeholder chasing</span>
@@ -223,7 +216,40 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             <div class="cs-more">Read the walkthrough &rarr;</div>
           </div>
         </a>
-
+        <a class="cs-card" href="synthetic-sdtm/">
+          <img src="synthetic-sdtm/workflow-diagram.webp"
+               alt="Workflow diagram for generating synthetic SDTM from an NCT ID"
+               loading="lazy" decoding="async" width="1600" height="1600" />
+          <div class="cs-card-body">
+            <h2>Synthetic SDTM From an NCT ID</h2>
+            <p>
+              One ClinicalTrials.gov ID in, conformant synthetic SDTM out, shaped like that study. An agent reads the protocol, a person approves the spec, and a seeded R package makes the data, the same way every time.
+            </p>
+            <div class="cs-meta">
+              <span class="cs-tag">Reproducible</span>
+              <span class="cs-tag">CDISC CORE</span>
+              <span class="cs-tag">Spec review gate</span>
+            </div>
+            <div class="cs-more">Read the walkthrough &rarr;</div>
+          </div>
+        </a>
+        <a class="cs-card" href="traceable-tfls/">
+          <img src="traceable-tfls/workflow-diagram.webp"
+               alt="Workflow diagram for traceable TFLs from protocol to rendered tables"
+               loading="lazy" decoding="async" width="1600" height="1600" />
+          <div class="cs-card-body">
+            <h2>Traceable TFLs, Protocol to Table</h2>
+            <p>
+              Agents plan the TFLs and a second agent audits the plan, scripts derive ADaM and check conformance, and three human gates decide. Every table traces back to its objective and its source data.
+            </p>
+            <div class="cs-meta">
+              <span class="cs-tag">USDM to TFLs</span>
+              <span class="cs-tag">Traceability explorer</span>
+              <span class="cs-tag">Three human gates</span>
+            </div>
+            <div class="cs-more">Read the walkthrough &rarr;</div>
+          </div>
+        </a>
       </div>
     </div>
   </main>

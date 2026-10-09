@@ -322,6 +322,12 @@ async function main() {
   // nav.js and theme.css are cached for four hours at the edge, and the pages
   // that depend on them are not. A stale nav.js paired with fresh HTML prepends
   // a second header to every page, which is what shipping without this did.
+  const notFound = await readFile(path.join(DOCS, '404.html'), 'utf-8');
+  const relative = [...notFound.matchAll(/\b(?:href|src)="(?![a-z]+:|\/\/|#|\/)([^"]*)"/g)].map((m) => m[1]);
+  if (relative.length > 0) {
+    throw new Error(`docs/404.html is served at any missing path, so its links must start with /. Relative: ${relative.join(', ')}`);
+  }
+
   for (const file of await htmlFiles(DOCS)) {
     const html = await readFile(file, 'utf-8');
     const footer = html.match(/<footer class="footer">([\s\S]*?)<\/footer>/);

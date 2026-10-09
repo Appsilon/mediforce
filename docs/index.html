@@ -611,6 +611,38 @@
 
 
 
+    .features { padding: 2.75rem 0 2.25rem; }
+    .features .section-title { font-size: 1.375rem; margin-top: 0.5rem; }
+    .peek { position: relative; overflow: hidden; margin-top: 1.5rem; padding: 0.25rem 0; }
+    .peek-track { display: flex; align-items: flex-start; transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1); }
+    .peek-slide {
+      flex: 0 0 40%; padding: 0 0.75%;
+      transform: scale(0.86); transform-origin: center var(--frame-middle, 30%); opacity: 0.5;
+      transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.45s;
+      cursor: pointer;
+    }
+    .peek-slide.is-current { transform: none; opacity: 1; cursor: default; }
+    .peek-slide:not(.is-current) .hero-video-play { pointer-events: none; }
+    .peek-slide:not(.is-current) .peek-caption { visibility: hidden; }
+    .peek-caption h3 { font-size: 1rem; font-weight: 700; margin-top: 0.75rem; }
+    .peek-caption p { font-size: 0.875rem; color: var(--text-60); margin-top: 0.25rem; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .peek-arrow {
+      position: absolute; z-index: 2; transform: translateY(-50%);
+      width: 2.5rem; height: 2.5rem; border-radius: 9999px;
+      border: 1px solid var(--border); background: var(--bg-card);
+      font-size: 1.5rem; line-height: 1; color: var(--text-80); cursor: pointer;
+      box-shadow: 0 2px 8px hsl(222 47% 11% / 0.08);
+    }
+    .peek-arrow:hover { border-color: var(--accent); color: var(--accent-dark); }
+    .peek-prev { left: 0.5rem; }
+    .peek-next { right: 0.5rem; }
+    .peek-dots { display: flex; justify-content: center; gap: 0.5rem; margin-top: 1rem; }
+    .peek-dot { width: 0.5rem; height: 0.5rem; padding: 0; border: 0; border-radius: 9999px; background: var(--text-40); cursor: pointer; transition: width 0.2s, background 0.2s; }
+    .peek-dot.is-current { width: 1.5rem; background: var(--accent); }
+    @media (max-width: 900px) { .peek-slide { flex-basis: 62%; } }
+    @media (max-width: 600px) { .peek-slide { flex-basis: 86%; } }
+    @media (prefers-reduced-motion: reduce) { .peek-track, .peek-slide { transition: none; } }
+
     /* ── Case Study steps ── */
     .steps-list { margin-top: 3rem; display: flex; flex-direction: column; gap: 0; }
     .step-item {
@@ -656,6 +688,7 @@
     .home-cs-grid {
       display: grid;
       gap: 1rem;
+      margin-top: 2.5rem;
       margin-bottom: 2.5rem;
     }
     @media (min-width: 800px) {
@@ -761,7 +794,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
   </header>
 
-  <script src="nav.js?v=c8226c70" defer></script>
+  <script src="nav.js?v=f63efa2b" defer></script>
 
   <!-- Hero -->
   <section class="hero">
@@ -807,6 +840,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             type="button"
             class="hero-video-play"
             data-full-src="images/mediforce-demo.mp4"
+            data-start="3"
             aria-label="Play the full 48-second Mediforce demo"
           >
             <span>
@@ -833,94 +867,272 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
   </section>
 
+  <section class="section section--alt features" aria-labelledby="features-title">
+    <div class="container">
+      <div class="section-label">In Action</div>
+      <h2 class="section-title" id="features-title">See what Mediforce does, a minute at a time</h2>
+      <div class="peek" aria-roledescription="carousel">
+        <button type="button" class="peek-arrow peek-prev" aria-label="Previous feature">&#8249;</button>
+        <div class="peek-track">
+          <div class="peek-slide" data-index="0">
+            <div class="hero-video-frame">
+              <video class="hero-video" poster="images/features/ai-builder-poster.webp" playsinline preload="none" aria-label="AI Workflow Builder"></video>
+              <button type="button" class="hero-video-play" data-full-src="images/features/ai-builder.mp4" aria-label="Play AI Workflow Builder">
+                <span>
+              <svg viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><path d="M0 0v14l12-7z"/></svg>
+            </span>
+              </button>
+              <div class="hero-player">
+            <button type="button" class="hp-toggle" data-state="playing" aria-label="Pause">
+              <svg class="hp-icon-pause" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><rect x="1" y="1" width="3.5" height="12" rx="0.5"/><rect x="7.5" y="1" width="3.5" height="12" rx="0.5"/></svg>
+              <svg class="hp-icon-play" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><path d="M0 0v14l12-7z"/></svg>
+            </button>
+            <input class="hp-seek" type="range" min="0" max="100" step="0.1" value="0" aria-label="Seek" />
+            <span class="hp-time">0:00 / 0:00</span>
+            <button type="button" class="hp-mute" data-state="loud" aria-label="Mute">
+              <svg class="hp-icon-loud" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 2 4.5 5H2v6h2.5L8 14V2Z"/><path d="M10.5 5.5a3.5 3.5 0 0 1 0 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <svg class="hp-icon-muted" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 2 4.5 5H2v6h2.5L8 14V2Z"/><path d="M11 6l3 4M14 6l-3 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+            <button type="button" class="hp-full" aria-label="Full screen">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2H2v4M10 2h4v4M10 14h4v-4M6 14H2v-4"/></svg>
+            </button>
+          </div>
+            </div>
+            <div class="peek-caption">
+              <h3>AI Workflow Builder</h3>
+              <p>Describe a process in a sentence and the blocks assemble on their own. A person then sets the roles and how much each agent may decide, and activation locks the version.</p>
+            </div>
+          </div>
+          <div class="peek-slide" data-index="1">
+            <div class="hero-video-frame">
+              <video class="hero-video" poster="images/features/example-workflows-poster.webp" playsinline preload="none" aria-label="Example Workflows"></video>
+              <button type="button" class="hero-video-play" data-full-src="images/features/example-workflows.mp4" aria-label="Play Example Workflows">
+                <span>
+              <svg viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><path d="M0 0v14l12-7z"/></svg>
+            </span>
+              </button>
+              <div class="hero-player">
+            <button type="button" class="hp-toggle" data-state="playing" aria-label="Pause">
+              <svg class="hp-icon-pause" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><rect x="1" y="1" width="3.5" height="12" rx="0.5"/><rect x="7.5" y="1" width="3.5" height="12" rx="0.5"/></svg>
+              <svg class="hp-icon-play" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><path d="M0 0v14l12-7z"/></svg>
+            </button>
+            <input class="hp-seek" type="range" min="0" max="100" step="0.1" value="0" aria-label="Seek" />
+            <span class="hp-time">0:00 / 0:00</span>
+            <button type="button" class="hp-mute" data-state="loud" aria-label="Mute">
+              <svg class="hp-icon-loud" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 2 4.5 5H2v6h2.5L8 14V2Z"/><path d="M10.5 5.5a3.5 3.5 0 0 1 0 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <svg class="hp-icon-muted" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 2 4.5 5H2v6h2.5L8 14V2Z"/><path d="M11 6l3 4M14 6l-3 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+            <button type="button" class="hp-full" aria-label="Full screen">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2H2v4M10 2h4v4M10 14h4v-4M6 14H2v-4"/></svg>
+            </button>
+          </div>
+            </div>
+            <div class="peek-caption">
+              <h3>Example Workflows</h3>
+              <p>Complete starting points, with every block, connection and data scope already set. Bring your requirements and adapt one, rather than starting from a blank canvas.</p>
+            </div>
+          </div>
+          <div class="peek-slide" data-index="2">
+            <div class="hero-video-frame">
+              <video class="hero-video" poster="images/features/human-in-the-lead-poster.webp" playsinline preload="none" aria-label="Human in the Lead"></video>
+              <button type="button" class="hero-video-play" data-full-src="images/features/human-in-the-lead.mp4" aria-label="Play Human in the Lead">
+                <span>
+              <svg viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><path d="M0 0v14l12-7z"/></svg>
+            </span>
+              </button>
+              <div class="hero-player">
+            <button type="button" class="hp-toggle" data-state="playing" aria-label="Pause">
+              <svg class="hp-icon-pause" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><rect x="1" y="1" width="3.5" height="12" rx="0.5"/><rect x="7.5" y="1" width="3.5" height="12" rx="0.5"/></svg>
+              <svg class="hp-icon-play" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><path d="M0 0v14l12-7z"/></svg>
+            </button>
+            <input class="hp-seek" type="range" min="0" max="100" step="0.1" value="0" aria-label="Seek" />
+            <span class="hp-time">0:00 / 0:00</span>
+            <button type="button" class="hp-mute" data-state="loud" aria-label="Mute">
+              <svg class="hp-icon-loud" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 2 4.5 5H2v6h2.5L8 14V2Z"/><path d="M10.5 5.5a3.5 3.5 0 0 1 0 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <svg class="hp-icon-muted" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 2 4.5 5H2v6h2.5L8 14V2Z"/><path d="M11 6l3 4M14 6l-3 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+            <button type="button" class="hp-full" aria-label="Full screen">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2H2v4M10 2h4v4M10 14h4v-4M6 14H2v-4"/></svg>
+            </button>
+          </div>
+            </div>
+            <div class="peek-caption">
+              <h3>Human in the Lead</h3>
+              <p>The workflow waits for the data manager, who can accept, reject with an agent-drafted note, or send the report back to the agent with an instruction.</p>
+            </div>
+          </div>
+          <div class="peek-slide" data-index="3">
+            <div class="hero-video-frame">
+              <video class="hero-video" poster="images/features/execution-logs-poster.webp" playsinline preload="none" aria-label="Built for Regulated Work"></video>
+              <button type="button" class="hero-video-play" data-full-src="images/features/execution-logs.mp4" aria-label="Play Built for Regulated Work">
+                <span>
+              <svg viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><path d="M0 0v14l12-7z"/></svg>
+            </span>
+              </button>
+              <div class="hero-player">
+            <button type="button" class="hp-toggle" data-state="playing" aria-label="Pause">
+              <svg class="hp-icon-pause" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><rect x="1" y="1" width="3.5" height="12" rx="0.5"/><rect x="7.5" y="1" width="3.5" height="12" rx="0.5"/></svg>
+              <svg class="hp-icon-play" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><path d="M0 0v14l12-7z"/></svg>
+            </button>
+            <input class="hp-seek" type="range" min="0" max="100" step="0.1" value="0" aria-label="Seek" />
+            <span class="hp-time">0:00 / 0:00</span>
+            <button type="button" class="hp-mute" data-state="loud" aria-label="Mute">
+              <svg class="hp-icon-loud" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 2 4.5 5H2v6h2.5L8 14V2Z"/><path d="M10.5 5.5a3.5 3.5 0 0 1 0 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <svg class="hp-icon-muted" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 2 4.5 5H2v6h2.5L8 14V2Z"/><path d="M11 6l3 4M14 6l-3 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+            <button type="button" class="hp-full" aria-label="Full screen">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2H2v4M10 2h4v4M10 14h4v-4M6 14H2v-4"/></svg>
+            </button>
+          </div>
+            </div>
+            <div class="peek-caption">
+              <h3>Built for Regulated Work</h3>
+              <p>Versions lock on activation, autonomy is set per step, roles are enforced, and an append-only audit trail records who did what, when and why.</p>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="peek-arrow peek-next" aria-label="Next feature">&#8250;</button>
+      </div>
+      <div class="peek-dots"><button type="button" class="peek-dot" data-index="0" aria-label="Show AI Workflow Builder"></button><button type="button" class="peek-dot" data-index="1" aria-label="Show Example Workflows"></button><button type="button" class="peek-dot" data-index="2" aria-label="Show Human in the Lead"></button><button type="button" class="peek-dot" data-index="3" aria-label="Show Built for Regulated Work"></button></div>
+    </div>
+  </section>
+
   <script>
-    // None of the 6 MB file crosses the wire until this runs.
     (function () {
-      var trigger = document.querySelector('.hero-video-play');
-      var video = document.querySelector('.hero-video');
-      if (trigger === null || video === null) return;
-      trigger.addEventListener('click', function () {
-        // 0:03 is where the poster is cut from, so the still the visitor
-        // clicked is the frame the video opens on.
-        var frame = video.closest('.hero-video-frame');
-        video.src = trigger.dataset.fullSrc + '#t=3';
-        video.load();
-        frame.classList.add('is-playing');
-        var started = video.play();
-        if (started !== undefined) {
-          started.catch(function () { frame.classList.remove('is-playing'); });
-        }
-      });
-      // A decode error or a 404 would otherwise leave a blank frame with a live
-      // control bar; falling back to the poster keeps the hero legible.
-      video.addEventListener('error', function () {
-        video.closest('.hero-video-frame').classList.remove('is-playing');
-      });
-    })();
-
-    // Every control reads state off the element rather than tracking a copy, so
-    // a keyboard seek or native gesture cannot desynchronise the bar.
-    (function () {
-      var frame = document.querySelector('.hero-video-frame');
-      var video = document.querySelector('.hero-video');
-      if (frame === null || video === null) return;
-
-      var toggle = frame.querySelector('.hp-toggle');
-      var seek = frame.querySelector('.hp-seek');
-      var time = frame.querySelector('.hp-time');
-      var mute = frame.querySelector('.hp-mute');
-      var full = frame.querySelector('.hp-full');
-
       function clock(seconds) {
         if (isFinite(seconds) === false) return '0:00';
         var whole = Math.floor(seconds);
-        var mins = Math.floor(whole / 60);
         var secs = whole % 60;
-        return mins + ':' + (secs < 10 ? '0' : '') + secs;
+        return Math.floor(whole / 60) + ':' + (secs < 10 ? '0' : '') + secs;
       }
 
-      toggle.addEventListener('click', function () {
-        if (video.paused === true) video.play();
-        else video.pause();
-      });
-      video.addEventListener('play', function () {
-        toggle.dataset.state = 'playing';
-        toggle.setAttribute('aria-label', 'Pause');
-      });
-      video.addEventListener('pause', function () {
-        toggle.dataset.state = 'paused';
-        toggle.setAttribute('aria-label', 'Play');
+      // Every control reads state off the element rather than tracking a copy, so
+      // a keyboard seek or native gesture cannot desynchronise the bar.
+      function mount(frame) {
+        var video = frame.querySelector('video');
+        var trigger = frame.querySelector('.hero-video-play');
+        if (video === null || trigger === null) return null;
+        var toggle = frame.querySelector('.hp-toggle');
+        var seek = frame.querySelector('.hp-seek');
+        var time = frame.querySelector('.hp-time');
+        var mute = frame.querySelector('.hp-mute');
+        var full = frame.querySelector('.hp-full');
+
+        // Nothing crosses the wire until play is pressed. data-start skips to the
+        // frame the poster was cut from, so the still clicked is where it opens.
+        trigger.addEventListener('click', function () {
+          var start = trigger.dataset.start;
+          video.src = trigger.dataset.fullSrc + (start === undefined ? '' : '#t=' + start);
+          video.load();
+          frame.classList.add('is-playing');
+          var started = video.play();
+          if (started !== undefined) {
+            started.catch(function () { frame.classList.remove('is-playing'); });
+          }
+        });
+        // A decode error or a 404 would otherwise leave a blank frame with a live
+        // control bar; falling back to the poster keeps it legible.
+        video.addEventListener('error', function () { frame.classList.remove('is-playing'); });
+
+        toggle.addEventListener('click', function () {
+          if (video.paused === true) video.play();
+          else video.pause();
+        });
+        video.addEventListener('play', function () {
+          toggle.dataset.state = 'playing';
+          toggle.setAttribute('aria-label', 'Pause');
+          document.querySelectorAll('.hero-video-frame video').forEach(function (other) {
+            if (other !== video && other.paused === false) other.pause();
+          });
+        });
+        video.addEventListener('pause', function () {
+          toggle.dataset.state = 'paused';
+          toggle.setAttribute('aria-label', 'Play');
+        });
+        video.addEventListener('timeupdate', function () {
+          if (isFinite(video.duration) === false) return;
+          seek.value = String((video.currentTime / video.duration) * 100);
+          time.textContent = clock(video.currentTime) + ' / ' + clock(video.duration);
+        });
+        video.addEventListener('loadedmetadata', function () {
+          time.textContent = clock(video.currentTime) + ' / ' + clock(video.duration);
+        });
+        seek.addEventListener('input', function () {
+          if (isFinite(video.duration) === false) return;
+          video.currentTime = (Number(seek.value) / 100) * video.duration;
+        });
+        mute.addEventListener('click', function () { video.muted = video.muted === false; });
+        video.addEventListener('volumechange', function () {
+          mute.dataset.state = video.muted === true ? 'muted' : 'loud';
+          mute.setAttribute('aria-label', video.muted === true ? 'Unmute' : 'Mute');
+        });
+        full.addEventListener('click', function () {
+          // Safari on iPhone only ever offers the native fullscreen player.
+          if (frame.requestFullscreen !== undefined) frame.requestFullscreen();
+          else if (video.webkitEnterFullscreen !== undefined) video.webkitEnterFullscreen();
+        });
+
+        return {
+          stop: function () {
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            frame.classList.remove('is-playing');
+          }
+        };
+      }
+
+      document.querySelectorAll('.hero-video-frame').forEach(function (frame) {
+        frame.player = mount(frame);
       });
 
-      video.addEventListener('timeupdate', function () {
-        if (isFinite(video.duration) === false) return;
-        seek.value = String((video.currentTime / video.duration) * 100);
-        time.textContent = clock(video.currentTime) + ' / ' + clock(video.duration);
-      });
-      video.addEventListener('loadedmetadata', function () {
-        time.textContent = clock(video.currentTime) + ' / ' + clock(video.duration);
-      });
-      seek.addEventListener('input', function () {
-        if (isFinite(video.duration) === false) return;
-        video.currentTime = (Number(seek.value) / 100) * video.duration;
-      });
+      var peek = document.querySelector('.peek');
+      if (peek === null) return;
+      var track = peek.querySelector('.peek-track');
+      var slides = Array.prototype.slice.call(track.querySelectorAll('.peek-slide'));
+      var dots = Array.prototype.slice.call(document.querySelectorAll('.peek-dot'));
+      var arrows = peek.querySelectorAll('.peek-arrow');
+      var current = 0;
 
-      mute.addEventListener('click', function () {
-        video.muted = video.muted === false;
-      });
-      video.addEventListener('volumechange', function () {
-        mute.dataset.state = video.muted === true ? 'muted' : 'loud';
-        mute.setAttribute('aria-label', video.muted === true ? 'Unmute' : 'Mute');
-      });
+      // Reordering keeps the previous and next clips beside the current one at
+      // either end of the list, so there is always a neighbour on both sides.
+      function go(index) {
+        current = (index + slides.length) % slides.length;
+        slides.forEach(function (slide, i) {
+          var offset = (i - current + slides.length) % slides.length;
+          slide.style.order = offset === slides.length - 1 ? 0 : offset + 1;
+          slide.classList.toggle('is-current', i === current);
+          slide.setAttribute('aria-hidden', i === current ? 'false' : 'true');
+          var frame = slide.querySelector('.hero-video-frame');
+          if (i !== current && frame.player !== null) frame.player.stop();
+        });
+        dots.forEach(function (dot, i) {
+          dot.classList.toggle('is-current', i === current);
+          dot.setAttribute('aria-current', i === current ? 'true' : 'false');
+        });
+        var slide = slides[current];
+        var frame = slide.querySelector('.hero-video-frame');
+        track.style.transform = 'translateX(' + (peek.clientWidth / 2 - (slide.offsetLeft + slide.offsetWidth / 2)) + 'px)';
+        track.style.setProperty('--frame-middle', (frame.offsetHeight / 2) + 'px');
+        arrows.forEach(function (arrow) { arrow.style.top = (frame.offsetHeight / 2) + 'px'; });
+      }
 
-      full.addEventListener('click', function () {
-        // Safari on iPhone only ever offers the native fullscreen player.
-        if (frame.requestFullscreen !== undefined) frame.requestFullscreen();
-        else if (video.webkitEnterFullscreen !== undefined) video.webkitEnterFullscreen();
+      slides.forEach(function (slide, i) {
+        slide.addEventListener('click', function () { if (i !== current) go(i); });
       });
+      dots.forEach(function (dot, i) { dot.addEventListener('click', function () { go(i); }); });
+      peek.querySelector('.peek-prev').addEventListener('click', function () { go(current - 1); });
+      peek.querySelector('.peek-next').addEventListener('click', function () { go(current + 1); });
+      peek.addEventListener('keydown', function (event) {
+        if (event.key === 'ArrowLeft') go(current - 1);
+        if (event.key === 'ArrowRight') go(current + 1);
+      });
+      window.addEventListener('resize', function () { go(current); });
+      go(0);
     })();
-
   </script>
+
+
 
   <div class="hero-divider"></div>
 
@@ -1080,7 +1292,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <div class="container">
       <div class="section-label">Case Studies</div>
       <h2 class="section-title">See how Mediforce works in a real clinical workflow</h2>
-      <p class="section-subtitle">Two processes, each with a Control Mode on every step - so it is clear where an agent acts alone and where a human decides.</p>
+      <p class="section-subtitle">Real clinical processes, each with a Control Mode on every step, so it is clear where an agent acts alone and where a human decides.</p>
       <div class="home-cs-grid">
 
         <a class="home-cs-card" href="case-studies/data-delivery/">
@@ -1095,6 +1307,18 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           <span class="home-cs-more">Read the walkthrough &rarr;</span>
         </a>
 
+        <a class="home-cs-card" href="case-studies/synthetic-sdtm/">
+          <h3>Synthetic SDTM From an NCT ID</h3>
+          <p>One ClinicalTrials.gov ID in, conformant synthetic SDTM out, shaped like that study and reproducible down to the seed. A person checks the spec before any data is made.</p>
+          <span class="home-cs-more">Read the walkthrough &rarr;</span>
+        </a>
+
+        <a class="home-cs-card" href="case-studies/traceable-tfls/">
+          <h3>Traceable TFLs, Protocol to Table</h3>
+          <p>Agents plan and render, scripts derive and check, and three human gates decide. Every table traces back to its objective and its source data.</p>
+          <span class="home-cs-more">Read the walkthrough &rarr;</span>
+        </a>
+
       </div>
       <div class="case-preview">
         <img
@@ -1104,7 +1328,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           decoding="async" width="1400" height="698" />
       </div>
       <div class="case-study-cta">
-        <a href="case-studies/" class="btn btn--primary">Browse both case studies</a>
+        <a href="case-studies/" class="btn btn--primary">Browse all case studies</a>
       </div>
     </div>
   </section>

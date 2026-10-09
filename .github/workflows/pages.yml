@@ -31,6 +31,7 @@ on:
       - 'scripts/assets/**'
       - 'scripts/build-news.ts'
       - 'scripts/clean_site_urls.py'
+      - 'scripts/build_sitemap.py'
       - 'scripts/news/**'
       - '.github/workflows/pages.yml'
   schedule:
@@ -50,6 +51,7 @@ on:
       - 'scripts/assets/**'
       - 'scripts/build-news.ts'
       - 'scripts/clean_site_urls.py'
+      - 'scripts/build_sitemap.py'
       - 'scripts/news/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
@@ -70,7 +72,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # Full history, so the sitemap's lastmod is each page's last commit.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
@@ -108,6 +113,9 @@ jobs:
       # the files stay put and old .html links keep working.
       - name: Drop .html from the marketing site's links
         run: python3 scripts/clean_site_urls.py _site
+
+      - name: Write the sitemap from the built pages
+        run: python3 scripts/build_sitemap.py _site docs
 
       # `docusaurus build` transpiles without type-checking, and the root
       # `tsc -b` has no `website` reference, so this is the only thing in CI
