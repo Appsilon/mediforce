@@ -21,7 +21,9 @@ on:
         type: string
         required: true
 
-# Main builds cancel each other; a release build is never cancelled.
+# Main builds cancel each other; a release build is never cancelled. A release
+# build only reads the layer cache: release.yml calls it from a merged PR's
+# `closed` event, which can't write the cache ('failed to reserve cache').
 concurrency:
   group: build-images-${{ inputs.version || 'latest' }}
   cancel-in-progress: ${{ !inputs.version }}
@@ -89,7 +91,7 @@ jobs:
           tags: |
             ${{ env.IMAGE_PREFIX }}-platform-ui:${{ env.SHA }}-${{ env.PLATFORM_SLUG }}
           cache-from: type=gha,scope=platform-ui-${{ env.PLATFORM_SLUG }}
-          cache-to: type=gha,mode=max,scope=platform-ui-${{ env.PLATFORM_SLUG }}
+          cache-to: ${{ !inputs.version && format('type=gha,mode=max,scope=platform-ui-{0}', env.PLATFORM_SLUG) || '' }}
 
       - name: Build & push migrate (${{ matrix.platform }})
         uses: docker/build-push-action@v7
@@ -102,7 +104,7 @@ jobs:
           tags: |
             ${{ env.IMAGE_PREFIX }}-migrate:${{ env.SHA }}-${{ env.PLATFORM_SLUG }}
           cache-from: type=gha,scope=migrate-${{ env.PLATFORM_SLUG }}
-          cache-to: type=gha,mode=max,scope=migrate-${{ env.PLATFORM_SLUG }}
+          cache-to: ${{ !inputs.version && format('type=gha,mode=max,scope=migrate-{0}', env.PLATFORM_SLUG) || '' }}
 
       - name: Build & push container-worker (${{ matrix.platform }})
         uses: docker/build-push-action@v7
@@ -114,7 +116,7 @@ jobs:
           tags: |
             ${{ env.IMAGE_PREFIX }}-container-worker:${{ env.SHA }}-${{ env.PLATFORM_SLUG }}
           cache-from: type=gha,scope=container-worker-${{ env.PLATFORM_SLUG }}
-          cache-to: type=gha,mode=max,scope=container-worker-${{ env.PLATFORM_SLUG }}
+          cache-to: ${{ !inputs.version && format('type=gha,mode=max,scope=container-worker-{0}', env.PLATFORM_SLUG) || '' }}
 
   merge-manifests:
     needs: build

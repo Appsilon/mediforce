@@ -36,6 +36,11 @@ const ACTION_ITEMS = [
 
 const MONITORING_ITEM = { path: '/monitoring', label: 'Monitoring', icon: Activity } as const;
 
+// MEDIFORCE_VERSION via docker-compose.prod.yml: a release on production,
+// `latest` on a server bootstrapped from main, empty on staging.
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION;
+const RELEASE_VERSION = APP_VERSION !== undefined && APP_VERSION !== '' && APP_VERSION !== 'latest' ? APP_VERSION : null;
+
 function NavItem({
   href,
   label,
@@ -365,8 +370,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         />
       </nav>
 
-      {/* Bottom — git SHA + optional branch */}
-      {process.env.NEXT_PUBLIC_GIT_SHA && (
+      {/* Bottom — release version, else git SHA + optional branch */}
+      {RELEASE_VERSION ? (
+        <div className="border-t px-4 py-2">
+          <span className="font-mono text-[10px] text-muted-foreground" title={process.env.NEXT_PUBLIC_GIT_SHA}>
+            v{RELEASE_VERSION}
+          </span>
+        </div>
+      ) : process.env.NEXT_PUBLIC_GIT_SHA && (
         <div className="border-t px-4 py-2">
           <span className="font-mono text-[10px] text-muted-foreground">
             {process.env.NEXT_PUBLIC_GIT_SHA}
