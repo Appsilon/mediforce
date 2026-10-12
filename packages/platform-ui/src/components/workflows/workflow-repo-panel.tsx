@@ -1,103 +1,18 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronRight, FileText, Folder, GitBranch, Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { GitBranch } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { mediforceSilent } from '@/lib/mediforce';
-import { formatBytes } from '@/lib/format';
+import { routes } from '@/lib/routes';
 import {
-  buildRepoTree,
   referencedPaths,
   repoSources,
   type RepoSource,
-  type RepoTreeNode,
 } from '@/lib/repo-sources';
-import { CodeEditor } from './workflow-editor/code-editor';
-import type { WorkflowStep } from '@mediforce/platform-core';
-
-type OpenedFile =
-  | { kind: 'loading'; path: string }
-  | { kind: 'text'; path: string; contents: string; truncated?: boolean }
-  | { kind: 'too-large'; path: string; maxBytes: number }
-  | { kind: 'error'; path: string; message: string };
-
-interface TreeState {
-  entries: { path: string }[] | null;
-  error: string | null;
-}
-
-function TreeRow({
-  node,
-  depth,
-  openPath,
-  referenced,
-  onOpen,
-}: {
-  node: RepoTreeNode;
-  depth: number;
-  openPath: string | null;
-  /** Paths the workflow names; these are the files a reader came for. */
-  referenced: Set<string>;
-  onOpen: (path: string) => void;
-}) {
-  const [expanded, setExpanded] = React.useState(depth === 0);
-  if (!node.isFile) {
-    return (
-      <>
-        <button
-          type="button"
-          onClick={() => setExpanded((prev) => !prev)}
-          className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-xs transition-colors hover:bg-muted"
-          style={{ paddingLeft: depth * 12 + 8 }}
-        >
-          <ChevronRight className={cn('h-3 w-3 shrink-0 transition-transform', expanded && 'rotate-90')} />
-          <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span className="truncate">{node.name}</span>
-        </button>
-        {expanded && node.children.map((child) => (
-          <TreeRow
-            key={child.path}
-            node={child}
-            depth={depth + 1}
-            openPath={openPath}
-            referenced={referenced}
-            onOpen={onOpen}
-          />
-        ))}
-      </>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={() => onOpen(node.path)}
-      className={cn(
-        'flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-xs transition-colors hover:bg-muted',
-        openPath === node.path && 'bg-primary-subtle text-primary',
-      )}
-      style={{ paddingLeft: depth * 12 + 8 + 18 }}
-    >
-      <FileText
-        className={cn(
-          'h-3.5 w-3.5 shrink-0',
-          referenced.has(node.path) ? 'text-primary' : 'text-muted-foreground',
-        )}
-      />
-      <span className={cn('truncate', referenced.has(node.path) && 'font-medium')}>
-        {node.name}
-      </span>
-      {referenced.has(node.path) && (
-        <span
-          title="Named by a step in this workflow"
-          className="ml-auto shrink-0 rounded-full bg-primary-subtle px-1.5 py-0.5 text-[10px] font-medium text-primary"
-        >
-          used
-        </span>
-      )}
-    </button>
-  );
-}
+import { RepoFileBrowser } from '@/components/repo/repo-file-browser';
+import { stepContainerConfig, type WorkflowStep } from '@mediforce/platform-core';
 
 function RepoExplorer({
   source,
@@ -121,8 +36,6 @@ function RepoExplorer({
   const saved = workflowName !== undefined
     && workflowName !== ''
     && savedSources.has(`${source.repo}@${source.commit}`);
-  const [tree, setTree] = React.useState<TreeState>({ entries: null, error: null });
-  const [opened, setOpened] = React.useState<OpenedFile | null>(null);
   // A draft fetch is never automatic: it clones on the platform's own key, and
   // the reader is mid-edit, so it happens when they ask for it.
   const [fetchRequested, setFetchRequested] = React.useState(false);
@@ -144,42 +57,6 @@ function RepoExplorer({
     [saved, workflowName, source.stepId, source.repo, source.commit, namespace],
   );
 
-  React.useEffect(() => {
-    if (!saved && !fetchRequested) return;
-    let cancelled = false;
-    setTree({ entries: null, error: null });
-    void (async () => {
-      try {
-        const data = await request();
-        if (!cancelled) setTree({ entries: [...data.entries], error: null });
-      } catch (error) {
-        if (!cancelled) {
-          setTree({ entries: null, error: error instanceof Error ? error.message : String(error) });
-        }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [request, saved, fetchRequested]);
-
-  const onOpen = async (path: string): Promise<void> => {
-    setOpened({ kind: 'loading', path });
-    try {
-      const { file } = await request(path);
-      if (file === undefined) {
-        setOpened({ kind: 'error', path, message: 'The repository returned nothing for this file.' });
-        return;
-      }
-      if ('tooLarge' in file) {
-        setOpened({ kind: 'too-large', path, maxBytes: file.maxBytes });
-        return;
-      }
-      setOpened({ kind: 'text', path, contents: file.contents, ...(file.truncated === undefined ? {} : { truncated: file.truncated }) });
-    } catch (error) {
-      setOpened({ kind: 'error', path, message: error instanceof Error ? error.message : String(error) });
-    }
-  };
-
-  const nodes = React.useMemo(() => buildRepoTree(tree.entries ?? []), [tree.entries]);
   const referenced = React.useMemo(() => referencedPaths(steps, source), [steps, source]);
 
   if (!saved && !fetchRequested) {
@@ -234,72 +111,7 @@ function RepoExplorer({
         </span>
       </div>
 
-      <div className="flex min-h-0 flex-1 gap-3">
-        <div className="min-h-0 w-1/3 overflow-y-auto rounded-md border p-1">
-          {tree.error !== null && (
-            <p className="p-2 text-xs text-destructive">{tree.error}</p>
-          )}
-          {tree.error === null && tree.entries === null && (saved || fetchRequested) && (
-            <p className="flex items-center gap-2 p-2 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" /> Reading the repository…
-            </p>
-          )}
-          {nodes.map((node) => (
-            <TreeRow
-              key={node.path}
-              node={node}
-              depth={0}
-              openPath={opened?.path ?? null}
-              referenced={referenced}
-              onOpen={(path) => void onOpen(path)}
-            />
-          ))}
-        </div>
-
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {opened === null && (
-            <p className="m-auto max-w-sm text-center text-xs text-muted-foreground">
-              Pick a file to read it. Nothing is downloaded until you do, and nothing here
-              is copied into the workflow.
-            </p>
-          )}
-          {opened?.kind === 'loading' && (
-            <p className="m-auto flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" /> Fetching {opened.path}…
-            </p>
-          )}
-          {opened?.kind === 'too-large' && (
-            <div className="m-auto max-w-sm rounded-md border border-amber-200 bg-amber-50 p-3 text-center text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
-              <p className="font-medium">{opened.path} is too large to open here</p>
-              <p className="mt-1">
-                It is over {formatBytes(opened.maxBytes)}. Read it in {source.repo} at{' '}
-                {source.commit.slice(0, 8)}.
-              </p>
-            </div>
-          )}
-          {opened?.kind === 'error' && (
-            <p className="m-auto max-w-sm text-center text-xs text-destructive">{opened.message}</p>
-          )}
-          {opened?.kind === 'text' && (
-            <>
-              <div className="mb-1 flex shrink-0 items-baseline gap-2">
-                <span className="truncate font-mono text-xs">{opened.path}</span>
-                {opened.truncated === true && (
-                  <span className="text-[11px] text-amber-700 dark:text-amber-300">shown in part</span>
-                )}
-              </div>
-              <CodeEditor
-                value={opened.contents}
-                onChange={() => {}}
-                language="text"
-                readOnly
-                fill
-                className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-md border"
-              />
-            </>
-          )}
-        </div>
-      </div>
+      <RepoFileBrowser repo={source.repo} commit={source.commit} load={request} referenced={referenced} />
     </div>
   );
 }
@@ -334,10 +146,23 @@ export function WorkflowRepoPanel({
   const [active, setActive] = React.useState(0);
 
   if (sources.length === 0) {
+    // A step pinned to an image runs what the image holds, which may differ
+    // from any branch of its repository — its files are read where the image
+    // is, pinned to the commit it was built from.
+    const pinsImage = steps.some((step) => stepContainerConfig(step).image !== undefined);
     return (
       <p className="m-auto max-w-md text-center text-xs text-muted-foreground">
         No step here builds from a repository. Steps that do are pinned to a commit, and
         their files can be read without leaving Mediforce.
+        {pinsImage && namespace !== undefined && namespace !== '' && (
+          <>
+            {' '}Steps pinned to an image run what the image holds; read the files it was built
+            from in{' '}
+            <Link href={routes.images(namespace)} className="font-medium text-primary hover:underline">
+              Images
+            </Link>.
+          </>
+        )}
       </p>
     );
   }

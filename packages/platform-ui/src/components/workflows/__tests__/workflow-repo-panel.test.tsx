@@ -7,6 +7,10 @@ vi.mock('@/lib/mediforce', () => ({
   mediforceSilent: { workflows: { repoFiles, draftRepoFiles } },
 }));
 
+vi.mock('next/link', () => ({
+  default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
+}));
+
 const { WorkflowRepoPanel } = await import('../workflow-repo-panel');
 
 const step = (id: string, script?: object) =>
@@ -86,5 +90,16 @@ describe('WorkflowRepoPanel', () => {
     expect(screen.getByText(/No step here builds from a repository/)).toBeTruthy();
     expect(repoFiles).not.toHaveBeenCalled();
     expect(draftRepoFiles).not.toHaveBeenCalled();
+  });
+
+  it('points a step pinned to an image at the Images tab, where its files are read at the build commit', () => {
+    render(
+      <WorkflowRepoPanel
+        steps={[step('run', { image: 'mediforce-built:abc123' })]}
+        namespace="tenant-a"
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: 'Images' })).toHaveAttribute('href', '/tenant-a/images');
   });
 });
