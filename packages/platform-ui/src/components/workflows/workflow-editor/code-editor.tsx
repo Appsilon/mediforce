@@ -19,12 +19,22 @@ export function CodeEditor({
   onChange,
   language = 'json',
   className,
+  readOnly = false,
+  fill = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   /** `json` highlights; `text` is for a workflow file, which can be anything. */
   language?: 'json' | 'text';
   className?: string;
+  /** Shows a file the workflow does not own, so it reads but cannot be typed into. */
+  readOnly?: boolean;
+  /**
+   * Fill the container and scroll inside it. The default grows to the document
+   * and lets it overflow, which a long line turns into a stretched layout
+   * rather than a scrollbar.
+   */
+  fill?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -39,6 +49,10 @@ export function CodeEditor({
       doc: value,
       extensions: [
         basicSetup,
+        // Compartment-free: the panel remounts the editor when the file changes,
+        // so the facet is read once per document rather than reconfigured.
+        EditorState.readOnly.of(readOnly),
+        EditorView.editable.of(!readOnly),
         ...(language === 'json' ? [jsonLang()] : []),
         EditorView.updateListener.of((update) => {
           if (update.docChanged && !externalUpdateRef.current) {
@@ -46,8 +60,11 @@ export function CodeEditor({
           }
         }),
         EditorView.theme({
-          '&': { fontSize: '11px', height: 'auto' },
-          '.cm-scroller': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', overflow: 'visible' },
+          '&': { fontSize: '11px', height: fill ? '100%' : 'auto' },
+          '.cm-scroller': {
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            overflow: fill ? 'auto' : 'visible',
+          },
           '.cm-content': { padding: '8px 0' },
           '.cm-gutters': { borderRight: '1px solid var(--border)', background: 'transparent', color: 'hsl(var(--muted-foreground))', fontSize: '10px' },
           '.cm-activeLineGutter': { background: 'transparent' },

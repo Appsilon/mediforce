@@ -84,6 +84,47 @@ ignored rather than dropping anyone's work on open. `image` is the one field
 that changes meaning: in the two build modes it is the tag to build under, and
 it is labelled as such.
 
+A step that builds from a repository can be read without a checkout.
+**Repository** in the version editor, beside **Files**, is a read-only explorer
+over the whole commit a step pins: the container folder, the fixtures, whatever
+the Dockerfile copies. Nothing it shows is ever copied into the workflow, so a
+file that is git-backed stays git-backed and the definition cannot drift from
+the repository it names.
+
+It lists before it reads. The tree comes from a treeless fetch
+(`--depth 1 --filter=blob:none`, no checkout) plus `git ls-tree -r`, which costs
+the commit's directory structure rather than every byte it holds — and the
+listing carries no sizes, because asking git for one means reading the blob.
+A file's contents are fetched only when somebody opens it, and the read is
+capped at `WORKFLOW_ARTIFACT_MAX_BYTES`: past that it is abandoned and the file
+is refused rather than shown in part. Files a step names — its `dockerfile`, an
+agent's `SKILL.md` — are marked in the tree, so the ones driving the workflow
+stand out from the rest of the repository.
+
+Two endpoints serve it. `GET /api/workflow-definitions/:name/repo-files`
+(`mediforce.workflows.repoFiles`) reads through a **saved** step, resolving its
+repo, commit and `repoAuth` from the stored definition — so what is shown is
+what a run would build from. `GET /api/repo-files`
+(`mediforce.workflows.draftRepoFiles`) reads a `repo` and `commit` named
+directly, for a workflow being drafted or a step just repointed on the canvas.
+The draft read clones **anonymously**: it carries no workflow secret and is
+refused the deployment's deploy key, because `repo` there is caller-supplied and
+unrelated to the namespace they name, and spending the platform key on it would
+read out private repositories with no saved definition recording who asked. A
+repository needing a credential is read after saving, and the panel says so
+instead of offering a fetch that would fail.
+
+Three refusals apply, because the server clones on a caller's behalf and hands
+back what it read. A `repo` beginning `/` or `.` is a local path and is
+refused; a host outside `github.com`, `gitlab.com`, `bitbucket.org` and
+`MEDIFORCE_REPO_HOSTS` is refused, since a clone carrying `repoAuth` sends that
+secret to the host as basic auth; and a *public* workflow belonging to another
+workspace is readable but not previewable, because the clone uses the
+platform's deploy key rather than the caller's credentials. There is no
+checkout to walk out of: reads are `git show` against the object store, so a
+symlink in the repository reads as the path it holds, never as the file it
+points at.
+
 A step that names a file the workflow does not carry is flagged before the run
 (preflight, beside missing secrets and images): a command reading
 `/artifacts/<path>` with no such file, or a `dockerfile` with neither a carried
