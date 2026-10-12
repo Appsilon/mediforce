@@ -974,12 +974,11 @@ describe('ImagesPage', () => {
     expect(within(dialog).queryByLabelText('Repository')).not.toBeInTheDocument();
   });
 
-  it('offers no Delete to a member — retiring an entry takes its images', async () => {
+  it('offers no Delete to a member — retiring an entry is an admin call', async () => {
     renderPage();
 
     const card = await screen.findByTestId('image-entry-tealflow');
-    // A member may still add an entry; deleting one destroys artifacts on a
-    // daemon every workspace shares.
+    // A member may still add an entry; retiring one is an admin's call.
     expect(within(card).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
     expect(within(card).getByRole('button', { name: 'Edit' })).toBeInTheDocument();
   });
@@ -998,7 +997,7 @@ describe('ImagesPage', () => {
     // Blocked, not warned: the author can still re-point that step, so nobody
     // has to choose to break it.
     expect(
-      within(dialog).getByRole('button', { name: 'Delete entry and 2 images' }),
+      within(dialog).getByRole('button', { name: 'Delete entry' }),
     ).toBeDisabled();
     expect(deleteMock).not.toHaveBeenCalled();
   });
@@ -1026,7 +1025,7 @@ describe('ImagesPage', () => {
     // without a reload.
     await waitFor(() =>
       expect(
-        within(dialog).getByRole('button', { name: 'Delete entry and 2 images' }),
+        within(dialog).getByRole('button', { name: 'Delete entry' }),
       ).toBeEnabled(),
     );
   });
@@ -1053,7 +1052,7 @@ describe('ImagesPage', () => {
     // fresh answer knows that, so the button never enables in between.
     expect(await within(dialog).findByText(/acme\/sdtm-qc v3/)).toBeInTheDocument();
     expect(
-      within(dialog).getByRole('button', { name: 'Delete entry and 2 images' }),
+      within(dialog).getByRole('button', { name: 'Delete entry' }),
     ).toBeDisabled();
   });
 
@@ -1164,16 +1163,13 @@ describe('ImagesPage', () => {
     expect(await within(dialog).findByText(/superseded version/)).toBeInTheDocument();
     expect(within(dialog).queryByTestId('delete-blocked')).not.toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole('button', { name: 'Delete entry and 2 images' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Delete entry' }));
 
-    expect(deleteMock).toHaveBeenCalledWith({
-      namespace: 'acme',
-      id: 'tealflow',
-      withImages: true,
-    });
+    // The entry only — the images stay on the daemon.
+    expect(deleteMock).toHaveBeenCalledWith({ namespace: 'acme', id: 'tealflow' });
   });
 
-  it('removes only the record when the daemon holds no image for the entry', async () => {
+  it('removes only the record, never the images', async () => {
     role.value = { role: 'admin', canAdmin: true, loading: false };
     listMock.mockResolvedValue({
       entries: [{ ...TEALFLOW, availability: 'absent', versions: [] }],
@@ -1188,11 +1184,9 @@ describe('ImagesPage', () => {
     await user.click(within(card).getByRole('button', { name: 'Delete' }));
 
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText(/removes the record and nothing else/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/stay on the daemon/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Delete entry' }));
 
-    // No `withImages`: there is nothing on the daemon to remove, so the
-    // destructive half is not claimed.
     expect(deleteMock).toHaveBeenCalledWith({ namespace: 'acme', id: 'tealflow' });
   });
 
@@ -1209,11 +1203,10 @@ describe('ImagesPage', () => {
     await user.click(within(card).getByRole('button', { name: 'Delete' }));
     const dialog = await screen.findByRole('dialog');
     await user.click(
-      await within(dialog).findByRole('button', { name: 'Delete entry and 2 images' }),
+      await within(dialog).findByRole('button', { name: 'Delete entry' }),
     );
 
     expect(await within(dialog).findByText(/image is being used/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/Nothing was removed/)).toBeInTheDocument();
   });
 
   it('uploads a whole folder as the build context and catalogues it under the workspace name', async () => {
