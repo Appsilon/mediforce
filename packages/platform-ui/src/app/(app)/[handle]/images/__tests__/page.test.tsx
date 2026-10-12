@@ -15,6 +15,7 @@ const buildMock = vi.fn();
 const uploadMock = vi.fn();
 const publishMock = vi.fn();
 const pullMock = vi.fn();
+const draftRepoFilesMock = vi.fn();
 const apiFetchMock = vi.fn();
 const searchParams = new URLSearchParams();
 
@@ -31,6 +32,9 @@ vi.stubGlobal(
 vi.mock('@/lib/mediforce', () => ({
   ApiError: class ApiError extends Error {
     status = 500;
+  },
+  mediforceSilent: {
+    workflows: { draftRepoFiles: (...args: unknown[]) => draftRepoFilesMock(...args) },
   },
   mediforce: {
     workflows: {
@@ -1388,6 +1392,43 @@ describe('ImagesPage', () => {
 
     expect(await within(card).findByText('Declared by a member')).toBeInTheDocument();
     expect(within(card).getByText(/declared, not derived/)).toBeInTheDocument();
+  });
+
+  it('reads a built image\'s files at the commit it was built from, only when asked', async () => {
+    draftRepoFilesMock.mockResolvedValue({
+      repo: 'Appsilon/tealflow',
+      commit: 'c0ffee1234567',
+      entries: [{ path: 'container/Dockerfile' }],
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-tealflow');
+    await user.click(within(card).getByRole('button', { expanded: false }));
+    expect(draftRepoFilesMock).not.toHaveBeenCalled();
+
+    await user.click(await within(card).findByRole('button', { name: /Source files at c0ffee1/ }));
+
+    await waitFor(() =>
+      expect(draftRepoFilesMock).toHaveBeenCalledWith({
+        namespace: 'acme',
+        repo: 'Appsilon/tealflow',
+        commit: 'c0ffee1234567',
+      }),
+    );
+  });
+
+  it('offers no file browser for a source a member declared rather than the build recorded', async () => {
+    listMock.mockResolvedValue({ entries: [UPLOADED] });
+    getMock.mockResolvedValue({ entry: UPLOADED });
+    const user = userEvent.setup();
+    renderPage();
+
+    const card = await screen.findByTestId(`image-entry-${UPLOADED.id}`);
+    await user.click(within(card).getByRole('button', { name: /Local agent/ }));
+    await within(card).findByText('Declared by a member');
+
+    expect(within(card).queryByRole('button', { name: /Source files at/ })).not.toBeInTheDocument();
   });
 
   describe('an image built from a workflow\'s carried files', () => {

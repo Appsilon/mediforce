@@ -30,6 +30,7 @@ import { DeleteImageEntryDialog } from '@/components/images/delete-image-entry-d
 import { ImageDescriptionDialog } from '@/components/images/image-description-dialog';
 import { PublishImageDialog } from '@/components/images/publish-image-dialog';
 import { UploadImageDialog } from '@/components/images/upload-image-dialog';
+import { VersionSourceFiles } from '@/components/images/version-source-files';
 import { useWorkflowsByImage, type WorkflowImageMatch } from '@/hooks/use-workflows-by-image';
 import {
   groupByBase,
@@ -360,6 +361,18 @@ function VersionRow({
         />
       )}
       <SourceLine source={source} handle={handle} />
+      {/* Only a source the build itself recorded: a member's declared repo is
+          not derived from the image, so its tree would claim what it cannot. */}
+      {(source.rung === 'built' || source.rung === 'labelled') &&
+        source.repo !== undefined &&
+        source.commit !== undefined && (
+          <VersionSourceFiles
+            repo={source.repo}
+            commit={source.commit}
+            namespace={handle}
+            {...(source.dockerfile === undefined ? {} : { dockerfile: source.dockerfile })}
+          />
+        )}
       <button
         type="button"
         onClick={() => setLayersOpen((current) => !current)}

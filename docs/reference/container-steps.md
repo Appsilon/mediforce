@@ -114,6 +114,15 @@ read out private repositories with no saved definition recording who asked. A
 repository needing a credential is read after saving, and the panel says so
 instead of offering a fetch that would fail.
 
+A step pinned to an **image** has no repository of its own to explore: it runs
+what the image holds, which can differ from any branch. Its files are read on
+the **Images** page instead, under **Source files** on a version built by
+Mediforce (or carrying its own OCI source labels), through the same
+`draftRepoFiles` read pinned to the commit the build recorded — so the tree is
+what the image was built from, never a moving ref. A source a member merely
+declared on the entry gets no browser, since it is not derived from the image.
+The Repository panel points such steps there.
+
 Three refusals apply, because the server clones on a caller's behalf and hands
 back what it read. A `repo` beginning `/` or `.` is a local path and is
 refused; a host outside `github.com`, `gitlab.com`, `bitbucket.org` and
