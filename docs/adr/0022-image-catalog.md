@@ -265,6 +265,18 @@ a member can add an entry they cannot remove; that asymmetry is accepted, on
 the ground that adding an offer is reversible by an admin while destroying a
 deployment-wide artifact is not reversible by anyone.
 
+**Amendment (UI delete is record-only).** The Images tab's **Delete** no longer
+sends `withImages`: it removes the catalogue entry and leaves every image on the
+daemon. The reasoning above is unchanged for `mediforce images delete`, which still
+takes the images with the entry unless `--keep-images` is given; the API removes
+images only when asked with `withImages: true`. The UI chose the
+lighter act deliberately — a deployment-wide, unrecoverable `docker rmi` behind
+one button was judged the wrong default for a catalogue screen, and image
+removal stays reachable through **Admin → Infrastructure** and the CLI. A
+discovered entry has no row, so the UI offers it no Delete; **Describe** is the
+only act on it. The usage scan, the live-version block and the archive remedy
+below apply to the UI dialog unchanged.
+
 The gate is `assertCallerIsNamespaceAdmin`, not
 `assertCallerCanAdminDockerImages`, whose own comment calls it a loose
 approximation until #376 — owner or admin of *any* namespace, which nearly

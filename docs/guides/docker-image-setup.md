@@ -507,34 +507,28 @@ An entry marked **Needs a description** offers **Describe** rather than
 re-pointing it would describe a different one while leaving this one still
 undescribed. Describe it first, then **Edit** can correct it.
 
-## Removing an entry and its images
+## Removing an entry
 
-**Delete** on an entry removes it **and** every image behind it, running
-`docker rmi` on each tag it offered. Admin or owner of the workspace, and
-`mediforce images delete <entry-id> --namespace <handle>` is the same write.
+**Delete** on an entry in the UI removes the catalogue entry **only** — the
+images stay on the daemon, and the source can be catalogued again. Admin or
+owner of the workspace. An entry marked **Needs a description** has no stored
+row, so it offers no Delete; **Describe** it first. A source this workspace built is re-derived on the next
+read and comes back marked **Needs a description**, losing only the sentence
+somebody wrote.
 
-The two are one act on purpose. An entry exists *for* its images, and for a
-source this workspace built, removing the record alone achieves nothing: the row
-is re-derived on the next read and comes back marked **Needs a description**
-([ADR-0022](../adr/0022-image-catalog.md) decision 7), the image stays on the
-daemon, and the step-editor picker goes on offering it. The only thing lost is
-the sentence somebody wrote. When the daemon holds no image for the entry —
-catalogued but never built, or the images already gone — the delete is just the
-record, and the dialog says so.
-
-Two things to expect, because the daemon is shared by every workspace:
-
-- **It cannot be undone.** A deleted image is rebuilt or pulled again, never
-  restored; there is no registry to fall back on.
-- **Deletion is by tag, not by image id**, so an image a second tag still
-  references survives rather than needing a force that would take a version
-  some other entry offers. Docker also refuses an image a running container is
-  using, or one another image was built on — and the entry is then kept, since
-  it is the only handle anyone has on the versions left behind.
+The CLI is wider: `mediforce images delete <entry-id> --namespace <handle>`
+removes the entry **and** every image behind it (`docker rmi` on each tag),
+audited under `_system` since the daemon is deployment-wide; `--keep-images`
+gives the UI's record-only delete. Image removal cannot be undone — a deleted
+image is rebuilt or pulled again, never restored — and Docker refuses an image a
+running container is using, or one another image was built on. Only this CLI
+path leaves a workflow step naming an image that no longer exists: rebuild or
+re-point it before running that workflow again, and note that re-running a
+superseded version then fails at container start.
 
 ### What blocks a delete
 
-A **live** workflow version pinning one of the images blocks it. Live means the
+The dialog still warns about workflows pinning the entry's images, and a **live** workflow version pinning one of the images blocks it. Live means the
 version a run starts from: the workflow's **default** version when it is itself
 live, otherwise its newest non-archived version. That step can still be
 re-pointed, so nothing has to break — the delete is refused and names the
@@ -546,8 +540,7 @@ When the pinning version is the workflow's **only** runnable one, the button rea
 **Archive workflow**, because that is what archiving it does. The workflow is not
 deleted: on the workspace page, **Display → Archived workflows** lists it, and
 **Unarchive** on its page brings it back — every version of it, including any
-archived earlier on purpose. Its step still names the deleted image, so rebuild
-or re-point that before running it again.
+archived earlier on purpose.
 
 A version the workflow pins as its **default** is not offered that button, since
 archiving it would leave the workflow pointing at a version that cannot run.
@@ -556,15 +549,13 @@ Point its step at another image, or make a different version the default first.
 A **superseded or archived** version does not block, and is listed anyway. A
 registered version is immutable — there is no editing v2 in place — so it could
 never be moved off the image, and refusing on its account would mean an image
-pinned once could never be reclaimed. Re-running one after the delete fails at
-container start.
+pinned once could never be reclaimed.
 
 The check is deployment-wide, because the daemon is: a step in a workspace you
 cannot see blocks the delete just the same, and is reported as a count rather
 than by name.
 
-`mediforce images delete --keep-images` removes only the record — rarely what
-you want, for the reason above. `mediforce system rmi <id-or-tag>` and
+`mediforce system rmi <id-or-tag>` and
 **Admin → Infrastructure** still remove one image on its own, and the same live
 pin blocks them: deleting by id weighs every tag that names the image, since
 `docker rmi` on an id takes them all. If the daemon cannot be listed at that

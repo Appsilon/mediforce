@@ -9,26 +9,19 @@ import { useArchiveWorkflowVersion } from '@/hooks/use-archive-workflow-version'
 import { useWorkflowsByImage, type WorkflowImageMatch } from '@/hooks/use-workflows-by-image';
 
 /**
- * Retire an entry and the images behind it.
+ * Retire a catalogue entry — never the images behind it.
  *
- * One act, not two: an entry is an offer *for* images, and a record whose
- * images stay on the daemon achieves nothing — for anything this workspace
- * built, the row is re-derived on the next read and comes back marked "Needs a
- * description", losing only the sentence somebody wrote. So delete means both,
- * and when the daemon holds no image for the entry it simply removes the
- * record.
- *
- * That makes it destructive and deployment-wide, which is why it is
- * admin-gated and why this dialog leads with what pins those images:
+ * Deleting removes the record alone; the images stay on the deployment's
+ * daemon, and the source can be catalogued again. The scan of what pins those
+ * images stays as a warning, because a workflow pinning an image is worth
+ * knowing about before its entry disappears from the catalogue:
  *
  * - **A live version** — the one a run starts from — **blocks the delete.** Its
  *   author can still re-point the step, so breaking it is a choice nobody needs
- *   to make. Archiving that version is offered here, since the alternative is
- *   deleting a whole workflow to reclaim one image.
+ *   to make. Archiving that version is offered here.
  * - **A superseded or archived version does not block.** A registered version
- *   is immutable, so no edit can move it off the image; refusing on its account
- *   would mean an image pinned once could never be reclaimed. It is listed, so
- *   the loss is seen rather than discovered later.
+ *   is immutable, so no edit can move it off the image. It is listed so the
+ *   pin is seen rather than discovered later.
  */
 
 function PinLine({ pin, handle }: { pin: WorkflowImageMatch; handle: string }) {
@@ -61,20 +54,16 @@ export function DeleteImageEntryDialog({
   const remove = useDeleteImageEntry(handle);
   const archive = useArchiveWorkflowVersion();
   const tags = entry.versions.map((version) => version.imageTag);
-  // An image the engine falls back to when a step names none is not this
-  // workspace's to destroy: the daemon is shared by every workspace, and a step
-  // that names no image pins nothing for the scan below to find (#1376). The
-  // row is still the workspace's own, so the delete stays — it stops at the
-  // record, and the handler refuses the image half anyway.
-  const removesImages = tags.length > 0 && isDefaultEngineImageSource(entry.source) === false;
+  // An image the engine falls back to when a step names none pins nothing for
+  // the scan below to find (#1376), so there is nothing to look up for it.
+  const scansPins = tags.length > 0 && isDefaultEngineImageSource(entry.source) === false;
   // `all`, not the default: every version and archived workflows included. The
   // narrow answer would hide exactly the history this delete destroys.
-  const usage = useWorkflowsByImage(tags, open && removesImages, 'all');
+  const usage = useWorkflowsByImage(tags, open && scansPins, 'all');
   const pins = usage.workflows ?? [];
   const blockingLive = pins.filter((pin) => pin.live);
   const historical = pins.filter((pin) => pin.live === false);
 
-  const storedRow = entry.origin === 'catalogued';
   // Until the scan answers, there is nothing to judge — the button waits rather
   // than offering a delete whose blast radius is still unknown. That includes
   // the rescan after an archive: runs may fall back to a version pinning the
@@ -104,21 +93,9 @@ export function DeleteImageEntryDialog({
             <div>
               <Dialog.Title className="text-lg font-semibold">Delete {entry.name}?</Dialog.Title>
               <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-                {removesImages === false ? (
-                  <>
-                    {tags.length === 0
-                      ? 'No image for this entry is on the daemon, so this removes the record and nothing else.'
-                      : 'This is an image the engine falls back to when a step names none, so it stays on the shared daemon — this removes the record alone.'}{' '}
-                    The source can be catalogued again.
-                  </>
-                ) : (
-                  <>
-                    Removes the entry <strong>and</strong> its{' '}
-                    {tags.length === 1 ? 'image' : `${String(tags.length)} images`} from the
-                    deployment&apos;s daemon. The daemon is shared by every workspace, and this
-                    cannot be undone — a deleted image is rebuilt or pulled again, never restored.
-                  </>
-                )}
+                Removes the entry from the catalogue. Its{' '}
+                {tags.length === 1 ? 'image' : tags.length === 0 ? 'images' : `${String(tags.length)} images`}{' '}
+                stay on the daemon, and the source can be catalogued again.
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>
@@ -134,21 +111,6 @@ export function DeleteImageEntryDialog({
           </div>
 
           <div className="space-y-4">
-            {removesImages && (
-              <div className="space-y-1.5">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  {tags.length} version{tags.length === 1 ? '' : 's'} to remove
-                </p>
-                <ul className="max-h-32 divide-y overflow-y-auto rounded-md border bg-muted/20">
-                  {tags.map((tag) => (
-                    <li key={tag} className="break-all px-3 py-1.5 font-mono text-[11px]">
-                      {tag}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
             {usage.error !== null && (
               <p className="text-xs text-destructive">
                 Could not check which workflows use these images: {usage.error.message}
@@ -245,8 +207,7 @@ export function DeleteImageEntryDialog({
                   <span className="text-muted-foreground">
                     also{historical.length === 1 ? 's' : ''} pin{historical.length === 1 ? 's' : ''}{' '}
                     these images. They do not block: a registered version is immutable, so no edit
-                    can move it off the image. Re-running one after this would fail at container
-                    start.
+                    can move it off the image.
                   </span>
                 </p>
                 <ul className="max-h-28 space-y-0.5 overflow-y-auto">
@@ -262,10 +223,6 @@ export function DeleteImageEntryDialog({
             {remove.error !== null && (
               <div className="rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 <p className="break-all">{remove.error.message}</p>
-                <p className="mt-1 text-xs">
-                  Nothing was removed. Docker refuses an image a container is using, or one another
-                  image was built on.
-                </p>
               </div>
             )}
 
@@ -282,7 +239,7 @@ export function DeleteImageEntryDialog({
                 type="button"
                 onClick={() =>
                   remove.mutate(
-                    { id: entry.id, withImages: removesImages },
+                    { id: entry.id },
                     { onSuccess: () => onOpenChange(false) },
                   )
                 }
@@ -290,9 +247,7 @@ export function DeleteImageEntryDialog({
                 className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-50"
               >
                 {remove.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                {removesImages === false
-                  ? 'Delete entry'
-                  : `Delete ${storedRow ? 'entry and ' : ''}${String(tags.length)} image${tags.length === 1 ? '' : 's'}`}
+                Delete entry
               </button>
             </div>
           </div>

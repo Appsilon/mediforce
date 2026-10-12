@@ -531,11 +531,11 @@ function EntryCard({
             >
               {discovered ? 'Describe' : 'Edit'}
             </button>
-            {/* Admin only. Delete takes the entry's images with it, and the
-                daemon is deployment-wide — one tag can back steps in
-                workspaces this reader cannot see. A member can still add an
-                entry; retiring one is an admin's call. */}
-            {canAdmin && (
+            {/* Admin only. Delete removes the catalogue entry, never its
+                images. A member can still add an entry; retiring one is an
+                admin's call. A discovered entry has no stored row, so there is
+                nothing to remove until it is described. */}
+            {canAdmin && discovered === false && (
               <button
                 type="button"
                 onClick={() => setDeleting(true)}
