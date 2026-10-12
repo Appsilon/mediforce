@@ -95,6 +95,7 @@ services:
       args:
         - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
         - NEXT_PUBLIC_GIT_SHA
+        - NEXT_PUBLIC_APP_VERSION=${MEDIFORCE_VERSION:-}
     restart: unless-stopped
     mem_limit: ${PLATFORM_UI_MEM_LIMIT:-2g}
     expose:
@@ -109,6 +110,9 @@ services:
       # (replaces __PLACEHOLDER__ values in pre-built registry images).
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
       - NEXT_PUBLIC_GIT_SHA
+      # The sidebar shows the release version instead of the SHA. Empty (not
+      # unset) on staging, so the placeholder is still replaced.
+      - NEXT_PUBLIC_APP_VERSION=${MEDIFORCE_VERSION:-}
       # --- Authentication: NextAuth / Auth.js v5 (ADR-0002) ---
       # Server-side only. `instrumentation-node.ts` refuses to boot without
       # AUTH_SECRET and without at least one provider (Google / password /

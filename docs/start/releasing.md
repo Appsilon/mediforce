@@ -105,4 +105,5 @@ the hotfix tag sits off `main`. Leave them out of its notes.
 - **Staging runs `main`.** Every push to `main` builds `:latest` and deploys it
   to staging. Production never runs `:latest`: `scripts/deploy.sh` pins
   `MEDIFORCE_VERSION` in the server's `.env`, and `docker-compose.prod.yml` uses
-  it for every Mediforce image.
+  it for every Mediforce image. The sidebar footer shows it (`v1.4.0`); staging shows
+  the commit SHA instead.
