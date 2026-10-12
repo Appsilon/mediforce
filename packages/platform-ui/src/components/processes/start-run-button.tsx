@@ -22,7 +22,7 @@ import { useModelValidation } from '@/hooks/use-model-validation';
 import { runPreflightChecks, findSkippedChecks, type PreflightWarning } from '@/lib/preflight-checks';
 import { ParamField } from '@/components/ui/param-field';
 import { buildTriggerPayload, hasInvalidObjectInput } from '@/lib/trigger-input-payload';
-import { VERIFY_WORKFLOW_URL, stepHasBuildSource, type TriggerInputField } from '@mediforce/platform-core';
+import { VERIFY_WORKFLOW_URL, stepHasBuildSource, type TriggerInputField, type WorkflowDefinition } from '@mediforce/platform-core';
 
 interface StartRunButtonProps {
   workflowName: string;
@@ -118,26 +118,31 @@ export function StartRunButton({
     handle,
     preflightVersion,
   );
+  // What `onBeforeStart` just registered. The definition above was read before
+  // the save — on the new-workflow page there is none — so its input contract is
+  // not the one the run will be validated against.
+  const [savedDefinition, setSavedDefinition] = React.useState<WorkflowDefinition | null>(null);
+  const runDefinition = savedDefinition ?? effectiveDefinition;
   const modelValidation = useModelValidation(effectiveDefinition);
   // Said only when there is something to build: a dry run of a workflow that
   // names ready-made images starts immediately, and a warning about minutes
   // would be false.
-  const buildsItsOwnImage = (effectiveDefinition?.steps ?? []).some((step) => {
+  const buildsItsOwnImage = (runDefinition?.steps ?? []).some((step) => {
     if (step.executor !== 'agent' && step.executor !== 'script') return false;
     const config = step.executor === 'script' ? step.script : step.agent;
-    return stepHasBuildSource(config, effectiveDefinition ?? undefined);
+    return stepHasBuildSource(config, runDefinition ?? undefined);
   });
 
   const hasContext = secretKeysCtx !== null;
   const uid = user?.id;
 
-  const triggerInput: TriggerInputField[] = effectiveDefinition?.triggerInput ?? [];
+  const triggerInput: TriggerInputField[] = runDefinition?.triggerInput ?? [];
   const hasTriggerInput = triggerInput.length > 0;
 
   const [inputValues, setInputValues] = React.useState<Record<string, unknown>>({});
 
   React.useEffect(() => {
-    const fields = effectiveDefinition?.triggerInput ?? [];
+    const fields = runDefinition?.triggerInput ?? [];
     const initial: Record<string, unknown> = {};
     for (const field of fields) {
       if (field.default !== undefined) {
@@ -151,7 +156,7 @@ export function StartRunButton({
       }
     }
     setInputValues(initial);
-  }, [effectiveDefinition]);
+  }, [runDefinition]);
 
   React.useEffect(() => {
     if (hasContext) {
@@ -229,7 +234,7 @@ export function StartRunButton({
   // new-workflow page, where `onBeforeStart` may have saved elsewhere.
   const savedNamespaceRef = React.useRef<string | null>(null);
 
-  async function executeStart(v?: number, dryRun?: boolean) {
+  async function executeStart(v?: number, dryRun?: boolean, fields: TriggerInputField[] = triggerInput) {
     const targetVersion = v ?? effectiveVersion;
     const startNamespace = savedNamespaceRef.current ?? handle;
     if (!user || targetVersion === null || targetVersion === 0) return;
@@ -239,7 +244,7 @@ export function StartRunButton({
     setDropdownOpen(false);
     setDialogOpen(false);
 
-    const payload = hasTriggerInput ? buildTriggerPayload(triggerInput, inputValues) : undefined;
+    const payload = fields.length > 0 ? buildTriggerPayload(fields, inputValues) : undefined;
 
     try {
       const result = await startMutation.mutateAsync({
@@ -275,28 +280,36 @@ export function StartRunButton({
 
   async function handleStart(v?: number) {
     let targetVersion = v;
+    let fields = triggerInput;
     if (onBeforeStart) {
       setRunningBeforeStart(true);
       setError(null);
       try {
         const saved = await onBeforeStart();
-        targetVersion = saved?.version;
-        savedNamespaceRef.current = saved?.namespace ?? null;
+        if (saved === undefined) return;
+        targetVersion = saved.version;
+        savedNamespaceRef.current = saved.namespace;
+        const { definition } = await mediforce.workflows.get({
+          name: workflowName,
+          namespace: saved.namespace,
+          version: saved.version,
+        });
+        setSavedDefinition(definition);
+        fields = definition.triggerInput ?? [];
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to save before starting');
-        setRunningBeforeStart(false);
+        setError(err instanceof Error ? err.message : 'Failed to prepare the run after saving');
         return;
+      } finally {
+        setRunningBeforeStart(false);
       }
-      setRunningBeforeStart(false);
-      if (targetVersion === undefined) return;
     }
 
     const versionChanged = targetVersion !== undefined && targetVersion !== effectiveVersion;
-    if (hasTriggerInput || hasWarnings || (versionChanged && !onBeforeStart)) {
+    if (fields.length > 0 || hasWarnings || (versionChanged && !onBeforeStart)) {
       setPendingVersion(targetVersion);
       setDialogOpen(true);
     } else {
-      executeStart(targetVersion, mode === 'dry-run');
+      executeStart(targetVersion, mode === 'dry-run', fields);
     }
   }
 

@@ -949,6 +949,51 @@ test.describe('Workflow Editor Journey', () => {
     await expect(page.getByText('Run not found.')).toHaveCount(0);
   });
 
+  test('Save & Dry Run asks for the run input the saved version declares', async ({ page }) => {
+    trackPageErrors(page);
+    // The input contract reaches the registration the way a pasted definition's
+    // `triggerInput` does; the canvas has no other surface for it on this page.
+    await page.route(
+      (url) => url.pathname === '/api/workflow-definitions',
+      async (route) => {
+        if (route.request().method() !== 'POST') {
+          await route.fallback();
+          return;
+        }
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        await route.continue({
+          postData: JSON.stringify({
+            ...body,
+            triggerInput: [{ name: 'studyId', type: 'string', required: true }],
+          }),
+        });
+      },
+    );
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+
+    const stamp = String(Date.now());
+    const unique = `e2e-input-dry-${stamp}`;
+    await page.getByPlaceholder('Add a Workflow Name…').fill(unique);
+    await page.getByPlaceholder('Add a workflow description…').fill('Save and Dry Run with input');
+
+    await page.getByRole('button', { name: 'Add Block', exact: true }).click();
+    await (await executorButton(page, 'human')).click();
+
+    await page.getByRole('button', { name: /save & dry run/i }).click();
+    await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('v1');
+    await page.getByRole('button', { name: /publish workflow/i }).click();
+
+    // The page had no definition before the save, so the run input has to come
+    // from the version the save just registered — starting without it is a 400.
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('Run input')).toBeVisible({ timeout: 15_000 });
+    await dialog.locator('input[type="text"]').fill('STUDY-1');
+    await dialog.getByRole('button', { name: 'Dry Run', exact: true }).click();
+
+    await page.waitForURL(new RegExp(`/${TEST_ORG_HANDLE}/workflows/${unique}/runs/`), { timeout: 30_000 });
+  });
+
   test('new workflow save blocked when workflow name slugifies to empty', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
