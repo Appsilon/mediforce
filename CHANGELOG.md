@@ -6,6 +6,62 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-12
+
+<!-- release-draft
+Write this release for the people who use and run Mediforce, following
+skills/add-changelog-entry/SKILL.md, then delete this comment.
+The release refuses to publish while it is here.
+
+Merged since the last release:
+#889 chore(deps): update codemirror
+#1197 chore(deps): update dependency tsx to v4.23.15
+#1228 fix(deps): update dependency bullmq to v6
+#1229 fix(deps): update dependency ioredis to v6
+#1238 chore(deps): update dependency @xyflow/react to v12.12.0
+#1260 chore(deps): update dependency fast-xml-parser to v5.11.2
+#1319 chore(deps): update dependency @vitejs/plugin-react to v6.1.1
+#1334 chore(deps): update dependency @testing-library/user-event to v14.6.7
+#1343 chore(deps): update dependency lucide-react to v1.52.0
+#1360 feat(visibility): preview repo files in the Git tab
+#1403 feat: Step Evaluation 1a — outputSchema, Agent Trajectory, Score
+#1450 fix(step-eval): no estimate error when the step has no Dataset
+#1451 fix(deps): bump next to 16.3.6 for GHSA-vcvr-r3jv-pc5j
+#1452 fix(step-eval): show the share of model verdicts a person denied
+#1453 feat(agents): MCP binding on agent forms, discovered tool picker, focused tool forms
+#1454 feat(tool-catalog): check whether an image provides an MCP server's command
+#1455 feat(ui): move Models to a top-level sidebar tab and /models route
+#1456 feat(workflow-editor): warn when a step's image lacks a bound MCP server's command
+#1457 feat(ui): show MCP tools on agent cards, drop configure-page intro
+#1464 docs(adr): ADR-0025 skill catalog and the Skill concept
+#1467 fix(deps): override vulnerable transitive packages to patched versions
+#1468 fix(agent-runtime): seed /output/input.json for OpenCode agent steps
+#1470 fix(agent-runtime): give container agents the /data path of uploaded files
+#1474 fix(models): drop stored :batch variants from the model registry
+#1475 feat(models): default to the newest Claude Sonnet
+#1476 feat(agent-runtime): wait for slow stdio MCP servers before the agent starts
+#1478 feat(agent-runtime): OpenCode agent parity with Claude Code (MCP, allowlist, skills, run warnings)
+#1479 feat(evaluation): drop Evaluator severity — every Evaluator meets one floor
+#1480 fix(platform-ui): scope agents page to the workspace in the URL
+#1482 feat(website): add Google Tag Manager to the landing site and docs
+#1483 feat: MCP page with stdio + HTTP servers in the workspace catalog
+#1484 chore: update Unreleased CHANGELOG
+#1486 feat(website): replace Discord with a Talk to Our Experts page
+#1487 fix: make pnpm test:affected compare against the merge base with origin/main
+#1488 fix(agent-runtime): give script steps the files a file-upload step uploaded
+#1489 fix(agent-runtime): default opencode-agent steps to the shared Sonnet model
+#1490 chore(deps): update dependency @hono/node-server to v2.1.3
+#1491 refactor(platform-ui): share folder-upload reader and text-files pane
+#1492 feat(images): read an image's source files at its build commit
+#1494 chore(deps): update dependency @types/nodemailer to v8.0.2 - autoclosed
+#1495 chore(deps): update dependency @vitejs/plugin-react to v6.1.2
+#1497 fix(ui): images tab Delete removes only the catalogue entry
+#1498 fix(ui): read run input from the saved version on Save & Run
+#1499 chore(deps): update dependency drizzle-kit to v0.31.11
+#1500 chore(deps): update dependency drizzle-orm to v0.45.3
+#1502 ci(release): one-run, one-merge releases that deploy production
+-->
+
 ### Added
 
 - **Step Evaluation:** Check that an agent step can be trusted before you rely on it. The Evaluation tab lets you write rules for a step's output, build test cases, run the step against them many times and read the report, with an Evaluation Assistant to help at each stage ([#1403](https://github.com/Appsilon/mediforce/pull/1403), [#1406](https://github.com/Appsilon/mediforce/pull/1406), [#1407](https://github.com/Appsilon/mediforce/pull/1407), [#1408](https://github.com/Appsilon/mediforce/pull/1408), [#1415](https://github.com/Appsilon/mediforce/pull/1415), [#1442](https://github.com/Appsilon/mediforce/pull/1442), [#1450](https://github.com/Appsilon/mediforce/pull/1450), [#1452](https://github.com/Appsilon/mediforce/pull/1452)).
