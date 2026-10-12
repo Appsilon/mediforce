@@ -94,19 +94,20 @@ pnpm test:e2e:ui            # Playwright UI mode (from the repo root this
 
 ## Branches
 
-Two branches are permanent: `main` (default, deploys to staging via
-`deploy-staging.yml`) and `production` (live deploy target — `deploy-production.yml`
-triggers on every push to it). Everything else on `origin` is temporary.
+One branch is permanent: `main` (default, deploys to staging via
+`deploy-staging.yml`). Production runs a released version, not a branch; see
+[releasing.md](releasing.md). Everything else on `origin` is temporary.
 
 Work branches are named `<type>/<slug>`, e.g. `feat/cron-trigger-management`,
 `fix/1158-agent-time-budget-overhead`. Bots own their own prefix: `renovate/*`
-(Renovate recreates and drops these itself).
+(Renovate recreates and drops these itself) and `release/v*` (the Release
+workflow opens one per release PR).
 
 **Retention rule:**
 
 | Branch | Kept |
 |--------|------|
-| `main`, `production` | Always |
+| `main` | Always |
 | Open PR | Until the PR closes |
 | Merged PR | Deleted on merge — by GitHub's *Automatically delete head branches* repo setting, which must stay enabled |
 | Closed (unmerged) PR, or no PR, and no commit for 60 days | Deleted in the periodic sweep |

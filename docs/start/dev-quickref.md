@@ -9,6 +9,7 @@ last_reviewed: 2026-08-19
 Terse command-first lookup for agents and devs. Zero-to-running setup:
 [GETTING-STARTED.md](../../GETTING-STARTED.md). Deeper guides:
 [development.md](development.md) (env vars, branches, deployment),
+[releasing.md](releasing.md) (cutting a release, rolling back),
 [postgres-local-dev.md](postgres-local-dev.md) (migrations, DB internals).
 
 ## Which dev command?

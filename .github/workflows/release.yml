@@ -1,36 +1,159 @@
 name: Release
 
-on:
-  push:
-    tags: ['v*.*.*']
+# A release is one run and one merge. Run this workflow from the Actions tab: it
+# opens a release PR with the version bump and a drafted CHANGELOG section.
+# Rewrite the section for users and merge the PR. Merging tags the release,
+# publishes it on GitHub, builds that version's images and deploys them to
+# production. See docs/start/releasing.md.
 
-permissions:
-  contents: write
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'auto: major for a breaking PR title (feat!:), minor for any feat, patch otherwise'
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [main]
 
 jobs:
-  release:
+  prepare:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
 
-      - name: Publish the version's CHANGELOG section as the release
+      - name: Bump the version and open its CHANGELOG section
+        id: version
         env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          BUMP: ${{ inputs.bump }}
+        run: echo "version=$(python3 scripts/release.py prepare --bump "$BUMP")" >> "$GITHUB_OUTPUT"
+
+      - name: Draft the release notes
+        # The draft only saves typing. Without it the section keeps the list of
+        # merged PRs, and a person writes the notes in the release PR.
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            CHANGELOG.md has a draft section for version ${{ steps.version.outputs.version }}.
+            Its release-draft comment lists the PRs merged since the last release.
+            Write that section by following steps 2 and 3 of skills/add-changelog-entry/SKILL.md,
+            then delete the release-draft comment. Change nothing else in the repository.
+          claude_args: '--allowedTools "Read,Edit,Bash(gh pr view:*)"'
+
+      - name: Open the release PR
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          version="${TAG#v}"
-          awk -v v="$version" '
-            $0 ~ "^## \\[" v "\\]" { on = 1; next }
-            on && /^## \[/ { exit }
-            on { print }
-          ' CHANGELOG.md > notes.md
-          if ! grep -q '[^[:space:]]' notes.md; then
-            echo "::error::CHANGELOG.md has no '## [$version]' section. Write it in the release PR, then tag."
+          branch="release/v$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add package.json CHANGELOG.md
+          git commit -m "chore(release): v$VERSION"
+          git push origin "$branch"
+          cat > body.md <<EOF
+          Releases **v$VERSION**.
+
+          1. Read the \`[$VERSION]\` section of \`CHANGELOG.md\` as someone who uses Mediforce: what changed and why it matters to them, in as few words as possible. Fix it in this PR. If the release-draft comment is still there, write the notes and delete it.
+          2. Merge. Merging tags \`v$VERSION\`, publishes the GitHub release, builds the \`$VERSION\` images and deploys them to production.
+
+          Wrong version? Close this PR, delete the \`$branch\` branch and run the Release workflow again with the bump you want.
+          EOF
+          gh pr create --base main --head "$branch" --title "chore(release): v$VERSION" --body-file body.md
+
+  # Marks the release PR red while its notes are a draft. Bot-opened PRs start
+  # no workflows, so this first runs on the first push a person makes to it.
+  check:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action != 'closed' &&
+      startsWith(github.event.pull_request.head.ref, 'release/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Release notes are written
+        run: python3 scripts/release.py notes "$(jq -r .version package.json)"
+
+  publish:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'release/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      sha: ${{ github.event.pull_request.merge_commit_sha }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Read the version
+        id: version
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          version=$(jq -r .version package.json)
+          if [ "$BRANCH" != "release/v$version" ]; then
+            echo "::error::Branch $BRANCH does not match package.json version $version."
             exit 1
           fi
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "$TAG" --notes-file notes.md
-          else
-            gh release create "$TAG" --title "$TAG" --notes-file notes.md --verify-tag
-          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Tag and publish the GitHub release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          python3 scripts/release.py notes "$VERSION" > notes.md
+          gh release create "v$VERSION" --target "$SHA" --title "v$VERSION" --notes-file notes.md
+
+      # A release made with this workflow's token raises no `release` event, so
+      # the News page that lists releases is rebuilt explicitly.
+      - name: Rebuild the News page
+        run: gh workflow run pages.yml --ref main
+
+  build:
+    needs: publish
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-images.yml
+    with:
+      sha: ${{ needs.publish.outputs.sha }}
+      version: ${{ needs.publish.outputs.version }}
+
+  deploy:
+    needs: [publish, build]
+    uses: ./.github/workflows/deploy-production.yml
+    with:
+      version: ${{ needs.publish.outputs.version }}
+    secrets: inherit

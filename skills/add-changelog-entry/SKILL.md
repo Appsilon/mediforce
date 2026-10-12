@@ -1,11 +1,11 @@
 ---
 name: add-changelog-entry
-description: Draft the CHANGELOG.md section for a Mediforce release from the PRs merged since the last tag. Developer-triggered only, at release time, via /add-changelog-entry <version>. Never run it on your own initiative.
+description: Draft the CHANGELOG.md section for a Mediforce release from the PRs merged since the last tag. The Release workflow follows it to draft the release PR; a developer can run it via /add-changelog-entry <version>. Never run it on your own initiative.
 disable-model-invocation: true
 allowed-tools: Bash, Read, Edit
 metadata:
   author: Mediforce
-  version: "3.0"
+  version: "4.0"
   domain: development
   complexity: basic
   tags: changelog, keep-a-changelog, release
@@ -13,9 +13,9 @@ metadata:
 
 # Add Changelog Entry
 
-The changelog is human-driven. A developer runs this when cutting a release, reads the draft, and rewrites whatever doesn't sound right. The developer owns the result, not the skill.
+The changelog is human-driven. The [Release workflow](../../.github/workflows/release.yml) follows steps 2 and 3 to draft a version's section in the release PR; a developer reads the draft there and rewrites whatever doesn't sound right. The developer owns the result, not the skill.
 
-`CHANGELOG.md` holds released versions, newest first, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) form. `## [Unreleased]` sits on top and stays empty unless a developer jots something there by hand. Nothing fills it automatically, and there is no per-PR entry. Pushing a `vX.Y.Z` tag makes [`release.yml`](../../.github/workflows/release.yml) publish that version's section as the GitHub release, word for word.
+`CHANGELOG.md` holds released versions, newest first, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) form. `## [Unreleased]` sits on top and stays empty unless a developer jots something there by hand. Nothing fills it automatically, and there is no per-PR entry. Merging the release PR publishes that version's section as the GitHub release, word for word.
 
 ## Usage
 
@@ -28,7 +28,7 @@ The changelog is human-driven. A developer runs this when cutting a release, rea
 ### 1. Find what shipped
 
 ```bash
-previous=$(git describe --tags --abbrev=0 origin/main)
+previous=$(git tag --list 'v*.*.*' --sort=-v:refname | head -1)
 since=$(git log -1 --format=%cI "$previous")
 gh pr list --state merged --base main --search "merged:>$since" --limit 200 \
   --json number,title,body,labels
@@ -40,7 +40,7 @@ Someone using Mediforce, or running it, must be able to notice the change. Leave
 
 ### 3. Write the section
 
-Insert it directly below `## [Unreleased]`, above the previous version. Fold in any bullets a developer left under `[Unreleased]`, then leave that heading empty. Categories appear in this order and only when they have entries: Added, Changed, Deprecated, Removed, Fixed, Security.
+Insert it directly below `## [Unreleased]`, above the previous version. In a release PR the section already exists with a `release-draft` comment listing the PRs: write the section there and delete the comment. Fold in any bullets a developer left under `[Unreleased]`, then leave that heading empty. Categories appear in this order and only when they have entries: Added, Changed, Deprecated, Removed, Fixed, Security.
 
 ```markdown
 ## [1.3.0] - 2026-10-12
@@ -74,8 +74,4 @@ Show the developer the section. Don't commit, push or tag unless they ask.
 
 ## Releasing
 
-1. In one release PR, bump `version` in the root `package.json` and add the section.
-2. Merge it.
-3. Tag the merge commit: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-
-A tag without a matching section fails the release job, so the notes can't be skipped.
+Don't tag by hand. Run the Release workflow and merge its PR; see [`docs/start/releasing.md`](../../docs/start/releasing.md). The release refuses to publish while the section is empty or still holds the `release-draft` comment, so the notes can't be skipped.

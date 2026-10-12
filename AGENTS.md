@@ -119,12 +119,12 @@ understand → simplify → write test (RED) → implement (GREEN) → self-revi
    `AskUserQuestion` tool — write a/b/c/... in plain text.
 
 10. **Changelogs are human-driven. Don't touch `CHANGELOG.md`.** It holds
-   released versions, written by a developer in the release PR, and a
-   `vX.Y.Z` tag publishes that section as the GitHub release. `## [Unreleased]`
-   stays empty unless a developer writes in it by hand. Feature PRs add no
-   entry, and no agent, hook or workflow ever fills it. Never run
-   `/add-changelog-entry` yourself: a developer invokes it at release time to
-   draft the section, then edits and owns it.
+   released versions. The Release workflow drafts a version's section in the
+   release PR, a developer rewrites and owns it, and merging publishes it as
+   the GitHub release ([`docs/start/releasing.md`](docs/start/releasing.md)).
+   `## [Unreleased]` stays empty unless a developer writes in it by hand.
+   Feature PRs add no entry, and nothing else ever fills it. Never run
+   `/add-changelog-entry` yourself: only a developer invokes it.
 
 11. **Sync the docs via `/sync-docs`.** Before reporting done, run it — with no
     arguments it checks what *this session* changed and what that made untrue,
