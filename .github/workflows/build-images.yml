@@ -22,8 +22,8 @@ on:
         required: true
 
 # Main builds cancel each other; a release build is never cancelled. A release
-# build only reads the layer cache: it starts with the push to main that merged
-# its PR, and two builds exporting the same cache scope fail to reserve it.
+# build only reads the layer cache: release.yml calls it from a merged PR's
+# `closed` event, which can't write the cache ('failed to reserve cache').
 concurrency:
   group: build-images-${{ inputs.version || 'latest' }}
   cancel-in-progress: ${{ !inputs.version }}
