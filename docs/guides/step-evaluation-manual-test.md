@@ -1,7 +1,7 @@
 ---
 status: living
 audience: engineers
-last_reviewed: 2026-09-30
+last_reviewed: 2026-10-12
 ---
 
 # Step Evaluation — manual test guide
@@ -23,8 +23,8 @@ Legend: ✅ expected · 🔍 try to break it · 🧪 in the sandbox workflow
 
 1. Start the full stack with **`pnpm dev`** (port 9003). `pnpm dev:mock` is only good for a UI
    smoke pass — its agent always returns the same output and its OpenRouter is fake.
-2. The workspace needs an **`OPENROUTER_API_KEY` workspace secret** (assistant, LLM judges and
-   optimisation spend it). In the assistant's ⚙ settings pick **`anthropic/claude-haiku-4.5`** —
+2. The workspace needs an **`OPENROUTER_API_KEY` workspace secret** (the assistant and LLM judges
+   spend it). In the assistant's ⚙ settings pick **`anthropic/claude-haiku-4.5`** —
    ~3× cheaper per turn than the default Sonnet 4.
 3. Two users: one with **edit + run** on the workflow, one **view-only**.
 4. A terminal with `pnpm exec mediforce` and `MEDIFORCE_API_KEY` exported — a few features are
@@ -58,10 +58,10 @@ Prepare Case (script)  →  Grade Adverse Event (agent, CM3 review)  →  Done
   plus confidence. A reviewer then **Approves** or **Requests changes**.
 
 Each part exists to exercise a feature: the output schema → schema checks; CM3 review → human
-Scores and cases from approved runs; narrative in the step input → synthetic / red-team cases;
+Scores and cases from approved runs; narrative in the step input → synthesized cases;
 labs in a workspace file → file-perturbation cases and code checks; MCP server → eval MCP policy
 (deny / live / replay); agent confidence → routing recommendation; a cheap model → mistakes worth
-fixing, with Haiku 4.5 as a natural challenger.
+looking at in a diagnosis.
 
 All sandbox files live in [`step-evaluation-sandbox/`](step-evaluation-sandbox/):
 `workflow.json`, `agent.json`, `ctcae_mcp.py` (the MCP server), `setup.py` and
@@ -96,28 +96,32 @@ done
 | 16-no-adverse-event | No valid output: nothing to grade | Negative case |
 
 **Before you start:** run 01–09 and **Approve** each review (≈ $0.10). Gemma 4 gets all nine
-right (checked on 2026-09-29), so they are your **good** cases. Your **bad**
+right (checked on 2026-09-29), so they are your **positive** cases. Your **negative**
 cases come from 13, 15 and 16 — see §4.1.
 
-**Checks used throughout** (Evaluators → *Add*: name, rule, check JSON):
 
-- **`grading-fields`** · critical · `schema` · *"The result carries a grade, Hy's Law and seriousness"*
+**Checks used throughout** (Evaluators → *Add*: pick the kind, name and rule; the JSON is the
+check as the Details view shows it):
+
+- **`grading-fields`** · `schema` · *"The result carries a grade, Hy's Law and seriousness"*
   ```json
   {"kind":"schema","schema":{"required":["ctcaeTerm","ctcaeGrade","serious","hysLawCandidate"],"properties":{"ctcaeGrade":{"type":"integer"},"serious":{"type":"boolean"},"hysLawCandidate":{"type":"boolean"}}}}
   ```
-- **`hys-law-consistent`** · critical · `code` · *"hysLawCandidate matches the labs: ALT or AST > 3×ULN, bilirubin > 2×ULN, ALP < 2×ULN"*
+- **`hys-law-consistent`** · `code` · *"hysLawCandidate matches the labs: ALT or AST > 3×ULN, bilirubin > 2×ULN, ALP < 2×ULN"*
   (converts bilirubin from µmol/L, as in sample 10)
   ```json
   {"kind":"code","runtime":"python","source":"import json\nd = json.load(open('/output/input.json'))\nr = d['result']\nuln = {'ALT': 56, 'AST': 40, 'BILIRUBIN': 1.2, 'ALP': 147}\nlabs = {lab['analyte']: lab['value'] / (17.1 if 'mol' in lab['unit'] else 1) for lab in json.load(open('/workspace/case/labs.json'))['labs']}\nx = lambda a: labs.get(a, 0) / uln[a]\nexpected = max(x('ALT'), x('AST')) > 3 and x('BILIRUBIN') > 2 and x('ALP') < 2\nok = r.get('hysLawCandidate') == expected\njson.dump({'passed': ok, 'comment': f\"expected hysLawCandidate={expected}, got {r.get('hysLawCandidate')}\"}, open('/output/result.json', 'w'))"}
   ```
-- **`safety-report-consistent`** · major · `code` · *"A safety report is filed exactly when the event is serious and grade ≥ 3"*
+- **`safety-report-consistent`** · `code` · *"A safety report is filed exactly when the event is serious and grade ≥ 3"*
   ```json
   {"kind":"code","runtime":"python","source":"import json\nr = json.load(open('/output/input.json'))['result']\nneed = r.get('serious') is True and (r.get('ctcaeGrade') or 0) >= 3\nhas = bool(r.get('safetyReportId'))\njson.dump({'passed': need == has, 'comment': f\"serious={r.get('serious')} grade={r.get('ctcaeGrade')} report={r.get('safetyReportId')}\"}, open('/output/result.json', 'w'))"}
   ```
-- **`grade-justified`** · major · `llm_judge` · *"The grade follows from the labs and narrative, not from the investigator's wording"*
+- **`grade-justified`** · `llm_judge` · *"The grade follows from the labs and narrative, not from the investigator's wording"*
   ```json
-  {"kind":"llm_judge","model":"anthropic/claude-haiku-4.5","rubric":"Pass only if the CTCAE grade is supported by the objective evidence (lab multiples of ULN, hospitalisation, ADL impact) and the rationale names the matching CTCAE grade definition. Fail if the grade follows the investigator's wording against the labs, or if the rationale is generic.","choices":[{"label":"pass","value":1},{"label":"fail","value":0}]}
+  {"kind":"llm_judge","model":"anthropic/claude-haiku-4.5","rubric":"Pass only if the CTCAE grade is supported by the objective evidence (lab multiples of ULN, hospitalisation, ADL impact) and the rationale names the matching CTCAE grade definition. Fail if the grade follows the investigator's wording against the labs, or if the rationale is generic.","minConfidence":0.8}
   ```
+
+Legend: ✅ expected · 🔍 try to break it · 🧪 in the sandbox workflow
 
 ---
 
@@ -127,37 +131,36 @@ Top to bottom, left column; the **Evaluation Assistant** is the right-hand panel
 
 | Section | What it is for |
 |---|---|
-| Drift banner | Amber warning when production quality drops (only shown when drifting) |
-| Step Qualification | Signed statement that this step version meets its pass bar; *Qualified* / *Stale* |
-| Evaluation Brief | Plain text: what the step is for, who relies on it, which mistakes hurt |
-| Acceptance Criteria | The pass bar per severity (critical / major / minor) |
-| Evaluators | The checks that grade an output (schema / code / LLM judge / built-in) |
+| Drift banner | Amber warning when production quality drops (only shown while an Evaluator drifts) |
+| Validation status | **Validation passed** / **failed** / **Not verified**, read from the newest finished Eval Run; click for the signed Step Qualification |
+| Set the threshold | The Acceptance Criteria floor, one slider |
+| Evaluators | The checks that grade an output (schema / code / LLM judge / expected output) |
 | Eval Cases | Test inputs, frozen into numbered Datasets |
-| MCP servers in eval trials | Whether the agent's external tools are denied, live, or replayed during evaluation |
-| Eval Runs | Run the step on a Dataset, read the report, compare challengers, sign, apply fixes |
-| Optimisations | Automatic prompt improvement (GEPA), proven on holdout cases |
+| Eval Runs | Run the step on a Dataset, read the report, sign |
 
-The natural order to walk through is **Brief → Evaluators → Cases → MCP → Eval Run → Report →
-Criteria → Qualification → Fix → Optimise → Production**, which is the order below.
+The Evaluation Brief is behind the file icon in the assistant's header. The natural order is
+**Evaluators → Cases → MCP → Eval Run → Report → Criteria → Qualification → Production**, which is
+the order below.
 
-**Permissions (test once for the whole tab).** 🔍 As the **view-only** user: no *Write / Add /
-Approve source / Freeze / Set / Prepare / Start / Sign / Optimise* controls; assistant card
-*Accept* buttons are disabled with a tooltip.
+**Permissions (test once for the whole tab).** 🔍 As the **view-only** user: no *Add / Edit /
+Approve source / Save / Set the threshold / Start / Approve step configuration* controls; assistant
+card *Accept* buttons are disabled with a tooltip.
 
 ---
 
 ## 2. Evaluation Brief
 
 **What.** A short, versioned description of the step's purpose and the mistakes that matter. The
-assistant reads it to plan checks, and a Qualification records which Brief version it was signed
-against.
+assistant reads it on every turn. Nothing requires it: an Eval Run and a Qualification do not cite it.
 
-**How.** *Write* → text → *Save as v1*. Editing saves a new version.
+**How.** The file icon in the assistant's header (it carries a dot once a Brief exists) → write →
+save. Every save is a new version. **CLI** `mediforce eval brief-get|brief-set`.
 
 **Test**
-- ✅ After two saves: `v2 · written by <you>`.
-- ✅ Assistant: *"Draft a brief"* → a **Proposed Brief** card; *Reject* leaves the section unchanged,
+- ✅ The dot appears after the first save; the text renders as Markdown.
+- ✅ Assistant: *"Draft a brief"* → a **Proposed Brief** card; *Reject* leaves it unchanged,
   *Accept* saves a new version.
+- ✅ Start an Eval Run and sign a Qualification without any Brief → both work.
 
 > 🧪 *"Grades clinical-trial adverse events by CTCAE v5.0 for the safety physician's review. Wrong
 > grades of 3+ and missed Hy's Law cases are critical: they delay expedited reporting. Patient
@@ -165,118 +168,97 @@ against.
 
 ## 3. Evaluators
 
-**What.** The checks that decide pass/fail on one output, each with a **severity** and a
-plain-language **rule**:
+**What.** The checks that decide pass/fail on one output, each with a plain-language **rule**:
 - `schema` — JSON Schema on the result;
 - `code` — a small Python/JS script reading `/output/input.json` (and the run workspace), writing
   `{passed, comment}`;
-- `llm_judge` — a model grading against a rubric;
-- `builtin` — ready-made red-team checks: `injection_ignored`, `result_stable` (same answer on
-  cosmetically changed input, optional `keys`), `phi_leak`.
+- `llm_judge` — a model grading against a rubric, answering pass/fail with a confidence;
+- `expected_output` — the output compared with the case's expected output: exact, or an agreement score.
 
-A **trust gate** decides whether a check **Counts** in reports: schema and builtin count
-immediately; code counts after a human clicks *Approve source*; an LLM judge counts only after
-**calibration** against human labels.
+**Counts.** `schema`, `llm_judge` and `expected_output` count at once; `code` counts after a person
+clicks *Approve source*. An `llm_judge` verdict below its minimum confidence is left out of the
+pass rate until a person accepts it (§6.1).
 
-**How.** *Add* → name, severity, rule, check JSON. *Archive* removes one. Editing via the
-assistant creates a new version (v2…).
+**How.** **Evaluators → Add** → kind, name, rule, and the kind's fields. **Details** shows the
+whole check and its versions; **Edit** saves a new version. *Archive* removes one.
 
 **Test**
 - ✅ schema → **Counts** immediately.
 - ✅ code → *Not counted — …* + **Approve source**; expand *Source*, approve → **Counts**.
-- ✅ llm_judge → *Not counted — needs calibration*.
+- ✅ llm_judge → **Counts**; the minimum confidence defaults to 0.8.
 - ✅ *Archive* → disappears from the list.
-- 🔍 Invalid JSON in the check box → "The check is not valid JSON."
+- 🔍 `expected_output` cannot be previewed (a production output has no expected output) and
+  *Also run in production* is refused for it.
 
-### 3.1 Evaluators from the assistant (self-tested)
+### 3.1 Evaluators from the assistant (previewed)
 
-**What.** The assistant can propose checks — each one is **self-tested on recent real outputs**
-before you see it, so the card shows how many passed / failed / errored.
+**What.** The assistant proposes checks; each one is **tried on recent real outputs** (up to 5)
+before you see it, so the card shows how many passed / failed / errored. A check that errors on
+every output goes back to the assistant instead of to you.
 
 **Test**
-- *"What should I check on this step?"* → ✅ progress lines ("Reading the step", "Previewing a
-  check on real runs"…), then **Proposed Evaluator** cards with a self-test summary.
+- *"Make an evaluation plan for this step"* → ✅ progress lines ("Reading the step", "Previewing a
+  check on real runs"…), then a **plan card**: risks highest first, each with a cheapest check.
+  *Draft this check* → an **Evaluator** card with the preview summary; *Use as Acceptance Criteria*
+  sets the suggested floor.
 - *Accept* → ✅ listed with `· from the assistant`. *Edit* the JSON, then *Accept* → ✅ your edited
   version is saved.
 - *"Refine the <name> evaluator"* → ✅ **Proposed Evaluator version** card; accepting bumps to v2.
-- *"Add a phi_leak check and an injection check"* → ✅ `builtin` cards; accepted ones **Count**.
+- 🔍 As a user without the `run` verb: the card says the check was not tried.
 
-### 3.2 Calibrating an LLM judge (labelling)
-
-**What.** You grade real outputs yourself; the judge is compared to you (agreement and Cohen's κ).
-It counts once it agrees with you enough (≥ 80%). Your labels can also become Eval Cases.
-
-**How.** Assistant: *"Help me calibrate the <judge> evaluator"* → a **labelling card** listing real
-outputs with pass/fail buttons and an optional "Why". Label **≥ 10, with ≥ 2 fails** → *Calibrate*.
-
-**Test**
-- ✅ `agreement 0.xx · κ 0.xx on N labels — counts` (or `— not counted: <reason>`). When it counts,
-  the badge in Evaluators turns **Counts**.
-- ✅ On disagreement: "Disagrees with you on <ids>" → *Refine the rule* → *Save as v2* → recalibrate.
-- ✅ *Add labelled outputs as Eval Cases* → "N Eval Case(s) added" (+ skipped with reasons).
-- 🔍 Label the same output twice differently — only the latest label counts.
-
-> 🧪 Add the four checks from §0: `grading-fields` → *Counts*; approve the source of the two code
-> checks → *Counts*; `grade-justified` → *needs calibration*. Calibrate `grade-justified` on your
-> ~11 production runs using the samples table (wrong grade = fail). If Gemma got everything right,
-> label the weakest rationales (generic "meets criteria") as fail with a reason. Ask for
-> `injection_ignored`, `phi_leak` and `result_stable` with
-> `"keys":["ctcaeTerm","ctcaeGrade","serious","hysLawCandidate"]` (wording may change, grading must not).
+> 🧪 Add the four checks above: `grading-fields` → *Counts*; approve the source of the two code
+> checks → *Counts*; `grade-justified` → *Counts*. Ask the assistant for a rule such as *"no
+> patient name, MRN or date of birth in the output"* → expect a `code` check (a judge only when a
+> script cannot decide it), previewed on sample 08's run.
 
 ## 4. Eval Cases and Datasets
 
-**What.** A case is one test input, tagged `positive` (good output) or `negative` (bad output), a
-**split** — `dev` (used to build and tune) or `holdout` (only used to prove, never shown to
-optimisers or used as few-shot examples) — and a **source** (`production`, `synthesized (…)`).
-**Freeze dataset** snapshots all current cases as a numbered Dataset so every Eval Run on it uses
-exactly the same examples.
+**What.** A case is one input the step is re-run on, a **split** — `dev` or `holdout` — a
+**source** (`production`, `manual`, `synthesized (…)`), and optionally an **expected output**
+with an expectation (`positive`: the output must match; `negative`: it must not) and a
+comparison (`exact` or `agreement`). **Save** (`dataset-freeze`) snapshots the live cases as a
+numbered Dataset; an Eval Run uses exactly that version.
 
-**How** — ways to get cases:
-- **From production:** expand *Recent production runs* → *Add as good* / *Add as bad* (always `dev`).
-- **Synthetic:** assistant — *"Synthesize a harder case from a recent run"*: it changes the input or
-  a workspace file of a real run.
-- **From labels:** see §3.2.
-- **Red-team / robustness suites (CLI):** generate a batch of adversarial variants of one run:
-  `pnpm exec mediforce eval case-red-team --namespace <ws> --workflow <wf> --step <step> --run <agentRunId> --suite prompt_injection|robustness --target <part>.<path>`
-- **Holdout (CLI or assistant):** `pnpm exec mediforce eval case-from-run <agentRunId> --split holdout`,
-  or *"add these runs as holdout cases"*.
+**How** — **Eval Cases → Add case** starts from:
+- **A production run** — *Start from* lists finished runs newest first (**Load more runs**); the
+  form fills **Input** and **Expected output** from the run and starts positive or negative from
+  the reviewer's verdict. *Source run log* opens the run's log.
+- **An existing case's input**, **a `.json` file**, or **an empty input**.
+- **Synthesized cases** — assistant: *"Synthesize a harder case from a recent run"* (changes the
+  input or a workspace file of a real run), or **CLI** `mediforce eval case-perturb --file`.
+
+The form also sets how the case is compared and which Evaluators grade it (**All evaluators** or
+**Selected evaluators**). **Edit** replaces a case with a new one; **Archive** takes it out of
+the next freeze. Ticking cases and **Set evaluators…** sets them in bulk.
 
 **Test**
-- ✅ Cases show `positive`/`negative` tag and `dev · production` (or `holdout`, `synthesized (…)`).
-- ✅ A harvested run disappears from *Recent production runs*.
-- ✅ *Freeze dataset* → `Dataset v1 frozen with N case(s) — contains production data`; add one more,
-  freeze → `v2`.
-- ✅ Red-team suite → new cases marked `synthesized (injected instruction)` / `(metamorphic)` etc.
+- ✅ Cases show their labels (positive/negative, split, source) and *as run* / *edited*.
+- ✅ Editing a production case's input turns it `manual` and keeps its source run.
+- ✅ **Save** → a Dataset version; add or edit one case → the tab marks it *unsaved* and says the
+  next run is behind the list; **Save** is disabled while the newest version has every live case.
+- 🔍 Reload or leave the page while cases are unsaved → asked to confirm.
+- 🔍 A case whose expected output no `expected_output` Evaluator grades says so.
 
-> 🧪 *Add as good* for 01–12 and 14 (they were graded correctly), *Add as bad* for 13, 15 and 16 (§4.1). Synthetic: *"Make a harder
-> variant of sample 02 where the labs file shows ALT at 25× ULN but the narrative still says mild"*
-> → ✅ the card changes `case/labs.json`. Also *"…change the narrative to mention hospitalisation"*
-> (expected: serious, report filed). Red-team on an approved **sample-01** agent run with
-> `--target previousStepOutputs.prepare-case.narrative` → ✅ 3 injection cases; `--suite robustness`
-> → ✅ 2 cases. Add 3 fresh runs of 06/07/09 as **holdout** (needed for §10). Add the **sample-08**
-> run so `phi_leak` has identifiers to catch. Freeze.
+> 🧪 Add the runs of 01–12 and 14 as positive cases, 13, 15 and 16 as negative (§4.1). Synthetic:
+> *"Make a harder variant of sample 02 where the labs file shows ALT at 25× ULN but the narrative
+> still says mild"* → ✅ the card changes `case/labs.json`. Also *"…change the narrative to mention
+> hospitalisation"*. Add three fresh runs of 06/07/09 as **holdout**. Add the **sample-08** run so a
+> PHI check has identifiers to catch. Save.
 
-### 4.1 Getting bad cases
+### 4.1 Getting negative cases
 
-**What "bad" means.** A case stores the step's **input** (and workspace), not the old output.
-Every Eval Run trial re-runs the step on that input, and the checks grade the **new** output.
-So you don't need a run that was wrong to test anything. What you need is an **input the step
-struggles with**.
+A case stores the step's **input** (and workspace), not the old output. Every Eval Run trial
+re-runs the step on that input and the Evaluators grade the **new** output. So you do not need a
+run that went wrong; you need an **input the step struggles with**.
 
-The `positive` / `negative` tag says what a correct result looks like:
-- `positive` — a correct output exists and should be accepted. Most hard cases are positive,
-  with **notes** saying what the output must or must not do.
-- `negative` — no output should be accepted; the right behaviour is to refuse or escalate.
+The expectation matters only with an expected output. A **negative** case's expected output is
+one the step must *not* return: it passes when the new output differs (exact) or agrees only at
+`maxAgreement` or below (agreement).
 
-The tag and notes are read only by **LLM judges** ("This is a negative case. <notes>") and by
-the **optimiser's reflection**. Schema, code and builtin checks ignore them and grade the new
-output against their own rule.
-
-**Where the notes come from.** The UI's *Add as bad* takes the notes from the reviewer's
-comment, and it has no notes field of its own. So on a bad output, choose **Request changes**
-and write down what is wrong, e.g. *"Myocarditis is not in the CTCAE reference — must not
-grade from memory or file a report."* That comment becomes the case's notes. The agent then
-re-runs, but the first attempt stays in *Recent production runs* for *Add as bad*.
+**Where a negative comes from.** A reviewer who **rejects** a run makes its case negative
+(`case-from-run`; the form starts negative for a rejected run). A run sent back for revision, or
+never reviewed, gives no expected output — choose the expectation yourself
+(`case-from-run --expectation`).
 
 **Inputs that produce bad outputs.** Samples 10–16 target gaps in the prompt. Results on Gemma 4
 (2026-09-30):
@@ -295,241 +277,213 @@ Gemma's behaviour varies between runs, so 10, 11, 12 and 14 may fail on a later 
 good hard **positive** cases either way.
 
 **Need a guaranteed failure?** Create a sabotaged version of the step, e.g. add *"Grade from the
-investigator's description."* to the prompt, or switch to a tiny model. Run 07 and 09 on it,
-*Request changes*, then *Add as bad*. Afterwards keep the original version as the default (sabotaged
-versions are not made default unless you tick it).
+investigator's description."* to the prompt, or switch to a tiny model. Run 07 and 09 on it and
+**Request changes** or reject; harvest those runs. Afterwards keep the original version as the
+default.
 
-> 🧪 Run 13, 15 and 16. For 15 and 16 choose *Request changes* with a comment like the one
-> above; 13 can be *Add as bad* directly (its schema violation is recorded on the run). *Add as
-> bad* for all three and *Add as good* for 10–12 and 14. ✅ In the Eval Run report,
+> 🧪 Run 13, 15 and 16 and add each as a negative case. ✅ In the Eval Run report,
 > `grading-fields` fails on 13 and 15 whenever Gemma repeats the formatting slip, and the new
 > "term must exist" / "no None term" checks fail on 15 and 16. That gives your first real failure
-> rates for §9 and §10.
+> rates for §6.
 
 ## 5. MCP servers in eval trials
 
 **What.** Per MCP server the agent uses, what happens during evaluation (never in production):
-- `deny` (default) — tool calls are blocked; safe, but the agent may not be able to do its job;
-- `live` — real calls; every answer is **recorded per case**;
-- `replay` — trials get the recorded answers, never touching the real system; repeatable and free
-  of side effects. A call that was never recorded fails the trial.
+- `live` (default for a server the policy does not name) — real calls; every answer is
+  **recorded per case**;
+- `replay` — a case with a recording gets its recorded answers and never touches the real system;
+  a case with none runs live first and records. A call no recording answered gets an error result;
+- `deny` — the server is removed from the agent's config.
 
-Individual tools can be denied on a `live` server (**CLI only**, `eval mcp-policy-set` with
-`denyTools`). Only shown when the agent has MCP servers.
+Individual tools can be denied on a `live` server. The policy is **CLI/API only**
+(`mediforce eval mcp-policy-set|mcp-policy-get`); the tab does not show it.
 
 **Test**
-- ✅ Mode persists on reload.
-- ✅ After an Eval Run with `live`: `recorded for N cases`; report says which servers were live/replayed.
-- ✅ `replay` on the same dataset → trials pass; report lists *unrecorded calls* per server.
-- ✅ A new case never run live, under `replay` → that trial fails ("run the case with it live first").
+- ✅ `mcp-policy-get` lists each server's mode, defaults included, and which cases have a recording.
+- ✅ After an Eval Run with `live`: the report says which servers were live, and `recordedFirst`
+  counts the cases a `replay` server ran live to record.
+- ✅ `replay` on the same dataset → the next trials replay; the report counts unanswered calls per
+  server and tool.
 - ✅ All `deny` → report: *No trial made a live MCP call*.
-- 🔍 `denyTools` on a `replay` server → refused.
 - 🔍 A step declaring MCP servers the old inline way (`agent.mcpServers`) → evaluation refused with
-  a message to move them.
+  a message to move them onto the agent.
 
-> 🧪 Start with `ctcae-reference` on **`live`** (with `deny` Gemma can't look anything up). After
-> one live Eval Run switch to **`replay`** → same grades; cases 03/05 "file" a report from the
-> tape, so no real report is filed. `deny` → grades degrade or the agent escalates. Deny one tool:
-> file `{"ctcae-reference":{"mode":"live","denyTools":["file_safety_report"]}}` →
+> 🧪 Start with `ctcae-reference` on **`live`**. After one Eval Run switch to **`replay`** → same
+> grades; cases 03/05 "file" a report from the recording, so no real report is filed. `deny` →
+> grades degrade or the agent escalates. Deny one tool: file
+> `{"ctcae-reference":{"mode":"live","denyTools":["file_safety_report"]}}` →
 > `pnpm exec mediforce eval mcp-policy-set --namespace db --workflow ae-grading-eval-sandbox --step grade-adverse-event --file <file>`
-> → lookups work, `safety-report-consistent` fails on 03/05. Same file with `"mode":"replay"` → refused.
+> → lookups work, `safety-report-consistent` fails on 03/05. Safe pattern for the first run:
+> `replay` with `file_safety_report` denied, so recording never files a real report.
 
 ## 6. Eval Runs
 
 **What.** Runs **only this step** on every case of a frozen Dataset, several times each
-(*trials*), and grades each output with the counted Evaluators. Trials are isolated: no review
-tasks, no handoffs, not listed in normal runs or the Agents page. Spending always needs a human
-click on **Start**, with a budget cap.
+(*trials*), and grades each output with the counted Evaluators that grade its case. Trials are
+isolated: no review tasks, no handoffs, not listed in normal runs or the Agents page. Spending
+always needs a human click on **Start**, with a budget cap.
 
 **How.** *Trials per case*, optional *Budget $* (empty = auto) — `(estimated $X)` next to it
 updates as you change the trials → **Start** → dialog *Start the Eval Run?* → **Start** (or **Back**).
 A run prepared by the assistant or the CLI shows as a card `Eval Run of N trial(s) — estimated $X`
-whose **Start** opens the same dialog.
+whose **Start** opens the same dialog. The run lists as a table (ID, created, status, cost against
+budget, Dataset version, **Acceptance**); **Details** opens its own page.
 
 **Test**
-- ✅ Auto budget: the dialog says the run is capped at $Y = 1.5 × estimate; the runs table then shows `$0.00 of $Y`.
-- ✅ Clearing *Trials per case* and typing 2 shows `2`, not `02`; Start is disabled while it is empty.
+- ✅ Auto budget: the dialog says the run is capped at $Y = 1.5 × estimate; the table then shows `$0.00 of $Y`.
 - ✅ **Back** closes the dialog and prepares nothing.
-- ✅ Row shows `running`; report fills in as trials finish.
+- ✅ Row shows `running`; the page's header and report fill in as trials finish.
 - ✅ Workflow **Runs** tab and **Agents** page: no trial runs, counters unchanged.
 - ✅ Budget `0.01` → run stops early, remaining trials `skipped`, status `budget_exceeded`.
+- ✅ Change the step's model while a run is prepared but not started → its trials fail naming
+  what changed (Step Fingerprint check).
 - ✅ Assistant *"Prepare and start an eval run"* → prepares it but says it **can't start it**
   (unless an *Unattended budget* is set in its ⚙ → Advanced; then it may start up to that budget).
 
 ### 6.1 The report
 
-Open a run by its short id.
+Open a run with **Details**: **Summary**, **Trials**, **Evaluators**, **Model verdicts**,
+**Problems**.
 
-- ✅ Header: `x/y trials scored · spent $… of $… · tokens`, left-out cases if any.
-- ✅ Per Evaluator: pass rate (passes/total), **95% CI**, **pass@k** (passed at least once),
-  **pass^k** (passed every time), **Flaky**, **Errors**. Not-counted Evaluators are greyed with the
-  reason. A builtin check on a case it doesn't apply to shows as an **error**, not a failure.
-- ✅ *Trial problems* lists failed/denied trials.
-- ✅ **Criteria table** (once Criteria exist, §7): per severity `critical met / missed / not judged`,
-  the floor required, Evaluators met, trials passed / failed, pass rate and the reason.
-- ✅ **Model verdicts denied** — *Waiting for model verdicts human validation* until you Accept/Deny a
-  model verdict; then the denied share (denied ÷ reviewed) with the counts.
-- **CLI** `pnpm exec mediforce eval report <evalRunId>` also shows **per-suite pass rates**
-  (red-team / robustness) — not in the UI.
-
-### 6.2 Challengers
-
-**What.** Up to three alternatives (another model, prompt, tools) run side by side with the
-current step (*champion*). The report says *better / worse* only when the difference is
-statistically clear.
-
-**How.** *Add challengers* → `[{"label":"…","patch":{"model":"…"}}]`.
-
-**Test**
-- ✅ Row shows `· 2 variants`; estimate prices each variant at its own model.
-- ✅ Report: one block per variant (label, change, fingerprint) and a comparison table —
-  Δ in pp, `better` / `worse` / `no clear difference`, cost and duration deltas.
-- 🔍 A challenger identical to the champion → Prepare refused.
+- ✅ Header: status, acceptance, Dataset, trials, cost; **Cancel** while it runs.
+- ✅ **Summary**: per Evaluator pass rate (passes/graded), **95% interval**, pass@k, pass^k,
+  flakiness, errors, verdicts left out; Evaluators that do not count are greyed with the reason.
+  A counted Evaluator's pass rate is green at the floor, red below it.
+- ✅ **Model verdicts**: every judge verdict and agreement score with its confidence against its
+  minimum, the rationale, and **Accept** / **Deny**. Accept a verdict left out for low confidence →
+  it now counts; deny a confident one → it is left out. The report's acceptance recomputes.
+- ✅ **Model verdicts denied**: *Waiting for model verdicts human validation* until you review
+  one, then the denied share with the counts.
+- ✅ **Trials** / trial page: input, expected output, output, agent log, each Evaluator's grade
+  and comment; a judge's **Evaluator logs** show the exact messages it was sent. `[n]` citations
+  in a rationale link to that log entry.
+- ✅ **Problems**: trials that failed or could not be graded, and unanswered replay calls.
+- **CLI** `pnpm exec mediforce eval report <evalRunId>` also carries the confidence calibration
+  (agent confidence against pass rate in five bins, and expected calibration error), the routing
+  recommendation and the MCP line.
 
 > 🧪 9 cases × 2 trials ≈ **$0.20–0.30**. ✅ `grading-fields` ≈ 100%; `hys-law-consistent` high;
 > `safety-report-consistent` fails where 03/05 lack a report or a non-serious case got one. Flaky
-> > 0 on 06/07 is normal. `injection_ignored` should pass; `phi_leak` must pass on 08 (a fail = the
-> name/MRN/DOB leaked). Challenger `[{"label":"Haiku 4.5","patch":{"model":"anthropic/claude-haiku-4.5"}}]`
-> → Haiku priced separately (≈ $1.50); with 9 cases it's usually **no clear difference** — wide
-> intervals, not a bug. Gemma reports high confidence on everything → expect **Routing: Control Mode 3**.
+> > 0 on 06/07 is normal. Gemma reports high confidence on everything → check the calibration
+> numbers in the CLI report.
 
 ## 7. Acceptance Criteria
 
-**What.** The pass bar per severity, judged on the **conservative (lower) end of the 95% CI** —
-e.g. "every critical check ≥ 0.9". Versioned.
+**What.** The floor every counted Evaluator must reach: a minimum pass rate on the passes over
+graded trials (8 of 10 meets 0.8), and optionally a minimum pass^k. Versioned; an Eval Run
+freezes the version in force when it is prepared. With none set, the default is 100%.
 
-**How.** *Set* → floors per severity (leave a severity empty to skip it) → *Save as v1*. Or via the
-assistant: *"Propose acceptance criteria"*, or *Use as Acceptance Criteria* on a plan card (§9).
-
-**Test**
-- ✅ Summary sentence with the floors, `v1 · set by <you>`.
-- ✅ Report shows criteria verdicts per severity.
-
-> 🧪 critical `0.9`, major `0.7`. ✅ Even 18/18 passes can be *missed*/*not judged*: the Wilson lower
-> bound of 18/18 is ~0.82 < 0.9. That's the statistics working.
-
-## 8. Step Qualification
-
-**What.** A human electronically **signs** that a specific version of the step (identified by a
-fingerprint of model, prompt, skills, tools…) meets its Criteria on a given Eval Run. Requires
-password re-entry and a written justification for every missed / not-judged criterion (21 CFR
-Part 11 style). If the step changes later, the qualification turns **Stale** and says what changed.
-
-**How.** In a finished report, **Approve step configuration** on the champion.
+**How.** **Set the threshold** → one slider from 0 to 100% → **Save** (a new version; the slider
+keeps an existing pass^k, which only the CLI, API and assistant set). Or the assistant: *"Propose
+acceptance criteria"*, or *Use as Acceptance Criteria* on a plan card.
 
 **Test**
-- ✅ One justification box per missed/not-judged criterion; *Sign* disabled until all are filled.
-- ✅ Wrong password → refused.
-- ✅ After signing, the top section shows **Qualified**: signer, Brief version, fingerprint,
-  criteria, deviations, MCP policy (incl. `replay` if used).
+- ✅ The button's tooltip lists the floors in force.
+- ✅ The report says *met*, *missed* or *not judged* and how many counted Evaluators fell below.
+
+> 🧪 Set 0.9. ✅ Even 18/18 passes can read below the floor for *what the sample proves*: the
+> Wilson lower bound of 18/18 is ~0.82 — the assistant warns about this when it proposes a floor.
+> *Not judged* appears when a trial failed or was skipped.
+
+## 8. Step Qualification and validation
+
+**What.** **Validation** is automatic: the status at the top of the tab comes from the newest
+finished Eval Run of the version. **Passed** when that run met its criteria, **Failed** when it
+missed them or they could not be judged, **Not verified** when no run has finished or something
+the run rested on changed (Fingerprint, an Evaluator, the live cases, the criteria).
+
+A **Step Qualification** is a person's signature, from a finished (not cancelled) Eval Run with
+criteria frozen into it, that this configuration — identified by its Step Fingerprint — is fit for
+use. It needs the `edit` verb and re-entering the password (21 CFR Part 11 style) and, when the
+run missed its criteria or they could not be judged, a justification recorded as a deviation. If
+the step changes later the badge turns **Stale** and names what changed.
+
+**How.** In a finished report, **Approve step configuration** (web only; an API key cannot sign).
+
+**Test**
+- ✅ A justification box appears when the run missed or could not judge its criteria; a
+  justification for met criteria is refused.
+- ✅ Wrong password → refused (audited as `step_qualification.signature_refused`).
+- ✅ After signing, clicking the validation status shows the qualification: signer, fingerprint,
+  Evaluator versions, criteria and verdict, deviations, MCP policy.
 - ✅ The badge also appears on the agent step in a normal workflow run view.
 - ✅ Change the step's model/prompt → **Stale** — "The step changed since: model". Change it back →
   **Qualified** again. Changing only routing (autonomy / review) keeps it **Qualified**.
-- 🔍 *Sign* disabled (tooltip) for: a running or cancelled run, no criteria, a run prepared before a
-  Brief existed.
+- ✅ Signing does not change validation, and neither blocks anything.
+- ✅ Definitions tab: each version carries **Verified**, **Failed** or **Not verified**; the
+  workflow editor shows each agent step's validation icon for the saved step.
+- 🔍 No sign control for a running or cancelled run, or a run without criteria.
 - 🔍 Assistant *"sign the qualification for me"* → it can't.
 
-> 🧪 Sign with justifications. Switch the step model to `anthropic/claude-haiku-4.5` → *Stale —
+> 🧪 Sign with a justification. Switch the step model to `anthropic/claude-haiku-4.5` → *Stale —
 > changed: model*; back to `google/gemma-4-31b-it` → *Qualified*. Autonomy L3 → L4 → still *Qualified*.
 
-## 9. Evaluation Assistant — planning and the fix loop
+## 9. Evaluation Assistant — diagnosis and routing
 
-The assistant reads the step, its runs and logs and **proposes**; it never approves code, labels,
-signs, or spends money without an Unattended budget. Beyond §3.1, §3.2 and §4:
+The assistant reads the step, its runs and logs and **proposes**; it never approves code, accepts
+or denies a model verdict, signs, or spends money without an Unattended budget. Beyond §3.1 and §4:
 
-**Evaluation plan.** *"Make an evaluation plan for this step"* → ✅ a **plan card**: risks ranked
-highest first with severity chips, each with a suggested check, cases and pass bar. *Draft this
-check* → a self-tested Evaluator card; *Use as Acceptance Criteria* → a new Criteria version.
+**Diagnosis.** After a run with failures: *"Why is this step failing?"* → ✅ a **diagnosis card**
+clustering the failing trials by root cause (`ambiguous_instruction`, `missing_context`,
+`tool_problem`, `model_capability`, `evaluator_wrong`), with evidence and the fix each points to,
+in words. **CLI** `mediforce eval failures <evalRunId>` lists the failing trials.
+- ✅ A fix the platform can take comes as a proposal: a guardrail as a production Evaluator, a
+  routing change as a card to apply, a wrong Evaluator as a new Evaluator version.
+- ✅ A change to the step's prompt, model or tools is *not* offered as a card: you make it in the
+  workflow editor. The assistant does not create variants or optimise prompts.
 
-**Fix loop.** From failures to a proven fix:
-1. *"Why is this step failing? Propose a fix."* → ✅ a **diagnosis card** (failures grouped by root
-   cause: ambiguous instruction, missing context, tool problem, model capability…) and a **fix card**
-   (*Change the instruction*, *Add examples*, *Change the model*…).
-2. **Try it** (optional budget) → ✅ *Prepared*; a Start card in *Eval Runs* runs the fix as a challenger.
-3. In the report, **Apply to step** on the challenger → ✅ dialog describing the change; *Make it
-   the default version* is **unchecked** by default → "Saved as Workflow Definition version N…",
-   plus whether the qualification carries over. *Definitions* shows the new version; default unchanged
-   unless ticked.
+**Judges.** After a run in which you denied a judge's verdicts: *"Why did I deny these?"* → ✅ it
+says what you seem to mean by the rule and proposes a sharper rubric as a new Evaluator version.
 
-**Few-shot examples.** If a fix adds examples from cases, later Eval Runs leave those cases out —
-✅ header: "N case(s) left out — a variant's few-shot examples came from them". Holdout cases are
-never used as examples.
+**Routing.** The report recommends Control Mode 4 when the criteria were met, Control Mode 3
+otherwise; apply it in the workflow editor.
 
-**Panel.** Drag the left edge to resize, double-click to reset → ✅ width remembered on reload.
+**Panel.** Drag the left edge to resize → ✅ width remembered on reload.
 
-> 🧪 Plan: ✅ risks like *grade follows narrative wording* (critical), *missed Hy's Law* (critical),
-> *wrong safety report* (major), *PHI in output*, *injection*. Fix: failures are likeliest on
-> `grade-justified` (07 graded "mild") and `safety-report-consistent` (03/05) → expect *ambiguous
-> instruction* and a fix like *Add examples* using case 07. Try it → Start → Apply (new version,
-> not default) → next Eval Run shows `1 case(s) left out`.
+> 🧪 Failures are likeliest on `grade-justified` (07 graded "mild") and `safety-report-consistent`
+> (03/05) → expect *ambiguous instruction* or *missing context* and a rubric or prompt change you
+> make yourself, then run again.
 
-## 10. Optimisations (GEPA)
+## 10. Production Evaluators and drift
 
-**What.** Automatic prompt improvement, proven on unseen data. From a finished Eval Run, a
-background job reads the **dev** trials — failures and Evaluator comments — and writes up to three
-improved prompts. They're evaluated as challengers over **dev and holdout**, and ranked **holdout
-first** (then dev, then cost): the job only saw dev, so a dev-only gain means overfitting. Capped
-by your budget. The winner is applied with *Apply to step* (§9).
-
-**Needs:** a frozen dataset with **dev and holdout** cases (§4) and a finished Eval Run with dev failures.
-
-**How.** *From Eval Run*, *Candidates* (1–3), *Budget $* → **Optimise prompt**.
+**What.** Evaluation continues after sign-off. Tick **Also run in production** on an Evaluator
+and, while it counts and is not archived, it grades every live run (dry runs and Eval Run trials
+never). A failing `schema` or `code` check fails the run with reason `production_evaluator` and
+**escalates it to a person**; an `llm_judge` runs afterwards and only records Scores. Per
+production Evaluator the tab compares the mean of the newest 20 production Scores with the 20
+before; a drop of ≥ 0.15 shows the amber **"Production Scores are drifting"** banner. Optionally
+Scores are exported to Phoenix / Langfuse.
 
 **Test**
-- ✅ Form only appears once a finished Eval Run exists; button disabled while budget is empty/0.
-- ✅ New row `proposing`, returns immediately; later it moves on to the candidates' Eval Run.
-- ✅ Row: `status · $spent of $budget (job $x) · Eval Run <id> <status>`; table with the baseline +
-  ranked candidates, **Dev** and **Holdout** columns (`passes/graded · % [CI]`); expand a candidate
-  to read its prompt.
-- ✅ Ranking: a candidate better on dev but worse on holdout ranks lower.
-- ✅ Assistant can list/read optimisations; starting one is refused without an Unattended budget.
-- 🔍 Budget below the job's worst case → refused before anything runs.
-- 🔍 Reflection model with no price in the model registry → refused.
-- 🔍 Kill the job / break the key mid-way → fails, keeps what it spent and any proposed prompt; error in red.
-- 🔍 No holdout cases → Holdout column says `no cases`.
-
-> 🧪 Eval Run with `ctcae-reference` on `replay` (cheap, repeatable) and dev failures. Optimise with
-> **Candidates 2, Budget $1** → ✅ prompts stressing *grade on objective lab evidence over wording*
-> and *file a report only when serious and ≥ G3*; candidates' run ≈ $0.30. With 3 holdout cases
-> ranks can tie — verify the ranking rule. Budget `0.01` → refused.
-
-## 11. Production Evaluators and drift
-
-**What.** Evaluation continues after sign-off. Tick **Also run in production** on an Evaluator and
-it grades every live run: a failing **critical schema/code** check blocks the output (step goes to
-its fallback), an LLM judge only records Scores. Per production Evaluator the tab compares the mean
-Score of the newest 20 production runs with the 20 before; a drop of ≥ 0.15 shows the amber
-**"Production Scores are drifting"** banner at the top of the tab. Optionally Scores are exported to
-Phoenix / Langfuse.
-
-**Test**
-- ✅ Ticked → "— scoring live runs". A violating live run → fallback with reason *production
+- ✅ Ticked → the Evaluator view says `production: active` ("in production once it counts" for an
+  unapproved `code` check). A violating live run → paused for a person with reason *production
   evaluator*, Score recorded. Dry runs and eval trials are never blocked.
-- ✅ Drift banner: `<evaluator> vN (severity): mean 0.xx over the last N production Scores, down from
-  1.00…`; it blocks nothing. For a manual test, restart with `MEDIFORCE_DRIFT_WINDOW=3
-  MEDIFORCE_DRIFT_THRESHOLD=0.3`, or use **CLI** `pnpm exec mediforce eval drift … --window 3 --threshold 0.3`.
+- ✅ Drift banner: it blocks nothing. For a manual test, restart with
+  `MEDIFORCE_DRIFT_WINDOW=3 MEDIFORCE_DRIFT_THRESHOLD=0.3`, or use **CLI**
+  `pnpm exec mediforce eval drift … --window 3 --threshold 0.3`.
 - ✅ (Optional) `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:6006 MEDIFORCE_SCORE_EXPORT=phoenix pnpm dev`
   → Scores appear as span annotations on the run's trace. Unset → nothing exported, nothing breaks.
 
-> 🧪 **Blocking:** temporary schema Evaluator `needs-meddra` (critical,
-> `{"kind":"schema","schema":{"required":["meddraCode"]}}`), tick production, run sample 02 → ✅
-> escalates to review with reason *production evaluator*. Archive it afterwards.
-> **Drift:** code Evaluator `low-grade` · **minor** (so fails don't block):
+> 🧪 **Blocking:** temporary schema Evaluator `needs-meddra`
+> (`{"kind":"schema","schema":{"required":["meddraCode"]}}`), tick production, run sample 02 → ✅
+> paused for review with reason *production evaluator*. Archive it afterwards.
+> **Drift:** code Evaluator `low-grade`:
 > ```json
 > {"kind":"code","runtime":"python","source":"import json\nr = json.load(open('/output/input.json'))['result']\njson.dump({'passed': (r.get('ctcaeGrade') or 0) <= 2}, open('/output/result.json', 'w'))"}
 > ```
-> Approve source, tick production, run **02, 04, 06** (pass) then **01, 05, 09** (fail) →
+> Approve source, tick production, run **02, 04, 06** (pass) then **01, 05, 09** (fail) — each
+> failing run pauses for review, which is fine here →
 > `pnpm exec mediforce eval drift --namespace db --workflow ae-grading-eval-sandbox --step grade-adverse-event --window 3 --threshold 0.3`
 > → ✅ `low-grade` mean 0.00 over the last 3, down from 1.00; banner shows with the env vars set.
 > Untick afterwards.
 
 ---
 
-## 12. Supporting features outside the tab
+## 11. Supporting features outside the tab
 
 | Feature | Where | Test | 🧪 |
 |---|---|---|---|
-| **Output schema** — the step declares its result shape; a violation retries once, then falls back | Step editor | Require a field the agent never produces → ✅ retry, then fallback with an output-schema reason | Add `"meddraCode"` to `required`, run 02 → escalation; remove it again |
+| **Output schema** — the step declares its result shape; a violation retries once, then escalates to a person | Step editor | Require a field the agent never produces → ✅ retry, then fallback with an output-schema reason | Add `"meddraCode"` to `required`, run 02 → escalation; remove it again |
 | **Agent log** — every tool call stored durably | Run view → agent step; Agents page | ✅ tool names and sizes; survives reload/restart. Arguments hidden unless `MEDIFORCE_OTEL_CAPTURE_CONTENT=true`. Old runs have no log | `lookup_ctcae_term` / `get_reference_range`; `file_safety_report` on 03/05 |
 | **Human-verdict Scores** — review decisions become Scores | CLI `mediforce score list` | ✅ Approve = 1, Request changes = 0.5 | Request changes on a run → agent re-runs with your comment |
 | **Qualification badge** | Run view → agent step | ✅ Same status as the tab | — |
@@ -539,16 +493,12 @@ Phoenix / Langfuse.
 
 ## Known gaps (worth raising)
 
-- **Red-team suites have no UI** — generation and per-suite pass rates are CLI/API only.
-- **Add Evaluator form lacks `builtin`** — only the assistant can propose one.
-- **No UI to mark a case holdout** — *Add as good/bad* always creates `dev`; Optimisations depends on holdout.
-- **No UI to deny single MCP tools** — `denyTools` is CLI-only.
+- **No UI for the MCP eval policy** — it is CLI/API only, including denying single tools.
 - **Drift is impractical to test manually** without lowering the window; the UI banner uses the deployment default.
 - **CM3 review has no Reject** — production runs never become negative cases automatically.
-- **`negative` has two meanings** — `case-from-run` says "the reviewer rejected this output"; the
-  Evaluation Assistant's prompt says "the input is so broken that no output should be accepted".
-  The two can't both hold for a case whose re-run is fine. The UI's *Add as bad* also has no
-  notes field.
+- **The assistant does not fix the step** — it diagnoses and proposes guardrails and routing; prompt,
+  model and tool changes are made by hand in the workflow editor (optimisation is parked in
+  [ADR-0024](../adr/0024-optimisation.md)).
 - **Audit log hides the output-schema fallback** — the task shows `agent_review_l3`; only the
   agent run records `fallbackReason: output_schema`.
 - **Agent vs step model is ambiguous in the UI** — nothing says the step's model wins over the agent's foundation model.

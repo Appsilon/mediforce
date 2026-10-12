@@ -146,7 +146,7 @@ test.describe('Workflow Files Journey', () => {
       await page.getByText('Prompt & model').click();
 
       // The step adds to its agent; the picker lists the workspace's catalog.
-      await expect(page.getByText(/nothing here replaces them/)).toBeVisible();
+      await expect(page.getByText(/replaces it\./)).toBeVisible();
       await page.getByLabel('Add skill').selectOption(`${TEST_ORG_HANDLE}/${skillId}`);
       await expect(page.getByRole('button', { name: `Remove skill ${TEST_ORG_HANDLE}/${skillId}` })).toBeVisible();
 

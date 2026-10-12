@@ -1,7 +1,7 @@
 {
   "name": "ae-grading-eval-sandbox",
   "title": "AE Grading \u2014 Evaluation Sandbox",
-  "description": "Grades a clinical-trial adverse event by CTCAE v5.0. Built to exercise every Step Evaluation feature: output schema, Control Mode 3 review (human_verdict Scores), an MCP server with a side-effecting tool (eval policy live/deny/replay), a narrative in the step input (red-team and perturbed cases) and a workspace file (file perturbations), agent confidence (calibration and routing).",
+  "description": "Grades a clinical-trial adverse event by CTCAE v5.0. Built to exercise every Step Evaluation feature: output schema, Control Mode 3 review (human_verdict Scores), an MCP server with a side-effecting tool (eval policy live/deny/replay), a narrative in the step input (synthesized cases) and a workspace file (file perturbations), agent confidence (confidence calibration and routing).",
   "preamble": "Clinical terms (CTCAE grades incl. Grade 5 = death, Hy's Law, MedDRA) are technical workflow content.",
   "triggerInput": [
     {

@@ -814,7 +814,7 @@ export function StepEditor({
           <Section title="This step adds">
             <p className="px-0.5 text-xs text-muted-foreground">
               Added to {selectedAgent === undefined ? 'the agent' : selectedAgent.name}&apos;s prompt and skills
-              for this step only; nothing here replaces them.
+              for this step only. A step skill with the same id as one of the agent&apos;s replaces it.
             </p>
           </Section>
 
