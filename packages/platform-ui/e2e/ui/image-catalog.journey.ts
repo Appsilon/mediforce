@@ -6,6 +6,7 @@ import type { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { trackPageErrors } from '../helpers/page-errors';
+import { probeGitHub } from '../helpers/github-reachable';
 
 /**
  * L4 UI journey for the Images view (#1297).
@@ -41,11 +42,11 @@ function dockerAvailable(): boolean {
 
 /** `docker commit` rather than `docker build`: one real filesystem layer — what
  *  lineage matches on — in about a second, without occupying BuildKit. */
-function deriveImage(tag: string, from: string, command: string): void {
+function deriveImage(tag: string, from: string, command: string, labels: string[] = []): void {
   const container = `mediforce-e2e-ui-${tag.replace(/[^a-z0-9]/gi, '-')}`;
   docker('run', '--name', container, from, ...command.split(' '));
   try {
-    docker('commit', container, tag);
+    docker('commit', ...labels.flatMap((label) => ['--change', `LABEL ${label}`]), container, tag);
   } finally {
     docker('rm', '-f', container);
   }
@@ -173,6 +174,60 @@ test.describe('Image Catalog UI journey', () => {
         { headers: AUTH },
       );
       docker('rmi', `${derivedReference}:v1`, `${baseReference}:v1`);
+    }
+  });
+
+  test('an author reads the files an image was built from, at its build commit', async ({
+    page,
+    request,
+  }) => {
+    test.skip(!(await probeGitHub()).apiReachable, 'github.com unreachable or rate limited — the clone cannot run.');
+    test.setTimeout(180_000);
+    trackPageErrors(page);
+
+    const stamp = Date.now();
+    const reference = `mediforce-e2e-ui-sourced-${stamp}`;
+    // A tiny public repository, pinned: its only file is `README`.
+    const commit = '7fd1a60b01f91b314f59955a4e4d4e80d8edf11d';
+    let entryId = '';
+
+    try {
+      docker('image', 'inspect', BASE_IMAGE);
+    } catch {
+      docker('pull', BASE_IMAGE);
+    }
+    // The OCI labels an image sets for itself, so it reads as coming from the
+    // repository at that revision without running a real build.
+    deriveImage(`${reference}:v1`, BASE_IMAGE, 'mkdir /e2e-sourced-marker', [
+      'org.opencontainers.image.source=https://github.com/octocat/Hello-World',
+      `org.opencontainers.image.revision=${commit}`,
+    ]);
+
+    try {
+      entryId = await catalogue(request, `E2E sourced ${stamp}`, reference);
+
+      await page.goto(`/${TEST_ORG_HANDLE}/images`);
+      const card = page.getByTestId(`image-entry-${entryId}`);
+      await expect(card).toBeVisible({ timeout: 30_000 });
+      await card.getByRole('button', { expanded: false }).click();
+
+      // Collapsed until asked for: opening it is what clones the repository.
+      const toggle = card.getByRole('button', { name: `Source files at ${commit.slice(0, 7)}` });
+      await expect(toggle).toBeVisible({ timeout: 60_000 });
+      await toggle.click();
+
+      // Opening a file shows what the repository holds at that commit.
+      const file = card.getByRole('button', { name: /README/ });
+      await expect(file).toBeVisible({ timeout: 120_000 });
+      await file.click();
+      await expect(card.getByText('Hello World!')).toBeVisible({ timeout: 60_000 });
+    } finally {
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: AUTH,
+        });
+      }
+      docker('rmi', '-f', `${reference}:v1`);
     }
   });
 

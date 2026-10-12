@@ -119,6 +119,7 @@ export function RepoFileBrowser({
 }) {
   const [tree, setTree] = React.useState<TreeState>({ entries: null, error: null });
   const [opened, setOpened] = React.useState<OpenedFile | null>(null);
+  const latestOpen = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -137,9 +138,11 @@ export function RepoFileBrowser({
   }, [load]);
 
   const onOpen = async (path: string): Promise<void> => {
+    latestOpen.current = path;
     setOpened({ kind: 'loading', path });
     try {
       const { file } = await load(path);
+      if (latestOpen.current !== path) return;
       if (file === undefined) {
         setOpened({ kind: 'error', path, message: 'The repository returned nothing for this file.' });
         return;
@@ -150,6 +153,7 @@ export function RepoFileBrowser({
       }
       setOpened({ kind: 'text', path, contents: file.contents, ...(file.truncated === undefined ? {} : { truncated: file.truncated }) });
     } catch (error) {
+      if (latestOpen.current !== path) return;
       setOpened({ kind: 'error', path, message: error instanceof Error ? error.message : String(error) });
     }
   };
