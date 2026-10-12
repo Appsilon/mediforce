@@ -56,7 +56,7 @@ export async function enqueueDockerJob(data: DockerJobData): Promise<DockerJobRe
   const jobId = `${data.processInstanceId}:${data.stepId}:${Date.now()}`;
   // The caller stops waiting after this long, so nothing reads the files later.
   const waitTtlMs = data.timeoutMs + 60_000;
-  const client = await queue.client;
+  const client = await queue.getBackend().client;
 
   try {
     const jobData = await offloadJobPayload(

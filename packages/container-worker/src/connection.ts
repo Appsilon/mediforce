@@ -36,7 +36,7 @@ export async function pingRedis(): Promise<{ pong: string; host: string; port: n
   const connection = getRedisConnection();
   const { Queue } = await import('bullmq');
   const queue = new Queue('redis-health-ping', { connection });
-  const client = await queue.client;
+  const client = await queue.getBackend().client;
   // bullmq's IRedisClient is backend-agnostic (ioredis/node-redis/Bun) and no
   // longer exposes ioredis's `ping`; `info()` is part of the interface and
   // serves as the liveness probe.

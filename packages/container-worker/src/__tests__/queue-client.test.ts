@@ -16,14 +16,18 @@ const jobAdded = vi.fn<(name: string, data: DockerJobData) => void>();
 vi.mock('bullmq', () => {
   return {
     Queue: class {
-      client = Promise.resolve({
-        get: async (key: string) => redis.get(key) ?? null,
-        set: async (key: string, value: string) => {
-          redis.set(key, value);
-          return 'OK';
-        },
-        del: async (...keys: string[]) => keys.filter((key) => redis.delete(key)).length,
-      });
+      getBackend() {
+        return {
+          client: Promise.resolve({
+            get: async (key: string) => redis.get(key) ?? null,
+            set: async (key: string, value: string) => {
+              redis.set(key, value);
+              return 'OK';
+            },
+            del: async (...keys: string[]) => keys.filter((key) => redis.delete(key)).length,
+          }),
+        };
+      }
       constructor(name: string, options: Record<string, unknown>) {
         queueConstructed(name, options);
       }
