@@ -19,7 +19,8 @@ released version, and the `vX.Y.Z` tag is the record of which one.
 2. **Edit the section in that PR.** Read it as someone who uses Mediforce: what
    changed and why it matters to them, in as few words as possible. If the
    draft failed, the section holds a `release-draft` comment listing the PRs.
-   Write the notes and delete the comment.
+   Write the notes and delete the comment. Merging on a later day? Change the
+   heading's date to that day.
 3. **Merge.** [`release.yml`](../../.github/workflows/release.yml) then:
    - tags the merge commit `vX.Y.Z` and publishes the section as the GitHub
      release, word for word (it refuses while the section is empty or still a
@@ -31,8 +32,11 @@ released version, and the `vX.Y.Z` tag is the record of which one.
      which records the deploy in the repo's **production** environment;
    - rebuilds the News page.
 
-Wrong version? Close the PR, delete its branch and run the workflow again with
-the bump you want.
+Wrong version, or PRs merged into `main` while the release PR was open? Close
+the PR, delete its branch and run the workflow again. The notes and version
+describe `main` as it was when the workflow ran: `Release / check` refuses on
+the next push to the PR once `main` has moved past that, and publishing refuses
+at the merge.
 
 ## Which number
 
@@ -56,7 +60,9 @@ older): their `deploy.sh` ignores the version and would redeploy `main`.
 ## If publishing fails after the merge
 
 `main` then has the bump but no tag, and re-running the job fails the same way.
-Fix the section on `main` in a PR, then finish by hand: steps 2–4 of the hotfix
+Fix the section on `main` in a PR (for PRs that merged while the release PR was
+open, add them to the notes and correct the version if they change the bump),
+then finish by hand: steps 2–4 of the hotfix
 below, with the release PR's merge commit as `<sha>`.
 
 ## Hotfix
@@ -70,6 +76,9 @@ can't ship yet, do by hand what the merge would have done:
 3. **Build & Push Docker Images** from that tag, with the version.
 4. **Deploy to Production** with the version.
 5. Merge the changelog section back to `main` in a PR.
+
+The next release's draft lists the fix and the merge-back PR again, because
+the hotfix tag sits off `main`. Leave them out of its notes.
 
 ## One-time setup
 

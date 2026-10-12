@@ -42,6 +42,7 @@ jobs:
         run: |
           version=$(python3 scripts/release.py prepare --bump "$BUMP")
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "base=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           git add package.json
 
       - name: Draft the release notes
@@ -62,6 +63,7 @@ jobs:
       - name: Open the release PR
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          BASE: ${{ steps.version.outputs.base }}
         run: |
           # The draft reads PR titles and bodies; only its CHANGELOG.md edit ships.
           git checkout -- package.json
@@ -70,20 +72,22 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
           git add CHANGELOG.md
-          git commit -m "chore(release): v$VERSION"
+          # check and publish compare main against this to catch PRs merged meanwhile.
+          git commit -m "chore(release): v$VERSION" -m "Release-Base: $BASE"
           git push origin "$branch"
           cat > body.md <<EOF
           Releases **v$VERSION**.
 
-          1. Read the \`[$VERSION]\` section of \`CHANGELOG.md\` as someone who uses Mediforce: what changed and why it matters to them, in as few words as possible. Fix it in this PR. If the release-draft comment is still there, write the notes and delete it.
+          1. Read the \`[$VERSION]\` section of \`CHANGELOG.md\` as someone who uses Mediforce: what changed and why it matters to them, in as few words as possible. Fix it in this PR. If the release-draft comment is still there, write the notes and delete it. Merging on a later day? Change the heading's date to that day.
           2. Merge. Merging tags \`v$VERSION\`, publishes the GitHub release, builds the \`$VERSION\` images and deploys them to production.
 
-          Wrong version? Close this PR, delete the \`$branch\` branch and run the Release workflow again with the bump you want.
+          Wrong version, or PRs merged into \`main\` since this opened? Close this PR, delete the \`$branch\` branch and run the Release workflow again.
           EOF
           gh pr create --base main --head "$branch" --title "chore(release): v$VERSION" --body-file body.md
 
-  # Marks the release PR red while its notes are a draft. Bot-opened PRs start
-  # no workflows, so this first runs on the first push a person makes to it.
+  # Marks the release PR red while its notes are a draft or main has moved past
+  # what they describe. Bot-opened PRs start no workflows, so this first runs on
+  # the first push a person makes to it.
   check:
     if: >-
       github.event_name == 'pull_request' &&
@@ -93,12 +97,18 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
       - name: Release notes are written
         run: python3 scripts/release.py notes "$(jq -r .version package.json)"
+      - name: Nothing merged into main since the release was prepared
+        run: python3 scripts/release.py unannounced HEAD origin/main
 
   publish:
     if: >-
@@ -111,6 +121,7 @@ jobs:
     permissions:
       contents: write
       actions: write
+      pull-requests: read
     outputs:
       version: ${{ steps.version.outputs.version }}
       sha: ${{ github.event.pull_request.merge_commit_sha }}
@@ -120,6 +131,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
 
       - name: Read the version
         id: version
@@ -132,6 +144,16 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # The notes and version describe main as it was when the release was
+      # prepared. A PR merged since would ship in this tag without them.
+      - name: Nothing merged into main since the release was prepared
+        env:
+          NUMBER: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          git fetch --quiet origin "refs/pull/$NUMBER/head"
+          python3 scripts/release.py unannounced FETCH_HEAD "$SHA"
 
       - name: Tag and publish the GitHub release
         env:

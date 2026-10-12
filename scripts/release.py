@@ -10,6 +10,11 @@
       Print the version's CHANGELOG section. Fails while the section is missing,
       empty, or still holds the draft comment, so unwritten notes never ship.
 
+  release.py unannounced <release-ref> <main-ref>
+      Fail when PRs reached <main-ref> after the `main` the release at
+      <release-ref> was prepared from (its Release-Base trailer): merging or
+      tagging would ship them without notes.
+
 The bump follows the PR titles' conventional-commit prefix: any `type!:` is
 major, any `feat` is minor, anything else is patch.
 """
@@ -19,7 +24,7 @@ import json
 import re
 import subprocess
 import sys
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -29,6 +34,7 @@ PACKAGE_JSON = REPO_ROOT / "package.json"
 SEMVER_TAG = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 CONVENTIONAL_TITLE = re.compile(r"^(?P<type>\w+)(\([^)]*\))?(?P<breaking>!)?:")
 DRAFT_MARKER = "<!-- release-draft"
+BASE_TRAILER = "Release-Base"
 UNRELEASED_HEADING = "## [Unreleased]"
 BUMPS = ("patch", "minor", "major")
 
@@ -49,13 +55,23 @@ def latest_release_tag() -> tuple[str, tuple[int, int, int]]:
     return tag, version
 
 
-def merged_pull_requests_since(tag: str) -> list[dict]:
-    since = run("git", "log", "-1", "--format=%cI", tag).strip()
+def merged_pull_requests_between(base: str, head: str) -> list[dict]:
+    # Ancestry decides, not dates: a hotfix tag sits off main, so PRs merged
+    # before it can still be unreleased. The date only narrows the search.
+    fork_point = run("git", "merge-base", base, head).strip()
+    fork_time = datetime.fromtimestamp(int(run("git", "log", "-1", "--format=%ct", fork_point)), timezone.utc)
+    since = (fork_time - timedelta(days=1)).date().isoformat()
+    unreleased = set(run("git", "rev-list", f"{base}..{head}").split())
     output = run(
         "gh", "pr", "list", "--state", "merged", "--base", "main",
-        "--search", f"merged:>{since}", "--limit", "500", "--json", "number,title,headRefName",
+        "--search", f"merged:>={since}", "--limit", "500", "--json", "number,title,headRefName,mergeCommit",
     )
-    shipped = [pr for pr in json.loads(output) if not pr["headRefName"].startswith("release/")]
+    shipped = [
+        pr for pr in json.loads(output)
+        if pr["mergeCommit"] is not None
+        and pr["mergeCommit"]["oid"] in unreleased
+        and not pr["headRefName"].startswith("release/")
+    ]
     return sorted(shipped, key=lambda pull_request: pull_request["number"])
 
 
@@ -118,7 +134,7 @@ def open_changelog_section(version: str, pull_requests: list[dict]) -> None:
 
 def prepare(bump: str) -> int:
     tag, current = latest_release_tag()
-    pull_requests = merged_pull_requests_since(tag)
+    pull_requests = merged_pull_requests_between(tag, "HEAD")
     if len(pull_requests) == 0:
         sys.exit(f"Nothing merged since {tag}; there is nothing to release.")
 
@@ -147,6 +163,17 @@ def notes(version: str) -> int:
     return 0
 
 
+def unannounced(release_ref: str, main_ref: str) -> int:
+    trailers = run("git", "log", f"--format=%(trailers:key={BASE_TRAILER},valueonly)", release_ref).split()
+    if len(trailers) == 0:
+        sys.exit(f"{release_ref} has no {BASE_TRAILER} trailer; it was not opened by the Release workflow.")
+    late = merged_pull_requests_between(trailers[0], main_ref)
+    if len(late) == 0:
+        return 0
+    lines = "\n".join(f"  #{pr['number']} {pr['title']}" for pr in late)
+    sys.exit(f"Merged into main after this release was prepared, so missing from its notes and version:\n{lines}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -154,10 +181,15 @@ def main() -> int:
     prepare_parser.add_argument("--bump", choices=("auto", *BUMPS), default="auto")
     notes_parser = commands.add_parser("notes")
     notes_parser.add_argument("version")
+    unannounced_parser = commands.add_parser("unannounced")
+    unannounced_parser.add_argument("release_ref")
+    unannounced_parser.add_argument("main_ref")
     arguments = parser.parse_args()
 
     if arguments.command == "prepare":
         return prepare(arguments.bump)
+    if arguments.command == "unannounced":
+        return unannounced(arguments.release_ref, arguments.main_ref)
     return notes(arguments.version)
 
 

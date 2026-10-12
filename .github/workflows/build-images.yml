@@ -49,6 +49,18 @@ jobs:
       packages: write
 
     steps:
+      # A manual release build must run from its tag, or `:<version>` would
+      # point at whatever commit the Actions UI had selected.
+      - name: Release build runs from its tag
+        if: github.event_name == 'workflow_dispatch' && inputs.version != ''
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/tags/v$VERSION" ]; then
+            echo "::error::Run this build from the v$VERSION tag, not $GITHUB_REF."
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
         with:
           ref: ${{ env.SHA }}
