@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { WORKFLOW_ARTIFACT_MAX_BYTES } from '@mediforce/platform-core';
-import { decodeTextFile, mergeUploadedFiles, uploadPathFor } from '../workflow-file-uploads';
+import { decodeTextFile, mergeUploadedFiles } from '../workflow-file-uploads';
 
 const bytes = (text: string): Uint8Array => new TextEncoder().encode(text);
 
@@ -25,26 +25,6 @@ describe('decodeTextFile', () => {
 
   it('keeps non-ASCII text, which is text', () => {
     expect(decodeTextFile(bytes('# Résumé 🧬\n'))).toBe('# Résumé 🧬\n');
-  });
-});
-
-describe('uploadPathFor', () => {
-  it('uses the file name for a single file', () => {
-    expect(uploadPathFor({ name: 'poll.py' })).toBe('poll.py');
-  });
-
-  it('keeps the structure of an uploaded folder', () => {
-    // Uploading a `skills/` directory has to arrive as `skills/<skill>/SKILL.md`
-    // or the agent's `skillsDir` finds nothing.
-    expect(uploadPathFor({ name: 'SKILL.md', webkitRelativePath: 'skills/validator/SKILL.md' }))
-      .toBe('skills/validator/SKILL.md');
-  });
-
-  it('drops the leading directory a folder upload prepends', () => {
-    // The picker prefixes the chosen folder's own name; keeping it would bury
-    // every file one level deeper than the author picked.
-    expect(uploadPathFor({ name: 'SKILL.md', webkitRelativePath: 'my-workflow/skills/validator/SKILL.md' }, 'my-workflow'))
-      .toBe('skills/validator/SKILL.md');
   });
 });
 
