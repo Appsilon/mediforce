@@ -84,6 +84,9 @@ the hotfix tag sits off `main`. Leave them out of its notes.
 
 - **Settings → Actions → General:** *Allow GitHub Actions to create and approve
   pull requests* stays on, or the Release workflow can't open its PR.
+- **Settings → Secrets → Actions:** add `ANTHROPIC_API_KEY`. It lets the Release
+  workflow draft the notes. Without it the draft step fails quietly and the
+  release PR opens with the `release-draft` comment for you to write by hand.
 - **Optional, Settings → Rules:** make `Release / check` a required status
   check on `main`, so a release PR with draft notes can't be merged (it is
   skipped, which passes, on every other PR). The cost: a bot-opened PR runs no
