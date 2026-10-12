@@ -9,7 +9,6 @@ const validStepConfig = {
   stepId: 'review-step',
   executorType: 'human' as const,
   autonomyLevel: 'L2' as const,
-  fallbackBehavior: 'escalate_to_human' as const,
   timeoutMinutes: 30,
   reviewConstraints: {
     maxIterations: 3,
@@ -61,7 +60,6 @@ describe('StepConfigSchema', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.autonomyLevel).toBe('L2');
-      expect(result.data.fallbackBehavior).toBe('escalate_to_human');
       expect(result.data.reviewConstraints?.maxIterations).toBe(3);
     }
   });
@@ -104,30 +102,6 @@ describe('StepConfigSchema', () => {
       stepId: 'step-1',
       executorType: 'human',
       autonomyLevel: 'L5',
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('should accept all valid fallback behaviors', () => {
-    for (const behavior of [
-      'escalate_to_human',
-      'continue_with_flag',
-      'pause',
-    ]) {
-      const result = StepConfigSchema.safeParse({
-        stepId: 'step-1',
-        executorType: 'human',
-        fallbackBehavior: behavior,
-      });
-      expect(result.success).toBe(true);
-    }
-  });
-
-  it('should reject invalid fallback behavior', () => {
-    const result = StepConfigSchema.safeParse({
-      stepId: 'step-1',
-      executorType: 'human',
-      fallbackBehavior: 'ignore',
     });
     expect(result.success).toBe(false);
   });

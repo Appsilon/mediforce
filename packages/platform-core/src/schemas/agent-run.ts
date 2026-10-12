@@ -17,11 +17,12 @@ export const AgentRunStatusSchema = z.enum([
 ]);
 
 /**
- * Why a run left the happy path and went to the step's `fallbackBehavior`.
+ * Why a run left the happy path and was escalated to a person.
  * `output_schema` is a `result` that still broke `agent.outputSchema` after
  * one retry with the validation error (ADR-0023 D13). `production_evaluator`
  * is a critical `schema` or `code` Evaluator marked to run in production that
- * failed the result (D13).
+ * failed the result (D13). `low_confidence` is no longer produced; it stays so
+ * runs and tasks recorded while steps had a confidence threshold still read.
  */
 export const AgentFallbackReasonSchema = z.enum([
   'timeout',

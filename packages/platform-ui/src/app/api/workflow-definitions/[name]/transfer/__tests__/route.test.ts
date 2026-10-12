@@ -12,6 +12,8 @@ vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
     processRepo: {
       transferWorkflowNamespace: mockTransferNamespace,
+      // No stored version to check for step skills (ADR-0027).
+      getLatestWorkflowVersion: vi.fn().mockResolvedValue(0),
       // ADR-0019 cascade: the gates stay in the source workspace, where the
       // role names mean the people they were granted to.
       setWorkflowAccess: mockSetWorkflowAccess,

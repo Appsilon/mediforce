@@ -1847,7 +1847,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       description: 'End-to-end supply chain review process',
       steps: [
         { id: 'vendor-assessment', name: 'Vendor Assessment', type: 'creation', executor: 'agent', autonomyLevel: 'L2', plugin: 'supply-data-collector', agent: { skill: 'vendor-assessment', mcpServers: [{ name: 'postgres-ro', command: 'npx', args: ['-y', '@modelcontextprotocol/server-postgres'], env: { DATABASE_URL: '{{DB_URL}}' }, allowedTools: ['query'] }, { name: 'filesystem', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/data'] }] } },
-        { id: 'narrative-summary', name: 'Narrative Summary', type: 'creation', executor: 'agent', autonomyLevel: 'L3', agent: { allowedTools: ['WebFetch'] } },
+        { id: 'narrative-summary', name: 'Narrative Summary', type: 'creation', executor: 'agent', autonomyLevel: 'L3', agent: {} },
         { id: 'risk-scoring', name: 'Risk Scoring', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
         { id: 'data-quality', name: 'Data Quality Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
         { id: 'query-status', name: 'Query Status Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L1' },
@@ -1895,15 +1895,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       ],
       createdAt: SEEDED_DEFINITION_CREATED_AT,
     },
-    // Backs `proc-agent-runs-page-journey` (see `processInstances` above,
-    // added earlier this session for agent-runs-page.journey.ts's L3 API
-    // coverage). That fixture set never got a matching `workflowDefinitions`
-    // entry, which is harmless for the API-only journey but 404s `GET
-    // /api/processes/:id/steps` the moment the Agents tab actually *renders*
-    // one of these runs (AgentRunListTable's `PermissionsCell` calls it per
-    // row) — a real pre-existing bug this L4 UI journey newly exercises.
-    // Fixed here rather than filed as a follow-up: additive, one fixture
-    // object, same shape as the entry below it.
+    // Backs `proc-agent-runs-page-journey` (see `processInstances` above), so
+    // its runs resolve to a workflow definition like any real run.
     'test:Agent Runs Page Journey Workflow:1': {
       name: 'Agent Runs Page Journey Workflow',
       namespace: 'test',
@@ -1911,18 +1904,15 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       title: 'Agent Runs Page Journey Workflow',
       description: 'Minimal definition backing agent-runs-page.journey.ts\'s fixtures, added so the Agents tab (which resolves per-row step permissions) doesn\'t 404 when it renders these runs.',
       steps: [
-        { id: 'step-running', name: 'Step Running', type: 'review', executor: 'agent', agent: { allowedTools: [] } },
+        { id: 'step-running', name: 'Step Running', type: 'review', executor: 'agent', agent: {} },
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'step-running', to: 'done' }],
       createdAt: SEEDED_DEFINITION_CREATED_AT,
     },
-    // Backs `proc-monitoring-loadmore-agents` (see `processInstances` above)
-    // — exists only so `GET /api/processes/:id/steps` (called per row by
-    // AgentRunListTable's `PermissionsCell` in the live Agents tab) resolves
-    // instead of 404ing; the fixture agent runs' individual stepIds don't
-    // need to match an entry here (`useStepAllowedTools` degrades to "no
-    // data" on a miss, same as any step with no allowed-tools list).
+    // Backs `proc-monitoring-loadmore-agents` (see `processInstances` above),
+    // so its runs resolve to a workflow definition and the Monitoring
+    // workflow filter lists it.
     'test:Monitoring LoadMore Agent Workflow:1': {
       name: 'Monitoring LoadMore Agent Workflow',
       namespace: 'test',
@@ -1930,7 +1920,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       title: 'Monitoring LoadMore Agent Workflow',
       description: 'Minimal definition backing monitoring.journey.ts\'s Agents-tab Load More fixtures.',
       steps: [
-        { id: 'step-monitoring-loadmore', name: 'Monitoring LoadMore Step', type: 'review', executor: 'agent', agent: { allowedTools: [] } },
+        { id: 'step-monitoring-loadmore', name: 'Monitoring LoadMore Step', type: 'review', executor: 'agent', agent: {} },
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],
       transitions: [{ from: 'step-monitoring-loadmore', to: 'done' }],

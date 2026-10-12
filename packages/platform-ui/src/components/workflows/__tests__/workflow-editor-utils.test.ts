@@ -505,20 +505,34 @@ describe('withDefaultModel', () => {
 
 describe('selectAgentPatch', () => {
   const SONNET = 'anthropic/claude-sonnet-4.6';
+  const agent = { id: 'agent-1', kind: 'plugin' as const, runtimeId: 'claude-code-agent' };
 
   it('drops the default model a new step was given, so the step inherits the agent\'s model', () => {
-    expect(selectAgentPatch({ agent: { model: SONNET } }, 'agent-1', SONNET)).toEqual({ agentId: 'agent-1', agent: undefined });
+    expect(selectAgentPatch({ agent: { model: SONNET } }, agent, SONNET))
+      .toEqual({ agentId: 'agent-1', agent: undefined, plugin: 'claude-code-agent' });
   });
 
   it('keeps the rest of the agent config when it drops the default model', () => {
-    expect(selectAgentPatch({ agent: { model: SONNET, skill: 'draft-note' } }, 'agent-1', SONNET)).toEqual({ agentId: 'agent-1', agent: { skill: 'draft-note' } });
+    expect(selectAgentPatch({ agent: { model: SONNET, prompt: 'Draft the note' } }, agent, SONNET))
+      .toEqual({ agentId: 'agent-1', agent: { prompt: 'Draft the note' }, plugin: 'claude-code-agent' });
   });
 
   it('keeps a model the author chose as an override', () => {
-    expect(selectAgentPatch({ agent: { model: 'openai/gpt-4o' } }, 'agent-1', SONNET)).toEqual({ agentId: 'agent-1', agent: { model: 'openai/gpt-4o' } });
+    expect(selectAgentPatch({ agent: { model: 'openai/gpt-4o' } }, agent, SONNET))
+      .toEqual({ agentId: 'agent-1', agent: { model: 'openai/gpt-4o' }, plugin: 'claude-code-agent' });
   });
 
-  it('keeps the model when the agent is cleared', () => {
-    expect(selectAgentPatch({ agent: { model: SONNET } }, undefined, SONNET)).toEqual({ agentId: undefined, agent: { model: SONNET } });
+  it('fills the plugin from the agent\'s runtime, replacing the one the step had', () => {
+    expect(selectAgentPatch({ plugin: 'opencode-agent' }, agent, SONNET).plugin).toBe('claude-code-agent');
+  });
+
+  it('keeps the step\'s plugin for an agent that names no plugin runtime', () => {
+    expect(selectAgentPatch({ plugin: 'opencode-agent' }, { id: 'agent-2', kind: 'plugin' }, SONNET).plugin).toBe('opencode-agent');
+    expect(selectAgentPatch({ plugin: 'opencode-agent' }, { id: 'chat', kind: 'cowork', runtimeId: 'chat' }, SONNET).plugin).toBe('opencode-agent');
+  });
+
+  it('keeps the model and plugin when the agent is cleared', () => {
+    expect(selectAgentPatch({ agent: { model: SONNET }, plugin: 'claude-code-agent' }, undefined, SONNET))
+      .toEqual({ agentId: undefined, agent: { model: SONNET }, plugin: 'claude-code-agent' });
   });
 });

@@ -11,7 +11,7 @@ import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepo
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
-import { agentLogEntries, createLineStreamReader, offeredSkill, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes, unfence } from '@mediforce/platform-core';
+import { DEFAULT_STEP_TIMEOUT_MINUTES, agentLogEntries, createLineStreamReader, offeredSkill, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes, unfence } from '@mediforce/platform-core';
 import { MCP_TAPE_DIR, MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from '../mcp/mcp-tape';
 import type { AgentLogFormat } from '@mediforce/platform-core';
 
@@ -62,7 +62,7 @@ const __dirname_base = dirname(__filename_base);
 // SIGKILLed before the PluginRunner Promise.race classifies it as `timeout`
 // rather than `error` (ADR-0010). The workflow path never reaches this — it
 // resolves the timeout from the step via resolveStepTimeoutMinutes.
-export const DEFAULT_TIMEOUT_MS = 30 * 60_000;
+export const DEFAULT_TIMEOUT_MS = DEFAULT_STEP_TIMEOUT_MINUTES * 60_000;
 
 /** Container-side path where downloaded step input files are bind-mounted read-only. */
 export const CONTAINER_DATA_MOUNT = '/data';
@@ -834,14 +834,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         skill: stepAgent.skill,
         prompt: stepAgent.prompt,
         skillsDir: stepAgent.skillsDir,
-        timeoutMs: stepAgent.timeoutMs ?? resolveStepTimeoutMinutes(context.step) * 60_000,
+        timeoutMs: resolveStepTimeoutMinutes(context.step) * 60_000,
         image: stepAgent.image,
         repo: stepAgent.repo,
         commit: stepAgent.commit,
         dockerfile: stepAgent.dockerfile,
         context: stepAgent.context,
         mcpServers: stepAgent.mcpServers,
-        allowedTools: stepAgent.allowedTools,
       };
     } else {
       const stepConfig = context.config.stepConfigs.find(

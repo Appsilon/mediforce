@@ -788,7 +788,7 @@ export async function POST(
             // with this step still `running`. Rather than launch a duplicate
             // attempt, gather EVERY still-running execution of this step and, once
             // they are all past their timeout, reap each through the timeout
-            // fallback (fail/escalate/flag per fallbackBehavior). If any row is a
+            // fallback, which escalates to a person. If any row is a
             // not-yet-overdue live attempt, defer wholesale to the heartbeat — we
             // never reap rows out from under, or double-run, live work.
             const stepExecutions = await instanceRepo.getStepExecutions(instanceId);
@@ -820,27 +820,14 @@ export async function POST(
                 );
               }
               stepsExecuted++;
-
-              // A `continue_with_flag` fallback reaps to status 'flagged' and
-              // leaves the instance running on the same step. Without advancing,
-              // the loop would re-enter with no running execution and dispatch a
-              // fresh attempt — restarting the very step we just timed out. Move
-              // the run forward with an empty envelope so it leaves the stranded
-              // state. Escalate/pause fallbacks already paused the instance and
-              // fall through to the loop's status check on the next pass.
-              const afterReap = await instanceRepo.getById(instanceId);
-              if (afterReap?.status === 'running' && afterReap.currentStepId === instance.currentStepId) {
-                console.log(`[auto-runner] Reaped step '${instance.currentStepId}' left the run on the same step (continue_with_flag) — advancing past it`);
-                const { engine } = getPlatformServices();
-                await engine.advanceStep(instanceId, {}, { id: 'auto-runner', role: 'system' });
-              }
+              // The escalation paused the instance; the loop's status check ends the run.
               continue;
             }
 
             // Retry branch (ADR-0010 §4): a prior execution marked `interrupted`
             // by the SIGTERM shutdown hook means we KNOW the driver was recycled
             // by a deploy, not that the step genuinely timed out. Unlike the
-            // reap-as-timeout path above (which honours `fallbackBehavior`), an
+            // reap-as-timeout path above (which escalates), an
             // interrupted step gets a fresh attempt below. The interrupted rows
             // stay as terminal-ish records and count toward the persisted
             // `MAX_STEP_ATTEMPTS` cap, so this retry can't loop unbounded.

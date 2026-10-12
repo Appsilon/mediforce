@@ -65,14 +65,20 @@ export const AgentDefinitionSchema = z.object({
 
 export type AgentDefinition = z.infer<typeof AgentDefinitionSchema>;
 
-/** ADR-0025 decision 3: a private Skill is held only by a private Agent of its
- *  own Namespace; a public Skill by every Agent. */
-export function agentMayHoldSkill(
-  agent: Pick<AgentDefinition, 'namespace' | 'visibility'>,
+/** ADR-0025 decision 3, ADR-0027 decision 4: a private Skill is held only by
+ *  a private Agent, or added only by a Step of a private Workflow, of its own
+ *  Namespace; a public Skill by every one. */
+export interface SkillHolder {
+  namespace?: string;
+  visibility: 'public' | 'private';
+}
+
+export function mayHoldSkill(
+  holder: SkillHolder,
   skill: Pick<Skill, 'namespace' | 'visibility'>,
 ): boolean {
   if (skill.visibility === 'public') return true;
-  return agent.visibility === 'private' && agent.namespace === skill.namespace;
+  return holder.visibility === 'private' && holder.namespace === skill.namespace;
 }
 
 export const CreateAgentDefinitionInputSchema = AgentDefinitionSchema.omit({

@@ -2,12 +2,11 @@
 
 import * as React from 'react';
 import { BookOpen } from 'lucide-react';
-import type { AgentSkillRef, AgentVisibility } from '@mediforce/platform-core';
+import { mayHoldSkill, type AgentSkillRef, type AgentVisibility } from '@mediforce/platform-core';
 import Link from 'next/link';
 import { routes } from '@/lib/routes';
-import { useSkills } from '@/hooks/use-skills';
-
-const SKILL_LOADING_RUNTIMES: ReadonlySet<string> = new Set(['claude-code-agent', 'opencode-agent']);
+import { skillKey, useSkills } from '@/hooks/use-skills';
+import { SkillRuntimeWarning } from '@/components/skills/skill-runtime-warning';
 
 interface AgentSkillsSectionProps {
   /** The agent's workspace, whose Skills are listed first. A built-in agent
@@ -26,7 +25,7 @@ interface SkillOption {
   description: string | null;
 }
 
-const refKey = (ref: AgentSkillRef) => `${ref.namespace}/${ref.id}`;
+const refKey = (ref: AgentSkillRef) => skillKey(ref.namespace, ref.id);
 
 /**
  * The Skills an agent may hold (ADR-0025 decision 3): a private agent its own
@@ -39,8 +38,8 @@ export function AgentSkillsSection({ namespace, ownsNamespace, visibility, selec
   const available = skills.data ?? [];
 
   const selectedKeys = new Set(selected.map(refKey));
-  const mayHold = available.filter((skill) =>
-    skill.visibility === 'public' || (visibility === 'private' && ownsNamespace && skill.namespace === namespace));
+  const holder = { namespace: ownsNamespace ? namespace : undefined, visibility };
+  const mayHold = available.filter((skill) => mayHoldSkill(holder, skill));
   const mayHoldKeys = new Set(mayHold.map(refKey));
   const options: SkillOption[] = [
     ...mayHold.map((skill) => ({ ref: { namespace: skill.namespace, id: skill.id }, description: skill.description })),
@@ -70,12 +69,7 @@ export function AgentSkillsSection({ namespace, ownsNamespace, visibility, selec
         the task.
       </p>
 
-      {runtimeId !== undefined && SKILL_LOADING_RUNTIMES.has(runtimeId) === false && (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-          Skills are applied to Claude Code and OpenCode agents only. This agent&apos;s runtime is{' '}
-          <code className="font-mono">{runtimeId}</code>, so it will not receive them.
-        </div>
-      )}
+      <SkillRuntimeWarning runtimeId={runtimeId} subject="This agent" />
 
       {skills.isError && (
         <div className="rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">

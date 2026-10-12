@@ -745,7 +745,7 @@ describe('executeAgentStep', () => {
         status: 'completed',
         envelope: { ...defaultEnvelope, result: null },
         appliedToWorkflow: true,
-        fallbackReason: 'low_confidence',
+        fallbackReason: 'output_schema',
       });
 
       await expect(
@@ -797,7 +797,7 @@ describe('executeAgentStep', () => {
         status: 'escalated',
         envelope: defaultEnvelope,
         appliedToWorkflow: false,
-        fallbackReason: 'low_confidence',
+        fallbackReason: 'output_schema',
       });
 
       await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1');
@@ -823,13 +823,13 @@ describe('executeAgentStep', () => {
       expect(mockHumanTaskRepo.create).toHaveBeenCalled();
     });
 
-    it('[DATA] L3 with review.type=agent + escalated (low_confidence) still creates HumanTask with escalationReason', async () => {
+    it('[DATA] L3 with review.type=agent + escalated (output_schema) still creates HumanTask with escalationReason', async () => {
       const l3AgentReview: WorkflowStep = { ...l3Step, review: { type: 'agent' } };
       mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
         status: 'escalated',
         envelope: defaultEnvelope,
         appliedToWorkflow: false,
-        fallbackReason: 'low_confidence',
+        fallbackReason: 'output_schema',
       });
 
       await executeAgentStep('inst-wf-001', 'gather-data', l3AgentReview, {}, 'user-1');
@@ -839,7 +839,7 @@ describe('executeAgentStep', () => {
           creationReason: 'agent_review_l3',
           completionData: expect.objectContaining({
             agentOutput: expect.objectContaining({
-              escalationReason: 'low_confidence',
+              escalationReason: 'output_schema',
             }),
           }),
         }),
@@ -865,7 +865,7 @@ describe('executeAgentStep', () => {
         status: 'escalated',
         envelope: defaultEnvelope,
         appliedToWorkflow: false,
-        fallbackReason: 'low_confidence',
+        fallbackReason: 'output_schema',
       });
 
       await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1', 'exec-1');
@@ -1078,7 +1078,7 @@ describe('executeAgentStep', () => {
         status: 'escalated',
         envelope: null,
         appliedToWorkflow: false,
-        fallbackReason: 'low_confidence',
+        fallbackReason: 'output_schema',
       });
 
       await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
@@ -1089,7 +1089,7 @@ describe('executeAgentStep', () => {
       );
       expect(escalationAudit).toBeDefined();
       expect((escalationAudit![0] as Record<string, unknown>).inputSnapshot).toEqual(
-        expect.objectContaining({ fallbackReason: 'low_confidence' }),
+        expect.objectContaining({ fallbackReason: 'output_schema' }),
       );
     });
   });

@@ -8,7 +8,7 @@ import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, s
 /**
  * API E2E for production Evaluators (ADR-0023 D13): a `schema`
  * Evaluator marked "also run in production" fails a live run's output, which
- * takes the step's `fallbackBehavior` with reason `production_evaluator`, and
+ * escalates it to a person with reason `production_evaluator`, and
  * scores the run with a Score marked `production`. The flag reports whether
  * it is in effect.
  *
@@ -28,12 +28,12 @@ async function scoresOf(request: APIRequestContext, runId: string) {
 }
 
 test.describe('Step Evaluation production Evaluators — API E2E', () => {
-  test('a failing production Evaluator sends the run to the step fallback and scores it', async ({ request }) => {
+  test('a failing production Evaluator escalates the run and scores it', async ({ request }) => {
     test.setTimeout(120_000);
     const workflowName = `e2e-production-${randomUUID().slice(0, 8)}`;
     const firstRunId = await startRun(request, agentStepWorkflow(workflowName, {
       autonomyLevel: 'L4',
-      agent: { prompt: 'Grade each AE.', fallbackBehavior: 'continue_with_flag' },
+      agent: { prompt: 'Grade each AE.' },
     }));
     const beforeFlag = await awaitFinishedAgentRun(request, firstRunId);
     expect(beforeFlag).toMatchObject({ status: 'completed', fallbackReason: null });
@@ -54,7 +54,7 @@ test.describe('Step Evaluation production Evaluators — API E2E', () => {
     }, 201) as { run: { id: string } };
     const gated = await awaitFinishedAgentRun(request, gatedRunRes.run.id);
 
-    expect(gated).toMatchObject({ status: 'flagged', fallbackReason: 'production_evaluator' });
+    expect(gated).toMatchObject({ status: 'escalated', fallbackReason: 'production_evaluator' });
     const [score] = await scoresOf(request, gatedRunRes.run.id);
     expect(score).toMatchObject({
       name: 'findings-present', value: 0, source: 'deterministic', evaluatorId: created.evaluator.id,

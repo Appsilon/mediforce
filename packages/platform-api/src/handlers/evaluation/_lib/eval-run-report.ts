@@ -270,7 +270,7 @@ export async function buildEvalRunReport(scope: CallerScope, run: EvalRun, trial
     evaluators,
     criteriaVerdict,
     confidence: calibrateConfidence(outcomes),
-    recommendation: finished ? recommendControl(outcomes, criteriaVerdict) : null,
+    recommendation: finished ? recommendControl(criteriaVerdict) : null,
     judgeVerdicts: judgeVerdicts(run, trials, scores, cases),
     trialResults: trialResults(run, trials, scores, cases),
     costUsd: costs.reduce((sum, cost) => sum + cost, 0),

@@ -137,6 +137,7 @@ export {
   OutputSchemaPropertyTypeSchema,
   ScriptStepConfigSchema,
   DatabricksJobConfigSchema,
+  DEFAULT_STEP_TIMEOUT_MINUTES,
   resolveStepTimeoutMinutes,
   resolveStepTimeoutMs,
   resolveStrandedBudgetMs,
@@ -647,7 +648,8 @@ export {
   AgentVisibilitySchema,
   CreateAgentDefinitionInputSchema,
   UpdateAgentDefinitionInputSchema,
-  agentMayHoldSkill,
+  mayHoldSkill,
+  type SkillHolder,
 } from './schemas/agent-definition';
 export type {
   AgentDefinition,

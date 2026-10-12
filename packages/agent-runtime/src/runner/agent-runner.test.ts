@@ -402,44 +402,25 @@ describe('AgentRunner', () => {
     const context = makeContext({ autonomyLevel: 'L4' });
     const stepConfig = makeStepConfig({
       timeoutMinutes: 0.0001, // ~6ms
-      fallbackBehavior: 'escalate_to_human',
     });
 
     const result = await runner.run(plugin, context, stepConfig);
 
     // Should have triggered fallback
     expect(result.fallbackReason).toBe('timeout');
-    expect(['escalated', 'flagged', 'paused']).toContain(result.status);
+    expect(result.status).toBe('escalated');
   }, 5000);
-
-  // --- Test 7: Low confidence triggers fallback ---
-  it('Low confidence: triggers fallback when confidence below threshold', async () => {
-    const envelope = makeValidEnvelope({ confidence: 0.5 });
-    const plugin = makeSuccessPlugin(envelope);
-    const context = makeContext({ autonomyLevel: 'L4' });
-    const stepConfig = makeStepConfig({
-      confidenceThreshold: 0.8,
-      fallbackBehavior: 'continue_with_flag',
-    });
-
-    const result = await runner.run(plugin, context, stepConfig);
-
-    expect(result.fallbackReason).toBe('low_confidence');
-    expect(result.status).toBe('flagged');
-  });
 
   // --- Test 8: Invalid result envelope triggers error fallback ---
   it('Invalid envelope: triggers error fallback when result payload fails schema validation', async () => {
     const plugin = makeInvalidEnvelopePlugin();
     const context = makeContext({ autonomyLevel: 'L4' });
-    const stepConfig = makeStepConfig({
-      fallbackBehavior: 'continue_with_flag',
-    });
+    const stepConfig = makeStepConfig();
 
     const result = await runner.run(plugin, context, stepConfig);
 
     expect(result.fallbackReason).toBe('error');
-    expect(result.status).toBe('flagged');
+    expect(result.status).toBe('escalated');
   });
 
   // --- Test 9: Audit event fields (COMP-05) ---
@@ -491,7 +472,7 @@ describe('AgentRunner', () => {
   it('Audit event is appended even on fallback (error case)', async () => {
     const plugin = makeInvalidEnvelopePlugin();
     const context = makeContext({ autonomyLevel: 'L4' });
-    const stepConfig = makeStepConfig({ fallbackBehavior: 'escalate_to_human' });
+    const stepConfig = makeStepConfig();
 
     await runner.run(plugin, context, stepConfig);
 
@@ -507,7 +488,7 @@ describe('AgentRunner', () => {
       run: async () => { throw new Error('LLM API key invalid'); },
     };
     const context = makeContext({ autonomyLevel: 'L2' });
-    const stepConfig = makeStepConfig({ fallbackBehavior: 'escalate_to_human' });
+    const stepConfig = makeStepConfig();
 
     const result = await runner.run(plugin, context, stepConfig);
 
@@ -526,7 +507,7 @@ describe('AgentRunner', () => {
       run: async () => { throw new Error('OpenRouter 401 Unauthorized'); },
     };
     const context = makeContext({ autonomyLevel: 'L2' });
-    const stepConfig = makeStepConfig({ fallbackBehavior: 'escalate_to_human' });
+    const stepConfig = makeStepConfig();
 
     await runner.run(plugin, context, stepConfig);
 
@@ -547,7 +528,7 @@ describe('AgentRunner', () => {
       },
     };
     const context = makeContext({ autonomyLevel: 'L4' });
-    const stepConfig = makeStepConfig({ fallbackBehavior: 'continue_with_flag' });
+    const stepConfig = makeStepConfig();
 
     const result = await runner.run(plugin, context, stepConfig);
 
@@ -664,7 +645,7 @@ describe('AgentRunner.reapAsTimeout (issue #868)', () => {
       type: 'review',
       executor: 'agent',
       plugin: 'test-plugin',
-      agent: { model: 'anthropic/claude-sonnet-4', fallbackBehavior: 'escalate_to_human' },
+      agent: { model: 'anthropic/claude-sonnet-4' },
     };
 
     const result = await runner.reapAsTimeout(makeWorkflowContext({ step }));
@@ -770,13 +751,11 @@ describe('AgentRunner.markStepRunsInterrupted (issue #907)', () => {
 describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
   const outputSchema = { type: 'object' as const, required: ['findings'], properties: { findings: { type: 'array' as const } } };
 
-  function makeSchemaStepContext(
-    fallbackBehavior: 'escalate_to_human' | 'continue_with_flag' | 'pause',
-  ): WorkflowAgentContext {
+  function makeSchemaStepContext(): WorkflowAgentContext {
     const base = makeWorkflowContext({ autonomyLevel: 'L4' });
     return {
       ...base,
-      step: { ...base.step, agent: { ...base.step.agent, outputSchema, fallbackBehavior } },
+      step: { ...base.step, agent: { ...base.step.agent, outputSchema } },
     };
   }
 
@@ -811,7 +790,7 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
   it('accepts a conforming result on the first attempt without retrying', async () => {
     const { plugin, seenContexts } = makeScriptedPlugin([makeValidEnvelope({ result: { findings: [] } })]);
 
-    const result = await runner.runWithWorkflowStep(plugin, makeSchemaStepContext('continue_with_flag'));
+    const result = await runner.runWithWorkflowStep(plugin, makeSchemaStepContext());
 
     expect(result.status).toBe('completed');
     expect(result.fallbackReason).toBeNull();
@@ -824,7 +803,7 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
       makeValidEnvelope({ result: { findings: ['AE grade 3'] } }),
     ]);
 
-    const result = await runner.runWithWorkflowStep(plugin, makeSchemaStepContext('continue_with_flag'));
+    const result = await runner.runWithWorkflowStep(plugin, makeSchemaStepContext());
 
     expect(result.status).toBe('completed');
     expect(result.envelope?.result).toEqual({ findings: ['AE grade 3'] });
@@ -837,12 +816,12 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
     expect(statuses.some((payload) => payload.includes('missing required keys: findings'))).toBe(true);
   });
 
-  it('routes a second violation to fallbackBehavior with reason output_schema', async () => {
+  it('escalates a second violation with reason output_schema', async () => {
     const { plugin, seenContexts } = makeScriptedPlugin([
       makeValidEnvelope({ result: { summary: 'still wrong' } }),
     ]);
 
-    const result = await runner.runWithWorkflowStep(plugin, makeSchemaStepContext('escalate_to_human'));
+    const result = await runner.runWithWorkflowStep(plugin, makeSchemaStepContext());
 
     expect(seenContexts).toHaveLength(2);
     expect(result.status).toBe('escalated');
@@ -853,24 +832,24 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
   });
 
   it('does not retry a non-schema failure', async () => {
-    const { plugin, seenContexts } = makeScriptedPlugin([
-      makeValidEnvelope({ confidence: 0.2, result: { findings: [] } }),
-    ]);
-    const context = makeSchemaStepContext('continue_with_flag');
-    const lowThresholdContext = {
-      ...context,
-      step: { ...context.step, agent: { ...context.step.agent, confidenceThreshold: 0.8 } },
+    let attempts = 0;
+    const plugin: StepExecutorPlugin = {
+      initialize: async () => {},
+      run: async () => {
+        attempts += 1;
+        throw new Error('container exited 1');
+      },
     };
 
-    const result = await runner.runWithWorkflowStep(plugin, lowThresholdContext);
+    const result = await runner.runWithWorkflowStep(plugin, makeSchemaStepContext());
 
-    expect(result.fallbackReason).toBe('low_confidence');
-    expect(seenContexts).toHaveLength(1);
+    expect(result.fallbackReason).toBe('error');
+    expect(attempts).toBe(1);
   });
 
   describe('output gate — production Evaluators (D13)', () => {
-    function gatedContext(gate: AgentOutputGate, fallbackBehavior: 'escalate_to_human' | 'continue_with_flag' = 'escalate_to_human'): WorkflowAgentContext {
-      return { ...makeSchemaStepContext(fallbackBehavior), outputGate: gate };
+    function gatedContext(gate: AgentOutputGate): WorkflowAgentContext {
+      return { ...makeSchemaStepContext(), outputGate: gate };
     }
 
     function statuses(): string[] {
@@ -893,7 +872,7 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
       expect(call.envelope.result).toEqual({ findings: [] });
     });
 
-    it('routes a gate failure to fallbackBehavior with reason production_evaluator', async () => {
+    it('escalates a gate failure with reason production_evaluator', async () => {
       const auditRepository = new InMemoryAuditRepository();
       runner = new AgentRunner(instanceRepository, auditRepository, eventLog);
       const gate: AgentOutputGate = async () => ({ failure: "Evaluator 'grade-5-flagged' v1 failed: grade 4 on a fatal AE", errors: [] });
@@ -908,22 +887,6 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
       expect(statuses().some((payload) => payload.includes('failed a production Evaluator'))).toBe(true);
       const [audit] = await auditRepository.getByProcess('instance-1');
       expect(audit?.outputSnapshot).toMatchObject({ error: expect.stringContaining('grade 4 on a fatal AE') });
-    });
-
-    it('keeps a low-confidence signal in the error when the gate fails too', async () => {
-      const gate: AgentOutputGate = async () => ({ failure: "Evaluator 'grade-5-flagged' v1 failed", errors: [] });
-      const { plugin } = makeScriptedPlugin([makeValidEnvelope({ confidence: 0.5, result: { findings: [] } })]);
-      const context = gatedContext(gate);
-      const lowThresholdContext = {
-        ...context,
-        step: { ...context.step, agent: { ...context.step.agent, confidenceThreshold: 0.8 } },
-      };
-
-      const result = await runner.runWithWorkflowStep(plugin, lowThresholdContext);
-
-      expect(result.fallbackReason).toBe('production_evaluator');
-      expect(result.errorMessage).toContain('grade-5-flagged');
-      expect(result.errorMessage).toContain('below the confidence threshold');
     });
 
     it('never gates a result that still broke outputSchema', async () => {
@@ -959,7 +922,7 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
     const STEP_TIMEOUT_MS = 10 * 60_000;
 
     function makeTimedSchemaStepContext(): WorkflowAgentContext {
-      const context = makeSchemaStepContext('escalate_to_human');
+      const context = makeSchemaStepContext();
       return {
         ...context,
         step: { ...context.step, agent: { ...context.step.agent, timeoutMinutes: STEP_TIMEOUT_MS / 60_000 } },

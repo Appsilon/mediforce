@@ -1,7 +1,7 @@
 import type { UpdateAgentInput, UpdateAgentBody, UpdateAgentOutput } from '../../contract/agents';
 import type { CallerScope } from '../../repositories/index';
 import { actorFromCaller } from '../_helpers';
-import { assertAgentMayHoldSkills } from './agent-skills';
+import { assertAgentMayHoldSkills } from '../skills/may-hold-skills';
 import { assertBindingsTargetCatalogEntries } from './mcp-bindings';
 
 // Body is merged into input by the route adapter — see route.ts for the

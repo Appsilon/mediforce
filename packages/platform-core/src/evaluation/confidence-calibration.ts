@@ -7,8 +7,6 @@ export interface ConfidenceOutcome {
 }
 
 const BIN_COUNT = 5;
-/** Fewer trials than this above a threshold say too little to let them run without a person. */
-const MIN_COVERED_TRIALS = 5;
 
 /**
  * The reliability curve of agent-reported confidence — equal-width bins, each
@@ -40,54 +38,21 @@ export function calibrateConfidence(outcomes: readonly ConfidenceOutcome[]): Con
 }
 
 /**
- * What an Eval Run's results say about routing the step's outputs. Control Mode 4 with
- * a `confidenceThreshold` when some confidence level separates outputs that
- * pass: the lowest threshold whose outputs at or above it passed every counted
- * Evaluator at a rate of at least the criteria's `minPassRate`,
- * over at least a handful of trials. Below it the
- * step's fallback routes the output — so a step that misses its criteria
- * overall can still run unreviewed where it is confident. Control Mode 3, a
- * person reviewing every output, when there are no criteria, they could not
- * be judged, the agent reported no confidence, or no threshold holds.
+ * What an Eval Run's results say about routing the step's outputs: Control
+ * Mode 4, the agent applying its output unreviewed, when every counted
+ * Evaluator met the Acceptance Criteria; Control Mode 3, a person reviewing
+ * every output, when there are no criteria, they could not be judged, or they
+ * were missed.
  */
-export function recommendControl(
-  outcomes: readonly ConfidenceOutcome[],
-  verdict: AcceptanceCriterionVerdict | null,
-): ControlRecommendation {
-  const review = (reason: string): ControlRecommendation => ({
-    autonomyLevel: 'L3', confidenceThreshold: null, coverage: null, reason,
-  });
+export function recommendControl(verdict: AcceptanceCriterionVerdict | null): ControlRecommendation {
   if (verdict === null) {
-    return review('No Acceptance Criteria were frozen into this run, so there is no floor to run unreviewed against; keep a person reviewing every output.');
+    return { autonomyLevel: 'L3', reason: 'No Acceptance Criteria were frozen into this run, so there is no floor to run unreviewed against; keep a person reviewing every output.' };
   }
   if (verdict.status === 'not_evaluable') {
-    return review('The Acceptance Criteria could not be judged; keep a person reviewing every output.');
+    return { autonomyLevel: 'L3', reason: 'The Acceptance Criteria could not be judged; keep a person reviewing every output.' };
   }
-  if (outcomes.length === 0) {
-    return review('The agent reported no confidence to route on; keep a person reviewing every output.');
+  if (verdict.status === 'met') {
+    return { autonomyLevel: 'L4', reason: `Outputs passed every counted Evaluator at or above the floor ${verdict.criterion.minPassRate}; the agent can apply its output without a person.` };
   }
-
-  const met = verdict.status === 'met';
-  const target = verdict.criterion.minPassRate;
-  const thresholds = [...new Set(outcomes.map((outcome) => outcome.confidence))].sort((left, right) => left - right);
-  for (const threshold of thresholds) {
-    const covered = outcomes.filter((outcome) => outcome.confidence >= threshold);
-    if (covered.length < MIN_COVERED_TRIALS) break;
-    const passes = covered.filter((outcome) => outcome.passed === true).length;
-    const passRate = passes / covered.length;
-    if (passRate >= target) {
-      return {
-        autonomyLevel: 'L4',
-        confidenceThreshold: threshold,
-        coverage: covered.length / outcomes.length,
-        reason: `${met ? 'The criteria were met, and outputs' : 'The criteria were missed overall, but outputs'} with confidence ${threshold} or more `
-          + `passed every counted Evaluator ${passes}/${covered.length} times (pass rate ${passRate.toFixed(2)}, at least the floor ${target}). `
-          + 'Below the threshold the step\'s fallbackBehavior applies; escalate_to_human sends the output to a person.',
-      };
-    }
-  }
-  return review(
-    `No confidence level separates outputs that pass every counted Evaluator at a rate of ${target} `
-    + `over at least ${MIN_COVERED_TRIALS} trials; keep a person reviewing every output, or run more trials.`,
-  );
+  return { autonomyLevel: 'L3', reason: `Outputs missed the floor ${verdict.criterion.minPassRate}; keep a person reviewing every output, or fix the failures and run again.` };
 }

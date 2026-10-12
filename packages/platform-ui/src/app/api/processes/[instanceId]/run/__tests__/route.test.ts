@@ -319,44 +319,6 @@ describe('POST /api/processes/[instanceId]/run', () => {
       expect(mockInstanceAddStepExecution).not.toHaveBeenCalled();
     });
 
-    it('[DATA] advances past a continue_with_flag reap instead of re-dispatching the timed-out step (issue #868)', async () => {
-      let callCount = 0;
-      mockInstanceGetById.mockImplementation(() => {
-        callCount++;
-        const base = {
-          id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest',
-          definitionVersion: '1', configName: undefined, variables: {}, triggerPayload: {},
-        };
-        // Reap + afterReap read the run still `running` on the same step
-        // (continue_with_flag leaves it there). Once advanced, the loop lands on
-        // the terminal step and exits.
-        return Promise.resolve(callCount <= 3
-          ? { ...base, status: 'running', currentStepId: 'gather-data' }
-          : { ...base, status: 'running', currentStepId: 'done' });
-      });
-      mockGetWorkflowDefinition.mockResolvedValue(workflowDefinition);
-      mockGetStepExecutions.mockResolvedValue([
-        { id: 'exec-stranded', stepId: 'gather-data', status: 'running', startedAt: new Date(Date.now() - 40 * 60_000).toISOString() },
-      ]);
-      // executeAgentStep (reap) does not move the instance off the step — mirrors
-      // the continue_with_flag fallback returning status 'flagged'.
-      mockExecuteAgentStep.mockResolvedValue({
-        instanceId: 'inst-1', status: 'running', currentStepId: 'gather-data', agentRunStatus: 'flagged',
-      });
-
-      await POST(makeRequest(), { params: makeParams('inst-1') });
-      await afterCallback!();
-
-      // Reaped once, then advanced past the flagged step — no fresh attempt.
-      expect(mockExecuteAgentStep).toHaveBeenCalledTimes(1);
-      expect(mockExecuteAgentStep).toHaveBeenCalledWith(
-        'inst-1', 'gather-data', expect.objectContaining({ id: 'gather-data' }),
-        expect.anything(), expect.any(String), 'exec-stranded', { reapTimedOut: true },
-      );
-      expect(mockAdvanceStep).toHaveBeenCalledWith('inst-1', {}, { id: 'auto-runner', role: 'system' });
-      expect(mockInstanceAddStepExecution).not.toHaveBeenCalled();
-    });
-
     it('[DATA] retries a deploy-interrupted step as a fresh attempt, not a timeout reap (issue #907)', async () => {
       let callCount = 0;
       mockInstanceGetById.mockImplementation(() => {

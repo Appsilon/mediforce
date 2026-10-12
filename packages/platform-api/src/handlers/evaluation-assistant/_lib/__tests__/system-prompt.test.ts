@@ -22,7 +22,7 @@ describe('Evaluation Assistant prompt', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('newest finished Eval Run of its workflow version');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('it rests on that run alone');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toContain('citing the Brief');
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Propose it with propose_control_settings');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Propose the recommendation with propose_control_settings');
   });
 
   it('covers diagnosis: failures, root causes, fixes by what expresses them', () => {

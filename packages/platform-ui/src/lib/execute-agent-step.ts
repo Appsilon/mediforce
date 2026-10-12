@@ -207,12 +207,13 @@ export async function executeAgentStep(
     : {};
   const agentIdentityPrompt = agentDefaults.identityPrompt;
 
-  // The Skills the step's agent holds, each from the namespace its reference
-  // names (ADR-0025 decision 4). undefined when the step has no agentId; a
-  // reference to a Skill that is gone fails the step.
+  // The Skills offered to the step: its agent's and the ones it adds, each
+  // from the namespace its reference names (ADR-0025 §4, ADR-0027).
+  // undefined when there are none to resolve; a reference to a Skill that is
+  // gone fails the step.
   const agentSkills = reapTimedOut
     ? undefined
-    : (await resolveSkillsForStep(workflowStep, { agentDefinitionRepo, skillRepo: runtimeSkillRepo })) ?? undefined;
+    : (await resolveSkillsForStep(workflowStep, { agentDefinitionRepo, skillRepo: runtimeSkillRepo }, workflowDefinition)) ?? undefined;
 
   // Picking an agent picks its model unless the step deliberately overrides it.
   const resolvedStep = applyAgentModel(workflowStep, agentDefaults.model);

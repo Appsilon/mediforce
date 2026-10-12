@@ -92,8 +92,6 @@
         "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
         "model": "haiku",
         "image": "mediforce-landing-zone:latest",
-        "confidenceThreshold": 0.7,
-        "fallbackBehavior": "escalate_to_human",
         "timeoutMinutes": 15
       }
     },
@@ -154,8 +152,6 @@
         "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
         "model": "haiku",
         "image": "mediforce-landing-zone:latest",
-        "confidenceThreshold": 0.7,
-        "fallbackBehavior": "continue_with_flag",
         "timeoutMinutes": 5
       }
     },
@@ -198,8 +194,6 @@
         "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
         "model": "haiku",
         "image": "mediforce-landing-zone:latest",
-        "confidenceThreshold": 0.7,
-        "fallbackBehavior": "escalate_to_human",
         "timeoutMinutes": 10
       }
     },

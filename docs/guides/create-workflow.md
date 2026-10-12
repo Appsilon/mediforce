@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-09-02
+last_reviewed: 2026-10-12
 ---
 
 # How to create a workflow
@@ -43,9 +43,9 @@ placing and wiring blocks by hand.
   files the workflow carries (a script, a Dockerfile, a SKILL.md), one file per
   call. Files appear in the **Files** panel, where you can edit them, upload
   more from disk (a folder keeps its structure, so a `skills/` directory
-  uploads whole) or drop them in, and a run reads them from `/artifacts`. A
-  skill among those files is offered by name on an agent step, which fills in
-  the directory it lives in — no repository path to type. It does not edit secrets or other workspace
+  uploads whole) or drop them in, and a run reads them from `/artifacts`.
+  Skills don't belong there: an agent step picks them from the Skill catalog,
+  on top of its agent's own. It does not edit secrets or other workspace
   state, except the parts it can now set up for you: it can list the workspace's
   secret **keys** (never their values), list and create **agents** a step points
   at, and list the **Tool Catalog** servers an agent binds to. Those calls run

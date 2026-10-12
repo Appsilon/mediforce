@@ -1,6 +1,6 @@
 import { WorkflowAuthorableSchema } from '@mediforce/platform-core';
 import { formatStepName } from '@/lib/format';
-import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
+import type { AgentDefinition, WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
 type Transitions = WorkflowDefinition['transitions'];
 type CarryOverEntries = NonNullable<WorkflowDefinition['inputForNextRun']>;
@@ -270,17 +270,20 @@ export function withDefaultModel(step: WorkflowStep, defaultModel: string): Work
 /**
  * The patch for picking a saved agent on a step. A model that is still the
  * default `withDefaultModel` filled in is dropped, so the step inherits the
- * agent's own model rather than overriding it with the default.
+ * agent's own model rather than overriding it with the default. A plugin agent
+ * names the runtime it runs on, so the step's plugin is filled from it; the
+ * author may still change it afterwards.
  */
 export function selectAgentPatch(
-  step: Pick<WorkflowStep, 'agent'>,
-  agentId: string | undefined,
+  step: Pick<WorkflowStep, 'agent' | 'plugin'>,
+  agent: Pick<AgentDefinition, 'id' | 'kind' | 'runtimeId'> | undefined,
   defaultModel: string,
-): Pick<WorkflowStep, 'agentId' | 'agent'> {
+): Pick<WorkflowStep, 'agentId' | 'agent' | 'plugin'> {
+  const plugin = agent?.kind === 'plugin' && agent.runtimeId !== undefined ? agent.runtimeId : step.plugin;
   const model = step.agent?.model;
-  if (agentId === undefined || model !== defaultModel) {
-    return { agentId, agent: step.agent };
+  if (agent === undefined || model !== defaultModel) {
+    return { agentId: agent?.id, agent: step.agent, plugin };
   }
   const { model: _defaultModel, ...rest } = step.agent ?? {};
-  return { agentId, agent: Object.keys(rest).length > 0 ? rest : undefined };
+  return { agentId: agent.id, agent: Object.keys(rest).length > 0 ? rest : undefined, plugin };
 }

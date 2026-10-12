@@ -12,6 +12,7 @@ import { ProcessNotificationConfigSchema } from './process-config';
 import { BuildContextSchema } from '../utils/docker-build-paths';
 import { McpServerConfigSchema } from './mcp-server-config';
 import { StepMcpRestrictionSchema } from './agent-mcp-binding';
+import { AgentSkillRefsSchema } from './agent-definition';
 
 /** HTTP method enum used by the http action handler and (via the detached
  *  Trigger resource) webhook triggers. */
@@ -159,12 +160,12 @@ export const WorkflowAgentConfigSchema = z.object({
   skill: z.string().optional(),
   prompt: z.string().optional(),
   skillsDir: z.string().optional(),
-  timeoutMs: z.number().positive().optional(),
+  /** Catalog Skills this step offers on top of its agent's (ADR-0027). A
+   *  Skill of the agent's with the same id is replaced by the step's. */
+  skills: AgentSkillRefsSchema.optional(),
   timeoutMinutes: z.number().optional(),
-  confidenceThreshold: z.number().min(0).max(1).optional(),
-  fallbackBehavior: z.enum(['escalate_to_human', 'continue_with_flag', 'pause']).optional(),
   /** Shown to the agent in its prompt and checked against `result` after the
-   *  run: one retry with the validation error, then `fallbackBehavior`. */
+   *  run: one retry with the validation error, then the run is escalated. */
   outputSchema: AgentOutputSchemaSchema.optional(),
   /** @deprecated Step-level MCP configuration is being removed.
    *  Move servers onto the agent via AgentDefinition.mcpServers and
@@ -172,10 +173,6 @@ export const WorkflowAgentConfigSchema = z.object({
    *  Step 2 of the MCP permissions refactor will migrate existing
    *  workflows and drop this field. Still parsed for backward-compat. */
   mcpServers: z.array(McpServerConfigSchema).optional(),
-  /** Additional Claude Code tools to allow beyond the default set
-   *  (Bash, Read, Write, Edit, Glob, Grep). Use this to grant internet
-   *  access (WebSearch, WebFetch) or any other built-in tool. */
-  allowedTools: z.array(z.string()).optional(),
 }).merge(ContainerSchema);
 
 /**
@@ -987,9 +984,11 @@ export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
 export type InputForNextRunEntry = z.infer<typeof InputForNextRunEntrySchema>;
 
+/** How long a step may run when it names no timeout of its own. */
+export const DEFAULT_STEP_TIMEOUT_MINUTES = 30;
+
 /**
  * Effective step timeout in minutes, regardless of executor flavour.
- * Mirrors the runtime's historical default of 30 minutes (agent-runner).
  */
 export function resolveStepTimeoutMinutes(
   step: Pick<WorkflowStep, 'agent' | 'script' | 'databricks'>,
@@ -997,7 +996,7 @@ export function resolveStepTimeoutMinutes(
   return step.agent?.timeoutMinutes
     ?? step.script?.timeoutMinutes
     ?? step.databricks?.timeoutMinutes
-    ?? 30;
+    ?? DEFAULT_STEP_TIMEOUT_MINUTES;
 }
 
 /**

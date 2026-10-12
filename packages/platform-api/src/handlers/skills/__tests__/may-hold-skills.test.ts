@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../errors';
-import { createAgent } from '../create-agent';
-import { updateAgent } from '../update-agent';
-import { createSkill } from '../../skills/create-skill';
-import { agentInput, createSkillTestKit, skillMd } from '../../skills/__tests__/fixtures';
+import { createAgent } from '../../agents/create-agent';
+import { updateAgent } from '../../agents/update-agent';
+import { createSkill } from '../create-skill';
+import { agentInput, createSkillTestKit, skillMd } from './fixtures';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 const skillFiles = (name: string) => [{ path: 'SKILL.md', contents: skillMd(name) }];

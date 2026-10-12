@@ -1,3 +1,5 @@
+import type { Page } from '@playwright/test';
+import type { WorkflowDefinition } from '@mediforce/platform-core';
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { trackPageErrors } from '../helpers/page-errors';
@@ -12,6 +14,24 @@ import { trackPageErrors } from '../helpers/page-errors';
 
 const WORKFLOW = 'Files Editor Test';
 const EDITOR_URL = `/${TEST_ORG_HANDLE}/workflows/${encodeURIComponent(WORKFLOW)}/definitions/1`;
+const DEFINITION_API = `/api/workflow-definitions/${encodeURIComponent(WORKFLOW)}`;
+
+async function saveVersion(page: Page, title: string): Promise<void> {
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 10_000 });
+  await page.getByPlaceholder('e.g. Added AI review step').fill(title);
+  await page.getByRole('button', { name: /save new version/i }).click();
+}
+
+/** The version saved under `title`, once the save has landed; null before. */
+async function savedVersion(page: Page, title: string): Promise<WorkflowDefinition | null> {
+  const list = await page.request.get(`${DEFINITION_API}/versions?namespace=${TEST_ORG_HANDLE}`);
+  const { versions } = (await list.json()) as { versions: { version: number; title?: string }[] };
+  const match = versions.find((entry) => entry.title === title);
+  if (match === undefined) return null;
+  const response = await page.request.get(`${DEFINITION_API}?namespace=${TEST_ORG_HANDLE}&version=${String(match.version)}`);
+  return ((await response.json()) as { definition: WorkflowDefinition }).definition;
+}
 
 test.describe('Workflow Files Journey', () => {
   test('a file written in the editor saves with the version and reopens', async ({ page }) => {
@@ -39,32 +59,18 @@ test.describe('Workflow Files Journey', () => {
     await page.keyboard.press('Escape');
     await expect(page.getByRole('heading', { name: 'Files', exact: true })).toBeHidden();
 
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 10_000 });
-    await page.getByPlaceholder('e.g. Added AI review step').fill('with a script');
-    await page.getByRole('button', { name: /save new version/i }).click();
+    await saveVersion(page, 'with a script');
 
     // The version carries the file, byte for byte.
-    let savedVersion = 0;
+    let version = 0;
     await expect(async () => {
-      const saved = await page.evaluate(async (workflow) => {
-        const base = `/api/workflow-definitions/${encodeURIComponent(workflow)}`;
-        const list = await fetch(`${base}/versions?namespace=test`);
-        const { versions } = (await list.json()) as { versions: { version: number; title?: string }[] };
-        const match = versions.find((entry) => entry.title === 'with a script');
-        if (match === undefined) return null;
-        const response = await fetch(`${base}?namespace=test&version=${String(match.version)}`);
-        const body = (await response.json()) as {
-          definition: { artifacts?: { path: string; contents: string }[] };
-        };
-        return { version: match.version, artifacts: body.definition.artifacts };
-      }, WORKFLOW);
+      const saved = await savedVersion(page, 'with a script');
       expect(saved?.artifacts).toEqual([{ path: 'scripts/poll.py', contents: 'print("poll")\n' }]);
-      savedVersion = saved?.version ?? 0;
+      version = saved?.version ?? 0;
     }).toPass({ timeout: 20_000 });
 
     // Reopening that version shows the file, so the round trip is complete.
-    await page.goto(`/${TEST_ORG_HANDLE}/workflows/${encodeURIComponent(WORKFLOW)}/definitions/${String(savedVersion)}`);
+    await page.goto(`/${TEST_ORG_HANDLE}/workflows/${encodeURIComponent(WORKFLOW)}/definitions/${String(version)}`);
     await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Files', exact: true }).click();
     await expect(page.getByLabel('File path')).toHaveValue('scripts/poll.py');
@@ -100,25 +106,10 @@ test.describe('Workflow Files Journey', () => {
 
     // And they register as the workflow's files.
     await page.keyboard.press('Escape');
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 10_000 });
-    await page.getByPlaceholder('e.g. Added AI review step').fill('uploaded files');
-    await page.getByRole('button', { name: /save new version/i }).click();
+    await saveVersion(page, 'uploaded files');
 
     await expect(async () => {
-      const saved = await page.evaluate(async (workflow) => {
-        const base = `/api/workflow-definitions/${encodeURIComponent(workflow)}`;
-        const list = await fetch(`${base}/versions?namespace=test`);
-        const { versions } = (await list.json()) as { versions: { version: number; title?: string }[] };
-        const match = versions.find((entry) => entry.title === 'uploaded files');
-        if (match === undefined) return null;
-        const response = await fetch(`${base}?namespace=test&version=${String(match.version)}`);
-        const body = (await response.json()) as {
-          definition: { artifacts?: { path: string; contents: string }[] };
-        };
-        return body.definition.artifacts;
-      }, WORKFLOW);
-      expect(saved).toEqual([
+      expect((await savedVersion(page, 'uploaded files'))?.artifacts).toEqual([
         { path: 'poll.py', contents: 'print("uploaded")\n' },
         { path: 'SKILL.md', contents: '# Validator\n' },
       ]);
@@ -140,30 +131,33 @@ test.describe('Workflow Files Journey', () => {
     await expect(page.getByText(/artifact path must not contain/i)).toBeVisible();
   });
 
-  test('an uploaded skills folder is offered where an agent step picks its skill', async ({ page }) => {
+  test('an agent step adds a catalog skill, and the version saves it', async ({ page }) => {
     trackPageErrors(page);
-    await page.goto(EDITOR_URL);
-    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+    const skillId = `e2e-step-skill-${Date.now()}`;
+    const skillRes = await page.request.post(`/api/skills?namespace=${TEST_ORG_HANDLE}`, {
+      data: { files: [{ path: 'SKILL.md', contents: `---\nname: ${skillId}\ndescription: Validate SDTM domains\n---\n` }] },
+    });
+    expect(skillRes.status(), await skillRes.text()).toBe(201);
 
-    await page.getByRole('button', { name: 'Files', exact: true }).click();
-    await page.getByLabel('Files to upload').setInputFiles([
-      { name: 'SKILL.md', mimeType: 'text/markdown', buffer: Buffer.from('# Data validator\n') },
-    ]);
-    // Uploaded flat, then given the path a skill needs: `<dir>/<skill>/SKILL.md`
-    // is what the runtime reads, and the picker below is what proves it.
-    await page.getByLabel('File path').fill('skills/data-validator/SKILL.md');
-    await page.keyboard.press('Escape');
+    try {
+      await page.goto(EDITOR_URL);
+      await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 10_000 });
+      await page.locator('.react-flow__node', { hasText: 'Interpret' }).first().click();
+      await page.getByText('Prompt & model').click();
 
-    await page.locator('.react-flow__node', { hasText: 'Interpret' }).first().click();
-    await page.getByText('Prompt & model').click();
+      // The step adds to its agent; the picker lists the workspace's catalog.
+      await expect(page.getByText(/nothing here replaces them/)).toBeVisible();
+      await page.getByLabel('Add skill').selectOption(`${TEST_ORG_HANDLE}/${skillId}`);
+      await expect(page.getByRole('button', { name: `Remove skill ${TEST_ORG_HANDLE}/${skillId}` })).toBeVisible();
 
-    const picker = page.getByLabel('Skill', { exact: true });
-    await expect(picker).toBeVisible();
-    await expect(picker.locator('option')).toHaveText(['None', 'data-validator']);
+      await saveVersion(page, 'with a step skill');
 
-    // Picking it fills in both fields the runtime needs, which is what typing a
-    // repo path by hand used to be for.
-    await picker.selectOption('skills/data-validator');
-    await expect(page.getByLabel('Skills directory')).toHaveValue('skills');
+      await expect(async () => {
+        const saved = await savedVersion(page, 'with a step skill');
+        expect(saved?.steps.find((step) => step.id === 'interpret')?.agent?.skills).toEqual([{ namespace: TEST_ORG_HANDLE, id: skillId }]);
+      }).toPass({ timeout: 20_000 });
+    } finally {
+      await page.request.delete(`/api/skills/${skillId}?namespace=${TEST_ORG_HANDLE}`);
+    }
   });
 });

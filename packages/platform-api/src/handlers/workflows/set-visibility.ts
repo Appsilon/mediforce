@@ -6,6 +6,7 @@ import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
 import { assertCallerMayEditWorkflow } from './_access-gate';
+import { assertStepsMayAddSkills } from '../skills/may-hold-skills';
 
 interface ScopedInput extends SetVisibilityInput {
   namespace: string;
@@ -26,6 +27,13 @@ export async function setWorkflowVisibility(
   // ADR-0019 `edit` — after the 404, so a gated workflow and a missing one
   // still look the same to someone who may not touch either.
   await assertCallerMayEditWorkflow(scope, input.namespace, input.name);
+
+  // Only the latest version is checked, as on a transfer (ADR-0027 §7): an
+  // older one that reaches a private Skill fails at run time, naming the step.
+  if (input.visibility === 'public') {
+    const latest = await scope.workflowDefinitions.get(input.namespace, input.name, latestVersion);
+    if (latest !== null) await assertStepsMayAddSkills({ ...latest, visibility: 'public' }, scope);
+  }
 
   await scope.workflowDefinitions.setVisibility(input.namespace, input.name, input.visibility);
 

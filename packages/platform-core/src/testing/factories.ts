@@ -332,8 +332,6 @@ export function buildProcessConfig(
         executorType: 'agent' as const,
         plugin: '@mediforce/intake-agent',
         autonomyLevel: 'L2' as const,
-        confidenceThreshold: 0.8,
-        fallbackBehavior: 'escalate_to_human' as const,
         timeoutMinutes: 30,
       },
       {

@@ -24,7 +24,7 @@ describe('computeStepFingerprint', () => {
 
     expect(await fingerprint({})).toEqual(base);
     expect(await fingerprint({
-      step: { name: 'Renamed', autonomyLevel: 'L4', review: { type: 'human' }, agent: { ...step.agent, confidenceThreshold: 0.8, fallbackBehavior: 'escalate_to_human' } },
+      step: { name: 'Renamed', autonomyLevel: 'L4', review: { type: 'human' } },
     })).toEqual(base);
     // The agent's model, named on the step, is the model it inherited.
     expect(await fingerprint({ step: { agent: { ...step.agent, model: 'anthropic/claude-sonnet-4' } } })).toEqual(base);
@@ -128,5 +128,60 @@ describe('computeStepFingerprint', () => {
     const broken = await fingerprint();
     expect(changedFingerprintComponents(edited, broken)).toEqual(['skill']);
     expect(broken.components.skill).not.toBe(withoutSkills.components.skill);
+  });
+
+  it('folds the skills the step adds into the skill component', async () => {
+    const fixture = await evaluationFixture();
+    const skillRepo = new InMemorySkillRepository();
+    const scope = fixture.scope(undefined, { skillRepo });
+    const { definition, step } = await loadEvaluatedStep(scope, STEP, 'read');
+    const addingStep = { ...step, agent: { ...step.agent, skills: [{ namespace: NAMESPACE, id: 'recist-reading' }] } };
+    const fingerprint = () => computeStepFingerprint(scope, { ...definition, steps: [addingStep] }, addingStep);
+    const skill = (contentHash: string) => ({
+      namespace: NAMESPACE,
+      id: 'recist-reading',
+      name: 'recist-reading',
+      description: 'Read tumour response by RECIST 1.1',
+      visibility: 'private' as const,
+      contentHash,
+      files: [{ path: 'SKILL.md', contents: '---\nname: recist-reading\ndescription: Read tumour response by RECIST 1.1\n---\n' }],
+    });
+
+    await skillRepo.create(skill('hash-v1'));
+    const added = await fingerprint();
+
+    await skillRepo.update(skill('hash-v2'));
+    const edited = await fingerprint();
+    expect(changedFingerprintComponents(added, edited)).toEqual(['skill']);
+  });
+
+  it('covers the skills a step adds without naming an agent', async () => {
+    const fixture = await evaluationFixture();
+    const skillRepo = new InMemorySkillRepository();
+    const scope = fixture.scope(undefined, { skillRepo });
+    const { definition, step } = await loadEvaluatedStep(scope, STEP, 'read');
+    const { agentId: _agentId, ...agentless } = step;
+    const withSkills = (skills: { namespace: string; id: string }[]) => ({ ...agentless, agent: { ...step.agent, skills } });
+    const fingerprint = (bare: WorkflowStep) => computeStepFingerprint(scope, { ...definition, steps: [bare] }, bare);
+    const skill = (contentHash: string) => ({
+      namespace: NAMESPACE,
+      id: 'meddra-coding',
+      name: 'meddra-coding',
+      description: 'Code verbatim AE terms to MedDRA PTs',
+      visibility: 'private' as const,
+      contentHash,
+      files: [{ path: 'SKILL.md', contents: '---\nname: meddra-coding\ndescription: Code verbatim AE terms to MedDRA PTs\n---\n' }],
+    });
+
+    const none = await fingerprint(withSkills([]));
+    expect(none.components.skill).toBe(createHash('sha256').update(canonicalJson(null)).digest('hex'));
+
+    await skillRepo.create(skill('hash-v1'));
+    const added = await fingerprint(withSkills([{ namespace: NAMESPACE, id: 'meddra-coding' }]));
+    expect(added.components.skill).not.toBe(none.components.skill);
+
+    await skillRepo.update(skill('hash-v2'));
+    const edited = await fingerprint(withSkills([{ namespace: NAMESPACE, id: 'meddra-coding' }]));
+    expect(changedFingerprintComponents(added, edited)).toEqual(['skill']);
   });
 });

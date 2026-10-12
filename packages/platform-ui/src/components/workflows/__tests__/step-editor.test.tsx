@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
-import type { AgentDefinition, ImageCommandCheck, ModelRegistryEntry, ToolCatalogEntry, WorkflowStep } from '@mediforce/platform-core';
+import type { AgentDefinition, ImageCommandCheck, ModelRegistryEntry, SkillSummary, ToolCatalogEntry, WorkflowStep } from '@mediforce/platform-core';
 import type { DockerImageInfo, ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 
 // ---- Mocks (must be before component import) ----
@@ -96,6 +96,15 @@ vi.mock('@/hooks/use-image-catalog', () => ({
     mcpState.askedImages.push(image);
     return mcpState.checks;
   },
+}));
+
+// The step's skill picker lists the workspace's catalog Skills.
+const skillState = vi.hoisted(() => ({
+  skills: [] as SkillSummary[],
+}));
+vi.mock('@/hooks/use-skills', () => ({
+  skillKey: (namespace: string, id: string) => `${namespace}/${id}`,
+  useSkills: () => ({ data: skillState.skills, isPending: false, isError: false }),
 }));
 
 vi.mock('@/hooks/use-namespace-members', () => ({
@@ -192,6 +201,7 @@ describe('StepEditor', () => {
     mcpState.catalog = [];
     mcpState.checks = {};
     mcpState.askedImages = [];
+    skillState.skills = [];
     rolesState.workspaceRoles = {
       roles: [], workflowNames: [], heldRoles: null, loading: false, error: null,
     };
@@ -510,9 +520,124 @@ describe('StepEditor', () => {
     expandCard('Prompt & model');
     // Agent-specific labels should be visible (rendered via humanizeToken)
     expect(screen.getAllByText('Autonomy Level').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Agent ID')).toBeInTheDocument();
-    expect(screen.getByText('Agent Model')).toBeInTheDocument();
-    expect(screen.getByText('Agent Prompt')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Agent' })).toBeInTheDocument();
+    expect(screen.getByText('Model Override')).toBeInTheDocument();
+    expect(screen.getByText('Step Prompt')).toBeInTheDocument();
+    expect(screen.getByLabelText('Add skill')).toBeInTheDocument();
+    expect(screen.getByText("Step's Maximum Duration (minutes)")).toBeInTheDocument();
+    for (const gone of ['Agent Skill', 'Agent Skills Dir', 'Agent Timeout Ms', 'Agent Timeout Minutes']) {
+      expect(screen.queryByText(gone)).toBeNull();
+    }
+  });
+
+  it('[RENDER] says the step adds to its agent, and what the agent brings', async () => {
+    agentState.response = {
+      agents: [{
+        ...buildAgentDefinition('clinical-reviewer', 'Clinical Reviewer'),
+        foundationModel: 'anthropic/claude-opus-4-5',
+        skills: [{ namespace: 'test', id: 'ctcae-grading' }],
+      }],
+    };
+    render(<StepEditor step={buildStep({ executor: 'agent', agentId: 'clinical-reviewer' })} allSteps={[]} onChange={noop} />);
+    expandCard('Prompt & model');
+    await screen.findByText(/anthropic\/claude-opus-4-5 · 1 skill/);
+
+    expect(screen.getByText(/Added to Clinical Reviewer's prompt and skills/)).toBeInTheDocument();
+    expect(screen.getByText('ctcae-grading')).toBeInTheDocument();
+  });
+
+  it('[DATA] the step maximum duration is a number of minutes', () => {
+    const onChange = vi.fn();
+    render(<StepEditor step={buildStep({ executor: 'agent' })} allSteps={[]} onChange={onChange} />);
+    expandCard('Prompt & model');
+    const duration = screen.getByLabelText("Step's maximum duration in minutes");
+
+    expect(duration).toHaveAttribute('type', 'number');
+    fireEvent.change(duration, { target: { value: '45' } });
+    expect(onChange).toHaveBeenCalledWith({ agent: { timeoutMinutes: 45 } });
+  });
+
+  it('[DATA] adds a catalog skill to the step', () => {
+    skillState.skills = [{
+      namespace: 'test', id: 'define-xml', name: 'define-xml', description: 'Write define.xml', visibility: 'private',
+      contentHash: 'hash', paths: ['SKILL.md'], size: 64, createdAt: '2026-10-06T00:00:00Z', updatedAt: '2026-10-06T00:00:00Z',
+    }];
+    const onChange = vi.fn();
+    render(<StepEditor step={buildStep({ executor: 'agent' })} allSteps={[]} onChange={onChange} />);
+    expandCard('Prompt & model');
+
+    fireEvent.change(screen.getByLabelText('Add skill'), { target: { value: 'test/define-xml' } });
+    expect(onChange).toHaveBeenCalledWith({ agent: { skills: [{ namespace: 'test', id: 'define-xml' }] } });
+  });
+
+  it('[DATA] filters what a step may add by its workflow\'s visibility', () => {
+    const skill = (namespace: string, id: string, visibility: 'public' | 'private'): SkillSummary => ({
+      namespace, id, name: id, description: id, visibility,
+      contentHash: 'hash', paths: ['SKILL.md'], size: 64, createdAt: '2026-10-06T00:00:00Z', updatedAt: '2026-10-06T00:00:00Z',
+    });
+    skillState.skills = [skill('test', 'own-private', 'private'), skill('other', 'shared', 'public')];
+    const options = () => Array.from(screen.getByLabelText<HTMLSelectElement>('Add skill').options).map((option) => option.value).filter(Boolean);
+
+    const { unmount } = render(<StepEditor step={buildStep({ executor: 'agent' })} allSteps={[]} onChange={noop} workflowVisibility="private" />);
+    expandCard('Prompt & model');
+    expect(options()).toEqual(['test/own-private', 'other/shared']);
+    unmount();
+
+    render(<StepEditor step={buildStep({ executor: 'agent' })} allSteps={[]} onChange={noop} workflowVisibility="public" />);
+    expandCard('Prompt & model');
+    expect(options()).toEqual(['other/shared']);
+  });
+
+  it('[RENDER] marks an agent skill the step replaces, and warns when the runtime does not load skills', async () => {
+    agentState.response = {
+      agents: [{ ...buildAgentDefinition('clinical-reviewer', 'Clinical Reviewer'), skills: [{ namespace: 'test', id: 'ctcae-grading' }] }],
+    };
+    render(
+      <StepEditor
+        step={buildStep({
+          executor: 'agent', agentId: 'clinical-reviewer', plugin: 'script-container',
+          agent: { skills: [{ namespace: 'other', id: 'ctcae-grading' }] },
+        })}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+    expandCard('Prompt & model');
+
+    expect(await screen.findByTitle("Replaced by the step's skill of the same name")).toHaveTextContent('ctcae-grading');
+    expect(screen.getByText(/This step's runtime is/)).toHaveTextContent('script-container');
+  });
+
+  it('[DATA] shows a workflow-file skills folder without a skill, and removes it', () => {
+    const onChange = vi.fn();
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', agent: { skillsDir: 'plugins/review/skills', prompt: 'Review' } })}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+    expandCard('Prompt & model');
+
+    expect(screen.getByText('plugins/review/skills')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove workflow-file skill' }));
+    expect(onChange).toHaveBeenCalledWith({ agent: { skill: undefined, skillsDir: undefined, prompt: 'Review' } });
+  });
+
+  it('[DATA] shows a workflow-file skill read-only, and removes it', () => {
+    const onChange = vi.fn();
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', agent: { skill: 'draft-note', skillsDir: 'skills', prompt: 'Draft' } })}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+    expandCard('Prompt & model');
+
+    expect(screen.getByText('skills/draft-note')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove workflow-file skill' }));
+    expect(onChange).toHaveBeenCalledWith({ agent: { skill: undefined, skillsDir: undefined, prompt: 'Draft' } });
   });
 
   it('[DATA] drops an uncommitted outputSchema draft when another agent step is selected', () => {
@@ -559,7 +684,7 @@ describe('StepEditor', () => {
 
     fireEvent.change(agentSelect, { target: { value: 'clinical-reviewer' } });
 
-    expect(onChange).toHaveBeenCalledWith({ agentId: 'clinical-reviewer' });
+    expect(onChange).toHaveBeenCalledWith({ agentId: 'clinical-reviewer', agent: undefined, plugin: 'claude-code-agent' });
   });
 
   it('[DATA] the model picker offers the selected agent model as the blank default', async () => {
@@ -578,10 +703,11 @@ describe('StepEditor', () => {
     );
 
     expandCard('Prompt & model');
-    await screen.findByRole('combobox', { name: 'Agent' });
 
-    const modelSelect = screen.getByRole('combobox', { name: 'Agent Model' });
-    expect(modelSelect.options[0].textContent).toContain('anthropic/claude-opus-4-5');
+    // The agent list loads after the first render: wait for its model to reach the default option.
+    expect(await screen.findByRole('option', { name: /Use Clinical Reviewer's model.*anthropic\/claude-opus-4-5/ })).toBe(
+      screen.getByRole<HTMLSelectElement>('combobox', { name: 'Model override' }).options[0],
+    );
   });
 
   describe('agent model picker by plugin', () => {
@@ -624,7 +750,7 @@ describe('StepEditor', () => {
       render(<StepEditor step={buildStep({ executor: 'agent', ...step })} allSteps={[]} onChange={vi.fn()} />);
       expandCard('Prompt & model');
       await screen.findByRole('option', { name: /Claude Sonnet 4\.6/ });
-      return screen.getByRole('combobox', { name: 'Agent Model' });
+      return screen.getByRole('combobox', { name: 'Model override' });
     }
 
     it('[DATA] offers only Anthropic models for a claude-code-agent step', async () => {
@@ -717,7 +843,7 @@ describe('StepEditor', () => {
     expandCard('Prompt & model');
     await screen.findByRole('combobox', { name: 'Agent' });
 
-    const modelSelect = screen.getByRole('combobox', { name: 'Agent Model' });
+    const modelSelect = screen.getByRole('combobox', { name: 'Model override' });
     expect(modelSelect.options[0].textContent).not.toContain('anthropic/claude-opus-4-5');
   });
 
@@ -1705,78 +1831,6 @@ describe('StepEditor — verdict presentation and conditional params', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'reject' }));
     expect((onChange.mock.calls[0]?.[0] as { params?: { requiredForVerdicts?: string[] }[] })
       .params?.[0]?.requiredForVerdicts).toEqual(['reject']);
-  });
-});
-
-// Skills used to be a repo path typed by hand, which is why uploading one had
-// nowhere to land. A skill the workflow carries is picked here instead, and
-// picking it fills in the directory the runtime reads it from.
-describe('StepEditor — skills the workflow carries', () => {
-  beforeEach(() => {
-    pluginState.plugins = [];
-    agentState.response = { agents: [] };
-    modelState.models = [];
-    rolesState.workspaceRoles = {
-      roles: [], workflowNames: [], heldRoles: null, loading: false, error: null,
-    };
-    rolesState.members = [];
-  });
-
-  const agentStep = (agent: Record<string, unknown> = {}): WorkflowStep =>
-    buildStep({ id: 'interpret', name: 'Interpret', executor: 'agent', agent });
-
-  it('offers each carried skill, and sets both fields when one is picked', () => {
-    const onChange = vi.fn();
-    render(
-      <StepEditor
-        step={agentStep()}
-        allSteps={[agentStep()]}
-        onChange={onChange}
-        workflowArtifacts={[
-          { path: 'skills/data-validator/SKILL.md', contents: '# Validator' },
-          { path: 'plugins/lz/skills/router/SKILL.md', contents: '# Router' },
-        ]}
-      />,
-    );
-
-    fireEvent.click(screen.getByText('Prompt & model'));
-    const picker = screen.getByLabelText('Skill') as HTMLSelectElement;
-    expect([...picker.options].map((option) => option.textContent)).toEqual([
-      'None',
-      'router (plugins/lz/skills)',
-      'data-validator',
-    ]);
-
-    fireEvent.change(picker, { target: { value: 'skills/data-validator' } });
-    // Both fields, because a skill name alone does not tell the runtime where
-    // to read it from — that pair is what this replaces typing by hand.
-    expect(onChange).toHaveBeenLastCalledWith({
-      agent: expect.objectContaining({ skill: 'data-validator', skillsDir: 'skills' }),
-    });
-  });
-
-  it('clears both fields when the skill is set back to none', () => {
-    const onChange = vi.fn();
-    render(
-      <StepEditor
-        step={agentStep({ skill: 'data-validator', skillsDir: 'skills' })}
-        allSteps={[agentStep()]}
-        onChange={onChange}
-        workflowArtifacts={[{ path: 'skills/data-validator/SKILL.md', contents: '' }]}
-      />,
-    );
-
-    fireEvent.click(screen.getByText('Prompt & model'));
-    fireEvent.change(screen.getByLabelText('Skill'), { target: { value: '' } });
-    expect(onChange).toHaveBeenLastCalledWith({
-      agent: expect.objectContaining({ skill: undefined, skillsDir: undefined }),
-    });
-  });
-
-  it('stays a text field when the workflow carries no skills, so a repo path can still be typed', () => {
-    render(<StepEditor step={agentStep()} allSteps={[agentStep()]} onChange={vi.fn()} />);
-    fireEvent.click(screen.getByText('Prompt & model'));
-    expect(screen.queryByLabelText('Skill')).toBeNull();
   });
 });
 

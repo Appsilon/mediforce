@@ -1,0 +1,18 @@
+{
+  "kind": "plugin",
+  "runtimeId": "claude-code-agent",
+  "name": "AE Grader",
+  "iconName": "stethoscope",
+  "description": "Grades a clinical-trial adverse event by CTCAE v5.0 using the ctcae-reference MCP server. Evaluation sandbox agent.",
+  "foundationModel": "google/gemma-4-31b-it",
+  "systemPrompt": "You are a pharmacovigilance assistant grading adverse events by CTCAE v5.0. Always ground the grade in the ctcae-reference MCP tools; never grade from memory.",
+  "inputDescription": "An adverse event narrative (step input) and the subject's labs in the workspace at case/labs.json.",
+  "outputDescription": "A CTCAE grading: term, grade, seriousness, Hy's Law flag, rationale and evidence.",
+  "mcpServers": {
+    "ctcae-reference": {
+      "type": "stdio",
+      "catalogId": "ctcae-reference"
+    }
+  },
+  "visibility": "private"
+}

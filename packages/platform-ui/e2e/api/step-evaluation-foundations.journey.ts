@@ -23,8 +23,8 @@ import {
 
 /**
  * API E2E for the evaluation groundwork on agent steps (ADR-0023 D8, D13):
- * a result that breaks `agent.outputSchema` is retried once and then routed to
- * `fallbackBehavior`; every Agent Run's Agent Trajectory is persisted and
+ * a result that breaks `agent.outputSchema` is retried once and then
+ * escalated to a person; every Agent Run's Agent Trajectory is persisted and
  * readable only from the run's workspace; and a Control Mode 3 review verdict
  * is recorded as a `human_verdict` Score on the reviewed Agent Run, likewise
  * invisible from other workspaces.
@@ -53,13 +53,12 @@ test.describe('Step Evaluation foundations — API E2E', () => {
     callers = await setupMultiNamespaceCallers();
   });
 
-  test('a result that breaks agent.outputSchema is retried once, then routed to fallbackBehavior', async ({ request }) => {
+  test('a result that breaks agent.outputSchema is retried once, then escalated', async ({ request }) => {
     const runId = await startRun(request, agentStepWorkflow(`e2e-output-schema-${Date.now()}`, {
       autonomyLevel: 'L4',
       agent: {
         prompt: 'Grade each adverse event by CTCAE.',
         outputSchema: { type: 'object', required: ['findings'], properties: { findings: { type: 'array' } } },
-        fallbackBehavior: 'escalate_to_human',
       },
     }));
 

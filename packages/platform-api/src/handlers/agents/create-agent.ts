@@ -2,7 +2,7 @@ import type { CreateAgentInput, CreateAgentOutput } from '../../contract/agents'
 import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
-import { assertAgentMayHoldSkills } from './agent-skills';
+import { assertAgentMayHoldSkills } from '../skills/may-hold-skills';
 import { assertBindingsTargetCatalogEntries } from './mcp-bindings';
 
 export async function createAgent(

@@ -37,11 +37,9 @@ interface StepConfigInfo {
   autonomyLevel?: string;
   plugin?: string;
   model?: string;
-  confidenceThreshold?: number;
-  fallbackBehavior?: string;
   timeoutMinutes?: number;
   reviewerType?: string;
-  agentConfig?: { skill?: string; prompt?: string; model?: string; skillsDir?: string; runtime?: string; mcpServers?: Array<{ name: string }> };
+  agentConfig?: { skill?: string; skills?: Array<{ namespace: string; id: string }>; prompt?: string; model?: string; skillsDir?: string; runtime?: string; mcpServers?: Array<{ name: string }> };
 }
 
 interface StepStatusPanelProps {
@@ -366,9 +364,8 @@ function StepConfigDetail({
     if (model) entries.push({ label: 'Model', value: model });
   }
   if (config.agentConfig?.skill) entries.push({ label: 'Skill', value: config.agentConfig.skill });
-  if (config.executorType !== 'script' && config.confidenceThreshold !== undefined)
-    entries.push({ label: 'Confidence threshold', value: `${config.confidenceThreshold}` });
-  if (config.fallbackBehavior) entries.push({ label: 'Fallback', value: config.fallbackBehavior.replace(/_/g, ' ') });
+  if (config.agentConfig?.skills?.length)
+    entries.push({ label: 'Step skills', value: config.agentConfig.skills.map((ref) => `${ref.namespace}/${ref.id}`).join(', ') });
   if (config.timeoutMinutes) entries.push({ label: 'Timeout', value: `${config.timeoutMinutes} min` });
   if (config.reviewerType && config.reviewerType !== 'none') entries.push({ label: 'Reviewer', value: config.reviewerType });
   if (config.agentConfig?.mcpServers?.length)

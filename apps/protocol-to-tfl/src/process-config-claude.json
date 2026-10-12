@@ -17,8 +17,6 @@
       "executorType": "agent",
       "plugin": "claude-code-agent",
       "autonomyLevel": "L3",
-      "confidenceThreshold": 0.7,
-      "fallbackBehavior": "escalate_to_human",
       "timeoutMinutes": 20,
       "agentConfig": {
         "skill": "trial-metadata-extractor",
@@ -32,8 +30,6 @@
       "executorType": "agent",
       "plugin": "claude-code-agent",
       "autonomyLevel": "L3",
-      "confidenceThreshold": 0.7,
-      "fallbackBehavior": "escalate_to_human",
       "timeoutMinutes": 20,
       "agentConfig": {
         "skill": "mock-tlg-generator",
@@ -51,8 +47,6 @@
       "executorType": "agent",
       "plugin": "claude-code-agent",
       "autonomyLevel": "L3",
-      "confidenceThreshold": 0.7,
-      "fallbackBehavior": "escalate_to_human",
       "timeoutMinutes": 30,
       "agentConfig": {
         "skill": "sdtm-to-adam",
@@ -68,8 +62,6 @@
       "executorType": "agent",
       "plugin": "claude-code-agent",
       "autonomyLevel": "L3",
-      "confidenceThreshold": 0.7,
-      "fallbackBehavior": "escalate_to_human",
       "timeoutMinutes": 30,
       "agentConfig": {
         "skill": "adam-to-tlg",

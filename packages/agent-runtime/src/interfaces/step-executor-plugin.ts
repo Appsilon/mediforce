@@ -144,7 +144,7 @@ export interface WorkflowAgentContext {
 
 /** What an output gate made of a result. */
 export interface AgentOutputGateVerdict {
-  /** Why the result goes to the step's `fallbackBehavior`; null when it passes. */
+  /** Why the result is escalated to a person; null when it passes. */
   failure: string | null;
   /** Checks that could not run — recorded, never a failure. */
   errors: string[];

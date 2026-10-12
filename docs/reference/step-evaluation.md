@@ -56,9 +56,8 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
 - **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
   written or synthesized), Brief drafts and Acceptance Criteria come back as
   cards to accept, edit or reject. Accepting one is the same write the forms
-  make, recorded with `origin: assistant`. A routing recommendation (Control
-  Mode and `confidenceThreshold`) comes back as a card to apply in the
-  workflow editor. So does a **diagnosis** of an Eval Run's failures
+  make, recorded with `origin: assistant`. A routing recommendation (a Control
+  Mode) comes back as a card to apply in the workflow editor. So does a **diagnosis** of an Eval Run's failures
   (`propose_diagnosis`) — see below. Nothing is applied to the step by the
   assistant.
 - **Prepares:** it can prepare an Eval Run of the step; the run starts
@@ -88,7 +87,7 @@ The step's Brief is sent to the assistant on every turn. What it can help with:
   how many graded trials a floor needs to mean something (8 passes out of 10
   meet a 0.8 floor, but their Wilson 95% interval runs from 0.49 to 0.94).
 - **Routing.** It explains the criteria's verdict and recommends a Control
-  Mode and `confidenceThreshold` from the run's confidence calibration.
+  Mode from it.
 - **Diagnosis.** After a run with failures the assistant reads them
   (`get_failures`: the run's trials where a counted Evaluator failed, a
   check errored, or no Agent Run was produced — each with its case, its
@@ -283,13 +282,13 @@ production once it counts (source not approved)").
 
 A run is production when it is not a dry run and not an Eval Run trial; those
 are never gated. After the output passes `agent.outputSchema` and before the
-confidence and autonomy routing, `AgentRunner` hands it to the gate
+autonomy routing, `AgentRunner` hands it to the gate
 (`executeAgentStep` installs it only when the step has a flagged Evaluator):
 
 - `schema` and `code` run synchronously and each writes a Score marked
   `metadata.production: true` (no `evalRunId`). A failing one fails
-  the run with reason `production_evaluator`: the step's `fallbackBehavior`
-  applies as for low confidence, and the failure message is the run's
+  the run with reason `production_evaluator`: the run is escalated to a
+  person, and the failure message is the run's
   `errorMessage`, an activity-log line and part of the `agent.run` audit event.
 - `llm_judge` runs asynchronously after the run has moved on and only writes a
   Score (`source: llm_judge`, its cost in `metadata.judgeCostUsd`, its
@@ -612,12 +611,11 @@ the judge calls. Then:
   confidence. Until a person reviews one it reads *Waiting for model verdicts
   human validation*.
 - **Routing.** Once the trials are done, as the `autonomyLevel` to
-  set: `L4` (Control Mode 4) with a `confidenceThreshold` — the lowest
-  confidence at which the outputs at or above it (at least 5) passed every
-  counted Evaluator at a rate of at least the criteria's floor; below it the step's `fallbackBehavior` applies — or `L3` (Control
-  Mode 3), a person reviewing every output, when there are no criteria, they could not be judged, the agent
-  reported no confidence, or no threshold holds. A recommendation to apply in
-  the workflow editor.
+  set: `L4` (Control Mode 4) when the Acceptance Criteria were met, or `L3`
+  (Control Mode 3), a person reviewing every output, when there are no
+  criteria, they could not be judged, or they were missed. The confidence
+  calibration above is evidence about the agent; nothing routes on it. A
+  recommendation to apply in the workflow editor.
 
 - **Trial results.** Every trial, by case, with each of its case's
   Evaluators' grade — `pass`, `fail`, `excluded` (a model verdict left out) or
@@ -709,16 +707,16 @@ its own so two Fingerprints say what differs:
 
 | Component | What is hashed |
 |---|---|
-| `step` | the agent config, plugin, agent id, params, step params, env and MCP restrictions — not its name, display, `autonomyLevel`, `review`, `confidenceThreshold` or `fallbackBehavior` |
+| `step` | the agent config, plugin, agent id, params, step params, env and MCP restrictions — not its name, display, `autonomyLevel` or `review` |
 | `model` | the step's model, or its agent's when the step names none |
 | `systemPrompt` | the agent's system prompt |
-| `skill` | every file the workflow carries under `<skillsDir>/<skill>/`, or the external skills repository, commit and path; plus, when the step's agent holds Skills, each one's namespace, id and content hash ([ADR-0025](../adr/0025-skill-catalog.md)). An agent with no Skills leaves the component as it was. |
+| `skill` | every file the workflow carries under `<skillsDir>/<skill>/`, or the external skills repository, commit and path; plus, when the step is offered catalog Skills (its agent's and the ones it adds), each one's namespace, id and content hash ([ADR-0025](../adr/0025-skill-catalog.md), [ADR-0027](../adr/0027-step-adds-catalog-skills.md)). A step offered none leaves the component as it was. |
 | `image` | the image reference the runtime resolves, the files a carried Dockerfile builds from, and the commit a repository build checks out |
 | `mcpServers` | the MCP servers and tools production resolves for the step |
 | `preamble` | the workflow preamble |
 
-Routing is left out, so applying a recommended Control Mode or
-`confidenceThreshold` keeps a qualification. The MCP eval policy is left out
+Routing is left out, so applying a recommended Control Mode keeps a
+qualification. The MCP eval policy is left out
 too (ADR-0023 D6); a qualification states it instead. The image is its
 reference, not a registry digest: a tag re-pushed under the same name does not
 change the Fingerprint — pin an image by digest (`image@sha256:…`) where that

@@ -26,8 +26,7 @@ function printRun(output: OutputSink, { evalRun, report }: EvalRunOutput): void 
   }
   if (report.confidence !== null) output.stdout(`confidence: ECE ${report.confidence.ece.toFixed(3)} over ${report.confidence.count} trial(s)`);
   if (report.recommendation !== null) {
-    const threshold = report.recommendation.confidenceThreshold === null ? '' : ` above confidence ${report.recommendation.confidenceThreshold}`;
-    output.stdout(`routing: ${report.recommendation.autonomyLevel}${threshold} — ${report.recommendation.reason}`);
+    output.stdout(`routing: ${report.recommendation.autonomyLevel} — ${report.recommendation.reason}`);
   }
   const leftOut = report.judgeVerdicts.filter((verdict) => verdict.counts === false);
   if (leftOut.length > 0) output.stdout(`\nmodel verdicts left out of the criteria (review with: mediforce eval judge-review ${evalRun.id} --trial <id> --evaluator <id> --accept|--deny):`);

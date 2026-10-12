@@ -30,7 +30,6 @@ export const AgentConfigSchema = z.object({
   commit: z.string().regex(/^[a-f0-9]{7,40}$/, 'commit must be a hex SHA (7-40 chars)').optional(),
   repoAuth: z.string().optional(),
   mcpServers: z.array(McpServerConfigSchema).optional(),
-  allowedTools: z.array(z.string()).optional(),
 });
 
 export const StepConfigSchema = z.object({
@@ -38,10 +37,6 @@ export const StepConfigSchema = z.object({
   executorType: z.enum(['human', 'agent', 'script']), // required: who executes this step
   plugin: z.string().optional(), // e.g. '@mediforce/example-agent'
   autonomyLevel: z.enum(['L0', 'L1', 'L2', 'L3', 'L4']).optional(), // L0 added
-  confidenceThreshold: z.number().min(0).max(1).optional(), // default 0 (always pass)
-  fallbackBehavior: z
-    .enum(['escalate_to_human', 'continue_with_flag', 'pause'])
-    .optional(),
   timeoutMinutes: z.number().optional(),
   model: z.string().optional(), // e.g. 'anthropic/claude-sonnet-4'
   reviewConstraints: ReviewConstraintsSchema.optional(),

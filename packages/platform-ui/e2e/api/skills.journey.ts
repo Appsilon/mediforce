@@ -307,4 +307,61 @@ test.describe('skills API journey', () => {
       cli(baseURL, ['skill', 'delete', name, '--namespace', TEST_ORG_HANDLE, '--force']);
     }
   });
+
+  test('a step adds catalog skills its workflow may reach, is offered them without an agent, and is refused the rest on save', async ({ request, baseURL }) => {
+    if (baseURL === undefined) throw new Error('Playwright baseURL is not configured');
+    test.setTimeout(120_000);
+    const member = sessionCookieHeaders(callers.member);
+    const outsider = sessionCookieHeaders(callers.outsider);
+    const stamp = Date.now();
+    const name = `e2e-step-skill-${stamp}`;
+    const otherPrivate = `e2e-step-other-private-${stamp}`;
+    const { dir } = writeSkillFolder(name);
+    const created = JSON.parse(cli(baseURL, ['skill', 'create', '--from', dir, '--namespace', TEST_ORG_HANDLE])) as { skill: SkillBody };
+    const otherRes = await request.post(`/api/skills?namespace=${OUTSIDER_NAMESPACE}`, {
+      headers: outsider,
+      data: { files: [{ path: 'SKILL.md', contents: `---\nname: ${otherPrivate}\ndescription: Derive ADaM ADSL\n---\n` }] },
+    });
+    expect(otherRes.status(), await otherRes.text()).toBe(201);
+    const workflowName = `e2e-step-skill-run-${stamp}`;
+
+    try {
+      // Another workspace's private skill is refused when the workflow is saved, not when it runs.
+      const refused = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
+        headers: member,
+        data: agentStepWorkflow(`e2e-step-skill-refused-${stamp}`, {
+          agent: { prompt: 'Map the raw data to SDTM.', skills: [{ namespace: OUTSIDER_NAMESPACE, id: otherPrivate }] },
+        }),
+      });
+      expect(refused.status()).toBe(400);
+      expect(await refused.text()).toContain(`step 'grade-aes': skill '${OUTSIDER_NAMESPACE}/${otherPrivate}' does not exist`);
+
+      // No agentId: the step's own skills are offered on their own.
+      const runId = await startRun(request, agentStepWorkflow(workflowName, {
+        autonomyLevel: 'L4',
+        agent: { prompt: 'Map the raw data to SDTM.', skills: [{ namespace: TEST_ORG_HANDLE, id: name }] },
+      }));
+      const agentRun = await awaitFinishedAgentRun(request, runId);
+      const trajectory = GetAgentTrajectoryOutputSchema.parse(JSON.parse(cli(baseURL, ['agent-run', 'trajectory', agentRun.id])));
+      expect(trajectory.entries[0]?.text).toContain(`Agent skills: ${name}.`);
+      const stepsRes = await request.get(`/api/processes/${runId}/steps`, { headers: JSON_HEADERS });
+      expect(stepsRes.status(), await stepsRes.text()).toBe(200);
+      const step = GetProcessStepsOutputSchema.parse(await stepsRes.json()).steps.find((entry) => entry.stepId === 'grade-aes');
+      expect(step?.executions.at(-1)?.agentOutput?.skills).toEqual([
+        { namespace: TEST_ORG_HANDLE, id: name, contentHash: created.skill.contentHash },
+      ]);
+
+      // A public workflow may add only public skills.
+      const madePublic = await request.patch(`/api/workflow-definitions/${workflowName}?namespace=${TEST_ORG_HANDLE}`, {
+        headers: member,
+        data: { visibility: 'public' },
+      });
+      expect(madePublic.status()).toBe(400);
+      expect(await madePublic.text()).toContain(`'${TEST_ORG_HANDLE}/${name}' is private, and a public workflow may add only public skills`);
+    } finally {
+      await request.delete(`/api/workflow-definitions/${workflowName}?namespace=${TEST_ORG_HANDLE}`, { headers: member });
+      cli(baseURL, ['skill', 'delete', name, '--namespace', TEST_ORG_HANDLE, '--force']);
+      await request.delete(`/api/skills/${otherPrivate}?namespace=${OUTSIDER_NAMESPACE}`, { headers: outsider });
+    }
+  });
 });

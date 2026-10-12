@@ -52,8 +52,8 @@ Evaluation Brief.
   commit of a production step is the exact workspace that step saw. With
   `StepExecution.input` and previous step outputs, a production Agent Run is
   a complete Eval Case seed.
-- **Autonomy.** `confidenceThreshold` gates escalation at runtime; nothing
-  checks whether the agent's self-reported confidence is calibrated.
+- **Autonomy.** Nothing routes on the agent's self-reported confidence; the
+  Eval Run report shows how well it is calibrated.
 - **Run flags.** `dryRun` + `MockAgentPlugin` show the pattern for tagging a
   run as non-production.
 
@@ -121,8 +121,7 @@ the Step Qualification cites as its context of use.
    injected into the prompt, validated on `result.json`, one retry with the
    errors, and auto-registered as a critical `schema` Evaluator.
 4. **Evaluation plan.** The Evaluation Assistant reads prompt, SKILL.md, agent
-   `systemPrompt`, input/output descriptions, effective MCPs and
-   `allowedTools`, upstream outputs, sample runs and the Evaluation Brief → a
+   `systemPrompt`, input/output descriptions, effective MCPs, upstream outputs, sample runs and the Evaluation Brief → a
    risk-ranked plan of Evaluators, cases and thresholds, as proposals the user
    accepts.
 5. **Matrix runs and report.** Variants: model, prompt override, skill
@@ -145,7 +144,7 @@ Additional methods:
 - **Trajectory evals** — required/forbidden tool calls, out-of-scope reads,
   wasted steps.
 - **Confidence calibration** — self-reported confidence vs actual pass rate
-  (reliability curve, ECE) → recommended `confidenceThreshold` and Control
+  (reliability curve, ECE), shown as evidence beside the recommended Control
   Mode.
 - **Robustness / metamorphic tests** — semantics-preserving input changes
   must not change the result.
@@ -185,6 +184,6 @@ licence change announced). Neither changes the ADR-0007 call:
 | 1a — Foundations | `outputSchema` on agent steps (prompt, validation, one retry, fallback); Agent Trajectory persistence; Score entity with automatic `human_verdict` Scores |
 | 1b — Eval Runs + Evaluation Assistant | Shared assistant core extracted from the workflow assistant; Evaluation tab = Step view + assistant panel; Evaluation Brief; Evaluators (`schema`, `code`, `llm_judge`) with the trust gate; Eval Cases (production + manual) and Datasets; single-step eval Workflow Run with MCP eval policy; one variant × n trials; report with CI and pass^k; `mediforce eval` CLI. Assistant tools: reads, propose Evaluator / Eval Case, `preview_evaluator`, prepare Eval Run with cost, explain report |
 | 2 — Assistant planning | Assistant tools: evaluation plan from Step config + Brief; rule → self-tested check; calibration help (choose outputs to label); case synthesis incl. negative cases |
-| 3 — Qualification | Variant matrix, champion/challenger, Acceptance Criteria, signed Step Qualification citing the Brief, Fingerprint and staleness badge, confidence calibration. Assistant tools: propose criteria from risk, compare variants, recommend `confidenceThreshold` / Control Mode |
+| 3 — Qualification | Variant matrix, champion/challenger, Acceptance Criteria, signed Step Qualification citing the Brief, Fingerprint and staleness badge, confidence calibration. Assistant tools: propose criteria from risk, compare variants, recommend Control Mode |
 | 4 — Fix loop | Assistant tools: diagnose failure clusters, propose and run fix variants, per-request budget for unattended attempts; `agent.examples` with exclusion; production Evaluators |
 | 5 | GEPA optimisation, MCP record/replay, red-team and robustness suites, drift alerts |

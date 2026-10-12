@@ -62,9 +62,7 @@ runs where nobody reviews the output. Two fire against config that exists
 today:
 
 - **Has result** — `envelope.result !== null`.
-- **Confidence threshold** — `envelope.confidence >= agent.confidenceThreshold`
-  (`WorkflowAgentConfigSchema.confidenceThreshold`).
-- **Duration** — `envelope.duration_ms <= agent.timeoutMs`.
+- **Duration** — `envelope.duration_ms <= agent.timeoutMinutes × 60 000`.
 
 Two more are commonly wanted but have **no config field and no data to check
 against** — proposing them means adding the field first:
