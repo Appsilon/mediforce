@@ -27,7 +27,7 @@
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.41.0",
     "@hookform/resolvers": "^5.0.0",
-    "@lezer/highlight": "^1.2.3",
+    "@lezer/highlight": "^1.2.5",
     "@mediforce/agent-runtime": "workspace:*",
     "@mediforce/core-actions": "workspace:*",
     "@mediforce/mcp-client": "workspace:*",
