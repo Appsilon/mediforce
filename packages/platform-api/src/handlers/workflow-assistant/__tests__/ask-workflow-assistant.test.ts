@@ -729,7 +729,7 @@ describe('askWorkflowAssistant handler', () => {
     });
 
     await expect(askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope))
-      .rejects.toThrow(/truncated/i);
+      .rejects.toThrow(/ran out of room/i);
   });
 });
 

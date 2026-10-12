@@ -315,7 +315,7 @@ export async function askWorkflowAssistant(
       // The model stopped calling tools. If it was cut off mid-sentence with no
       // salvageable step, that's a genuine failure — surface it.
       if (truncated) {
-        throw new HandlerError('validation', 'Assistant response was truncated — try a shorter request.');
+        throw new HandlerError('validation', 'The assistant ran out of room before it finished its answer, so nothing was applied. Ask for a smaller part of the workflow first (for example one step), then build on it.');
       }
       // Terminal completeness gate: a build that spanned several turns ends here.
       // Never hand back a graph the user then can't save — re-prompt to finish it.
@@ -375,7 +375,7 @@ export async function askWorkflowAssistant(
         else break;
       }
       if (salvaged.length === 0) {
-        throw new HandlerError('validation', 'Assistant response was truncated — try a shorter request.');
+        throw new HandlerError('validation', 'The assistant ran out of room before it finished its answer, so nothing was applied. Ask for a smaller part of the workflow first (for example one step), then build on it.');
       }
       accumulatedToolCalls.push(...salvaged);
       const salvagedCalls = response.toolCalls.slice(0, salvaged.length);
@@ -455,7 +455,7 @@ export async function askWorkflowAssistant(
   throw new HandlerError(
     'internal',
     lastErrors.length > 0
-      ? `Assistant did not finish after several rounds of tool use. Last error: ${lastErrors.join('; ')}`
-      : 'Assistant did not finish after several rounds of tool use — try rephrasing your request.',
+      ? `The assistant could not complete this change after several attempts, so nothing was applied. Last problem it hit: ${lastErrors.join('; ')}. Try rephrasing, or ask for one step at a time.`
+      : 'The assistant could not complete this change after several attempts, so nothing was applied. Try rephrasing, or ask for one step at a time.',
   );
 }

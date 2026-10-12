@@ -1,4 +1,5 @@
 import type { CallerScope } from '../../repositories/index';
+import { OPENROUTER_KEY_MISSING_MESSAGE } from '../../services/openrouter-key';
 import type {
   OpenRouterCreditsInput,
   OpenRouterCreditsOutput,
@@ -34,7 +35,7 @@ export async function getOpenRouterCredits(
   const apiKey = secrets['OPENROUTER_API_KEY'];
 
   if (apiKey === undefined || apiKey === '') {
-    return { ...EMPTY, error: 'OPENROUTER_API_KEY not configured in workspace secrets' };
+    return { ...EMPTY, error: OPENROUTER_KEY_MISSING_MESSAGE };
   }
 
   return fetchCredits(apiKey, options.fetch ?? globalThis.fetch);

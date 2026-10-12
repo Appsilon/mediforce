@@ -11,6 +11,7 @@ import type {
   SynthesizeVoiceArtifactOutput,
 } from '../../contract/cowork';
 import { callOpenRouter } from '../../services/openrouter-client';
+import { OPENROUTER_KEY_MISSING_MESSAGE } from '../../services/openrouter-key';
 
 const SYNTHESIS_TEMPERATURE = 0.3;
 const SYNTHESIS_MAX_TOKENS = 4096;
@@ -65,10 +66,7 @@ async function loadSynthesisContext(
   const secrets = await scope.workspaceSecrets.getRuntimeSecrets(namespace, workflowName);
   const openRouterKey = secrets['OPENROUTER_API_KEY'];
   if (!openRouterKey) {
-    throw new HandlerError(
-      'validation',
-      'OPENROUTER_API_KEY not configured in workspace secrets',
-    );
+    throw new HandlerError('validation', OPENROUTER_KEY_MISSING_MESSAGE);
   }
 
   return {
