@@ -533,8 +533,9 @@ function EntryCard({
             </button>
             {/* Admin only. Delete removes the catalogue entry, never its
                 images. A member can still add an entry; retiring one is an
-                admin's call. */}
-            {canAdmin && (
+                admin's call. A discovered entry has no stored row, so there is
+                nothing to remove until it is described. */}
+            {canAdmin && discovered === false && (
               <button
                 type="button"
                 onClick={() => setDeleting(true)}

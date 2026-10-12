@@ -511,7 +511,8 @@ undescribed. Describe it first, then **Edit** can correct it.
 
 **Delete** on an entry in the UI removes the catalogue entry **only** — the
 images stay on the daemon, and the source can be catalogued again. Admin or
-owner of the workspace. A source this workspace built is re-derived on the next
+owner of the workspace. An entry marked **Needs a description** has no stored
+row, so it offers no Delete; **Describe** it first. A source this workspace built is re-derived on the next
 read and comes back marked **Needs a description**, losing only the sentence
 somebody wrote.
 
@@ -520,7 +521,10 @@ removes the entry **and** every image behind it (`docker rmi` on each tag),
 audited under `_system` since the daemon is deployment-wide; `--keep-images`
 gives the UI's record-only delete. Image removal cannot be undone — a deleted
 image is rebuilt or pulled again, never restored — and Docker refuses an image a
-running container is using, or one another image was built on.
+running container is using, or one another image was built on. Only this CLI
+path leaves a workflow step naming an image that no longer exists: rebuild or
+re-point it before running that workflow again, and note that re-running a
+superseded version then fails at container start.
 
 ### What blocks a delete
 
@@ -536,8 +540,7 @@ When the pinning version is the workflow's **only** runnable one, the button rea
 **Archive workflow**, because that is what archiving it does. The workflow is not
 deleted: on the workspace page, **Display → Archived workflows** lists it, and
 **Unarchive** on its page brings it back — every version of it, including any
-archived earlier on purpose. Its step still names the deleted image, so rebuild
-or re-point that before running it again.
+archived earlier on purpose.
 
 A version the workflow pins as its **default** is not offered that button, since
 archiving it would leave the workflow pointing at a version that cannot run.
@@ -546,8 +549,7 @@ Point its step at another image, or make a different version the default first.
 A **superseded or archived** version does not block, and is listed anyway. A
 registered version is immutable — there is no editing v2 in place — so it could
 never be moved off the image, and refusing on its account would mean an image
-pinned once could never be reclaimed. Re-running one after the delete fails at
-container start.
+pinned once could never be reclaimed.
 
 The check is deployment-wide, because the daemon is: a step in a workspace you
 cannot see blocks the delete just the same, and is reported as a count rather

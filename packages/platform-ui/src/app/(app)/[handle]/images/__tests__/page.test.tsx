@@ -983,6 +983,16 @@ describe('ImagesPage', () => {
     expect(within(card).getByRole('button', { name: 'Edit' })).toBeInTheDocument();
   });
 
+  it('offers an admin no Delete on a discovered entry — it has no stored row to remove', async () => {
+    role.value = { role: 'admin', canAdmin: true, loading: false };
+    listMock.mockResolvedValue({ entries: [GOLDEN, DISCOVERED] });
+    renderPage();
+
+    const card = await screen.findByTestId('image-entry-cdisc-case-1-1a2b3c4d');
+    expect(within(card).getByRole('button', { name: 'Describe' })).toBeInTheDocument();
+    expect(within(card).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+  });
+
   it('refuses to delete while a live workflow version pins one of the images', async () => {
     role.value = { role: 'admin', canAdmin: true, loading: false };
     const user = userEvent.setup();
