@@ -29,6 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: main
           fetch-depth: 0
 
       # Releases cut before versioned deploys carry a deploy.sh that ignores the
