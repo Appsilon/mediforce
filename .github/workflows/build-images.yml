@@ -1,18 +1,36 @@
 name: Build & Push Docker Images
 
+# A push to main builds `:latest`, which staging runs. A release build, called by
+# release.yml or started by hand with a version, builds `:<version>` instead,
+# which production pins. Every build is also tagged with its commit SHA.
 on:
   push:
     branches: [main]
-    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version to tag the images with, e.g. 1.4.0. Run from its vX.Y.Z tag. Empty builds :latest.'
+        type: string
+        required: false
+  workflow_call:
+    inputs:
+      sha:
+        type: string
+        required: true
+      version:
+        type: string
+        required: true
 
+# Main builds cancel each other; a release build is never cancelled.
 concurrency:
-  group: build-images
-  cancel-in-progress: true
+  group: build-images-${{ inputs.version || 'latest' }}
+  cancel-in-progress: ${{ !inputs.version }}
 
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/appsilon/mediforce
+  SHA: ${{ inputs.sha || github.sha }}
+  RELEASE_TAG: ${{ inputs.version || 'latest' }}
 
 jobs:
   build:
@@ -31,7 +49,21 @@ jobs:
       packages: write
 
     steps:
+      # A manual release build must run from its tag, or `:<version>` would
+      # point at whatever commit the Actions UI had selected.
+      - name: Release build runs from its tag
+        if: github.event_name == 'workflow_dispatch' && inputs.version != ''
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/tags/v$VERSION" ]; then
+            echo "::error::Run this build from the v$VERSION tag, not $GITHUB_REF."
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4
@@ -55,7 +87,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           push: true
           tags: |
-            ${{ env.IMAGE_PREFIX }}-platform-ui:${{ env.PLATFORM_SLUG }}
+            ${{ env.IMAGE_PREFIX }}-platform-ui:${{ env.SHA }}-${{ env.PLATFORM_SLUG }}
           cache-from: type=gha,scope=platform-ui-${{ env.PLATFORM_SLUG }}
           cache-to: type=gha,mode=max,scope=platform-ui-${{ env.PLATFORM_SLUG }}
 
@@ -68,7 +100,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           push: true
           tags: |
-            ${{ env.IMAGE_PREFIX }}-migrate:${{ env.PLATFORM_SLUG }}
+            ${{ env.IMAGE_PREFIX }}-migrate:${{ env.SHA }}-${{ env.PLATFORM_SLUG }}
           cache-from: type=gha,scope=migrate-${{ env.PLATFORM_SLUG }}
           cache-to: type=gha,mode=max,scope=migrate-${{ env.PLATFORM_SLUG }}
 
@@ -80,7 +112,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           push: true
           tags: |
-            ${{ env.IMAGE_PREFIX }}-container-worker:${{ env.PLATFORM_SLUG }}
+            ${{ env.IMAGE_PREFIX }}-container-worker:${{ env.SHA }}-${{ env.PLATFORM_SLUG }}
           cache-from: type=gha,scope=container-worker-${{ env.PLATFORM_SLUG }}
           cache-to: type=gha,mode=max,scope=container-worker-${{ env.PLATFORM_SLUG }}
 
@@ -103,26 +135,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Create multi-arch manifest — platform-ui
+      - name: Create multi-arch manifests
         run: |
-          docker buildx imagetools create \
-            --tag ${{ env.IMAGE_PREFIX }}-platform-ui:latest \
-            --tag ${{ env.IMAGE_PREFIX }}-platform-ui:${{ github.sha }} \
-            ${{ env.IMAGE_PREFIX }}-platform-ui:linux-amd64 \
-            ${{ env.IMAGE_PREFIX }}-platform-ui:linux-arm64
-
-      - name: Create multi-arch manifest — migrate
-        run: |
-          docker buildx imagetools create \
-            --tag ${{ env.IMAGE_PREFIX }}-migrate:latest \
-            --tag ${{ env.IMAGE_PREFIX }}-migrate:${{ github.sha }} \
-            ${{ env.IMAGE_PREFIX }}-migrate:linux-amd64 \
-            ${{ env.IMAGE_PREFIX }}-migrate:linux-arm64
-
-      - name: Create multi-arch manifest — container-worker
-        run: |
-          docker buildx imagetools create \
-            --tag ${{ env.IMAGE_PREFIX }}-container-worker:latest \
-            --tag ${{ env.IMAGE_PREFIX }}-container-worker:${{ github.sha }} \
-            ${{ env.IMAGE_PREFIX }}-container-worker:linux-amd64 \
-            ${{ env.IMAGE_PREFIX }}-container-worker:linux-arm64
+          for image in platform-ui migrate container-worker; do
+            docker buildx imagetools create \
+              --tag "$IMAGE_PREFIX-$image:$RELEASE_TAG" \
+              --tag "$IMAGE_PREFIX-$image:$SHA" \
+              "$IMAGE_PREFIX-$image:$SHA-linux-amd64" \
+              "$IMAGE_PREFIX-$image:$SHA-linux-arm64"
+          done

@@ -46,6 +46,7 @@ Every engineering doc, what it is for, and how far to trust it.
 | Follow local dev conventions and auth setup | [`start/development.md`](start/development.md) | engineers | living |
 | Run Postgres and migrations locally | [`start/postgres-local-dev.md`](start/postgres-local-dev.md) | engineers | living |
 | Run a workspace locally | [`start/running-workspace-locally.md`](start/running-workspace-locally.md) | engineers | living |
+| Cut a release, deploy production, or roll back | [`start/releasing.md`](start/releasing.md) | engineers | living |
 | Understand what Mediforce is and why | [`concepts/vision.md`](concepts/vision.md) | everyone | living |
 | Use the canonical domain vocabulary | [`../CONTEXT.md`](../CONTEXT.md) | everyone | living |
 | See how the packages fit together | [`concepts/architecture.md`](concepts/architecture.md) | engineers | living |

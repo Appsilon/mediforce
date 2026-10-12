@@ -1,19 +1,60 @@
 name: Deploy to Production
 
+# Production runs one released version: the vX.Y.Z tag's code and that
+# version's images. release.yml calls this after publishing a release. Run it
+# by hand with an earlier version to roll back.
 on:
-  push:
-    branches: [production]
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Released version to deploy, e.g. 1.4.0'
+        type: string
+        required: true
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment: production
 
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      # Releases cut before versioned deploys carry a deploy.sh that ignores the
+      # version and redeploys main on :latest.
+      - name: Check the version can be deployed
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$VERSION' is not a version like 1.4.0."
+            exit 1
+          fi
+          if ! git show "v$VERSION:docker-compose.prod.yml" | grep -q 'MEDIFORCE_VERSION'; then
+            echo "::error::v$VERSION predates versioned deploys and can't be deployed by this workflow."
+            exit 1
+          fi
+
       - name: Deploy via SSH
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy@${{ secrets.PROD_SERVER_IP }} "/opt/mediforce/scripts/deploy.sh"
+          # Check out the tag before running the script, so a release deploys
+          # with its own deploy.sh.
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy@${{ secrets.PROD_SERVER_IP }} \
+            "cd /opt/mediforce && git fetch --force --tags origin && git checkout -f v$VERSION && scripts/deploy.sh $VERSION"

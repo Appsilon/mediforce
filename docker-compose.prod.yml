@@ -4,6 +4,10 @@
 #   docker compose -f docker-compose.prod.yml up -d
 #   docker compose -f docker-compose.prod.yml logs -f
 #
+# MEDIFORCE_VERSION (e.g. 1.4.0) pins the Mediforce images to a release.
+# Production sets it in .env on every deploy (scripts/deploy.sh). Unset, the
+# images are :latest, the newest main build, which is what staging runs.
+#
 # Staging overlay (adds stunnel + Redis auth for Vercel previews):
 #   docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml up -d
 
@@ -66,7 +70,7 @@ services:
   # service_completed_successfully so the app boot never races a
   # half-applied schema.
   migrate:
-    image: ghcr.io/appsilon/mediforce-migrate:latest
+    image: ghcr.io/appsilon/mediforce-migrate:${MEDIFORCE_VERSION:-latest}
     build:
       context: .
       dockerfile: packages/platform-ui/Dockerfile
@@ -79,7 +83,7 @@ services:
         condition: service_healthy
 
   platform-ui:
-    image: ghcr.io/appsilon/mediforce-platform-ui:latest
+    image: ghcr.io/appsilon/mediforce-platform-ui:${MEDIFORCE_VERSION:-latest}
     build:
       context: .
       dockerfile: packages/platform-ui/Dockerfile
@@ -223,7 +227,7 @@ services:
         condition: service_completed_successfully
 
   container-worker:
-    image: ghcr.io/appsilon/mediforce-container-worker:latest
+    image: ghcr.io/appsilon/mediforce-container-worker:${MEDIFORCE_VERSION:-latest}
     build:
       context: .
       dockerfile: packages/container-worker/Dockerfile.worker

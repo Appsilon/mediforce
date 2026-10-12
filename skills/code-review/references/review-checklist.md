@@ -108,7 +108,7 @@ A behaviour the user could rely on yesterday MUST keep working today. Migrations
 
 ## 9. Changelog
 
-- [ ] A feature PR does not touch `CHANGELOG.md`. Only a release PR adds a `## [X.Y.Z]` section, written by a developer (AGENTS.md §10).
+- [ ] A feature PR does not touch `CHANGELOG.md`. Only a release PR (`release/vX.Y.Z`) adds a `## [X.Y.Z]` section, drafted by the Release workflow and finished by a developer (AGENTS.md §10).
 
 ## Anti-Pattern Quick Scan
 

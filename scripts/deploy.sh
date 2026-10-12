@@ -1,6 +1,11 @@
 #!/bin/bash
+# deploy.sh <version>   Deploys a release. deploy-production.yml checks out its tag first:
+#   git fetch --force --tags origin && git checkout -f v1.4.0 && scripts/deploy.sh 1.4.0
+# deploy.sh             Deploys the checked-out branch's head with :latest images
+#                       (bootstrap-server.py's first deploy of a new server).
 set -euo pipefail
 
+VERSION="${1:-}"
 DEPLOY_DIR="/opt/mediforce"
 COMPOSE_FILE="docker-compose.prod.yml"
 LOG_FILE="/var/log/mediforce-deploy.log"
@@ -21,20 +26,42 @@ else
   exit 1
 fi
 
-# Pull latest code (checkout -f handles stale local changes)
-BRANCH=$(git rev-parse --abbrev-ref HEAD)
-log "Pulling latest changes from $BRANCH"
-git fetch origin "$BRANCH"
-git checkout -f "$BRANCH"
-git reset --hard "origin/$BRANCH"
+if [ -n "$VERSION" ]; then
+  if [ "$(git rev-parse HEAD)" != "$(git rev-parse "v$VERSION^{commit}")" ]; then
+    log "ERROR: HEAD is not tag v$VERSION — run: git fetch --force --tags origin && git checkout -f v$VERSION"
+    exit 1
+  fi
+  log "Deploying v$VERSION"
+else
+  # Pull latest code (checkout -f handles stale local changes)
+  BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  if [ "$BRANCH" = "HEAD" ]; then
+    log "ERROR: HEAD is detached (a release is checked out) — pass its version: scripts/deploy.sh <version>"
+    exit 1
+  fi
+  log "Pulling latest changes from $BRANCH"
+  git fetch origin "$BRANCH"
+  git checkout -f "$BRANCH"
+  git reset --hard "origin/$BRANCH"
+  VERSION=latest
+fi
+
+# docker-compose.prod.yml pins its images to MEDIFORCE_VERSION. Keeping it in
+# .env means a later manual `docker compose up` stays on this version.
+if grep -q '^MEDIFORCE_VERSION=' .env 2>/dev/null; then
+  sed -i "s/^MEDIFORCE_VERSION=.*/MEDIFORCE_VERSION=$VERSION/" .env
+else
+  echo "MEDIFORCE_VERSION=$VERSION" >> .env
+fi
+export MEDIFORCE_VERSION="$VERSION"
 
 # Export git SHA for build-time inlining
 export NEXT_PUBLIC_GIT_SHA=$(git rev-parse --short HEAD)
 log "Git SHA: $NEXT_PUBLIC_GIT_SHA"
 
-# Pull pre-built images from registry (skips the 5-7 min local build).
-# Falls back to local build if registry is unreachable or first deploy
-# before CI has run.
+# Pull this version's pre-built images (skips the 5-7 min local build). Falls
+# back to building the checked-out code locally if the registry is unreachable
+# or the version predates versioned images.
 log "Pulling platform images from registry"
 docker compose -f "$COMPOSE_FILE" pull --ignore-pull-failures 2>&1 | tee -a "$LOG_FILE" || true
 
