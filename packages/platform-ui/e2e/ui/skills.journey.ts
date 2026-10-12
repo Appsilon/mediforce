@@ -17,7 +17,7 @@ const skillMd = (name: string, description: string) => `---\nname: ${name}\ndesc
 /** Replace the open file's contents. CodeMirror is a contenteditable, so the
  *  text goes in as one input event rather than keystroke by keystroke. */
 async function replaceEditorText(page: Page, text: string): Promise<void> {
-  const editor = page.getByTestId('skill-file-editor').locator('.cm-content');
+  const editor = page.getByTestId('text-file-editor').locator('.cm-content');
   await editor.click();
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.insertText(text);
@@ -63,7 +63,7 @@ test.describe('Skills Catalog Journey', () => {
 
       await page.reload();
       await page.getByRole('button', { name: 'ctcae.md', exact: true }).click({ timeout: 30_000 });
-      await expect(page.getByTestId('skill-file-editor').locator('.cm-content')).toContainText('Grade 4 = life-threatening');
+      await expect(page.getByTestId('text-file-editor').locator('.cm-content')).toContainText('Grade 4 = life-threatening');
     } finally {
       await deleteSkill(page, id);
     }

@@ -32,26 +32,6 @@ export function decodeTextFile(bytes: Uint8Array): string | null {
 }
 
 /**
- * The artifact path an uploaded file lands at. A folder upload carries its
- * structure in `webkitRelativePath`, which has to survive — a `skills/`
- * directory uploaded flat leaves an agent's `skillsDir` pointing at nothing.
- * The picker prefixes the chosen folder's own name, so that one leading segment
- * is dropped: keeping it would bury every file a level deeper than intended.
- */
-export function uploadPathFor(
-  file: { name: string; webkitRelativePath?: string },
-  droppedFolderName?: string,
-): string {
-  const relative = file.webkitRelativePath;
-  if (relative === undefined || relative === '') return file.name;
-  const segments = relative.split('/');
-  if (droppedFolderName !== undefined && segments[0] === droppedFolderName) {
-    return segments.slice(1).join('/');
-  }
-  return relative;
-}
-
-/**
  * Fold uploaded files into the set a workflow carries. Upserts by path, so
  * re-uploading a file replaces it where it already sits rather than appending a
  * second copy.

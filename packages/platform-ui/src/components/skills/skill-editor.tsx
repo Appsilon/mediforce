@@ -6,20 +6,15 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
-  FileCode,
-  Folder,
   FolderUp,
   Globe,
   Loader2,
   Lock,
-  Plus,
   Trash2,
 } from 'lucide-react';
 import {
   SKILL_MANIFEST_PATH,
   SkillFilesSchema,
-  WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES,
-  fileTreeBytes,
   parseSkillFrontmatter,
   type AgentDefinition,
   type Skill,
@@ -27,19 +22,12 @@ import {
   type SkillVisibility,
 } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
-import { formatBytes } from '@/lib/format';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { routes } from '@/lib/routes';
-import {
-  compareSkillPaths,
-  diffSkillFiles,
-  entriesFromDrop,
-  entriesFromFiles,
-  readSkillUpload,
-  type UploadedEntry,
-} from '@/lib/skill-upload';
-import { CodeEditor } from '@/components/workflows/workflow-editor/code-editor';
+import { entriesFromDrop, entriesFromFiles, type UploadedEntry } from '@/lib/folder-upload';
+import { diffSkillFiles, readSkillUpload } from '@/lib/skill-upload';
+import { TextFilesPane } from '@/components/files/text-files-pane';
 import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { secondaryButtonClass } from '@/components/ui/button-styles';
 import { DeleteSkillDialog } from './delete-skill-dialog';
@@ -99,32 +87,6 @@ function findIssues(files: SkillFile[], fixedId: string | null): Issues {
   return { byFile, general };
 }
 
-type TreeRow =
-  | { kind: 'folder'; path: string; name: string; depth: number }
-  | { kind: 'file'; index: number; name: string; depth: number };
-
-/** The draft as a tree: SKILL.md first, then by path, each folder once above
- *  its files. Rows keep the file's index in the draft, which is what edits
- *  address, so a rename does not lose the selection. */
-function treeRows(files: SkillFile[]): TreeRow[] {
-  const order = files
-    .map((file, index) => ({ file, index }))
-    .sort((left, right) => compareSkillPaths(left.file.path, right.file.path));
-  const rows: TreeRow[] = [];
-  const shown = new Set<string>();
-  for (const { file, index } of order) {
-    const segments = file.path.split('/');
-    for (let depth = 1; depth < segments.length; depth += 1) {
-      const folder = segments.slice(0, depth).join('/');
-      if (shown.has(folder)) continue;
-      shown.add(folder);
-      rows.push({ kind: 'folder', path: folder, name: segments[depth - 1] ?? '', depth: depth - 1 });
-    }
-    rows.push({ kind: 'file', index, name: segments[segments.length - 1] ?? file.path, depth: segments.length - 1 });
-  }
-  return rows;
-}
-
 interface PendingUpload {
   files: SkillFile[];
   skipped: string[];
@@ -169,10 +131,8 @@ export function SkillEditor({
   const [files, setFiles] = React.useState<SkillFile[]>(skill?.files ?? TEMPLATE);
   const [visibility, setVisibility] = React.useState<SkillVisibility>(skill?.visibility ?? 'private');
   const [selected, setSelected] = React.useState(0);
-  const [newPath, setNewPath] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState<PendingUpload | null>(null);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
-  const [dropping, setDropping] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
@@ -184,7 +144,6 @@ export function SkillEditor({
   const manifest = parseSkillFrontmatter(files.find((file) => file.path === SKILL_MANIFEST_PATH)?.contents ?? '');
   const baseline = skill ?? { files: TEMPLATE, visibility: 'private' };
   const changed = visibility !== baseline.visibility || JSON.stringify(files) !== JSON.stringify(baseline.files);
-  const current = files[selected];
 
   /** `read` is called before the first await: a drop's entries are only
    *  readable while its event is live. */
@@ -211,23 +170,6 @@ export function SkillEditor({
     setPending(null);
   };
 
-  const updateFile = (index: number, patch: Partial<SkillFile>): void => {
-    setFiles((previous) => previous.map((file, at) => (at === index ? { ...file, ...patch } : file)));
-  };
-
-  const removeFile = (index: number): void => {
-    setFiles((previous) => previous.filter((_, at) => at !== index));
-    setSelected((previous) => (previous >= index ? Math.max(0, previous - 1) : previous));
-  };
-
-  const addFile = (): void => {
-    const path = (newPath ?? '').trim();
-    if (path === '') return;
-    setFiles((previous) => [...previous, { path, contents: '' }]);
-    setSelected(files.length);
-    setNewPath(null);
-  };
-
   const save = async (): Promise<void> => {
     setSaving(true);
     setSaveError(null);
@@ -248,8 +190,6 @@ export function SkillEditor({
       setSaving(false);
     }
   };
-
-  const used = fileTreeBytes(files);
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-6">
@@ -362,173 +302,66 @@ export function SkillEditor({
       )}
       {uploadError !== null && <p role="alert" className="text-sm text-destructive">{uploadError}</p>}
 
-      <div
-        onDragOver={(event) => {
-          if (readOnly) return;
-          event.preventDefault();
-          setDropping(true);
-        }}
-        onDragLeave={() => setDropping(false)}
-        onDrop={(event) => {
-          if (readOnly) return;
-          event.preventDefault();
-          setDropping(false);
-          const items = event.dataTransfer.items;
-          void review(() => entriesFromDrop(items));
-        }}
-        className={cn('flex min-h-[28rem] flex-1 gap-4 rounded-lg', dropping && 'outline-dashed outline-2 outline-offset-4 outline-primary/60')}
-      >
-        <div className="flex w-64 shrink-0 flex-col gap-1">
-          <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto" aria-label="Skill files">
-            {treeRows(files).map((row) =>
-              row.kind === 'folder' ? (
-                <li key={`folder:${row.path}`} className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground" style={{ paddingLeft: `${0.5 + row.depth * 0.75}rem` }}>
-                  <Folder className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate font-mono">{row.name}/</span>
-                </li>
-              ) : (
-                <li key={`file:${row.index}`}>
-                  <div
-                    className={cn(
-                      'group flex items-center gap-1 rounded-md px-2 py-1 text-xs',
-                      row.index === selected ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60',
-                    )}
-                    style={{ paddingLeft: `${0.5 + row.depth * 0.75}rem` }}
-                  >
-                    <button type="button" onClick={() => setSelected(row.index)} className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
-                      <FileCode className={cn('h-3.5 w-3.5 shrink-0', issues.byFile.has(row.index) && 'text-destructive')} />
-                      <span className={cn('truncate font-mono', issues.byFile.has(row.index) && 'text-destructive')}>{row.name}</span>
-                    </button>
-                    {readOnly === false && files[row.index]?.path !== SKILL_MANIFEST_PATH && (
-                      <button
-                        type="button"
-                        aria-label={`Remove ${files[row.index]?.path ?? ''}`}
-                        onClick={() => removeFile(row.index)}
-                        className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus:opacity-100"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </li>
-              ),
-            )}
-          </ul>
-
-          {readOnly === false && (
-            <>
-              {newPath !== null ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    autoFocus
-                    value={newPath}
-                    placeholder="references/notes.md"
-                    aria-label="New file path"
-                    onChange={(event) => setNewPath(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') addFile();
-                      if (event.key === 'Escape') setNewPath(null);
-                    }}
-                    className="w-full rounded-md border bg-background px-2 py-1 font-mono text-xs outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <button
-                    type="button"
-                    onClick={addFile}
-                    disabled={newPath.trim() === ''}
-                    className="shrink-0 rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"
-                  >
-                    Add
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-1">
-                  <button type="button" onClick={() => setNewPath('')} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted">
-                    <Plus className="h-3.5 w-3.5" />
-                    Add file
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => folderPickerRef.current?.click()}
-                    className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
-                  >
-                    <FolderUp className="h-3.5 w-3.5" />
-                    Folder
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => zipPickerRef.current?.click()}
-                    className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
-                  >
-                    .zip
-                  </button>
-                </div>
-              )}
-              <input
-                ref={folderPickerRef}
-                type="file"
-                multiple
-                aria-label="Skill folder"
-                className="hidden"
-                // Not in React's JSX types, and the picker is the only way to
-                // keep an uploaded folder's structure.
-                {...{ webkitdirectory: '', directory: '' } as Record<string, string>}
-                onChange={(event) => {
-                  const picked = Array.from(event.target.files ?? []);
-                  event.target.value = '';
-                  if (picked.length > 0) void review(() => entriesFromFiles(picked));
-                }}
-              />
-              <input
-                ref={zipPickerRef}
-                type="file"
-                accept=".zip,application/zip"
-                aria-label="Skill zip"
-                className="hidden"
-                onChange={(event) => {
-                  const picked = Array.from(event.target.files ?? []);
-                  event.target.value = '';
-                  if (picked.length > 0) void review(() => entriesFromFiles(picked));
-                }}
-              />
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                {formatBytes(used)} of {formatBytes(WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES)} used. Drop a skill folder or
-                a .zip here to replace the files.
-              </p>
-            </>
-          )}
-        </div>
-
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          {current === undefined ? (
-            <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground">
-              Select a file to edit it
-            </div>
-          ) : readOnly ? (
-            <>
-              <p className="font-mono text-xs text-muted-foreground">{current.path}</p>
-              <pre className="min-h-0 flex-1 overflow-auto rounded-lg border bg-muted/30 p-3 font-mono text-[11px] whitespace-pre-wrap">
-                {current.contents}
-              </pre>
-            </>
-          ) : (
-            <>
-              <input
-                value={current.path}
-                aria-label="File path"
-                disabled={current.path === SKILL_MANIFEST_PATH}
-                onChange={(event) => updateFile(selected, { path: event.target.value })}
-                className="w-full rounded-md border bg-background px-2 py-1 font-mono text-xs outline-none focus:ring-1 focus:ring-ring disabled:opacity-70"
-              />
-              {issues.byFile.has(selected) && (
-                <p role="alert" className="text-xs text-destructive">{issues.byFile.get(selected)}</p>
-              )}
-              <div className="min-h-0 flex-1 overflow-y-auto" data-testid="skill-file-editor">
-                <CodeEditor value={current.contents} language="text" onChange={(contents) => updateFile(selected, { contents })} />
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+      <TextFilesPane
+        files={files}
+        onChange={setFiles}
+        readOnly={readOnly}
+        issuesByIndex={issues.byFile}
+        pinnedPaths={[SKILL_MANIFEST_PATH]}
+        selected={selected}
+        onSelect={setSelected}
+        onDrop={(items) => void review(() => entriesFromDrop(items))}
+        pathPlaceholder="references/notes.md"
+        listLabel="Skill files"
+        className="min-h-[28rem]"
+        hint="Drop a skill folder or a .zip here to replace the files."
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => folderPickerRef.current?.click()}
+              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
+            >
+              <FolderUp className="h-3.5 w-3.5" />
+              Folder
+            </button>
+            <button
+              type="button"
+              onClick={() => zipPickerRef.current?.click()}
+              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
+            >
+              .zip
+            </button>
+            <input
+              ref={folderPickerRef}
+              type="file"
+              multiple
+              aria-label="Skill folder"
+              className="hidden"
+              // Not in React's JSX types, and the picker is the only way to
+              // keep an uploaded folder's structure.
+              {...{ webkitdirectory: '', directory: '' } as Record<string, string>}
+              onChange={(event) => {
+                const picked = Array.from(event.target.files ?? []);
+                event.target.value = '';
+                if (picked.length > 0) void review(() => entriesFromFiles(picked));
+              }}
+            />
+            <input
+              ref={zipPickerRef}
+              type="file"
+              accept=".zip,application/zip"
+              aria-label="Skill zip"
+              className="hidden"
+              onChange={(event) => {
+                const picked = Array.from(event.target.files ?? []);
+                event.target.value = '';
+                if (picked.length > 0) void review(() => entriesFromFiles(picked));
+              }}
+            />
+          </>
+        }
+      />
 
       {deleteOpen && skill !== null && (
         <DeleteSkillDialog handle={handle} skill={skill} holders={holders} onClose={() => setDeleteOpen(false)} />
