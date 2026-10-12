@@ -28,7 +28,7 @@ const worker = new Worker(
     console.log(`[worker] Processing job ${job.id} (${label})`);
 
     if (job.id === undefined) throw new Error(`Job for ${label} has no id`);
-    const client = await worker.client;
+    const client = await worker.getBackend().client;
     const data = DockerJobDataSchema.parse(job.data);
     const processed = await processDockerJob(await restoreJobPayload(client, data));
     const result = await offloadResultPayload(client, job.id, data, processed, RESULT_PAYLOAD_TTL_SECONDS);
@@ -49,7 +49,7 @@ const worker = new Worker(
 const httpServer = startHttpServer();
 
 worker.on('ready', () => {
-  const advertise = async () => advertisePayloadKeySupport(await worker.client);
+  const advertise = async () => advertisePayloadKeySupport(await worker.getBackend().client);
   const advertiseOrLog = () => advertise().catch((error: Error) => console.error('[worker] Capability heartbeat failed:', error.message));
   void advertiseOrLog();
   setInterval(advertiseOrLog, WORKER_CAPABILITY_REFRESH_MS).unref();
