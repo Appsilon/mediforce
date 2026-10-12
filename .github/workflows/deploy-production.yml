@@ -27,7 +27,13 @@ jobs:
     environment: production
 
     steps:
-      - name: Deploy via SSH
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Releases cut before versioned deploys carry a deploy.sh that ignores the
+      # version and redeploys main on :latest.
+      - name: Check the version can be deployed
         env:
           VERSION: ${{ inputs.version }}
         run: |
@@ -35,6 +41,15 @@ jobs:
             echo "::error::'$VERSION' is not a version like 1.4.0."
             exit 1
           fi
+          if ! git show "v$VERSION:docker-compose.prod.yml" | grep -q 'MEDIFORCE_VERSION'; then
+            echo "::error::v$VERSION predates versioned deploys and can't be deployed by this workflow."
+            exit 1
+          fi
+
+      - name: Deploy via SSH
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key

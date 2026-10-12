@@ -50,9 +50,14 @@ Release often. Small releases are what make the numbers mean something.
 ## Roll back
 
 **Actions → Deploy to Production → Run workflow** with an earlier version, e.g.
-`1.3.1`. Any released version can be deployed this way. A version released
-before versioned images existed is built on the server from its tag, which takes
-a few minutes longer.
+`1.3.1`. It refuses versions released before this process existed (v1.3.0 and
+older): their `deploy.sh` ignores the version and would redeploy `main`.
+
+## If publishing fails after the merge
+
+`main` then has the bump but no tag, and re-running the job fails the same way.
+Fix the section on `main` in a PR, then finish by hand: steps 2–4 of the hotfix
+below, with the release PR's merge commit as `<sha>`.
 
 ## Hotfix
 
@@ -65,6 +70,19 @@ can't ship yet, do by hand what the merge would have done:
 3. **Build & Push Docker Images** from that tag, with the version.
 4. **Deploy to Production** with the version.
 5. Merge the changelog section back to `main` in a PR.
+
+## One-time setup
+
+- **Settings → Actions → General:** *Allow GitHub Actions to create and approve
+  pull requests* stays on, or the Release workflow can't open its PR.
+- **Optional, Settings → Rules:** make `Release / check` a required status
+  check on `main`, so a release PR with draft notes can't be merged (it is
+  skipped, which passes, on every other PR). The cost: a bot-opened PR runs no
+  checks until someone pushes to it, so every release PR then needs one human
+  commit. Without it, the draft is only caught after the merge.
+- **Settings → Environments → production:** no deployment branch restriction.
+  Deploys start from a release PR's merge, not from a branch.
+- **Tags:** a ruleset blocking update and deletion of `v*` tags.
 
 ## Rules
 

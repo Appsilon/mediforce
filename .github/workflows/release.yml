@@ -39,7 +39,10 @@ jobs:
         id: version
         env:
           BUMP: ${{ inputs.bump }}
-        run: echo "version=$(python3 scripts/release.py prepare --bump "$BUMP")" >> "$GITHUB_OUTPUT"
+        run: |
+          version=$(python3 scripts/release.py prepare --bump "$BUMP")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          git add package.json
 
       - name: Draft the release notes
         # The draft only saves typing. Without it the section keeps the list of
@@ -60,11 +63,13 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          # The draft reads PR titles and bodies; only its CHANGELOG.md edit ships.
+          git checkout -- package.json
           branch="release/v$VERSION"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
-          git add package.json CHANGELOG.md
+          git add CHANGELOG.md
           git commit -m "chore(release): v$VERSION"
           git push origin "$branch"
           cat > body.md <<EOF

@@ -35,6 +35,10 @@ if [ -n "$VERSION" ]; then
 else
   # Pull latest code (checkout -f handles stale local changes)
   BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  if [ "$BRANCH" = "HEAD" ]; then
+    log "ERROR: HEAD is detached (a release is checked out) — pass its version: scripts/deploy.sh <version>"
+    exit 1
+  fi
   log "Pulling latest changes from $BRANCH"
   git fetch origin "$BRANCH"
   git checkout -f "$BRANCH"
