@@ -54,7 +54,7 @@ Release often. Small releases are what make the numbers mean something.
 ## Roll back
 
 **Actions → Deploy to Production → Run workflow** with an earlier version, e.g.
-`1.3.1`. It refuses versions released before this process existed (v1.3.0 and
+`1.3.1`. It refuses versions released before this process existed (v1.2.0 and
 older): their `deploy.sh` ignores the version and would redeploy `main`.
 
 ## If publishing fails after the merge
