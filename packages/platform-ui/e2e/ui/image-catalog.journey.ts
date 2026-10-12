@@ -442,13 +442,11 @@ test.describe('Image Catalog UI journey', () => {
       const movedCard = page.getByTestId(`image-entry-${entryId}`);
       await expect(movedCard).toBeVisible({ timeout: 60_000 });
 
-      // And withdrawing it entirely. Nothing was ever built from this repo, so
-      // the daemon holds no image for the entry and the delete is the record
-      // alone — the case the dialog has to name rather than promising to
-      // destroy something that is not there.
+      // And withdrawing it entirely. Delete only ever retires the catalogue
+      // entry; the dialog says so rather than promising to touch any image.
       await movedCard.getByRole('button', { name: 'Delete' }).click();
       const deleteDialog = page.getByRole('dialog');
-      await expect(deleteDialog.getByText(/removes the record and nothing else/)).toBeVisible();
+      await expect(deleteDialog.getByText(/Removes the entry from the catalogue/)).toBeVisible();
       await deleteDialog.getByRole('button', { name: 'Delete entry' }).click();
       await expect(deleteDialog).toBeHidden({ timeout: 60_000 });
 
