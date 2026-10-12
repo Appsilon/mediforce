@@ -211,7 +211,7 @@ importers:
         version: link:../platform-core
       bullmq:
         specifier: ^5.52.0
-        version: 5.81.4
+        version: 5.81.5
       zod:
         specifier: ^4.0.0
         version: 4.4.3
@@ -504,7 +504,7 @@ importers:
         version: 3.0.3
       bullmq:
         specifier: ^5.71.0
-        version: 5.81.4
+        version: 5.81.5
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -4985,8 +4985,8 @@ packages:
   buffer-from@1.1.2:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
 
-  bullmq@5.81.4:
-    resolution: {integrity: sha512-n+WHSzz20KooBGoJyASre6oJNz/p5f1IJRRN2ibD+NWPQaNpNQmDrwYuPO+bsXrQeM1MQzUxXGbdjmyOFKP2xQ==}
+  bullmq@5.81.5:
+    resolution: {integrity: sha512-pW7pFc/X+9AEIx91TWTdIpZ1icfbJnA0unsyzD7VICjCUw8a3qedSjej5dxxn6LjfM1kr2jvalOCGbCmoA5Kxg==}
     engines: {node: '>=12.22.0'}
     peerDependencies:
       redis: '>=5.0.0'
@@ -14393,7 +14393,7 @@ snapshots:
 
   buffer-from@1.1.2: {}
 
-  bullmq@5.81.4:
+  bullmq@5.81.5:
     dependencies:
       cron-parser: 4.9.0
       ioredis: 5.11.1
