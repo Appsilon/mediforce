@@ -1,5 +1,6 @@
 import {
   AgentOutputEnvelopeSchema,
+  DEFAULT_STEP_TIMEOUT_MINUTES,
   resolveStepTimeoutMinutes,
   type AgentFallbackReason,
   type AgentOutputEnvelope,
@@ -49,12 +50,6 @@ interface AttemptOutcome {
   errorMessage: string | null;
   /** The `validateOutputSchema` message when `fallbackReason` is `output_schema`. */
   outputSchemaViolation: string | null;
-}
-
-/** What a result must satisfy to be accepted without a fallback. */
-interface AttemptChecks {
-  outputSchema: OutputSchemaShape | undefined;
-  confidenceThreshold: number;
 }
 
 export class AgentRunner {
@@ -117,7 +112,7 @@ export class AgentRunner {
 
   /**
    * Run an agent plugin using the unified WorkflowDefinition model.
-   * Config is read from step.agent (model, confidenceThreshold, fallbackBehavior)
+   * Config is read from step.agent (model, outputSchema)
    * or step.script / step.databricks (deterministic plugins), plus
    * step.autonomyLevel / step.plugin; timeout via resolveStepTimeoutMinutes.
    */
@@ -152,11 +147,8 @@ export class AgentRunner {
         ? undefined
         : new TrajectoryRecorder(this.agentTrajectoryRepository, runId);
       const runContext: WorkflowAgentContext = trajectory === undefined ? context : { ...context, trajectory };
-      const checks: AttemptChecks = {
-        outputSchema: context.step.agent?.outputSchema,
-        confidenceThreshold: context.step.agent?.confidenceThreshold ?? 0,
-      };
-      let attempt = await this.runAttempt(plugin, runContext, timeoutMs, checks);
+      const outputSchema = context.step.agent?.outputSchema;
+      let attempt = await this.runAttempt(plugin, runContext, timeoutMs, outputSchema);
 
       if (attempt.outputSchemaViolation !== null) {
         // Both attempts share one step timeout: the run route's reap guard
@@ -175,7 +167,7 @@ export class AgentRunner {
             plugin,
             { ...runContext, outputSchemaViolation: attempt.outputSchemaViolation },
             retryBudgetMs,
-            checks,
+            outputSchema,
           );
         } else {
           await this.eventLog.write(processInstanceId, stepId, {
@@ -190,29 +182,18 @@ export class AgentRunner {
       if (
         context.outputGate !== undefined
         && attempt.envelope !== null
-        && (attempt.fallbackReason === null || attempt.fallbackReason === 'low_confidence')
+        && attempt.fallbackReason === null
       ) {
         const gateFailure = await this.runOutputGate(context.outputGate, runId, context, attempt.envelope);
         if (gateFailure !== null) {
-          const alsoLowConfidence = attempt.fallbackReason === 'low_confidence';
-          attempt = {
-            ...attempt,
-            fallbackReason: 'production_evaluator',
-            errorMessage: alsoLowConfidence ? `${gateFailure} (the result was also below the confidence threshold)` : gateFailure,
-          };
+          attempt = { ...attempt, fallbackReason: 'production_evaluator', errorMessage: gateFailure };
         }
       }
 
       const { envelope, fallbackReason, errorMessage } = attempt;
 
       if (fallbackReason) {
-        const partialWork = this.eventLog.getPartialWork(processInstanceId, stepId);
-        const fallbackResult = await this.fallbackHandler.handleWithWorkflowStep(
-          fallbackReason,
-          context,
-          partialWork,
-          envelope,
-        );
+        const fallbackResult = await this.fallbackHandler.escalate(fallbackReason, processInstanceId, envelope);
         const duration_ms = Date.now() - startedAt;
         await this.appendAuditEventFromWorkflowStep(context, envelope, fallbackResult.status, duration_ms, errorMessage);
         await this.recordTerminalRun(
@@ -261,14 +242,12 @@ export class AgentRunner {
     }
   }
 
-  /** Execute the plugin once and classify the outcome. The output-schema check
-   *  runs before the confidence check: a malformed result is not trusted for
-   *  its self-assessed confidence either. */
+  /** Execute the plugin once and classify the outcome. */
   private async runAttempt(
     plugin: StepExecutorPlugin,
     context: AgentContext | WorkflowAgentContext,
     timeoutMs: number,
-    checks: AttemptChecks,
+    outputSchema: OutputSchemaShape | undefined,
   ): Promise<AttemptOutcome> {
     const { resultPayload, timedOut, errorMessage } = await this.pluginRunner.execute(
       plugin, context, timeoutMs,
@@ -283,9 +262,9 @@ export class AgentRunner {
     if (!parseResult.success) return failed('error');
     const envelope = parseResult.data;
 
-    const violation = checks.outputSchema === undefined
+    const violation = outputSchema === undefined
       ? null
-      : validateOutputSchema(envelope.result ?? {}, checks.outputSchema);
+      : validateOutputSchema(envelope.result ?? {}, outputSchema);
     if (violation !== null) {
       return {
         envelope,
@@ -295,20 +274,15 @@ export class AgentRunner {
       };
     }
 
-    return {
-      envelope,
-      fallbackReason: envelope.confidence < checks.confidenceThreshold ? 'low_confidence' : null,
-      errorMessage: null,
-      outputSchemaViolation: null,
-    };
+    return { envelope, fallbackReason: null, errorMessage: null, outputSchemaViolation: null };
   }
 
   /**
    * Reap a stranded agent step whose driver died mid-run (ADR-0010).
    *
    * Produces the SAME `AgentRunResult` the live `Promise.race` timeout path
-   * produces — `fallbackReason='timeout'` routed through the `FallbackHandler`
-   * per the step's `fallbackBehavior` — but WITHOUT running the plugin (it is
+   * produces — `fallbackReason='timeout'` escalated through the `FallbackHandler`
+   * — but WITHOUT running the plugin (it is
    * already gone). Any orphaned still-`running` Agent Run row for this step is
    * transitioned to the fallback's terminal status so it no longer shows as
    * running forever. Downstream `AgentStepExecutor` handling (L3 review routing,
@@ -319,9 +293,7 @@ export class AgentRunner {
     const errorMessage =
       'Step timed out — stranded past its timeout after its driver stopped';
 
-    const fallbackResult = await this.fallbackHandler.handleWithWorkflowStep(
-      'timeout', context, [], null,
-    );
+    const fallbackResult = await this.fallbackHandler.escalate('timeout', processInstanceId, null);
 
     let reapedRunId: string | undefined;
     if (this.agentRunRepository) {
@@ -400,21 +372,11 @@ export class AgentRunner {
       });
     }
 
-    const timeoutMs = (stepConfig.timeoutMinutes ?? 30) * 60_000;
-    const { envelope, fallbackReason, errorMessage } = await this.runAttempt(plugin, context, timeoutMs, {
-      outputSchema: undefined,
-      confidenceThreshold: stepConfig.confidenceThreshold ?? 0,
-    });
+    const timeoutMs = (stepConfig.timeoutMinutes ?? DEFAULT_STEP_TIMEOUT_MINUTES) * 60_000;
+    const { envelope, fallbackReason, errorMessage } = await this.runAttempt(plugin, context, timeoutMs, undefined);
 
     if (fallbackReason) {
-      const partialWork = this.eventLog.getPartialWork(processInstanceId, stepId);
-      const fallbackResult = await this.fallbackHandler.handle(
-        fallbackReason,
-        context,
-        stepConfig,
-        partialWork,
-        envelope,
-      );
+      const fallbackResult = await this.fallbackHandler.escalate(fallbackReason, processInstanceId, envelope);
       const duration_ms = Date.now() - startedAt;
       await this.appendAuditEvent(context, stepConfig, envelope, fallbackResult.status, duration_ms, errorMessage);
       if (this.agentRunRepository) {
@@ -481,7 +443,7 @@ export class AgentRunner {
         // not pause for human approval. The executor inspects step.type to pick
         // the right engine path: submitReviewVerdict (iteration loop with
         // maxIterations enforcement) for review steps, or advanceStep for others.
-        // Low-confidence or timeout still routes through the fallback handler above.
+        // A timeout or error still escalates through the fallback handler above.
         if (context.step.review?.type === 'agent') {
           return { status: 'completed', envelope, appliedToWorkflow: true, fallbackReason: null };
         }

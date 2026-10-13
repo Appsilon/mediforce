@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-09-23
+last_reviewed: 2026-10-12
 ---
 
 # Workflow capabilities
@@ -227,12 +227,13 @@ that *enforces* each one — the behaviour is not visible from the schema.
 | Capability | Field | Where the behaviour is defined |
 |-----------|-------|-------------------------------|
 | Autonomy L0–L4 — silent / shadow / annotate / human-review / autopilot | `autonomyLevel` | [`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts) decides `appliedToWorkflow` + pause/escalate per level |
-| Confidence gate | `agent.confidenceThreshold` (0–1) | [`fallback-handler.ts`](../../packages/agent-runtime/src/runner/fallback-handler.ts) |
-| What happens below threshold / on failure | `agent.fallbackBehavior` = `escalate_to_human` \| `continue_with_flag` \| `pause` | [`fallback-handler.ts`](../../packages/agent-runtime/src/runner/fallback-handler.ts) |
-| Typed output | `agent.outputSchema` (inline JSON Schema; top-level `type: object`, `required` and per-property `type` — `string`, `number`, `integer`, `boolean`, `null`, `array`, `object` — are checked) — `executor: agent` steps only, rejected elsewhere | shown to the agent in its prompt; [`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts) validates `result`, retries once with the error inside the same step timeout, then applies `fallbackBehavior` with reason `output_schema` ([ADR-0023](../adr/0023-step-evaluation.md) D13) |
+| What happens on failure | none — a timeout, error, `outputSchema` violation or failing production Evaluator always escalates the run to a person (the instance pauses) | [`fallback-handler.ts`](../../packages/agent-runtime/src/runner/fallback-handler.ts) |
+| Typed output | `agent.outputSchema` (inline JSON Schema; top-level `type: object`, `required` and per-property `type` — `string`, `number`, `integer`, `boolean`, `null`, `array`, `object` — are checked) — `executor: agent` steps only, rejected elsewhere | shown to the agent in its prompt; [`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts) validates `result`, retries once with the error inside the same step timeout, then escalates with reason `output_schema` ([ADR-0023](../adr/0023-step-evaluation.md) D13) |
 | Built-in approve/revise loop | `review` (`type`: `human`/`agent`/`none`, `maxIterations`, `timeBoxDays`) + L3 | iteration cap enforced by [`review-tracker.ts`](../../packages/workflow-engine/src/review/review-tracker.ts) + [`workflow-engine.ts`](../../packages/workflow-engine/src/engine/workflow-engine.ts); L3 task creation in [`agent-step-executor.ts`](../../packages/agent-runtime/src/runner/agent-step-executor.ts) |
-| **Internet / extra tools** | `agent.allowedTools` | base set is `Bash, Read, Write, Edit, Glob, Grep`; add `WebSearch`/`WebFetch` (or any built-in tool) here — merged in [`claude-code-agent-plugin.ts`](../../packages/agent-runtime/src/plugins/claude-code-agent-plugin.ts) |
-| Fail-soft (advance despite a step error) | `continueOnError` — **`action` steps only** | the only runtime branch honouring it is the action-executor catch in [`run/route.ts`](../../packages/platform-ui/src/app/api/processes/[instanceId]/run/route.ts): marks the step `failed`, logs a warning + audit entry, advances with `{}`. Agent/script/human/cowork steps ignore it — for `agent`, the equivalent is `fallbackBehavior: continue_with_flag` |
+| Skills | `agent.skills` — catalog `(namespace, id)` references, added to the step's agent's Skills; a step Skill replaces the agent's Skill of the same id | resolved by [`resolve-skills-for-step.ts`](../../packages/agent-runtime/src/skills/resolve-skills-for-step.ts), offered through the `/plugin` folder ([ADR-0027](../adr/0027-step-adds-catalog-skills.md)) |
+| Step time limit | `agent.timeoutMinutes` (default 30) | [`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts) races the run against it, then escalates with reason `timeout` |
+| Built-in tools | none — every Claude Code step gets `Bash, Read, Write, Edit, Glob, Grep`; no internet tools (`WebSearch`, `WebFetch`). Reach the network through an MCP server bound to the agent | [`claude-code-agent-plugin.ts`](../../packages/agent-runtime/src/plugins/claude-code-agent-plugin.ts) |
+| Fail-soft (advance despite a step error) | `continueOnError` — **`action` steps only** | the only runtime branch honouring it is the action-executor catch in [`run/route.ts`](../../packages/platform-ui/src/app/api/processes/[instanceId]/run/route.ts): marks the step `failed`, logs a warning + audit entry, advances with `{}`. Agent/script/human/cowork steps ignore it; a failed `agent` step escalates to a person |
 
 `review.timeBoxDays` is accepted by the schema but **not enforced at runtime** —
 only `maxIterations` is checked. Treat it as declarative-only.

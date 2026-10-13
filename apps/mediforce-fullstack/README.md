@@ -76,11 +76,7 @@ yields `[]`, and `draft-plan` derives its own list from the issue text.
 Every agent step also emits `confidence` + `confidence_rationale` into
 `/output/result.json`. The runtime lifts them onto the envelope and strips them
 from the step output, so they show up per-step in the run UI without reaching any
-transition. **`agent.confidenceThreshold` is deliberately left unset**: below the
-threshold the runtime hands off to `FallbackHandler`, whose three behaviours all
-escalate/pause the *run* rather than route it — that leaves the issue on
-`fullstack:in-progress` until a human explicitly adds `fullstack:retry` (the
-platform does not dispatch `task_assigned`). `needsHuman` is the router;
+transition. The runtime never routes on confidence: `needsHuman` is the router;
 confidence is observability.
 
 Every agent prompt also states its own completion criteria. A configured timeout

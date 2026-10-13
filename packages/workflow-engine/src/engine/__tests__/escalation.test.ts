@@ -51,14 +51,13 @@ const stepConfigWithRole: StepConfig = {
   stepId: 'agent-step',
   executorType: 'agent',
   allowedRoles: ['reviewer'],
-  fallbackBehavior: 'escalate_to_human',
 };
 
 const escalatedResult: AgentRunResult = {
   status: 'escalated',
   envelope: null,
   appliedToWorkflow: false,
-  fallbackReason: 'low_confidence',
+  fallbackReason: 'output_schema',
   agentRunId: 'run-001',
 };
 
@@ -66,12 +65,12 @@ const escalatedWithEnvelope: AgentRunResult = {
   status: 'escalated',
   envelope: {
     result: { analysis: 'partial result from agent' },
-    reasoning_summary: 'Confidence too low to proceed automatically',
+    reasoning_summary: 'Result did not match the output schema',
     model: 'claude-sonnet-4',
     confidence: 0.3,
   },
   appliedToWorkflow: false,
-  fallbackReason: 'low_confidence',
+  fallbackReason: 'output_schema',
   agentRunId: 'run-002',
 };
 
@@ -162,7 +161,7 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     expect(handoff.assignedRole).toBe('reviewer');   // from stepConfig.allowedRoles[0]
     expect(handoff.assignedUserId).toBeNull();
     expect(handoff.type).toBe('agent_escalation');
-    expect(handoff.agentQuestion).toContain('confidence');
+    expect(handoff.agentQuestion).toBe('Agent escalated — please review');
     expect(handoff.resolution).toBeNull();
     expect(handoff.resolvedAt).toBeNull();
     expect(handoff.createdAt).toBeDefined();
@@ -196,8 +195,8 @@ describe('WorkflowEngine — agent escalation handoff creation', () => {
     const handoff = handoffs[0];
 
     expect(handoff.agentWork).toEqual({ analysis: 'partial result from agent' });
-    expect(handoff.agentReasoning).toBe('Confidence too low to proceed automatically');
-    expect(handoff.agentQuestion).toContain('confidence');
+    expect(handoff.agentReasoning).toBe('Result did not match the output schema');
+    expect(handoff.agentQuestion).toBe('Agent escalated — please review');
   });
 
   // --- Test 3: Escalation without handoffRepository — no error (graceful degradation) ---

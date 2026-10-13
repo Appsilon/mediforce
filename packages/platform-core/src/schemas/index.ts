@@ -432,6 +432,7 @@ export {
   parseWorkflowTemplate,
   getWorkflowAuthorableJsonSchema,
   resolveCoworkOutputSchema,
+  DEFAULT_STEP_TIMEOUT_MINUTES,
   resolveStepTimeoutMinutes,
   resolveStepTimeoutMs,
   resolveStrandedBudgetMs,

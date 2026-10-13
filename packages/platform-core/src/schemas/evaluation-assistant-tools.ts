@@ -54,7 +54,7 @@ export const ProposeEvaluatorToolSchema = z.object({
   /** Why this check, and what its preview showed. */
   rationale: z.string().max(1000).optional(),
   runInProduction: z.boolean().optional()
-    .describe('Also score live production runs of the step (a guardrail). A failing schema or code check sends the run to the step\'s fallbackBehavior; an llm_judge only writes Scores. A code check counts only once a person approves its source.'),
+    .describe('Also score live production runs of the step (a guardrail). A failing schema or code check escalates the run to a person; an llm_judge only writes Scores. A code check counts only once a person approves its source.'),
 });
 
 /** Propose an Eval Case: from a production Agent Run, or written out. */
@@ -129,18 +129,15 @@ export const ProposeAcceptanceCriteriaToolSchema = z.object({
 
 /**
  * Recommend how the step's outputs are routed after an Eval Run: `L4`
- * (Control Mode 4) above a `confidenceThreshold` (below it, `fallbackBehavior`
- * applies), or `L3` (Control Mode 3), a person reviewing every output. A recommendation card —
- * the person changes the step in the workflow editor.
+ * (Control Mode 4), the agent applying its output, or `L3` (Control Mode 3),
+ * a person reviewing every output. A recommendation card — the person
+ * changes the step in the workflow editor.
  */
 export const ProposeControlSettingsToolSchema = z.object({
   evalRunId: z.uuid(),
   autonomyLevel: z.enum(['L3', 'L4']),
-  confidenceThreshold: z.number().min(0).max(1).optional(),
-  /** What in the report supports it: criteria, calibration, coverage. */
+  /** What in the report supports it: criteria, pass rates. */
   rationale: z.string().min(1).max(2000),
-}).refine((value) => value.autonomyLevel === 'L3' || value.confidenceThreshold !== undefined, {
-  message: 'L4 needs a confidenceThreshold',
 });
 
 /** Why a group of an Eval Run's failing trials failed. */

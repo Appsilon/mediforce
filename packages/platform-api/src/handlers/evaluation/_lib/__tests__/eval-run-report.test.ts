@@ -164,7 +164,7 @@ describe('buildEvalRunReport', () => {
     const fixture = await evaluationFixture();
     const scope = fixture.scope();
     const evalRun = run({ trialsPerCase: 20, caseIds: [CASE_A], acceptanceCriteria: { minPassRate: 0.7 } });
-    // Confident trials all pass; unsure ones mostly fail. The step misses its floor overall, but not where it is confident.
+    // Confident trials all pass; unsure ones mostly fail. The step misses its floor overall, so a person keeps reviewing.
     const trials = Array.from({ length: 20 }, (_unused, index) =>
       trial(evalRun.id, CASE_A, index, { confidence: index < 12 ? 0.95 : 0.4 }));
     for (const [index, scored] of trials.entries()) await score(scope, evalRun, scored, index < 12 || index === 19 ? 1 : 0);
@@ -176,7 +176,7 @@ describe('buildEvalRunReport', () => {
       { lower: 0.8, upper: 1, count: 12, passRate: 1 },
     ] });
     expect(report.criteriaVerdict!.status).toBe('missed');
-    expect(report.recommendation).toMatchObject({ autonomyLevel: 'L4', confidenceThreshold: 0.95, coverage: 0.6 });
+    expect(report.recommendation).toMatchObject({ autonomyLevel: 'L3' });
   });
 
   it('calibrates confidence only on trials every counted Evaluator graded: a missing Score is not a pass', async () => {

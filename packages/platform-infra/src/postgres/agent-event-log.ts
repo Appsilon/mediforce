@@ -8,14 +8,12 @@ type EmitPayload = Omit<AgentEvent, 'id' | 'sequence' | 'processInstanceId' | 's
 interface AgentEventLog {
   write(instanceId: string, stepId: string, event: EmitPayload): Promise<void>;
   getEvents(instanceId: string, stepId: string): AgentEvent[];
-  getPartialWork(instanceId: string, stepId: string): AgentEvent[];
 }
 
 /**
  * Postgres-backed agent event log. Writes go to the `agent_events` table via
  * PostgresProcessInstanceRepository.addAgentEvent and are also cached in
- * memory so synchronous reads (`getEvents` / `getPartialWork`, used by
- * fallback handlers) stay free.
+ * memory so synchronous `getEvents` reads stay free.
  *
  * Per-step writes are serialized through a promise chain so concurrent emits
  * cannot race on `existing.length` and produce duplicate `sequence` values.
@@ -56,9 +54,5 @@ export class PostgresAgentEventLog implements AgentEventLog {
 
   getEvents(instanceId: string, stepId: string): AgentEvent[] {
     return this.cache.get(`${instanceId}:${stepId}`) ?? [];
-  }
-
-  getPartialWork(instanceId: string, stepId: string): AgentEvent[] {
-    return this.getEvents(instanceId, stepId);
   }
 }

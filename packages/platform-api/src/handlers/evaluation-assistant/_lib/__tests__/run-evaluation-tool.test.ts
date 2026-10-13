@@ -112,11 +112,11 @@ describe('executeEvaluationTool', () => {
     });
   });
 
-  it('describes what an evaluation plan reads: agent, I/O, tools, MCP servers in production and in trials, upstream steps', async () => {
+  it('describes what an evaluation plan reads: agent, I/O, MCP servers in production and in trials, upstream steps', async () => {
     const { scope, context } = await setup();
     const workflowStep = {
       ...context.workflowStep,
-      agent: { ...context.workflowStep.agent, allowedTools: ['WebFetch'], outputSchema: { required: ['findings'] } },
+      agent: { ...context.workflowStep.agent, outputSchema: { required: ['findings'] } },
       mcpRestrictions: { edc: { denyTools: ['write_record'] } },
     };
     const result = await executeEvaluationTool('get_step', {}, scope, { ...context, workflowStep });
@@ -124,7 +124,6 @@ describe('executeEvaluationTool', () => {
     expect(result).toMatchObject({
       agent: { name: 'AE grader', inputDescription: 'Extracted AEs', outputDescription: 'Graded AEs' },
       outputSchema: { required: ['findings'] },
-      additionalTools: ['WebFetch'],
       mcpServers: [
         { name: 'edc', inProduction: ['read_record'], inEvalTrials: { mode: 'live', defaulted: true } },
         { name: 'email', inProduction: 'all tools', inEvalTrials: { mode: 'live', defaulted: true } },

@@ -547,6 +547,13 @@
       "when": 1789641802400,
       "tag": "0077_tool_catalog_http_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1789641802500,
+      "tag": "0078_agent_step_timeout_minutes",
+      "breakpoints": true
     }
   ]
 }

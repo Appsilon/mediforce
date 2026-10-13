@@ -1,28 +1,34 @@
 import {
-  agentMayHoldSkill,
+  mayHoldSkill,
+  type AgentDefinition,
   type AgentDefinitionRepository,
   type AgentSkillRef,
   type Skill,
+  type WorkflowDefinition,
   type WorkflowStep,
 } from '@mediforce/platform-core';
 import { AgentDefinitionNotFoundError } from '../mcp/resolve-mcp-for-step';
 
-/** Raised when an agent holds a Skill that no longer exists, or that it may no
- *  longer reach. A broken reference must surface, not quietly mean "no skills". */
+/** Who names a Skill reference: the step's agent, or the step itself. */
+export type SkillOfferer = { kind: 'agent' | 'step'; id: string };
+
+/** Raised when an agent or step names a Skill that no longer exists, or that
+ *  it may no longer reach. A broken reference must surface, not quietly mean
+ *  "no skills". */
 export class SkillNotFoundError extends Error {
   public readonly namespace: string;
   public readonly skillId: string;
-  public readonly agentId: string;
+  public readonly offerer: SkillOfferer;
 
-  constructor(ref: AgentSkillRef, agentId: string) {
+  constructor(ref: AgentSkillRef, offerer: SkillOfferer) {
     super(
-      `Skill '${ref.namespace}/${ref.id}' (held by agent '${agentId}') not found, ` +
-      'or not reachable by the agent; remove it from the agent or restore the skill',
+      `Skill '${ref.namespace}/${ref.id}' (offered by ${offerer.kind} '${offerer.id}') not found, ` +
+      `or not reachable by the ${offerer.kind}; remove it from the ${offerer.kind} or restore the skill`,
     );
     this.name = 'SkillNotFoundError';
     this.namespace = ref.namespace;
     this.skillId = ref.id;
-    this.agentId = agentId;
+    this.offerer = offerer;
   }
 }
 
@@ -31,34 +37,53 @@ export interface ResolveSkillsForStepDeps {
   skillRepo: { getById(namespace: string, id: string): Promise<Skill | null> };
 }
 
-/** Resolve the Skills a workflow step's agent holds (ADR-0025 decision 4).
+/** Resolve the Skills offered to a workflow step: its agent's, then the ones
+ *  the step adds (ADR-0025 §4, ADR-0027).
  *
  *  Contract, the same as resolveMcpForStep:
- *   - step.agentId unset → null.
+ *   - no agentId and no step Skills → null.
  *   - AgentDefinition missing → AgentDefinitionNotFoundError.
- *   - a reference to a Skill that is gone, or that the agent may no longer
- *     hold → SkillNotFoundError.
- *   - otherwise the Skills in the agent's order; [] when it holds none.
+ *   - a reference to a Skill that is gone, or that its offerer may no longer
+ *     reach → SkillNotFoundError. The agent's rule is its own
+ *     namespace and visibility; the step's is its workflow's.
+ *   - otherwise the agent's Skills in its order, then the step's; a step
+ *     Skill replaces the agent's Skill of the same id.
  *
  *  Each Skill resolves in the namespace its reference names, never the
  *  workflow's. */
 export async function resolveSkillsForStep(
   step: WorkflowStep,
   deps: ResolveSkillsForStepDeps,
+  workflow: Pick<WorkflowDefinition, 'namespace' | 'visibility'>,
 ): Promise<Skill[] | null> {
-  if (step.agentId === undefined) return null;
+  const stepRefs = step.agent?.skills ?? [];
+  if (step.agentId === undefined && stepRefs.length === 0) return null;
 
-  const agent = await deps.agentDefinitionRepo.getById(step.agentId);
+  const agentSkills = step.agentId === undefined ? [] : await resolveAgentSkills(step.agentId, step.id, deps);
+  const stepSkills = await resolveOfferedSkills(stepRefs, workflow, { kind: 'step', id: step.id }, deps);
+  const stepIds = new Set(stepSkills.map((skill) => skill.id));
+  return [...agentSkills.filter((skill) => stepIds.has(skill.id) === false), ...stepSkills];
+}
+
+async function resolveAgentSkills(agentId: string, stepId: string, deps: ResolveSkillsForStepDeps): Promise<Skill[]> {
+  const agent = await deps.agentDefinitionRepo.getById(agentId);
   if (agent === null) {
-    throw new AgentDefinitionNotFoundError(step.agentId, step.id);
+    throw new AgentDefinitionNotFoundError(agentId, stepId);
   }
+  return resolveOfferedSkills(agent.skills ?? [], agent, { kind: 'agent', id: agent.id }, deps);
+}
 
-  const refs = agent.skills ?? [];
+async function resolveOfferedSkills(
+  refs: AgentSkillRef[],
+  owner: Pick<AgentDefinition, 'namespace' | 'visibility'>,
+  offerer: SkillOfferer,
+  deps: ResolveSkillsForStepDeps,
+): Promise<Skill[]> {
   const skills = await Promise.all(refs.map((ref) => deps.skillRepo.getById(ref.namespace, ref.id)));
   return refs.map((ref, index) => {
     const skill = skills[index] ?? null;
-    if (skill === null || agentMayHoldSkill(agent, skill) === false) {
-      throw new SkillNotFoundError(ref, agent.id);
+    if (skill === null || mayHoldSkill(owner, skill) === false) {
+      throw new SkillNotFoundError(ref, offerer);
     }
     return skill;
   });

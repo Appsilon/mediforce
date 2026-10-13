@@ -17,6 +17,7 @@ import { assertCallerMayEditWorkflow } from './_access-gate';
 import { checkRetiredModels } from './model-checks';
 import { seedDefaultWorkflowAccess } from './_seed-access';
 import { seedManualTrigger } from './_seed-triggers';
+import { assertStepsMayAddSkills } from '../skills/may-hold-skills';
 import { isLocalAgentMode, fetchFromContainerWorker, fetchFromLocalDocker } from '../system/_docker';
 
 interface RegisterScopedInput extends RegisterWorkflowInput {
@@ -51,6 +52,8 @@ export async function registerWorkflow(
       parsed.error.issues,
     );
   }
+
+  await assertStepsMayAddSkills(parsed.data, scope);
 
   const allModels = await scope.models.list();
   const retired = checkRetiredModels(parsed.data, allModels);

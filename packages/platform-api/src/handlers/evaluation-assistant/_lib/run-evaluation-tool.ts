@@ -178,7 +178,6 @@ export async function executeEvaluationTool(
           systemPrompt: clip(agent.systemPrompt, 4000),
         },
         outputSchema: workflowStep.agent?.outputSchema ?? null,
-        additionalTools: workflowStep.agent?.allowedTools ?? [],
         mcpServers: await effectiveMcpServers(scope, step, workflowStep),
         upstreamSteps: upstreamSteps(definition, workflowStep.id).map((upstream) => ({
           id: upstream.id,

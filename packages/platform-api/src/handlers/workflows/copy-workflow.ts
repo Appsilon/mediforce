@@ -6,6 +6,7 @@ import type { CallerScope } from '../../repositories/index';
 import { ConflictError, NotFoundError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
 import { seedManualTrigger } from './_seed-triggers';
+import { assertStepsMayAddSkills } from '../skills/may-hold-skills';
 
 interface ScopedInput extends CopyWorkflowInput {
   targetNamespace: string;
@@ -62,6 +63,8 @@ export async function copyWorkflow(
   // Doc IDs are namespace-scoped ({namespace}:{name}:{version}); copies start
   // fresh at version 1 of the target.
   const nextVersion = 1;
+
+  await assertStepsMayAddSkills({ ...source, namespace: input.targetNamespace, visibility: 'private' }, scope);
 
   await scope.workflowDefinitions.save({
     ...source,

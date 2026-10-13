@@ -107,7 +107,7 @@ export const EvaluatorSchema = EvaluatedStepSchema.extend({
   /**
    * Also scores live production Agent Runs of the step (D13) — only while its
    * latest version counts. A failing critical `schema` or `code` one sends the
-   * run to the step's `fallbackBehavior`; an `llm_judge` only writes Scores.
+   * run to a person; an `llm_judge` only writes Scores.
    */
   runInProduction: z.boolean(),
   createdBy: z.string().min(1),

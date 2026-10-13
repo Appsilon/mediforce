@@ -277,10 +277,9 @@ export function PlanCard({ step, plan, onDraft, busy, mayEdit, editReason }: {
 }
 
 /**
- * The assistant's routing recommendation after an Eval Run: a Control Mode
- * and, for Control Mode 4, the confidence below which the step's fallback takes over.
- * The person applies it in the workflow editor; neither setting is part of
- * the Step Fingerprint, so applying it keeps a qualification.
+ * The assistant's routing recommendation after an Eval Run: a Control Mode.
+ * The person applies it in the workflow editor; it is not part of the Step
+ * Fingerprint, so applying it keeps a qualification.
  */
 export function ControlSettingsCard({ proposal }: { proposal: Proposal<'propose_control_settings'>['arguments'] }) {
   return (
@@ -288,13 +287,10 @@ export function ControlSettingsCard({ proposal }: { proposal: Proposal<'propose_
       <div className="mb-1 font-medium">
         Recommended routing: <ControlModeBadge executor="agent" autonomyLevel={proposal.autonomyLevel} showNumber />
       </div>
-      {proposal.confidenceThreshold !== undefined && (
-        <p>Confidence threshold {proposal.confidenceThreshold}: below it, the step&apos;s fallbackBehavior applies.</p>
-      )}
       <p className="mt-0.5 whitespace-pre-wrap text-muted-foreground">{proposal.rationale}</p>
       <p className="mt-1 text-muted-foreground">
         From Eval Run <span className="font-mono">{proposal.evalRunId.slice(0, 8)}</span>. Apply it in the workflow editor;
-        Control Mode and confidence threshold are not part of the Step Fingerprint, so a qualification stays valid.
+        Control Mode is not part of the Step Fingerprint, so a qualification stays valid.
       </p>
     </div>
   );

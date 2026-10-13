@@ -39,12 +39,12 @@ function sha256(text: string): string {
 /**
  * The step config that shapes what the agent does. Left out: its name and
  * display, who reviews or may act on it, and how its output is routed —
- * `autonomyLevel`, `review`, `confidenceThreshold`, `fallbackBehavior` — so
- * acting on the routing a qualification recommends does not make it stale.
+ * `autonomyLevel`, `review` — so acting on the routing a qualification
+ * recommends does not make it stale.
  * The model is a component of its own, resolved the way the runtime does.
  */
 function behaviouralStep(step: WorkflowStep): unknown {
-  const { confidenceThreshold: _threshold, fallbackBehavior: _fallback, model: _model, ...agent } = step.agent ?? {};
+  const { model: _model, ...agent } = step.agent ?? {};
   return {
     executor: step.executor,
     plugin: step.plugin,
@@ -77,10 +77,10 @@ function skillIdentity(definition: WorkflowDefinition, step: WorkflowStep): unkn
 }
 
 /**
- * The `skill` component: the step skill, and the Skills its agent holds by
- * reference and content hash (ADR-0025 decision 7), so editing one makes the
- * step a changed step. A step whose agent holds none hashes the step skill
- * alone, exactly as before agents could hold Skills, so no existing
+ * The `skill` component: the step skill, and the Skills offered to the step —
+ * its agent's and the ones it adds — by reference and content hash (ADR-0025
+ * decision 7), so editing one makes the step a changed step. A step offered
+ * none hashes the step skill alone, exactly as before agents could hold Skills, so no existing
  * Fingerprint moves. A reference that no longer resolves is a component of
  * its own, as the runtime refuses to run the step.
  */
@@ -89,7 +89,7 @@ async function skillComponent(repos: StepFingerprintRepos, definition: WorkflowD
   const agentSkills = await resolveSkillsForStep(step, {
     agentDefinitionRepo: repos.agentDefinitions,
     skillRepo: repos.skills,
-  }).then(
+  }, definition).then(
     (skills) => skills ?? [],
     (error: unknown) => {
       if (error instanceof SkillNotFoundError) return null;

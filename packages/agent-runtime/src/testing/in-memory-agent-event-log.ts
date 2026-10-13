@@ -23,10 +23,6 @@ export class InMemoryAgentEventLog implements AgentEventLog {
     );
   }
 
-  getPartialWork(instanceId: string, stepId: string): AgentEvent[] {
-    return this.getEvents(instanceId, stepId);
-  }
-
   /** Test helper */
   getAllEvents(): AgentEvent[] {
     return [...this.events];

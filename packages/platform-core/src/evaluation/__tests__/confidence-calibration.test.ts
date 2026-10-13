@@ -31,33 +31,16 @@ describe('calibrateConfidence', () => {
 });
 
 describe('recommendControl', () => {
-  it('keeps review without criteria, with criteria it could not judge, or without confidence', () => {
-    expect(recommendControl(outcomes(0.9, 30, 0), null)).toMatchObject({ autonomyLevel: 'L3', confidenceThreshold: null });
-    expect(recommendControl(outcomes(0.9, 30, 0), verdict('not_evaluable')).reason).toMatch(/could not be judged/);
-    expect(recommendControl([], verdict('met')).reason).toMatch(/no confidence/);
+  it('keeps review without criteria, or with criteria it could not judge', () => {
+    expect(recommendControl(null)).toMatchObject({ autonomyLevel: 'L3' });
+    expect(recommendControl(verdict('not_evaluable'))).toMatchObject({ autonomyLevel: 'L3', reason: expect.stringMatching(/could not be judged/) });
   });
 
-  it('recommends the lowest threshold whose outputs pass at the floor', () => {
-    const recommendation = recommendControl(
-      [...outcomes(0.95, 30, 0), ...outcomes(0.6, 10, 20)],
-      verdict('missed', 0.8),
-    );
-    expect(recommendation).toMatchObject({ autonomyLevel: 'L4', confidenceThreshold: 0.95, coverage: 0.5 });
-    expect(recommendation.reason).toMatch(/^The criteria were missed overall/);
+  it('lets the agent apply its output when the criteria were met', () => {
+    expect(recommendControl(verdict('met', 0.8))).toMatchObject({ autonomyLevel: 'L4', reason: expect.stringMatching(/0\.8/) });
   });
 
-  it('lets every output run unreviewed when all of them pass at the floor', () => {
-    expect(recommendControl([...outcomes(0.9, 15, 0), ...outcomes(0.7, 15, 0)], verdict('met', 0.8)))
-      .toMatchObject({ autonomyLevel: 'L4', confidenceThreshold: 0.7, coverage: 1 });
-  });
-
-  it('reads the floor as the literal pass rate of the outputs at or above a threshold', () => {
-    expect(recommendControl(outcomes(0.9, 8, 2), verdict('met', 0.8)))
-      .toMatchObject({ autonomyLevel: 'L4', confidenceThreshold: 0.9, coverage: 1 });
-  });
-
-  it('keeps review when no confidence level separates passing outputs over enough trials', () => {
-    expect(recommendControl(outcomes(0.9, 3, 1), verdict('met', 0.5)).autonomyLevel).toBe('L3');
-    expect(recommendControl(outcomes(0.9, 10, 10), verdict('missed', 0.8)).autonomyLevel).toBe('L3');
+  it('keeps review when the criteria were missed', () => {
+    expect(recommendControl(verdict('missed', 0.8)).autonomyLevel).toBe('L3');
   });
 });

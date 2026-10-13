@@ -27,23 +27,24 @@ one `result` event** conforming to `AgentOutputEnvelopeSchema`. The envelope
 carries `confidence` (0.0–1.0) and `confidence_rationale`.
 
 **Plugins do not implement autonomy.** `AgentRunner` applies it *after* `run`
-returns: it compares `confidence` against the step's threshold and fires the
-fallback — escalate to a human, retry, or fail the step. A plugin that decides
-for itself whether its answer was good enough has taken a governance decision
-out of the workflow definition, where it is auditable, and buried it in code.
+returns, from the step's `autonomyLevel`. A plugin that decides for itself
+whether its answer was good enough has taken a governance decision out of the
+workflow definition, where it is auditable, and buried it in code. Nothing
+routes on `confidence`: it is recorded, and Eval Runs report how well it is
+calibrated.
 
-The same rule covers timeouts and errors: they are envelope outcomes handled by
-`FallbackHandler`, not exceptions a plugin swallows.
+Timeouts and errors are envelope outcomes too: `FallbackHandler` escalates
+them to a person, never an exception a plugin swallows.
 
 `agent.outputSchema` is the runner's check too: it validates `result`, reruns
 the plugin once with the violation in `context.outputSchemaViolation` — within
-what is left of the one step timeout — then falls back with reason
+what is left of the one step timeout — then escalates with reason
 `output_schema` (ADR-0023 D13).
 
 **An optional `context.outputGate` checks a result that passed `outputSchema`.**
-It runs before the confidence and autonomy routing, receives the Agent Run id,
-context and envelope, and returns `{ failure, errors }`. A `failure` falls back
-with reason `production_evaluator`, like low confidence; `errors` (and a gate
+It runs before the autonomy routing, receives the Agent Run id, context and
+envelope, and returns `{ failure, errors }`. A `failure` escalates with reason
+`production_evaluator`; `errors` (and a gate
 that throws) are only logged to the activity log. The runner stays free of
 platform-api: `executeAgentStep` supplies the gate for real, non-trial runs of
 steps with production Evaluators.

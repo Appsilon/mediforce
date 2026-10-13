@@ -1067,6 +1067,7 @@ export function WorkflowEditorCanvas({
               imageWarning={warningStepIds?.get(selectedStep.id)}
               dockerImages={dockerImages}
               workflowArtifacts={settingsDraft?.artifacts}
+              workflowVisibility={settingsDraft?.visibility}
               catalogEntries={catalogEntries}
               workflowExternalSkillsRepo={workflowExternalSkillsRepo}
             />

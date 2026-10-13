@@ -28,6 +28,8 @@ function makeSkill(namespace: string, id: string, visibility: Skill['visibility'
   };
 }
 
+const workflow = { namespace: 'alpha', visibility: 'private' } as const;
+
 describe('resolveSkillsForStep', () => {
   let agentRepo: InMemoryAgentDefinitionRepository;
   let stored: Map<string, Skill>;
@@ -64,55 +66,116 @@ describe('resolveSkillsForStep', () => {
   });
 
   it('[DATA] returns null when the step names no agent', async () => {
-    expect(await resolveSkillsForStep(makeStep(), deps)).toBeNull();
+    expect(await resolveSkillsForStep(makeStep(), deps, workflow)).toBeNull();
   });
 
   it('[ERROR] throws AgentDefinitionNotFoundError for a missing agent', async () => {
-    await expect(resolveSkillsForStep(makeStep({ agentId: 'missing' }), deps))
+    await expect(resolveSkillsForStep(makeStep({ agentId: 'missing' }), deps, workflow))
       .rejects.toThrow(AgentDefinitionNotFoundError);
   });
 
   it('[DATA] returns [] for an agent that holds no skills', async () => {
     await holdingAgent(undefined);
-    expect(await resolveSkillsForStep(makeStep({ agentId: 'mapper' }), deps)).toEqual([]);
+    expect(await resolveSkillsForStep(makeStep({ agentId: 'mapper' }), deps, workflow)).toEqual([]);
   });
 
   it('[DATA] resolves each skill in the namespace its reference names, in the agent\'s order', async () => {
     store(makeSkill('alpha', 'sdtm-mapping'), makeSkill('beta', 'meddra-coding', 'public'));
     await holdingAgent([{ namespace: 'beta', id: 'meddra-coding' }, { namespace: 'alpha', id: 'sdtm-mapping' }]);
 
-    const skills = await resolveSkillsForStep(makeStep({ agentId: 'mapper' }), deps);
+    const skills = await resolveSkillsForStep(makeStep({ agentId: 'mapper' }), deps, workflow);
     expect(skills?.map((skill) => `${skill.namespace}/${skill.id}`)).toEqual(['beta/meddra-coding', 'alpha/sdtm-mapping']);
   });
 
   it('[ERROR] names a skill that no longer exists', async () => {
     await holdingAgent([{ namespace: 'alpha', id: 'deleted-skill' }]);
 
-    const error = await resolveSkillsForStep(makeStep({ agentId: 'mapper' }), deps).catch((caught: unknown) => caught);
+    const error = await resolveSkillsForStep(makeStep({ agentId: 'mapper' }), deps, workflow).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(SkillNotFoundError);
     expect((error as SkillNotFoundError).message).toContain("'alpha/deleted-skill'");
-    expect((error as SkillNotFoundError).agentId).toBe('mapper');
+    expect((error as SkillNotFoundError).offerer).toEqual({ kind: 'agent', id: 'mapper' });
   });
 
   it('[ERROR] refuses another workspace\'s private skill', async () => {
     store(makeSkill('beta', 'internal-sop'));
     await holdingAgent([{ namespace: 'beta', id: 'internal-sop' }]);
 
-    await expect(resolveSkillsForStep(makeStep({ agentId: 'mapper' }), deps)).rejects.toThrow(SkillNotFoundError);
+    await expect(resolveSkillsForStep(makeStep({ agentId: 'mapper' }), deps, workflow)).rejects.toThrow(SkillNotFoundError);
   });
 
   it('[ERROR] refuses a private skill on a public agent, even from its own workspace', async () => {
     store(makeSkill('alpha', 'sdtm-mapping'));
     await holdingAgent([{ namespace: 'alpha', id: 'sdtm-mapping' }], 'public');
 
-    await expect(resolveSkillsForStep(makeStep({ agentId: 'mapper' }), deps)).rejects.toThrow(SkillNotFoundError);
+    await expect(resolveSkillsForStep(makeStep({ agentId: 'mapper' }), deps, workflow)).rejects.toThrow(SkillNotFoundError);
   });
 
   it('[DATA] gives a built-in public agent its public skills', async () => {
     store(makeSkill('alpha', 'sdtm-mapping', 'public'));
     await holdingAgent([{ namespace: 'alpha', id: 'sdtm-mapping' }], 'public', undefined);
 
-    const skills = await resolveSkillsForStep(makeStep({ agentId: 'mapper' }), deps);
+    const skills = await resolveSkillsForStep(makeStep({ agentId: 'mapper' }), deps, workflow);
     expect(skills?.map((skill) => skill.id)).toEqual(['sdtm-mapping']);
+  });
+  describe('skills the step adds', () => {
+    const addingStep = (skills: AgentSkillRef[], agentId: string | null = 'mapper') =>
+      makeStep({ ...(agentId === null ? {} : { agentId }), agent: { prompt: 'map', skills } });
+
+    it('[DATA] offers them after the agent\'s own', async () => {
+      store(makeSkill('alpha', 'sdtm-mapping'), makeSkill('alpha', 'define-xml'));
+      await holdingAgent([{ namespace: 'alpha', id: 'sdtm-mapping' }]);
+
+      const skills = await resolveSkillsForStep(addingStep([{ namespace: 'alpha', id: 'define-xml' }]), deps, workflow);
+      expect(skills?.map((skill) => skill.id)).toEqual(['sdtm-mapping', 'define-xml']);
+    });
+
+    it('[DATA] offers them on a step that names no agent', async () => {
+      store(makeSkill('alpha', 'define-xml'));
+
+      const skills = await resolveSkillsForStep(addingStep([{ namespace: 'alpha', id: 'define-xml' }], null), deps, workflow);
+      expect(skills?.map((skill) => skill.id)).toEqual(['define-xml']);
+    });
+
+    it('[DATA] lists a skill the agent already holds once', async () => {
+      store(makeSkill('alpha', 'sdtm-mapping'));
+      await holdingAgent([{ namespace: 'alpha', id: 'sdtm-mapping' }]);
+
+      const skills = await resolveSkillsForStep(addingStep([{ namespace: 'alpha', id: 'sdtm-mapping' }]), deps, workflow);
+      expect(skills?.map((skill) => `${skill.namespace}/${skill.id}`)).toEqual(['alpha/sdtm-mapping']);
+    });
+
+    it('[DATA] replaces the agent\'s skill of the same id from another workspace', async () => {
+      store(makeSkill('alpha', 'sdtm-mapping'), makeSkill('beta', 'sdtm-mapping', 'public'));
+      await holdingAgent([{ namespace: 'alpha', id: 'sdtm-mapping' }]);
+
+      const skills = await resolveSkillsForStep(addingStep([{ namespace: 'beta', id: 'sdtm-mapping' }]), deps, workflow);
+      expect(skills?.map((skill) => `${skill.namespace}/${skill.id}`)).toEqual(['beta/sdtm-mapping']);
+    });
+
+    it('[ERROR] names the step when its skill no longer exists', async () => {
+      await holdingAgent(undefined);
+
+      const error = await resolveSkillsForStep(addingStep([{ namespace: 'alpha', id: 'deleted-skill' }]), deps, workflow)
+        .catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(SkillNotFoundError);
+      expect((error as SkillNotFoundError).offerer).toEqual({ kind: 'step', id: 'map' });
+    });
+
+    it('[ERROR] refuses another workspace\'s private skill', async () => {
+      store(makeSkill('beta', 'internal-sop'));
+
+      await expect(resolveSkillsForStep(addingStep([{ namespace: 'beta', id: 'internal-sop' }], null), deps, workflow))
+        .rejects.toThrow(SkillNotFoundError);
+    });
+
+    it('[ERROR] refuses a private skill on a public workflow, even from its own workspace', async () => {
+      store(makeSkill('alpha', 'sdtm-mapping'));
+
+      await expect(resolveSkillsForStep(
+        addingStep([{ namespace: 'alpha', id: 'sdtm-mapping' }], null),
+        deps,
+        { namespace: 'alpha', visibility: 'public' },
+      )).rejects.toThrow(SkillNotFoundError);
+    });
   });
 });

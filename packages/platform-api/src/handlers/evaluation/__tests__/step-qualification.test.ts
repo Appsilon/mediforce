@@ -146,7 +146,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
         { id: 'extract-aes', name: 'Extract AEs', type: 'creation', executor: 'script', script: { runtime: 'python', inlineScript: 'print(1)' } },
         {
           id: 'grade-aes', name: 'Grade AEs (renamed)', type: 'creation', executor: 'agent', agentId: 'ae-grader', autonomyLevel: 'L4',
-          agent: { prompt: 'Grade each AE.', model: 'openai/gpt-5', confidenceThreshold: 0.8 },
+          agent: { prompt: 'Grade each AE.', model: 'openai/gpt-5' },
         },
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
       ],

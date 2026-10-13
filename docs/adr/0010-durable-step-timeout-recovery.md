@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-07-21
+last_reviewed: 2026-10-12
 ---
 
 # ADR-0010: Durable Step Timeout & Stranded-Run Recovery
@@ -9,6 +9,11 @@ last_reviewed: 2026-07-21
 **Date:** 2026-07-15
 **Deciders:** Krystian Zielinski
 **Context issue:** [#868](https://github.com/Appsilon/mediforce/issues/868)
+**Amended 2026-10-12:** `fallbackBehavior` is gone. Every fallback, a timeout
+reap included, now pauses the instance for a person (`FallbackHandler.escalate`,
+`pauseReason: 'agent_escalated'`). Read "escalate/fail per `fallbackBehavior`",
+"advances on `continue_with_flag`" and "honouring `fallbackBehavior`" below as
+"escalates to a person"; the reap path itself is unchanged.
 
 ## Context
 

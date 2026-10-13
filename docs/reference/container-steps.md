@@ -42,7 +42,7 @@ path and branch conventions live in `workspace-paths.ts` so the read-only
 | `/output` | rw | the step | Engine ↔ step channel. Host seeds `input.json`, `prompt.txt`, `previous_run.json`, the agent CLI's config (`mcp-config.json` for Claude Code, `opencode.json` for OpenCode), `script.<ext>`; the step writes `result.json` and optional `presentation.md`. |
 | `/data` | ro | the step | Uploaded attachments the host downloaded for this step (agent and script steps). Each `files[].localPath` in the agent's prompt and `input.json` points here. |
 | `/artifacts` | ro | the definition | The files the workflow carries (`artifacts` on the definition): scripts, a Dockerfile, skills. Materialized to a content-addressed host directory per file set, so every step of every run of an unchanged workflow shares one write. Absent when the workflow carries none. |
-| `/plugin` | ro | the step | The plugin root (`skills/<id>/SKILL.md`), when an agent step sets `skillsDir` or its agent holds Skills. With `skillsDir` alone it is the parent of the resolved skills directory: carried skills, then the `externalSkillsRepo` cache, then the repo checkout on the host. When the agent holds Skills (`claude-code-agent` via `--plugin-dir`, `opencode-agent` via `skills.paths` in `opencode.json`; [ADR-0025](../adr/0025-skill-catalog.md)), it is a content-hashed folder under `mediforce-agent-skills/` holding them under `skills/<id>/`, merged with the step's skills, which win a name clash. |
+| `/plugin` | ro | the step | The plugin root (`skills/<id>/SKILL.md`), when an agent step sets `skillsDir` or is offered catalog Skills (its agent's or its own `agent.skills`). With `skillsDir` alone it is the parent of the resolved skills directory: carried skills, then the `externalSkillsRepo` cache, then the repo checkout on the host. When it is offered catalog Skills (`claude-code-agent` via `--plugin-dir`, `opencode-agent` via `skills.paths` in `opencode.json`; [ADR-0025](../adr/0025-skill-catalog.md)), it is a content-hashed folder under `mediforce-agent-skills/` holding them under `skills/<id>/`, merged with the step's skills, which win a name clash. |
 
 Why `/workspace` and `/output` stay separate — and why `/output` is a bad name
 for a channel that carries inputs — is argued in the header comment of
@@ -176,18 +176,18 @@ An agent step's `result.json` becomes the envelope's `result`. When the step
 sets `agent.outputSchema`, the schema is added to the prompt and `AgentRunner`
 checks `result` against it after the run: a violation records a `status` event
 and runs the plugin once more with the error in the prompt; a second violation
-goes to `fallbackBehavior` with `fallbackReason: output_schema`
+escalates the run to a person with `fallbackReason: output_schema`
 ([`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts),
 ADR-0023 D13). Both attempts share the one step timeout — the retry gets what the
-first attempt left, and with nothing left the violation goes straight to
-`fallbackBehavior` — so the run route's reap guard never reads a live retry as
+first attempt left, and with nothing left the violation escalates straight
+away — so the run route's reap guard never reads a live retry as
 stranded. The retry refreshes the run's `updatedAt` for the heartbeat's
 stranded sweep. `agent.outputSchema` is valid on `executor: agent` steps only;
 definition validation rejects it anywhere else.
 
 A result that passes `outputSchema` is then checked by the step's production
-Evaluators, when it has any: a failing critical `schema` or `code` one goes to
-`fallbackBehavior` with `fallbackReason: production_evaluator`
+Evaluators, when it has any: a failing critical `schema` or `code` one
+escalates the run with `fallbackReason: production_evaluator`
 ([Step Evaluation](step-evaluation.md#production-evaluators), ADR-0023 D13).
 
 Every agent step's Agent Run also keeps an Agent Trajectory: the same entries

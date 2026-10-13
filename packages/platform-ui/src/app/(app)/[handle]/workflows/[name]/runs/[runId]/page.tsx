@@ -48,8 +48,6 @@ export default function RunDetailPage() {
               autonomyLevel: ws.autonomyLevel,
               plugin: ws.plugin,
               model: ws.agent?.model,
-              confidenceThreshold: ws.agent?.confidenceThreshold,
-              fallbackBehavior: ws.agent?.fallbackBehavior,
               timeoutMinutes: resolveStepTimeoutMinutes(ws),
               reviewerType: ws.review?.type,
               agentConfig: ws.agent,

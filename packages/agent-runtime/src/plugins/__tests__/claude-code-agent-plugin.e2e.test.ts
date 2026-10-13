@@ -30,8 +30,6 @@ const PROCESS_CONFIG: ProcessConfig = {
       executorType: 'agent',
       plugin: 'claude-code-agent',
       autonomyLevel: 'L3',
-      confidenceThreshold: 0.7,
-      fallbackBehavior: 'escalate_to_human',
       timeoutMinutes: 15,
       agentConfig: {
         skill: 'trial-metadata-extractor',

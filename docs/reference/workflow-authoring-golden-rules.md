@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-08-19
+last_reviewed: 2026-10-12
 ---
 
 # Workflow authoring rules
@@ -121,24 +121,26 @@ repo root, which `dockerfile` is then read from) — set `"context": "."` when a
 
 ## 4. Wire Skills Explicitly
 
-Workflow-specific skills SHOULD live in the workflow package: pin
-`externalSkillsRepo` at workflow level, and point the step at `agent.skill` plus
-`agent.skillsDir` (the skills folder's path inside that repo). A workflow can
-also carry its skills itself — `artifacts` with a file at
-`<skillsDir>/<skill>/SKILL.md`, which needs no repository and no checkout, and
-takes precedence over `externalSkillsRepo` for the directory it holds. Use a separate
-skills repo only when the skills are shared products with their own release
-process.
+Skills SHOULD live in the Skill catalog (the Skills page, `mediforce skill`).
+Give a skill every step needs to the Agent. Give a skill only one step needs to
+that step, in `agent.skills`. Either way the skill is offered, not pasted into
+the prompt, so the Agent's system prompt or the step's `agent.prompt` should name
+it when the step must use it
+([ADR-0027](../adr/0027-step-adds-catalog-skills.md)).
 
 ```json
 {
-  "externalSkillsRepo": {
-    "url": "https://github.com/acme/workflow-repo.git",
-    "commit": "0123456789abcdef0123456789abcdef01234567"
-  },
-  "agent": { "skill": "my-skill", "skillsDir": "my-workflow/skills" }
+  "agentId": "sdtm-mapper",
+  "agent": {
+    "prompt": "Map the raw AE domain. Use the `define-xml` skill for the metadata.",
+    "skills": [{ "namespace": "acme", "id": "define-xml" }]
+  }
 }
 ```
+
+A step skill (`agent.skill` and `agent.skillsDir`, read from the workflow's
+`artifacts` or its `externalSkillsRepo`) still runs and is always pasted into
+the prompt. The editor cannot add one; use catalog Skills for new steps.
 
 ## 5. Choose Control Mode, Executor, Type
 

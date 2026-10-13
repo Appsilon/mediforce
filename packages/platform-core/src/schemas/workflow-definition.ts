@@ -12,6 +12,7 @@ import { ProcessNotificationConfigSchema } from './process-config';
 import { BuildContextSchema } from '../utils/docker-build-paths';
 import { McpServerConfigSchema } from './mcp-server-config';
 import { StepMcpRestrictionSchema } from './agent-mcp-binding';
+import { AgentSkillRefsSchema } from './agent-definition';
 
 /** HTTP method enum used by the http action handler and (via the detached
  *  Trigger resource) webhook triggers. */
@@ -154,17 +155,21 @@ export const AgentOutputSchemaSchema = z.looseObject({
   properties: z.record(z.string(), z.looseObject({ type: OutputSchemaPropertyTypeSchema.optional() })).optional(),
 });
 
+/** Maximum run time of a step, shared by every executor flavour that runs one
+ *  (agent, script, databricks); see {@link resolveStepTimeoutMinutes}. */
+export const StepTimeoutMinutesSchema = z.number().positive();
+
 export const WorkflowAgentConfigSchema = z.object({
   model: z.string().optional(),
   skill: z.string().optional(),
   prompt: z.string().optional(),
   skillsDir: z.string().optional(),
-  timeoutMs: z.number().positive().optional(),
-  timeoutMinutes: z.number().optional(),
-  confidenceThreshold: z.number().min(0).max(1).optional(),
-  fallbackBehavior: z.enum(['escalate_to_human', 'continue_with_flag', 'pause']).optional(),
+  /** Catalog Skills this step offers on top of its agent's (ADR-0027). A
+   *  Skill of the agent's with the same id is replaced by the step's. */
+  skills: AgentSkillRefsSchema.optional(),
+  timeoutMinutes: StepTimeoutMinutesSchema.optional(),
   /** Shown to the agent in its prompt and checked against `result` after the
-   *  run: one retry with the validation error, then `fallbackBehavior`. */
+   *  run: one retry with the validation error, then the run is escalated. */
   outputSchema: AgentOutputSchemaSchema.optional(),
   /** @deprecated Step-level MCP configuration is being removed.
    *  Move servers onto the agent via AgentDefinition.mcpServers and
@@ -172,10 +177,6 @@ export const WorkflowAgentConfigSchema = z.object({
    *  Step 2 of the MCP permissions refactor will migrate existing
    *  workflows and drop this field. Still parsed for backward-compat. */
   mcpServers: z.array(McpServerConfigSchema).optional(),
-  /** Additional Claude Code tools to allow beyond the default set
-   *  (Bash, Read, Write, Edit, Glob, Grep). Use this to grant internet
-   *  access (WebSearch, WebFetch) or any other built-in tool. */
-  allowedTools: z.array(z.string()).optional(),
 }).merge(ContainerSchema);
 
 /**
@@ -189,7 +190,7 @@ export const ScriptStepConfigSchema = z.object({
   command: z.string().min(1).optional(),
   inlineScript: z.string().min(1).optional(),
   runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),
-  timeoutMinutes: z.number().positive().optional(),
+  timeoutMinutes: StepTimeoutMinutesSchema.optional(),
 }).merge(ContainerSchema).superRefine((config, ctx) => {
   if ((config.command !== undefined) === (config.inlineScript !== undefined)) {
     ctx.addIssue({
@@ -214,7 +215,7 @@ export const DatabricksJobConfigSchema = z.object({
   jobParameters: z.record(z.string(), z.string()).optional(),
   /** Run-state poll cadence; the plugin defaults to 10s when unset. */
   pollIntervalMs: z.number().int().positive().optional(),
-  timeoutMinutes: z.number().positive().optional(),
+  timeoutMinutes: StepTimeoutMinutesSchema.optional(),
 });
 
 export const CoworkChatConfigSchema = z.object({
@@ -987,9 +988,11 @@ export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
 export type InputForNextRunEntry = z.infer<typeof InputForNextRunEntrySchema>;
 
+/** How long a step may run when it names no timeout of its own. */
+export const DEFAULT_STEP_TIMEOUT_MINUTES = 30;
+
 /**
  * Effective step timeout in minutes, regardless of executor flavour.
- * Mirrors the runtime's historical default of 30 minutes (agent-runner).
  */
 export function resolveStepTimeoutMinutes(
   step: Pick<WorkflowStep, 'agent' | 'script' | 'databricks'>,
@@ -997,7 +1000,7 @@ export function resolveStepTimeoutMinutes(
   return step.agent?.timeoutMinutes
     ?? step.script?.timeoutMinutes
     ?? step.databricks?.timeoutMinutes
-    ?? 30;
+    ?? DEFAULT_STEP_TIMEOUT_MINUTES;
 }
 
 /**

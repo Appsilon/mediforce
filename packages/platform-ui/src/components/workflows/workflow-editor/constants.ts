@@ -1,12 +1,5 @@
 export const STEP_TYPE_LABELS: Record<string, string> = { creation: 'Creation', review: 'Review', decision: 'Decision', terminal: 'End' };
 
-export const FALLBACK_OPTIONS = [
-  { value: '', label: 'Default' },
-  { value: 'escalate_to_human', label: 'Escalate to human' },
-  { value: 'continue_with_flag', label: 'Continue with flag' },
-  { value: 'pause', label: 'Pause' },
-] as const;
-
 export const KNOWN_MODELS = [
   { value: '', label: 'Default' },
   { value: 'sonnet', label: 'Sonnet' },

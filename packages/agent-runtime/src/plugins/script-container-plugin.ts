@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
 import type { AgentConfig, ScriptStepConfig, StepConfig, PluginCapabilityMetadata, Presentation } from '@mediforce/platform-core';
-import { DEFAULT_SCRIPT_RUNTIME_IMAGES, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
+import { DEFAULT_SCRIPT_RUNTIME_IMAGES, DEFAULT_STEP_TIMEOUT_MINUTES, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
 import {
@@ -17,9 +17,9 @@ import {
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 
 // Last-resort for the legacy process-mode path only; the workflow path resolves
-// the timeout via resolveStepTimeoutMinutes. Aligned with that resolver's
-// default (30 min) so the two never silently disagree (ADR-0010).
-const DEFAULT_TIMEOUT_MS = 30 * 60_000;
+// the timeout via resolveStepTimeoutMinutes. The resolver's own default, so the
+// two never silently disagree (ADR-0010).
+const DEFAULT_TIMEOUT_MS = DEFAULT_STEP_TIMEOUT_MINUTES * 60_000;
 
 /** Runtime → Docker image, file extension, and run command (as array for spawn).
  *  The images come from `DEFAULT_SCRIPT_RUNTIME_IMAGES` because the Image

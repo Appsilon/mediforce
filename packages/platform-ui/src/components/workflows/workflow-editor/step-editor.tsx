@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, X } from 'lucide-react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
 import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
@@ -9,18 +10,17 @@ import { useNamespaceMembers } from '@/hooks/use-namespace-members';
 import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
 import { useAuth } from '@/contexts/auth-context';
 import { mediforce } from '@/lib/mediforce';
-import { carriedSkills } from '@/lib/carried-skills';
+import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
-import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, defaultVerdictLabel, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
+import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, DEFAULT_STEP_TIMEOUT_MINUTES, defaultVerdictLabel, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
 import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo, ImageCatalogEntryView } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import { selectAgentPatch } from '../workflow-editor-utils';
 import {
   STEP_TYPE_LABELS,
-  FALLBACK_OPTIONS,
   RUNTIME_OPTIONS,
 } from './constants';
 import { CoworkSection } from './cowork-section';
@@ -31,6 +31,7 @@ import { FieldRow, FieldGroup, Section, PillToggle, inputBase, inputBaseMono, se
 import { ImageSourceFields } from './image-source-fields';
 import { identityImageValue, pickerImageValue } from './image-options';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
+import { StepSkillsField } from './step-skills-field';
 import { McpCommandWarnings } from '@/components/agents/mcp-command-alert';
 import { stdioServerCommands } from '@/components/agents/mcp-command-warnings';
 import { useToolCatalogEntries } from '@/hooks/use-tool-catalog';
@@ -45,6 +46,19 @@ import {
 /** Stable identity for "no catalog", so the picker memo is not defeated by a
  *  fresh array on every render of a caller that passes none. */
 const NO_CATALOG_ENTRIES: ImageCatalogEntryView[] = [];
+
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+/** What a saved agent brings to every step that names it. */
+function agentSummary(agent: AgentDefinition): string {
+  return [
+    agent.foundationModel,
+    plural(agent.skills?.length ?? 0, 'skill'),
+    plural(Object.keys(agent.mcpServers ?? {}).length, 'MCP server'),
+  ].join(' · ');
+}
 
 function friendlyFieldError(message: string): string {
   if (/too small|>=1|at least 1/i.test(message)) return 'This field cannot be empty.';
@@ -122,19 +136,14 @@ const TIP = {
   executor:                'Who performs this step: human, agent, script, cowork, or action. Fixed at step creation.',
 
   autonomyLevel:           'Assist: agent runs and produces a draft; human approves. Human review: explicit human approval required. Autonomous agent: agent executes without review. L0/L1 are developer-only flags set via raw YAML.',
-  plugin:                  'Agent plugin to invoke (e.g. opencode-agent, claude-code-agent). Must be registered in the platform.',
+  plugin:                  'Runtime that runs the agent (e.g. opencode-agent, claude-code-agent). Filled in from the agent you pick; change it to run this step on another runtime.',
   pluginScript:            'Plugin that runs the script (usually script-container). Must be registered in the platform.',
-  agentId:                 'Saved agent definition used by this step. Its system prompt, model and MCP server bindings are loaded for the run.',
-  agentModel:              'LLM model for this step. Leave blank to use the agent definition\'s model. Use provider/model format.',
-  agentSkill:              'The skill this step loads: a SKILL.md holding specialised instructions for one task. Skills the workflow carries in its Files are offered here; upload a skills folder there to add one.',
-  agentSkillsDir:          'Where that skill lives. Filled in for you when you pick a carried skill. Otherwise a path inside the workflow\'s externalSkillsRepo, or inside the repository on the host.',
-  agentTimeoutMinutes:     'Maximum minutes the agent may run before the step is escalated.',
-  agentTimeoutMs:          'Maximum run time in milliseconds. Takes precedence over timeoutMinutes if both are set.',
-  agentConfidence:         'Minimum confidence (0–1) the agent must self-report before output is accepted. Below this, the step escalates.',
-  agentFallback:           'What to do if the agent fails or is below the confidence threshold: escalate to human, retry, or skip.',
-  agentOutputSchema:       'JSON Schema the agent\'s result must match. Shown to the agent; a result that breaks it gets one retry with the error, then the fallback behavior.',
-  agentAllowedTools:       'Tools the agent may call, comma-separated. Leave empty to allow all available tools.',
-  agentPrompt:             'Additional instructions appended to the agent\'s system prompt for this step only.',
+  agentId:                 'Saved agent from the Agents page. Its system prompt, model, skills and MCP servers are used for this step; the fields below add to them.',
+  agentModel:              'Leave on the default to run the agent\'s own model. Picking a model here replaces it for this step only; the agent itself is unchanged.',
+  agentSkills:             'Skills offered to the agent in this step, on top of its own. The agent loads one when its description fits the task. A step skill replaces the agent\'s skill of the same name.',
+  stepTimeoutMinutes:      `How long the step may run before it is stopped as timed out. Blank means ${DEFAULT_STEP_TIMEOUT_MINUTES} minutes.`,
+  agentOutputSchema:       'JSON Schema the agent\'s result must match. Shown to the agent; a result that breaks it gets one retry with the error, then the run is escalated to a person.',
+  agentPrompt:             'Instructions for this step, added after the agent\'s system prompt. The agent\'s own prompt still applies.',
 
   scriptRuntime:           'Language runtime for the inline script: javascript, python, r, or bash.',
   scriptCommand:           'Shell command to run in the container, typically to invoke a file from script.repo.',
@@ -144,7 +153,6 @@ const TIP = {
   databricksNotebookParams:'notebook_params for run-now as JSON object of string values. Values support ${steps.*} interpolation.',
   databricksJobParameters: 'job_parameters for run-now (jobs with job-level parameters) as JSON object of string values.',
   databricksPollIntervalMs:'How often to poll the run state, in milliseconds. Default 10000.',
-  databricksTimeoutMinutes:'Step timeout in minutes — the run is cancelled when exceeded. Default 30.',
 
   allowedRoles:            'Roles that can claim and complete this task. Enforced: a member holding none of them is refused, and a role nobody holds on this workflow makes the step unclaimable. Pick from the roles this workspace already knows, or type a new one. Leave empty to allow any workspace member.',
   assignedTo:              'Pre-assign this human task to a specific user. Pick a workspace member, or type an interpolated value like ${triggerPayload.userId} to assign per run. Human steps only.',
@@ -167,7 +175,6 @@ const TIP = {
   actionWaitDuration:      'How long to pause. Fields combine, so 1 hour 30 minutes is hours 1 + minutes 30.',
   actionWaitDeadline:      'Absolute time to wait until — an ISO timestamp, or an interpolation like ${steps.x.dueAt}. Takes precedence over a duration.',
   actionWaitCondition:     'Transition-language expression checked while waiting; the step proceeds as soon as it is true.',
-  scriptTimeoutMinutes:    'Maximum run time in minutes. Without it a long script is killed at the 30-minute default.',
   verdictLabel:            'Button text shown to the reviewer. Defaults to a title-cased form of the verdict key.',
   verdictIntent:           'Button styling: success, danger, warning or neutral. Defaults from the key for the common names.',
   verdictRequiresComment:  'Enforced server-side — the task cannot be completed on this verdict without a comment.',
@@ -229,6 +236,26 @@ function StepIdField({ currentId, onChange, error }: { currentId: string; onChan
 // StepEditor
 // ---------------------------------------------------------------------------
 
+function StepTimeoutField({ value, onChange }: {
+  value: number | undefined;
+  onChange: (timeoutMinutes: number | undefined) => void;
+}) {
+  return (
+    <FieldRow label="Step's maximum duration (minutes)" tooltip={TIP.stepTimeoutMinutes}>
+      <input
+        type="number"
+        min="1"
+        step="1"
+        aria-label="Step's maximum duration in minutes"
+        value={value ?? ''}
+        placeholder={String(DEFAULT_STEP_TIMEOUT_MINUTES)}
+        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
+        className={ri}
+      />
+    </FieldRow>
+  );
+}
+
 export function StepEditor({
   step,
   allSteps,
@@ -241,6 +268,7 @@ export function StepEditor({
   catalogEntries = NO_CATALOG_ENTRIES,
   workflowExternalSkillsRepo,
   workflowArtifacts,
+  workflowVisibility = 'private',
 }: {
   step: WorkflowStep;
   allSteps: WorkflowStep[];
@@ -252,12 +280,13 @@ export function StepEditor({
   dockerImages?: DockerImageInfo[];
   catalogEntries?: ImageCatalogEntryView[];
   workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
-  /** The files this workflow carries. Skills among them are offered here, so a
-   *  skill uploaded in the Files panel is picked rather than typed as a path. */
+  /** The files this workflow carries: a Dockerfile among them is an image
+   *  source the step can build from. */
   workflowArtifacts?: WorkflowDefinition['artifacts'];
+  /** Decides which catalog Skills the step may add (ADR-0027). */
+  workflowVisibility?: WorkflowDefinition['visibility'];
 }) {
   const isNewStep = step.id.startsWith('new-step-');
-  const skillsOnHand = carriedSkills(workflowArtifacts);
   const { plugins } = usePlugins();
   const pinnedDefaultModel = usePinnedDefaultModel();
   const selectedPluginMetadata = plugins.find((p) => p.name === step.plugin)?.metadata;
@@ -738,25 +767,15 @@ export function StepEditor({
             />
           </FieldRow>
 
-          <FieldRow label="plugin" tooltip={TIP.plugin}>
-            <select
-              value={step.plugin ?? ''}
-              onChange={(e) => onChange({ plugin: e.target.value || undefined })}
-              className={rs}
-            >
-              <option value="">None</option>
-              {plugins.map((p) => <option key={p.name} value={p.name}>{humanizeToken(p.name)}</option>)}
-              {step.plugin && !plugins.some((p) => p.name === step.plugin) && (
-                <option value={step.plugin}>{humanizeToken(step.plugin)}</option>
-              )}
-            </select>
-          </FieldRow>
-
-          <FieldRow label="agentId" tooltip={TIP.agentId}>
+          <FieldRow label="Agent" tooltip={TIP.agentId}>
             <select
               aria-label="Agent"
               value={step.agentId ?? ''}
-              onChange={(e) => onChange(selectAgentPatch(step, e.target.value || undefined, pinnedDefaultModel))}
+              onChange={(e) => onChange(selectAgentPatch(
+                step,
+                e.target.value === '' ? undefined : agentDefinitions.find((agent) => agent.id === e.target.value) ?? { id: e.target.value, kind: 'plugin' },
+                pinnedDefaultModel,
+              ))}
               className={rs}
             >
               <option value="">{agentsLoading ? 'Loading agents…' : 'No agent selected'}</option>
@@ -771,109 +790,95 @@ export function StepEditor({
                   </option>
                 ))}
             </select>
+            {selectedAgent !== undefined && (
+              <p className="text-xs text-muted-foreground">
+                {agentSummary(selectedAgent)}
+                {' · '}
+                <Link href={routes.agentDefinition(handle, selectedAgent.id)} className="underline">Edit agent</Link>
+              </p>
+            )}
             {agentsError && <p className="text-xs text-amber-600">Agent list unavailable: {agentsError}</p>}
           </FieldRow>
 
-          <FieldRow label="agent.model" tooltip={TIP.agentModel}>
+          <FieldRow label="Plugin" tooltip={TIP.plugin}>
+            <select
+              aria-label="Plugin"
+              value={step.plugin ?? ''}
+              onChange={(e) => onChange({ plugin: e.target.value || undefined })}
+              className={rs}
+            >
+              <option value="">None</option>
+              {plugins.map((p) => <option key={p.name} value={p.name}>{humanizeToken(p.name)}</option>)}
+              {step.plugin && !plugins.some((p) => p.name === step.plugin) && (
+                <option value={step.plugin}>{humanizeToken(step.plugin)}</option>
+              )}
+            </select>
+          </FieldRow>
+
+          <FieldRow label="Model" tooltip={TIP.agentModel}>
             <ModelPicker
               value={step.agent?.model}
               onChange={(model) => updateAgent({ model })}
               defaultModel={selectedAgentDefaultModel}
+              defaultLabel={selectedAgent === undefined ? 'Plugin default' : `Use ${selectedAgent.name}'s model`}
               providers={selectedPluginMetadata?.modelProviders}
-              ariaLabel="Agent Model"
+              ariaLabel="Model"
               className={rs}
             />
           </FieldRow>
+        </FieldGroup>
 
-          <FieldRow label="agent.skill" tooltip={TIP.agentSkill}>
-            {skillsOnHand.length > 0 ? (
-              <select
-                value={
-                  skillsOnHand.some((carried) =>
-                    carried.skill === step.agent?.skill && carried.skillsDir === step.agent?.skillsDir)
-                    ? `${step.agent?.skillsDir ?? ''}/${step.agent?.skill ?? ''}`
-                    : ''
-                }
-                aria-label="Skill"
-                onChange={(e) => {
-                  // The value is the skill's own path, so it splits back into
-                  // the pair the runtime reads: the directory it lives in and
-                  // its name.
-                  const at = e.target.value.lastIndexOf('/');
-                  updateAgent(at === -1
-                    ? { skill: undefined, skillsDir: undefined }
-                    : { skillsDir: e.target.value.slice(0, at), skill: e.target.value.slice(at + 1) });
-                }}
-                className={rs}
-              >
-                <option value="">None</option>
-                {skillsOnHand.map((carried) => (
-                  <option
-                    key={`${carried.skillsDir}/${carried.skill}`}
-                    value={`${carried.skillsDir}/${carried.skill}`}
-                  >
-                    {carried.skill}
-                    {carried.skillsDir === 'skills' ? '' : ` (${carried.skillsDir})`}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                value={step.agent?.skill ?? ''}
-                onChange={(e) => updateAgent({ skill: e.target.value || undefined })}
-                className={riMono}
-              />
+        <FieldGroup>
+          <Section title="This step adds">
+            <p className="px-0.5 text-xs text-muted-foreground">
+              Added to {selectedAgent === undefined ? 'the agent' : selectedAgent.name}&apos;s prompt and skills
+              for this step only. A step skill with the same id as one of the agent&apos;s replaces it.
+            </p>
+          </Section>
+
+          <FieldRow label="Step prompt" tooltip={TIP.agentPrompt} alignStart>
+            <textarea
+              aria-label="Step prompt"
+              value={step.agent?.prompt ?? ''}
+              onChange={(e) => updateAgent({ prompt: e.target.value || undefined })}
+              rows={3}
+              placeholder="Instructions for the agent…"
+              className={cn(rt, 'placeholder:italic placeholder:text-muted-foreground/40')}
+            />
+          </FieldRow>
+
+          <FieldRow label="Skills" tooltip={TIP.agentSkills} alignStart>
+            <StepSkillsField
+              namespace={handle}
+              workflowVisibility={workflowVisibility}
+              runtimeId={step.plugin}
+              agentName={selectedAgent?.name}
+              agentSkills={selectedAgent?.skills ?? []}
+              selected={step.agent?.skills ?? []}
+              onChange={(skills) => updateAgent({ skills: skills.length > 0 ? skills : undefined })}
+            />
+            {(step.agent?.skill !== undefined || step.agent?.skillsDir !== undefined) && (
+              <div className="mt-2 flex items-start justify-between gap-2 rounded-md border border-dashed px-2.5 py-1.5 text-xs">
+                <span className="min-w-0 text-muted-foreground">
+                  {step.agent.skill === undefined ? 'Workflow-file skills folder, offered to the agent: ' : 'Workflow-file skill, always in the prompt: '}
+                  <span className="font-mono text-foreground">
+                    {[step.agent.skillsDir, step.agent.skill].filter((part) => part !== undefined).join('/')}
+                  </span>
+                  . Move it to the Skills page to manage it there.
+                </span>
+                <button
+                  type="button"
+                  aria-label="Remove workflow-file skill"
+                  onClick={() => updateAgent({ skill: undefined, skillsDir: undefined })}
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
             )}
           </FieldRow>
 
-          <FieldRow label="agent.skillsDir" tooltip={TIP.agentSkillsDir}>
-            <input
-              value={step.agent?.skillsDir ?? ''}
-              aria-label="Skills directory"
-              onChange={(e) => updateAgent({ skillsDir: e.target.value || undefined })}
-              className={riMono}
-            />
-          </FieldRow>
-
-          <FieldRow label="agent.timeoutMinutes" tooltip={TIP.agentTimeoutMinutes}>
-            <input
-              type="number"
-              value={step.agent?.timeoutMinutes ?? ''}
-              onChange={(e) => updateAgent({ timeoutMinutes: e.target.value ? Number(e.target.value) : undefined })}
-              className={ri}
-            />
-          </FieldRow>
-
-          <FieldRow label="agent.timeoutMs" tooltip={TIP.agentTimeoutMs}>
-            <input
-              type="number"
-              value={step.agent?.timeoutMs ?? ''}
-              onChange={(e) => updateAgent({ timeoutMs: e.target.value ? Number(e.target.value) : undefined })}
-              className={ri}
-            />
-          </FieldRow>
-
-          <FieldRow label="agent.confidenceThreshold" tooltip={TIP.agentConfidence}>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              max="1"
-              value={step.agent?.confidenceThreshold ?? ''}
-              onChange={(e) => updateAgent({ confidenceThreshold: e.target.value ? Number(e.target.value) : undefined })}
-              className={ri}
-            />
-          </FieldRow>
-
-          <FieldRow label="agent.fallbackBehavior" tooltip={TIP.agentFallback}>
-            <select
-              value={step.agent?.fallbackBehavior ?? ''}
-              onChange={(e) => updateAgent({ fallbackBehavior: (e.target.value || undefined) as WorkflowStep['agent'] extends { fallbackBehavior?: infer F } ? F : never })}
-              className={rs}
-            >
-              {FALLBACK_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </FieldRow>
+          <StepTimeoutField value={step.agent?.timeoutMinutes} onChange={(timeoutMinutes) => updateAgent({ timeoutMinutes })} />
 
           <FieldRow label="agent.outputSchema" tooltip={TIP.agentOutputSchema} alignStart>
             <OutputSchemaEditor
@@ -884,25 +889,6 @@ export function StepEditor({
             />
           </FieldRow>
 
-          <FieldRow label="agent.allowedTools" tooltip={TIP.agentAllowedTools}>
-            <input
-              value={step.agent?.allowedTools?.join(', ') ?? ''}
-              onChange={(e) => updateAgent({
-                allowedTools: e.target.value ? e.target.value.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
-              })}
-              className={ri}
-            />
-          </FieldRow>
-
-          <FieldRow label="agent.prompt" tooltip={TIP.agentPrompt} alignStart>
-            <textarea
-              value={step.agent?.prompt ?? ''}
-              onChange={(e) => updateAgent({ prompt: e.target.value || undefined })}
-              rows={3}
-              placeholder="Instructions for the agent…"
-              className={cn(rt, 'placeholder:italic placeholder:text-muted-foreground/40')}
-            />
-          </FieldRow>
         </FieldGroup>
 
         <FieldGroup>
@@ -970,15 +956,7 @@ export function StepEditor({
             />
           </FieldRow>
 
-          <FieldRow label="script.timeoutMinutes" tooltip={TIP.scriptTimeoutMinutes}>
-            <input
-              type="number"
-              min={1}
-              value={step.script?.timeoutMinutes ?? ''}
-              onChange={(e) => updateScript({ timeoutMinutes: e.target.value ? Number(e.target.value) : undefined })}
-              className={ri}
-            />
-          </FieldRow>
+          <StepTimeoutField value={step.script?.timeoutMinutes} onChange={(timeoutMinutes) => updateScript({ timeoutMinutes })} />
           </>)}
 
           {step.plugin === 'databricks-job' && (<>
@@ -997,14 +975,7 @@ export function StepEditor({
               className={riMono}
             />
           </FieldRow>
-          <FieldRow label="databricks.timeoutMinutes" tooltip={TIP.databricksTimeoutMinutes}>
-            <input
-              type="number"
-              value={step.databricks?.timeoutMinutes ?? ''}
-              onChange={(e) => updateDatabricks({ timeoutMinutes: e.target.value ? Number(e.target.value) : undefined })}
-              className={riMono}
-            />
-          </FieldRow>
+          <StepTimeoutField value={step.databricks?.timeoutMinutes} onChange={(timeoutMinutes) => updateDatabricks({ timeoutMinutes })} />
           {(['notebookParams', 'jobParameters'] as const).map((field) => (
             <div key={field} className="px-3 py-1.5 border-b border-border/30 last:border-0">
               <div

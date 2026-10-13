@@ -14,7 +14,6 @@ import { useModelPricing } from '@/hooks/use-model-registry';
 import { routes } from '@/lib/routes';
 import { formatAgentRunCost } from '@/lib/agent-cost';
 import { formatAgentRunContainer } from '@/lib/agent-container';
-import { useStepAllowedTools } from '@/hooks/use-step-permissions';
 import { LoadMoreFooter } from '@/components/load-more-footer';
 import type { LucideIcon } from 'lucide-react';
 
@@ -42,15 +41,6 @@ const STATUS_STYLES: Record<string, string> = {
   paused: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
   interrupted: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
 };
-
-function PermissionsCell({ run }: { run: AgentRun }) {
-  const { data: allowedTools, loading } = useStepAllowedTools(run.processInstanceId, run.stepId);
-  if (loading) return <span className="text-xs text-muted-foreground">…</span>;
-  if (allowedTools === undefined || allowedTools.length === 0) {
-    return <span className="text-xs text-muted-foreground">no data</span>;
-  }
-  return <span className="text-xs text-muted-foreground">{allowedTools.join(', ')}</span>;
-}
 
 function formatDuration(start: string, end: string | null): string {
   if (!end) return '—';
@@ -99,7 +89,7 @@ export function AgentRunListTable({
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10 bg-card">
             <tr className="border-b bg-muted text-xs text-muted-foreground">
-              {['Model', 'Plugin', 'Container', 'Workflow Run', 'Control Mode', 'Permissions', 'Cost', 'Duration', 'Started', 'Status', 'Log'].map((h) => (
+              {['Model', 'Plugin', 'Container', 'Workflow Run', 'Control Mode', 'Cost', 'Duration', 'Started', 'Status', 'Log'].map((h) => (
                 <th key={h} className="px-4 py-2.5 text-left font-medium whitespace-nowrap">
                   {h}
                 </th>
@@ -154,9 +144,6 @@ export function AgentRunListTable({
                     </td>
                     <td className="px-4 py-3">
                       <ControlModeBadge executor="agent" autonomyLevel={run.autonomyLevel} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <PermissionsCell run={run} />
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">
                       {formatAgentRunCost(run, modelPricing)}

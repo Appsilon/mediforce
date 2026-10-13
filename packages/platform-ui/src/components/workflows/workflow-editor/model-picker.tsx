@@ -10,6 +10,8 @@ interface ModelPickerProps {
   value: string | undefined;
   onChange: (model: string | undefined) => void;
   defaultModel?: string;
+  /** Whose default the blank option is, e.g. "Clinical Reviewer's model". */
+  defaultLabel?: string;
   ariaLabel?: string;
   className?: string;
   requireToolSupport?: boolean;
@@ -46,7 +48,7 @@ function formatPrice(perToken: number): string {
 
 const TOP_PICKS_COUNT = 20;
 
-export function ModelPicker({ value, onChange, defaultModel, ariaLabel, className, requireToolSupport, minContextTokens, showAllModels, providers }: ModelPickerProps) {
+export function ModelPicker({ value, onChange, defaultModel, defaultLabel = 'Default', ariaLabel, className, requireToolSupport, minContextTokens, showAllModels, providers }: ModelPickerProps) {
   const [allModels, setModels] = useState<ModelRegistryEntry[]>([]);
   const models = useMemo(
     () => allModels
@@ -161,7 +163,7 @@ export function ModelPicker({ value, onChange, defaultModel, ariaLabel, classNam
           }}
           className={className}
         >
-          <option value="">{loading ? 'Loading models…' : `Default (${displayDefault})`}</option>
+          <option value="">{loading ? 'Loading models…' : `${defaultLabel} (${displayDefault})`}</option>
           {topPicks.length > 0 && (
             <optgroup label="Top picks">
               {topPicks.map((m) => (

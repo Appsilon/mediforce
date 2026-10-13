@@ -234,7 +234,9 @@ Evaluator marked "also run in production" scores live Agent Runs. `schema` and
 `code` run synchronously; a failing critical one triggers the Step's existing
 `fallbackBehavior`, as low confidence does. _Amended 2026-10-07: Evaluators
 have no severity (D10), so any failing production `schema` or `code` Evaluator
-triggers it._ `llm_judge` runs asynchronously and
+triggers it._ _Amended 2026-10-12: steps have no `fallbackBehavior` or
+confidence threshold any more; a failing one escalates the run to a person,
+as every fallback does._ `llm_judge` runs asynchronously and
 only writes Scores. Human verdicts on CM3 reviews become Scores automatically,
 best-effort until handlers get a cross-repository transaction (#516): the verdict
 itself is always on the task and its `task.completed` audit event.

@@ -220,8 +220,9 @@ _Avoid_: conflating with Skill — Plugin is the runtime; Skill is data.
 A named folder of text an agent can load — a `SKILL.md` plus any references,
 scripts and templates — owned by one Namespace, identified there by the name in
 its `SKILL.md`, and `private` (its Namespace only) or `public` like an Agent.
-Given to an Agent, never to a Workflow. Offered, not imposed: the agent loads
-one when its description fits the task.
+Given to an Agent, or added by one Workflow Step on top of its Agent's
+(`step.agent.skills`, ADR-0027). Offered, not imposed: the agent
+loads one when its description fits the task.
 _Avoid_: Conflating with Plugin — Plugin is the runtime; Skill is data.
 "Catalog skill" (there is no other kind of Skill).
 
@@ -229,7 +230,8 @@ _Avoid_: Conflating with Plugin — Plugin is the runtime; Skill is data.
 A skill folder a Workflow Definition carries in its files or pins in its
 skills repository, named by one Workflow Step (`step.agent.skill`). Lives and
 versions with the Workflow Definition; not a Skill. Always in the Step's
-prompt.
+prompt. The workflow editor cannot add one; it shows an existing one
+read-only so it can be removed in favour of a Skill.
 _Avoid_: "workflow skill", "Skill" unqualified.
 
 **Agent**:
@@ -240,7 +242,10 @@ _Avoid_: Agent Definition (legacy code term; there is no versioned definition).
 _Note_: A Step inherits two things from the Agent it names — `systemPrompt`
 reaches the prompt as `agentIdentityPrompt`, and `foundationModel` supplies the
 run's model whenever the Step leaves `step.agent.model` unset. A Step also
-gets the Agent's Skills; its own Step skill is separate.
+gets the Agent's Skills. Everything else the Step sets adds to the Agent:
+`step.agent.prompt` follows the system prompt and `step.agent.skills` follow
+the Agent's Skills. Only `step.agent.model` (and `step.plugin`, which the editor fills
+in from the Agent's `runtimeId`) replaces what the Agent names.
 
 **MCP Server**:
 External tool host (stdio or HTTP) accessible to an agent via Model Context
@@ -559,7 +564,7 @@ _Avoid_: "step version", "config hash".
 The pass thresholds an Eval Run is judged against, fixed before it starts;
 signing a Step Qualification despite a missed criterion records a deviation
 with a written justification.
-_Avoid_: "threshold" alone (collides with `confidenceThreshold`), "target".
+_Avoid_: "threshold" alone, "target".
 
 **Step Qualification**:
 A signed decision that one Step Fingerprint met its acceptance criteria in an
