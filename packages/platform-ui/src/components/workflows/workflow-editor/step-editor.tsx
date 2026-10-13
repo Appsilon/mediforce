@@ -141,7 +141,7 @@ const TIP = {
   agentId:                 'Saved agent from the Agents page. Its system prompt, model, skills and MCP servers are used for this step; the fields below add to them.',
   agentModel:              'Leave on the default to run the agent\'s own model. Picking a model here replaces it for this step only; the agent itself is unchanged.',
   agentSkills:             'Skills offered to the agent in this step, on top of its own. The agent loads one when its description fits the task. A step skill replaces the agent\'s skill of the same name.',
-  agentTimeoutMinutes:     `How long the step may run before it times out and is escalated to a person. Blank means ${DEFAULT_STEP_TIMEOUT_MINUTES} minutes.`,
+  stepTimeoutMinutes:      `How long the step may run before it is stopped as timed out. Blank means ${DEFAULT_STEP_TIMEOUT_MINUTES} minutes.`,
   agentOutputSchema:       'JSON Schema the agent\'s result must match. Shown to the agent; a result that breaks it gets one retry with the error, then the run is escalated to a person.',
   agentPrompt:             'Instructions for this step, added after the agent\'s system prompt. The agent\'s own prompt still applies.',
 
@@ -153,7 +153,6 @@ const TIP = {
   databricksNotebookParams:'notebook_params for run-now as JSON object of string values. Values support ${steps.*} interpolation.',
   databricksJobParameters: 'job_parameters for run-now (jobs with job-level parameters) as JSON object of string values.',
   databricksPollIntervalMs:'How often to poll the run state, in milliseconds. Default 10000.',
-  databricksTimeoutMinutes:'Step timeout in minutes — the run is cancelled when exceeded. Default 30.',
 
   allowedRoles:            'Roles that can claim and complete this task. Enforced: a member holding none of them is refused, and a role nobody holds on this workflow makes the step unclaimable. Pick from the roles this workspace already knows, or type a new one. Leave empty to allow any workspace member.',
   assignedTo:              'Pre-assign this human task to a specific user. Pick a workspace member, or type an interpolated value like ${triggerPayload.userId} to assign per run. Human steps only.',
@@ -176,7 +175,6 @@ const TIP = {
   actionWaitDuration:      'How long to pause. Fields combine, so 1 hour 30 minutes is hours 1 + minutes 30.',
   actionWaitDeadline:      'Absolute time to wait until — an ISO timestamp, or an interpolation like ${steps.x.dueAt}. Takes precedence over a duration.',
   actionWaitCondition:     'Transition-language expression checked while waiting; the step proceeds as soon as it is true.',
-  scriptTimeoutMinutes:    'Maximum run time in minutes. Without it a long script is killed at the 30-minute default.',
   verdictLabel:            'Button text shown to the reviewer. Defaults to a title-cased form of the verdict key.',
   verdictIntent:           'Button styling: success, danger, warning or neutral. Defaults from the key for the common names.',
   verdictRequiresComment:  'Enforced server-side — the task cannot be completed on this verdict without a comment.',
@@ -237,6 +235,26 @@ function StepIdField({ currentId, onChange, error }: { currentId: string; onChan
 // ---------------------------------------------------------------------------
 // StepEditor
 // ---------------------------------------------------------------------------
+
+function StepTimeoutField({ value, onChange }: {
+  value: number | undefined;
+  onChange: (timeoutMinutes: number | undefined) => void;
+}) {
+  return (
+    <FieldRow label="Step's maximum duration (minutes)" tooltip={TIP.stepTimeoutMinutes}>
+      <input
+        type="number"
+        min="1"
+        step="1"
+        aria-label="Step's maximum duration in minutes"
+        value={value ?? ''}
+        placeholder={String(DEFAULT_STEP_TIMEOUT_MINUTES)}
+        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
+        className={ri}
+      />
+    </FieldRow>
+  );
+}
 
 export function StepEditor({
   step,
@@ -860,18 +878,7 @@ export function StepEditor({
             )}
           </FieldRow>
 
-          <FieldRow label="Step's maximum duration (minutes)" tooltip={TIP.agentTimeoutMinutes}>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              aria-label="Step's maximum duration in minutes"
-              value={step.agent?.timeoutMinutes ?? ''}
-              placeholder={String(DEFAULT_STEP_TIMEOUT_MINUTES)}
-              onChange={(e) => updateAgent({ timeoutMinutes: e.target.value ? Number(e.target.value) : undefined })}
-              className={ri}
-            />
-          </FieldRow>
+          <StepTimeoutField value={step.agent?.timeoutMinutes} onChange={(timeoutMinutes) => updateAgent({ timeoutMinutes })} />
 
           <FieldRow label="agent.outputSchema" tooltip={TIP.agentOutputSchema} alignStart>
             <OutputSchemaEditor
@@ -949,15 +956,7 @@ export function StepEditor({
             />
           </FieldRow>
 
-          <FieldRow label="script.timeoutMinutes" tooltip={TIP.scriptTimeoutMinutes}>
-            <input
-              type="number"
-              min={1}
-              value={step.script?.timeoutMinutes ?? ''}
-              onChange={(e) => updateScript({ timeoutMinutes: e.target.value ? Number(e.target.value) : undefined })}
-              className={ri}
-            />
-          </FieldRow>
+          <StepTimeoutField value={step.script?.timeoutMinutes} onChange={(timeoutMinutes) => updateScript({ timeoutMinutes })} />
           </>)}
 
           {step.plugin === 'databricks-job' && (<>
@@ -976,14 +975,7 @@ export function StepEditor({
               className={riMono}
             />
           </FieldRow>
-          <FieldRow label="databricks.timeoutMinutes" tooltip={TIP.databricksTimeoutMinutes}>
-            <input
-              type="number"
-              value={step.databricks?.timeoutMinutes ?? ''}
-              onChange={(e) => updateDatabricks({ timeoutMinutes: e.target.value ? Number(e.target.value) : undefined })}
-              className={riMono}
-            />
-          </FieldRow>
+          <StepTimeoutField value={step.databricks?.timeoutMinutes} onChange={(timeoutMinutes) => updateDatabricks({ timeoutMinutes })} />
           {(['notebookParams', 'jobParameters'] as const).map((field) => (
             <div key={field} className="px-3 py-1.5 border-b border-border/30 last:border-0">
               <div

@@ -155,6 +155,10 @@ export const AgentOutputSchemaSchema = z.looseObject({
   properties: z.record(z.string(), z.looseObject({ type: OutputSchemaPropertyTypeSchema.optional() })).optional(),
 });
 
+/** Maximum run time of a step, shared by every executor flavour that runs one
+ *  (agent, script, databricks); see {@link resolveStepTimeoutMinutes}. */
+export const StepTimeoutMinutesSchema = z.number().positive();
+
 export const WorkflowAgentConfigSchema = z.object({
   model: z.string().optional(),
   skill: z.string().optional(),
@@ -163,7 +167,7 @@ export const WorkflowAgentConfigSchema = z.object({
   /** Catalog Skills this step offers on top of its agent's (ADR-0027). A
    *  Skill of the agent's with the same id is replaced by the step's. */
   skills: AgentSkillRefsSchema.optional(),
-  timeoutMinutes: z.number().optional(),
+  timeoutMinutes: StepTimeoutMinutesSchema.optional(),
   /** Shown to the agent in its prompt and checked against `result` after the
    *  run: one retry with the validation error, then the run is escalated. */
   outputSchema: AgentOutputSchemaSchema.optional(),
@@ -186,7 +190,7 @@ export const ScriptStepConfigSchema = z.object({
   command: z.string().min(1).optional(),
   inlineScript: z.string().min(1).optional(),
   runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),
-  timeoutMinutes: z.number().positive().optional(),
+  timeoutMinutes: StepTimeoutMinutesSchema.optional(),
 }).merge(ContainerSchema).superRefine((config, ctx) => {
   if ((config.command !== undefined) === (config.inlineScript !== undefined)) {
     ctx.addIssue({
@@ -211,7 +215,7 @@ export const DatabricksJobConfigSchema = z.object({
   jobParameters: z.record(z.string(), z.string()).optional(),
   /** Run-state poll cadence; the plugin defaults to 10s when unset. */
   pollIntervalMs: z.number().int().positive().optional(),
-  timeoutMinutes: z.number().positive().optional(),
+  timeoutMinutes: StepTimeoutMinutesSchema.optional(),
 });
 
 export const CoworkChatConfigSchema = z.object({
