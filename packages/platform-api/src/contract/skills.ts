@@ -40,6 +40,27 @@ export const UpdateSkillInputSchema = SkillRef.extend({
 );
 export const UpdateSkillOutputSchema = z.object({ skill: SkillSchema });
 
+/** POST input. `repo` is a GitHub repository or tree URL; `ref` (default: the
+ *  tree URL's ref, else `main`) is resolved to a commit before anything is read.
+ *  Every `<dir>/<name>/SKILL.md` folder becomes a Skill of `namespace`. */
+export const ImportSkillsInputSchema = NamespaceQuery.extend({
+  repo: z.string().url(),
+  ref: z.string().optional(),
+  dir: z.string().optional(),
+}).strict();
+
+/** What an import did to each Skill: a new one, new content for an existing
+ *  one (its visibility kept), or content identical to what is stored. */
+export const ImportedSkillSchema = z.object({
+  id: z.string().min(1),
+  outcome: z.enum(['created', 'updated', 'unchanged']),
+});
+
+export const ImportSkillsOutputSchema = z.object({
+  source: z.object({ url: z.string(), commit: z.string(), dir: z.string() }),
+  skills: z.array(ImportedSkillSchema),
+});
+
 export const DeleteSkillInputSchema = SkillRef;
 export const DeleteSkillOutputSchema = z.object({ success: z.literal(true) });
 
@@ -51,5 +72,8 @@ export type CreateSkillInput = z.infer<typeof CreateSkillInputSchema>;
 export type CreateSkillOutput = z.infer<typeof CreateSkillOutputSchema>;
 export type UpdateSkillInput = z.infer<typeof UpdateSkillInputSchema>;
 export type UpdateSkillOutput = z.infer<typeof UpdateSkillOutputSchema>;
+export type ImportSkillsInput = z.infer<typeof ImportSkillsInputSchema>;
+export type ImportedSkill = z.infer<typeof ImportedSkillSchema>;
+export type ImportSkillsOutput = z.infer<typeof ImportSkillsOutputSchema>;
 export type DeleteSkillInput = z.infer<typeof DeleteSkillInputSchema>;
 export type DeleteSkillOutput = z.infer<typeof DeleteSkillOutputSchema>;

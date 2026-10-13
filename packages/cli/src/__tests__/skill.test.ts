@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { readSkillFolder, skillCreateCommand } from '../commands/skill';
+import { readSkillFolder, skillCreateCommand, skillImportCommand } from '../commands/skill';
 import { captureOutput, jsonResponse } from './test-helpers';
 
 const skillMd = '---\nname: sdtm-mapping\ndescription: Map raw data to SDTM\n---\n# SDTM\n';
@@ -98,5 +98,29 @@ describe('skill create', () => {
     expect(code).toBe(1);
     expect(output.stderrLines.join('\n')).toContain('data.bin is not UTF-8 text');
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('skill import', () => {
+  it('sends the repo, dir and ref and lists what happened to each skill', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({
+        source: { url: 'https://github.com/acme/skills', commit: 'a'.repeat(40), dir: 'skills' },
+        skills: [{ id: 'rank-changes', outcome: 'created' }, { id: 'draft-posts', outcome: 'unchanged' }],
+      }),
+    );
+    const output = captureOutput();
+    const code = await skillImportCommand({
+      argv: ['--repo', 'https://github.com/acme/skills', '--dir', 'skills', '--ref', 'v1', '--namespace', 'alpha', '--base-url', 'http://test:9000'],
+      env: { MEDIFORCE_API_KEY: 'k' },
+      output,
+    });
+
+    expect(code).toBe(0);
+    const [url, init] = fetchSpy.mock.calls[0] ?? [];
+    expect(String(url)).toBe('http://test:9000/api/skills/import?namespace=alpha');
+    expect(JSON.parse(String(init?.body))).toEqual({ repo: 'https://github.com/acme/skills', dir: 'skills', ref: 'v1' });
+    expect(output.stdoutLines.join('\n')).toContain("Imported 2 skill(s) into 'alpha' from https://github.com/acme/skills@aaaaaaaa (skills)");
+    expect(output.stdoutLines.join('\n')).toContain('rank-changes  created');
   });
 });

@@ -152,6 +152,7 @@ export { listSkills } from './skills/list-skills';
 export { createSkill } from './skills/create-skill';
 export { updateSkill } from './skills/update-skill';
 export { deleteSkill } from './skills/delete-skill';
+export { importSkills } from './skills/import-skills';
 export { discoverMcpTools } from './mcp-tools/discover-tools';
 
 export { listImageCatalogEntries } from './image-catalog/list-entries';

@@ -30,6 +30,14 @@ export interface RepoFileTooLarge {
   readonly tooLarge: true;
 }
 
+/** A file under a directory that is not text: a link, or bytes that are not UTF-8. */
+export interface RepoFileRefused {
+  readonly path: string;
+  readonly refused: 'symlink' | 'not-text';
+}
+
+export type RepoDirectoryEntry = RepoFile | RepoFileTooLarge | RepoFileRefused;
+
 /**
  * Reads named files out of a repository at one commit. An interface so the
  * clone is swapped at the composition root rather than branched on inside a
@@ -58,7 +66,24 @@ export interface RepoFileReader {
     readonly maxBytes: number;
     readonly anonymousOnly?: boolean;
   }): Promise<RepoFile | RepoFileTooLarge | null>;
+
+  /**
+   * Every file under `dir`, read as UTF-8 text from one clone. Paths are from
+   * the repository root. A symlink is reported, never followed, and so is a
+   * file that is not text or passes `maxBytes`.
+   */
+  readDirectory(options: {
+    readonly repo: string;
+    readonly commit: string;
+    readonly dir: string;
+    readonly token?: string;
+    readonly maxBytes: number;
+    readonly anonymousOnly?: boolean;
+  }): Promise<RepoDirectoryEntry[]>;
 }
+
+const SYMLINK_MODE = '120000';
+const utf8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 
 /**
  * `git ls-tree -r` prints `<mode> <type> <oid>\t<path>`. Only blobs are kept:
@@ -146,6 +171,48 @@ export function createGitRepoFileReader(): RepoFileReader {
         rmSync(checkout, { recursive: true, force: true });
       }
     },
+
+    readDirectory: async ({ repo, commit, dir, token, maxBytes, anonymousOnly }) => {
+      const checkout = mkdtempSync(join(tmpdir(), 'mediforce-dir-'));
+      try {
+        cloneRepoAtCommit(checkout, repo, commit, token, {
+          timeoutMs: CLONE_TIMEOUT_MS,
+          treeless: true,
+          ...(anonymousOnly === undefined ? {} : { anonymousOnly }),
+        });
+        const pathspec = dir === '' ? [] : ['--', `${dir.replace(/\/+$/, '')}/`];
+        const listing = execFileSync(
+          'git',
+          ['-C', checkout, 'ls-tree', '-r', 'FETCH_HEAD', ...pathspec],
+          { stdio: 'pipe', encoding: 'utf8', timeout: CLONE_TIMEOUT_MS },
+        );
+        const entries: RepoDirectoryEntry[] = [];
+        for (const line of listing.split('\n')) {
+          const match = /^(\d+) blob [0-9a-f]+\t(.+)$/.exec(line);
+          if (match === null) continue;
+          const [, mode, path] = match as unknown as [string, string, string];
+          if (mode === SYMLINK_MODE) {
+            entries.push({ path, refused: 'symlink' });
+            continue;
+          }
+          try {
+            const raw = execFileSync('git', ['-C', checkout, 'show', `FETCH_HEAD:${path}`], {
+              stdio: 'pipe',
+              timeout: CLONE_TIMEOUT_MS,
+              maxBuffer: maxBytes,
+            });
+            entries.push({ path, contents: utf8.decode(raw) });
+          } catch (error) {
+            if (isMaxBufferExceeded(error)) entries.push({ path, maxBytes, tooLarge: true });
+            else if (error instanceof TypeError) entries.push({ path, refused: 'not-text' });
+            else throw error;
+          }
+        }
+        return entries;
+      } finally {
+        rmSync(checkout, { recursive: true, force: true });
+      }
+    },
   };
 }
 
@@ -154,6 +221,8 @@ export interface StubRepoFileReader extends RepoFileReader {
   readonly reads: { repo: string; commit: string; paths: readonly string[]; token?: string }[];
   /** Entries `list` returns and `open` resolves against. Tests set this. */
   tree: RepoTreeEntry[];
+  /** Per-path contents `readDirectory` returns; any other path reads the default. */
+  files: Record<string, string>;
 }
 
 export function createStubRepoFileReader(contents = '# stub\n'): StubRepoFileReader {
@@ -161,6 +230,7 @@ export function createStubRepoFileReader(contents = '# stub\n'): StubRepoFileRea
   const stub: StubRepoFileReader = {
     reads,
     tree: [{ path: 'Dockerfile' }],
+    files: {},
     list: async ({ repo, commit, token }) => {
       reads.push({ repo, commit, paths: [], ...(token === undefined ? {} : { token }) });
       return Promise.resolve(stub.tree);
@@ -171,6 +241,15 @@ export function createStubRepoFileReader(contents = '# stub\n'): StubRepoFileRea
       if (entry === undefined) return Promise.resolve(null);
       if (contents.length > maxBytes) return Promise.resolve({ path, maxBytes, tooLarge: true });
       return Promise.resolve({ path, contents });
+    },
+    readDirectory: async ({ repo, commit, dir, token, maxBytes }) => {
+      const prefix = dir === '' ? '' : `${dir.replace(/\/+$/, '')}/`;
+      const entries = stub.tree.filter((entry) => entry.path.startsWith(prefix));
+      reads.push({ repo, commit, paths: entries.map((entry) => entry.path), ...(token === undefined ? {} : { token }) });
+      return Promise.resolve(entries.map((entry): RepoDirectoryEntry => {
+        const text = stub.files[entry.path] ?? contents;
+        return text.length > maxBytes ? { path: entry.path, maxBytes, tooLarge: true } : { path: entry.path, contents: text };
+      }));
     },
   };
   return stub;

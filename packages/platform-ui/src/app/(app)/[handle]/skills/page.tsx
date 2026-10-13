@@ -4,11 +4,13 @@ import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
-import { BookOpen, Globe, Lock, Plus } from 'lucide-react';
+import { BookOpen, GitBranch, Globe, Lock, Plus } from 'lucide-react';
 import type { AgentDefinition, SkillSummary } from '@mediforce/platform-core';
 import { ConceptPopover } from '@/components/ui/concept-intro';
 import { SearchField } from '@/components/ui/search-field';
+import { ImportSkillsDialog } from '@/components/skills/import-skills-dialog';
 import { SkillHolders } from '@/components/skills/skill-holders';
+import { secondaryButtonClass } from '@/components/ui/button-styles';
 import { routes } from '@/lib/routes';
 import { formatBytes } from '@/lib/format';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
@@ -92,6 +94,7 @@ export default function SkillsPage() {
   const skills = useSkills(handle);
   const holders = useSkillHolders();
   const [query, setQuery] = useState('');
+  const [importing, setImporting] = useState(false);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -123,15 +126,23 @@ export default function SkillsPage() {
           <p className="text-sm text-muted-foreground mt-0.5">Skills agents in @{handle} can hold.</p>
         </div>
         {role !== null && (
-          <Link
-            href={routes.skillNew(handle)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New skill
-          </Link>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setImporting(true)} className={secondaryButtonClass}>
+              <GitBranch className="h-3.5 w-3.5" />
+              Import from git
+            </button>
+            <Link
+              href={routes.skillNew(handle)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New skill
+            </Link>
+          </div>
         )}
       </div>
+
+      {importing && <ImportSkillsDialog handle={handle} onClose={() => setImporting(false)} />}
 
       <SearchField value={query} onChange={setQuery} placeholder="Search skills..." className="mb-6" />
 
@@ -149,7 +160,7 @@ export default function SkillsPage() {
             <BookOpen className="h-6 w-6 text-muted-foreground" />
           </div>
           <p className="text-sm text-muted-foreground">
-            {query.trim() === '' ? 'No skills yet. Create one or upload a skill folder with “New skill”.' : 'No skills match your search.'}
+            {query.trim() === '' ? 'No skills yet. Create one or upload a skill folder with “New skill”, or import a repository’s skills with “Import from git”.' : 'No skills match your search.'}
           </p>
         </div>
       ) : (

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ImportedSkillSchema } from './skills';
 import {
   ProcessInstanceSchema,
   WorkflowAccessSchema,
@@ -441,7 +442,12 @@ export const ImportWorkflowInputSchema = z.object({
   namespace: z.string().min(1),
 });
 export type ImportWorkflowInput = z.infer<typeof ImportWorkflowInputSchema>;
-export type ImportWorkflowOutput = RegisterWorkflowOutput;
+/** Registration's output, plus what happened to each Skill the package ships
+ *  in its `skills/` folder: they are created in the importing workspace first. */
+export const ImportWorkflowOutputSchema = RegisterWorkflowOutputSchema.extend({
+  skills: z.array(ImportedSkillSchema).optional(),
+});
+export type ImportWorkflowOutput = z.infer<typeof ImportWorkflowOutputSchema>;
 
 // --- Manifest ---
 

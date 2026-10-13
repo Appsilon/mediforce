@@ -85,6 +85,30 @@ describe('createGitRepoFileReader', () => {
     expect(file).toEqual({ path: 'Dockerfile', maxBytes: 4, tooLarge: true });
   });
 
+  it('reads every file under a directory from one clone, reporting links and binary files', async () => {
+    const git = (...args: string[]): void => {
+      execFileSync('git', ['-C', origin, ...args], { stdio: 'pipe' });
+    };
+    mkdirSync(join(origin, 'skills', 'summarize', 'references'), { recursive: true });
+    writeFileSync(join(origin, 'skills', 'summarize', 'SKILL.md'), '---\nname: summarize\n---\n');
+    writeFileSync(join(origin, 'skills', 'summarize', 'references', 'style.md'), '# Style\n');
+    writeFileSync(join(origin, 'skills', 'logo.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0xfe]));
+    symlinkSync(join(secretsDir, 'id_rsa'), join(origin, 'skills', 'key-link'));
+    git('add', '-A');
+    git('commit', '-qm', 'skills');
+    const head = execFileSync('git', ['-C', origin, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+
+    const entries = await createGitRepoFileReader()
+      .readDirectory({ repo: origin, commit: head, dir: 'skills', maxBytes: 1024 });
+
+    expect([...entries].sort((left, right) => (left.path < right.path ? -1 : 1))).toEqual([
+      { path: 'skills/key-link', refused: 'symlink' },
+      { path: 'skills/logo.png', refused: 'not-text' },
+      { path: 'skills/summarize/SKILL.md', contents: '---\nname: summarize\n---\n' },
+      { path: 'skills/summarize/references/style.md', contents: '# Style\n' },
+    ]);
+  });
+
   it('deletes the checkout even when the clone throws', async () => {
     const before = readdirSync(tmpdir()).filter((name) => name.startsWith('mediforce-tree-')).length;
     await expect(createGitRepoFileReader().list({ repo: origin, commit: 'f'.repeat(40) }))

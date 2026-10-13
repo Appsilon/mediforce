@@ -202,3 +202,34 @@ export const skillDeleteCommand = defineCommand({
     return 0;
   },
 });
+
+export const skillImportCommand = defineCommand({
+  name: 'mediforce skill import',
+  description:
+    'Create or update a workspace\'s Skills from a public GitHub repo: every <dir>/<name>/SKILL.md folder, read at the commit --ref resolves to. ' +
+    'A Skill already there is updated when its content differs (its visibility kept) and left alone when it does not.',
+  args: {
+    repo: { type: 'string', required: true, description: 'GitHub repo or tree URL (e.g. https://github.com/Appsilon/mediforce-sdtm-skills)' },
+    dir: { type: 'string', description: 'Directory holding the skill folders, from the repo root or the tree URL\'s directory (default: that root)' },
+    ref: { type: 'string', description: 'Branch, tag, or commit SHA (default: the tree URL\'s ref, else main)' },
+    namespace: { type: 'string', required: true, description: 'Workspace handle' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.skills.importFromRepo({
+      namespace: args.namespace,
+      repo: args.repo,
+      ...(args.dir === undefined ? {} : { dir: args.dir }),
+      ...(args.ref === undefined ? {} : { ref: args.ref }),
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    const { url, commit, dir } = result.source;
+    output.stdout(`Imported ${String(result.skills.length)} skill(s) into '${args.namespace}' from ${url}@${commit.slice(0, 8)}${dir === '' ? '' : ` (${dir})`}:`);
+    for (const skill of result.skills) {
+      output.stdout(`  ${skill.id}  ${skill.outcome}`);
+    }
+    return 0;
+  },
+});
