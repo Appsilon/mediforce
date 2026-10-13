@@ -108,11 +108,8 @@ export type ActionConfig = z.infer<typeof ActionConfigSchema>;
  *                    Supply `image` explicitly to control the registry tag
  *                    or when you push to a shared registry.
  *
- * Fallback: when a step sets `dockerfile` but no step-level `repo`/`commit`,
- * the workflow's `externalSkillsRepo` (or the deprecated `repo`) field is
- * used as the build context. This fallback is retained for backward
- * compatibility and will be removed once the deprecated `repo` field is
- * dropped (see follow-up issue for that migration).
+ * A `dockerfile` with no `repo`/`commit` builds from the files the workflow
+ * carries (`artifacts`); see `carriedDockerfile`.
  */
 export const ContainerSchema = z.object({
   /**
@@ -159,14 +156,26 @@ export const AgentOutputSchemaSchema = z.looseObject({
  *  (agent, script, databricks); see {@link resolveStepTimeoutMinutes}. */
 export const StepTimeoutMinutesSchema = z.number().positive();
 
+const FILE_SKILL_RETIRED =
+  'file skills (skill / skillsDir) were retired (ADR-0028): name the skill in agent.skills from the Skill catalog, ' +
+  'and import it with `mediforce skill import` if it lives in git';
+
 export const WorkflowAgentConfigSchema = z.object({
   model: z.string().optional(),
-  skill: z.string().optional(),
   prompt: z.string().optional(),
-  skillsDir: z.string().optional(),
   /** Catalog Skills this step offers on top of its agent's (ADR-0027). A
    *  Skill of the agent's with the same id is replaced by the step's. */
   skills: AgentSkillRefsSchema.optional(),
+  /** Refused with a pointer to `skills`, so a file written before ADR-0028 is
+   *  not registered without the skill it names. */
+  skill: z.never({ error: FILE_SKILL_RETIRED }).optional(),
+  skillsDir: z.never({ error: FILE_SKILL_RETIRED }).optional(),
+  /**
+   * The file skill (`<skillsDir>/<skill>`) a version stored before ADR-0028
+   * named, set by migration 0079 and never by a caller. Saving refuses it and
+   * running fails on it, rather than running the step without its skill.
+   */
+  retiredFileSkill: z.string().optional(),
   timeoutMinutes: StepTimeoutMinutesSchema.optional(),
   /** Shown to the agent in its prompt and checked against `result` after the
    *  run: one retry with the validation error, then the run is escalated. */
@@ -512,6 +521,24 @@ function validateSteps(
   });
 }
 
+/** A stored step that still names a retired file skill (ADR-0028) is not
+ *  saved again as it is: the new version would fail on its first run. */
+function validateNoRetiredFileSkills(
+  wd: { steps: WorkflowStep[] },
+  ctx: z.RefinementCtx,
+): void {
+  wd.steps.forEach((step, index) => {
+    const retired = step.agent?.retiredFileSkill;
+    if (retired === undefined) return;
+    ctx.addIssue({
+      code: 'custom',
+      path: ['steps', index, 'agent', 'retiredFileSkill'],
+      message: `step '${step.id}' uses the file skill '${retired}', which no longer runs (ADR-0028): ` +
+        'remove it and name the skill in agent.skills from the Skill catalog',
+    });
+  });
+}
+
 /**
  * Artifacts have to survive being written to a directory: two files cannot
  * share a path, a file cannot sit where another needs a directory, and the set
@@ -795,17 +822,6 @@ export const WorkflowDefinitionBaseSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   preamble: z.string().optional(),
-  /**
-   * External git repository that provides skills for this workflow.
-   * The runtime clones the repo at `commit` and mounts the directory
-   * containing the skill files into the agent container.
-   *
-   * `commit` is required — omitting it silently no-ops the skills fetch.
-   * `auth` names a workflow secret that holds the clone token for private repos.
-   */
-  externalSkillsRepo: RepoSchema.extend({
-    commit: CommitShaSchema,
-  }).optional(),
   url: z.string().url().optional(),
   roles: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
@@ -857,7 +873,6 @@ export const WorkflowAuthorableSchema = WorkflowDefinitionBaseSchema.pick({
   title: true,
   description: true,
   preamble: true,
-  externalSkillsRepo: true,
   url: true,
   roles: true,
   env: true,
@@ -926,6 +941,7 @@ export function parseWorkflowDefinitionForCreation(input: unknown) {
       validateVerdicts(wd, ctx);
       validateTriggerInput(wd, ctx);
       validateArtifacts(wd, ctx);
+      validateNoRetiredFileSkills(wd, ctx);
     })
     .safeParse(input);
 }
@@ -948,6 +964,7 @@ export const WorkflowTemplateSchema = WorkflowDefinitionBaseSchema.omit(
   validateVerdicts(wd, ctx);
   validateTriggerInput(wd, ctx);
   validateArtifacts(wd, ctx);
+  validateNoRetiredFileSkills(wd, ctx);
 });
 
 export type WorkflowTemplate = z.infer<typeof WorkflowTemplateSchema>;

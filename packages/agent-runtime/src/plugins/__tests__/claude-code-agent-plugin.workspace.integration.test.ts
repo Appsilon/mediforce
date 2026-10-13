@@ -17,7 +17,6 @@ import type { EmitPayload, EmitFn, WorkflowAgentContext } from '../../interfaces
 import type { AgentCommandSpec } from '../base-container-agent-plugin';
 
 type GetAgentCommandTarget = { getAgentCommand: (promptPath: string, options?: unknown) => AgentCommandSpec };
-type ReadSkillTarget = { readSkillFile: (skillsDir: string, skill: string) => Promise<string> };
 
 function buildWorkflowContext(overrides: Partial<WorkflowAgentContext> = {}): WorkflowAgentContext {
   const step: WorkflowStep = {
@@ -27,8 +26,7 @@ function buildWorkflowContext(overrides: Partial<WorkflowAgentContext> = {}): Wo
     executor: 'agent',
     plugin: 'claude-code-agent',
     agent: {
-      skill: 'some-skill',
-      // No skillsDir: skips `--plugin-dir` wiring (no plugin manifest in tests).
+      prompt: 'Extract the data',
       // No image: triggers local mode (ALLOW_LOCAL_AGENTS=true required).
     },
   };
@@ -108,7 +106,6 @@ describe('ClaudeCodeAgentPlugin ↔ WorkspaceManager integration', () => {
     const plugin = new ClaudeCodeAgentPlugin();
     const context = buildWorkflowContext();
     await plugin.initialize(context);
-    vi.spyOn(plugin as unknown as ReadSkillTarget, 'readSkillFile').mockResolvedValue('# Skill');
     vi.spyOn(plugin as unknown as GetAgentCommandTarget, 'getAgentCommand').mockReturnValue(
       mockAgentShellCommand('echo "# extracted" > report.md'),
     );
@@ -135,7 +132,6 @@ describe('ClaudeCodeAgentPlugin ↔ WorkspaceManager integration', () => {
     const plugin = new ClaudeCodeAgentPlugin();
     const context = buildWorkflowContext();
     await plugin.initialize(context);
-    vi.spyOn(plugin as unknown as ReadSkillTarget, 'readSkillFile').mockResolvedValue('# Skill');
     vi.spyOn(plugin as unknown as GetAgentCommandTarget, 'getAgentCommand').mockReturnValue(
       mockAgentShellCommand('true'), // no file writes
     );
@@ -164,7 +160,6 @@ describe('ClaudeCodeAgentPlugin ↔ WorkspaceManager integration', () => {
     const context1 = buildWorkflowContext();
     const plugin1 = new ClaudeCodeAgentPlugin();
     await plugin1.initialize(context1);
-    vi.spyOn(plugin1 as unknown as ReadSkillTarget, 'readSkillFile').mockResolvedValue('# Skill');
     vi.spyOn(plugin1 as unknown as GetAgentCommandTarget, 'getAgentCommand').mockReturnValue(
       mockAgentShellCommand('echo "step 1 content" > foo.txt'),
     );
@@ -178,7 +173,6 @@ describe('ClaudeCodeAgentPlugin ↔ WorkspaceManager integration', () => {
     };
     const plugin2 = new ClaudeCodeAgentPlugin();
     await plugin2.initialize(context2);
-    vi.spyOn(plugin2 as unknown as ReadSkillTarget, 'readSkillFile').mockResolvedValue('# Skill');
     // Assert inside the shell command that foo.txt exists — if step 2 got a fresh
     // worktree without step 1's commits, the file wouldn't be there and the exit
     // code would flip to non-zero, failing the test.

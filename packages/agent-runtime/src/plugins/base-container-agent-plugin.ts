@@ -7,8 +7,9 @@ import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/s
 import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, AgentTrajectoryEntry } from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
-import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, resolveRepoToken, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
+import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
+import { RetiredFileSkillError } from '../skills/resolve-skills-for-step';
 import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
 import { DEFAULT_STEP_TIMEOUT_MINUTES, agentLogEntries, createLineStreamReader, offeredSkill, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes, unfence } from '@mediforce/platform-core';
@@ -97,12 +98,6 @@ function agentLog(tag: string, message: string, data?: Record<string, unknown>):
  */
 export function isLocalExecutionAllowed(): boolean {
   return process.env.ALLOW_LOCAL_AGENTS === 'true';
-}
-
-/** Strip YAML frontmatter (--- ... ---) from markdown content. */
-export function stripFrontmatter(content: string): string {
-  const match = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
-  return match ? content.slice(match[0].length) : content;
 }
 
 export interface FileEntry {
@@ -773,11 +768,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     return null;
   }
 
-  /** Resolve the host path to the mock-fixtures directory for this step's plugin.
-   *  Returns null if skillsDir is not set. */
+  /** Host path of the canned step results a `MOCK_AGENT` container copies
+   *  (`<stepId>.json`, see `getMockDockerArgs`): `MOCK_FIXTURES_DIR`, resolved
+   *  from the project root, or null when it is not set. */
   protected getMockFixturesDir(): string | null {
-    if (!this.agentConfig.skillsDir) return null;
-    return join(this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath), '..', 'mock-fixtures');
+    const fixturesDir = process.env.MOCK_FIXTURES_DIR;
+    if (fixturesDir === undefined || fixturesDir === '') return null;
+    return resolveProjectPath(fixturesDir);
   }
 
   /** Resolve the host path to the mock data directory from _config.json.
@@ -807,14 +804,18 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       if (!stepAgent) {
         throw new Error(
           `No agent config found in step '${context.stepId}'. ` +
-          `${this.agentName} plugin requires step.agent with at least image and skill or prompt.`,
+          `${this.agentName} plugin requires step.agent with at least image and prompt.`,
         );
       }
 
-      if (!stepAgent.skill && !stepAgent.prompt) {
+      if (stepAgent.retiredFileSkill !== undefined) {
+        throw new RetiredFileSkillError(context.stepId, stepAgent.retiredFileSkill);
+      }
+
+      if (!stepAgent.prompt) {
         throw new Error(
-          `Neither skill nor prompt configured in step.agent for step '${context.stepId}'. ` +
-          `${this.agentName} plugin requires at least one of step.agent.skill or step.agent.prompt.`,
+          `No prompt configured in step.agent for step '${context.stepId}'. ` +
+          `${this.agentName} plugin requires step.agent.prompt.`,
         );
       }
 
@@ -831,9 +832,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       // Map WorkflowAgentConfig fields to the AgentConfig shape used internally
       agentConfig = {
         model: stepAgent.model,
-        skill: stepAgent.skill,
         prompt: stepAgent.prompt,
-        skillsDir: stepAgent.skillsDir,
         timeoutMs: resolveStepTimeoutMinutes(context.step) * 60_000,
         image: stepAgent.image,
         repo: stepAgent.repo,
@@ -855,14 +854,14 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       if (!legacyAgentConfig) {
         throw new Error(
           `No agentConfig found for step '${context.stepId}'. ` +
-          `${this.agentName} plugin requires agentConfig with at least image and skill or prompt.`,
+          `${this.agentName} plugin requires agentConfig with at least image and prompt.`,
         );
       }
 
-      if (!legacyAgentConfig.skill && !legacyAgentConfig.prompt) {
+      if (!legacyAgentConfig.prompt) {
         throw new Error(
-          `Neither skill nor prompt configured in agentConfig for step '${context.stepId}'. ` +
-          `${this.agentName} plugin requires at least one of agentConfig.skill or agentConfig.prompt.`,
+          `No prompt configured in agentConfig for step '${context.stepId}'. ` +
+          `${this.agentName} plugin requires agentConfig.prompt.`,
         );
       }
 
@@ -887,15 +886,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
   async run(emit: EmitFn): Promise<void> {
     const startTime = Date.now();
-    const skillName = this.agentConfig.skill ?? 'custom-prompt';
     const timeoutMs = this.agentConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const stepId = this.context.stepId;
     const instanceId = this.context.processInstanceId;
 
     agentLog('run.start', `${this.agentName} starting`, {
-      stepId, instanceId, skillName,
+      stepId, instanceId,
       image: this.agentConfig.image ?? 'local',
-      skillsDir: this.agentConfig.skillsDir ?? null,
       agentSkills: isWorkflowAgentContext(this.context)
         ? (this.context.agentSkills ?? []).map(offeredSkill)
         : [],
@@ -924,7 +921,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
     await emit({
       type: 'status',
-      payload: `spawning ${this.agentName} with skill '${skillName}'`,
+      payload: `spawning ${this.agentName}`,
       timestamp: new Date().toISOString(),
     });
 
@@ -974,32 +971,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       await this.resolveRunWorkspace();
       const workingDirForPrompt = isLocalMode ? this.runWorkspaceHandle!.path : '/workspace';
 
-      // Files the workflow carries are written before the prompt is built: the
-      // SKILL.md read below happens on the host, in local mode as well as
-      // Docker, so the mount alone would be too late.
-      if (isWorkflowAgentContext(this.context)) {
-        await materializeArtifacts(this.context.workflowDefinition.artifacts);
-      }
-
-      // Fetch skills from the workflow's external skills repo if configured.
-      if (this.agentConfig.skillsDir && isWorkflowAgentContext(this.context)) {
-        const wfRepo = this.context.workflowDefinition.externalSkillsRepo;
-        if (wfRepo?.url && wfRepo?.commit) {
-          const repoToken = resolveRepoToken(this.agentConfig, this.context, this.resolvedEnv.vars);
-          await this.fetchSkillsFromRepo(
-            this.agentConfig.skillsDir,
-            wfRepo.url,
-            wfRepo.commit,
-            repoToken,
-          );
-        }
-      }
-
-      agentLog('run.buildPrompt', 'building prompt', {
-        stepId,
-        skillsDir: this.agentConfig.skillsDir ?? null,
-        resolvedSkillsDir: this.agentConfig.skillsDir ? this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath) : null,
-      });
+      agentLog('run.buildPrompt', 'building prompt', { stepId });
 
       const prompt = await this.buildPrompt(agentInput, timeoutMs, outputDirForPrompt, dockerOutputDir, workingDirForPrompt);
 
@@ -1019,7 +991,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       // its agent's. Claude Code gets it as `--plugin-dir`, OpenCode as
       // `skills.paths` in opencode.json, so native skill resolution
       // (SKILL.md + references/) works without workspace pollution.
-      const pluginDir = await this.resolvePluginDir(this.agentConfig.skillsDir, resolveProjectPath);
+      const pluginDir = await this.resolvePluginDir();
       if (pluginDir !== undefined) options.pluginDir = pluginDir;
 
       // Create activity log file for observability
@@ -1205,9 +1177,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         payload: {
           confidence,
           ...(confidence_rationale ? { confidence_rationale } : {}),
-          reasoning_summary: `${this.agentName} skill '${skillName}' completed successfully`,
+          reasoning_summary: `${this.agentName} step '${stepId}' completed successfully`,
           reasoning_chain: [
-            `Invoked skill: ${skillName}`,
             `Input keys: ${Object.keys(this.context.stepInput).join(', ')}`,
             tempDir ? `Downloaded files to temp dir` : 'No file downloads needed',
             isLocalMode ? `Local execution (no Docker)` : `Docker container: ${this.agentConfig.image}`,
@@ -1234,7 +1205,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       const duration_ms = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : String(error);
       agentLog('run.error', errorMessage, {
-        stepId, instanceId, skillName, duration_ms,
+        stepId, instanceId, duration_ms,
         stack: error instanceof Error ? error.stack?.split('\n').slice(0, 5) : undefined,
       });
 
@@ -1244,7 +1215,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         type: 'error',
         payload: {
           error: errorMessage,
-          skill: skillName,
           duration_ms,
         },
         timestamp: new Date().toISOString(),
@@ -1366,15 +1336,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     // 0b. Agent identity (systemPrompt) from AgentDefinition (resolved by platform-ui)
     if (isWorkflowAgentContext(this.context) && this.context.agentIdentityPrompt) {
       parts.push(this.context.agentIdentityPrompt);
-    }
-
-    // 1. Skill prompt from SKILL.md (step-level override — takes precedence over agent skills)
-    if (this.agentConfig.skill && this.agentConfig.skillsDir) {
-      const skillContent = await this.readSkillFile(
-        this.resolveSkillsDir(this.agentConfig.skillsDir, resolveProjectPath),
-        this.agentConfig.skill,
-      );
-      parts.push(skillContent);
     }
 
     // 2. Custom prompt
@@ -1566,26 +1527,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     return parts.join('\n\n');
   }
 
-  protected async readSkillFile(skillsDir: string, skill: string): Promise<string> {
-    const skillPath = join(skillsDir, skill, 'SKILL.md');
-    agentLog('readSkillFile', `reading ${skillPath}`, { skillsDir, skill });
-    try {
-      const raw = await readFile(skillPath, 'utf-8');
-      agentLog('readSkillFile', `success — ${raw.length} chars`, { skillPath });
-      return stripFrontmatter(raw);
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code;
-      if (code === 'ENOENT') {
-        throw new Error(
-          `Skill file not found: ${skillPath}\n` +
-          `Resolved from skillsDir="${skillsDir}", skill="${skill}"\n` +
-          `Project root: ${MONOREPO_ROOT} (MEDIFORCE_ROOT=${process.env.MEDIFORCE_ROOT ?? 'NOT_SET'})`,
-        );
-      }
-      throw err;
-    }
-  }
-
   protected async spawnLocalProcess(
     prompt: string,
     options: SpawnCliOptions,
@@ -1725,8 +1666,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     if (!image) {
       throw new Error(
         `No Docker image could be resolved for step '${this.context.stepId}'. ` +
-        'In build mode set dockerfile + repo + commit on the step, or provide ' +
-        'externalSkillsRepo (with commit) on the workflow definition.',
+        'In build mode set dockerfile + repo + commit on the step, or carry the Dockerfile ' +
+        'in the workflow\'s files.',
       );
     }
 
@@ -1795,7 +1736,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       dockerArgs.push('-v', `${artifactsHostDir}:${CONTAINER_ARTIFACTS_MOUNT}:ro`);
     }
 
-    // Bind-mount the plugin root (read-only) when the step has one (skillsDir or agent skills).
+    // Bind-mount the plugin root (read-only) when the step offers skills.
     if (options?.pluginDir) {
       dockerArgs.push('-v', `${options.pluginDir}:${CONTAINER_PLUGIN_MOUNT}:ro`);
     }

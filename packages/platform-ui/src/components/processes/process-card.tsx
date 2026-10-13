@@ -162,12 +162,6 @@ export function ProcessCard({
                   <Layers className="h-3 w-3" />
                   {definition.stepCount} {definition.stepCount === 1 ? 'step' : 'steps'}
                 </span>
-                {definition.externalSkillsRepo && (
-                  <>
-                    <span className="text-border">·</span>
-                    <CatalogRepoIcon repo={definition.externalSkillsRepo} />
-                  </>
-                )}
                 {definition.url && (
                   <>
                     <span className="text-border">·</span>
@@ -243,23 +237,6 @@ export function ProcessCard({
       </div>
 
     </>
-  );
-}
-
-function CatalogRepoIcon({ repo }: { repo: { url: string; commit?: string } }) {
-  const href = repo.commit ? `${repo.url}/tree/${repo.commit}` : repo.url;
-  return (
-    <button
-      type="button"
-      className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.open(href, '_blank', 'noopener,noreferrer');
-      }}
-    >
-      <GitBranch className="h-3 w-3" />
-    </button>
   );
 }
 

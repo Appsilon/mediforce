@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import type { AgentContext, EmitFn, EmitPayload, WorkflowAgentContext } from '../../interfaces/step-executor-plugin';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
+import { RetiredFileSkillError } from '../../skills/resolve-skills-for-step';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 
 type DockerResult = { cliOutput: string; failedMcpServers?: string[]; pendingMcpServers?: string[]; gitMetadata: null; presentation: string | null; outputDir: string; injectedEnvVars: string[] };
@@ -12,7 +13,6 @@ type SpawnDockerTarget = { spawnDockerContainer: (prompt: string, options?: Reco
 type SpawnLocalTarget = {
   spawnLocalProcess: (prompt: string, options: Record<string, unknown>, workingDir: string) => Promise<DockerResult>;
 };
-type ReadSkillTarget = { readSkillFile: (skillsDir: string, skill: string) => Promise<string> };
 
 // Ensure ALLOW_LOCAL_AGENTS is not set during tests (unless explicitly set in a test)
 const originalAllowLocal = process.env.ALLOW_LOCAL_AGENTS;
@@ -27,10 +27,6 @@ afterAll(() => {
 
 function mockSpawn(plugin: ClaudeCodeAgentPlugin) {
   return vi.spyOn(plugin as unknown as SpawnDockerTarget, 'spawnDockerContainer');
-}
-
-function mockReadSkill(plugin: ClaudeCodeAgentPlugin) {
-  return vi.spyOn(plugin as unknown as ReadSkillTarget, 'readSkillFile');
 }
 
 function mockSpawnLocal(plugin: ClaudeCodeAgentPlugin) {
@@ -54,8 +50,7 @@ function buildMockContext(overrides: Partial<AgentContext> = {}): AgentContext {
           executorType: 'agent',
           plugin: 'claude-code-agent',
           agentConfig: {
-            skill: 'trial-metadata-extractor',
-            skillsDir: '/plugins/protocol-to-tfl/skills',
+            prompt: 'Extract trial metadata from the protocol',
             image: 'mediforce-agent:protocol-to-tfl',
           },
         },
@@ -89,8 +84,7 @@ function buildWorkflowContext(agentOverrides: Record<string, unknown>): Workflow
       type: 'creation',
       executor: 'agent',
       agent: {
-        skill: 'trial-metadata-extractor',
-        skillsDir: '/plugins/protocol-to-tfl/skills',
+        prompt: 'Extract trial metadata from the protocol',
         image: 'mediforce-agent:protocol-to-tfl',
         ...agentOverrides,
       },
@@ -116,35 +110,11 @@ describe('ClaudeCodeAgentPlugin', () => {
   });
 
   describe('initialize', () => {
-    it('[DATA] stores context and extracts skill from agentConfig', async () => {
-      const context = buildMockContext();
-      await plugin.initialize(context);
-      expect(() => plugin.initialize(context)).not.toThrow();
+    it('[DATA] accepts a config with a prompt', async () => {
+      await expect(plugin.initialize(buildMockContext())).resolves.toBeUndefined();
     });
 
-    it('[DATA] accepts prompt-only config without skill', async () => {
-      const context = buildMockContext({
-        config: {
-          processName: 'protocol-to-tfl',
-          configName: 'default',
-          configVersion: 'v1',
-          stepConfigs: [
-            {
-              stepId: 'extract',
-              executorType: 'agent',
-              plugin: 'claude-code-agent',
-              agentConfig: {
-                prompt: 'Extract metadata from the uploaded PDF files',
-                image: 'mediforce-agent:protocol-to-tfl',
-              },
-            },
-          ],
-        },
-      });
-      await expect(plugin.initialize(context)).resolves.toBeUndefined();
-    });
-
-    it('[ERROR] throws if neither skill nor prompt configured', async () => {
+    it('[ERROR] throws if no prompt configured', async () => {
       const context = buildMockContext({
         config: {
           processName: 'protocol-to-tfl',
@@ -160,7 +130,21 @@ describe('ClaudeCodeAgentPlugin', () => {
           ],
         },
       });
-      await expect(plugin.initialize(context)).rejects.toThrow(/skill.*prompt/i);
+      await expect(plugin.initialize(context)).rejects.toThrow("No prompt configured in agentConfig for step 'extract'");
+    });
+
+    it('[ERROR] throws if a workflow step has no prompt', async () => {
+      await expect(plugin.initialize(buildWorkflowContext({ prompt: undefined })))
+        .rejects.toThrow("No prompt configured in step.agent for step 'triage'");
+    });
+
+    it('[ERROR] refuses a step that still names a retired file skill, naming the step and the skill', async () => {
+      const error = await plugin.initialize(buildWorkflowContext({ retiredFileSkill: 'trial-metadata-extractor' }))
+        .catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(RetiredFileSkillError);
+      expect((error as RetiredFileSkillError).message).toContain(
+        "Step 'triage' uses the file skill 'trial-metadata-extractor', which no longer runs (ADR-0028)",
+      );
     });
 
     it('[ERROR] throws if no Docker image and local execution not allowed', async () => {
@@ -176,7 +160,7 @@ describe('ClaudeCodeAgentPlugin', () => {
               executorType: 'agent',
               plugin: 'claude-code-agent',
               agentConfig: {
-                skill: 'trial-metadata-extractor',
+                prompt: 'Extract trial metadata from the protocol',
               },
             },
           ],
@@ -198,8 +182,7 @@ describe('ClaudeCodeAgentPlugin', () => {
               executorType: 'agent',
               plugin: 'claude-code-agent',
               agentConfig: {
-                skill: 'trial-metadata-extractor',
-                skillsDir: '/plugins/protocol-to-tfl/skills',
+                prompt: 'Extract trial metadata from the protocol',
               },
             },
           ],
@@ -293,7 +276,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor\nExtract metadata...');
       mockSpawn(plugin).mockResolvedValue(
         { cliOutput: JSON.stringify({ result: 'extracted metadata', confidence: 0.85 }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
       );
@@ -302,7 +284,7 @@ describe('ClaudeCodeAgentPlugin', () => {
 
       const statusEvents = events.filter((e) => e.type === 'status');
       expect(statusEvents.length).toBeGreaterThanOrEqual(1);
-      expect(statusEvents[0].payload).toContain('trial-metadata-extractor');
+      expect(statusEvents[0].payload).toBe('spawning Claude Code');
     });
 
     it('[DATA] says so when the CLI reports a bound MCP server as failed, instead of staying silent', async () => {
@@ -310,7 +292,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
         failedMcpServers: ['biomcp'],
@@ -335,7 +316,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       } as WorkflowAgentContext);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
         pendingMcpServers: ['biomcp'],
@@ -360,7 +340,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       } as WorkflowAgentContext);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
         failedMcpServers: ['remote'],
@@ -385,13 +364,12 @@ describe('ClaudeCodeAgentPlugin', () => {
       const context = buildMockContext({
         config: {
           processName: 'p', configName: 'c', configVersion: 'v1',
-          stepConfigs: [{ stepId: 'extract', executorType: 'agent', plugin: 'claude-code-agent', agentConfig: { skill: 'trial-metadata-extractor', skillsDir: '/plugins/protocol-to-tfl/skills' } }],
+          stepConfigs: [{ stepId: 'extract', executorType: 'agent', plugin: 'claude-code-agent', agentConfig: { prompt: 'Extract trial metadata from the protocol' } }],
         } as ProcessConfig,
       });
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
       mockSpawnLocal(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
         failedMcpServers: ['biomcp'],
@@ -410,7 +388,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({
           type: 'result',
@@ -434,7 +411,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({
           type: 'result',
@@ -483,8 +459,7 @@ describe('ClaudeCodeAgentPlugin', () => {
           type: 'creation',
           executor: 'agent',
           agent: {
-            skill: 'trial-metadata-extractor',
-            skillsDir: '/plugins/protocol-to-tfl/skills',
+            prompt: 'Extract trial metadata from the protocol',
             dockerfile: 'Dockerfile.agent',
             repo: 'https://github.com/appsilon/mediforce-agent.git',
             commit: 'abcdef1234567890abcdef1234567890abcdef12',
@@ -496,7 +471,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
       const dockerSpy = mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: 'ok' }),
         gitMetadata: null,
@@ -524,60 +498,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       ]));
     });
 
-    it('[DATA] builds prompt from SKILL.md content and input data', async () => {
-      const context = buildMockContext();
-      await plugin.initialize(context);
-
-      const { emit } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor\nExtract metadata from docs.');
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue(
-        { cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
-      );
-
-      await plugin.run(emit);
-
-      expect(spawnSpy).toHaveBeenCalledOnce();
-      const [prompt] = spawnSpy.mock.calls[0];
-      expect(prompt).toContain('Trial Metadata Extractor');
-      expect(prompt).toContain('/data/protocol.pdf');
-      expect(prompt).toContain('/data/sap.pdf');
-    });
-
-    it('[DATA] appends custom prompt to skill prompt when both provided', async () => {
-      const context = buildMockContext({
-        config: {
-          processName: 'protocol-to-tfl',
-          configName: 'default',
-          configVersion: 'v1',
-          stepConfigs: [
-            {
-              stepId: 'extract',
-              executorType: 'agent',
-              plugin: 'claude-code-agent',
-              agentConfig: {
-                skill: 'trial-metadata-extractor',
-                skillsDir: '/plugins/protocol-to-tfl/skills',
-                prompt: 'Focus on endpoints and safety data only',
-                image: 'mediforce-agent:protocol-to-tfl',
-              },
-            },
-          ],
-        },
-      });
-      await plugin.initialize(context);
-
-      const { emit } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor');
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] });
-
-      await plugin.run(emit);
-
-      const [prompt] = spawnSpy.mock.calls[0];
-      expect(prompt).toContain('Trial Metadata Extractor');
-      expect(prompt).toContain('Focus on endpoints and safety data only');
-    });
-
-    it('[DATA] uses prompt-only when no skill is configured', async () => {
+    it('[DATA] builds prompt from the configured prompt and input data', async () => {
       const context = buildMockContext({
         config: {
           processName: 'protocol-to-tfl',
@@ -606,6 +527,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       const [prompt] = spawnSpy.mock.calls[0];
       expect(prompt).toContain('Analyze these PDF files');
       expect(prompt).toContain('/data/protocol.pdf');
+      expect(prompt).toContain('/data/sap.pdf');
     });
 
     it('[DATA] passes model option to CLI when configured', async () => {
@@ -620,8 +542,7 @@ describe('ClaudeCodeAgentPlugin', () => {
               executorType: 'agent',
               plugin: 'claude-code-agent',
               agentConfig: {
-                skill: 'trial-metadata-extractor',
-                skillsDir: '/plugins/protocol-to-tfl/skills',
+                prompt: 'Extract trial metadata from the protocol',
                 model: 'sonnet',
                 image: 'mediforce-agent:protocol-to-tfl',
               },
@@ -632,7 +553,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] });
 
       await plugin.run(emit);
@@ -646,7 +566,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockResolvedValue(
         { cliOutput: JSON.stringify({ result: 'extracted data', confidence: 0.9 }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
       );
@@ -670,7 +589,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockResolvedValue(
         { cliOutput: JSON.stringify({ result: { ok: true }, confidence: 0.72, confidence_rationale: 'Missing supplier X data — interpolated from similar category.' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
       );
@@ -687,7 +605,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockResolvedValue(
         { cliOutput: JSON.stringify({ result: { ok: true }, confidence: 0.9 }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
       );
@@ -704,7 +621,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       const spawnSpy = mockSpawn(plugin).mockResolvedValue(
         { cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
       );
@@ -772,8 +688,7 @@ describe('ClaudeCodeAgentPlugin', () => {
               executorType: 'agent',
               plugin: 'claude-code-agent',
               agentConfig: {
-                skill: 'trial-metadata-extractor',
-                skillsDir: '/plugins/protocol-to-tfl/skills',
+                prompt: 'Extract trial metadata from the protocol',
                 image: 'mediforce-agent:protocol-to-tfl',
                 // no repo or commit — standalone mode
               },
@@ -784,7 +699,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor\nExtract metadata...');
       mockSpawn(plugin).mockResolvedValue(
         { cliOutput: JSON.stringify({ result: 'standalone output', confidence: 0.85 }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
       );
@@ -825,7 +739,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: streamJson,
         gitMetadata: null,
@@ -870,7 +783,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: streamJson,
         gitMetadata: null,
@@ -897,7 +809,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       const spawnSpy = mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: 'ok' }),
         gitMetadata: null,
@@ -920,7 +831,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockRejectedValue(
         new Error('CLI process exited with code 1'),
       );
@@ -944,7 +854,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] });
 
       await plugin.run(emit);
@@ -959,7 +868,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill content');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: 'ok', confidence: 0.9 }),
         gitMetadata: null,
@@ -981,7 +889,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill content');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: 'ok', confidence: 0.9 }),
         gitMetadata: null,
@@ -1010,8 +917,7 @@ describe('ClaudeCodeAgentPlugin', () => {
               executorType: 'agent',
               plugin: 'claude-code-agent',
               agentConfig: {
-                skill: 'trial-metadata-extractor',
-                skillsDir: '/plugins/protocol-to-tfl/skills',
+                prompt: 'Extract trial metadata from the protocol',
                 image: 'mediforce-agent:protocol-to-tfl',
                 mcpServers: [
                   { name: 'cdisc-library', command: 'node', args: ['/opt/mcp/cdisc.js'] },
@@ -1025,7 +931,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: 'ok' }),
         gitMetadata: null,
@@ -1058,8 +963,7 @@ describe('ClaudeCodeAgentPlugin', () => {
               executorType: 'agent',
               plugin: 'claude-code-agent',
               agentConfig: {
-                skill: 'trial-metadata-extractor',
-                skillsDir: '/plugins/protocol-to-tfl/skills',
+                prompt: 'Extract trial metadata from the protocol',
                 image: 'mediforce-agent:protocol-to-tfl',
                 mcpServers: [
                   { name: 'github', command: 'npx', args: ['-y', '@mcp/server-github'] },
@@ -1157,7 +1061,6 @@ describe('ClaudeCodeAgentPlugin', () => {
     async function captureBudgetMinutes(agentOverrides: Record<string, unknown>): Promise<string> {
       const context = buildWorkflowContext(agentOverrides);
       await plugin.initialize(context);
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       const spawnSpy = mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [],
       });
@@ -1230,7 +1133,6 @@ describe('ClaudeCodeAgentPlugin', () => {
     describe('MCP startup instruction', () => {
       async function promptFor(resolvedMcpConfig?: WorkflowAgentContext['resolvedMcpConfig']): Promise<string> {
         await plugin.initialize({ ...buildWorkflowContext({}), resolvedMcpConfig } as WorkflowAgentContext);
-        mockReadSkill(plugin).mockResolvedValue('# Skill');
         const spawnSpy = mockSpawn(plugin).mockResolvedValue({
           cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [],
         });
@@ -1267,7 +1169,6 @@ describe('ClaudeCodeAgentPlugin', () => {
         trajectory: { record },
       } as WorkflowAgentContext;
       await plugin.initialize(context);
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
         const tapeDir = join(options!.outputDir as string, 'mcp-tape');
         await mkdir(tapeDir, { recursive: true });
@@ -1292,7 +1193,6 @@ describe('ClaudeCodeAgentPlugin', () => {
         trajectory: { record: vi.fn() },
       } as WorkflowAgentContext;
       await plugin.initialize(context);
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
         const tapeDir = join(options!.outputDir as string, 'mcp-tape');
         await mkdir(tapeDir, { recursive: true });

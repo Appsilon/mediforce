@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { posix } from 'node:path';
 import {
   AgentDefinitionNotFoundError,
+  RetiredFileSkillError,
   SkillNotFoundError,
   resolveBuildSource,
   resolveCarriedBuild,
@@ -58,50 +58,32 @@ function behaviouralStep(step: WorkflowStep): unknown {
 }
 
 /**
- * The skill the runtime loads: every file the workflow carries under
- * `<skillsDir>/<skill>/`, or, fetched from the external skills repository, the
- * commit and path it is read from.
- */
-function skillIdentity(definition: WorkflowDefinition, step: WorkflowStep): unknown {
-  const skill = step.agent?.skill;
-  const skillsDir = step.agent?.skillsDir;
-  if (skill === undefined || skill === '' || skillsDir === undefined || skillsDir === '') return null;
-  const directory = `${posix.normalize(posix.join(skillsDir, skill))}/`;
-  const carried = (definition.artifacts ?? [])
-    .filter((artifact) => posix.normalize(artifact.path).startsWith(directory))
-    .map((artifact) => ({ path: posix.normalize(artifact.path), sha256: sha256(artifact.contents) }))
-    .sort((left, right) => left.path.localeCompare(right.path));
-  if (carried.length > 0) return { carried };
-  const repo = definition.externalSkillsRepo;
-  return repo === undefined ? { missing: directory } : { repo: repo.url, commit: repo.commit, path: directory };
-}
-
-/**
- * The `skill` component: the step skill, and the Skills offered to the step —
- * its agent's and the ones it adds — by reference and content hash (ADR-0025
- * decision 7), so editing one makes the step a changed step. A step offered
- * none hashes the step skill alone, exactly as before agents could hold Skills, so no existing
- * Fingerprint moves. A reference that no longer resolves is a component of
- * its own, as the runtime refuses to run the step.
+ * The `skill` component: the Skills offered to the step — its agent's and the
+ * ones it adds — by reference and content hash (ADR-0025 decision 7), so
+ * editing one makes the step a changed step. A step offered none hashes to
+ * `null`, as it always has. `step` held the workflow-file skill until ADR-0028
+ * retired it; it stays `null` so the Fingerprints of steps that never had one
+ * do not move. A reference that no longer resolves, or a retired file skill
+ * the step still names, is a component of its own, as the runtime refuses to
+ * run the step.
  */
 async function skillComponent(repos: StepFingerprintRepos, definition: WorkflowDefinition, step: WorkflowStep): Promise<unknown> {
-  const stepSkill = skillIdentity(definition, step);
-  const agentSkills = await resolveSkillsForStep(step, {
+  const offered = await resolveSkillsForStep(step, {
     agentDefinitionRepo: repos.agentDefinitions,
     skillRepo: repos.skills,
   }, definition).then(
     (skills) => skills ?? [],
     (error: unknown) => {
-      if (error instanceof SkillNotFoundError) return null;
+      if (error instanceof SkillNotFoundError || error instanceof RetiredFileSkillError) return null;
       if (error instanceof AgentDefinitionNotFoundError) return [];
       throw error;
     },
   );
-  if (agentSkills === null) return { step: stepSkill, agentSkills: { refused: true } };
-  if (agentSkills.length === 0) return stepSkill;
+  if (offered === null) return { step: null, agentSkills: { refused: true } };
+  if (offered.length === 0) return null;
   return {
-    step: stepSkill,
-    agentSkills: agentSkills
+    step: null,
+    agentSkills: offered
       .map(offeredSkill)
       .sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0)),
   };
@@ -119,7 +101,7 @@ function imageIdentity(definition: WorkflowDefinition, step: WorkflowStep): unkn
   return {
     image: resolveStepImage(config, definition) ?? null,
     carriedBuild: resolveCarriedBuild(config, definition)?.meta.artifactsHash ?? null,
-    buildSource: resolveBuildSource(config, definition.externalSkillsRepo) ?? null,
+    buildSource: resolveBuildSource(config) ?? null,
   };
 }
 

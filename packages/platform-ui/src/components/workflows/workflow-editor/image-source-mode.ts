@@ -22,7 +22,6 @@ export type ImageSourceDefinition = Pick<WorkflowDefinition, 'artifacts'> & {
   /** Which names the Image Catalog owns, so a build tag that would replace one
    *  reads as ignored rather than as the tag the build uses. */
   namespace?: string;
-  externalSkillsRepo?: { url?: string; commit?: string };
 };
 
 function isSet(value: string | undefined): value is string {
@@ -31,8 +30,7 @@ function isSet(value: string | undefined): value is string {
 
 /**
  * The mode a stored step reads as, by the runtime's own order of precedence:
- * an explicit repo and commit, then a Dockerfile the workflow carries, then the
- * workflow's `externalSkillsRepo` behind a Dockerfile that names neither.
+ * an explicit repo and commit, then a Dockerfile the workflow carries.
  *
  * A `dockerfile` with nothing at all to build it from still reads as `repo`,
  * which is where the missing repository can be supplied — preflight separately

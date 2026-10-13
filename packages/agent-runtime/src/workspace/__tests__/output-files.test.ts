@@ -177,7 +177,7 @@ function buildWorkflowContext(stepId: string): WorkflowAgentContext {
     type: 'creation',
     executor: 'agent',
     plugin: 'test-container',
-    agent: { skill: 'noop' },
+    agent: { prompt: 'noop' },
   };
   const workflowDefinition: WorkflowDefinition = {
     name: `wd-outfiles-${Math.random().toString(36).slice(2, 8)}`,

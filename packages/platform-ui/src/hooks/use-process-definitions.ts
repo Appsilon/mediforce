@@ -32,7 +32,6 @@ export interface DefinitionGroup {
   hasManualTrigger: boolean;
   /** Whether this caller may start a run — the workflow's `run` gate (ADR-0019). */
   callerMayRun: boolean;
-  externalSkillsRepo?: { url: string; commit?: string; auth?: string };
   url?: string;
   archived?: boolean;
   namespace?: string;
@@ -101,7 +100,6 @@ export function useProcessDefinitions(includeCompletedRuns: boolean = true) {
           // Run gate answered by the server on the same read (ADR-0019), so a
           // catalog of thirty cards costs no extra request.
           callerMayRun: g.callerMayRun,
-          externalSkillsRepo: def.externalSkillsRepo,
           url: def.url,
           archived: def.archived,
           namespace: g.namespace,

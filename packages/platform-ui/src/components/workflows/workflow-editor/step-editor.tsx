@@ -266,7 +266,6 @@ export function StepEditor({
   imageWarning,
   dockerImages,
   catalogEntries = NO_CATALOG_ENTRIES,
-  workflowExternalSkillsRepo,
   workflowArtifacts,
   workflowVisibility = 'private',
 }: {
@@ -279,7 +278,6 @@ export function StepEditor({
   imageWarning?: string;
   dockerImages?: DockerImageInfo[];
   catalogEntries?: ImageCatalogEntryView[];
-  workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
   /** The files this workflow carries: a Dockerfile among them is an image
    *  source the step can build from. */
   workflowArtifacts?: WorkflowDefinition['artifacts'];
@@ -411,12 +409,11 @@ export function StepEditor({
   // A catalog with nothing to say — empty, or a daemon nobody could reach —
   // degrades to the daemon listing the picker offered before it existed, so an
   // author never faces an empty picker (AGENTS.md §13).
-  // What decides a step's image source: the files the workflow carries, the
-  // skills repo behind a bare `dockerfile`, and the handle whose catalog names
-  // a build must not land on.
+  // What decides a step's image source: the files the workflow carries, and
+  // the handle whose catalog names a build must not land on.
   const imageSourceDefinition = useMemo(
-    () => ({ artifacts: workflowArtifacts, namespace: handle, externalSkillsRepo: workflowExternalSkillsRepo }),
-    [workflowArtifacts, handle, workflowExternalSkillsRepo],
+    () => ({ artifacts: workflowArtifacts, namespace: handle }),
+    [workflowArtifacts, handle],
   );
 
   // The MCP servers the step's agent binds run inside the step's image. An
@@ -857,19 +854,20 @@ export function StepEditor({
               selected={step.agent?.skills ?? []}
               onChange={(skills) => updateAgent({ skills: skills.length > 0 ? skills : undefined })}
             />
-            {(step.agent?.skill !== undefined || step.agent?.skillsDir !== undefined) && (
-              <div className="mt-2 flex items-start justify-between gap-2 rounded-md border border-dashed px-2.5 py-1.5 text-xs">
-                <span className="min-w-0 text-muted-foreground">
-                  {step.agent.skill === undefined ? 'Workflow-file skills folder, offered to the agent: ' : 'Workflow-file skill, always in the prompt: '}
-                  <span className="font-mono text-foreground">
-                    {[step.agent.skillsDir, step.agent.skill].filter((part) => part !== undefined).join('/')}
-                  </span>
-                  . Move it to the Skills page to manage it there.
+            {step.agent?.retiredFileSkill !== undefined && (
+              <div
+                role="alert"
+                className="mt-2 flex items-start justify-between gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-700 dark:text-amber-300"
+              >
+                <span className="min-w-0">
+                  This step used the workflow-file skill{' '}
+                  <span className="font-mono">{step.agent.retiredFileSkill}</span>, which no longer runs. Import it on
+                  the Skills page, pick it above, then remove this to save.
                 </span>
                 <button
                   type="button"
-                  aria-label="Remove workflow-file skill"
-                  onClick={() => updateAgent({ skill: undefined, skillsDir: undefined })}
+                  aria-label="Remove retired file skill"
+                  onClick={() => updateAgent({ retiredFileSkill: undefined })}
                   className="shrink-0 text-muted-foreground hover:text-foreground"
                 >
                   <X className="h-3.5 w-3.5" />

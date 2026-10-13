@@ -62,7 +62,6 @@ export const workflowDefinitions = pgTable(
     notifications: jsonb('notifications'),
     gitWorkspace: jsonb('git_workspace'),
     metadata: jsonb('metadata'),
-    externalSkillsRepo: jsonb('external_skills_repo'),
     url: text('url'),
     copiedFrom: jsonb('copied_from'),
     source: jsonb('source'),

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   WorkflowDefinitionSchema,
+  parseWorkflowDefinitionForCreation,
   resolveStepTimeoutMinutes,
   resolveStepTimeoutMs,
   resolveStrandedBudgetMs,
@@ -580,15 +581,6 @@ describe('WorkflowDefinitionSchema — placeholder commits', () => {
     expect(JSON.stringify(result.error?.issues)).toMatch(/placeholder/i);
   });
 
-  it('refuses an all-zeros externalSkillsRepo commit', () => {
-    const result = WorkflowDefinitionSchema.safeParse({
-      ...baseWd,
-      externalSkillsRepo: { url: 'https://github.com/org/skills.git', commit: ZEROS },
-    });
-    expect(result.success).toBe(false);
-    expect(JSON.stringify(result.error?.issues)).toMatch(/placeholder/i);
-  });
-
   it('accepts a real commit', () => {
     expect(WorkflowDefinitionSchema.safeParse(withStep({
       dockerfile: 'Dockerfile',
@@ -603,5 +595,46 @@ describe('WorkflowDefinitionSchema — placeholder commits', () => {
       repo: 'https://github.com/org/thing.git',
       commit: 'main',
     })).success).toBe(false);
+  });
+});
+
+describe('retired file skills (ADR-0028)', () => {
+  const withAgent = (agent: Record<string, unknown>) => ({
+    ...baseWd,
+    steps: [
+      { id: 'work', name: 'Work', type: 'creation' as const, executor: 'agent' as const, agent },
+      { id: 'done', name: 'Done', type: 'terminal' as const, executor: 'human' as const },
+    ],
+    transitions: [{ from: 'work', to: 'done' }],
+  });
+
+  it('refuses skill and skillsDir, pointing at the catalog', () => {
+    for (const agent of [{ skill: 'summarize', prompt: 'Go.' }, { skillsDir: 'skills', prompt: 'Go.' }]) {
+      const result = WorkflowDefinitionSchema.safeParse(withAgent(agent));
+      expect(result.success).toBe(false);
+      expect(JSON.stringify(result.error?.issues)).toContain('agent.skills');
+    }
+  });
+
+  it('reads the marker a stored version keeps for a file skill it named', () => {
+    const result = WorkflowDefinitionSchema.safeParse(withAgent({ prompt: 'Go.', retiredFileSkill: 'skills/summarize' }));
+    expect(result.success).toBe(true);
+    expect(result.data?.steps[0]?.agent?.retiredFileSkill).toBe('skills/summarize');
+  });
+
+  it('refuses to save a step that still carries the marker, naming the step', () => {
+    const { version: _version, ...draft } = withAgent({ prompt: 'Go.', retiredFileSkill: 'skills/summarize' });
+    const result = parseWorkflowDefinitionForCreation(draft);
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain("step 'work' uses the file skill 'skills/summarize'");
+  });
+
+  it('no longer reads externalSkillsRepo', () => {
+    const result = WorkflowDefinitionSchema.safeParse({
+      ...baseWd,
+      externalSkillsRepo: { url: 'https://github.com/org/skills.git', commit: 'b'.repeat(40) },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).not.toHaveProperty('externalSkillsRepo');
   });
 });

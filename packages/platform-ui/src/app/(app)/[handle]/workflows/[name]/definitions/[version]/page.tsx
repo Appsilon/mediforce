@@ -330,7 +330,6 @@ export default function WorkflowDefinitionVersionPage() {
         stepEvaluation={stepEvaluation}
         workflowName={decodedName}
         namespace={handle}
-        workflowExternalSkillsRepo={definition.externalSkillsRepo}
         wdJsonFields={{ ...(wdJsonFields as Record<string, unknown>), ...settingsDraft }}
         settingsDraft={{
           preamble: definition.preamble,
@@ -338,7 +337,6 @@ export default function WorkflowDefinitionVersionPage() {
           env: definition.env,
           notifications: definition.notifications,
           workspace: definition.workspace,
-          externalSkillsRepo: definition.externalSkillsRepo,
           triggerInput: definition.triggerInput,
           artifacts: definition.artifacts,
           visibility: definition.visibility,

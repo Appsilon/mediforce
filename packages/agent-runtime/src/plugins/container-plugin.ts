@@ -52,11 +52,8 @@
  * `/output/result.json`. A rename is a breaking change across all those and
  * belongs in its own PR.
  */
-import { existsSync, mkdirSync, cpSync, renameSync } from 'node:fs';
-import { mkdtempSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { dirname, join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
 import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata, WorkflowArtifact } from '@mediforce/platform-core';
 import {
@@ -69,7 +66,6 @@ import {
   DOCKER_IMAGE_SETUP_URL,
 } from '@mediforce/platform-core';
 import { artifactsBuildHash, artifactsBuildTag, artifactsDir } from './workflow-artifacts';
-import { cloneRepoAtCommit } from './git-clone';
 import { writeFile } from 'node:fs/promises';
 import type { GitMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env';
@@ -83,27 +79,14 @@ export function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext)
 }
 
 /**
- * Resolve image build metadata for lazy Docker image building.
- *
- * A step opts in to lazy build when it has:
- *   a) step-level repo + commit (explicit — always enables lazy build), OR
- *   b) step-level dockerfile + workflow-level repo with commit (fallback)
- *
- * Steps without repo/commit/dockerfile are left alone (image must already exist).
- */
-/**
- * Resolve the repo auth token from the step or workflow-level config.
- * `repoAuth` is the name of a key in resolvedEnv (sourced from workflow secrets).
+ * Resolve the repo auth token a step's build clone uses: `repoAuth` names a
+ * key in resolvedEnv (sourced from workflow secrets).
  */
 export function resolveRepoToken(
   buildConfig: ContainerConfig,
-  context: AgentContext | WorkflowAgentContext,
   resolvedEnv?: Record<string, string>,
 ): string | undefined {
-  // Step-level repoAuth takes priority, then workflow-level externalSkillsRepo.auth.
-  const wfDef = isWorkflowAgentContext(context) ? context.workflowDefinition : undefined;
-  const authKey = buildConfig.repoAuth
-    ?? wfDef?.externalSkillsRepo?.auth;
+  const authKey = buildConfig.repoAuth;
   if (!authKey || !resolvedEnv) return undefined;
   return resolvedEnv[authKey];
 }
@@ -143,35 +126,18 @@ export interface BuildSource {
 }
 
 /**
- * Resolve a container config's build inputs, applying the workflow-level
- * skills-repo fallback for a step that names only a `dockerfile`.
+ * Resolve a container config's build inputs: a step builds lazily from git when
+ * it names `repo` + `commit`; without them it runs a prebuilt `image` (or a
+ * Dockerfile the workflow carries, see {@link resolveCarriedBuild}).
  *
  * Pure and context-free so the `by-image` scan can reach the same answer from
  * a stored WorkflowDefinition — a step that omits `image` runs under the tag
  * `deriveBuildTag` mints from exactly these inputs, and nothing else can name it.
  */
-export function resolveBuildSource(
-  buildConfig: ContainerConfig,
-  workflowRepo?: { url?: string; commit?: string },
-): BuildSource | undefined {
+export function resolveBuildSource(buildConfig: ContainerConfig): BuildSource | undefined {
   const { dockerfile, context, repo, commit } = buildConfig;
-
-  if (repo && commit) {
-    return { repoUrl: normalizeRepoUrls(repo).gitUrl, repoRef: repo, commit, dockerfile, context };
-  }
-
-  if (dockerfile && workflowRepo?.url && workflowRepo?.commit) {
-    const repoRef = repo ?? workflowRepo.url;
-    return {
-      repoUrl: normalizeRepoUrls(repoRef).gitUrl,
-      repoRef,
-      commit: commit ?? workflowRepo.commit,
-      dockerfile,
-      context,
-    };
-  }
-
-  return undefined;
+  if (!repo || !commit) return undefined;
+  return { repoUrl: normalizeRepoUrls(repo).gitUrl, repoRef: repo, commit, dockerfile, context };
 }
 
 /**
@@ -179,8 +145,9 @@ export function resolveBuildSource(
  * shared golden image, and never a name this workspace's catalog owns.
  *
  * Registration used to write the golden image onto a step whose Dockerfile came
- * from `externalSkillsRepo`, and a registered version cannot be edited, so the
- * build would replace the golden image on the host for every workflow using it.
+ * from a workflow-level repo (migrated onto the step by 0079), and a registered
+ * version cannot be edited, so the build would replace the golden image on the
+ * host for every workflow using it.
  * Such a step builds under its derived tag instead, as does one whose `image` is
  * empty and one naming an image the catalog published.
  */
@@ -193,7 +160,6 @@ function buildTarget(image: string | undefined, namespace?: string): string | un
 /** The parts of a definition that decide where a step's image comes from. */
 export interface StepImageDefinition {
   artifacts?: WorkflowArtifact[];
-  externalSkillsRepo?: { url?: string; commit?: string };
   name?: string;
   namespace?: string;
 }
@@ -230,10 +196,9 @@ export function resolveCarriedBuild(
  * tag derived from its build inputs when it leaves `image` unset.
  * `undefined` when the config names neither.
  *
- * Takes the definition rather than only its skills repo so the answer is the
- * one `resolveImageBuild` gives at run time — a carried Dockerfile wins over
- * `externalSkillsRepo` there, and a scan asking which images a version pins
- * must not name a `mediforce-built:*` tag the runtime never builds.
+ * Takes the definition so the answer is the one `resolveImageBuild` gives at
+ * run time — a carried Dockerfile wins there, and a scan asking which images a
+ * version pins must not name a `mediforce-built:*` tag the runtime never builds.
  */
 export function resolveStepImage(
   buildConfig: ContainerConfig | undefined,
@@ -242,7 +207,7 @@ export function resolveStepImage(
   if (!buildConfig) return undefined;
   const carried = resolveCarriedBuild(buildConfig, definition);
   if (carried !== undefined) return buildTarget(buildConfig.image, definition?.namespace) ?? carried.tag;
-  const source = resolveBuildSource(buildConfig, definition?.externalSkillsRepo);
+  const source = resolveBuildSource(buildConfig);
   if (source === undefined) return buildConfig.image || undefined;
   return buildTarget(buildConfig.image, definition?.namespace)
     ?? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile, source.context);
@@ -256,36 +221,22 @@ export function resolveImageBuild(
 ): ImageBuildMeta | undefined {
   const workflowDefinition = isWorkflowAgentContext(context) ? context.workflowDefinition : undefined;
 
-  // Second to an explicit step-level repo+commit, which said something
-  // specific, and ahead of the externalSkillsRepo fallback.
+  // Second to an explicit step-level repo+commit, which said something specific.
   const carried = resolveCarriedBuild(buildConfig, workflowDefinition);
   if (carried !== undefined) {
     return { ...carried.meta, image: buildTarget(image, workflowDefinition?.namespace) ?? carried.tag };
   }
 
-  const source = resolveBuildSource(buildConfig, workflowDefinition?.externalSkillsRepo);
+  const source = resolveBuildSource(buildConfig);
   if (!source) return undefined;
 
   return {
     ...source,
     image: buildTarget(image, workflowDefinition?.namespace) ?? deriveBuildTag(source.repoUrl, source.commit, source.dockerfile, source.context),
-    repoToken: resolveRepoToken(buildConfig, context, resolvedEnv),
+    repoToken: resolveRepoToken(buildConfig, resolvedEnv),
     workflow: workflowDefinition?.name,
     namespace: workflowDefinition?.namespace,
   };
-}
-
-const SKILLS_CACHE_DIR = join(tmpdir(), 'mediforce-skills-cache');
-
-/**
- * Content-addressed cache directory for skills fetched from a git repo.
- * Key: sha256(repoUrl + commit + skillsDir). Pure — computable for free
- * whenever the path is needed, so nothing about it has to be stored on
- * shared instance state.
- */
-export function skillsCacheDir(repoUrl: string, commit: string, skillsDir: string): string {
-  const hash = createHash('sha256').update(`${repoUrl}\0${commit}\0${skillsDir}`).digest('hex').slice(0, 16);
-  return join(SKILLS_CACHE_DIR, hash);
 }
 
 /**
@@ -515,131 +466,20 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
   }
 
   /**
-   * Populate the content-addressed skills cache from a git repo (clone + copy).
-   * Idempotent: a cache hit is a no-op. Stores nothing on instance state — the
-   * cache path is derived on demand by {@link resolveSkillsDir} via
-   * {@link skillsCacheDir}, so concurrent steps can't leak or clobber it.
-   *
-   * Populates via a staging dir + rename so a process kill mid-copy (OOM,
-   * step timeout, engine restart) can never leave a half-populated directory
-   * at `cacheDir` — `existsSync(cacheDir)` above would treat that as a
-   * permanent cache hit and every future run would fail to find the skill.
+   * Host path of the Claude Code plugin folder holding the step's Skills (its
+   * agent's and its own, ADR-0027), or undefined when it has none or its
+   * runtime loads no Skills. Written by {@link materializeAgentSkillsPlugin}.
    */
-  protected async fetchSkillsFromRepo(
-    skillsDir: string,
-    repoRef: string,
-    commit: string,
-    repoToken?: string,
-  ): Promise<void> {
-    const cacheDir = skillsCacheDir(repoRef, commit, skillsDir);
-
-    // Cache hit
-    if (existsSync(cacheDir)) {
-      console.log(`[container-plugin] Skills cache hit for ${skillsDir} (${cacheDir})`);
-      return;
-    }
-
-    // Cache miss — clone, copy into a staging dir, delete clone
-    console.log(`[container-plugin] Fetching skills from ${repoRef}@${commit.slice(0, 8)} path=${skillsDir}`);
-    const cloneDir = mkdtempSync(join(tmpdir(), 'mediforce-skills-clone-'));
-    mkdirSync(SKILLS_CACHE_DIR, { recursive: true });
-    const stagingDir = mkdtempSync(join(SKILLS_CACHE_DIR, '.staging-'));
-
-    try {
-      cloneRepoAtCommit(cloneDir, repoRef, commit, repoToken);
-
-      const sourceDir = join(cloneDir, skillsDir);
-      if (!existsSync(sourceDir)) {
-        throw new Error(
-          `Skills directory "${skillsDir}" not found in repo ${repoRef}@${commit.slice(0, 8)}`,
-        );
-      }
-
-      const stagedSkills = join(stagingDir, 'skills');
-      cpSync(sourceDir, stagedSkills, { recursive: true });
-
-      try {
-        renameSync(stagedSkills, cacheDir);
-        console.log(`[container-plugin] Skills cached at ${cacheDir}`);
-      } catch (error) {
-        // A concurrent fetch for the same content-addressed key won the
-        // race and already populated cacheDir — its content is identical
-        // by construction, so this attempt is redundant, not a failure.
-        if (existsSync(cacheDir) === false) throw error;
-        console.log(`[container-plugin] Skills cache populated concurrently for ${skillsDir} (${cacheDir})`);
-      }
-    } finally {
-      rmSync(cloneDir, { recursive: true, force: true });
-      rmSync(stagingDir, { recursive: true, force: true });
-    }
-  }
-
-  /**
-   * Resolve the host skills directory for the current step. Three sources, most
-   * specific first: skills the workflow *carries* as artifacts (materialized by
-   * {@link materializeArtifacts}, no checkout involved), then the
-   * `externalSkillsRepo` content-addressed cache dir (populated by
-   * {@link fetchSkillsFromRepo}), then disk. Derived fresh from `this.context`
-   * per call — no shared field — so a repo-mode step can't leak its cache dir
-   * into a later disk-mode step, and concurrent steps can't clobber each other.
-   *
-   * Carried skills win over a declared repository because the definition
-   * holding the files is the answer an author edited in the app. They only
-   * answer for a directory the artifacts actually contain, so a workflow can
-   * carry a Dockerfile and still take its skills from a repo.
-   */
-  protected resolveSkillsDir(skillsDir: string, resolveProjectPath: (p: string) => string): string {
-    const definition = isWorkflowAgentContext(this.context)
-      ? this.context.workflowDefinition
-      : undefined;
-
-    const artifacts = definition?.artifacts;
-    if (artifacts !== undefined && artifacts.length > 0) {
-      const prefix = `${skillsDir.replace(/\/+$/, '')}/`;
-      if (artifacts.some((artifact) => artifact.path.startsWith(prefix))) {
-        return join(artifactsDir(artifacts), skillsDir);
-      }
-    }
-
-    const wfRepo = definition?.externalSkillsRepo;
-    if (wfRepo?.url && wfRepo?.commit) {
-      // Key on the raw url — must match the `repoRef` `fetchSkillsFromRepo`
-      // populates with (see the call site in base-container-agent-plugin).
-      return skillsCacheDir(wfRepo.url, wfRepo.commit, skillsDir);
-    }
-    return resolveProjectPath(skillsDir);
-  }
-
-  /**
-   * Host path of the Claude Code plugin folder the step mounts, or undefined
-   * for none. Without agent Skills it is the step's own plugin root:
-   * `skillsDir` points at `<plugin-root>/skills`, so the root is its parent.
-   * With them, it is the folder {@link materializeAgentSkillsPlugin} merges
-   * both into (ADR-0025 decision 6), the step's skill winning a name clash.
-   */
-  protected async resolvePluginDir(
-    skillsDir: string | undefined,
-    resolveProjectPath: (p: string) => string,
-  ): Promise<string | undefined> {
-    const stepSkillsDir = skillsDir === undefined || skillsDir === '' ? null : this.resolveSkillsDir(skillsDir, resolveProjectPath);
-    const stepPluginDir = stepSkillsDir === null ? undefined : dirname(stepSkillsDir);
-    const agentSkills = isWorkflowAgentContext(this.context) ? this.context.agentSkills ?? [] : [];
-    if (agentSkills.length === 0) return stepPluginDir;
+  protected async resolvePluginDir(): Promise<string | undefined> {
+    const skills = isWorkflowAgentContext(this.context) ? this.context.agentSkills ?? [] : [];
+    if (skills.length === 0) return undefined;
     if (this.loadsAgentSkills === false) {
       console.log(
-        `[${this.metadata.name}] Step '${this.context.stepId}' runs without its agent's skills ` +
-        `(${agentSkills.map((skill) => skill.id).join(', ')}): this runtime does not load Skills`,
+        `[${this.metadata.name}] Step '${this.context.stepId}' runs without its skills ` +
+        `(${skills.map((skill) => skill.id).join(', ')}): this runtime does not load Skills`,
       );
-      return stepPluginDir;
+      return undefined;
     }
-
-    const plugin = await materializeAgentSkillsPlugin(agentSkills, stepSkillsDir);
-    for (const id of plugin.clashes) {
-      console.warn(
-        `[${this.metadata.name}] Step '${this.context.stepId}': the step's skill '${id}' ` +
-        `replaces the agent's skill of the same name`,
-      );
-    }
-    return plugin.dir;
+    return materializeAgentSkillsPlugin(skills);
   }
 }

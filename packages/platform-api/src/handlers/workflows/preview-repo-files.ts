@@ -132,8 +132,7 @@ export async function previewRepoFiles(
   }
 
   const config = stepContainerConfig(step);
-  const repo = config.repo ?? definition.externalSkillsRepo?.url;
-  const commit = config.commit ?? definition.externalSkillsRepo?.commit;
+  const { repo, commit } = config;
   if (repo === undefined || commit === undefined) {
     throw new ValidationError(
       `Step '${input.stepId}' does not build from a repository, so it carries nothing to preview.`,
@@ -141,7 +140,7 @@ export async function previewRepoFiles(
   }
   assertClonableRepo(repo);
 
-  const authKey = config.repoAuth ?? definition.externalSkillsRepo?.auth;
+  const authKey = config.repoAuth;
   let token: string | undefined;
   if (authKey !== undefined) {
     const secrets = await scope.workflowSecrets.getSecrets(namespace, input.name);

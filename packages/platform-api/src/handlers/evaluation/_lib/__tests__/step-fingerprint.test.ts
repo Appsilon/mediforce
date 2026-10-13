@@ -81,19 +81,6 @@ describe('computeStepFingerprint', () => {
     expect(await scope.toolCatalog.getById('owner-ws', 'email')).toBeNull();
   });
 
-  it('covers the skill files the workflow carries', async () => {
-    const { fingerprint, step } = await loaded();
-    const skillStep = { agent: { ...step.agent, skill: 'grading', skillsDir: 'skills' } };
-    const artifacts = (contents: string) => ({ artifacts: [
-      { path: 'skills/grading/SKILL.md', contents },
-      { path: 'scripts/other.py', contents: 'print(1)' },
-    ] });
-
-    const base = await fingerprint({ step: skillStep, definition: artifacts('Grade by CTCAE v5.') });
-    const edited = await fingerprint({ step: skillStep, definition: artifacts('Grade by CTCAE v6.') });
-    expect(changedFingerprintComponents(base, edited)).toEqual(['skill']);
-  });
-
   it('folds the agent\'s skills into the skill component, and keeps it as it was for an agent with none', async () => {
     const fixture = await evaluationFixture();
     const skillRepo = new InMemorySkillRepository();
@@ -110,7 +97,7 @@ describe('computeStepFingerprint', () => {
       files: [{ path: 'SKILL.md', contents: '---\nname: ctcae-grading\ndescription: Grade AEs by CTCAE v5\n---\n' }],
     });
 
-    // No agent skills: the component hashes the step skill alone (none here), as before agents held skills.
+    // No skills: the component hashes null, as it always has.
     const withoutSkills = await fingerprint();
     expect(withoutSkills.components.skill).toBe(createHash('sha256').update(canonicalJson(null)).digest('hex'));
 
@@ -119,6 +106,11 @@ describe('computeStepFingerprint', () => {
     await fixture.agentDefinitionRepo.upsert('ae-grader', { ...agent, skills: [{ namespace: NAMESPACE, id: 'ctcae-grading' }] });
     const held = await fingerprint();
     expect(changedFingerprintComponents(withoutSkills, held)).toEqual(['skill']);
+    // The shape it had while a step could also name a file skill, so retiring those moved no Fingerprint.
+    expect(held.components.skill).toBe(createHash('sha256').update(canonicalJson({
+      step: null,
+      agentSkills: [{ namespace: NAMESPACE, id: 'ctcae-grading', contentHash: 'hash-v1' }],
+    })).digest('hex'));
 
     await skillRepo.update(skill('hash-v2'));
     const edited = await fingerprint();

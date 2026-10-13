@@ -608,36 +608,20 @@ describe('StepEditor', () => {
     expect(screen.getByText(/This step's runtime is/)).toHaveTextContent('script-container');
   });
 
-  it('[DATA] shows a workflow-file skills folder without a skill, and removes it', () => {
+  it('[DATA] warns about a retired workflow-file skill a stored step still names, and removes it', () => {
     const onChange = vi.fn();
     render(
       <StepEditor
-        step={buildStep({ executor: 'agent', agent: { skillsDir: 'plugins/review/skills', prompt: 'Review' } })}
+        step={buildStep({ executor: 'agent', agent: { retiredFileSkill: 'skills/draft-note', prompt: 'Draft' } })}
         allSteps={[]}
         onChange={onChange}
       />,
     );
     expandCard('Prompt & model');
 
-    expect(screen.getByText('plugins/review/skills')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Remove workflow-file skill' }));
-    expect(onChange).toHaveBeenCalledWith({ agent: { skill: undefined, skillsDir: undefined, prompt: 'Review' } });
-  });
-
-  it('[DATA] shows a workflow-file skill read-only, and removes it', () => {
-    const onChange = vi.fn();
-    render(
-      <StepEditor
-        step={buildStep({ executor: 'agent', agent: { skill: 'draft-note', skillsDir: 'skills', prompt: 'Draft' } })}
-        allSteps={[]}
-        onChange={onChange}
-      />,
-    );
-    expandCard('Prompt & model');
-
-    expect(screen.getByText('skills/draft-note')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Remove workflow-file skill' }));
-    expect(onChange).toHaveBeenCalledWith({ agent: { skill: undefined, skillsDir: undefined, prompt: 'Draft' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('skills/draft-note');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove retired file skill' }));
+    expect(onChange).toHaveBeenCalledWith({ agent: { retiredFileSkill: undefined, prompt: 'Draft' } });
   });
 
   it('[DATA] drops an uncommitted outputSchema draft when another agent step is selected', () => {
@@ -1156,24 +1140,6 @@ describe('StepEditor', () => {
 
       expect(screen.queryByLabelText('Known Docker image')).toBeNull();
       expect(screen.getByText('Built from a git repo')).toBeTruthy();
-    });
-
-    it('[RENDER] a bare Dockerfile behind the workflow skills repo reads as a repo build', () => {
-      render(
-        <StepEditor
-          step={buildStep({ executor: 'agent', agent: { dockerfile: 'Dockerfile' } })}
-          allSteps={[]}
-          onChange={vi.fn()}
-          dockerImages={mixedImages}
-          catalogEntries={catalogEntries}
-          workflowExternalSkillsRepo={{ url: 'https://github.com/acme/wf.git', commit: 'abc1234' }}
-        />,
-      );
-      expandCard('Prompt & model');
-
-      expect(screen.queryByLabelText('Known Docker image')).toBeNull();
-      // The repo it inherits is named, rather than left as two empty boxes.
-      expect(screen.getByText(/github.com\/acme\/wf.git/)).toBeTruthy();
     });
 
     it('[REGRESSION] treats the untagged persisted default as the discovered latest image', () => {

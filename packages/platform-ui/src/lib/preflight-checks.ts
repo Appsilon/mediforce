@@ -14,7 +14,8 @@ export interface PreflightWarning {
     | 'low-credits'
     | 'unknown-model'
     | 'contract-collected-twice'
-    | 'image-and-dockerfile';
+    | 'image-and-dockerfile'
+    | 'retired-file-skill';
   resource: string;
   stepNames: string[];
   message: string;
@@ -83,10 +84,7 @@ const ARTIFACTS_MOUNT_PREFIX = '/artifacts/';
  *
  * Two sources, both exact: a command argument under `/artifacts/`, which by
  * definition is a carried file, and a `dockerfile` with no carried file and no
- * repo to build from. `skillsDir` is deliberately not checked — with neither
- * carried skills nor an `externalSkillsRepo` it resolves against the repository
- * mounted on the host, which the browser cannot see, so a warning would fire on
- * every workflow that ships in the repo.
+ * repo to build from.
  */
 function collectMissingFiles(
   definition: WorkflowDefinition,
@@ -267,6 +265,28 @@ export function runPreflightChecks(
         ? `Image cannot be built: this workflow does not carry '${path}', and no repository is configured to build from`
         : `This workflow does not carry '${path}', so the step cannot read it at /artifacts/${path}`,
       actions: [{ label: 'Add the file', href: editorHref }],
+    });
+  }
+
+  // A version stored before ADR-0028 whose step still names a workflow-file
+  // skill: the run fails on that step rather than running it without its skill.
+  for (const step of steps) {
+    const retired = step.agent?.retiredFileSkill;
+    if (retired === undefined) continue;
+    warnings.push({
+      category: 'retired-file-skill',
+      resource: retired,
+      stepNames: [step.name],
+      message: `This step uses the workflow-file skill '${retired}', which no longer runs: import it as a catalog Skill and pick it on the step`,
+      actions: [
+        { label: 'Import skills', href: `/${options.handle}/skills` },
+        {
+          label: 'Edit the step',
+          href: options.version !== undefined
+            ? `/${options.handle}/workflows/${encodedName}/definitions/${String(options.version)}`
+            : `/${options.handle}/workflows/${encodedName}`,
+        },
+      ],
     });
   }
 

@@ -102,7 +102,7 @@ describe('validateProcessConfig', () => {
     expect(result.warnings.some((w) => w.includes('step-intake') && w.toLowerCase().includes('self-review'))).toBe(true);
   });
 
-  it('[DATA] should return error when claude-code-agent step has no skill or prompt', () => {
+  it('[DATA] should return error when claude-code-agent step has no prompt', () => {
     const config: ProcessConfig = {
       ...baseConfig,
       stepConfigs: [
@@ -113,7 +113,7 @@ describe('validateProcessConfig', () => {
     };
     const result = validateProcessConfig(config, baseDefinition);
     expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.includes('step-intake') && e.includes('skill or agentConfig.prompt'))).toBe(true);
+    expect(result.errors.some((e) => e.includes('step-intake') && e.includes('requires agentConfig.prompt'))).toBe(true);
   });
 
   it('[DATA] should pass when claude-code-agent step has prompt', () => {

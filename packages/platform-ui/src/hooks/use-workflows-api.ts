@@ -18,7 +18,6 @@ export interface ApiDefinitionItem {
     steps: Array<{ id: string; type: string }>;
     title?: string;
     description?: string;
-    externalSkillsRepo?: { url: string; commit?: string; auth?: string };
     url?: string;
     archived?: boolean;
     namespace?: string;
@@ -50,7 +49,6 @@ export function mapApiToDefinitionGroups(
         hasManualTrigger: item.manualStartEnabled ?? false,
         // Absent means "no gate", which is what an ungated workflow answers.
         callerMayRun: item.callerMayRun ?? true,
-        externalSkillsRepo: def.externalSkillsRepo,
         url: def.url,
         archived: def.archived,
         namespace: def.namespace,

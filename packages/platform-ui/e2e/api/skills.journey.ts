@@ -284,7 +284,7 @@ test.describe('skills API journey', () => {
     try {
       cli(baseURL, ['agent', 'set-skills', agentId, '--skills', name]);
 
-      // The workflow names the agent only — no skill, no skillsDir.
+      // The workflow names the agent only — no step skills.
       const runId = await startRun(request, agentStepWorkflow(`e2e-skill-run-${stamp}`, {
         autonomyLevel: 'L4',
         agentId,

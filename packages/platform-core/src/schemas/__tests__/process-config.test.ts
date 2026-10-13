@@ -178,29 +178,14 @@ describe('StepConfigSchema', () => {
     }
   });
 
-  it('[DATA] should accept agentConfig with skill', () => {
-    const result = StepConfigSchema.safeParse({
-      stepId: 'step-1',
-      executorType: 'agent',
-      plugin: 'claude-code',
-      agentConfig: { skill: 'trial-metadata-extractor', image: 'mediforce-agent:base' },
-    });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.agentConfig?.skill).toBe('trial-metadata-extractor');
-    }
-  });
-
-  it('[DATA] should accept agentConfig with prompt, model, and skillsDir', () => {
+  it('[DATA] should accept agentConfig with prompt and model', () => {
     const result = StepConfigSchema.safeParse({
       stepId: 'step-1',
       executorType: 'agent',
       plugin: 'claude-code-agent',
       agentConfig: {
-        skill: 'trial-metadata-extractor',
         prompt: 'Extract metadata from the uploaded protocol PDF',
         model: 'sonnet',
-        skillsDir: 'apps/protocol-to-tfl/plugins/protocol-to-tfl/skills',
         image: 'mediforce-agent:base',
       },
     });
@@ -208,7 +193,6 @@ describe('StepConfigSchema', () => {
     if (result.success) {
       expect(result.data.agentConfig?.prompt).toBe('Extract metadata from the uploaded protocol PDF');
       expect(result.data.agentConfig?.model).toBe('sonnet');
-      expect(result.data.agentConfig?.skillsDir).toBe('apps/protocol-to-tfl/plugins/protocol-to-tfl/skills');
     }
   });
 
@@ -216,7 +200,7 @@ describe('StepConfigSchema', () => {
     const result = StepConfigSchema.safeParse({
       stepId: 'step-1',
       executorType: 'agent',
-      agentConfig: { skill: 'some-skill' },
+      agentConfig: { prompt: 'Do the step.' },
     });
     expect(result.success).toBe(true);
     if (result.success) {

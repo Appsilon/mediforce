@@ -46,8 +46,8 @@ export async function entriesFromDrop(items: DataTransferItemList): Promise<Uplo
  * The path a file of a folder upload lands at, relative to the folder. Both
  * the picker and a drop prefix the chosen folder's own name; keeping it would
  * bury every file a level deeper than the author picked, so that one leading
- * segment is dropped and the rest of the structure survives (a `skills/`
- * directory uploaded flat leaves an agent's `skillsDir` pointing at nothing).
+ * segment is dropped and the rest of the structure survives (a `scripts/`
+ * directory uploaded flat leaves a step's command pointing at nothing).
  * A loose file has no folder to drop.
  */
 export function uploadPathFor(path: string): string {

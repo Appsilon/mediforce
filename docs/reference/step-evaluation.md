@@ -710,7 +710,7 @@ its own so two Fingerprints say what differs:
 | `step` | the agent config, plugin, agent id, params, step params, env and MCP restrictions — not its name, display, `autonomyLevel` or `review` |
 | `model` | the step's model, or its agent's when the step names none |
 | `systemPrompt` | the agent's system prompt |
-| `skill` | every file the workflow carries under `<skillsDir>/<skill>/`, or the external skills repository, commit and path; plus, when the step is offered catalog Skills (its agent's and the ones it adds), each one's namespace, id and content hash ([ADR-0025](../adr/0025-skill-catalog.md), [ADR-0027](../adr/0027-step-adds-catalog-skills.md)). A step offered none leaves the component as it was. |
+| `skill` | the catalog Skills the step is offered (its agent's and the ones it adds), each one's namespace, id and content hash ([ADR-0025](../adr/0025-skill-catalog.md), [ADR-0027](../adr/0027-step-adds-catalog-skills.md)); `null` for a step offered none. Its shape is the one it had before file skills were retired ([ADR-0028](../adr/0028-retire-file-skills.md)), so those Fingerprints did not move. |
 | `image` | the image reference the runtime resolves, the files a carried Dockerfile builds from, and the commit a repository build checks out |
 | `mcpServers` | the MCP servers and tools production resolves for the step |
 | `preamble` | the workflow preamble |

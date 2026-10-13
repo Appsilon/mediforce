@@ -74,20 +74,22 @@ agent's.
 `workflow-artifacts.ts` writes the files a workflow carries (`artifacts` on the
 definition) to a content-addressed host directory and both container plugins
 mount it read-only at `/artifacts`. It is also where a carried `Dockerfile`
-gets its build context, and where `resolveSkillsDir` looks first — which is
-what lets a workflow authored in the app run without a git checkout. Do not
+gets its build context — which is what lets a workflow authored in the app
+run without a git checkout. Do not
 resolve an artifact path by hand: `materializeArtifacts` refuses a path that
 would escape the directory, and the tag/dir are keyed on file content so a
 changed file never overwrites what a running step is reading.
 
 Catalog Skills — the agent's (ADR-0025) and the ones the step adds (ADR-0027) —
-reach the container through the same `/plugin` mount. `resolvePluginDir` in
-`container-plugin.ts` returns the step's own plugin root when there are none, so
-those steps mount exactly what they did before. When there are some and the
-plugin sets `loadsAgentSkills`
-(`claude-code-agent` and `opencode-agent`), `materializeAgentSkillsPlugin` writes them, merged with
-the step's skills, to a folder named by their content hashes; the step's
-skill wins a name clash. Other runtimes log that they skip them.
+are the only skills a step has (ADR-0028), and reach the container through the
+`/plugin` mount. When a step is offered some and the plugin sets
+`loadsAgentSkills` (`claude-code-agent` and `opencode-agent`),
+`resolvePluginDir` in `container-plugin.ts` has `materializeAgentSkillsPlugin`
+write them to a folder named by their content hashes; a step offered none
+mounts nothing. Other runtimes log that they skip them. A step stored with a
+retired file skill (`agent.retiredFileSkill`) refuses to start
+(`RetiredFileSkillError`). In `MOCK_AGENT` Docker mode the canned step results
+come from `MOCK_FIXTURES_DIR`.
 
 Execution model in depth:
 [`docs/reference/container-steps.md`](../../../../docs/reference/container-steps.md).

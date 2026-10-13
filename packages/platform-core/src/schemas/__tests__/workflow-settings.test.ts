@@ -59,24 +59,6 @@ describe('pruneWorkflowSettings', () => {
       .toEqual({ workspace: { remote: 'Appsilon/repo' } });
   });
 
-  it('drops an externalSkillsRepo that is not complete, since a half one is unusable', () => {
-    // Neither half works alone: no url means nothing to clone, no commit means
-    // the runtime silently fetches nothing. The panel warns about the second
-    // rather than letting it look saved.
-    for (const half of [
-      { url: '', commit: '', auth: '' },
-      { url: 'https://github.com/org/skills' },
-      { commit: '0'.repeat(40) },
-    ]) {
-      expect(pruneWorkflowSettings({ externalSkillsRepo: half })).toEqual({ externalSkillsRepo: undefined });
-    }
-  });
-
-  it('keeps an externalSkillsRepo intact once it has a url and commit', () => {
-    const repo = { url: 'https://github.com/org/skills', commit: '0'.repeat(40) };
-    expect(pruneWorkflowSettings({ externalSkillsRepo: repo })).toEqual({ externalSkillsRepo: repo });
-  });
-
   it('leaves an explicit false alone — it is a value, not an absence', () => {
     expect(pruneWorkflowSettings({ visibility: 'private' })).toEqual({ visibility: 'private' });
   });

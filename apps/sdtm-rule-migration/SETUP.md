@@ -34,7 +34,7 @@ export MEDIFORCE_API_KEY=$(grep "^MEDIFORCE_API_KEY=" packages/platform-ui/.env.
   --base-url https://staging.mediforce.ai
 ```
 
-`GITHUB_TOKEN` is used to clone the workspace + skills repos over HTTPS (the platform-ui container has no `ssh` binary). Step 2 pushes via the OAuth-backed MCP, not via this token.
+`GITHUB_TOKEN` is used to clone the workspace repo over HTTPS (the platform-ui container has no `ssh` binary). Step 2 pushes via the OAuth-backed MCP, not via this token.
 
 ## Trigger a run
 
@@ -84,23 +84,34 @@ curl -s -X POST -H "X-Api-Key: $MEDIFORCE_API_KEY" -H "Content-Type: application
 
 `testResults: "environment-skip: <reason>"` is expected — the `core-contributor` repo declares an `engine/` git submodule that the runtime does not initialise, so `python test.py` typically can't run. The agent's YAML verification doesn't depend on it.
 
-## Iterating skills
+## Skills
 
-Skills live in `Appsilon/mediforce-sdtm-skills` (~2 MB, public). The workflow pins by SHA in `repo.commit`. Loop:
+The step names two catalog Skills in `appsilon`, `sdtm-rule` and
+`sdtmig-reference` ([ADR-0028](../../docs/adr/0028-retire-file-skills.md)). They
+live in the public `Appsilon/mediforce-sdtm-skills` repo and are imported into
+the workspace before the workflow is registered:
 
-1. Push your change to `Appsilon/mediforce-sdtm-skills`.
-2. Get the new SHA: `gh api repos/Appsilon/mediforce-sdtm-skills/commits/<branch> --jq '.sha'`.
-3. Update `repo.commit` in `apps/sdtm-rule-migration/src/sdtm-rule-migration.wd.json`.
-4. Re-register the workflow with the same CLI command above. No mediforce redeploy needed.
+```bash
+pnpm exec mediforce skill import \
+  --repo https://github.com/Appsilon/mediforce-sdtm-skills \
+  --ref 6424cdc75fd164ab0e9165f9f425c79edbab3361 --dir skills --namespace appsilon
+```
+
+Each of them carries a CSV over the 256 KB Skill cap (ADR-0025 §1) at that
+commit, so the import is refused until the cap is raised or the CSVs leave the
+skills.
+
+To take a change to the skills, push it to `Appsilon/mediforce-sdtm-skills` and
+re-run the import with the new ref: an import updates a Skill whose files
+differ, and the next run uses it. No re-registration is needed.
 
 ## Auth + clone notes
 
-The runtime clones two repos per run:
+The runtime clones the workspace repo per run:
 
-- **Skills repo** (`Appsilon/mediforce-sdtm-skills`) via `fetchSkillsFromRepo` — cached by SHA in `/tmp/mediforce-skills-cache/`, auth via `repo.auth` → `env.GITHUB_TOKEN`.
 - **Workspace repo** (`Appsilon/core-contributor`) via `WorkspaceManager` — cached as a bare repo per `(namespace, workflow-name)` in `~/.mediforce/bare-repos/`, auth via `workspace.remoteAuth` → `env.GITHUB_TOKEN`.
 
-Both secrets must be templated into the workflow's `env` block (e.g. `"GITHUB_TOKEN": "{{GITHUB_TOKEN}}"`) — `resolveStepEnv` doesn't auto-flatten the workflow secrets bag.
+The secret must be templated into the workflow's `env` block (e.g. `"GITHUB_TOKEN": "{{GITHUB_TOKEN}}"`) — `resolveStepEnv` doesn't auto-flatten the workflow secrets bag.
 
 `workspace.remote` resolves to an HTTPS-with-token URL when the secret is set, sidestepping the missing `ssh` binary in the platform-ui container.
 

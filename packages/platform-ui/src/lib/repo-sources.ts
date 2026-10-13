@@ -50,10 +50,10 @@ export function repoSources(steps: WorkflowStep[]): RepoSource[] {
  * Paths a step names inside its repository, so the explorer can mark the files
  * that actually drive the workflow among everything else in the repo.
  *
- * Only what the definition states outright: the Dockerfile it builds from and
- * the skill it runs. A step's `command` is a path inside the built image, not
- * inside the repository, so guessing a repository path from it would mark the
- * wrong file more often than the right one.
+ * Only what the definition states outright: the Dockerfile it builds from. A
+ * step's `command` is a path inside the built image, not inside the
+ * repository, so guessing a repository path from it would mark the wrong file
+ * more often than the right one.
  */
 export function referencedPaths(steps: WorkflowStep[], source: Pick<RepoSource, 'repo' | 'commit'>): Set<string> {
   const paths = new Set<string>();
@@ -61,8 +61,6 @@ export function referencedPaths(steps: WorkflowStep[], source: Pick<RepoSource, 
     const config = stepContainerConfig(step);
     if (config.repo !== source.repo || config.commit !== source.commit) continue;
     if (config.dockerfile !== undefined) paths.add(config.dockerfile);
-    const { skillsDir, skill } = step.agent ?? {};
-    if (skillsDir !== undefined && skill !== undefined) paths.add(`${skillsDir}/${skill}/SKILL.md`);
   }
   return paths;
 }

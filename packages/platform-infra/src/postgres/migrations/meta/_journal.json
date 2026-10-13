@@ -554,6 +554,13 @@
       "when": 1789641802500,
       "tag": "0078_agent_step_timeout_minutes",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1789641802600,
+      "tag": "0079_retire_file_skills",
+      "breakpoints": true
     }
   ]
 }
