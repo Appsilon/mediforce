@@ -815,14 +815,14 @@ export function StepEditor({
             </select>
           </FieldRow>
 
-          <FieldRow label="Model override" tooltip={TIP.agentModel}>
+          <FieldRow label="Model" tooltip={TIP.agentModel}>
             <ModelPicker
               value={step.agent?.model}
               onChange={(model) => updateAgent({ model })}
               defaultModel={selectedAgentDefaultModel}
               defaultLabel={selectedAgent === undefined ? 'Plugin default' : `Use ${selectedAgent.name}'s model`}
               providers={selectedPluginMetadata?.modelProviders}
-              ariaLabel="Model override"
+              ariaLabel="Model"
               className={rs}
             />
           </FieldRow>

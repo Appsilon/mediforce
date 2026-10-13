@@ -521,7 +521,7 @@ describe('StepEditor', () => {
     // Agent-specific labels should be visible (rendered via humanizeToken)
     expect(screen.getAllByText('Autonomy Level').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('combobox', { name: 'Agent' })).toBeInTheDocument();
-    expect(screen.getByText('Model Override')).toBeInTheDocument();
+    expect(screen.getByText('Model')).toBeInTheDocument();
     expect(screen.getByText('Step Prompt')).toBeInTheDocument();
     expect(screen.getByLabelText('Add skill')).toBeInTheDocument();
     expect(screen.getByText("Step's Maximum Duration (minutes)")).toBeInTheDocument();
@@ -706,7 +706,7 @@ describe('StepEditor', () => {
 
     // The agent list loads after the first render: wait for its model to reach the default option.
     expect(await screen.findByRole('option', { name: /Use Clinical Reviewer's model.*anthropic\/claude-opus-4-5/ })).toBe(
-      screen.getByRole<HTMLSelectElement>('combobox', { name: 'Model override' }).options[0],
+      screen.getByRole<HTMLSelectElement>('combobox', { name: 'Model' }).options[0],
     );
   });
 
@@ -750,7 +750,7 @@ describe('StepEditor', () => {
       render(<StepEditor step={buildStep({ executor: 'agent', ...step })} allSteps={[]} onChange={vi.fn()} />);
       expandCard('Prompt & model');
       await screen.findByRole('option', { name: /Claude Sonnet 4\.6/ });
-      return screen.getByRole('combobox', { name: 'Model override' });
+      return screen.getByRole('combobox', { name: 'Model' });
     }
 
     it('[DATA] offers only Anthropic models for a claude-code-agent step', async () => {
@@ -843,7 +843,7 @@ describe('StepEditor', () => {
     expandCard('Prompt & model');
     await screen.findByRole('combobox', { name: 'Agent' });
 
-    const modelSelect = screen.getByRole('combobox', { name: 'Model override' });
+    const modelSelect = screen.getByRole('combobox', { name: 'Model' });
     expect(modelSelect.options[0].textContent).not.toContain('anthropic/claude-opus-4-5');
   });
 
