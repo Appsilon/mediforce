@@ -17,9 +17,9 @@ const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
 const authHeaders = { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' };
 
 const REPO = 'https://github.com/Appsilon/mediforce';
-/** A `main` commit whose `apps/golden-standard-workflow/skills/` holds one skill. */
+/** A `main` commit whose community-digest skills folder holds two skills. */
 const COMMIT = 'a19d8bf1ceaae1f9c331ab129efb4f9998e158f0';
-const DIR = 'apps/golden-standard-workflow/skills';
+const DIR = 'apps/community-digest/plugins/community-digest/skills';
 
 test.describe('Skill import from GitHub — API E2E', () => {
   let gitHubReachable = false;
@@ -50,10 +50,13 @@ test.describe('Skill import from GitHub — API E2E', () => {
     expect(first.status(), await first.text()).toBe(200);
     expect(await first.json()).toEqual({
       source: { url: REPO, commit: COMMIT, dir: DIR },
-      skills: [{ id: 'summarize-record', outcome: 'created' }],
+      skills: [
+        { id: 'draft-discord-posts', outcome: 'created' },
+        { id: 'rank-changes', outcome: 'created' },
+      ],
     });
 
-    const stored = await request.get(`/api/skills/summarize-record?namespace=${namespace}`, { headers: authHeaders });
+    const stored = await request.get(`/api/skills/rank-changes?namespace=${namespace}`, { headers: authHeaders });
     expect(stored.status(), await stored.text()).toBe(200);
     const { skill } = await stored.json() as { skill: { visibility: string; files: { path: string; contents: string }[] } };
     expect(skill.visibility).toBe('private');
@@ -64,7 +67,10 @@ test.describe('Skill import from GitHub — API E2E', () => {
       data: { repo: REPO, ref: COMMIT, dir: DIR },
     });
     expect(again.status(), await again.text()).toBe(200);
-    expect((await again.json() as { skills: unknown[] }).skills).toEqual([{ id: 'summarize-record', outcome: 'unchanged' }]);
+    expect((await again.json() as { skills: unknown[] }).skills).toEqual([
+      { id: 'draft-discord-posts', outcome: 'unchanged' },
+      { id: 'rank-changes', outcome: 'unchanged' },
+    ]);
   });
 
   test('refuses a directory holding no skill folders', async ({ request }) => {
