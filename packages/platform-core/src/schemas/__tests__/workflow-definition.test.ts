@@ -629,12 +629,12 @@ describe('retired file skills (ADR-0028)', () => {
     expect(JSON.stringify(result.error?.issues)).toContain("step 'work' uses the file skill 'skills/summarize'");
   });
 
-  it('no longer reads externalSkillsRepo', () => {
+  it('refuses externalSkillsRepo, pointing at skill import', () => {
     const result = WorkflowDefinitionSchema.safeParse({
       ...baseWd,
       externalSkillsRepo: { url: 'https://github.com/org/skills.git', commit: 'b'.repeat(40) },
     });
-    expect(result.success).toBe(true);
-    expect(result.data).not.toHaveProperty('externalSkillsRepo');
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('mediforce skill import');
   });
 });

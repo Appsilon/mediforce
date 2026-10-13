@@ -228,7 +228,7 @@ Two tiers, different resolution — don't confuse them:
 | Tier | Location | Resolved by |
 |------|----------|-------------|
 | Runtime | the workspace's Skill catalog; a package ships its own in `apps/*/skills/` | an Agent's `skills` and a step's `agent.skills` (ADR-0025, ADR-0027); importing a workflow creates the package's Skills (ADR-0028) |
-| Development | `skills/` (symlinked into `.claude/skills/`) | Claude Code slash-command loader |
+| Development | `skills/` (symlinked into `.claude/skills/`; `skills/code-review` is itself a symlink to the copy `apps/mediforce-reviewer` ships) | Claude Code slash-command loader |
 
 A step names catalog Skills, never a path. To load a package's Skills without
 importing the workflow: `mediforce skill import --repo <url> --dir apps/<app>/skills --namespace <ns>`.

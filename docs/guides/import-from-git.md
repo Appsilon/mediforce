@@ -23,8 +23,10 @@ Before registering, import also turns the package's skills into Skills of the
 target namespace ([ADR-0028](../adr/0028-retire-file-skills.md)): every
 `skills/<name>/SKILL.md` folder beside the `.wd.json`, or beside its `src/`
 folder in the canonical `<workflow>/src/<workflow>.wd.json` layout. A step that
-names one of them in `agent.skills` is pointed at the imported copy, whatever
-namespace the file wrote, so a package imports into any workspace. A Skill
+names one of them in `agent.skills`, in the namespace the file declares, is
+pointed at the imported copy, so a package imports into any workspace; a
+reference to another namespace is left alone. The definition is validated first,
+so one that cannot register creates no Skills. A Skill
 already there is updated when its files differ (its visibility kept) and left
 alone when they do not; a folder that is not a valid skill imports nothing.
 

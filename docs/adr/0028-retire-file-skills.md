@@ -37,12 +37,15 @@ have named Skills that did not exist there.
 2. **A workflow package ships its Skills.** Importing a workflow from git
    first imports the package's `skills/` folder (beside the `.wd.json`, or
    beside its `src/` folder) into the importing workspace, then points every
-   step skill reference naming one of those Skills at that workspace. The
-   namespace a package file writes is therefore irrelevant for its own Skills.
+   step skill reference naming one of those Skills in the file's own namespace
+   (or in any, when the file declares none) at that workspace; a reference to
+   another namespace is left alone. The definition is validated before any
+   Skill is written, so one that cannot register imports nothing.
 3. **A step names Skills only in `agent.skills`.** `skill`, `skillsDir` and the
    workflow's `externalSkillsRepo` leave the schema. Registering a file that
-   still sets `skill` or `skillsDir` is refused with a pointer to
-   `agent.skills`; `externalSkillsRepo` is no longer read. A step whose
+   still sets any of them is refused with a pointer to `agent.skills` and
+   `skill import`, rather than stripped: a stripped `externalSkillsRepo` would
+   hand a bare `dockerfile` step the golden image. A step whose
    instructions were a pasted SKILL.md now has a `prompt` that names its Skill:
    the Skill is offered, not imposed (ADR-0025 §5), so the prompt is what makes
    the agent use it.

@@ -136,7 +136,7 @@ export interface BuildSource {
  */
 export function resolveBuildSource(buildConfig: ContainerConfig): BuildSource | undefined {
   const { dockerfile, context, repo, commit } = buildConfig;
-  if (!repo || !commit) return undefined;
+  if (repo === undefined || repo === '' || commit === undefined || commit === '') return undefined;
   return { repoUrl: normalizeRepoUrls(repo).gitUrl, repoRef: repo, commit, dockerfile, context };
 }
 
@@ -144,10 +144,9 @@ export function resolveBuildSource(buildConfig: ContainerConfig): BuildSource | 
  * The tag a step with a build source builds under, when it names one: never the
  * shared golden image, and never a name this workspace's catalog owns.
  *
- * Registration used to write the golden image onto a step whose Dockerfile came
- * from a workflow-level repo (migrated onto the step by 0079), and a registered
- * version cannot be edited, so the build would replace the golden image on the
- * host for every workflow using it.
+ * A stored step may name the golden image beside its own build source, and a
+ * registered version cannot be edited, so building under that name would
+ * replace the golden image on the host for every workflow using it.
  * Such a step builds under its derived tag instead, as does one whose `image` is
  * empty and one naming an image the catalog published.
  */

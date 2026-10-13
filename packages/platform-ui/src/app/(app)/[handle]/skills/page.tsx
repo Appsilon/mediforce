@@ -10,7 +10,7 @@ import { ConceptPopover } from '@/components/ui/concept-intro';
 import { SearchField } from '@/components/ui/search-field';
 import { ImportSkillsDialog } from '@/components/skills/import-skills-dialog';
 import { SkillHolders } from '@/components/skills/skill-holders';
-import { secondaryButtonClass } from '@/components/ui/button-styles';
+import { primaryButtonClass, secondaryButtonClass } from '@/components/ui/button-styles';
 import { routes } from '@/lib/routes';
 import { formatBytes } from '@/lib/format';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
@@ -133,7 +133,7 @@ export default function SkillsPage() {
             </button>
             <Link
               href={routes.skillNew(handle)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              className={primaryButtonClass}
             >
               <Plus className="h-3.5 w-3.5" />
               New skill

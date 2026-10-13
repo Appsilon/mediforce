@@ -812,7 +812,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         throw new RetiredFileSkillError(context.stepId, stepAgent.retiredFileSkill);
       }
 
-      if (!stepAgent.prompt) {
+      if (stepAgent.prompt === undefined || stepAgent.prompt === '') {
         throw new Error(
           `No prompt configured in step.agent for step '${context.stepId}'. ` +
           `${this.agentName} plugin requires step.agent.prompt.`,
@@ -858,7 +858,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         );
       }
 
-      if (!legacyAgentConfig.prompt) {
+      if (legacyAgentConfig.prompt === undefined || legacyAgentConfig.prompt === '') {
         throw new Error(
           `No prompt configured in agentConfig for step '${context.stepId}'. ` +
           `${this.agentName} plugin requires agentConfig.prompt.`,

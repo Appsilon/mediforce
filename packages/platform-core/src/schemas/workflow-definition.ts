@@ -822,6 +822,12 @@ export const WorkflowDefinitionBaseSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   preamble: z.string().optional(),
+  /** Refused, so a file written before ADR-0028 does not register with its
+   *  skills gone and a bare `dockerfile` quietly handed the golden image. */
+  externalSkillsRepo: z.never({
+    error: 'externalSkillsRepo was retired (ADR-0028): import its skills with `mediforce skill import` and name them in ' +
+      'agent.skills; a step that built from it sets its own repo + commit',
+  }).optional(),
   url: z.string().url().optional(),
   roles: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),

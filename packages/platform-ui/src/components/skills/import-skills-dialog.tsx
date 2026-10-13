@@ -7,13 +7,10 @@ import { GitBranch, Loader2, X } from 'lucide-react';
 import type { ImportSkillsOutput } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
-import { secondaryButtonClass } from '@/components/ui/button-styles';
+import { primaryButtonClass, secondaryButtonClass } from '@/components/ui/button-styles';
 
 const inputClass =
   'w-full rounded-md border px-3 py-2 text-sm outline-none transition-colors focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50';
-
-const primaryButtonClass =
-  'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none';
 
 const OUTCOME_LABEL: Record<ImportSkillsOutput['skills'][number]['outcome'], string> = {
   created: 'created',

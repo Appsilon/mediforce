@@ -363,7 +363,7 @@ function StepConfigDetail({
     const model = config.agentConfig?.model ?? config.model;
     if (model) entries.push({ label: 'Model', value: model });
   }
-  if (config.agentConfig?.retiredFileSkill) entries.push({ label: 'Retired file skill', value: config.agentConfig.retiredFileSkill });
+  if (config.agentConfig?.retiredFileSkill !== undefined) entries.push({ label: 'Retired file skill', value: config.agentConfig.retiredFileSkill });
   if (config.agentConfig?.skills?.length)
     entries.push({ label: 'Step skills', value: config.agentConfig.skills.map((ref) => `${ref.namespace}/${ref.id}`).join(', ') });
   if (config.timeoutMinutes) entries.push({ label: 'Timeout', value: `${config.timeoutMinutes} min` });

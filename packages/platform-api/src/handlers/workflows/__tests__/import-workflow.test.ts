@@ -236,6 +236,34 @@ describe('importWorkflow handler', () => {
       ]);
     });
 
+    it('leaves a reference to another namespace alone, even when the package ships a skill of that id', async () => {
+      mockFetchOk({ ...withStepSkills([{ namespace: 'shared', id: 'summarize-record' }]), namespace: 'appsilon' });
+      const { scope, processRepo, skillRepo } = buildSkillScope({ 'pkg/skills/summarize-record/SKILL.md': skillMd('summarize-record') });
+      await skillRepo.create({
+        namespace: 'shared', id: 'summarize-record', name: 'summarize-record', description: 'public', visibility: 'public',
+        contentHash: 'h', files: [{ path: 'SKILL.md', contents: skillMd('summarize-record') }],
+      });
+
+      await importWorkflow(
+        { repo: 'https://github.com/Appsilon/mediforce-workflows', path: 'pkg/src/pkg.wd.json', ref: SHA, namespace: 'test-ns' },
+        scope,
+      );
+
+      const stored = await processRepo.getWorkflowDefinition('test-ns', 'imported-workflow', 1);
+      expect(stored?.steps[1]?.agent?.skills).toEqual([{ namespace: 'shared', id: 'summarize-record' }]);
+    });
+
+    it('writes no skill when the definition cannot register', async () => {
+      mockFetchOk({ ...withStepSkills([{ namespace: 'appsilon', id: 'summarize-record' }]), transitions: [{ from: 'nowhere', to: 'done' }] });
+      const { scope, skillRepo } = buildSkillScope({ 'pkg/skills/summarize-record/SKILL.md': skillMd('summarize-record') });
+
+      await expect(importWorkflow(
+        { repo: 'https://github.com/Appsilon/mediforce-workflows', path: 'pkg/src/pkg.wd.json', ref: SHA, namespace: 'test-ns' },
+        scope,
+      )).rejects.toThrow(ValidationError);
+      expect(await skillRepo.getById('test-ns', 'summarize-record', { publicOnly: false })).toBeNull();
+    });
+
     it('registers nothing and creates nothing when a shipped skill folder is invalid', async () => {
       mockFetchOk(withStepSkills([{ namespace: 'appsilon', id: 'summarize-record' }]));
       const { scope, processRepo, skillRepo } = buildSkillScope({ 'pkg/skills/summarize-record/SKILL.md': '# no frontmatter\n' });

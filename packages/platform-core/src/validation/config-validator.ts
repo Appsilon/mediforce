@@ -48,7 +48,7 @@ export function validateProcessConfig(
       errors.push(`Step '${sc.stepId}': reviewerType='agent' requires a 'reviewerPlugin' field`);
     }
 
-    if (sc.plugin === 'claude-code-agent' && !sc.agentConfig?.prompt) {
+    if (sc.plugin === 'claude-code-agent' && (sc.agentConfig?.prompt ?? '') === '') {
       errors.push(`Step '${sc.stepId}': plugin 'claude-code-agent' requires agentConfig.prompt`);
     }
 

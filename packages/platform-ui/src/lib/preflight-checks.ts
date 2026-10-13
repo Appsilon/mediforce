@@ -1,5 +1,6 @@
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { type WorkflowDefinition, carriedDockerfile, isCatalogReference, normaliseModelId, splitImageRef, stepHasBuildSource, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
+import { routes } from './routes';
 
 export interface PreflightAction {
   label: string;
@@ -279,7 +280,7 @@ export function runPreflightChecks(
       stepNames: [step.name],
       message: `This step uses the workflow-file skill '${retired}', which no longer runs: import it as a catalog Skill and pick it on the step`,
       actions: [
-        { label: 'Import skills', href: `/${options.handle}/skills` },
+        { label: 'Import skills', href: routes.skills(options.handle) },
         {
           label: 'Edit the step',
           href: options.version !== undefined

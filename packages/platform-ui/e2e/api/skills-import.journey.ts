@@ -42,6 +42,8 @@ test.describe('Skill import from GitHub — API E2E', () => {
 
   test('imports every skill folder under a directory, then leaves them alone on re-import', async ({ request }) => {
     test.skip(!gitHubReachable, 'GitHub unreachable or rate limited');
+    // Two real clones of this repository.
+    test.setTimeout(120_000);
 
     const first = await request.post(`/api/skills/import?namespace=${namespace}`, {
       headers: authHeaders,
@@ -75,6 +77,7 @@ test.describe('Skill import from GitHub — API E2E', () => {
 
   test('refuses a directory holding no skill folders', async ({ request }) => {
     test.skip(!gitHubReachable, 'GitHub unreachable or rate limited');
+    test.setTimeout(60_000);
 
     const res = await request.post(`/api/skills/import?namespace=${namespace}`, {
       headers: authHeaders,

@@ -9,12 +9,12 @@ import { ValidationError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import type { ImportSkillsInput, ImportSkillsOutput, ImportedSkill } from '../../contract/skills';
 import { resolveGitHubSource } from '../workflows/_github';
-import { assertClonableRepo } from '../workflows/preview-repo-files';
+import { assertClonableRepo } from '../_clonable-repo';
 import { skillContentHash } from './_helpers';
 import { createSkill } from './create-skill';
 import { updateSkill } from './update-skill';
 
-export interface SkillFolderSource {
+interface SkillFolderSource {
   /** Canonical repository URL. */
   repo: string;
   commit: string;
@@ -47,6 +47,7 @@ export async function readSkillFolders(
     repo: source.repo,
     commit: source.commit,
     dir: source.dir,
+    // One file may take the whole Skill cap; SkillFilesSchema checks the total.
     maxBytes: WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES,
     anonymousOnly: true,
   });

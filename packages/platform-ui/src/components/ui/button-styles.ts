@@ -9,6 +9,10 @@
 export const secondaryButtonClass =
   'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50 disabled:pointer-events-none';
 
+/** The filled primary action of a page or dialog. */
+export const primaryButtonClass =
+  'inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none';
+
 /** Same shape as the secondary button, for the one destructive action in a
  *  confirmation pair. Filled, so the consequence is not a guess. */
 export const destructiveButtonClass =
