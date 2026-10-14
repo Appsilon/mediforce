@@ -5,8 +5,8 @@ import { printJson } from '../output';
 import { readJsonFile, STEP_ARGS, stepFrom } from './eval-step-args';
 
 const QUALIFICATION_LABEL: Record<GetStepQualificationOutput['status'], string> = { qualified: 'qualified', stale: 'stale', not_qualified: 'not qualified' };
-const STEP_VALIDATION_LABEL: Record<StepValidation['status'], string> = { passed: 'passed', failed: 'failed', not_verified: 'not verified' };
-const VERSION_VALIDATION_LABEL: Record<StepValidation['status'], string> = { passed: 'verified', failed: 'failed', not_verified: 'not verified' };
+const STEP_VALIDATION_LABEL: Record<StepValidation['status'], string> = { passed: 'passed', failed: 'failed', awaiting_approval: 'waiting for human approval', not_verified: 'not verified' };
+const VERSION_VALIDATION_LABEL: Record<StepValidation['status'], string> = { passed: 'verified', failed: 'failed', awaiting_approval: 'waiting for human approval', not_verified: 'not verified' };
 
 export const evalCriteriaGetCommand = defineCommand({
   name: 'mediforce eval criteria-get',
@@ -42,7 +42,7 @@ export const evalCriteriaSetCommand = defineCommand({
 
 export const evalQualificationCommand = defineCommand({
   name: 'mediforce eval qualification',
-  description: 'Print a step\'s qualification: Qualified, Stale (and what changed) or Not qualified. A person signs one in the Evaluation tab.',
+  description: 'Print a step\'s qualification: Qualified, Stale (and what changed) or Not qualified. A person confirms or overwrites an Eval Run\'s verdict in the Evaluation tab.',
   args: { ...STEP_ARGS, version: { type: 'string', description: 'Definition version (default: the runnable one)' } },
   async run({ args, output, mediforce, jsonMode }) {
     const version = parsePositiveIntArg(args.version);
@@ -62,7 +62,7 @@ export const evalQualificationCommand = defineCommand({
     output.stdout(`${QUALIFICATION_LABEL[result.status]}  (v${result.definitionVersion}, fingerprint ${result.fingerprint.hash.slice(0, 12)})`);
     const { qualification } = result;
     if (qualification === null) return 0;
-    output.stdout(`signed by ${qualification.signature.signerName} at ${qualification.signature.signedAt} for Eval Run ${qualification.evalRunId}`);
+    output.stdout(`verdict ${qualification.decision} by ${qualification.signature.signerName} at ${qualification.signature.signedAt} for Eval Run ${qualification.evalRunId}`);
     output.stdout(`criteria: ${describeCriteria(qualification.acceptanceCriteria)}`);
     output.stdout(describeMcpPolicy(qualification.mcpPolicy));
     for (const deviation of qualification.deviations) output.stdout(`deviation${deviation.severity === undefined ? '' : ` (${deviation.severity})`}: ${deviation.justification}`);

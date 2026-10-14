@@ -157,3 +157,16 @@ export async function addStepRun(fixture: EvaluationFixture, run: {
     }),
   }));
 }
+
+/** Stores a `schema` Evaluator beside one the handler already refuses to duplicate, as a step edited before the one-schema limit has. */
+export async function seedSchemaEvaluator(
+  scope: CallerScope,
+  evaluator: { name: string; rule: string; required: string[] },
+): Promise<void> {
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  await scope.evaluation.createEvaluator(
+    { ...STEP, id, name: evaluator.name, archived: false, runInProduction: false, createdBy: 'author-1', createdAt },
+    { evaluatorId: id, version: 1, rule: evaluator.rule, check: { kind: 'schema', schema: { required: evaluator.required } }, origin: 'user', sourceApproval: null, createdBy: 'author-1', createdAt },
+  );
+}

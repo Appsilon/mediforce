@@ -2,8 +2,10 @@
 
 import * as React from 'react';
 import {
+  qualificationOutcome,
   qualificationSignatureMeaning,
   type AcceptanceCriterionVerdict,
+  type QualificationDecision,
   type EvalRunReport,
   type EvaluatedStep,
   type JudgeVerdict,
@@ -11,8 +13,7 @@ import {
 import type { EvalRunOutput } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
-import { useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
-import { useAuth } from '@/contexts/auth-context';
+import { useStepEvaluationMutation, useStepQualification } from '@/hooks/use-step-evaluation';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 
@@ -20,7 +21,7 @@ export function percent(value: number | null): string {
   return value === null ? '—' : `${Math.round(value * 100)}%`;
 }
 
-const VERDICT_CLASSES: Record<AcceptanceCriterionVerdict['status'], string> = {
+export const VERDICT_CLASSES: Record<AcceptanceCriterionVerdict['status'], string> = {
   met: 'bg-green-500/10 text-green-700 dark:text-green-400',
   missed: 'bg-red-500/10 text-red-700 dark:text-red-400',
   not_evaluable: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
@@ -133,50 +134,47 @@ function VerdictReviewSection({ verdicts }: { verdicts: readonly JudgeVerdict[] 
   );
 }
 
+/** The verdict the Acceptance Criteria gave: only a run that met them passed. */
+function computedOutcome(verdict: AcceptanceCriterionVerdict): 'passed' | 'failed' {
+  return verdict.status === 'met' ? 'passed' : 'failed';
+}
+
 /**
- * Signing a Step Qualification for a run (ADR-0023 D10), labelled as an
- * approval of the step configuration: the person
- * reads what the signature means, justifies the criteria when the run did
- * not meet them, and re-enters their password where password sign-in is enabled.
+ * A person's signed decision on a run's verdict (ADR-0023 D10): confirm it,
+ * or overwrite it with a written justification. They read what the signature
+ * means.
  */
-function SignQualificationForm({ step, evalRunId, verdict, onDone }: {
+function SignQualificationForm({ step, evalRunId, verdict, decision, onDone }: {
   step: EvaluatedStep;
   evalRunId: string;
-  verdict: AcceptanceCriterionVerdict | null;
+  verdict: AcceptanceCriterionVerdict;
+  decision: QualificationDecision;
   onDone: () => void;
 }) {
-  const unmet = verdict !== null && verdict.status !== 'met' ? verdict : null;
   const [justification, setJustification] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  // Without password sign-in, signing re-authenticates by the session; the server ignores a password.
-  const { passwordAuthEnabled } = useAuth();
+  const computed = computedOutcome(verdict);
+  const outcome = decision === 'confirmed' ? computed : computed === 'passed' ? 'failed' : 'passed';
   const sign = useStepEvaluationMutation(step, () => mediforce.evaluation.signQualification({
     evalRunId,
-    ...(unmet === null ? {} : { justification: justification.trim() }),
-    ...(password === '' ? {} : { password }),
+    decision,
+    ...(decision === 'overwritten' ? { justification: justification.trim() } : {}),
   }));
-  const justified = unmet === null || justification.trim() !== '';
+  const justified = decision === 'confirmed' || justification.trim() !== '';
   return (
     <div className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-xs" data-testid="sign-qualification-form">
-      <p className="font-medium">Approve the step configuration (e-signature)</p>
-      <p>{qualificationSignatureMeaning()}</p>
-      {unmet !== null && (
+      <p className="font-medium">
+        {decision === 'confirmed' ? `Confirm that the evaluation ${computed}` : `Overwrite the evaluation verdict: ${computed} → ${outcome}`} (e-signature)
+      </p>
+      <p>{qualificationSignatureMeaning(decision, outcome)}</p>
+      {decision === 'overwritten' && (
         <label className="block space-y-1">
-          <span>
-            The Acceptance Criteria were {unmet.status === 'missed' ? 'missed' : 'not judged'} ({unmet.reason}). Signing records a deviation — why is that acceptable?
-          </span>
+          <span>The criteria gave {computed} ({verdict.reason}). Why is {outcome} the right verdict?</span>
           <textarea
-            aria-label="Justification for the deviation"
+            aria-label="Justification for overwriting the verdict"
             className={cn(inputClass, 'w-full min-h-16 text-xs')}
             value={justification}
             onChange={(event) => setJustification(event.target.value)}
           />
-        </label>
-      )}
-      {passwordAuthEnabled !== false && (
-        <label className="flex items-center gap-2">
-          <span>Your password</span>
-          <input type="password" autoComplete="current-password" className={cn(inputClass, 'text-xs')} value={password} onChange={(event) => setPassword(event.target.value)} />
         </label>
       )}
       {sign.error !== null && <p className="text-destructive">{sign.error.message}</p>}
@@ -201,13 +199,13 @@ function signingBlocked(output: EvalRunOutput, mayEdit: boolean, editReason: str
   return null;
 }
 
-const APPROVE_EXPLANATION = 'Record your signed approval that this exact step configuration — model, prompt, skills, tools — is fit for use, based on this Eval Run. It is shown on the step and marked out of date once the step changes; nothing is blocked without one.';
+const DECISION_EXPLANATION = 'A person signs off every Eval Run. The step\'s validation stays "Waiting for human approval" until you confirm the verdict the Acceptance Criteria gave, or overwrite it with a justification.';
 
 /**
  * An Eval Run's results (ADR-0023 D10): every Evaluator's pass rate with its
  * Wilson 95% interval, pass@k, pass^k and flakiness, the verdict on the
  * Acceptance Criteria, and how well the grading models' confidence matches a
- * person's review of their verdicts. A person signs a Step Qualification from here.
+ * person's review of their verdicts. A person confirms or overwrites the verdict from here.
  */
 export function EvalRunSummary({ output, step, mayEdit, editReason }: {
   output: EvalRunOutput;
@@ -216,24 +214,40 @@ export function EvalRunSummary({ output, step, mayEdit, editReason }: {
   editReason: string | undefined;
 }) {
   const { evalRun, report } = output;
-  const [signing, setSigning] = React.useState(false);
+  const [signing, setSigning] = React.useState<QualificationDecision | null>(null);
   const blocked = signingBlocked(output, mayEdit, editReason);
+  const qualification = useStepQualification(step, evalRun.definitionVersion);
+  const signed = qualification.data?.history.find((candidate) => candidate.evalRunId === evalRun.id);
+  const verdict = report.criteriaVerdict;
   return (
     <div className="space-y-5" data-testid="eval-run-report">
       {evalRun.acceptanceCriteria === null && (
         <p className="text-xs text-muted-foreground">No Acceptance Criteria were frozen into this run, so nothing is judged.</p>
       )}
-      {report.criteriaVerdict !== null && <CriteriaLine verdict={report.criteriaVerdict} />}
+      {verdict !== null && <CriteriaLine verdict={verdict} />}
       <EvaluatorTable report={report} />
       <VerdictReviewSection verdicts={report.judgeVerdicts} />
-      {signing ? (
-        <SignQualificationForm step={step} evalRunId={evalRun.id} verdict={report.criteriaVerdict} onDone={() => setSigning(false)} />
-      ) : (
+      {signed !== undefined ? (
+        <p className="text-sm" data-testid="run-decision" data-outcome={qualificationOutcome(signed)}>
+          Verdict {signed.decision === 'confirmed' ? 'confirmed' : 'overwritten'} by <span className="font-medium">{signed.signature.signerName}</span>:
+          {' '}evaluation <span className="font-medium">{qualificationOutcome(signed)}</span>.
+          {signed.deviations.map((deviation, index) => <span key={index} className="block text-xs text-muted-foreground">Reason: {deviation.justification}</span>)}
+        </p>
+      ) : verdict !== null && signing !== null ? (
+        <SignQualificationForm step={step} evalRunId={evalRun.id} verdict={verdict} decision={signing} onDone={() => setSigning(null)} />
+      ) : verdict !== null && (
         <div className="flex flex-wrap items-start gap-2">
-          <InstantTooltip label={blocked ?? APPROVE_EXPLANATION}>
+          <InstantTooltip label={blocked ?? DECISION_EXPLANATION}>
             <span className="inline-flex">
-              <button type="button" className={buttonClass} disabled={blocked !== null} onClick={() => setSigning(true)} data-testid="sign-qualification">
-                Approve step configuration
+              <button type="button" className={primaryButtonClass} disabled={blocked !== null} onClick={() => setSigning('confirmed')} data-testid="confirm-verdict">
+                Confirm that evaluation {computedOutcome(verdict)}
+              </button>
+            </span>
+          </InstantTooltip>
+          <InstantTooltip label={blocked ?? DECISION_EXPLANATION}>
+            <span className="inline-flex">
+              <button type="button" className={buttonClass} disabled={blocked !== null} onClick={() => setSigning('overwritten')} data-testid="overwrite-verdict">
+                Overwrite the evaluation verdict
               </button>
             </span>
           </InstantTooltip>

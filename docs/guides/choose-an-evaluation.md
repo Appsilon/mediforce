@@ -72,7 +72,7 @@ flowchart TD
 | Whether the step can drop its reviewer | a finished Eval Run | routing recommendation (Control Mode 4 when the criteria were met) | the report; apply it in the workflow editor |
 | Bad outputs stopped in live runs | a `schema` or `code` Evaluator | **Also run in production** | Evaluator toggle, `mediforce eval evaluator-production` |
 | Live quality has dropped | production Evaluators | drift alerts | banner on the tab, `mediforce eval drift` |
-| Someone signed that this configuration is fit for use | a finished Eval Run | Step Qualification | **Approve step configuration** in the report (web only) |
+| Someone signed that this configuration is fit for use | a finished Eval Run | Step Qualification | **Confirm** or **Overwrite** the run's verdict in the report (web only) |
 
 ## Which kind of Evaluator
 
@@ -146,8 +146,8 @@ guarded in production needs steps 2 and 7, not a qualification.
 7. **Production guardrails.** Turn on **Also run in production** for the checks
    that should score live runs. A failing `schema` or `code` check escalates
    the run to a person; judges only write Scores.
-8. **Qualify.** Sign a Step Qualification on a finished Eval Run, justifying
-   the deviation if it missed its criteria.
+8. **Qualify.** Confirm or overwrite the verdict of a finished Eval Run — the
+   step waits for human approval until you do; overwriting needs a justification.
 9. **Watch.** Drift alerts tell you when a production Evaluator's recent mean
    drops. The qualification badge turns **Stale** when the step changes;
    re-run and re-sign.

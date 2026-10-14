@@ -29,6 +29,7 @@ import {
   McpEvalPolicySchema,
   McpEvalServerPolicySchema,
   PerturbedEvalCaseSpecSchema,
+  QualificationDecisionSchema,
   QualificationDeviationSchema,
   ScoreSchema,
   StepFingerprintComponentSchema,
@@ -502,13 +503,17 @@ export const GetStepQualificationInputSchema = EvaluatedStepSchema.extend({
  * newest finished Eval Run of that version against the criteria frozen into it.
  * `not_verified` when there is none, or when the step's Fingerprint, its
  * Evaluators, its live Eval Cases or its Acceptance Criteria changed since.
+ * That run's verdict stands only once a person signed it — `awaiting_approval`
+ * until then; the signer's decision then gives `passed` or `failed`.
  */
 export const StepValidationSchema = z.object({
-  status: z.enum(['passed', 'failed', 'not_verified']),
-  /** The run it is read from; null when no run of the version finished. */
+  status: z.enum(['passed', 'failed', 'awaiting_approval', 'not_verified']),
+  /** The run it is read from — for `awaiting_approval`, the run a person must sign; null when no run of the version finished. */
   evalRunId: z.uuid().nullable(),
   /** The run's verdict, or what reset it. */
   reason: z.string(),
+  /** What the run's Acceptance Criteria said, while it awaits a signature. */
+  runVerdict: z.enum(['passed', 'missed', 'not_judged']).optional(),
   /** An Eval Run of the step is running; the status is read again once it ends. */
   runInProgress: z.boolean(),
 });
@@ -543,8 +548,9 @@ export const StepVersionValidationSchema = z.object({
 
 /**
  * One version of the workflow: `passed` (verified) when every agent step's
- * validation in it passed, `failed` when any failed, else `not_verified` —
- * also when it has no agent step.
+ * validation in it passed, `failed` when any failed, `awaiting_approval` when
+ * none failed but one waits for a signature, else `not_verified` — also when
+ * it has no agent step.
  */
 export const WorkflowVersionValidationSchema = z.object({
   definitionVersion: z.number().int().positive(),
@@ -585,16 +591,15 @@ export const GetStepDriftOutputSchema = z.object({
 });
 
 /**
- * A person signs a Step Qualification for a finished Eval Run (D10). Criteria
- * the run missed, or that could not be judged, need a deviation: a written
- * justification. Where password sign-in is
- * enabled, the signer's password re-authenticates them (21 CFR 11.200); an
- * API key cannot sign.
+ * A person signs a Step Qualification for a finished Eval Run (D10): they
+ * confirm its verdict on the Acceptance Criteria or overwrite it. Only
+ * overwriting takes — and needs — a written justification, recorded as a
+ * deviation. They sign from their session; an API key cannot sign.
  */
 export const SignStepQualificationInputSchema = z.object({
   evalRunId: z.uuid(),
+  decision: QualificationDecisionSchema,
   justification: QualificationDeviationSchema.shape.justification.optional(),
-  password: z.string().min(1).optional(),
 });
 export const SignStepQualificationOutputSchema = z.object({ qualification: StepQualificationSchema });
 

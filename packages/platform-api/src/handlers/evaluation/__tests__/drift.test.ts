@@ -96,7 +96,7 @@ describe('getStepDrift', () => {
 
   it('leaves out Evaluators that do not run in production', async () => {
     await createEvaluator(
-      { ...STEP, name: 'grade-5-flagged', rule: 'r', check: findingsSchema, origin: 'user' },
+      { ...STEP, name: 'grade-5-flagged', rule: 'r', check: { kind: 'code', runtime: 'python', source: 'pass' }, origin: 'user' },
       fixture.scope(),
     );
 

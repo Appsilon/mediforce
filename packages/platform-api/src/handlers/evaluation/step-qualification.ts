@@ -3,6 +3,7 @@ import type { z } from 'zod';
 import {
   DEFAULT_ACCEPTANCE_CRITERIA,
   inlineMcpServerNames,
+  qualificationOutcome,
   qualificationSignatureMeaning,
   type AcceptanceCriteria,
   type ElectronicSignature,
@@ -28,7 +29,6 @@ import { ConflictError, ForbiddenError, NotFoundError, PreconditionFailedError, 
 import { inlineMcpReason, loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
 import { appendEvaluationAudit } from './_lib/audit';
 import { buildEvalRunReport, rebuildEvalRunAcceptance } from './_lib/eval-run-report';
-import { checkPassword } from '../users/_lib/check-password';
 import { changedFingerprintComponents, computeStepFingerprint } from './_lib/step-fingerprint';
 
 /** One of the Step's Evaluators with its newest version — `null` once archived. */
@@ -47,6 +47,7 @@ interface StepRows {
   readonly evaluators: () => Promise<readonly StepEvaluator[]>;
   readonly liveCaseIds: () => Promise<readonly string[]>;
   readonly criteria: () => Promise<AcceptanceCriteria>;
+  readonly qualifications: () => Promise<readonly StepQualification[]>;
 }
 
 function once<Value>(read: () => Promise<Value>): () => Promise<Value> {
@@ -64,6 +65,7 @@ function stepRows(scope: CallerScope, step: EvaluatedStep): StepRows {
     })))),
     liveCaseIds: once(async () => (await scope.evaluation.listCases(step)).filter((evalCase) => evalCase.archived === false).map((evalCase) => evalCase.id)),
     criteria: once(async () => (await scope.evaluation.listAcceptanceCriteria(step))[0]?.criteria ?? DEFAULT_ACCEPTANCE_CRITERIA),
+    qualifications: once(() => scope.evaluation.listQualifications(step)),
   };
 }
 
@@ -88,7 +90,9 @@ const FINISHED_RUN_STATUSES = new Set(['completed', 'budget_exceeded']);
 /**
  * The step's validation in one Definition version: the newest finished Eval Run
  * of that version, judged on the criteria frozen into it — reset to
- * `not_verified` by any change to what that run rested on. A step that declares
+ * `not_verified` by any change to what that run rested on. Its verdict stands
+ * once a person signed that run (`confirmed` or `overwritten`); until then the
+ * step is `awaiting_approval`. A step that declares
  * MCP servers inline cannot be evaluated, so it stays `not_verified`. Its
  * Fingerprint is computed only when a run of that version finished.
  */
@@ -130,15 +134,33 @@ async function stepValidation(
 
   const acceptance = run.acceptance ?? await rebuildEvalRunAcceptance(scope, run);
   if (acceptance === null) return notVerified(`Eval Run ${run.id.slice(0, 8)} has not finished.`);
-  if (acceptance.status === 'met') return { status: 'passed', evalRunId: run.id, reason: `Eval Run ${run.id.slice(0, 8)} met its Acceptance Criteria.`, runInProgress };
-  return { status: 'failed', evalRunId: run.id, reason: `Eval Run ${run.id.slice(0, 8)}: ${acceptance.reason}.`, runInProgress };
+  const runLabel = `Eval Run ${run.id.slice(0, 8)}`;
+  const verdict = acceptance.status === 'met' ? `${runLabel} met its Acceptance Criteria` : `${runLabel}: ${acceptance.reason}`;
+  const signed = (await rows.qualifications()).find((qualification) => qualification.evalRunId === run.id);
+  if (signed === undefined) {
+    const runVerdict = acceptance.status === 'met' ? 'passed' : acceptance.status === 'missed' ? 'missed' : 'not_judged';
+    const said = runVerdict === 'passed' ? 'its Acceptance Criteria were met' : acceptance.reason;
+    return {
+      status: 'awaiting_approval',
+      evalRunId: run.id,
+      reason: `${runLabel} ${runVerdict === 'not_judged' ? 'not judged' : runVerdict}: ${said}. Waiting for a person to confirm or overwrite the verdict.`,
+      runVerdict,
+      runInProgress,
+    };
+  }
+  const outcome = qualificationOutcome(signed);
+  const by = `${signed.signature.signerName}`;
+  const reason = signed.decision === 'confirmed'
+    ? `${verdict}; ${by} confirmed it.`
+    : `${verdict}; ${by} overwrote it: ${signed.deviations[0]?.justification ?? 'no reason recorded'}.`;
+  return { status: outcome, evalRunId: run.id, reason, runInProgress };
 }
 
 /**
  * The Step's qualification badge (ADR-0023 D11): `qualified` when some signed
- * qualification binds the Step's Fingerprint as it is now — in the runnable
+ * qualification that passed — confirmed met, or overwritten from missed — binds the Step's Fingerprint as it is now — in the runnable
  * version, or the version asked about — `stale` when qualifications exist but
- * none binds it, `not_qualified` when none was ever signed. Evaluators changed
+ * none binds it, `not_qualified` when none passed. Evaluators changed
  * since the qualification shown are flagged beside it (D7). Beside it, the
  * step's validation in that version (`stepValidation`).
  */
@@ -149,13 +171,14 @@ export async function getStepQualification(
   const step = stepRef(input);
   const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'read', input.definitionVersion);
   const fingerprint = await computeStepFingerprint(scope, definition, workflowStep);
-  const history = await scope.evaluation.listQualifications(step);
-  const matching = history.find((qualification) => qualification.fingerprint.hash === fingerprint.hash);
-  const shown = matching ?? history[0];
   const rows = stepRows(scope, step);
+  const history = [...await rows.qualifications()];
+  const approvals = history.filter((qualification) => qualificationOutcome(qualification) === 'passed');
+  const matching = approvals.find((qualification) => qualification.fingerprint.hash === fingerprint.hash);
+  const shown = matching ?? approvals[0] ?? history[0];
   const validation = await stepValidation(scope, rows, workflowStep, definition.version, async () => fingerprint);
-  if (shown === undefined) {
-    return { status: 'not_qualified', validation, qualification: null, definitionVersion: definition.version, fingerprint, changed: [], evaluatorsChanged: [], history };
+  if (shown === undefined || approvals.length === 0) {
+    return { status: 'not_qualified', validation, qualification: shown ?? null, definitionVersion: definition.version, fingerprint, changed: [], evaluatorsChanged: [], history };
   }
   return {
     status: matching === undefined ? 'stale' : 'qualified',
@@ -172,7 +195,8 @@ export async function getStepQualification(
 /**
  * Whether each live version of a workflow is verified: every agent step's
  * validation in that version (`stepValidation`), rolled up — `passed` when all
- * passed, `failed` when any failed, else `not_verified`. Archived versions are
+ * passed, `failed` when any failed, `awaiting_approval` when one waits for a
+ * signature, else `not_verified`. Archived versions are
  * not evaluated, so they are left out.
  */
 export async function getWorkflowValidation(
@@ -197,48 +221,22 @@ export async function getWorkflowValidation(
     const statuses = steps.map((entry) => entry.validation.status);
     const status = statuses.includes('failed')
       ? 'failed'
-      : statuses.length > 0 && statuses.every((stepStatus) => stepStatus === 'passed') ? 'passed' : 'not_verified';
+      : statuses.length > 0 && statuses.every((stepStatus) => stepStatus === 'passed')
+        ? 'passed'
+        : statuses.includes('awaiting_approval') ? 'awaiting_approval' : 'not_verified';
     return { definitionVersion: definition.version, status, steps };
   }));
   return { versions };
 }
 
 /**
- * The signer proves who they are again at signing (21 CFR 11.200): with their
- * password where password sign-in is enabled, or, on a deployment without it,
- * with the session they sign from — recorded either way. A wrong password is
- * audited against the run, so failed attempts can be detected (11.300(d)).
- */
-async function reauthenticate(scope: CallerScope, uid: string, password: string | undefined, run: EvalRun): Promise<ElectronicSignature['reauthentication']> {
-  if (scope.system.passwordAuthEnabled !== true) return 'session';
-  const check = await checkPassword(scope, uid, password);
-  if (check === 'no_password') {
-    throw new PreconditionFailedError('Set a password for your account to sign: signing asks for it again');
-  }
-  if (check === 'not_given') throw new ValidationError('Enter your password to sign');
-  if (check === 'incorrect') {
-    await appendEvaluationAudit(scope, {
-      action: 'step_qualification.signature_refused',
-      description: `Step Qualification signing refused for step '${run.stepId}' of '${run.workflowName}': password incorrect`,
-      namespace: run.namespace,
-      entityType: 'eval_run',
-      entityId: run.id,
-      inputSnapshot: {},
-      basis: 'A signer failed to re-authenticate (21 CFR 11.300(d))',
-    });
-    throw new ForbiddenError('Password is incorrect');
-  }
-  return 'password';
-}
-
-/**
  * A person signs a Step Qualification for a finished Eval Run (ADR-0023
  * D10) — not a cancelled one. It binds the run's Step Fingerprint and cites the run,
  * the Evaluator versions, the MCP eval policy and the
- * Acceptance Criteria frozen into it, with the verdict on them. Signing
- * despite criteria missed or not judged records a deviation with a written
- * justification; one without it is refused, as is a justification for
- * criteria that were met. Only a person signs — an API key cannot, and the
+ * Acceptance Criteria frozen into it, with the verdict on them. The signer
+ * confirms that verdict or overwrites it; overwriting records a deviation with
+ * a written justification, and confirming takes none — either mismatch is
+ * refused. A run is signed once. Only a person signs — an API key cannot, and the
  * Evaluation Assistant has no tool for it (D15).
  */
 export async function signStepQualification(
@@ -269,19 +267,21 @@ export async function signStepQualification(
   const report = await buildEvalRunReport(scope, run, trials);
   const verdict = report.criteriaVerdict;
   if (verdict === null) throw new ValidationError('No Acceptance Criteria were frozen into this Eval Run; set them and run the step again');
-  if (verdict.status === 'met' && input.justification !== undefined) {
-    throw new ValidationError('The Acceptance Criteria were met; there is no deviation to justify');
+  if (input.decision === 'confirmed' && input.justification !== undefined) {
+    throw new ValidationError('Confirming the verdict records no deviation; a justification is for overwriting it');
   }
-  if (verdict.status !== 'met' && input.justification === undefined) {
-    throw new ValidationError(
-      `The Acceptance Criteria were ${verdict.status === 'missed' ? 'missed' : 'not judged'} (${verdict.reason}); `
-      + 'signing anyway records a deviation — give a written justification for it',
-    );
+  if (input.decision === 'overwritten' && input.justification === undefined) {
+    throw new ValidationError('Overwriting the verdict records a deviation — give a written justification for it');
+  }
+  if ((await scope.evaluation.listQualifications(step)).some((existing) => existing.evalRunId === run.id)) {
+    throw new ConflictError(`Eval Run '${run.id}' was already signed`);
   }
   const deviations = input.justification === undefined ? [] : [{ justification: input.justification }];
+  const outcome = qualificationOutcome({ decision: input.decision, verdicts: [verdict] });
 
-  const reauthentication = await reauthenticate(scope, uid, input.password, run);
   const metadata = scope.system.userDirectory === null ? null : await scope.system.userDirectory.getUserMetadata(uid).catch(() => null);
+  const signedConcurrently = async (): Promise<boolean> =>
+    (await scope.evaluation.listQualifications(step)).some((existing) => existing.evalRunId === run.id);
   const qualification = await scope.evaluation.createQualification({
     ...step,
     id: randomUUID(),
@@ -292,19 +292,24 @@ export async function signStepQualification(
     mcpPolicy: run.mcpPolicy,
     acceptanceCriteria: run.acceptanceCriteria,
     verdicts: [verdict],
+    decision: input.decision,
     deviations,
     signature: {
       signerId: uid,
       signerName: metadata?.displayName ?? metadata?.email ?? uid,
-      meaning: qualificationSignatureMeaning(),
+      meaning: qualificationSignatureMeaning(input.decision, outcome),
       signedAt: new Date().toISOString(),
-      reauthentication,
+      reauthentication: 'session',
     },
+  }).catch(async (error: unknown) => {
+    // The run's unique index refuses a second signature; a reader of the first one gets the same answer as the check above.
+    if (await signedConcurrently()) throw new ConflictError(`Eval Run '${run.id}' was already signed`);
+    throw error;
   });
   await appendEvaluationAudit(scope, {
     action: 'step_qualification.signed',
     description: `Step Qualification signed for step '${step.stepId}' of '${step.workflowName}' by ${qualification.signature.signerName}`
-      + (deviations.length === 0 ? '' : ' with a deviation'),
+      + (deviations.length === 0 ? ` (${input.decision})` : ` (${input.decision}, with a deviation)`),
     namespace: step.namespace,
     entityType: 'step_qualification',
     entityId: qualification.id,
@@ -312,6 +317,8 @@ export async function signStepQualification(
     outputSnapshot: {
       fingerprint: qualification.fingerprint.hash,
       verdict: verdict.status,
+      decision: input.decision,
+      outcome,
       signature: qualification.signature,
     },
     basis: 'A person signed the Step Qualification (ADR-0023 D10, 21 CFR 11.50)',

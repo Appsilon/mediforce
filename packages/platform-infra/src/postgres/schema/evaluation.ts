@@ -280,5 +280,6 @@ export const stepQualifications = pgTable(
   },
   (table) => ({
     stepIdx: index('step_qualifications_step_idx').on(table.workspace, table.workflowName, table.stepId, table.signedAt.desc()),
+    runUnique: uniqueIndex('step_qualifications_eval_run_uniq').on(table.evalRunId),
   }),
 );

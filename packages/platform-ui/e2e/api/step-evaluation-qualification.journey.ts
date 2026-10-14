@@ -10,7 +10,7 @@ import {
   type EvalRunOutput,
 } from '@mediforce/platform-api/contract';
 import { test, expect } from '../helpers/test-fixtures';
-import { TEST_ORG_HANDLE, TEST_USER_PASSWORD } from '../helpers/constants';
+import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { pollUntil } from '../helpers/poll-until';
 import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
 import { sessionCookieHeaders, setupMultiNamespaceCallers, type MultiNamespaceFixture } from '../helpers/multi-namespace';
@@ -18,8 +18,8 @@ import { sessionCookieHeaders, setupMultiNamespaceCallers, type MultiNamespaceFi
 /**
  * API E2E for Step Evaluation 3 (ADR-0023 D5, D10, D11): Acceptance Criteria
  * set before a run and frozen into it, criteria judged on the step's trials,
- * and a Step Qualification a signed-in person signs with their password — refused
- * for an API key, and stale once the step changes.
+ * and a verdict a signed-in person confirms or overwrites —
+ * refused for an API key, and stale once the step changes.
  *
  * MOCK_AGENT=true: the mock agent's result is `{ mock, summary }` at
  * confidence 1, and its first trajectory entry names the MCP servers the step
@@ -85,10 +85,6 @@ test.describe('Step Evaluation qualification — API E2E', () => {
     expect(GetAcceptanceCriteriaOutputSchema.parse(await criteriaRes.json()).criteria).toMatchObject({ version: 1 });
 
     await post(request, '/api/evaluation/evaluators', {
-      ...step, name: 'summary-present', rule: 'The result carries a summary.',
-      check: { kind: 'schema', schema: { required: ['summary'] } },
-    }, 201);
-    await post(request, '/api/evaluation/evaluators', {
       ...step, name: 'findings-present', rule: 'The result lists findings.',
       check: { kind: 'schema', schema: { required: ['findings'] } },
     }, 201);
@@ -122,24 +118,24 @@ test.describe('Step Evaluation qualification — API E2E', () => {
       expect(trial).toMatchObject({ status: 'scored', confidence: 1 });
       expect(await trajectoryText(request, trial.agentRunId!)).toContain('with MCP servers: meddra.');
     }
-    expect(finished.report.criteriaVerdict).toMatchObject({ status: 'missed', reason: 'findings-present: pass rate 0% < 50%, pass^k 0% < 100%' });
+    expect(finished.report.criteriaVerdict).toMatchObject({ status: 'missed', reason: 'findings-present passed 0 of 1 trial (0%, needs 50%) and passed all trials in 0% of cases (needs 100%)' });
     expect(finished.report.recommendation).toMatchObject({ autonomyLevel: 'L3' });
 
     const unsigned = GetStepQualificationOutputSchema.parse(await (await request.get(`/api/evaluation/qualification?${query}`, { headers: AUTH_HEADERS })).json());
-    expect(unsigned).toMatchObject({ status: 'not_qualified', qualification: null, validation: { status: 'failed', evalRunId: finished.evalRun.id } });
+    expect(unsigned).toMatchObject({ status: 'not_qualified', qualification: null, validation: { status: 'awaiting_approval', evalRunId: finished.evalRun.id } });
 
     const signing = {
       evalRunId: finished.evalRun.id,
+      decision: 'overwritten',
       justification: 'Findings are listed by the downstream step; a reviewer reads every grade.',
-      password: TEST_USER_PASSWORD,
     };
     const member = sessionCookieHeaders(callers.member);
     const byApiKey = await request.post('/api/evaluation/qualification', { headers: JSON_HEADERS, data: signing });
     expect(byApiKey.status(), await byApiKey.text()).toBe(403);
-    const unjustified = await request.post('/api/evaluation/qualification', { headers: member, data: { evalRunId: signing.evalRunId, password: signing.password } });
+    const unjustified = await request.post('/api/evaluation/qualification', { headers: member, data: { evalRunId: signing.evalRunId, decision: 'overwritten' } });
     expect(unjustified.status(), await unjustified.text()).toBe(400);
-    const wrongPassword = await request.post('/api/evaluation/qualification', { headers: member, data: { ...signing, password: 'not-the-password' } });
-    expect(wrongPassword.status(), await wrongPassword.text()).toBe(403);
+    const confirmedWithReason = await request.post('/api/evaluation/qualification', { headers: member, data: { ...signing, decision: 'confirmed' } });
+    expect(confirmedWithReason.status(), await confirmedWithReason.text()).toBe(400);
     const outsider = await request.post('/api/evaluation/qualification', { headers: sessionCookieHeaders(callers.outsider), data: signing });
     expect(outsider.status(), await outsider.text()).toBe(404);
 
@@ -149,11 +145,12 @@ test.describe('Step Evaluation qualification — API E2E', () => {
     expect(qualification).toMatchObject({
       evalRunId: finished.evalRun.id,
       fingerprint: { hash: finished.evalRun.fingerprint!.hash },
-      signature: { signerId: callers.member.uid, reauthentication: 'password' },
+      decision: 'overwritten',
+      signature: { signerId: callers.member.uid, reauthentication: 'session' },
     });
 
     const qualified = GetStepQualificationOutputSchema.parse(await (await request.get(`/api/evaluation/qualification?${query}`, { headers: AUTH_HEADERS })).json());
-    expect(qualified).toMatchObject({ status: 'qualified', definitionVersion: 1, changed: [] });
+    expect(qualified).toMatchObject({ status: 'qualified', definitionVersion: 1, changed: [], validation: { status: 'passed', evalRunId: finished.evalRun.id } });
 
     // A new version with another prompt: the step is no longer the one qualified — but a run of v1 still ran it.
     const v2 = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
@@ -173,7 +170,7 @@ test.describe('Step Evaluation qualification — API E2E', () => {
     expect(GetWorkflowValidationOutputSchema.parse(await validationRes.json())).toMatchObject({
       versions: [
         { definitionVersion: 2, status: 'not_verified', steps: [{ stepId: 'grade-aes', validation: { status: 'not_verified', evalRunId: null } }] },
-        { definitionVersion: 1, status: 'failed', steps: [{ stepId: 'grade-aes', validation: { status: 'failed', evalRunId: finished.evalRun.id } }] },
+        { definitionVersion: 1, status: 'passed', steps: [{ stepId: 'grade-aes', validation: { status: 'passed', evalRunId: finished.evalRun.id } }] },
       ],
     });
     const hidden = await request.get(`/api/evaluation/workflow-validation?${workflowQuery}`, { headers: sessionCookieHeaders(callers.outsider) });

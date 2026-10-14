@@ -51,7 +51,7 @@ describe('judgeAcceptanceCriteria', () => {
       [report({ name: 'findings-present', passes: 27, failures: 3, passRate: 0.9, passHatK: 0.5 })],
     );
     expect(verdict!.status).toBe('missed');
-    expect(verdict!.reason).toBe('findings-present: pass rate 90% < 95%, pass^k 50% < 90%');
+    expect(verdict!.reason).toBe('findings-present passed 27 of 30 trials (90%, needs 95%) and passed all trials in 50% of cases (needs 90%)');
   });
 
   it('holds every Evaluator to the same floor: a 100% floor means every graded trial passes', () => {
@@ -62,14 +62,14 @@ describe('judgeAcceptanceCriteria', () => {
         report({ name: 'grades-valid', passes: 29, failures: 1, passRate: 29 / 30, wilsonLower: 0.833 }),
       ],
     );
-    expect(verdict).toMatchObject({ status: 'missed', reason: 'grades-valid: pass rate 96.7% < 100%' });
+    expect(verdict).toMatchObject({ status: 'missed', reason: 'grades-valid passed 29 of 30 trials (96.7%, needs 100%)' });
   });
 
   it('cannot judge without a counted Evaluator, or with one that graded nothing', () => {
     expect(judgeAcceptanceCriteria({ minPassRate: 0.9 }, [report({ name: 'fatal-flagged', counted: false })]))
-      .toMatchObject({ status: 'not_evaluable', reason: 'No counted Evaluator' });
+      .toMatchObject({ status: 'not_evaluable', reason: 'No Evaluator counts toward the result' });
     expect(judgeAcceptanceCriteria({ minPassRate: 0.8 }, [report({ name: 'grades-valid', wilsonLower: null, passRate: null })]))
-      .toMatchObject({ status: 'not_evaluable', reason: 'grades-valid graded no trial' });
+      .toMatchObject({ status: 'not_evaluable', reason: 'grades-valid did not grade any trial' });
   });
 
   it('lets a miss outweigh an Evaluator that could not be judged', () => {
@@ -121,11 +121,11 @@ describe('evalRunAcceptance', () => {
     const failing = { ...findings, passes: 20, failures: 10, passRate: 20 / 30 };
     const ungraded = report({ name: 'grades-valid', passRate: null });
     expect(evalRunAcceptance({ status: 'completed' }, judged([failing, ungraded])))
-      .toEqual({ status: 'missed', reason: 'findings-present: pass rate 66.7% < 90%' });
+      .toEqual({ status: 'missed', reason: 'findings-present passed 20 of 30 trials (66.7%, needs 90%)' });
   });
 
   it('is not judged when nothing is missed but the criteria could not be judged', () => {
     expect(evalRunAcceptance({ status: 'budget_exceeded' }, judged([])))
-      .toEqual({ status: 'not_judged', reason: 'No counted Evaluator' });
+      .toEqual({ status: 'not_judged', reason: 'No Evaluator counts toward the result' });
   });
 });

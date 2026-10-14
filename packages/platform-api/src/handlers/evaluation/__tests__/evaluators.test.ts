@@ -31,6 +31,29 @@ describe('Evaluators', () => {
     await expect(createEvaluator(input, fixture.scope())).rejects.toBeInstanceOf(ConflictError);
   });
 
+  it('keeps a step to one output-schema check, however the second arrives', async () => {
+    const code = { kind: 'code' as const, runtime: 'python' as const, source: 'pass' };
+    const { evaluator: first } = await createEvaluator({ ...STEP, name: 'output-schema', rule: 'r', check: findingsSchema, origin: 'user' }, fixture.scope());
+    const { evaluator: other } = await createEvaluator({ ...STEP, name: 'other', rule: 'r', check: code, origin: 'assistant' }, fixture.scope());
+
+    await expect(createEvaluator({ ...STEP, name: 'second-schema', rule: 'r', check: findingsSchema, origin: 'assistant' }, fixture.scope())).rejects.toBeInstanceOf(ConflictError);
+    await expect(addEvaluatorVersion({ evaluatorId: other.id, check: findingsSchema, origin: 'assistant' }, fixture.scope())).rejects.toBeInstanceOf(ConflictError);
+
+    await archiveEvaluator({ evaluatorId: first.id, archived: true }, fixture.scope());
+    await addEvaluatorVersion({ evaluatorId: other.id, check: findingsSchema, origin: 'assistant' }, fixture.scope());
+    await expect(archiveEvaluator({ evaluatorId: first.id, archived: false }, fixture.scope())).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it('brings an archived output-schema check back when one is created again under its name', async () => {
+    const { evaluator } = await createEvaluator({ ...STEP, name: 'output-schema', rule: 'r', check: findingsSchema, origin: 'user' }, fixture.scope());
+    await archiveEvaluator({ evaluatorId: evaluator.id, archived: true }, fixture.scope());
+
+    const gradesSchema = { kind: 'schema' as const, schema: { required: ['grades'] } };
+    const { evaluator: again } = await createEvaluator({ ...STEP, name: 'output-schema', rule: 'r', check: gradesSchema, origin: 'user' }, fixture.scope());
+
+    expect(again).toMatchObject({ id: evaluator.id, archived: false, latest: { version: 2, check: gradesSchema } });
+  });
+
   it('makes a change a new version that carries over what it does not change', async () => {
     const { evaluator } = await createEvaluator(
       { ...STEP, name: 'findings-present', rule: 'The result lists findings.', check: findingsSchema, origin: 'user' },

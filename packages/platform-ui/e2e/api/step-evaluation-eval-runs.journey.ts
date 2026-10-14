@@ -90,10 +90,6 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
       ...step, name: 'summary-present', rule: 'The result carries a summary.',
       check: { kind: 'schema', schema: { required: ['summary'] } },
     }, 201);
-    await post(request, '/api/evaluation/evaluators', {
-      ...step, name: 'findings-present', rule: 'The result lists findings.',
-      check: { kind: 'schema', schema: { required: ['findings'] } },
-    }, 201);
     await post(request, '/api/evaluation/cases/from-agent-run', { agentRunId: production.id, expectation: 'positive' }, 201);
     await post(request, '/api/evaluation/datasets', step, 201);
     const policyRes = await request.put('/api/evaluation/mcp-policy', {
@@ -151,7 +147,6 @@ test.describe('Step Evaluation Eval Runs — API E2E', () => {
     }
     const byName = Object.fromEntries(finished.report.evaluators.map((evaluator) => [evaluator.name, evaluator]));
     expect(byName['summary-present']).toMatchObject({ passes: 2, failures: 0, passRate: 1, passAtK: 1, passHatK: 1, flakiness: 0 });
-    expect(byName['findings-present']).toMatchObject({ passes: 0, failures: 2, passRate: 0, passAtK: 0, passHatK: 0 });
     expect(byName['summary-present']!.wilsonLower).toBeCloseTo(0.3424, 3);
 
     // Trials stay out of the run list and the Agents history.
