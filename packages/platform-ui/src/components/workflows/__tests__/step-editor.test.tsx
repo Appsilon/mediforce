@@ -999,6 +999,30 @@ describe('StepEditor', () => {
     }
   });
 
+  it('[ACTION] leaving Human Review clears allowedRoles and assignedTo; entering it clears nothing', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', autonomyLevel: 'L3', allowedRoles: ['reviewer'], assignedTo: 'filip' })}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+    expandCard('Prompt & model');
+    fireEvent.click(screen.getByRole('button', { name: 'Autonomous' }));
+    expect(onChange).toHaveBeenLastCalledWith({ autonomyLevel: 'L4', allowedRoles: undefined, assignedTo: undefined });
+
+    rerender(
+      <StepEditor
+        step={buildStep({ executor: 'agent', autonomyLevel: 'L4' })}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Human Review' }));
+    expect(onChange).toHaveBeenLastCalledWith({ autonomyLevel: 'L3' });
+  });
+
   it('[RENDER] no placeholder text on regular inputs', () => {
     render(
       <StepEditor

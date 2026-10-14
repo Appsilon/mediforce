@@ -759,7 +759,11 @@ export function StepEditor({
           <FieldRow label="autonomy level" tooltip="Assist: agent draft, human approves. Human review: explicit approval required. Autonomous agent: executes without review.">
             <PillToggle
               value={step.autonomyLevel ?? 'L3'}
-              onChange={(v) => onChange({ autonomyLevel: v as WorkflowStep['autonomyLevel'] })}
+              onChange={(v) => onChange(
+                v === 'L3'
+                  ? { autonomyLevel: 'L3' }
+                  : { autonomyLevel: v as WorkflowStep['autonomyLevel'], allowedRoles: undefined, assignedTo: undefined },
+              )}
               options={[
                 { value: 'L2', label: 'Assist', icon: Bot, activeClassName: 'border-lime-400 bg-lime-50 text-lime-700 dark:bg-lime-950/30 dark:text-lime-400' },
                 { value: 'L3', label: 'Human Review', icon: Users, activeClassName: 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-400' },

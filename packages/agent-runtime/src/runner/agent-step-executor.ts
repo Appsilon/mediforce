@@ -1,8 +1,7 @@
 import {
   calculateEstimatedCost,
-  interpolate,
   offeredSkill,
-  resolveStepAssignee,
+  resolveInstanceAssignee,
   type AgentFallbackReason,
   type AgentOutputEnvelope,
 } from '@mediforce/platform-core';
@@ -185,18 +184,9 @@ export class AgentStepExecutor implements StepExecutor {
       let unresolvedAssignee: string | null = null;
       if (workflowStep.assignedTo) {
         const instance = await instanceRepo.getById(instanceId);
-        const resolved = interpolate(workflowStep.assignedTo, {
-          triggerPayload: (instance?.triggerPayload as Record<string, unknown>) ?? {},
-          triggerContext: (instance?.triggerContext as Record<string, unknown>) ?? {},
-          steps: instance?.variables ?? {},
-          variables: instance?.variables ?? {},
-          secrets: {},
-        });
-        if (typeof resolved === 'string' && resolved.length > 0) {
-          const assignee = await resolveStepAssignee(resolved, userDirectory);
-          assignedUserId = assignee.userId;
-          unresolvedAssignee = assignee.unresolved;
-        }
+        const assignee = await resolveInstanceAssignee(workflowStep.assignedTo, instance, userDirectory);
+        assignedUserId = assignee?.userId ?? null;
+        unresolvedAssignee = assignee?.unresolved ?? null;
       }
 
       await humanTaskRepo.create({
