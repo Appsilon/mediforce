@@ -3,7 +3,7 @@
 import { useParams } from 'next/navigation';
 import { SkillEditor } from '@/components/skills/skill-editor';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
-import { skillKey, useSkill, useSkillHolders } from '@/hooks/use-skills';
+import { skillKey, useSkill, useSkillHolders, useSkillWorkflows } from '@/hooks/use-skills';
 
 export default function SkillPage() {
   const params = useParams<{ handle: string; namespace: string; skillId: string }>();
@@ -12,6 +12,7 @@ export default function SkillPage() {
   const { role, loading: roleLoading } = useNamespaceRole(namespace);
   const skill = useSkill(namespace, skillId);
   const holders = useSkillHolders();
+  const workflows = useSkillWorkflows(holders);
 
   if (skill.isError) {
     return (
@@ -34,6 +35,7 @@ export default function SkillPage() {
       // Writes need workspace write on the Skill's own workspace (ADR-0025 §8).
       readOnly={role === null}
       holders={holders.get(skillKey(namespace, skillId)) ?? []}
+      workflows={workflows.get(skillKey(namespace, skillId)) ?? []}
     />
   );
 }

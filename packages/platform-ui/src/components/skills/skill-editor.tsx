@@ -31,6 +31,7 @@ import { TextFilesPane } from '@/components/files/text-files-pane';
 import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { secondaryButtonClass } from '@/components/ui/button-styles';
 import { DeleteSkillDialog } from './delete-skill-dialog';
+import type { SkillWorkflow } from '@/hooks/use-skills';
 import { SkillHolders } from './skill-holders';
 
 const TEMPLATE: SkillFile[] = [
@@ -120,11 +121,13 @@ export function SkillEditor({
   skill,
   readOnly,
   holders,
+  workflows,
 }: {
   handle: string;
   skill: Skill | null;
   readOnly: boolean;
   holders: AgentDefinition[];
+  workflows: SkillWorkflow[];
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -208,7 +211,7 @@ export function SkillEditor({
           </h1>
           {skill !== null && (
             <p className="mt-0.5 text-xs text-muted-foreground">
-              <SkillHolders holders={holders} handle={handle} />
+              <SkillHolders holders={holders} workflows={workflows} handle={handle} />
             </p>
           )}
         </div>
