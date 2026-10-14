@@ -30,7 +30,7 @@ export interface McpRecordedCase {
 
 /**
  * Storage for the Evaluation domain (ADR-0023): Briefs, Evaluators and their
- * versions, Eval Cases, frozen Eval Dataset versions, MCP eval policies and
+ * versions, Eval Cases, saved Eval Dataset versions, MCP eval policies and
  * recordings, Acceptance Criteria, Eval Runs and Step Qualifications.
  * Every row carries its Step's namespace, so the authorized wrapper gates each
  * call on the namespace it names or the row it returns.

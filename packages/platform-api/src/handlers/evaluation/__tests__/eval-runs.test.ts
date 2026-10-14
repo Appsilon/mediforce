@@ -7,7 +7,7 @@ import { ConflictError, NotFoundError, ValidationError } from '../../../errors';
 import type { CallerScope } from '../../../repositories/index';
 import { createEvaluator } from '../evaluators';
 import { createEvalCase } from '../eval-cases';
-import { freezeEvalDataset } from '../eval-datasets';
+import { saveEvalDataset } from '../eval-datasets';
 import { listStepAgentRuns } from '../step-agent-runs';
 import { advanceEvalRunOfInstance, cancelEvalRun, getEvalRun, listEvalRuns, prepareEvalRun, startEvalRun } from '../eval-runs';
 import { setEvaluationBrief } from '../briefs';
@@ -52,7 +52,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
         origin: 'user',
       }, scope);
     }
-    await freezeEvalDataset(STEP, scope);
+    await saveEvalDataset(STEP, scope);
   });
 
   /** Plays the auto-runner: the trial's agent step ran and produced `result` at `costUsd`. */

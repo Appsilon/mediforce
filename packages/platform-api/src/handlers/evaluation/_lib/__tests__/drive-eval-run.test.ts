@@ -6,7 +6,7 @@ import { noopRunKicker, type NoopRunKicker } from '../../../../runtime/run-kicke
 import type { CallerScope } from '../../../../repositories/index';
 import { createEvaluator } from '../../evaluators';
 import { createEvalCase } from '../../eval-cases';
-import { freezeEvalDataset } from '../../eval-datasets';
+import { saveEvalDataset } from '../../eval-datasets';
 import { prepareEvalRun, startEvalRun } from '../../eval-runs';
 import { recordScore } from '../../../scores/record-score';
 import { driveEvalRun } from '../drive-eval-run';
@@ -32,7 +32,7 @@ describe('driveEvalRun', () => {
       ...STEP, name: 'case', input: { triggerPayload: {}, previousStepOutputs: {} }, workspaceSeedCommit: null,
       expectation: 'positive', expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null, split: 'dev', containsProductionData: false, origin: 'user',
     }, scope);
-    await freezeEvalDataset(STEP, scope);
+    await saveEvalDataset(STEP, scope);
   });
 
   it('never starts more than the concurrency, however often it is called', async () => {

@@ -57,7 +57,7 @@ export function useStepEvaluatorHistory(step: EvaluatedStep) {
   });
 }
 
-/** The Step's frozen Dataset versions, newest first. */
+/** The Step's saved Dataset versions, newest first. */
 export function useStepDatasets(step: EvaluatedStep) {
   return useQuery({ queryKey: sectionKey(step, 'datasets'), queryFn: () => mediforce.evaluation.listDatasets(step), retry: stopRetryOn4xx });
 }
@@ -130,7 +130,7 @@ export function useStepEvaluation(step: EvaluatedStep, definitionVersion: number
 
 /**
  * A write on the Step's Evaluation. Every one refreshes the whole Step: an
- * accepted proposal, a frozen Dataset or a prepared run each changes what
+ * accepted proposal, a saved Dataset or a prepared run each changes what
  * more than one section shows.
  */
 export function useStepEvaluationMutation<TInput, TOutput>(

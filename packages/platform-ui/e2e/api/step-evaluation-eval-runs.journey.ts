@@ -256,7 +256,7 @@ test.describe('Step Evaluation judge verdicts — API E2E', () => {
     })).evalCase;
     const sureCase = await caseKeyedBy('Sure', sureKey);
     const unsureCase = await caseKeyedBy('Unsure', unsureKey);
-    await mediforce.evaluation.freezeDataset(step);
+    await mediforce.evaluation.saveDataset(step);
 
     const prepared = await mediforce.evaluation.prepareRun({ ...step, trialsPerCase: 1, concurrency: 2, budgetUsd: 1 });
     const evalRunId = prepared.evalRun.id;
@@ -365,7 +365,7 @@ test.describe('Step Evaluation judge verdicts — API E2E', () => {
     const avoids = await harvest('Must not match', { expectedOutput: { ...mockOutput, mock: false }, expectation: 'negative', evaluatorIds: [expected.id] });
     const agrees = await harvest('Agrees', { expectedOutput: { mock: true, summary: 'Mocked the AE grading.' }, comparison: 'agreement', agreementInstructions: agreementKey });
     expect(agrees).toMatchObject({ comparison: 'agreement', agreementInstructions: agreementKey, evaluatorIds: null });
-    await mediforce.evaluation.freezeDataset(step);
+    await mediforce.evaluation.saveDataset(step);
 
     const prepared = await mediforce.evaluation.prepareRun({ ...step, trialsPerCase: 1, concurrency: 3, budgetUsd: 1 });
     const evalRunId = prepared.evalRun.id;

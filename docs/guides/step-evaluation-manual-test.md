@@ -136,7 +136,7 @@ Top to bottom, left column; the **Evaluation Assistant** is the right-hand panel
 | Validation status | **Validation passed** / **failed** / **Waiting for human approval** / **Not verified**, read from the newest finished Eval Run and its sign-off; click for the signed Step Qualification |
 | Set the threshold | The Acceptance Criteria floor, one slider |
 | Evaluators | The checks that grade an output (schema / code / LLM judge / expected output) |
-| Eval Cases | Test inputs, frozen into numbered Datasets |
+| Eval Cases | Test inputs, saved into numbered Datasets |
 | Eval Runs | Run the step on a Dataset, read the report, sign |
 
 The Evaluation Brief is behind the file icon in the assistant's header. The natural order is
@@ -217,7 +217,7 @@ every output goes back to the assistant instead of to you.
 **What.** A case is one input the step is re-run on, a **split** — `dev` or `holdout` — a
 **source** (`production`, `manual`, `synthesized (…)`), and optionally an **expected output**
 with an expectation (`positive`: the output must match; `negative`: it must not) and a
-comparison (`exact` or `agreement`). **Save** (`dataset-freeze`) snapshots the live cases as a
+comparison (`exact` or `agreement`). **Save** (`dataset-save`) snapshots the live cases as a
 numbered Dataset; an Eval Run uses exactly that version.
 
 **How** — **Eval Cases → Add case** starts from:
@@ -230,7 +230,7 @@ numbered Dataset; an Eval Run uses exactly that version.
 
 With an expected output, the form also sets whether the output must match it and how it is
 compared; **Checked by** picks **All evaluators** or **Only these**. **Edit** replaces a case
-with a new one; **Archive** takes it out of the next freeze. Ticking cases and **Set evaluators…** sets them in bulk.
+with a new one; **Archive** takes it out of the next save. Ticking cases and **Set evaluators…** sets them in bulk.
 
 **Test**
 - ✅ Cases show their labels (positive/negative, split, source) and *as run* / *edited*.
@@ -321,7 +321,7 @@ Individual tools can be denied on a `live` server. The policy is **CLI/API only*
 
 ## 6. Eval Runs
 
-**What.** Runs **only this step** on every case of a frozen Dataset, several times each
+**What.** Runs **only this step** on every case of a saved Dataset, several times each
 (*trials*), and grades each output with the counted Evaluators that grade its case. Trials are
 isolated: no review tasks, no handoffs, not listed in normal runs or the Agents page. Spending
 always needs a human click on **Start**, with a budget cap.

@@ -50,7 +50,7 @@ describe('Evaluation Assistant prompt', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('"7 of 10 trials passed"');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('"Waiting for human approval"');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('"CM4 — Autonomous agent');
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toMatch(/frozen Dataset|Control Mode 4/);
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toMatch(/saved Dataset|Control Mode 4/);
   });
 
   it('says whether the request carries an unattended budget', () => {

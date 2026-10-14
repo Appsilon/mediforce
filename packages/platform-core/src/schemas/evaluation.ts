@@ -258,7 +258,7 @@ export const EvalCaseSchema = EvaluatedStepSchema.extend(EvalCaseLabelSchema.sha
   createdAt: z.iso.datetime(),
 });
 
-/** A frozen set of a Step's Eval Cases; an Eval Run runs one of these. */
+/** A saved set of a Step's Eval Cases; an Eval Run runs one of these. */
 export const EvalDatasetVersionSchema = EvaluatedStepSchema.extend({
   id: z.uuid(),
   version: z.number().int().positive(),

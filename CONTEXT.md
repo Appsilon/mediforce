@@ -551,7 +551,7 @@ judge's confidence; *denied* leaves it out. A denial never reverses the verdict.
 _Avoid_: "label", "override", "calibration" (judges are not calibrated).
 
 **Eval Dataset**:
-A versioned, frozen set of Eval Cases for one Workflow Step, drawn from production
+A versioned, saved set of Eval Cases for one Workflow Step, drawn from production
 Agent Runs, synthesised, or written by hand. Namespace-scoped.
 _Avoid_: "Dataset" alone (collides with generic data-engineering usage),
 "Benchmark" (implies public/academic suites).

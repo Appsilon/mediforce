@@ -12,7 +12,7 @@ import type { CallerScope } from '../../../repositories/index';
 import { setAcceptanceCriteria } from '../acceptance-criteria';
 import { addEvaluatorVersion, createEvaluator } from '../evaluators';
 import { createEvalCase } from '../eval-cases';
-import { freezeEvalDataset } from '../eval-datasets';
+import { saveEvalDataset } from '../eval-datasets';
 import { advanceEvalRunOfInstance, cancelEvalRun, prepareEvalRun, startEvalRun } from '../eval-runs';
 import { getStepQualification, getWorkflowValidation, signStepQualification } from '../step-qualification';
 import { evaluationFixture, NAMESPACE, seedSchemaEvaluator, STEP, WORKFLOW, type EvaluationFixture } from './fixture';
@@ -54,7 +54,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
         origin: 'user',
       }, scope);
     }
-    await freezeEvalDataset(STEP, scope);
+    await saveEvalDataset(STEP, scope);
   });
 
   function withEngine(built: CallerScope): CallerScope {

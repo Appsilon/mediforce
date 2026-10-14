@@ -20,7 +20,7 @@ export {
 } from './eval-cases';
 export { getAgentRunIo } from './agent-run-io';
 export { getStepDrift } from './drift';
-export { listEvalDatasets, freezeEvalDataset } from './eval-datasets';
+export { listEvalDatasets, saveEvalDataset } from './eval-datasets';
 export { getMcpEvalPolicy, setMcpEvalPolicy } from './mcp-eval-policy';
 export {
   estimateEvalRunCost,

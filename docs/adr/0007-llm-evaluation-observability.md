@@ -58,7 +58,7 @@ is implemented:
    sources: deterministic checks, LLM-as-judge, human review. Aggregated
    over time, scores per workflow/agent/model ARE the quality-tracking and
    practical drift-detection story.
-3. **Eval Datasets** — selected production executions frozen as golden /
+3. **Eval Datasets** — selected production executions saved as golden /
    regression cases (input → accepted output).
 4. **Eval Runs** — executing a dataset against a configuration (different
    model, prompt, agent version) and scoring the results; champion vs

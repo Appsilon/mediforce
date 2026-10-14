@@ -598,8 +598,8 @@ import {
   CreateEvaluatorInputSchema,
   EvalCaseOutputSchema,
   EvaluatorOutputSchema,
-  FreezeEvalDatasetInputSchema,
-  FreezeEvalDatasetOutputSchema,
+  SaveEvalDatasetInputSchema,
+  SaveEvalDatasetOutputSchema,
   GetEvaluationBriefInputSchema,
   GetEvaluationBriefOutputSchema,
   GetAcceptanceCriteriaInputSchema,
@@ -645,8 +645,8 @@ import {
   type CreateEvaluatorInput,
   type EvalCaseOutput,
   type EvaluatorOutput,
-  type FreezeEvalDatasetInput,
-  type FreezeEvalDatasetOutput,
+  type SaveEvalDatasetInput,
+  type SaveEvalDatasetOutput,
   type GetEvaluationBriefInput,
   type GetEvaluationBriefOutput,
   type GetAcceptanceCriteriaInput,
@@ -1133,10 +1133,10 @@ export class Mediforce {
     createCaseFromAgentRun: (input: CreateEvalCaseFromAgentRunInput) => Promise<EvalCaseOutput>;
     createPerturbedCase: (input: CreatePerturbedEvalCaseInput) => Promise<EvalCaseOutput>;
     archiveCase: (input: ArchiveEvalCaseInput) => Promise<EvalCaseOutput>;
-    /** Edits a case as a new case that replaces it; the old one is archived, so frozen Datasets keep it. */
+    /** Edits a case as a new case that replaces it; the old one is archived, so saved Datasets keep it. */
     updateCase: (input: UpdateEvalCaseInput) => Promise<EvalCaseOutput>;
     listDatasets: (input: ListEvalDatasetsInput) => Promise<ListEvalDatasetsOutput>;
-    freezeDataset: (input: FreezeEvalDatasetInput) => Promise<FreezeEvalDatasetOutput>;
+    saveDataset: (input: SaveEvalDatasetInput) => Promise<SaveEvalDatasetOutput>;
     getMcpPolicy: (input: GetMcpEvalPolicyInput) => Promise<GetMcpEvalPolicyOutput>;
     setMcpPolicy: (input: SetMcpEvalPolicyInput) => Promise<SetMcpEvalPolicyOutput>;
     estimateRun: (input: EstimateEvalRunInput) => Promise<EstimateEvalRunOutput>;
@@ -2750,9 +2750,9 @@ export class Mediforce {
         const step = ListEvalDatasetsInputSchema.parse(input);
         return this.getJson(`/api/evaluation/datasets${toSearchParams(step)}`, ListEvalDatasetsOutputSchema, 'mediforce.evaluation.listDatasets');
       },
-      freezeDataset: async (input) => this.sendJson(
-        'POST', '/api/evaluation/datasets', FreezeEvalDatasetInputSchema.parse(input),
-        FreezeEvalDatasetOutputSchema, 'mediforce.evaluation.freezeDataset',
+      saveDataset: async (input) => this.sendJson(
+        'POST', '/api/evaluation/datasets', SaveEvalDatasetInputSchema.parse(input),
+        SaveEvalDatasetOutputSchema, 'mediforce.evaluation.saveDataset',
       ),
       getMcpPolicy: async (input) => {
         const step = GetMcpEvalPolicyInputSchema.parse(input);

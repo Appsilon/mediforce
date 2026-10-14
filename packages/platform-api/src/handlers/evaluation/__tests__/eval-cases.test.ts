@@ -8,7 +8,7 @@ import {
   listEvalCases,
   updateEvalCase,
 } from '../eval-cases';
-import { freezeEvalDataset } from '../eval-datasets';
+import { saveEvalDataset } from '../eval-datasets';
 import { archiveEvaluator, createEvaluator } from '../evaluators';
 import {
   CreateEvalCaseFromAgentRunInputSchema,
@@ -123,11 +123,11 @@ describe('Eval Cases', () => {
     expect((await listEvalCases(STEP, fixture.scope())).cases).toEqual([]);
   });
 
-  it('edits a case as a replacement, so a Dataset frozen with the old one keeps what it ran', async () => {
+  it('edits a case as a replacement, so a Dataset saved with the old one keeps what it ran', async () => {
     const scope = fixture.scope();
     await reviewVerdict(fixture, GRADED_RUN, 1, null);
     const { evalCase: original } = await harvest({ agentRunId: GRADED_RUN });
-    const { dataset } = await freezeEvalDataset(STEP, scope);
+    const { dataset } = await saveEvalDataset(STEP, scope);
 
     const { evalCase: edited } = await updateEvalCase({
       caseId: original.id, expectation: 'negative', comparison: 'agreement', agreementInstructions: 'The grade is what matters.', split: 'holdout',

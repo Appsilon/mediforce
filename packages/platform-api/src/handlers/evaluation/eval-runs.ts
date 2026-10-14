@@ -67,7 +67,7 @@ function defaultBudget(totalUsd: number): number {
 /**
  * What an Eval Run of the input would run (ADR-0023 D4, D5, D10): the Step at
  * its runnable Definition version — or the `definitionVersion` given, unless
- * archived — with its Step Fingerprint, a frozen Dataset version, the Step's
+ * archived — with its Step Fingerprint, a saved Dataset version, the Step's
  * live Evaluator versions with whether each counts, the MCP eval policy the
  * trials will run under, and a cost estimate. Reads only.
  */
@@ -82,7 +82,7 @@ async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, s
     ? (await scope.evaluation.listDatasetVersions(step))[0]
     : await scope.evaluation.getDatasetVersion(input.datasetVersionId);
   if (dataset === undefined || dataset === null) {
-    throw new ValidationError(`Step '${step.stepId}' has no frozen Eval Dataset — freeze its cases first`);
+    throw new ValidationError(`Step '${step.stepId}' has no saved Eval Dataset — save its cases first`);
   }
   if (isSameStep(dataset, step) === false) {
     throw new ValidationError(`Eval Dataset '${dataset.id}' belongs to another step`);
