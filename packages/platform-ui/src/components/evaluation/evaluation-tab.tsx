@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { BookOpen } from 'lucide-react';
 import type { AgentOutputSchema, EvaluatedStep } from '@mediforce/platform-core';
 import { useStepEvaluation, useWorkflowValidation } from '@/hooks/use-step-evaluation';
 import { useWorkflowRunGate } from '@/hooks/use-workflow-access';
@@ -16,6 +17,7 @@ import {
   DriftAlert,
 } from './step-evaluation-sections';
 
+const EVALUATION_GUIDE_URL = 'https://mediforce.ai/docs/evaluate';
 const ASSISTANT_WIDTH_KEY = 'mediforce.evaluation-assistant.width';
 const DEFAULT_ASSISTANT_WIDTH = 380;
 const MIN_ASSISTANT_WIDTH = 320;
@@ -232,6 +234,16 @@ export function EvaluationTab({ handle, workflowName, runnableVersion, mayEdit, 
             </select>
           </label>
         )}
+        <a
+          href={EVALUATION_GUIDE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ml-auto inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+          data-testid="evaluation-guide-link"
+        >
+          <BookOpen className="h-4 w-4" aria-hidden />
+          Step-by-step guide
+        </a>
       </div>
       {selected === undefined ? (
         <p className="text-sm text-muted-foreground">Version {selectedVersion} has no agent steps to evaluate.</p>

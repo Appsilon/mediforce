@@ -48,6 +48,7 @@ test.describe('Step Evaluation tab', () => {
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
     await expect(page.getByText('No Evaluators yet.')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('evaluation-guide-link')).toHaveAttribute('href', 'https://mediforce.ai/docs/evaluate');
     await page.getByRole('button', { name: 'Show the step brief' }).click();
     const briefField = page.getByTestId('evaluation-brief');
     await expect(briefField.getByText(/No Brief yet/)).toBeVisible();

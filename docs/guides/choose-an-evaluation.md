@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-12
+last_reviewed: 2026-10-14
 ---
 
 # Choosing an evaluation
@@ -11,7 +11,10 @@ Which part of Step Evaluation to use, given **what you want to know** and
 full behaviour of each is in
 [`../reference/step-evaluation.md`](../reference/step-evaluation.md), and a
 hands-on walk through the tab is in
-[`step-evaluation-manual-test.md`](step-evaluation-manual-test.md).
+[`step-evaluation-manual-test.md`](step-evaluation-manual-test.md). The
+step-by-step guide for users, linked from the tab, is
+[`website/docs/evaluate/index.md`](../../website/docs/evaluate/index.md)
+(mediforce.ai/docs/evaluate) — change it when the tab's wording changes.
 
 Everything here belongs to **one agent step**: open the workflow's
 **Evaluation** tab and pick the step. Nothing you add there creates a new
