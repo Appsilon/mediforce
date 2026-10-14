@@ -12,6 +12,7 @@ import { VALIDATION_STATUS } from '@/components/evaluation/validation-status';
 import { useWorkflowValidation } from '@/hooks/use-step-evaluation';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
 import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
+import { OriginalDefinitionPanel } from '@/components/workflows/original-definition-panel';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
@@ -226,6 +227,7 @@ export default function WorkflowDefinitionVersionPage() {
     inputForNextRun: _inputForNextRun,
     version: _version,
     createdAt: _createdAt,
+    legacyDefinition: _legacyDefinition,
     ...wdJsonFields
   } = definition;
 
@@ -320,6 +322,19 @@ export default function WorkflowDefinitionVersionPage() {
           </div>
         </div>
       </div>
+
+      {definition.legacyDefinition !== undefined && (
+        <OriginalDefinitionPanel
+          original={{
+            ...wdJsonFields,
+            steps: definition.legacyDefinition.steps,
+            transitions: definition.transitions,
+            ...(definition.legacyDefinition.externalSkillsRepo !== undefined
+              ? { externalSkillsRepo: definition.legacyDefinition.externalSkillsRepo }
+              : {}),
+          }}
+        />
+      )}
 
       {/* Editor canvas — key resets internal state when navigating to a different version */}
       <WorkflowEditorCanvas

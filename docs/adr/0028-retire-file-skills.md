@@ -62,6 +62,13 @@ have named Skills that did not exist there.
    `dockerfile` from it, and its `auth` onto every repo-building step without a
    `repoAuth`, which is what the runtime resolved. The image tag is unchanged.
    The column is dropped.
+   Before rewriting a version, the migration keeps what it looked like in
+   `workflow_definitions.legacy_definition` (`{ steps, externalSkillsRepo? }`,
+   the steps verbatim, `skill` / `skillsDir` included). It is server-managed:
+   no registration or template carries it, and only the migration writes it.
+   The workspace's Workflows problems box names the repository its skills were
+   read from and links the version page, which shows the original definition
+   read-only beside the migrated steps.
 6. **The Step Fingerprint keeps its shape.** The `skill` component no longer
    hashes a file skill. It stays `null` for a step offered no Skills and keeps
    its `step: null` slot otherwise, so no Fingerprint of a step that never had

@@ -29,6 +29,7 @@ export const RegisterWorkflowInputSchema = WorkflowDefinitionBaseSchema.omit({
   version: true,
   createdAt: true,
   namespace: true,
+  legacyDefinition: true,
 });
 
 export const RegistrationWarningSchema = z.object({

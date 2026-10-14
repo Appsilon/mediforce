@@ -510,6 +510,7 @@ function toDefinition(
     source: parseSource(row.source),
     inputForNextRun: row.inputForNextRun ?? undefined,
     artifacts: row.artifacts ?? undefined,
+    legacyDefinition: row.legacyDefinition ?? undefined,
     archived: row.archivedAt !== null ? true : undefined,
     deleted: row.deletedAt !== null ? true : undefined,
     createdAt: row.createdAt !== null ? row.createdAt.toISOString() : undefined,

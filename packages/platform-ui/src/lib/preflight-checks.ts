@@ -269,16 +269,21 @@ export function runPreflightChecks(
     });
   }
 
-  // A version stored before ADR-0028 whose step still names a workflow-file
-  // skill: the run fails on that step rather than running it without its skill.
+  // A step that still names a workflow-file skill fails its run rather than
+  // running without it; the legacy snapshot says where its skills were read from.
+  const legacyRepo = definition.legacyDefinition?.externalSkillsRepo;
+  const originalHref = `${routes.workflowDefinition(options.handle, options.workflowName, definition.version)}?view=original`;
   for (const step of steps) {
     const retired = step.agent?.retiredFileSkill;
     if (retired === undefined) continue;
+    const fromRepo = legacyRepo !== undefined
+      ? ` (this workflow's skills repository was ${legacyRepo.url} at ${legacyRepo.commit.slice(0, 7)})`
+      : '';
     warnings.push({
       category: 'retired-file-skill',
       resource: retired,
       stepNames: [step.name],
-      message: `This step uses the workflow-file skill '${retired}', which no longer runs: import it as a catalog Skill and pick it on the step`,
+      message: `This step uses the workflow-file skill '${retired}'${fromRepo}, which no longer runs: import it as a catalog Skill and pick it on the step`,
       actions: [
         { label: 'Import skills', href: routes.skills(options.handle) },
         {
@@ -287,6 +292,7 @@ export function runPreflightChecks(
             ? `/${options.handle}/workflows/${encodedName}/definitions/${String(options.version)}`
             : `/${options.handle}/workflows/${encodedName}`,
         },
+        ...(definition.legacyDefinition !== undefined ? [{ label: 'View original definition', href: originalHref }] : []),
       ],
     });
   }

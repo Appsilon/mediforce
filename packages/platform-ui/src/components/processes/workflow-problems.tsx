@@ -23,6 +23,13 @@ function secretsHref(warning: WorkflowWarning): string | null {
   return warning.actions.find((action) => action.label === 'Configure in Secrets panel')?.href ?? null;
 }
 
+/** The warning's own actions to show beside its row. */
+function linkedActions(warning: WorkflowWarning): PreflightWarning['actions'] {
+  if (warning.category === 'missing-file') return warning.actions.slice(0, 1);
+  if (warning.category === 'retired-file-skill') return warning.actions;
+  return [];
+}
+
 interface WorkflowProblemsProps {
   handle: string;
   latestDocs: Map<string, WorkflowDefinition>;
@@ -146,14 +153,15 @@ export function WorkflowProblems({ handle, latestDocs, loading }: WorkflowProble
                   View images
                 </Link>
               )}
-              {warning.category === 'missing-file' && warning.actions[0] && (
+              {linkedActions(warning).map((action) => (
                 <Link
-                  href={warning.actions[0].href}
+                  key={action.label}
+                  href={action.href}
                   className="ml-1.5 text-xs text-amber-700 underline hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200"
                 >
-                  {warning.actions[0].label}
+                  {action.label}
                 </Link>
-              )}
+              ))}
               {secretHref !== null && (
                 <Link
                   href={secretHref}

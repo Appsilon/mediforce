@@ -12,10 +12,12 @@
 --    from a repo without `repoAuth` gets the workflow's `auth`. That is exactly
 --    what `resolveBuildSource` and `resolveRepoToken` resolved, so the same
 --    image tag is built from the same source.
--- 3. The `external_skills_repo` column goes.
+-- 3. Before either rewrite, a version it touches keeps what it looked like in
+--    `legacy_definition` ({ steps, externalSkillsRepo? }, the steps verbatim), so
+--    the author can compare it with the migrated steps and see which repo its
+--    skills came from. Nothing in the application writes it afterwards.
+-- 4. The `external_skills_repo` column goes.
 --
--- Idempotent: a rewritten step has no skillsDir, and once the column is gone
--- there is nothing left to copy.
 
 CREATE FUNCTION pg_temp.retire_file_skill(agent jsonb) RETURNS jsonb
 LANGUAGE sql IMMUTABLE AS $$
@@ -74,8 +76,14 @@ BEGIN
 END
 $$;
 
+ALTER TABLE "workflow_definitions" ADD COLUMN IF NOT EXISTS "legacy_definition" jsonb;
+
 UPDATE "workflow_definitions"
-SET "steps" = (
+SET "legacy_definition" = jsonb_build_object('steps', "steps") || CASE
+      WHEN "external_skills_repo" IS NULL THEN '{}'::jsonb
+      ELSE jsonb_build_object('externalSkillsRepo', "external_skills_repo")
+    END,
+  "steps" = (
   SELECT COALESCE(jsonb_agg(
     CASE
       WHEN step ? 'agent' THEN jsonb_set(

@@ -62,6 +62,10 @@ describe.skipIf(skipPg)('migration 0079 — file skills and externalSkillsRepo r
       { id: 'prebuilt', agent: { image: 'mediforce-golden-image', prompt: 'Go.' } },
     ], EXT, [{ path: 'carried/Dockerfile', contents: 'FROM r-base\n' }]);
 
+    await version('untouched', [
+      { id: 'catalog', agent: { prompt: 'Go.', skills: [{ namespace: 'ws-a', id: 'summarize' }] } },
+    ], null);
+
     await sql.unsafe(readFileSync(join(MIGRATIONS_DIR, MIGRATION), 'utf-8'));
   });
 
@@ -100,6 +104,22 @@ describe.skipIf(skipPg)('migration 0079 — file skills and externalSkillsRepo r
     expect(byId.carried?.agent).toEqual({ dockerfile: 'carried/Dockerfile', prompt: 'Go.' });
     expect(byId['carried-spelled']?.agent).toEqual({ dockerfile: '/carried/./sub/../Dockerfile', prompt: 'Go.' });
     expect(byId.prebuilt?.agent).toEqual({ image: 'mediforce-golden-image', prompt: 'Go.' });
+  });
+
+  it('keeps the pre-migration steps and externalSkillsRepo of a version it rewrites', async () => {
+    const legacy = async (name: string) => {
+      const [row] = await sql<{ legacy: { steps: Step[]; externalSkillsRepo?: unknown } | null }[]>`
+        SELECT legacy_definition AS legacy FROM workflow_definitions WHERE name = ${name}
+      `;
+      return row?.legacy;
+    };
+    const fileSkills = await legacy('file-skills');
+    expect(fileSkills?.steps.find((step) => step.id === 'named')?.agent).toEqual(
+      { skill: 'summarize', skillsDir: 'apps/x/skills/', prompt: 'Go.' },
+    );
+    expect(fileSkills).not.toHaveProperty('externalSkillsRepo');
+    expect((await legacy('build-fallback'))?.externalSkillsRepo).toEqual(EXT);
+    expect(await legacy('untouched')).toBeNull();
   });
 
   it('drops the external_skills_repo column', async () => {

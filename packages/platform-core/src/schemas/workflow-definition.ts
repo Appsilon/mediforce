@@ -812,6 +812,24 @@ export const WorkflowArtifactSchema = z.object({
 });
 export type WorkflowArtifact = z.infer<typeof WorkflowArtifactSchema>;
 
+/**
+ * What a version looked like before migration 0079 (ADR-0028) retired file
+ * skills and `externalSkillsRepo`: its steps verbatim (`skill` / `skillsDir`
+ * included) and the repo the definition read skills and build contexts from.
+ * Written once by the migration, read-only afterwards, so the author can see
+ * what to move into the Skill catalog. Steps stay `unknown`: they no longer
+ * parse as {@link WorkflowStepSchema}.
+ */
+export const LegacyDefinitionSchema = z.object({
+  steps: z.array(z.unknown()),
+  externalSkillsRepo: z.object({
+    url: z.string(),
+    commit: z.string(),
+    auth: z.string().optional(),
+  }).optional(),
+});
+export type LegacyDefinition = z.infer<typeof LegacyDefinitionSchema>;
+
 export const WorkflowDefinitionBaseSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
@@ -852,12 +870,14 @@ export const WorkflowDefinitionBaseSchema = z.object({
   /** Files this workflow carries: scripts its steps run, a Dockerfile its image
    *  is built from, skills its agents read. See {@link WorkflowArtifactSchema}. */
   artifacts: z.array(WorkflowArtifactSchema).optional(),
+  /** Server-managed, see {@link LegacyDefinitionSchema}. */
+  legacyDefinition: LegacyDefinitionSchema.optional(),
 });
 
 /**
  * Fields the platform injects or manages at registration — never authored by
  * template files, the design LLM, or `validate` callers. The loader supplies
- * `namespace`; `version` and `createdAt` are assigned server-side. Single
+ * `namespace`; `version` and `createdAt` are assigned server-side (so is `legacyDefinition`, which only a migration writes). Single
  * source for every `.omit()` / strip that drops them, so the three call sites
  * that used to redeclare this set can no longer drift apart.
  */
@@ -865,6 +885,7 @@ export const SERVER_MANAGED_WORKFLOW_FIELDS = {
   namespace: true,
   version: true,
   createdAt: true,
+  legacyDefinition: true,
 } as const;
 
 /**
@@ -942,7 +963,7 @@ export {
  * `.data` or `.error`.
  */
 export function parseWorkflowDefinitionForCreation(input: unknown) {
-  return WorkflowDefinitionBaseSchema.omit({ version: true, createdAt: true })
+  return WorkflowDefinitionBaseSchema.omit({ version: true, createdAt: true, legacyDefinition: true })
     .superRefine((wd, ctx) => {
       validateInputForNextRun(wd, ctx);
       validateSteps(wd, ctx);
