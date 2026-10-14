@@ -143,8 +143,9 @@ functions that sent them, so nothing extra is stored on the Score.
 **A Step Qualification binds a Step Fingerprint.** `_lib/step-fingerprint.ts`
 hashes each part of a step that shapes its behaviour on its own, so the badge
 (`getStepQualification`) can say which part changed. `signStepQualification`
-re-authenticates with the same `users/_lib/check-password.ts` as
-`setPassword`, audits a wrong password, refuses an API key and a cancelled run,
+signs from the session (no password), refuses an API key, a cancelled run and
+a run already signed, takes a justification only when the verdict is overwritten
+(a step's validation is `awaiting_approval` until its run is signed),
 and the record it writes is never changed.
 
 **Assistants share building blocks.** `src/assistant-core/` holds the pieces

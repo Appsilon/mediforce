@@ -38,6 +38,21 @@ function assertPinnedJudgeModel(check: EvaluatorCheck): void {
   }
 }
 
+/** A step has one output-schema check: the step's output either matches its JSON Schema or does not. */
+async function liveSchemaEvaluatorName(scope: CallerScope, step: ReturnType<typeof stepRef>, except?: string): Promise<string | null> {
+  const evaluators = await scope.evaluation.listEvaluators(step);
+  for (const evaluator of evaluators) {
+    if (evaluator.archived || evaluator.id === except) continue;
+    if ((await evaluatorView(scope, evaluator)).latest.check.kind === 'schema') return evaluator.name;
+  }
+  return null;
+}
+
+async function assertSingleSchemaEvaluator(scope: CallerScope, step: ReturnType<typeof stepRef>, except?: string): Promise<void> {
+  const taken = await liveSchemaEvaluatorName(scope, step, except);
+  if (taken !== null) throw new ConflictError(`Step '${step.stepId}' already has an output schema check ('${taken}'); a step has one`);
+}
+
 const NOT_IN_PRODUCTION = 'An expected-output check never runs in production: a production run has no expected output to compare with';
 
 /** An Evaluator starts at version 1. A `schema` check counts at once; the others wait for the trust gate (D9). */
@@ -48,8 +63,15 @@ export async function createEvaluator(
   const step = stepRef(input);
   await loadEvaluatedStep(scope, step, 'edit');
   const existing = await scope.evaluation.listEvaluators(step);
-  if (existing.some((evaluator) => evaluator.name === input.name)) {
-    throw new ConflictError(`Step '${step.stepId}' already has an Evaluator named '${input.name}'`);
+  const sameName = existing.find((evaluator) => evaluator.name === input.name);
+  if (input.check.kind === 'schema') await assertSingleSchemaEvaluator(scope, step);
+  if (sameName !== undefined) {
+    const archivedSchema = sameName.archived && (await evaluatorView(scope, sameName)).latest.check.kind === 'schema';
+    if (input.check.kind !== 'schema' || !archivedSchema) {
+      throw new ConflictError(`Step '${step.stepId}' already has an Evaluator named '${input.name}'`);
+    }
+    await archiveEvaluator({ evaluatorId: sameName.id, archived: false }, scope);
+    return addEvaluatorVersion({ evaluatorId: sameName.id, rule: input.rule, check: input.check, origin: input.origin }, scope);
   }
 
   const now = new Date().toISOString();
@@ -112,6 +134,7 @@ export async function addEvaluatorVersion(
     throw new ValidationError(`Evaluator '${evaluator.name}' is ${latest.check.kind === 'expected_output' ? 'an expected-output check and stays one' : `a ${latest.check.kind} check and cannot become an expected-output check`}`);
   }
   if (input.check !== undefined) assertPinnedJudgeModel(input.check);
+  if (input.check?.kind === 'schema' && latest.check.kind !== 'schema') await assertSingleSchemaEvaluator(scope, stepRef(evaluator), evaluator.id);
   const version = await scope.evaluation.appendEvaluatorVersion(evaluator, {
     evaluatorId: evaluator.id,
     version: latest.version + 1,
@@ -141,6 +164,9 @@ export async function archiveEvaluator(
 ): Promise<EvaluatorOutput> {
   const evaluator = await loadEvaluator(scope, input.evaluatorId);
   await loadEvaluatedStep(scope, stepRef(evaluator), 'edit');
+  if (input.archived === false && (await evaluatorView(scope, evaluator)).latest.check.kind === 'schema') {
+    await assertSingleSchemaEvaluator(scope, stepRef(evaluator), evaluator.id);
+  }
   await scope.evaluation.setEvaluatorArchived(evaluator, input.archived);
   await appendEvaluationAudit(scope, {
     action: input.archived ? 'evaluator.archived' : 'evaluator.restored',

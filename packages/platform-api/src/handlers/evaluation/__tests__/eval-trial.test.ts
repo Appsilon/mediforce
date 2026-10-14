@@ -114,7 +114,7 @@ describe('getEvalTrial (ADR-0023)', () => {
     const { evalRuns } = await listEvalRuns(STEP, scenario.scope);
 
     expect(evalRuns.find((run) => run.id === prepared.id)?.acceptance).toBeNull();
-    expect(evalRuns.find((run) => run.id === evalRunId)?.acceptance).toEqual({ status: 'missed', reason: expect.stringContaining('findings-present: pass rate 50% < 100%') });
+    expect(evalRuns.find((run) => run.id === evalRunId)?.acceptance).toEqual({ status: 'missed', reason: 'findings-present passed 1 of 2 trials (50%, needs 100%)' });
   });
 
   it('does not show a trial of another run, or of another workspace', async () => {

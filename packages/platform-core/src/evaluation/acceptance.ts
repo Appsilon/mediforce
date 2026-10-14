@@ -5,9 +5,13 @@ function percent(value: number): string {
   return `${Math.round(value * 1000) / 10}%`;
 }
 
+function trials(count: number): string {
+  return `${count} trial${count === 1 ? '' : 's'}`;
+}
+
 /** Why an Evaluator has no rate: it graded nothing, or every verdict it gave was left out. */
 function notGraded(evaluator: EvalRunEvaluatorReport): string {
-  if (evaluator.excluded === 0) return `${evaluator.name} graded no trial`;
+  if (evaluator.excluded === 0) return `${evaluator.name} did not grade any trial`;
   const verdicts = evaluator.excluded === 1 ? 'verdict' : 'verdicts';
   return `${evaluator.name} counted no trial: ${evaluator.excluded} ${verdicts} left out — below its minimum confidence, or denied by a person`;
 }
@@ -34,8 +38,8 @@ export function judgeAcceptanceCriteria(
         : evaluator.passHatK === null ? null : evaluator.passHatK >= criteria.minPassHatK;
       const met = passRateMet === false || passHatKMet === false ? false : passRateMet === null || passHatKMet === null ? null : true;
       const misses = [
-        passRateMet === false && `pass rate ${percent(evaluator.passRate!)} < ${percent(criteria.minPassRate)}`,
-        passHatKMet === false && `pass^k ${percent(evaluator.passHatK!)} < ${percent(criteria.minPassHatK!)}`,
+        passRateMet === false && `passed ${evaluator.passes} of ${trials(evaluator.passes + evaluator.failures)} (${percent(evaluator.passRate!)}, needs ${percent(criteria.minPassRate)})`,
+        passHatKMet === false && `passed all trials in ${percent(evaluator.passHatK!)} of cases (needs ${percent(criteria.minPassHatK!)})`,
       ].filter((miss) => miss !== false);
       return {
         line: {
@@ -45,7 +49,7 @@ export function judgeAcceptanceCriteria(
           passHatK: evaluator.passHatK,
           met,
         },
-        explanation: met === false ? `${evaluator.name}: ${misses.join(', ')}` : met === null ? notGraded(evaluator) : null,
+        explanation: met === false ? `${evaluator.name} ${misses.join(' and ')}` : met === null ? notGraded(evaluator) : null,
       };
     });
 
@@ -53,7 +57,7 @@ export function judgeAcceptanceCriteria(
   let reason: string;
   if (lines.length === 0) {
     status = 'not_evaluable';
-    reason = 'No counted Evaluator';
+    reason = 'No Evaluator counts toward the result';
   } else if (lines.some(({ line }) => line.met === false)) {
     status = 'missed';
     reason = lines.filter(({ line }) => line.met === false).map(({ explanation }) => explanation).join('; ');

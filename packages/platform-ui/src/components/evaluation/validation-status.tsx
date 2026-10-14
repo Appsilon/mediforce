@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { CircleCheck, CircleX, Clock, type LucideIcon } from 'lucide-react';
+import { CircleCheck, CircleX, Clock, UserCheck, type LucideIcon } from 'lucide-react';
 import type { StepValidation, WorkflowVersionValidation } from '@mediforce/platform-api/contract';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
@@ -33,6 +33,14 @@ export const VALIDATION_STATUS: Record<ValidationStatus, {
     textClassName: 'text-red-700 dark:text-red-400',
     buttonClassName: 'border-red-600/40 bg-red-600/10 text-red-700 hover:bg-red-600/15 dark:text-red-400',
   },
+  awaiting_approval: {
+    label: 'Waiting for human approval',
+    versionLabel: 'Awaiting approval',
+    symbol: '◔',
+    icon: UserCheck,
+    textClassName: 'text-amber-700 dark:text-amber-300',
+    buttonClassName: 'border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 dark:text-amber-300',
+  },
   not_verified: {
     label: 'Not verified',
     versionLabel: 'Not verified',
@@ -54,13 +62,14 @@ function describeVersionValidation(version: WorkflowVersionValidation): string {
 /**
  * A workflow version's badge: Verified when every agent step passed its
  * Acceptance Criteria in it. Links to the version on the Evaluation tab, on
- * its first failed step, else its first not verified one, else its first.
+ * its first failed step, else its first one awaiting approval, else its first not verified one, else its first.
  * Renders nothing for a version without agent steps.
  */
 export function VersionValidationBadge({ handle, workflowName, version }: { handle: string; workflowName: string; version: WorkflowVersionValidation }) {
   if (version.steps.length === 0) return null;
   const display = VALIDATION_STATUS[version.status];
   const shown = version.steps.find((step) => step.validation.status === 'failed')
+    ?? version.steps.find((step) => step.validation.status === 'awaiting_approval')
     ?? version.steps.find((step) => step.validation.status === 'not_verified')
     ?? version.steps[0]!;
   return (

@@ -24,7 +24,7 @@ export const GET = createRouteAdapter(
 /**
  * POST /api/evaluation/qualification — A person signs a Step Qualification for
  * one variant of a finished Eval Run. Needs the workflow's `edit` verb and a
- * signed-in person; their password where password sign-in is enabled.
+ * signed-in person.
  */
 export const POST = createRouteAdapter(
   SignStepQualificationInputSchema,

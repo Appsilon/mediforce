@@ -9,6 +9,7 @@ import { Bot, ChevronRight, Info, Loader2, X } from 'lucide-react';
 import {
   DEFAULT_ACCEPTANCE_CRITERIA,
   EvalCaseComparisonSchema,
+  EvalCaseExpectationSchema,
   EvalCaseInputSchema,
   EvalCaseLabelSchema,
   EvalCaseSplitSchema,
@@ -32,6 +33,7 @@ import {
   type EvaluatorView,
   type PreparedEvalRun,
   type GetStepQualificationOutput,
+  type StepValidation,
 } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
@@ -46,12 +48,15 @@ import { routes } from '@/lib/routes';
 import { AcceptanceBadge, EvalRunStatusBadge } from './eval-run-badges';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 import { VALIDATION_STATUS } from './validation-status';
+import { VERDICT_CLASSES } from './eval-run-report';
+import { FieldError, describeIssues, invalidClass, parseJson } from './field-errors';
 import {
   CHECK_KINDS,
   CheckDetails,
   CheckEditor,
   checkFromDraft,
   draftFromCheck,
+  type CheckField,
   emptyCheckDraft,
   type CheckDraft,
 } from './evaluator-check-editor';
@@ -83,6 +88,10 @@ export function loadedAgentRuns(evaluation: StepEvaluation): AgentRun[] {
 export function toEvaluatorName(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').slice(0, 63);
 }
+
+/** The one schema check a step has needs no name or description of its own. */
+const OUTPUT_SCHEMA_NAME = 'output-schema';
+const OUTPUT_SCHEMA_RULE = 'The output matches the JSON Schema.';
 
 function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
   step: EvaluatedStep;
@@ -131,7 +140,7 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
             evaluator.trust.trusted ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
           )}>{evaluator.trust.trusted ? 'Counts' : `Not counted — ${evaluator.trust.reason}`}</span>
           {check.kind === 'expected_output' ? (
-            <p className="mt-1.5 text-xs text-muted-foreground">Grades Eval Cases with an expected output only — never production runs.</p>
+            <p className="mt-1.5 text-xs text-muted-foreground">Only checks cases that have an expected output; never runs in production.</p>
           ) : <label className="mt-1.5 flex items-center gap-1.5 text-xs" data-testid="evaluator-production">
             <input
               type="checkbox"
@@ -208,14 +217,25 @@ interface EvaluatorFormValues {
   draft: CheckDraft;
 }
 
-/** Name, the kind of check and its fields. The kind comes from the dropdown, never typed. */
-function EvaluatorForm({ initial, editing = false, stepOutputSchema, submitLabel, pending, error, onSubmit, onCancel }: {
+interface EvaluatorFormProblems {
+  name?: string;
+  rule?: string;
+  check?: { error: string; field?: CheckField };
+}
+
+/**
+ * Name, the kind of check and its fields. The kind comes from the dropdown,
+ * never typed. What blocks a save is said under its field until it is edited.
+ */
+function EvaluatorForm({ initial, editing = false, schemaTaken = false, stepOutputSchema, submitLabel, pending, error, onSubmit, onCancel }: {
   initial: EvaluatorFormValues;
   /**
    * Editing an existing Evaluator: its name and type stay. The name is its
    * stable handle, and its Scores, drift and production series are one kind of check.
    */
   editing?: boolean;
+  /** The step already has its output schema check: another cannot be added. */
+  schemaTaken?: boolean;
   stepOutputSchema: AgentOutputSchema | undefined;
   submitLabel: string;
   pending: boolean;
@@ -224,30 +244,44 @@ function EvaluatorForm({ initial, editing = false, stepOutputSchema, submitLabel
   onCancel: () => void;
 }) {
   const [values, setValues] = React.useState(initial);
-  const [draftError, setDraftError] = React.useState<string | null>(null);
+  const [problems, setProblems] = React.useState<EvaluatorFormProblems>({});
+  const isSchema = values.draft.kind === 'schema';
   const judgeModel = usePinnedDefaultModel();
-  const submit = () => {
-    const result = checkFromDraft(values.draft);
-    if ('error' in result) {
-      setDraftError(result.error);
-      return;
-    }
-    setDraftError(null);
-    onSubmit({ name: values.name.replace(/-+$/, ''), rule: values.rule, check: result.check });
+  const edit = (changes: Partial<EvaluatorFormValues>, cleared: keyof EvaluatorFormProblems) => {
+    setValues((current) => ({ ...current, ...changes }));
+    setProblems((current) => ({ ...current, [cleared]: undefined }));
   };
-  const shownError = draftError ?? error;
+  const submit = () => {
+    const name = isSchema ? (editing ? initial.name : OUTPUT_SCHEMA_NAME) : values.name.replace(/-+$/, '');
+    const rule = isSchema ? (editing ? initial.rule : OUTPUT_SCHEMA_RULE) : values.rule;
+    const result = checkFromDraft(values.draft);
+    const found: EvaluatorFormProblems = {
+      name: name === '' ? 'Give the evaluator a name.' : undefined,
+      rule: rule.trim() === '' ? 'Say in one sentence what it checks.' : undefined,
+      check: 'error' in result ? result : undefined,
+    };
+    setProblems(found);
+    if ('error' in result || found.name !== undefined || found.rule !== undefined) return;
+    onSubmit({ name, rule, check: result.check });
+  };
+  const checkProblem = problems.check;
   return (
     <div className="space-y-2 rounded-md bg-muted/40 p-3" data-testid="evaluator-form">
       <div className="flex gap-2">
-        <input
-          aria-label="Evaluator name"
-          className={cn(inputClass, 'flex-1')}
-          placeholder="Name, e.g. grades-match-ctcae"
-          title="Also names the Scores it writes: lowercase letters, digits and dashes."
-          value={values.name}
-          disabled={editing}
-          onChange={(event) => setValues({ ...values, name: toEvaluatorName(event.target.value) })}
-        />
+        {isSchema ? (
+          <span className="flex-1 self-center text-sm font-medium">{editing ? initial.name : OUTPUT_SCHEMA_NAME}</span>
+        ) : (
+          <input
+            aria-label="Evaluator name"
+            aria-invalid={problems.name !== undefined}
+            className={cn(inputClass, 'flex-1', problems.name !== undefined && invalidClass)}
+            placeholder="Name, e.g. grades-match-ctcae"
+            title="Also names the Scores it writes: lowercase letters, digits and dashes."
+            value={values.name}
+            disabled={editing}
+            onChange={(event) => edit({ name: toEvaluatorName(event.target.value) }, 'name')}
+          />
+        )}
         <select
           aria-label="Type"
           className={inputClass}
@@ -255,18 +289,39 @@ function EvaluatorForm({ initial, editing = false, stepOutputSchema, submitLabel
           disabled={editing}
           onChange={(event) => {
             const kind = EvaluatorKindSchema.parse(event.target.value);
-            setValues({ ...values, draft: emptyCheckDraft(kind, stepOutputSchema, judgeModel) });
+            edit({ draft: emptyCheckDraft(kind, stepOutputSchema, judgeModel) }, 'check');
           }}
         >
-          {EvaluatorKindSchema.options.map((kind) => <option key={kind} value={kind}>{CHECK_KINDS[kind].label}</option>)}
+          {EvaluatorKindSchema.options.map((kind) => (
+            <option key={kind} value={kind} disabled={kind === 'schema' && schemaTaken && editing === false}>{CHECK_KINDS[kind].label}</option>
+          ))}
         </select>
       </div>
+      <FieldError message={problems.name} testId="evaluator-name-error" />
       <p className="text-xs text-muted-foreground">{CHECK_KINDS[values.draft.kind].description}</p>
-      <input aria-label="Rule" className={cn(inputClass, 'w-full')} placeholder="The rule, in plain language" value={values.rule} onChange={(event) => setValues({ ...values, rule: event.target.value })} />
-      <CheckEditor draft={values.draft} onChange={(draft) => setValues({ ...values, draft })} stepOutputSchema={stepOutputSchema} />
-      {shownError !== null && <p className="text-xs text-destructive">{shownError}</p>}
+      {isSchema === false && (
+        <>
+          <input
+            aria-label="Rule"
+            aria-invalid={problems.rule !== undefined}
+            className={cn(inputClass, 'w-full', problems.rule !== undefined && invalidClass)}
+            placeholder="What it checks, e.g. every adverse event has a CTCAE grade"
+            value={values.rule}
+            onChange={(event) => edit({ rule: event.target.value }, 'rule')}
+          />
+          <FieldError message={problems.rule} testId="evaluator-rule-error" />
+        </>
+      )}
+      <CheckEditor
+        draft={values.draft}
+        onChange={(draft) => edit({ draft }, 'check')}
+        stepOutputSchema={stepOutputSchema}
+        error={checkProblem?.field === undefined ? null : { field: checkProblem.field, message: checkProblem.error }}
+      />
+      <FieldError message={checkProblem !== undefined && checkProblem.field === undefined ? checkProblem.error : undefined} />
+      {error !== null && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex gap-2">
-        <button type="button" className={primaryButtonClass} disabled={values.name === '' || values.rule.trim() === '' || pending} onClick={submit}>{submitLabel}</button>
+        <button type="button" className={primaryButtonClass} disabled={pending} onClick={submit}>{submitLabel}</button>
         <button type="button" className={buttonClass} onClick={onCancel}>Cancel</button>
       </div>
     </div>
@@ -286,6 +341,7 @@ export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
     mediforce.evaluation.createEvaluator({ ...step, ...values }));
 
   const evaluators = data.data?.evaluators ?? [];
+  const schemaTaken = evaluators.some((evaluator) => evaluator.latest.check.kind === 'schema');
   return (
     <Section title="Evaluators" action={mayEdit && !adding && <button type="button" className={buttonClass} onClick={() => setAdding(true)}>Add</button>}>
       {data.isLoading ? <Loading /> : evaluators.length === 0 && !adding ? (
@@ -295,7 +351,8 @@ export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
       )}
       {adding && (
         <EvaluatorForm
-          initial={{ name: '', rule: '', draft: emptyCheckDraft('schema', stepOutputSchema) }}
+          initial={{ name: '', rule: '', draft: emptyCheckDraft(schemaTaken ? 'code' : 'schema', stepOutputSchema) }}
+          schemaTaken={schemaTaken}
           stepOutputSchema={stepOutputSchema}
           submitLabel="Create"
           pending={create.isPending}
@@ -351,27 +408,18 @@ export function caseFormValues(evalCase: EvalCase): CaseFormValues {
 
 /** The input text as a case input, or why it is not one. */
 export function parseCaseInput(text: string): { input: EvalCaseInput } | { error: string } {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return { error: 'The input is not valid JSON.' };
-  }
-  const checked = EvalCaseInputSchema.safeParse(parsed);
-  if (checked.success === false) {
-    return { error: `The input does not fit: ${checked.error.issues.map((issue) => `${issue.path.length === 0 ? 'input' : issue.path.join('.')} — ${issue.message}`).join('; ')}` };
-  }
+  const parsed = parseJson(text);
+  if ('error' in parsed) return parsed;
+  const checked = EvalCaseInputSchema.safeParse(parsed.value);
+  if (checked.success === false) return { error: describeIssues(checked.error.issues, parsed.value) };
   return { input: checked.data };
 }
 
 /** The expected output text as JSON — null when left empty — or why it is not JSON. */
 export function parseExpectedOutput(text: string): { expectedOutput: unknown } | { error: string } {
   if (text.trim() === '') return { expectedOutput: null };
-  try {
-    return { expectedOutput: JSON.parse(text) };
-  } catch {
-    return { error: 'The expected output is not valid JSON.' };
-  }
+  const parsed = parseJson(text);
+  return 'error' in parsed ? parsed : { expectedOutput: parsed.value };
 }
 
 /** Which Evaluators grade a case: every one of the step's, or only those ticked. */
@@ -383,7 +431,7 @@ function EvaluatorSelection({ evaluators, value, onChange }: {
   const chosen = new Set(value ?? []);
   return (
     <fieldset className="space-y-1" data-testid="case-evaluators">
-      <legend className="font-medium">Graded by</legend>
+      <legend className="font-medium">Checked by</legend>
       <div className="flex flex-wrap gap-3">
         <label className="flex items-center gap-1">
           <input type="radio" checked={value === null} onChange={() => onChange(null)} />
@@ -391,7 +439,7 @@ function EvaluatorSelection({ evaluators, value, onChange }: {
         </label>
         <label className="flex items-center gap-1">
           <input type="radio" checked={value !== null} disabled={evaluators.length === 0} onChange={() => onChange(evaluators.map((evaluator) => evaluator.id))} />
-          Selected evaluators
+          Only these
         </label>
       </div>
       {value !== null && (
@@ -401,7 +449,7 @@ function EvaluatorSelection({ evaluators, value, onChange }: {
               <label className="flex items-center gap-1">
                 <input
                   type="checkbox"
-                  aria-label={`Graded by ${evaluator.name}`}
+                  aria-label={`Checked by ${evaluator.name}`}
                   checked={chosen.has(evaluator.id)}
                   onChange={(event) => onChange(event.target.checked
                     ? evaluators.filter((candidate) => candidate.id === evaluator.id || chosen.has(candidate.id)).map((candidate) => candidate.id)
@@ -413,7 +461,7 @@ function EvaluatorSelection({ evaluators, value, onChange }: {
           ))}
         </ul>
       )}
-      {value !== null && value.length === 0 && <p className="text-destructive">Tick at least one Evaluator, or let all evaluators grade the case.</p>}
+      {value !== null && value.length === 0 && <p className="text-destructive">Tick at least one evaluator.</p>}
     </fieldset>
   );
 }
@@ -422,10 +470,10 @@ function EvaluatorSelection({ evaluators, value, onChange }: {
 function ExpectedOutputCheckHint({ evaluators, evaluatorIds }: { evaluators: readonly EvaluatorView[]; evaluatorIds: string[] | null }) {
   const checks = evaluators.filter((evaluator) => evaluator.latest.check.kind === 'expected_output');
   if (checks.length === 0) {
-    return <p className="text-amber-700 dark:text-amber-300">The step has no Expected output check yet, so nothing compares this. Add one under Evaluators — it holds the agreement judge&apos;s model.</p>;
+    return <p className="text-amber-700 dark:text-amber-300">Nothing compares this yet — add an Expected output evaluator.</p>;
   }
   if (evaluatorIds !== null && checks.every((evaluator) => evaluatorIds.includes(evaluator.id) === false)) {
-    return <p className="text-amber-700 dark:text-amber-300">No Expected output check grades this case, so its expected output is not compared. Select one under Graded by.</p>;
+    return <p className="text-amber-700 dark:text-amber-300">Nothing compares this — tick an Expected output evaluator under Checked by.</p>;
   }
   return null;
 }
@@ -475,11 +523,18 @@ function SourceRunLog({ agentRunId }: { agentRunId: string }) {
   );
 }
 
+interface FieldErrors {
+  name?: string;
+  input?: string;
+  expectedOutput?: string;
+}
+
 /**
- * Name, the input the step is given beside the output expected of it,
- * whether the case is positive or negative and how it is compared, and which
- * Evaluators grade it. A case from a run marks each side edited or as the run
- * had it, and opens the run's log.
+ * Name, the input the step is given beside the output expected of it, how
+ * that output is compared once there is one, and which Evaluators grade it.
+ * What blocks a save is said under the field it is about, until that field is
+ * edited. A case from a run marks each side edited or as the run had it, and
+ * opens the run's log.
  */
 function CaseForm({ initial, inputHelp, evaluators, sourceAgentRunId, submitLabel, pending, error, onSubmit, onCancel }: {
   initial: CaseFormValues;
@@ -494,22 +549,24 @@ function CaseForm({ initial, inputHelp, evaluators, sourceAgentRunId, submitLabe
   onCancel: () => void;
 }) {
   const [values, setValues] = React.useState(initial);
-  const [formError, setFormError] = React.useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = React.useState<FieldErrors>({});
   const sourceRun = useAgentRunIo(sourceAgentRunId).data;
   const hasExpectedOutput = values.expectedOutput.trim() !== '';
   const outputAsRun = sourceRun !== undefined && holdsJson(values.expectedOutput, sourceRun.result);
+  const edit = (field: keyof FieldErrors, changes: Partial<CaseFormValues>) => {
+    setValues((current) => ({ ...current, ...changes }));
+    setFieldErrors((current) => ({ ...current, [field]: undefined }));
+  };
   const submit = () => {
     const parsed = parseCaseInput(values.input);
-    if ('error' in parsed) {
-      setFormError(parsed.error);
-      return;
-    }
     const expected = parseExpectedOutput(values.expectedOutput);
-    if ('error' in expected) {
-      setFormError(expected.error);
-      return;
-    }
-    setFormError(null);
+    const problems: FieldErrors = {
+      name: values.name.trim() === '' ? 'Give the case a name.' : undefined,
+      input: 'error' in parsed ? parsed.error : undefined,
+      expectedOutput: 'error' in expected ? expected.error : undefined,
+    };
+    setFieldErrors(problems);
+    if ('error' in parsed || 'error' in expected || problems.name !== undefined) return;
     const agreementInstructions = values.agreementInstructions.trim();
     onSubmit({
       name: values.name.trim(),
@@ -522,10 +579,19 @@ function CaseForm({ initial, inputHelp, evaluators, sourceAgentRunId, submitLabe
       evaluatorIds: values.evaluatorIds,
     });
   };
-  const shownError = formError ?? error;
   return (
     <div className="space-y-3 text-xs" data-testid="case-form">
-      <input aria-label="Case name" className={cn(inputClass, 'w-full')} placeholder="Name" value={values.name} onChange={(event) => setValues({ ...values, name: event.target.value })} />
+      <div className="space-y-1">
+        <input
+          aria-label="Case name"
+          aria-invalid={fieldErrors.name !== undefined}
+          className={cn(inputClass, 'w-full', fieldErrors.name !== undefined && invalidClass)}
+          placeholder="Name, e.g. Fatal sepsis graded 4"
+          value={values.name}
+          onChange={(event) => edit('name', { name: event.target.value })}
+        />
+        <FieldError message={fieldErrors.name} testId="case-name-error" />
+      </div>
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-1">
           <div className="flex min-h-6 items-center justify-between gap-2">
@@ -535,91 +601,94 @@ function CaseForm({ initial, inputHelp, evaluators, sourceAgentRunId, submitLabe
                 asRun={holdsJson(values.input, sourceRun.caseInput)}
                 restoreLabel="Use the source run's input"
                 testId="case-input-mark"
-                onRestore={() => setValues((current) => ({ ...current, input: JSON.stringify(sourceRun.caseInput, null, 2) }))}
+                onRestore={() => edit('input', { input: JSON.stringify(sourceRun.caseInput, null, 2) })}
               />
             )}
           </div>
           <div className="text-muted-foreground">{inputHelp}</div>
           <textarea
             aria-label="Case input"
-            className={cn(inputClass, 'w-full min-h-48 font-mono text-xs')}
+            aria-invalid={fieldErrors.input !== undefined}
+            className={cn(inputClass, 'w-full min-h-48 font-mono text-xs', fieldErrors.input !== undefined && invalidClass)}
             spellCheck={false}
             value={values.input}
-            onChange={(event) => setValues({ ...values, input: event.target.value })}
+            onChange={(event) => edit('input', { input: event.target.value })}
           />
+          <FieldError message={fieldErrors.input} testId="case-input-error" />
         </div>
         <div className="space-y-1">
           <div className="flex min-h-6 items-center justify-between gap-2">
-            <span className="font-medium">Expected output</span>
+            <span className="font-medium">Expected output <span className="font-normal text-muted-foreground">(optional)</span></span>
             {sourceRun !== undefined && (
               <SourceRunMark
                 asRun={outputAsRun}
                 restoreLabel="Use the source run's output"
                 testId="case-output-mark"
-                onRestore={() => setValues((current) => ({ ...current, expectedOutput: outputText(sourceRun.result) }))}
+                onRestore={() => edit('expectedOutput', { expectedOutput: outputText(sourceRun.result) })}
               />
             )}
           </div>
-          <div className="text-muted-foreground">
-            The output the step should return, as JSON — or, for a negative case, one it must not return. Leave it empty to let the Evaluators alone grade the case.
-          </div>
+          <div className="text-muted-foreground">What the step should return. Leave empty to rely on the evaluators alone.</div>
           <textarea
             aria-label="Expected output"
-            className={cn(inputClass, 'w-full min-h-48 font-mono text-xs')}
+            aria-invalid={fieldErrors.expectedOutput !== undefined}
+            className={cn(inputClass, 'w-full min-h-48 font-mono text-xs', fieldErrors.expectedOutput !== undefined && invalidClass)}
             spellCheck={false}
             placeholder={'{ "findings": [{ "term": "Sepsis", "grade": 5 }] }'}
             value={values.expectedOutput}
-            onChange={(event) => setValues({ ...values, expectedOutput: event.target.value })}
+            onChange={(event) => edit('expectedOutput', { expectedOutput: event.target.value })}
           />
+          <FieldError message={fieldErrors.expectedOutput} testId="case-expected-output-error" />
           {outputAsRun && hasExpectedOutput && sourceRun.verdictExpectation === null && (
-            <p className="text-amber-700 dark:text-amber-300">Nobody reviewed this run: check its output before keeping it as the expected output.</p>
+            <p className="text-amber-700 dark:text-amber-300">Nobody reviewed this run — check its output before keeping it.</p>
           )}
         </div>
       </div>
       {sourceAgentRunId !== null && <SourceRunLog agentRunId={sourceAgentRunId} />}
-      <div className="space-y-2 rounded border bg-background/60 p-2" data-testid="case-comparison">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="font-medium">This case is</span>
-          {(['positive', 'negative'] as const).map((expectation) => (
-            <label key={expectation} className="flex items-center gap-1">
-              <input type="radio" name="expectation" checked={values.expectation === expectation} onChange={() => setValues({ ...values, expectation })} />
-              {expectation === 'positive' ? 'Positive — the output must match' : 'Negative — the output must not match'}
-            </label>
-          ))}
+      {hasExpectedOutput && (
+        <div className="space-y-2 rounded border bg-background/60 p-2" data-testid="case-comparison">
+          <div className="flex flex-wrap items-center gap-1.5">
+            The output must
+            <select
+              aria-label="Expectation"
+              className={inputClass}
+              value={values.expectation}
+              onChange={(event) => setValues({ ...values, expectation: EvalCaseExpectationSchema.parse(event.target.value) })}
+            >
+              <option value="positive">match it</option>
+              <option value="negative">not match it</option>
+            </select>
+            , compared
+            <select
+              aria-label="Comparison"
+              className={inputClass}
+              value={values.comparison}
+              onChange={(event) => setValues({ ...values, comparison: EvalCaseComparisonSchema.parse(event.target.value) })}
+            >
+              <option value="exact">exactly</option>
+              <option value="agreement">by meaning (a model scores 0–1)</option>
+            </select>
+          </div>
+          {values.comparison === 'agreement' && (
+            <textarea
+              aria-label="Agreement instructions"
+              className={cn(inputClass, 'w-full min-h-16')}
+              placeholder="Optional: what matters here, e.g. narrative wording is trivial; a changed grade is not."
+              value={values.agreementInstructions}
+              onChange={(event) => setValues({ ...values, agreementInstructions: event.target.value })}
+            />
+          )}
+          <ExpectedOutputCheckHint evaluators={evaluators} evaluatorIds={values.evaluatorIds} />
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="font-medium">Compared by</span>
-          <select
-            aria-label="Comparison"
-            className={inputClass}
-            value={values.comparison}
-            onChange={(event) => setValues({ ...values, comparison: EvalCaseComparisonSchema.parse(event.target.value) })}
-          >
-            <option value="exact">Exact match — any difference fails</option>
-            <option value="agreement">Output agreement score — a model scores 0 to 1</option>
-          </select>
-        </div>
-        {values.comparison === 'agreement' && (
-          <textarea
-            aria-label="Agreement instructions"
-            className={cn(inputClass, 'w-full min-h-16')}
-            placeholder="For this case only, e.g.: differences in narrative are trivial; if any grade changes, agreement is low."
-            value={values.agreementInstructions}
-            onChange={(event) => setValues({ ...values, agreementInstructions: event.target.value })}
-          />
-        )}
-        {hasExpectedOutput
-          ? <ExpectedOutputCheckHint evaluators={evaluators} evaluatorIds={values.evaluatorIds} />
-          : <p className="text-muted-foreground">With no expected output there is nothing to compare: only the Evaluators grade the case.</p>}
-      </div>
+      )}
       <EvaluatorSelection evaluators={evaluators} value={values.evaluatorIds} onChange={(evaluatorIds) => setValues({ ...values, evaluatorIds })} />
-      {shownError !== null && <p className="text-destructive">{shownError}</p>}
+      {error !== null && <p className="text-destructive">{error}</p>}
       <div className="flex justify-end gap-2">
         <button type="button" className={buttonClass} onClick={onCancel}>Cancel</button>
         <button
           type="button"
           className={primaryButtonClass}
-          disabled={values.name.trim() === '' || values.evaluatorIds?.length === 0 || pending}
+          disabled={values.evaluatorIds?.length === 0 || pending}
           onClick={submit}
         >{submitLabel}</button>
       </div>
@@ -663,11 +732,11 @@ function CaseExpects({ evalCase }: { evalCase: EvalCase }) {
     <div className="min-w-0" data-testid="eval-case-expected-output">
       <div className="text-muted-foreground">Expected output</div>
       {evalCase.expectedOutput === null ? (
-        <p className="mt-0.5">None — only the Evaluators grade it.</p>
+        <p className="mt-0.5">None — only the evaluators check it.</p>
       ) : (
         <>
           <p className="mt-0.5">
-            {evalCase.expectation === 'positive' ? 'An output that matches' : 'An output that does not match'} this, by {evalCase.comparison === 'exact' ? 'exact match' : 'output agreement score'}
+            The output must {evalCase.expectation === 'positive' ? 'match' : 'not match'} this, {evalCase.comparison === 'exact' ? 'exactly' : 'by meaning'}
           </p>
           <pre className="mt-0.5 max-h-60 overflow-auto rounded bg-muted p-1.5 whitespace-pre-wrap">{JSON.stringify(evalCase.expectedOutput, null, 2)}</pre>
           {evalCase.comparison === 'agreement' && evalCase.agreementInstructions !== null && (
@@ -736,7 +805,7 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSel
     setEditing(false);
     edit.reset();
   };
-  const gradedBy = evalCase.evaluatorIds === null
+  const checkedBy = evalCase.evaluatorIds === null
     ? 'all evaluators'
     : evalCase.evaluatorIds.map((evaluatorId) => evaluators.find((evaluator) => evaluator.id === evaluatorId)?.name ?? evaluatorId.slice(0, 8)).join(', ');
   return (
@@ -757,17 +826,17 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSel
           </InstantTooltip>
         )}
         {unsaved && (
-          <InstantTooltip label="Not in the newest Dataset version, so the next Eval Run does not run it. Save to include it.">
+          <InstantTooltip label="Not in the next Eval Run until you Save.">
             <span className="shrink-0 rounded bg-amber-500/10 px-1.5 text-[11px] text-amber-700 dark:text-amber-300" data-testid="eval-case-unsaved">unsaved</span>
           </InstantTooltip>
         )}
         <span className="ml-auto flex shrink-0 items-center gap-1.5">
           {evalCase.expectedOutput !== null && (
             <span className="text-xs text-muted-foreground" data-testid="eval-case-comparison">
-              {evalCase.comparison === 'exact' ? 'Exact match' : 'Agreement score'} ·
+              {evalCase.comparison === 'exact' ? 'Exact match' : 'By meaning'} ·
             </span>
           )}
-          <InstantTooltip label={`Graded by ${gradedBy}.`}>
+          <InstantTooltip label={`Checked by ${checkedBy}.`}>
             <span className="text-xs text-muted-foreground" data-testid="eval-case-evaluators">
               {evalCase.evaluatorIds === null ? 'All evaluators' : `${evalCase.evaluatorIds.length} selected evaluator${evalCase.evaluatorIds.length === 1 ? '' : 's'}`}
             </span>
@@ -787,19 +856,19 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSel
             </div>
             <CaseExpects evalCase={evalCase} />
           </div>
-          <p><span className="text-muted-foreground">Graded by:</span> {gradedBy}</p>
+          <p><span className="text-muted-foreground">Checked by:</span> {checkedBy}</p>
           {evalCase.sourceAgentRunId !== null && <SourceRunLog agentRunId={evalCase.sourceAgentRunId} />}
         </div>
       </details>
       {editing && (
         <CaseDialog
           title={`Edit ${evalCase.name}`}
-          description="Saving adds the edited case and removes this one: a Dataset version saved with it keeps it, and the next Save takes the edit."
+          description="Earlier Dataset versions keep the original."
           onClose={closeEdit}
         >
           <CaseForm
             initial={caseFormValues(evalCase)}
-            inputHelp={<>What the step is given: the trigger payload and the outputs of the steps before it. Keep its shape; change the values.{evalCase.source === 'production' && ' A production case with an edited input becomes a manual one.'}</>}
+            inputHelp="What the step receives. Change the values, keep the shape."
             evaluators={evaluators}
             sourceAgentRunId={evalCase.source === 'synthesized' ? null : evalCase.sourceAgentRunId}
             submitLabel="Save"
@@ -826,12 +895,9 @@ const caseOption = (caseId: string) => `case:${caseId}`;
  * step it was written for.
  */
 export function caseFromFile(text: string): { values: Partial<CaseFormValues> } | { error: string } {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return { error: 'The file is not valid JSON.' };
-  }
+  const json = parseJson(text);
+  if ('error' in json) return { error: `The file: ${json.error}` };
+  const parsed = json.value;
   const whole = z.object({
     name: z.string().optional(),
     input: EvalCaseInputSchema,
@@ -919,7 +985,7 @@ function AddCase({ step, evaluation, cases, evaluators, onClose }: {
           agreementInstructions: '',
           evaluatorIds: null,
         }}
-        inputHelp="What the run's step was given: the trigger payload and the outputs of the steps before it. Edit it to make a manual case that stays linked to the run."
+        inputHelp="What the step received in this run."
         evaluators={evaluators}
         sourceAgentRunId={run.id}
         submitLabel="Add case"
@@ -944,7 +1010,7 @@ function AddCase({ step, evaluation, cases, evaluators, onClose }: {
           evaluatorIds: null,
           ...fromFile?.values,
         }}
-        inputHelp="What the step is given: the trigger payload, the outputs of the steps before it by step id, and the previous run's carry-over when the workflow has one."
+        inputHelp="What the step receives: the trigger payload and earlier steps' outputs, by step id."
         evaluators={evaluators}
         sourceAgentRunId={null}
         submitLabel="Add case"
@@ -1039,23 +1105,26 @@ export function hasUnsavedCases(cases: readonly EvalCase[], dataset: EvalDataset
   return cases.length > 0 && (dataset === undefined || unfrozen.size > 0 || dropped > 0);
 }
 
+function pluralCases(count: number): string {
+  return `${count} case${count === 1 ? '' : 's'}`;
+}
+
 /**
- * What freezing means and where it stands: an Eval Run runs the newest frozen
- * Dataset version, never the live list, and a version never changes.
+ * Where saving stands: an Eval Run runs the newest saved Dataset version,
+ * never the live list, and a version never changes.
  */
 function DatasetStatus({ cases, datasets }: { cases: readonly EvalCase[]; datasets: readonly EvalDatasetVersion[] }) {
   const [latest] = datasets;
   if (latest === undefined) return null;
   const { unfrozen, dropped } = datasetDrift(cases, latest);
+  const saved = <span className="font-medium">Dataset v{latest.version}</span>;
   return (
     <div className="space-y-1 rounded-md bg-muted/40 p-2 text-xs" data-testid="dataset-status">
       {unfrozen.size === 0 && dropped === 0 ? (
-        <p>The next Eval Run runs <span className="font-medium">Dataset v{latest.version}</span>: all {latest.caseIds.length} live case(s){latest.containsProductionData ? ' — contains production data' : ''}.</p>
+        <p>All saved — the next Eval Run uses {saved} ({pluralCases(latest.caseIds.length)}).{latest.containsProductionData ? ' Contains production data.' : ''}</p>
       ) : (
         <p className="text-amber-700 dark:text-amber-300">
-          The next Eval Run runs <span className="font-medium">Dataset v{latest.version}</span> ({latest.caseIds.length} case(s)), which is behind the list:
-          {unfrozen.size > 0 && ` ${unfrozen.size} case(s) added or edited since are not in it`}{unfrozen.size > 0 && dropped > 0 && ';'}
-          {dropped > 0 && ` it still has ${dropped} case(s) archived or replaced since`}. Save to make v{latest.version + 1}.
+          Unsaved changes: the next Eval Run still uses {saved} ({pluralCases(latest.caseIds.length)}). Save to include them.
         </p>
       )}
       <details>
@@ -1063,7 +1132,7 @@ function DatasetStatus({ cases, datasets }: { cases: readonly EvalCase[]; datase
         <ul className="mt-1 space-y-0.5 text-muted-foreground" data-testid="dataset-versions">
           {datasets.map((dataset) => (
             <li key={dataset.id}>
-              v{dataset.version} · {dataset.createdAt.slice(0, 16).replace('T', ' ')} · {dataset.caseIds.length} case(s) · {dataset.createdBy}{dataset.containsProductionData ? ' · contains production data' : ''}
+              v{dataset.version} · {dataset.createdAt.slice(0, 16).replace('T', ' ')} · {pluralCases(dataset.caseIds.length)} · {dataset.createdBy}{dataset.containsProductionData ? ' · contains production data' : ''}
             </li>
           ))}
         </ul>
@@ -1091,9 +1160,8 @@ function SetCaseEvaluators({ step, cases, evaluators, onDone }: {
   });
   return (
     <div className="space-y-2 rounded-md bg-muted/40 p-3 text-xs" data-testid="set-case-evaluators">
-      <p className="font-medium">Evaluators for the {cases.length} selected case(s)</p>
+      <p className="font-medium">Evaluators for {pluralCases(cases.length)}</p>
       <EvaluatorSelection evaluators={evaluators} value={evaluatorIds} onChange={setEvaluatorIds} />
-      <p className="text-muted-foreground">Each changed case is saved as a new case that replaces it, so Dataset versions saved with the old one keep it.</p>
       {apply.error !== null && <p className="text-destructive">{apply.error.message}</p>}
       <div className="flex gap-2">
         <button
@@ -1132,12 +1200,12 @@ export function CasesSection({ step, evaluation, mayEdit }: {
       action={mayEdit && (
         <div className="flex gap-1.5">
           <button type="button" className={buttonClass} onClick={() => setAdding(true)}>Add case</button>
-          <InstantTooltip label={hasUnsavedChanges ? `Snapshot the ${cases.length} live case(s) as Dataset v${(latest?.version ?? 0) + 1}, which the next Eval Run runs.` : 'No unsaved changes.'}>
+          <InstantTooltip label={hasUnsavedChanges ? `Save as Dataset v${(latest?.version ?? 0) + 1} for the next Eval Run.` : 'No unsaved changes.'}>
             <span className="inline-flex">
               <button type="button" className={primaryButtonClass} disabled={save.isPending || !hasUnsavedChanges} onClick={() => save.mutate(undefined)}>{save.isPending ? 'Saving…' : 'Save'}</button>
             </span>
           </InstantTooltip>
-          <InstantTooltip label="An Eval Run does not run the list below: it runs a Dataset — a numbered snapshot of the live cases taken by Save. A snapshot never changes, so every Eval Run can be read against exactly the cases it ran. Save again after adding, editing or removing cases.">
+          <InstantTooltip label="Eval Runs use the last saved set of cases (a Dataset). Save after any change.">
             <span className="inline-flex items-center text-muted-foreground" aria-label="What Save does" data-testid="eval-cases-save-help">
               <Info className="h-4 w-4" />
             </span>
@@ -1146,12 +1214,12 @@ export function CasesSection({ step, evaluation, mayEdit }: {
       )}
     >
       <p className="text-xs text-muted-foreground" data-testid="eval-cases-purpose">
-        An Eval Case is an <span className="font-medium text-foreground">input</span> an Eval Run re-runs the step on, optionally with the <span className="font-medium text-foreground">output expected</span> of it — or, for a negative case, one it must not return. The Evaluators the case selects grade each re-run&apos;s output; an Expected output check compares it with the expected one.
+        Inputs to re-run the step on, each with the output you expect if you know it.
       </p>
       {adding && (
         <CaseDialog
           title="Add an Eval Case"
-          description="An input an Eval Run re-runs the step on, and optionally the output expected of it. Start from a production run to take both, or write an input production has not sent — one the step must refuse, a record that should trip a rule."
+          description="Start from a production run, or write an input yourself."
           onClose={() => setAdding(false)}
         >
           <AddCase step={step} evaluation={evaluation} cases={cases} evaluators={evaluators} onClose={() => setAdding(false)} />
@@ -1176,7 +1244,7 @@ export function CasesSection({ step, evaluation, mayEdit }: {
         />
       )}
       {evaluation.cases.isLoading ? <Loading /> : cases.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No cases yet. Add one from a production run or by hand, or ask the assistant.</p>
+        <p className="text-sm text-muted-foreground">No cases yet. Add one, or ask the assistant.</p>
       ) : (
         <ul className="space-y-1.5 text-sm">
           {cases.map((evalCase) => (
@@ -1250,12 +1318,12 @@ function describeThreshold(criteria: AcceptanceCriteria): string {
 function QualificationDetails({ status }: { status: GetStepQualificationOutput }) {
   const { qualification } = status;
   if (qualification === null) {
-    return <p className="text-muted-foreground">Not qualified. Run the step, then use <span className="font-medium">Approve step configuration</span> in the run&apos;s report. It is informational: nothing is blocked without one.</p>;
+    return <p className="text-muted-foreground">Not qualified. Run the step, then confirm or overwrite the verdict in the run&apos;s report. It is informational: nothing is blocked without one.</p>;
   }
   return (
     <div className="space-y-1" data-testid="step-qualification">
       <p>
-        Signed by <span className="font-medium">{qualification.signature.signerName}</span> on {qualification.signature.signedAt.slice(0, 16).replace('T', ' ')}
+        Verdict {qualification.decision} by <span className="font-medium">{qualification.signature.signerName}</span> on {qualification.signature.signedAt.slice(0, 16).replace('T', ' ')}
         {' '}— Eval Run <span className="font-mono">{qualification.evalRunId.slice(0, 8)}</span>,
         {' '}fingerprint <span className="font-mono">{qualification.fingerprint.hash.slice(0, 12)}</span>.
       </p>
@@ -1340,6 +1408,23 @@ function ThresholdDialog({ onClose, criteria, onSave, saving, error }: {
   );
 }
 
+const RUN_VERDICT_WORD = { passed: 'passed', missed: 'missed', not_judged: 'not judged' } as const;
+const RUN_VERDICT_CLASS = { passed: VERDICT_CLASSES.met, missed: VERDICT_CLASSES.missed, not_judged: VERDICT_CLASSES.not_evaluable } as const;
+
+/** The validation's reason; for a run waiting for a signature, the word saying how it fared — passed or missed — is coloured. */
+function ValidationReason({ validation }: { validation: StepValidation }) {
+  const { runVerdict, evalRunId, reason } = validation;
+  if (runVerdict === undefined || evalRunId === null) return <>{reason}</>;
+  const lead = `Eval Run ${evalRunId.slice(0, 8)} `;
+  const word = RUN_VERDICT_WORD[runVerdict];
+  if (reason.startsWith(`${lead}${word}`) === false) return <>{reason}</>;
+  return (
+    <>
+      {lead}<span className={cn('rounded px-1.5 py-0.5 font-medium', RUN_VERDICT_CLASS[runVerdict])} data-testid="validation-run-verdict" data-verdict={runVerdict}>{word}</span>{reason.slice(lead.length + word.length)}
+    </>
+  );
+}
+
 /**
  * Whether the step is validated (D10): the newest finished Eval Run of the
  * workflow version, passed or failed on its Acceptance Criteria, not verified
@@ -1364,7 +1449,7 @@ export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEd
     <section className="rounded-lg border p-3 space-y-3" data-testid="acceptance-criteria">
       <div className="flex flex-wrap items-center justify-between gap-2">
         {status === undefined || validation === null ? <Loading /> : (
-          <InstantTooltip label={`${status.validation.reason}${status.validation.runInProgress ? ' An Eval Run is running.' : ''}`}>
+          <InstantTooltip label="Show the step's qualification">
             <button
               type="button"
               className={cn('inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-semibold', validation.buttonClassName)}
@@ -1390,9 +1475,22 @@ export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEd
           </span>
         </InstantTooltip>
       </div>
+      {status !== undefined && (
+        <p className={cn('text-xs', status.validation.status === 'failed' ? validation?.textClassName : 'text-muted-foreground')} data-testid="validation-reason">
+          <ValidationReason validation={status.validation} />{status.validation.runInProgress && ' An Eval Run is running; this updates when it ends.'}
+          {status.validation.status === 'awaiting_approval' && status.validation.evalRunId !== null && (
+            <Link
+              href={routes.workflowEvalRun(step.namespace, step.workflowName, status.validation.evalRunId)}
+              className="ml-2 inline-flex items-center gap-0.5 font-medium text-primary hover:underline"
+              data-testid="review-eval-run"
+            >
+              Review the Eval Run <ChevronRight className="h-3 w-3" aria-hidden />
+            </Link>
+          )}
+        </p>
+      )}
       {showDetails && status !== undefined && (
         <div className="space-y-2 rounded-md bg-muted/40 p-2 text-xs">
-          <p data-testid="validation-reason">{status.validation.reason}{status.validation.runInProgress && ' An Eval Run is running; this updates when it ends.'}</p>
           <QualificationDetails status={status} />
         </div>
       )}

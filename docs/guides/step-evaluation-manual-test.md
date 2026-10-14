@@ -1,7 +1,7 @@
 ---
 status: living
 audience: engineers
-last_reviewed: 2026-10-12
+last_reviewed: 2026-10-14
 ---
 
 # Step Evaluation — manual test guide
@@ -101,9 +101,10 @@ cases come from 13, 15 and 16 — see §4.1.
 
 
 **Checks used throughout** (Evaluators → *Add*: pick the kind, name and rule; the JSON is the
-check as the Details view shows it):
+check as the Details view shows it. The one `schema` check a step may have takes only its JSON
+Schema and is always named `output-schema`):
 
-- **`grading-fields`** · `schema` · *"The result carries a grade, Hy's Law and seriousness"*
+- **`output-schema`** · `schema` · *"The output matches the JSON Schema."* (fixed; the form asks only for the Schema)
   ```json
   {"kind":"schema","schema":{"required":["ctcaeTerm","ctcaeGrade","serious","hysLawCandidate"],"properties":{"ctcaeGrade":{"type":"integer"},"serious":{"type":"boolean"},"hysLawCandidate":{"type":"boolean"}}}}
   ```
@@ -132,7 +133,7 @@ Top to bottom, left column; the **Evaluation Assistant** is the right-hand panel
 | Section | What it is for |
 |---|---|
 | Drift banner | Amber warning when production quality drops (only shown while an Evaluator drifts) |
-| Validation status | **Validation passed** / **failed** / **Not verified**, read from the newest finished Eval Run; click for the signed Step Qualification |
+| Validation status | **Validation passed** / **failed** / **Waiting for human approval** / **Not verified**, read from the newest finished Eval Run and its sign-off; click for the signed Step Qualification |
 | Set the threshold | The Acceptance Criteria floor, one slider |
 | Evaluators | The checks that grade an output (schema / code / LLM judge / expected output) |
 | Eval Cases | Test inputs, frozen into numbered Datasets |
@@ -143,7 +144,7 @@ The Evaluation Brief is behind the file icon in the assistant's header. The natu
 the order below.
 
 **Permissions (test once for the whole tab).** 🔍 As the **view-only** user: no *Add / Edit /
-Approve source / Save / Set the threshold / Start / Approve step configuration* controls; assistant
+Approve source / Save / Set the threshold / Start / Confirm that evaluation passed·failed / Overwrite the evaluation verdict* controls; assistant
 card *Accept* buttons are disabled with a tooltip.
 
 ---
@@ -206,7 +207,7 @@ every output goes back to the assistant instead of to you.
 - *"Refine the <name> evaluator"* → ✅ **Proposed Evaluator version** card; accepting bumps to v2.
 - 🔍 As a user without the `run` verb: the card says the check was not tried.
 
-> 🧪 Add the four checks above: `grading-fields` → *Counts*; approve the source of the two code
+> 🧪 Add the four checks above: `output-schema` → *Counts*; approve the source of the two code
 > checks → *Counts*; `grade-justified` → *Counts*. Ask the assistant for a rule such as *"no
 > patient name, MRN or date of birth in the output"* → expect a `code` check (a judge only when a
 > script cannot decide it), previewed on sample 08's run.
@@ -227,9 +228,9 @@ numbered Dataset; an Eval Run uses exactly that version.
 - **Synthesized cases** — assistant: *"Synthesize a harder case from a recent run"* (changes the
   input or a workspace file of a real run), or **CLI** `mediforce eval case-perturb --file`.
 
-The form also sets how the case is compared and which Evaluators grade it (**All evaluators** or
-**Selected evaluators**). **Edit** replaces a case with a new one; **Archive** takes it out of
-the next freeze. Ticking cases and **Set evaluators…** sets them in bulk.
+With an expected output, the form also sets whether the output must match it and how it is
+compared; **Checked by** picks **All evaluators** or **Only these**. **Edit** replaces a case
+with a new one; **Archive** takes it out of the next freeze. Ticking cases and **Set evaluators…** sets them in bulk.
 
 **Test**
 - ✅ Cases show their labels (positive/negative, split, source) and *as run* / *edited*.
@@ -238,6 +239,8 @@ the next freeze. Ticking cases and **Set evaluators…** sets them in bulk.
   next run is behind the list; **Save** is disabled while the newest version has every live case.
 - 🔍 Reload or leave the page while cases are unsaved → asked to confirm.
 - 🔍 A case whose expected output no `expected_output` Evaluator grades says so.
+- ✅ Saving a case with no name, broken JSON (says the line) or an input missing
+  `previousStepOutputs` shows the reason under that field; editing the field clears it.
 
 > 🧪 Add the runs of 01–12 and 14 as positive cases, 13, 15 and 16 as negative (§4.1). Synthetic:
 > *"Make a harder variant of sample 02 where the labs file shows ALT at 25× ULN but the narrative
@@ -268,7 +271,7 @@ never reviewed, gives no expected output — choose the expectation yourself
 | 10 bilirubin in µmol/L | Converted units; Hy's Law false | no — correct | `hys-law-consistent` |
 | 11 ALT exactly 5.0× ULN | G2 | no — correct | — |
 | 12 cholestatic | Hy's Law false (ALP ≥ 2×) | no — correct | `hys-law-consistent` |
-| 13 serious but grade 2 | Correct fields, but written as prose, not JSON → `output_schema` fallback, sent to review | **yes** | `grading-fields` (schema) |
+| 13 serious but grade 2 | Correct fields, but written as prose, not JSON → `output_schema` fallback, sent to review | **yes** | `output-schema` (schema) |
 | 14 afebrile neutropenia | Neutrophil count decreased G4 | no — correct | — |
 | 15 term not in reference | Myocarditis **G3 "from standard criteria"**, and **filed a real safety report**; JSON inside a markdown fence | **yes** | schema; `grade-justified`; a new check "grade only terms returned by `lookup_ctcae_term`" |
 | 16 no adverse event | `ctcaeTerm: "None"` with **`ctcaeGrade: 1`** | **yes** (negative) | new code check: `ctcaeTerm` must not be `None`/empty |
@@ -282,7 +285,7 @@ investigator's description."* to the prompt, or switch to a tiny model. Run 07 a
 default.
 
 > 🧪 Run 13, 15 and 16 and add each as a negative case. ✅ In the Eval Run report,
-> `grading-fields` fails on 13 and 15 whenever Gemma repeats the formatting slip, and the new
+> `output-schema` fails on 13 and 15 whenever Gemma repeats the formatting slip, and the new
 > "term must exist" / "no None term" checks fail on 15 and 16. That gives your first real failure
 > rates for §6.
 
@@ -362,7 +365,7 @@ Open a run with **Details**: **Summary**, **Trials**, **Evaluators**, **Model ve
   (agent confidence against pass rate in five bins, and expected calibration error), the routing
   recommendation and the MCP line.
 
-> 🧪 9 cases × 2 trials ≈ **$0.20–0.30**. ✅ `grading-fields` ≈ 100%; `hys-law-consistent` high;
+> 🧪 9 cases × 2 trials ≈ **$0.20–0.30**. ✅ `output-schema` ≈ 100%; `hys-law-consistent` high;
 > `safety-report-consistent` fails where 03/05 lack a report or a non-serious case got one. Flaky
 > > 0 on 06/07 is normal. Gemma reports high confidence on everything → check the calibration
 > numbers in the CLI report.
@@ -387,35 +390,38 @@ acceptance criteria"*, or *Use as Acceptance Criteria* on a plan card.
 
 ## 8. Step Qualification and validation
 
-**What.** **Validation** is automatic: the status at the top of the tab comes from the newest
-finished Eval Run of the version. **Passed** when that run met its criteria, **Failed** when it
-missed them or they could not be judged, **Not verified** when no run has finished or something
-the run rested on changed (Fingerprint, an Evaluator, the live cases, the criteria).
+**What.** **Validation** is the status at the top of the tab. It comes from the newest finished
+Eval Run of the version and a person's sign-off on it. **Not verified** when no run has finished or
+something the run rested on changed (Fingerprint, an Evaluator, the live cases, the criteria);
+**Waiting for human approval** once a run finished and nobody signed it (with a link to the run, and *Eval Run xxxx passed* / *missed* — green / red — in the reason);
+then **Passed** or **Failed** as the person confirms or overwrites the criteria's verdict.
 
 A **Step Qualification** is a person's signature, from a finished (not cancelled) Eval Run with
 criteria frozen into it, that this configuration — identified by its Step Fingerprint — is fit for
-use. It needs the `edit` verb and re-entering the password (21 CFR Part 11 style) and, when the
-run missed its criteria or they could not be judged, a justification recorded as a deviation. If
-the step changes later the badge turns **Stale** and names what changed.
+use. It needs the `edit` verb and a signed-in person (no password is asked). Overwriting the
+verdict needs a justification, recorded as a deviation; confirming takes none. If the step changes
+later the badge turns **Stale** and names what changed. A confirmed failure qualifies nothing.
 
-**How.** In a finished report, **Approve step configuration** (web only; an API key cannot sign).
+**How.** In a finished report, **Confirm that evaluation passed** / **failed**, or **Overwrite the evaluation verdict** (web only; an API key cannot sign).
 
 **Test**
-- ✅ A justification box appears when the run missed or could not judge its criteria; a
-  justification for met criteria is refused.
-- ✅ Wrong password → refused (audited as `step_qualification.signature_refused`).
+- ✅ Both buttons show; the confirm one names the criteria's verdict (*passed* / *failed*). A
+  justification box appears only when overwriting, and Sign stays disabled until it is filled.
+- ✅ Confirming a missed run → **Validation failed**, badge stays **Not qualified**; overwriting it →
+  **Validation passed** and **Qualified**. A run can be signed once.
+- ✅ The form asks for no password; the signature is recorded as made from the session.
 - ✅ After signing, clicking the validation status shows the qualification: signer, fingerprint,
   Evaluator versions, criteria and verdict, deviations, MCP policy.
 - ✅ The badge also appears on the agent step in a normal workflow run view.
 - ✅ Change the step's model/prompt → **Stale** — "The step changed since: model". Change it back →
   **Qualified** again. Changing only routing (autonomy / review) keeps it **Qualified**.
-- ✅ Signing does not change validation, and neither blocks anything.
-- ✅ Definitions tab: each version carries **Verified**, **Failed** or **Not verified**; the
+- ✅ Before signing, validation reads **Waiting for human approval**; nothing is blocked either way.
+- ✅ Definitions tab: each version carries **Verified**, **Failed**, **Awaiting approval** or **Not verified**; the
   workflow editor shows each agent step's validation icon for the saved step.
 - 🔍 No sign control for a running or cancelled run, or a run without criteria.
 - 🔍 Assistant *"sign the qualification for me"* → it can't.
 
-> 🧪 Sign with a justification. Switch the step model to `anthropic/claude-haiku-4.5` → *Stale —
+> 🧪 Overwrite with a justification. Switch the step model to `anthropic/claude-haiku-4.5` → *Stale —
 > changed: model*; back to `google/gemma-4-31b-it` → *Qualified*. Autonomy L3 → L4 → still *Qualified*.
 
 ## 9. Evaluation Assistant — diagnosis and routing
