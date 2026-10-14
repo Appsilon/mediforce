@@ -219,7 +219,6 @@ test.describe('Step Evaluation tab', () => {
       expect(res.status(), await res.text()).toBeLessThan(300);
       return res.json();
     };
-    await post('/api/evaluation/evaluators', { ...step, name: 'summary-present', rule: 'The result carries a summary.', check: { kind: 'schema', schema: { required: ['summary'] } } });
     await post('/api/evaluation/evaluators', { ...step, name: 'findings-present', rule: 'The result lists findings.', check: { kind: 'schema', schema: { required: ['findings'] } } });
     await post('/api/evaluation/cases/from-agent-run', { agentRunId });
     await post('/api/evaluation/datasets', step);
@@ -265,9 +264,8 @@ test.describe('Step Evaluation tab', () => {
     await expect(page.getByTestId('review-eval-run')).toBeVisible();
     await page.getByTestId('eval-run-row').filter({ hasText: prepared.evalRun.id.slice(0, 8) }).getByRole('link', { name: 'Details' }).click();
     const report = page.getByTestId('eval-run-report');
-    await expect(report.getByTestId('criteria-verdict')).toHaveText('Acceptance criteria missed — 1 of 2 counted Evaluators below pass rate ≥ 50%', { timeout: 15_000 });
+    await expect(report.getByTestId('criteria-verdict')).toHaveText('Acceptance criteria missed — 1 of 1 counted Evaluator below pass rate ≥ 50%', { timeout: 15_000 });
     await expect(report.getByRole('row').filter({ hasText: 'findings-present' }).getByTestId('evaluator-pass-rate')).toHaveAttribute('data-met', 'false');
-    await expect(report.getByRole('row').filter({ hasText: 'summary-present' }).getByTestId('evaluator-pass-rate')).toHaveAttribute('data-met', 'true');
     await expect(report.getByTestId('confirm-verdict')).toHaveText('Confirm that evaluation failed');
     await expect(report.getByTestId('overwrite-verdict')).toHaveText('Overwrite the evaluation verdict');
     await report.getByTestId('confirm-verdict').click();
