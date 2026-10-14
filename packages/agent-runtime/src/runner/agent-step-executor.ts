@@ -1,6 +1,7 @@
 import {
   calculateEstimatedCost,
   offeredSkill,
+  resolveInstanceAssignee,
   type AgentFallbackReason,
   type AgentOutputEnvelope,
 } from '@mediforce/platform-core';
@@ -22,7 +23,7 @@ export class AgentStepExecutor implements StepExecutor {
     services: StepExecutorServices,
     meta: StepExecutorMeta,
   ): Promise<StepExecutionResult> {
-    const { auditRepo, instanceRepo, engine, humanTaskRepo, modelRegistryRepo } = services;
+    const { auditRepo, instanceRepo, engine, humanTaskRepo, modelRegistryRepo, userDirectory } = services;
     const { instanceId, stepId, pluginId, triggeredBy, stepExecutionId, definitionVersion } = meta;
     const autonomyLevel = context.autonomyLevel;
     const workflowStep = context.step;
@@ -179,13 +180,22 @@ export class AgentStepExecutor implements StepExecutor {
       const priorReviewExecutions = (await instanceRepo.getStepExecutions(instanceId))
         .filter((e) => e.stepId === stepId).length;
 
+      let assignedUserId: string | null = null;
+      let unresolvedAssignee: string | null = null;
+      if (workflowStep.assignedTo) {
+        const instance = await instanceRepo.getById(instanceId);
+        const assignee = await resolveInstanceAssignee(workflowStep.assignedTo, instance, userDirectory);
+        assignedUserId = assignee?.userId ?? null;
+        unresolvedAssignee = assignee?.unresolved ?? null;
+      }
+
       await humanTaskRepo.create({
         id: reviewTaskId,
         processInstanceId: instanceId,
         stepId,
         assignedRole,
-        assignedUserId: null,
-        status: 'pending',
+        assignedUserId,
+        status: assignedUserId === null ? 'pending' : 'claimed',
         deadline: null,
         createdAt: reviewTaskNow,
         updatedAt: reviewTaskNow,
@@ -227,6 +237,25 @@ export class AgentStepExecutor implements StepExecutor {
         executorType: 'agent',
         reviewerType: 'human',
       });
+
+      if (unresolvedAssignee !== null) {
+        await auditRepo.append({
+          actorId: `agent:${pluginId}`,
+          actorType: 'agent',
+          actorRole: autonomyLevel,
+          action: 'task.assignee_unresolved',
+          description: `Step '${stepId}' is assigned to '${unresolvedAssignee}', which matches no user in this workspace — the review task was left unassigned so anyone holding the step's role can claim it`,
+          timestamp: reviewTaskNow,
+          inputSnapshot: { taskId: reviewTaskId, stepId, assignedTo: unresolvedAssignee },
+          outputSnapshot: { assignedUserId: null, status: 'pending' },
+          basis: 'L3 review: assignedTo resolved to no user',
+          entityType: 'humanTask',
+          entityId: reviewTaskId,
+          processInstanceId: instanceId,
+          stepId,
+          processDefinitionVersion: definitionVersion,
+        });
+      }
 
       await instanceRepo.update(instanceId, {
         status: 'paused',

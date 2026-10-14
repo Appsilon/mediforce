@@ -19,7 +19,7 @@ import type {
   ProcessNotificationConfig,
 } from '@mediforce/platform-core';
 import type { AgentFallbackReason, Selection, TaskVerdict } from '@mediforce/platform-core';
-import { normalizeSelection, buildTaskVerdicts, interpolate, toProcessDefinition, resolveStepAssignee } from '@mediforce/platform-core';
+import { normalizeSelection, buildTaskVerdicts, toProcessDefinition, resolveInstanceAssignee } from '@mediforce/platform-core';
 import { validateStepGraph } from '@mediforce/platform-core';
 import { StepExecutor, type StepActor } from './step-executor';
 import { RoutingError, InvalidTransitionError, ParentInstanceNotFoundError } from './errors';
@@ -273,20 +273,11 @@ export class WorkflowEngine {
           let preAssignedEmail: string | null = null;
           let unresolvedAssignee: string | null = null;
           if (nextStep.assignedTo) {
-            const resolved = interpolate(nextStep.assignedTo, {
-              triggerPayload: (updatedInstance.triggerPayload as Record<string, unknown>) ?? {},
-              triggerContext: (updatedInstance.triggerContext as Record<string, unknown>) ?? {},
-              steps: updatedInstance.variables,
-              variables: updatedInstance.variables,
-              secrets: {},
-            });
-            if (typeof resolved === 'string' && resolved.length > 0) {
-              // An address that resolves to nobody is not an assignee.
-              const assignee = await resolveStepAssignee(resolved, this.userDirectoryService);
-              preAssignedUserId = assignee.userId;
-              preAssignedEmail = assignee.email;
-              unresolvedAssignee = assignee.unresolved;
-            }
+            // An address that resolves to nobody is not an assignee.
+            const assignee = await resolveInstanceAssignee(nextStep.assignedTo, updatedInstance, this.userDirectoryService);
+            preAssignedUserId = assignee?.userId ?? null;
+            preAssignedEmail = assignee?.email ?? null;
+            unresolvedAssignee = assignee?.unresolved ?? null;
           }
           // The creator fallback puts a run's own tasks in the starter's inbox,
           // which is the right default for a step that named nobody. It is the

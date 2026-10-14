@@ -974,6 +974,55 @@ describe('StepEditor', () => {
     expect(screen.getByText('Allowed Roles')).toBeInTheDocument();
   });
 
+  it('[RENDER] Human Review agent step shows allowedRoles and assignedTo; Assist and Autonomous do not', () => {
+    const { rerender } = render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', autonomyLevel: 'L3' })}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+    expandCard('Advanced');
+    expect(screen.getByText('Allowed Roles')).toBeInTheDocument();
+    expect(screen.getByLabelText('Assign this task to')).toBeInTheDocument();
+
+    for (const autonomyLevel of ['L2', 'L4'] as const) {
+      rerender(
+        <StepEditor
+          step={buildStep({ executor: 'agent', autonomyLevel })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+      expect(screen.queryByText('Allowed Roles')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Assign this task to')).not.toBeInTheDocument();
+    }
+  });
+
+  it('[ACTION] leaving Human Review clears allowedRoles and assignedTo; entering it clears nothing', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', autonomyLevel: 'L3', allowedRoles: ['reviewer'], assignedTo: 'filip' })}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+    expandCard('Prompt & model');
+    fireEvent.click(screen.getByRole('button', { name: 'Autonomous' }));
+    expect(onChange).toHaveBeenLastCalledWith({ autonomyLevel: 'L4', allowedRoles: undefined, assignedTo: undefined });
+
+    rerender(
+      <StepEditor
+        step={buildStep({ executor: 'agent', autonomyLevel: 'L4' })}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Human Review' }));
+    expect(onChange).toHaveBeenLastCalledWith({ autonomyLevel: 'L3' });
+  });
+
   it('[RENDER] no placeholder text on regular inputs', () => {
     render(
       <StepEditor
