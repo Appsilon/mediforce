@@ -974,6 +974,31 @@ describe('StepEditor', () => {
     expect(screen.getByText('Allowed Roles')).toBeInTheDocument();
   });
 
+  it('[RENDER] Human Review agent step shows allowedRoles and assignedTo; Assist and Autonomous do not', () => {
+    const { rerender } = render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', autonomyLevel: 'L3' })}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+    expandCard('Advanced');
+    expect(screen.getByText('Allowed Roles')).toBeInTheDocument();
+    expect(screen.getByLabelText('Assign this task to')).toBeInTheDocument();
+
+    for (const autonomyLevel of ['L2', 'L4'] as const) {
+      rerender(
+        <StepEditor
+          step={buildStep({ executor: 'agent', autonomyLevel })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+      expect(screen.queryByText('Allowed Roles')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Assign this task to')).not.toBeInTheDocument();
+    }
+  });
+
   it('[RENDER] no placeholder text on regular inputs', () => {
     render(
       <StepEditor

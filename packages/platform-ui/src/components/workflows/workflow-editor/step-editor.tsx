@@ -78,7 +78,7 @@ export function buildExecutorChangePatch(step: WorkflowStep, targetExecutor: Wor
       : undefined;
     const agent = step.agent ?? (Object.keys(carriedFromScript ?? {}).length > 0 ? carriedFromScript as WorkflowStep['agent'] : undefined);
     return {
-      ...base, allowedRoles: undefined, cowork: undefined, script: undefined, databricks: undefined,
+      ...base, cowork: undefined, script: undefined, databricks: undefined,
       plugin: step.plugin === 'script-container' || step.plugin === 'databricks-job' ? 'opencode-agent' : step.plugin ?? 'opencode-agent',
       agent,
     };
@@ -89,13 +89,13 @@ export function buildExecutorChangePatch(step: WorkflowStep, targetExecutor: Wor
       : undefined;
     const script = step.script ?? (Object.keys(carriedFromAgent ?? {}).length > 0 ? carriedFromAgent as WorkflowStep['script'] : undefined);
     return {
-      ...base, allowedRoles: undefined, autonomyLevel: undefined, cowork: undefined, agent: undefined,
+      ...base, allowedRoles: undefined, assignedTo: undefined, autonomyLevel: undefined, cowork: undefined, agent: undefined,
       plugin: step.plugin ?? 'script-container',
       script,
     };
   }
   return {
-    ...base, plugin: undefined, autonomyLevel: undefined, allowedRoles: undefined,
+    ...base, plugin: undefined, autonomyLevel: undefined, allowedRoles: undefined, assignedTo: undefined,
     agent: undefined, script: undefined, databricks: undefined, cowork: step.cowork ?? { agent: 'chat' },
   };
 }
@@ -155,7 +155,7 @@ const TIP = {
   databricksPollIntervalMs:'How often to poll the run state, in milliseconds. Default 10000.',
 
   allowedRoles:            'Roles that can claim and complete this task. Enforced: a member holding none of them is refused, and a role nobody holds on this workflow makes the step unclaimable. Pick from the roles this workspace already knows, or type a new one. Leave empty to allow any workspace member.',
-  assignedTo:              'Pre-assign this human task to a specific user. Pick a workspace member, or type an interpolated value like ${triggerPayload.userId} to assign per run. Human steps only.',
+  assignedTo:              'Pre-assign this human task to a specific user. Pick a workspace member, or type an interpolated value like ${triggerPayload.userId} to assign per run. Human steps and Human Review agent steps only.',
   continueOnError:         'When on, a failure of this step is logged as a warning and the workflow advances anyway instead of failing the whole run. Use for non-critical side-effects (e.g. a notification), never for a step later steps depend on.',
 
   reviewType:              'Who performs the review: human (creates a task), agent (auto-evaluates), or none (skips review).',
@@ -317,6 +317,7 @@ export function StepEditor({
   const isCowork = step.executor === 'cowork';
   const isAction = step.executor === 'action';
   const isReview = step.type === 'review';
+  const hasHumanReviewer = isHuman || (isAgent && (step.autonomyLevel ?? 'L3') === 'L3');
   const isDecision = step.type === 'decision';
   const hasVerdicts = isReview || isDecision;
   const isTerminal = step.type === 'terminal';
@@ -364,7 +365,7 @@ export function StepEditor({
   // a grant narrowed to another workflow does not let its holder claim this
   // task, so it must not silence the unheld-role warning (#1252).
   const { roles: workspaceRoles, heldRoles } = useWorkspaceRoles(handle, {
-    enabled: isHuman,
+    enabled: hasHumanReviewer,
     workflowName,
   });
   const { members } = useNamespaceMembers(handle);
@@ -1524,7 +1525,7 @@ export function StepEditor({
       </FieldGroup>
 
       {/* ── Human roles ──────────────────────────────────────────── */}
-      {isHuman && (
+      {hasHumanReviewer && (
         <FieldGroup>
           <FieldRow label="allowedRoles" tooltip={TIP.allowedRoles}>
             <AllowedRolesField

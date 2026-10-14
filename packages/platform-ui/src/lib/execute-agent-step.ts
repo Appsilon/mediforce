@@ -86,6 +86,7 @@ export async function executeAgentStep(
     modelRegistryRepo,
     evaluationRepo,
     skillRepo,
+    userDirectory,
   } = getPlatformServices();
   // The runtime reads every Skill; which ones an agent may reach is
   // resolveSkillsForStep's rule (ADR-0025 decision 3).
@@ -275,6 +276,7 @@ export async function executeAgentStep(
     engine,
     humanTaskRepo,
     modelRegistryRepo,
+    userDirectory,
   };
 
   const meta = {

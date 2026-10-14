@@ -272,6 +272,58 @@ describe('AgentStepExecutor', () => {
     );
   });
 
+  describe('L3 review task assignee', () => {
+    const l3Step: WorkflowStep = {
+      ...agentStep,
+      autonomyLevel: 'L3',
+      allowedRoles: ['reviewer'],
+      assignedTo: '${triggerPayload.reviewerId}',
+    };
+    const l3Context = makeContext({ autonomyLevel: 'L3', step: l3Step });
+    const resolveUser = vi.fn();
+
+    beforeEach(() => {
+      mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+        status: 'paused',
+        envelope: defaultEnvelope,
+        appliedToWorkflow: false,
+        fallbackReason: null,
+      });
+      mockInstanceRepo.getById.mockResolvedValue({
+        status: 'running',
+        currentStepId: 'analyze-data',
+        definitionVersion: '1',
+        variables: {},
+        triggerPayload: { reviewerId: 'user-42' },
+        triggerContext: {},
+      });
+    });
+
+    it('pins the review task to the interpolated assignee and claims it', async () => {
+      resolveUser.mockResolvedValue({ uid: 'user-42', email: 'rev@acme.test' });
+
+      await executor.execute(mockPlugin, l3Context, { ...services, userDirectory: { resolveUser } }, meta);
+
+      expect(resolveUser).toHaveBeenCalledWith('user-42');
+      expect(mockHumanTaskRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ assignedRole: 'reviewer', assignedUserId: 'user-42', status: 'claimed' }),
+      );
+    });
+
+    it('leaves the task pending for the role and audits it when the assignee matches nobody', async () => {
+      resolveUser.mockResolvedValue(null);
+
+      await executor.execute(mockPlugin, l3Context, { ...services, userDirectory: { resolveUser } }, meta);
+
+      expect(mockHumanTaskRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ assignedRole: 'reviewer', assignedUserId: null, status: 'pending' }),
+      );
+      expect(mockAuditRepo.append).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'task.assignee_unresolved' }),
+      );
+    });
+  });
+
   it('persists step execution on completion', async () => {
     mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
       status: 'completed',

@@ -1,4 +1,4 @@
-import type { StepOutputEnvelope, AgentOutputEnvelope, AgentFallbackReason } from '@mediforce/platform-core';
+import type { StepOutputEnvelope, AgentOutputEnvelope, AgentFallbackReason, UserDirectoryService } from '@mediforce/platform-core';
 import type { StepExecutorPlugin, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
 
 export type StepExecutionStatus = 'completed' | 'paused' | 'escalated' | 'failed';
@@ -24,6 +24,8 @@ export interface StepExecutorServices {
   engine: StepExecutorEngine;
   humanTaskRepo: StepExecutorHumanTaskRepo;
   modelRegistryRepo: StepExecutorModelRegistryRepo;
+  /** Resolves a step's `assignedTo` to a user. Absent: the value names nobody. */
+  userDirectory?: Pick<UserDirectoryService, 'resolveUser'>;
 }
 
 export interface StepExecutorAuditRepo {
@@ -31,7 +33,7 @@ export interface StepExecutorAuditRepo {
 }
 
 export interface StepExecutorInstanceRepo {
-  getById(id: string): Promise<{ status: string; currentStepId: string | null; definitionVersion: string; variables: Record<string, unknown>; totalCostUsd?: number; evalRunId?: string } | null>;
+  getById(id: string): Promise<{ status: string; currentStepId: string | null; definitionVersion: string; variables: Record<string, unknown>; triggerPayload?: unknown; triggerContext?: unknown; totalCostUsd?: number; evalRunId?: string } | null>;
   update(id: string, data: Record<string, unknown>): Promise<unknown>;
   updateStepExecution(instanceId: string, executionId: string, data: Record<string, unknown>): Promise<unknown>;
   getStepExecutions(instanceId: string): Promise<Array<{ stepId: string; output: unknown }>>;

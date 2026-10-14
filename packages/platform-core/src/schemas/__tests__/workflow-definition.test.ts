@@ -527,6 +527,26 @@ describe('WorkflowDefinitionSchema — assignedTo', () => {
     expect(() => WorkflowDefinitionSchema.parse(wd)).not.toThrow();
   });
 
+  it('accepts assignedTo on an agent step, where it names the human reviewer', () => {
+    const wd = {
+      ...baseWd,
+      steps: [
+        {
+          id: 'draft',
+          name: 'Draft',
+          type: 'creation' as const,
+          executor: 'agent' as const,
+          autonomyLevel: 'L3' as const,
+          plugin: 'claude-code-agent',
+          assignedTo: '${triggerPayload.userId}',
+        },
+        { id: 'done', name: 'Done', type: 'terminal' as const, executor: 'human' as const },
+      ],
+      transitions: [{ from: 'draft', to: 'done' }],
+    };
+    expect(() => WorkflowDefinitionSchema.parse(wd)).not.toThrow();
+  });
+
   it('rejects assignedTo on a non-human step', () => {
     const wd = {
       ...baseWd,

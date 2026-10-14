@@ -299,9 +299,10 @@ export const WorkflowStepSchema = z.object({
   allowedRoles: z.array(z.string()).optional(),
   /** Pre-assigns the created human task to a specific user. Supports `${...}`
    *  interpolation against the run's trigger payload / step outputs
-   *  (e.g. "${triggerPayload.userId}"). Only valid when executor='human' — the
-   *  auto-runner resolves it, sets the result as the task's assignedUserId, and
-   *  marks the task 'claimed'. Validation rejects it on non-human steps. */
+   *  (e.g. "${triggerPayload.userId}"). Valid when executor='human', or when
+   *  executor='agent' (it names who reviews the agent's output at L3) — the
+   *  task creator resolves it, sets the result as the task's assignedUserId, and
+   *  marks the task 'claimed'. Validation rejects it on any other step. */
   assignedTo: z.string().optional(),
   agent: WorkflowAgentConfigSchema.optional(),
   /** Required when executor='script' and plugin='script-container'. */
@@ -458,11 +459,11 @@ function validateSteps(
       });
     }
 
-    if (step.assignedTo !== undefined && step.executor !== 'human') {
+    if (step.assignedTo !== undefined && step.executor !== 'human' && step.executor !== 'agent') {
       ctx.addIssue({
         code: 'custom',
         path: ['steps', i, 'assignedTo'],
-        message: `step '${step.id}' has assignedTo but executor is '${step.executor}' (assignedTo is only valid on executor='human')`,
+        message: `step '${step.id}' has assignedTo but executor is '${step.executor}' (assignedTo is only valid on executor='human' or 'agent')`,
       });
     }
     if (step.executor === 'action' && step.action === undefined) {
