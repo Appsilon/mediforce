@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { InMemoryAgentTrajectoryRepository, buildAgentRun } from '@mediforce/platform-core/testing';
+import { OPENROUTER_KEY_MISSING_MESSAGE } from '../../../../services/openrouter-key';
 import { runEvaluatorCheck } from '../run-evaluator-check';
 import { loadEvaluationSubject } from '../evaluation-subject';
 import { createEvalCase } from '../../eval-cases';
@@ -195,6 +196,6 @@ describe('runEvaluatorCheck', () => {
   it('reports a check that cannot run as an error, not a failure', async () => {
     const fixture = await evaluationFixture();
     const outcome = await runEvaluatorCheck(fixture.scope(), judge, await loadEvaluationSubject(fixture.scope(), GRADED_RUN, STEP), null);
-    expect(outcome).toMatchObject({ passed: null, value: null, error: 'OPENROUTER_API_KEY not configured in workspace secrets' });
+    expect(outcome).toMatchObject({ passed: null, value: null, error: OPENROUTER_KEY_MISSING_MESSAGE });
   });
 });

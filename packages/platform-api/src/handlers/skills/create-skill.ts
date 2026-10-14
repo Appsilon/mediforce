@@ -8,6 +8,7 @@ import { skillContentHash } from './_helpers';
 export async function createSkill(
   input: CreateSkillInput,
   scope: CallerScope,
+  basis = 'Skill created via API',
 ): Promise<CreateSkillOutput> {
   const { namespace, files } = input;
   const { name, description } = skillManifest(files);
@@ -32,7 +33,7 @@ export async function createSkill(
     timestamp: new Date().toISOString(),
     inputSnapshot: { namespace, id: skill.id, visibility: skill.visibility, paths: files.map((file) => file.path) },
     outputSnapshot: { id: skill.id, contentHash: skill.contentHash },
-    basis: 'Skill created via API',
+    basis,
     entityType: 'skill',
     entityId: skill.id,
     namespace,

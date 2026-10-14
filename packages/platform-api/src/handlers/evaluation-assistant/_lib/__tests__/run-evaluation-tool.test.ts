@@ -11,6 +11,7 @@ import { freezeEvalDataset } from '../../../evaluation/eval-datasets';
 import { prepareEvalRun } from '../../../evaluation/eval-runs';
 import { setAcceptanceCriteria } from '../../../evaluation/acceptance-criteria';
 import { recordScore } from '../../../scores/record-score';
+import { createSkill } from '../../../skills/create-skill';
 import { executeEvaluationTool, type UnattendedGrant } from '../run-evaluation-tool';
 import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, WORKFLOW } from '../../../evaluation/__tests__/fixture';
 import { gitWorkspace } from '../../../evaluation/__tests__/git-workspace';
@@ -203,20 +204,22 @@ describe('executeEvaluationTool', () => {
     expect(result).toEqual({ results: [{ agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', confidence: null, agreement: null, comment: null, error: null }] });
   });
 
-  it('reads the SKILL.md the runtime loads — `<skillsDir>/<skill>` — and none for a prompt-only step', async () => {
+  it('lists the catalog Skills the step is offered with their SKILL.md, and none for a step offered none', async () => {
     const { scope, context } = await setup();
-    const artifacts = [
-      { path: 'plugins/other/skills/grade-aes/SKILL.md', contents: 'Wrong plugin.' },
-      { path: 'plugins/ae/skills/grade-aes/SKILL.md', contents: 'Grade by CTCAE v5.' },
-    ];
-    const definition = { ...context.definition, artifacts };
-    const withSkill = { ...context.workflowStep, agent: { skill: 'grade-aes', skillsDir: 'plugins/ae/skills/' } };
+    const skillMd = '---\nname: grade-aes\ndescription: Grade AEs by CTCAE v5\n---\nGrade by CTCAE v5.';
+    await createSkill({ namespace: context.definition.namespace, files: [{ path: 'SKILL.md', contents: skillMd }] }, scope);
+    const withSkill = {
+      ...context.workflowStep,
+      agent: { ...context.workflowStep.agent, skills: [{ namespace: context.definition.namespace, id: 'grade-aes' }] },
+    };
 
-    const skilled = await executeEvaluationTool('get_step', {}, scope, { ...context, definition, workflowStep: withSkill });
-    const promptOnly = await executeEvaluationTool('get_step', {}, scope, { ...context, definition });
+    const skilled = await executeEvaluationTool('get_step', {}, scope, { ...context, workflowStep: withSkill });
+    const plain = await executeEvaluationTool('get_step', {}, scope, context);
 
-    expect(skilled).toMatchObject({ skill: 'Grade by CTCAE v5.' });
-    expect(promptOnly).toMatchObject({ skill: null });
+    expect(skilled).toMatchObject({
+      skills: [{ namespace: context.definition.namespace, id: 'grade-aes', description: 'Grade AEs by CTCAE v5', instructions: skillMd }],
+    });
+    expect(plain).toMatchObject({ skills: [] });
   });
 
   it('refuses the report of an Eval Run of the same step in another namespace', async () => {

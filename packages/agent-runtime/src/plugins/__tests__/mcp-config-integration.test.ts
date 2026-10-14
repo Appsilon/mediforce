@@ -25,8 +25,7 @@ function buildMockAgentContext(overrides: Partial<AgentContext> = {}): AgentCont
           executorType: 'agent',
           plugin: 'claude-code-agent',
           agentConfig: {
-            skill: 'test-skill',
-            skillsDir: '/plugins/test/skills',
+            prompt: 'Extract the data',
             image: 'mediforce-agent:test',
           },
         },
@@ -48,8 +47,7 @@ function buildMockWorkflowAgentContext(
     executor: 'agent',
     plugin: 'claude-code-agent',
     agent: {
-      skill: 'test-skill',
-      skillsDir: '/plugins/test/skills',
+      prompt: 'Extract the data',
       image: 'mediforce-agent:test',
     },
   };
@@ -99,8 +97,7 @@ function buildContextWithMcpServers(
           executorType: 'agent',
           plugin: 'claude-code-agent',
           agentConfig: {
-            skill: 'test-skill',
-            skillsDir: '/plugins/test/skills',
+            prompt: 'Extract the data',
             image: 'mediforce-agent:test',
             mcpServers,
           },
@@ -170,8 +167,7 @@ describe('writeMcpConfig integration', () => {
         executor: 'agent',
         plugin: 'claude-code-agent',
         agent: {
-          skill: 'test-skill',
-          skillsDir: '/plugins/test/skills',
+          prompt: 'Extract the data',
           image: 'mediforce-agent:test',
           mcpServers: [
             {
@@ -445,8 +441,7 @@ describe('writeMcpConfig integration', () => {
           executor: 'agent',
           plugin: 'claude-code-agent',
           agent: {
-            skill: 'test-skill',
-            skillsDir: '/plugins/test/skills',
+            prompt: 'Extract the data',
             image: 'mediforce-agent:test',
             mcpServers: [
               { name: 'should-be-ignored', command: 'legacy-inline' },

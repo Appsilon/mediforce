@@ -77,6 +77,7 @@ import {
   skillCreateCommand,
   skillUpdateCommand,
   skillDeleteCommand,
+  skillImportCommand,
 } from './commands/skill';
 import { agentGetCommand } from './commands/agent-get';
 import { agentDeleteCommand } from './commands/agent-delete';
@@ -279,13 +280,14 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   skill: {
-    description: 'Skills — Claude Code skill folders a workspace owns (list, get, create, update, delete)',
+    description: 'Skills — Claude Code skill folders a workspace owns (list, get, create, update, delete, import)',
     leaves: {
       list: { description: 'List a workspace\'s Skills', fn: skillListCommand },
       get: { description: 'Show a Skill and its files', fn: skillGetCommand },
       create: { description: 'Create a Skill from a local skill folder', fn: skillCreateCommand },
       update: { description: 'Replace a Skill\'s files or change its visibility', fn: skillUpdateCommand },
       delete: { description: 'Delete a Skill', fn: skillDeleteCommand },
+      import: { description: 'Create or update Skills from a GitHub repo\'s skill folders', fn: skillImportCommand },
     },
   },
   'agent-run': {

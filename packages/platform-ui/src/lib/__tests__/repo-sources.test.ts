@@ -49,17 +49,6 @@ describe('referencedPaths', () => {
     expect([...referencedPaths(steps, source)]).toEqual(['container/Dockerfile']);
   });
 
-  it('marks the skill an agent step runs', () => {
-    const steps = [{
-      id: 'plan',
-      name: 'plan',
-      type: 'creation',
-      executor: 'agent',
-      agent: { repo: 'org/repo', commit: 'abc', skillsDir: 'plugins/x/skills', skill: 'build-config' },
-    }] as never as WorkflowStep[];
-    expect([...referencedPaths(steps, source)]).toEqual(['plugins/x/skills/build-config/SKILL.md']);
-  });
-
   it('ignores a step pinned to a different commit of the same repository', () => {
     const steps = [step('other', { repo: 'org/repo', commit: 'zzz', dockerfile: 'Dockerfile' })];
     expect([...referencedPaths(steps, source)]).toEqual([]);

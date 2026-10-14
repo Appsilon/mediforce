@@ -73,7 +73,7 @@ export type { MissingEnvVar, MissingPluginEnv, UnknownModel, RetiredModelRef } f
 // MCP resolution helpers
 export { resolveMcpForStep, AgentDefinitionNotFoundError } from './mcp/resolve-mcp-for-step';
 export type { ResolveMcpForStepDeps } from './mcp/resolve-mcp-for-step';
-export { resolveSkillsForStep, SkillNotFoundError } from './skills/resolve-skills-for-step';
+export { resolveSkillsForStep, RetiredFileSkillError, SkillNotFoundError } from './skills/resolve-skills-for-step';
 export type { ResolveSkillsForStepDeps } from './skills/resolve-skills-for-step';
 export { flattenResolvedMcpToLegacy } from './mcp/flatten-resolved-mcp';
 

@@ -32,6 +32,24 @@ export class SkillNotFoundError extends Error {
   }
 }
 
+/** Raised for a step stored before ADR-0028 that still names a workflow-file
+ *  skill (`agent.retiredFileSkill`). Running it without that skill would run
+ *  it without its instructions, so it does not run. */
+export class RetiredFileSkillError extends Error {
+  public readonly stepId: string;
+  public readonly fileSkill: string;
+
+  constructor(stepId: string, fileSkill: string) {
+    super(
+      `Step '${stepId}' uses the file skill '${fileSkill}', which no longer runs (ADR-0028). ` +
+      'Re-save the step with catalog skills: name them in agent.skills and say in its prompt when to use them.',
+    );
+    this.name = 'RetiredFileSkillError';
+    this.stepId = stepId;
+    this.fileSkill = fileSkill;
+  }
+}
+
 export interface ResolveSkillsForStepDeps {
   agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>;
   skillRepo: { getById(namespace: string, id: string): Promise<Skill | null> };
@@ -41,6 +59,7 @@ export interface ResolveSkillsForStepDeps {
  *  the step adds (ADR-0025 §4, ADR-0027).
  *
  *  Contract, the same as resolveMcpForStep:
+ *   - a step still naming a retired file skill → RetiredFileSkillError.
  *   - no agentId and no step Skills → null.
  *   - AgentDefinition missing → AgentDefinitionNotFoundError.
  *   - a reference to a Skill that is gone, or that its offerer may no longer
@@ -56,6 +75,8 @@ export async function resolveSkillsForStep(
   deps: ResolveSkillsForStepDeps,
   workflow: Pick<WorkflowDefinition, 'namespace' | 'visibility'>,
 ): Promise<Skill[] | null> {
+  const retired = step.agent?.retiredFileSkill;
+  if (retired !== undefined) throw new RetiredFileSkillError(step.id, retired);
   const stepRefs = step.agent?.skills ?? [];
   if (step.agentId === undefined && stepRefs.length === 0) return null;
 

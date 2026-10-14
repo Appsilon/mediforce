@@ -209,8 +209,8 @@ describe('OpenCodeAgentPlugin — Claude Code parity (#1477)', () => {
         }],
       }));
 
-      const pluginDir = await (plugin as unknown as { resolvePluginDir(skillsDir: undefined, resolve: (path: string) => string): Promise<string | undefined> })
-        .resolvePluginDir(undefined, (path) => path);
+      const pluginDir = await (plugin as unknown as { resolvePluginDir(): Promise<string | undefined> })
+        .resolvePluginDir();
 
       expect(pluginDir).toBeDefined();
       expect(await readFile(join(pluginDir!, 'skills', 'sdtm-mapping', 'SKILL.md'), 'utf-8')).toContain('# SDTM');

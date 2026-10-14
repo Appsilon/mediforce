@@ -14,9 +14,8 @@
       "autonomyLevel": "L3",
       "timeoutMinutes": 20,
       "agentConfig": {
-        "skill": "trial-metadata-extractor",
-        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
-        "model": "sonnet"
+        "model": "sonnet",
+        "prompt": "Use the `trial-metadata-extractor` skill: it holds this step's instructions. Load it first and follow it."
       }
     },
     {
@@ -26,9 +25,8 @@
       "autonomyLevel": "L3",
       "timeoutMinutes": 20,
       "agentConfig": {
-        "skill": "mock-tlg-generator",
-        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
-        "model": "sonnet"
+        "model": "sonnet",
+        "prompt": "Use the `mock-tlg-generator` skill: it holds this step's instructions. Load it first and follow it."
       }
     },
     {
@@ -42,11 +40,10 @@
       "autonomyLevel": "L3",
       "timeoutMinutes": 30,
       "agentConfig": {
-        "skill": "sdtm-to-adam",
-        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
         "model": "sonnet",
         "repo": "Appsilon/mediforce-clinical-workspace",
-        "commit": "4beb1b0ad77872b04bc7ef930def16e555946222"
+        "commit": "4beb1b0ad77872b04bc7ef930def16e555946222",
+        "prompt": "Use the `sdtm-to-adam` skill: it holds this step's instructions. Load it first and follow it."
       }
     },
     {
@@ -56,11 +53,10 @@
       "autonomyLevel": "L3",
       "timeoutMinutes": 30,
       "agentConfig": {
-        "skill": "adam-to-tlg",
-        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
         "model": "sonnet",
         "repo": "Appsilon/mediforce-clinical-workspace",
-        "commit": "4beb1b0ad77872b04bc7ef930def16e555946222"
+        "commit": "4beb1b0ad77872b04bc7ef930def16e555946222",
+        "prompt": "Use the `adam-to-tlg` skill: it holds this step's instructions. Load it first and follow it."
       }
     }
   ]

@@ -37,8 +37,8 @@
         "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
       },
       "agent": {
-        "skill": "trial-metadata-extractor",
-        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "prompt": "Use the `trial-metadata-extractor` skill: it holds this step's instructions. Load it first and follow it.",
+        "skills": [{ "namespace": "appsilon", "id": "trial-metadata-extractor" }],
         "model": "sonnet",
         "image": "mediforce-agent:protocol-to-tfl",
         "timeoutMinutes": 20
@@ -58,8 +58,8 @@
         "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
       },
       "agent": {
-        "skill": "mock-tlg-generator",
-        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "prompt": "Use the `mock-tlg-generator` skill: it holds this step's instructions. Load it first and follow it.",
+        "skills": [{ "namespace": "appsilon", "id": "mock-tlg-generator" }],
         "model": "sonnet",
         "image": "mediforce-agent:protocol-to-tfl",
         "timeoutMinutes": 20
@@ -94,8 +94,8 @@
         "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
       },
       "agent": {
-        "skill": "sdtm-to-adam",
-        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "prompt": "Use the `sdtm-to-adam` skill: it holds this step's instructions. Load it first and follow it.",
+        "skills": [{ "namespace": "appsilon", "id": "sdtm-to-adam" }],
         "model": "sonnet",
         "image": "mediforce-agent:protocol-to-tfl",
         "timeoutMinutes": 30
@@ -115,8 +115,8 @@
         "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
       },
       "agent": {
-        "skill": "adam-to-tlg",
-        "skillsDir": "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills",
+        "prompt": "Use the `adam-to-tlg` skill: it holds this step's instructions. Load it first and follow it.",
+        "skills": [{ "namespace": "appsilon", "id": "adam-to-tlg" }],
         "model": "sonnet",
         "image": "mediforce-agent:protocol-to-tfl",
         "timeoutMinutes": 30

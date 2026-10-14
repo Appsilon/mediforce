@@ -39,7 +39,7 @@ interface StepConfigInfo {
   model?: string;
   timeoutMinutes?: number;
   reviewerType?: string;
-  agentConfig?: { skill?: string; skills?: Array<{ namespace: string; id: string }>; prompt?: string; model?: string; skillsDir?: string; runtime?: string; mcpServers?: Array<{ name: string }> };
+  agentConfig?: { retiredFileSkill?: string; skills?: Array<{ namespace: string; id: string }>; prompt?: string; model?: string; runtime?: string; mcpServers?: Array<{ name: string }> };
 }
 
 interface StepStatusPanelProps {
@@ -363,7 +363,7 @@ function StepConfigDetail({
     const model = config.agentConfig?.model ?? config.model;
     if (model) entries.push({ label: 'Model', value: model });
   }
-  if (config.agentConfig?.skill) entries.push({ label: 'Skill', value: config.agentConfig.skill });
+  if (config.agentConfig?.retiredFileSkill !== undefined) entries.push({ label: 'Retired file skill', value: config.agentConfig.retiredFileSkill });
   if (config.agentConfig?.skills?.length)
     entries.push({ label: 'Step skills', value: config.agentConfig.skills.map((ref) => `${ref.namespace}/${ref.id}`).join(', ') });
   if (config.timeoutMinutes) entries.push({ label: 'Timeout', value: `${config.timeoutMinutes} min` });

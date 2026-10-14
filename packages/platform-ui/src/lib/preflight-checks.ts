@@ -1,5 +1,6 @@
 import type { DockerImageInfo } from '@mediforce/platform-api/contract';
 import { type WorkflowDefinition, carriedDockerfile, isCatalogReference, normaliseModelId, splitImageRef, stepHasBuildSource, DOCKER_IMAGE_SETUP_URL } from '@mediforce/platform-core';
+import { routes } from './routes';
 
 export interface PreflightAction {
   label: string;
@@ -14,7 +15,8 @@ export interface PreflightWarning {
     | 'low-credits'
     | 'unknown-model'
     | 'contract-collected-twice'
-    | 'image-and-dockerfile';
+    | 'image-and-dockerfile'
+    | 'retired-file-skill';
   resource: string;
   stepNames: string[];
   message: string;
@@ -83,10 +85,7 @@ const ARTIFACTS_MOUNT_PREFIX = '/artifacts/';
  *
  * Two sources, both exact: a command argument under `/artifacts/`, which by
  * definition is a carried file, and a `dockerfile` with no carried file and no
- * repo to build from. `skillsDir` is deliberately not checked — with neither
- * carried skills nor an `externalSkillsRepo` it resolves against the repository
- * mounted on the host, which the browser cannot see, so a warning would fire on
- * every workflow that ships in the repo.
+ * repo to build from.
  */
 function collectMissingFiles(
   definition: WorkflowDefinition,
@@ -267,6 +266,34 @@ export function runPreflightChecks(
         ? `Image cannot be built: this workflow does not carry '${path}', and no repository is configured to build from`
         : `This workflow does not carry '${path}', so the step cannot read it at /artifacts/${path}`,
       actions: [{ label: 'Add the file', href: editorHref }],
+    });
+  }
+
+  // A step that still names a workflow-file skill fails its run rather than
+  // running without it; the legacy snapshot says where its skills were read from.
+  const legacyRepo = definition.legacyDefinition?.externalSkillsRepo;
+  const originalHref = `${routes.workflowDefinition(options.handle, options.workflowName, definition.version)}?view=original`;
+  for (const step of steps) {
+    const retired = step.agent?.retiredFileSkill;
+    if (retired === undefined) continue;
+    const fromRepo = legacyRepo !== undefined
+      ? ` (this workflow's skills repository was ${legacyRepo.url} at ${legacyRepo.commit.slice(0, 7)})`
+      : '';
+    warnings.push({
+      category: 'retired-file-skill',
+      resource: retired,
+      stepNames: [step.name],
+      message: `This step uses the workflow-file skill '${retired}'${fromRepo}, which no longer runs: import it as a catalog Skill and pick it on the step`,
+      actions: [
+        { label: 'Import skills', href: routes.skills(options.handle) },
+        {
+          label: 'Edit the step',
+          href: options.version !== undefined
+            ? `/${options.handle}/workflows/${encodedName}/definitions/${String(options.version)}`
+            : `/${options.handle}/workflows/${encodedName}`,
+        },
+        ...(definition.legacyDefinition !== undefined ? [{ label: 'View original definition', href: originalHref }] : []),
+      ],
     });
   }
 

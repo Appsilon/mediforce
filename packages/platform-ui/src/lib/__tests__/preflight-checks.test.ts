@@ -411,23 +411,34 @@ describe('runPreflightChecks — files the workflow references but does not carr
     };
     expect(runPreflightChecks(fromRepo, ctx).filter((w) => w.category === 'missing-file')).toEqual([]);
 
-    const fromSkillsRepo = buildWorkflowDefinition({ name: 'test-wf' });
-    fromSkillsRepo.steps[0].executor = 'agent';
-    fromSkillsRepo.steps[0].agent = { dockerfile: 'Dockerfile' };
-    fromSkillsRepo.externalSkillsRepo = { url: 'https://github.com/org/skills.git', commit: 'b'.repeat(40) };
-    expect(runPreflightChecks(fromSkillsRepo, ctx).filter((w) => w.category === 'missing-file')).toEqual([]);
   });
 
-  it('says nothing about a skills directory, which may live in the checkout', () => {
-    // `skillsDir` resolves against the repository mounted on the host when the
-    // workflow neither carries the skills nor names an `externalSkillsRepo`,
-    // and the browser cannot see that filesystem. Warning here would fire on
-    // every workflow that ships in the repo.
+  it('flags a step that still names a retired workflow-file skill, pointing at the Skills page', () => {
     const wd = buildWorkflowDefinition({ name: 'test-wf' });
     wd.steps[0].executor = 'agent';
-    wd.steps[0].agent = { skill: 'validator', skillsDir: 'apps/landing-zone/plugins/landing-zone/skills' };
-    expect(runPreflightChecks(wd, ctx).filter((w) => w.category === 'missing-file')).toEqual([]);
+    wd.steps[0].agent = { prompt: 'Validate.', retiredFileSkill: 'apps/landing-zone/skills/data-validator' };
+    const [warning] = runPreflightChecks(wd, ctx).filter((w) => w.category === 'retired-file-skill');
+    expect(warning).toMatchObject({ resource: 'apps/landing-zone/skills/data-validator', stepNames: [wd.steps[0].name] });
+    expect(warning?.actions[0]).toEqual({ label: 'Import skills', href: '/acme/skills' });
+    expect(warning?.actions.map((action) => action.label)).not.toContain('View original definition');
   });
+
+  it('names the repository the legacy snapshot says the skills were read from, and links the original definition', () => {
+    const wd = buildWorkflowDefinition({ name: 'test-wf', version: 3 });
+    wd.steps[0].executor = 'agent';
+    wd.steps[0].agent = { prompt: 'Validate.', retiredFileSkill: 'skills/data-validator' };
+    wd.legacyDefinition = {
+      steps: [],
+      externalSkillsRepo: { url: 'https://github.com/acme/skills.git', commit: 'abcdef1234567890' },
+    };
+    const [warning] = runPreflightChecks(wd, ctx).filter((w) => w.category === 'retired-file-skill');
+    expect(warning?.message).toContain('skills repository was https://github.com/acme/skills.git at abcdef1');
+    expect(warning?.actions).toContainEqual({
+      label: 'View original definition',
+      href: '/acme/workflows/my-wf/definitions/3?view=original',
+    });
+  });
+
 });
 
 describe('runPreflightChecks — an input contract the first step asks for again', () => {

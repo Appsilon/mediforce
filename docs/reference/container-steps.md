@@ -42,7 +42,7 @@ path and branch conventions live in `workspace-paths.ts` so the read-only
 | `/output` | rw | the step | Engine ↔ step channel. Host seeds `input.json`, `prompt.txt`, `previous_run.json`, the agent CLI's config (`mcp-config.json` for Claude Code, `opencode.json` for OpenCode), `script.<ext>`; the step writes `result.json` and optional `presentation.md`. |
 | `/data` | ro | the step | Uploaded attachments the host downloaded for this step (agent and script steps). Each `files[].localPath` in the agent's prompt and `input.json` points here. |
 | `/artifacts` | ro | the definition | The files the workflow carries (`artifacts` on the definition): scripts, a Dockerfile, skills. Materialized to a content-addressed host directory per file set, so every step of every run of an unchanged workflow shares one write. Absent when the workflow carries none. |
-| `/plugin` | ro | the step | The plugin root (`skills/<id>/SKILL.md`), when an agent step sets `skillsDir` or is offered catalog Skills (its agent's or its own `agent.skills`). With `skillsDir` alone it is the parent of the resolved skills directory: carried skills, then the `externalSkillsRepo` cache, then the repo checkout on the host. When it is offered catalog Skills (`claude-code-agent` via `--plugin-dir`, `opencode-agent` via `skills.paths` in `opencode.json`; [ADR-0025](../adr/0025-skill-catalog.md)), it is a content-hashed folder under `mediforce-agent-skills/` holding them under `skills/<id>/`, merged with the step's skills, which win a name clash. |
+| `/plugin` | ro | the step | The plugin root (`skills/<id>/SKILL.md`), when an agent step is offered catalog Skills (its agent's or its own `agent.skills`; `claude-code-agent` via `--plugin-dir`, `opencode-agent` via `skills.paths` in `opencode.json`; [ADR-0025](../adr/0025-skill-catalog.md), [ADR-0028](../adr/0028-retire-file-skills.md)): a content-hashed folder under `mediforce-agent-skills/` holding them under `skills/<id>/`. |
 
 Why `/workspace` and `/output` stay separate — and why `/output` is a bad name
 for a channel that carries inputs — is argued in the header comment of
@@ -69,8 +69,7 @@ step that also names its own `image` keeps that tag, which says nothing about
 the files, so the build labels the content hash (`mediforce.build.artifacts`)
 and an existing image is reused only when the label matches — otherwise it is
 rebuilt under the same tag, as a repo build is when its commit moves. An
-explicit step-level `repo` + `commit` still wins; `externalSkillsRepo` remains
-the fallback. The first build takes as long as a `docker build` does, which is
+explicit step-level `repo` + `commit` still wins. The first build takes as long as a `docker build` does, which is
 minutes for a sizeable image. The image appears in the Image Catalog as a
 `carried` entry ([ADR-0022](../adr/0022-image-catalog.md)).
 
@@ -137,9 +136,8 @@ points at.
 A step that names a file the workflow does not carry is flagged before the run
 (preflight, beside missing secrets and images): a command reading
 `/artifacts/<path>` with no such file, or a `dockerfile` with neither a carried
-file nor a repo to build from. A `skillsDir` is not flagged, because with
-neither carried skills nor an `externalSkillsRepo` it resolves against the
-repository on the host, which the browser cannot see.
+file nor a repo to build from. A step that still names a retired file skill
+(ADR-0028) is flagged too: it will not run until it is re-saved with Skills.
 
 A step names a carried file by its container path: `python3
 /artifacts/scripts/poll.py`. Files are written executable, so a command may be
@@ -246,8 +244,7 @@ Both live in
 With `dockerfile` + `repo` + `commit` set, the image is built lazily on first
 use and tagged `mediforce-built:<hash>`, keyed on the build inputs — `context`
 folds in only when set, so a step without one keeps the tag it always had; a rebuild
-happens only when the pinned commit moves. A step that names only `dockerfile`
-builds from the workflow's `externalSkillsRepo` the same way. No build lands on
+happens only when the pinned commit moves. No build lands on
 the golden image: a step with a build source that names `mediforce-golden-image`
 builds and runs under its derived tag. With `image` alone, it must already
 exist locally or be pullable. Without either, the step fails unless

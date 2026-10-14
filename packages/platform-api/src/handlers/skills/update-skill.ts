@@ -8,6 +8,7 @@ import { hasHolders, heldSkillConflict, skillContentHash } from './_helpers';
 export async function updateSkill(
   input: UpdateSkillInput,
   scope: CallerScope,
+  basis = 'Skill updated via API',
 ): Promise<UpdateSkillOutput> {
   const { namespace, id } = input;
   const existing = await scope.skills.getById(namespace, id);
@@ -68,7 +69,7 @@ export async function updateSkill(
       previousVisibility: existing.visibility,
     },
     outputSnapshot: { id, contentHash: skill.contentHash, visibility: skill.visibility },
-    basis: 'Skill updated via API',
+    basis,
     entityType: 'skill',
     entityId: id,
     namespace,

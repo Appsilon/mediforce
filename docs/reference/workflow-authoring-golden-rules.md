@@ -61,11 +61,10 @@ See [create-workflow.md](../guides/create-workflow.md#import-from-git) and
 
 MUST (once you build a custom image or pin sources **from a repository**):
 
-- Pin `externalSkillsRepo.commit`.
 - Pin step Docker build `repo` + `commit` + `dockerfile`.
 
-A workflow that carries its own files pins nothing: the Dockerfile, the scripts
-and the skills live on the definition, version with it, and the image tag is
+A workflow that carries its own files pins nothing: the Dockerfile and the
+scripts live on the definition, version with it, and the image tag is
 derived from their content. There the build context is always all of the carried
 files, and `dockerfile` is the carried file's own path. `repo` + `commit` describe a repository that
 actually exists — a placeholder SHA (all zeros) or an invented URL is refused at
@@ -73,12 +72,11 @@ registration, because it names a build that can never run.
 - Avoid `latest` image tags outside local development.
 - Register/import a new workflow version for every released change.
 
-The four repo-shaped fields control different things — keep them separate:
+The three repo-shaped fields control different things — keep them separate:
 
 | Field | Purpose |
 |-------|---------|
 | `source` | Git import provenance only (no runtime effect) |
-| `externalSkillsRepo` | Runtime skill source |
 | step `agent.repo` / `script.repo` | Docker build context |
 | `workspace.remote` | Optional per-run `/workspace` git worktree |
 
@@ -121,7 +119,7 @@ repo root, which `dockerfile` is then read from) — set `"context": "."` when a
 
 ## 4. Wire Skills Explicitly
 
-Skills SHOULD live in the Skill catalog (the Skills page, `mediforce skill`).
+Skills live in the Skill catalog (the Skills page, `mediforce skill`).
 Give a skill every step needs to the Agent. Give a skill only one step needs to
 that step, in `agent.skills`. Either way the skill is offered, not pasted into
 the prompt, so the Agent's system prompt or the step's `agent.prompt` should name
@@ -138,9 +136,12 @@ it when the step must use it
 }
 ```
 
-A step skill (`agent.skill` and `agent.skillsDir`, read from the workflow's
-`artifacts` or its `externalSkillsRepo`) still runs and is always pasted into
-the prompt. The editor cannot add one; use catalog Skills for new steps.
+A package keeps its skills in `skills/<name>/SKILL.md`; importing the workflow
+from git creates them in the importing workspace and points the steps naming
+them there. A step never names a skill by path: `agent.skill`, `agent.skillsDir`
+and `externalSkillsRepo` were retired
+([ADR-0028](../adr/0028-retire-file-skills.md)), and registering a file that
+sets them is refused.
 
 ## 5. Choose Control Mode, Executor, Type
 
@@ -280,7 +281,7 @@ Production-ready checklist:
 
 - Workflow validates.
 - README explains env vars, secrets, Agents, MCPs, images, and sample input.
-- Docker build contexts and skills sources are pinned by commit.
+- Docker build contexts are pinned by commit, and skills are catalog Skills named in `agent.skills`.
 - Secrets are platform-managed, not committed.
 - Agent steps have output contracts and timeouts.
 - MCPs that need governance are in Tool Catalog and Agent Definitions.

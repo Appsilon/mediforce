@@ -226,13 +226,14 @@ loads one when its description fits the task.
 _Avoid_: Conflating with Plugin — Plugin is the runtime; Skill is data.
 "Catalog skill" (there is no other kind of Skill).
 
-**Step skill** *(workflow-carried)*:
-A skill folder a Workflow Definition carries in its files or pins in its
-skills repository, named by one Workflow Step (`step.agent.skill`). Lives and
-versions with the Workflow Definition; not a Skill. Always in the Step's
-prompt. The workflow editor cannot add one; it shows an existing one
-read-only so it can be removed in favour of a Skill.
-_Avoid_: "workflow skill", "Skill" unqualified.
+**Retired file skill**:
+A skill folder a Workflow Step used to name by path (`step.agent.skill` +
+`skillsDir`, from the workflow's files or its `externalSkillsRepo`), retired by
+ADR-0028. A stored step that still names one keeps it as
+`step.agent.retiredFileSkill` and does not run until it is re-saved with
+Skills. A skill in git becomes a Skill by import (`mediforce skill import`, or
+workflow import for the skills a package ships).
+_Avoid_: "Step skill" for a Skill a Step adds — that is a Skill.
 
 **Agent**:
 A reusable, mutable agent configuration: system prompt, foundation model and
@@ -557,7 +558,7 @@ _Avoid_: "Dataset" alone (collides with generic data-engineering usage),
 
 **Step Fingerprint**:
 The identity of everything that shapes one agent Workflow Step's behaviour — its
-config, the Step skill, its Agent's Skills and instructions, its image and its
+config, the Skills it is offered and its Agent's instructions, its image and its
 effective MCP tools — independent of the Workflow Definition version.
 _Avoid_: "step version", "config hash".
 

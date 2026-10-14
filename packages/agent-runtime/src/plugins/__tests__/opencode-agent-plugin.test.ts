@@ -19,14 +19,9 @@ afterAll(() => {
 
 type DockerResult = { cliOutput: string; gitMetadata: { commitSha: string; branch: string; changedFiles: string[]; repoUrl: string } | null; presentation: null; outputDir: string; injectedEnvVars: string[] };
 type SpawnDockerTarget = { spawnDockerContainer: (prompt: string, options?: Record<string, unknown>) => Promise<DockerResult> };
-type ReadSkillTarget = { readSkillFile: (skillsDir: string, skill: string) => Promise<string> };
 
 function mockSpawn(plugin: OpenCodeAgentPlugin) {
   return vi.spyOn(plugin as unknown as SpawnDockerTarget, 'spawnDockerContainer');
-}
-
-function mockReadSkill(plugin: OpenCodeAgentPlugin) {
-  return vi.spyOn(plugin as unknown as ReadSkillTarget, 'readSkillFile');
 }
 
 function buildMockContext(overrides: Partial<AgentContext> = {}): AgentContext {
@@ -46,8 +41,7 @@ function buildMockContext(overrides: Partial<AgentContext> = {}): AgentContext {
           executorType: 'agent',
           plugin: 'opencode-agent',
           agentConfig: {
-            skill: 'trial-metadata-extractor',
-            skillsDir: '/plugins/protocol-to-tfl/skills',
+            prompt: 'Extract trial metadata from the protocol',
             image: 'mediforce-agent:opencode-protocol-to-tfl',
           },
         },
@@ -109,7 +103,7 @@ describe('OpenCodeAgentPlugin', () => {
       expect(() => plugin.initialize(context)).not.toThrow();
     });
 
-    it('[ERROR] throws if neither skill nor prompt configured', async () => {
+    it('[ERROR] throws if no prompt configured', async () => {
       const context = buildMockContext({
         config: {
           processName: 'protocol-to-tfl',
@@ -125,7 +119,7 @@ describe('OpenCodeAgentPlugin', () => {
           ],
         },
       });
-      await expect(plugin.initialize(context)).rejects.toThrow(/skill.*prompt/i);
+      await expect(plugin.initialize(context)).rejects.toThrow("No prompt configured in agentConfig for step 'extract'");
     });
 
     it('[ERROR] throws if no image and local execution not allowed', async () => {
@@ -141,7 +135,7 @@ describe('OpenCodeAgentPlugin', () => {
               executorType: 'agent',
               plugin: 'opencode-agent',
               agentConfig: {
-                skill: 'trial-metadata-extractor',
+                prompt: 'Extract trial metadata from the protocol',
               },
             },
           ],
@@ -291,8 +285,7 @@ describe('OpenCodeAgentPlugin', () => {
               executorType: 'agent',
               plugin: 'opencode-agent',
               agentConfig: {
-                skill: 'trial-metadata-extractor',
-                skillsDir: '/plugins/protocol-to-tfl/skills',
+                prompt: 'Extract trial metadata from the protocol',
                 image: 'mediforce-agent:opencode',
                 model: 'anthropic.claude-3.5-sonnet',
               },
@@ -339,7 +332,6 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor\nExtract metadata...');
 
       const agentResponse = JSON.stringify({ confidence: 0.85, summary: 'Extracted' });
       mockSpawn(plugin).mockResolvedValue({
@@ -353,16 +345,14 @@ describe('OpenCodeAgentPlugin', () => {
 
       const statusEvents = events.filter((e) => e.type === 'status');
       expect(statusEvents.length).toBeGreaterThanOrEqual(1);
-      expect(statusEvents[0].payload).toContain('OpenCode');
-      expect(statusEvents[0].payload).toContain('trial-metadata-extractor');
+      expect(statusEvents[0].payload).toBe('spawning OpenCode');
     });
 
-    it('[DATA] builds prompt from SKILL.md content and input data', async () => {
+    it('[DATA] builds prompt from the configured prompt and input data', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);
 
       const { emit } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Trial Metadata Extractor\nExtract metadata from docs.');
       const spawnSpy = mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: 'ok' }),
         gitMetadata: null,
@@ -374,7 +364,7 @@ describe('OpenCodeAgentPlugin', () => {
 
       expect(spawnSpy).toHaveBeenCalledOnce();
       const [prompt] = spawnSpy.mock.calls[0];
-      expect(prompt).toContain('Trial Metadata Extractor');
+      expect(prompt).toContain('Extract trial metadata from the protocol');
       expect(prompt).toContain('/data/protocol.pdf');
     });
 
@@ -383,7 +373,6 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       const spawnSpy = mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: 'ok' }),
         gitMetadata: null,
@@ -405,7 +394,6 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: 'extracted data', confidence: 0.9 }),
         gitMetadata: null,
@@ -448,7 +436,6 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput,
         gitMetadata: null,
@@ -473,7 +460,6 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockRejectedValue(new Error('Docker container failed'));
 
       await expect(plugin.run(emit)).rejects.toThrow('Docker container failed');
@@ -505,7 +491,6 @@ describe('OpenCodeAgentPlugin', () => {
       const hostDir = await mkdtemp(join(tmpdir(), 'test-docker-io-'));
       try {
         const { emit, events } = buildEmitSpy();
-        mockReadSkill(plugin).mockResolvedValue('# Skill');
 
         // Capture the prompt and verify the file was written to hostDir
         const spawnSpy = mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
@@ -548,7 +533,6 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: '"done"' }),
         gitMetadata: null,
@@ -576,7 +560,6 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
 
       mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
         const outputDir = (options as Record<string, unknown>).outputDir as string;
@@ -622,7 +605,6 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: agentResponse }),
         gitMetadata: null,
@@ -652,7 +634,6 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockResolvedValue({
         // result is text, not JSON — should fall back to reading result.json
         cliOutput: JSON.stringify({ result: 'I completed the task successfully.' }),
@@ -687,7 +668,6 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: agentResponse }),
         gitMetadata: null,
@@ -713,7 +693,6 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockReadSkill(plugin).mockResolvedValue('# Skill');
       mockSpawn(plugin).mockResolvedValue({
         cliOutput: JSON.stringify({ result: '"done"' }),
         gitMetadata: {

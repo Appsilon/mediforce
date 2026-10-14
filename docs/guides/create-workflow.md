@@ -39,11 +39,11 @@ placing and wiring blocks by hand.
 - **What it can change.** The whole definition: it adds, updates and removes
   steps (with their transitions and verdicts), sets conditional routing on an
   edge, writes the workflow-level fields — `triggerInput`, `preamble`, `env`,
-  `notifications`, `workspace`, `externalSkillsRepo`, `url` — and writes the
-  files the workflow carries (a script, a Dockerfile, a SKILL.md), one file per
-  call. Files appear in the **Files** panel, where you can edit them, upload
-  more from disk (a folder keeps its structure, so a `skills/` directory
-  uploads whole) or drop them in, and a run reads them from `/artifacts`.
+  `notifications`, `workspace`, `url` — and writes the
+  files the workflow carries (a script, a Dockerfile), one file per call.
+  Files appear in the **Files** panel, where you can edit them, upload more
+  from disk (a folder keeps its structure, so a `scripts/` directory uploads
+  whole) or drop them in, and a run reads them from `/artifacts`.
   Skills don't belong there: an agent step picks them from the Skill catalog,
   on top of its agent's own. It does not edit secrets or other workspace
   state, except the parts it can now set up for you: it can list the workspace's

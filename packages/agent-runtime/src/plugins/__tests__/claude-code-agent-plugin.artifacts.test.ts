@@ -1,14 +1,15 @@
 /**
- * The workflow's own files reaching an *agent* container. Agents already get a
- * `/plugin` mount for a git-checked-out skills directory; this covers the mount
- * that needs no checkout, so the same definition runs on an instance that has
- * never seen the repository.
+ * The workflow's own files reaching an *agent* container: the mount that needs
+ * no checkout, so the same definition runs on an instance that has never seen
+ * the repository. Also the `/mock-fixtures` mount a `MOCK_AGENT` run copies its
+ * canned result from.
  */
 import { EventEmitter } from 'node:events';
 import { Readable, Writable } from 'node:stream';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { tmpdir } from 'node:os';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ChildProcess } from 'node:child_process';
 import type { WorkflowAgentContext, EmitFn, EmitPayload } from '../../interfaces/step-executor-plugin';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
@@ -62,7 +63,7 @@ function buildContext(artifacts?: { path: string; contents: string }[]): Workflo
     type: 'creation' as const,
     executor: 'agent' as const,
     plugin: 'claude-code-agent',
-    agent: { skill: 'data-validator', image: 'mediforce-landing-zone:latest' },
+    agent: { prompt: 'Interpret the validation report', image: 'mediforce-landing-zone:latest' },
   };
   return {
     stepId: 'interpret',
@@ -93,15 +94,11 @@ describe('ClaudeCodeAgentPlugin — workflow artifacts', () => {
   beforeEach(() => {
     plugin = new ClaudeCodeAgentPlugin({ workspaceManager: createFakeWorkspaceManager() });
     spawnMock.mockReset();
-    vi.spyOn(
-      plugin as unknown as { readSkillFile: (dir: string, skill: string) => Promise<string> },
-      'readSkillFile',
-    ).mockResolvedValue('# Data validator\n');
   });
 
   it('mounts the files the workflow carries at /artifacts, read-only', async () => {
     await plugin.initialize(buildContext([
-      { path: 'skills/data-validator/SKILL.md', contents: '# Data validator\n' },
+      { path: 'docs/validation-rules.md', contents: '# Validation rules\n' },
       { path: 'scripts/report.py', contents: 'print("report")\n' },
     ]));
     mockCliSuccess();
@@ -123,5 +120,49 @@ describe('ClaudeCodeAgentPlugin — workflow artifacts', () => {
 
     const dockerArgs = spawnMock.mock.calls[0][1] as string[];
     expect(dockerArgs.some((arg) => arg.includes(':/artifacts'))).toBe(false);
+  });
+});
+
+describe('ClaudeCodeAgentPlugin — mock fixtures mount (MOCK_AGENT)', () => {
+  const originalMockAgent = process.env.MOCK_AGENT;
+  const originalFixturesDir = process.env.MOCK_FIXTURES_DIR;
+  let plugin: ClaudeCodeAgentPlugin;
+  let fixturesDir: string;
+
+  beforeEach(async () => {
+    plugin = new ClaudeCodeAgentPlugin({ workspaceManager: createFakeWorkspaceManager() });
+    spawnMock.mockReset();
+    fixturesDir = await mkdtemp(join(tmpdir(), 'mock-fixtures-'));
+    process.env.MOCK_AGENT = 'true';
+  });
+
+  afterEach(async () => {
+    await rm(fixturesDir, { recursive: true, force: true });
+    if (originalMockAgent === undefined) delete process.env.MOCK_AGENT;
+    else process.env.MOCK_AGENT = originalMockAgent;
+    if (originalFixturesDir === undefined) delete process.env.MOCK_FIXTURES_DIR;
+    else process.env.MOCK_FIXTURES_DIR = originalFixturesDir;
+  });
+
+  it('mounts MOCK_FIXTURES_DIR at /mock-fixtures, read-only', async () => {
+    process.env.MOCK_FIXTURES_DIR = fixturesDir;
+    await plugin.initialize(buildContext());
+    mockCliSuccess();
+
+    await plugin.run(noopEmit);
+
+    const dockerArgs = spawnMock.mock.calls[0][1] as string[];
+    expect(dockerArgs).toContain(`${fixturesDir}:/mock-fixtures:ro`);
+  });
+
+  it('adds no /mock-fixtures mount when MOCK_FIXTURES_DIR is not set', async () => {
+    delete process.env.MOCK_FIXTURES_DIR;
+    await plugin.initialize(buildContext());
+    mockCliSuccess();
+
+    await plugin.run(noopEmit);
+
+    const dockerArgs = spawnMock.mock.calls[0][1] as string[];
+    expect(dockerArgs.some((arg) => arg.includes(':/mock-fixtures'))).toBe(false);
   });
 });

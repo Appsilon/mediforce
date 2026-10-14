@@ -45,6 +45,20 @@ describe('handleSaveFailure', () => {
     });
   });
 
+  it('tells the author where to remove a retired file skill', () => {
+    const err = new ApiError(400, 'bad', {}, 'validation', [
+      { path: ['steps', 0, 'agent', 'retiredFileSkill'], message: 'retired' },
+    ]);
+
+    const result = handleSaveFailure(err, [step]);
+
+    expect(result.message).toBe(
+      "Step 'Review' still names a retired file skill — open it, expand Prompt & model, " +
+        'and remove the notice under Skills (pick the imported Skill there instead).',
+    );
+    expect(result.stepErrors).toEqual({ review: { agent: 'retired' } });
+  });
+
   it('names the offending field for a missing required value', () => {
     const result = handleSaveFailure(validationError({ name: '', steps: [], transitions: [] }), []);
 

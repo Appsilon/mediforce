@@ -1,15 +1,23 @@
-import { posix } from 'node:path';
 import type { z } from 'zod';
 import {
   DEFAULT_ACCEPTANCE_CRITERIA,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
+  SKILL_MANIFEST_PATH,
   type Evaluator,
   type EvaluatedStep,
   type EvaluationAssistantPlatformToolName,
   type WorkflowDefinition,
   type WorkflowStep,
 } from '@mediforce/platform-core';
-import { listCommitFiles, readCommitFile, resolveMcpForStep } from '@mediforce/agent-runtime';
+import {
+  AgentDefinitionNotFoundError,
+  RetiredFileSkillError,
+  SkillNotFoundError,
+  listCommitFiles,
+  readCommitFile,
+  resolveMcpForStep,
+  resolveSkillsForStep,
+} from '@mediforce/agent-runtime';
 import type { CallerScope } from '../../../repositories/index';
 import { NotFoundError, ValidationError } from '../../../errors';
 import { getMcpEvalPolicy } from '../../evaluation/mcp-eval-policy';
@@ -38,30 +46,25 @@ function clip(value: unknown, maxChars: number): unknown {
 }
 
 /**
- * The SKILL.md the runtime loads for the step — `<skillsDir>/<skill>/SKILL.md`,
- * read only when both are set — when the workflow carries it (`artifacts`).
+ * The catalog Skills the step is offered — its agent's and its own (ADR-0027)
+ * — with each one's SKILL.md, resolved as the runtime resolves them. A step
+ * whose Skill is gone does not start, and says so.
  */
-function skillContent(definition: WorkflowDefinition, step: WorkflowStep): string | null {
-  const skill = step.agent?.skill;
-  const skillsDir = step.agent?.skillsDir;
-  if (skill === undefined || skill === '' || skillsDir === undefined || skillsDir === '') return null;
-  const skillPath = posix.normalize(posix.join(skillsDir, skill, 'SKILL.md'));
-  const found = (definition.artifacts ?? []).find((artifact) => posix.normalize(artifact.path) === skillPath);
-  return found?.contents ?? null;
-}
-
-/** Where a step's SKILL.md lives when the workflow does not carry it: the external repo the runtime fetches, which the assistant cannot read. */
-function externalSkillLocation(definition: WorkflowDefinition, step: WorkflowStep) {
-  const repo = definition.externalSkillsRepo;
-  const skill = step.agent?.skill;
-  const skillsDir = step.agent?.skillsDir;
-  if (repo?.url === undefined || repo.commit === undefined || skill === undefined || skill === '' || skillsDir === undefined || skillsDir === '') return null;
-  return {
-    unreadable: 'the step uses a skill fetched from an external repository at run time; its SKILL.md is not visible here',
-    repo: repo.url,
-    commit: repo.commit,
-    path: posix.normalize(posix.join(skillsDir, skill, 'SKILL.md')),
-  };
+async function offeredSkills(scope: CallerScope, definition: WorkflowDefinition, step: WorkflowStep): Promise<unknown> {
+  try {
+    const skills = await resolveSkillsForStep(step, { agentDefinitionRepo: scope.agentDefinitions, skillRepo: scope.skills }, definition);
+    return (skills ?? []).map((skill) => ({
+      namespace: skill.namespace,
+      id: skill.id,
+      description: skill.description,
+      instructions: clip(skill.files.find((file) => file.path === SKILL_MANIFEST_PATH)?.contents ?? null, 8000),
+    }));
+  } catch (error) {
+    if (error instanceof SkillNotFoundError || error instanceof AgentDefinitionNotFoundError || error instanceof RetiredFileSkillError) {
+      return { refused: error.message };
+    }
+    throw error;
+  }
 }
 
 /** The steps whose outputs reach this one, nearest first, following transitions back. */
@@ -165,7 +168,6 @@ export async function executeEvaluationTool(
   switch (toolName) {
     case 'get_step': {
       const agent = workflowStep.agentId === undefined ? null : await scope.agentDefinitions.getById(workflowStep.agentId);
-      const skill = skillContent(definition, workflowStep);
       return {
         workflow: { name: definition.name, version: definition.version, description: definition.description ?? null },
         step: clip(workflowStep, 8000),
@@ -185,9 +187,7 @@ export async function executeEvaluationTool(
           executor: upstream.executor,
           description: upstream.description ?? null,
         })),
-        skill: skill !== null
-          ? clip(skill, 8000)
-          : externalSkillLocation(definition, workflowStep),
+        skills: await offeredSkills(scope, definition, workflowStep),
       };
     }
     case 'list_step_runs': {

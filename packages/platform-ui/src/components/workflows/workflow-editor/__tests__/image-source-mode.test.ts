@@ -15,11 +15,6 @@ const CARRIED: ImageSourceDefinition = {
   ],
 };
 
-const SKILLS_REPO: ImageSourceDefinition = {
-  namespace: 'db',
-  externalSkillsRepo: { url: 'https://github.com/org/skills.git', commit: 'b'.repeat(40) },
-};
-
 describe('deriveImageSourceMode', () => {
   it('reads a step that names only an image as a ready image', () => {
     expect(deriveImageSourceMode({ image: 'python:3.11-slim' }, CARRIED)).toBe('ready');
@@ -36,10 +31,6 @@ describe('deriveImageSourceMode', () => {
 
   it('reads a Dockerfile the workflow carries as a carried build', () => {
     expect(deriveImageSourceMode({ dockerfile: 'container/Dockerfile' }, CARRIED)).toBe('carried');
-  });
-
-  it('reads a bare Dockerfile behind the skills repo as a repo build', () => {
-    expect(deriveImageSourceMode({ dockerfile: 'container/Dockerfile' }, SKILLS_REPO)).toBe('repo');
   });
 
   it('reads a Dockerfile with nothing to build it from as a repo build, where the repo can be supplied', () => {

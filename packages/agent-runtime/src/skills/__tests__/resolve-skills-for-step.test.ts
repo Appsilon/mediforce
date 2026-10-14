@@ -8,7 +8,7 @@ import {
 } from '@mediforce/platform-core';
 import { InMemoryAgentDefinitionRepository } from '@mediforce/platform-core/testing';
 import { AgentDefinitionNotFoundError } from '../../mcp/resolve-mcp-for-step';
-import { resolveSkillsForStep, SkillNotFoundError, type ResolveSkillsForStepDeps } from '../resolve-skills-for-step';
+import { resolveSkillsForStep, RetiredFileSkillError, SkillNotFoundError, type ResolveSkillsForStepDeps } from '../resolve-skills-for-step';
 
 function makeStep(overrides: Partial<WorkflowStep> = {}): WorkflowStep {
   return WorkflowStepSchema.parse({ id: 'map', name: 'Map', type: 'creation', executor: 'agent', ...overrides });
@@ -67,6 +67,16 @@ describe('resolveSkillsForStep', () => {
 
   it('[DATA] returns null when the step names no agent', async () => {
     expect(await resolveSkillsForStep(makeStep(), deps, workflow)).toBeNull();
+  });
+
+  it('[ERROR] refuses a step still naming a retired file skill before resolving any catalog skill', async () => {
+    store(makeSkill('alpha', 'sdtm-mapping'));
+    await holdingAgent([{ namespace: 'alpha', id: 'sdtm-mapping' }]);
+    const step = makeStep({ agentId: 'mapper', agent: { prompt: 'map', retiredFileSkill: 'sdtm-mapper' } });
+
+    const error = await resolveSkillsForStep(step, deps, workflow).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(RetiredFileSkillError);
+    expect((error as RetiredFileSkillError).message).toContain("Step 'map' uses the file skill 'sdtm-mapper'");
   });
 
   it('[ERROR] throws AgentDefinitionNotFoundError for a missing agent', async () => {

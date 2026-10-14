@@ -107,8 +107,8 @@
         "GITHUB_TOKEN": "{{GITHUB_TOKEN}}"
       },
       "agent": {
-        "skill": "deploy-teal-app",
-        "skillsDir": "apps/tealflow/plugins/tealflow/skills",
+        "prompt": "Use the `deploy-teal-app` skill: it holds this step's instructions. Load it first and follow it.",
+        "skills": [{ "namespace": "appsilon", "id": "deploy-teal-app" }],
         "model": "sonnet",
         "image": "mediforce-agent:tealflow",
         "timeoutMinutes": 5

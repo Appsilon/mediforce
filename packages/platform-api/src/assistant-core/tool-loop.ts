@@ -151,7 +151,7 @@ export async function runProposalToolLoop<TPlatform extends string>(
     } catch (error) {
       if (error instanceof OpenRouterNetworkError) {
         console.warn('[assistant-tool-loop] model connection failed', { requestId, round: iteration + 1, error: error.message });
-        return finishPartial('The connection to the model was interrupted.');
+        return finishPartial('The connection to the model was interrupted, so this answer may be incomplete. Send your message again to continue.');
       }
       throw error;
     }
@@ -167,7 +167,7 @@ export async function runProposalToolLoop<TPlatform extends string>(
       if (response.finishReason !== 'length') return { reply: response.content, proposals, platformCalls };
       truncatedRounds += 1;
       if (truncatedRounds >= MAX_TRUNCATED_ROUNDS) {
-        return finishPartial('The assistant response was truncated at its output-token limit.');
+        return finishPartial('The answer got too long for the assistant to finish. Ask for a smaller piece at a time.');
       }
       if (response.content !== '') messages.push({ role: 'assistant', content: response.content });
       messages.push({ role: 'user', content: config.truncatedResponseNotice ?? DEFAULT_TRUNCATED_RESPONSE_NOTICE });

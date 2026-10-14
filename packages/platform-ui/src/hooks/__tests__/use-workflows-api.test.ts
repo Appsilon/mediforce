@@ -21,7 +21,6 @@ describe('mapApiToDefinitionGroups', () => {
         description: 'A test',
         namespace: 'acme',
         visibility: 'public',
-        externalSkillsRepo: { url: 'https://github.com/example/repo' },
       },
     }];
 
@@ -46,7 +45,6 @@ describe('mapApiToDefinitionGroups', () => {
       hasManualTrigger: true,
       // The public profile read carries no gate, and no gate means open.
       callerMayRun: true,
-      externalSkillsRepo: { url: 'https://github.com/example/repo' },
       url: undefined,
       archived: undefined,
       namespace: 'acme',

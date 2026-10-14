@@ -76,11 +76,6 @@ export function ImageSourceFields({
   const [chosen, setChosen] = useState<ImageSourceMode | null>(null);
   const mode = chosen ?? deriveImageSourceMode(config, definition);
   const unused = unusedFieldsForMode(mode, config, definition);
-  const skillsRepo = definition?.externalSkillsRepo;
-  const inheritsSkillsRepo =
-    mode === 'repo' &&
-    (config?.repo ?? '') === '' &&
-    typeof skillsRepo?.url === 'string' && skillsRepo.url.length > 0;
   // Hidden by default: an image worth running is one the catalog describes, and
   // the picker keeps a value it does not recognise rather than dropping it
   // (ADR-0022 decision 5). The escape hatch stays for an image nobody has
@@ -217,7 +212,6 @@ export function ImageSourceFields({
             <input
               value={config?.repo ?? ''}
               onChange={(event) => { onChange({ repo: event.target.value || undefined }); }}
-              placeholder={inheritsSkillsRepo ? skillsRepo?.url : undefined}
               className={inputBase}
             />
           </FieldRow>
@@ -226,17 +220,9 @@ export function ImageSourceFields({
             <input
               value={config?.commit ?? ''}
               onChange={(event) => { onChange({ commit: event.target.value || undefined }); }}
-              placeholder={inheritsSkillsRepo ? skillsRepo?.commit : undefined}
               className={inputBaseMono}
             />
           </FieldRow>
-
-          {inheritsSkillsRepo && (
-            <p className="text-[11px] leading-relaxed text-muted-foreground px-1 -mt-2">
-              Left empty, this builds from the workflow&apos;s skills repository — {skillsRepo?.url} at{' '}
-              {(skillsRepo?.commit ?? '').slice(0, 8)}.
-            </p>
-          )}
 
           <FieldRow label={`${prefix}.repoAuth`} tooltip="Name of a workflow secret holding the token for cloning a private repository.">
             <input

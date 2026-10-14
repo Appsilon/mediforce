@@ -63,7 +63,7 @@ export const TransitionSchema = z.object({
 });
 
 /** A git commit SHA: 7–40 lowercase hex chars. Shared by every field that pins
- *  an immutable commit (RepoSchema, externalSkillsRepo, container build source,
+ *  an immutable commit (RepoSchema, container build source,
  *  imported-workflow provenance) so the validation lives in one place.
  *
  *  All zeros is refused. It is the placeholder the `/design-workflow` skill

@@ -1,5 +1,5 @@
 ---
-status: partially superseded by 0027
+status: partially superseded by 0028
 audience: engineers
 last_reviewed: 2026-10-07
 ---
@@ -55,9 +55,10 @@ frontmatter carrying `name` (kebab-case) and `description`.
 - **`description` is required** because it is what Claude Code reads to decide
   whether to load the skill (decision 5).
 - **Paths follow `WorkflowArtifactSchema`**: relative, forward slashes, no
-  empty, `.` or `..` segment. The whole Skill is capped at 256 KB
-  (`WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES`), the same bound a workflow's carried
-  files already live under.
+  empty, `.` or `..` segment. The whole Skill is capped at 1 MB
+  (`SKILL_MAX_TOTAL_BYTES`). A workflow's carried files keep their own 256 KB
+  cap (`WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES`); a Skill carries reference data
+  such as CDISC rule CSVs and sits in its own row, not in a definition.
 - **Binary files are out of scope for v1.**
 
 ### 2. Stored as a Postgres row, files as `jsonb`
@@ -67,7 +68,7 @@ One row per Skill: `namespace`, `id`, `name`, `description`, `visibility`,
 over the files.
 
 A `BlobStore` exists for task attachments (ADR-0003). It is not used here.
-Attachments are large and streamed, while a Skill is at most 256 KB of text and
+Attachments are large and streamed, while a Skill is at most 1 MB of text and
 is read whole on every step. A single row keeps content, hash and visibility in
 one transaction, and at this size it costs `pg_dump` nothing. If binary assets
 arrive later, they can go to the `BlobStore` without changing what a Skill is.

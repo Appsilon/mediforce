@@ -221,18 +221,14 @@ anywhere. Adding a subpath export means touching `package.json` exports and
 `tsconfig.json` paths; consumers follow automatically. New package? Copy the
 smallest existing package with the same entry-point shape.
 
-### Runtime skill paths are hardcoded in `.wd.json`
-
-Move or rename a runtime skill directory and the step fails at execution:
-`BaseContainerAgentPlugin.readSkillFile()` can't find it. `skillsDir` in the
-WorkflowDefinition is a literal path, not a registry lookup.
+### Runtime skills live in the catalog, not on disk
 
 Two tiers, different resolution — don't confuse them:
 
 | Tier | Location | Resolved by |
 |------|----------|-------------|
-| Runtime | `apps/*/plugins/*/skills/` | `agent-runtime` via `skillsDir` in `.wd.json` |
-| Development | `skills/` (symlinked into `.claude/skills/`) | Claude Code slash-command loader |
+| Runtime | the workspace's Skill catalog; a package ships its own in `apps/*/skills/` | an Agent's `skills` and a step's `agent.skills` (ADR-0025, ADR-0027); importing a workflow creates the package's Skills (ADR-0028) |
+| Development | `skills/` (symlinked into `.claude/skills/`; `skills/code-review` is itself a symlink to the copy `apps/mediforce-reviewer` ships) | Claude Code slash-command loader |
 
-Each app indexes its own runtime skills in a local `_registry.yml`. Before
-refactoring: `grep -rn 'skillsDir' apps/ packages/`.
+A step names catalog Skills, never a path. To load a package's Skills without
+importing the workflow: `mediforce skill import --repo <url> --dir apps/<app>/skills --namespace <ns>`.

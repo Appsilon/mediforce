@@ -1846,7 +1846,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       title: 'Initial vendor assessment workflow',
       description: 'End-to-end supply chain review process',
       steps: [
-        { id: 'vendor-assessment', name: 'Vendor Assessment', type: 'creation', executor: 'agent', autonomyLevel: 'L2', plugin: 'supply-data-collector', agent: { skill: 'vendor-assessment', mcpServers: [{ name: 'postgres-ro', command: 'npx', args: ['-y', '@modelcontextprotocol/server-postgres'], env: { DATABASE_URL: '{{DB_URL}}' }, allowedTools: ['query'] }, { name: 'filesystem', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/data'] }] } },
+        { id: 'vendor-assessment', name: 'Vendor Assessment', type: 'creation', executor: 'agent', autonomyLevel: 'L2', plugin: 'supply-data-collector', agent: { prompt: 'Assess the vendor.', mcpServers: [{ name: 'postgres-ro', command: 'npx', args: ['-y', '@modelcontextprotocol/server-postgres'], env: { DATABASE_URL: '{{DB_URL}}' }, allowedTools: ['query'] }, { name: 'filesystem', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/data'] }] } },
         { id: 'narrative-summary', name: 'Narrative Summary', type: 'creation', executor: 'agent', autonomyLevel: 'L3', agent: {} },
         { id: 'risk-scoring', name: 'Risk Scoring', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
         { id: 'data-quality', name: 'Data Quality Analysis', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
@@ -2395,8 +2395,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     description: 'Test workflow for the files panel',
     steps: [
       { id: 'review', name: 'Review', type: 'creation', executor: 'human' },
-      // An agent step, so the journey can check that a skill uploaded into the
-      // files is offered where a step picks one.
+      // An agent step, so the journey can add a catalog skill to a step.
       { id: 'interpret', name: 'Interpret', type: 'creation', executor: 'agent', plugin: 'claude-code-agent', agent: { image: 'mediforce-golden-image' } },
       { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
     ],

@@ -223,17 +223,15 @@ describe('findWorkflowImagePins', () => {
     expect(pins[0].live).toBe(true);
   });
 
-  it('names the tag a carried Dockerfile builds under, even beside a skills repo', () => {
-    // The runtime builds a carried Dockerfile ahead of `externalSkillsRepo`, so
-    // the scan must too, or a live version pinning a `mediforce-artifacts:*`
-    // image would not block its delete.
+  it('names the tag a carried Dockerfile builds under', () => {
+    // The scan must reach the runtime's answer, or a live version pinning a
+    // `mediforce-artifacts:*` image would not block its delete.
     const artifacts = [{ path: 'container/Dockerfile', contents: 'FROM alpine:3.21\n' }];
     const definition = buildWorkflowDefinition({
       name: 'intake',
       namespace: 'acme',
       version: 1,
       artifacts,
-      externalSkillsRepo: { url: 'https://github.com/org/skills.git', commit: 'b'.repeat(40) },
       steps: [
         { id: 'build', name: 'Build', type: 'creation', executor: 'script', script: { dockerfile: 'container/Dockerfile', command: 'true' } },
         { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },

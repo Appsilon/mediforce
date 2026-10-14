@@ -7,7 +7,7 @@ import { workspaces } from './workspace';
  * PK `(workspace, id)` mirrors `tool_catalog_entries`; `id` is the `name` in
  * the skill's `SKILL.md` frontmatter.
  *
- * `files` is jsonb rather than a blob: a skill is at most 256 KB of text, read
+ * `files` is jsonb rather than a blob: a skill is at most 1 MB of text, read
  * whole on every step, and one row keeps content, hash and visibility in a
  * single transaction (ADR-0025 decision 2). `name` and `description` are
  * copies of the frontmatter, lifted to columns so a listing never reads

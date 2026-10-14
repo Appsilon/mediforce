@@ -3,10 +3,9 @@ generated: "2026-06-11"
 standard: "agentskills.io/specification"
 total_skills: 13
 
-# Runtime skills have their own per-app registries:
-#   apps/protocol-to-tfl/plugins/protocol-to-tfl/skills/_registry.yml
-#   apps/community-digest/plugins/community-digest/skills/_registry.yml
-#   apps/workflow-designer/plugins/workflow-designer/skills/_registry.yml
+# Workflow packages ship their own skills in apps/*/skills/; those become
+# catalog Skills when the workflow is imported (ADR-0028), and some apps index
+# them in a local _registry.yml.
 
 domains:
   development:
