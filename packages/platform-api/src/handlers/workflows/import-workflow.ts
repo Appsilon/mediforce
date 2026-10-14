@@ -8,6 +8,7 @@ import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
 import { normalizeRepoDir, readSkillFolders, upsertSkills } from '../skills/import-skills';
 import { buildRawUrl, fetchJsonOrThrow, resolveGitHubSource } from './_github';
+import { assertStepsMayAddSkills } from '../skills/may-hold-skills';
 import { registerWorkflow } from './register-workflow';
 import { validateWorkflow } from './validate-workflow';
 
@@ -73,6 +74,27 @@ export async function importWorkflow(
   if (checked.valid === false) {
     throw new ValidationError(checked.errors.map((error) => error.message).join(', '), checked.errors);
   }
+  // Skills the package ships are checked by registration once written, but a
+  // reference to any other Skill can already fail now; so can a shipped Skill
+  // that already exists, whose visibility the upsert keeps.
+  const existing = await Promise.all(
+    [...shipped].map(async (id) => [id, await scope.skills.getById(input.namespace, id)] as const),
+  );
+  const created = new Set(existing.filter(([, skill]) => skill === null).map(([id]) => id));
+  await assertStepsMayAddSkills(
+    {
+      namespace: input.namespace,
+      visibility: parsed.data.visibility,
+      steps: steps.map((step) => step.agent?.skills === undefined ? step : {
+        ...step,
+        agent: {
+          ...step.agent,
+          skills: step.agent.skills.filter((ref) => !(ref.namespace === input.namespace && created.has(ref.id))),
+        },
+      }),
+    },
+    scope,
+  );
   const skills = await upsertSkills(
     input.namespace,
     folders,

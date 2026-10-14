@@ -264,6 +264,17 @@ describe('importWorkflow handler', () => {
       expect(await skillRepo.getById('test-ns', 'summarize-record', { publicOnly: false })).toBeNull();
     });
 
+    it('writes no skill when a step also names a skill that does not exist', async () => {
+      mockFetchOk(withStepSkills([{ namespace: 'appsilon', id: 'summarize-record' }, { namespace: 'shared', id: 'missing' }]));
+      const { scope, skillRepo } = buildSkillScope({ 'pkg/skills/summarize-record/SKILL.md': skillMd('summarize-record') });
+
+      await expect(importWorkflow(
+        { repo: 'https://github.com/Appsilon/mediforce-workflows', path: 'pkg/src/pkg.wd.json', ref: SHA, namespace: 'test-ns' },
+        scope,
+      )).rejects.toThrow(ValidationError);
+      expect(await skillRepo.getById('test-ns', 'summarize-record', { publicOnly: false })).toBeNull();
+    });
+
     it('registers nothing and creates nothing when a shipped skill folder is invalid', async () => {
       mockFetchOk(withStepSkills([{ namespace: 'appsilon', id: 'summarize-record' }]));
       const { scope, processRepo, skillRepo } = buildSkillScope({ 'pkg/skills/summarize-record/SKILL.md': '# no frontmatter\n' });

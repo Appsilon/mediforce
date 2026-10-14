@@ -53,7 +53,7 @@ export async function readSkillFolders(
   });
 
   const folders = new Map<string, SkillFile[]>();
-  const refusals: string[] = [];
+  const refusals: { folder: string; path: string; message: string }[] = [];
   for (const entry of entries) {
     const [folder, ...rest] = entry.path.slice(prefix.length).split('/');
     if (folder === undefined || rest.length === 0) continue;
@@ -62,17 +62,24 @@ export async function readSkillFolders(
     if ('contents' in entry) {
       folders.set(folder, [...(folders.get(folder) ?? []), { path, contents: entry.contents }]);
     } else if ('tooLarge' in entry) {
-      refusals.push(`${entry.path} is over ${String(entry.maxBytes)} bytes`);
+      refusals.push({ folder, path, message: `${entry.path} is over ${String(entry.maxBytes)} bytes` });
     } else {
-      refusals.push(`${entry.path} is ${entry.refused === 'symlink' ? 'a symlink' : 'not UTF-8 text'}; a skill holds text files only`);
+      refusals.push({ folder, path, message: `${entry.path} is ${entry.refused === 'symlink' ? 'a symlink' : 'not UTF-8 text'}; a skill holds text files only` });
     }
   }
 
   const skillFolders = [...folders.entries()]
     .filter(([, files]) => files.some((file) => file.path === SKILL_MANIFEST_PATH))
     .sort(([left], [right]) => (left < right ? -1 : 1));
-  const relevantRefusals = refusals.filter((refusal) =>
-    skillFolders.some(([folder]) => refusal.startsWith(`${prefix}${folder}/`)));
+  // A folder whose SKILL.md was refused (link, oversized, binary) is still a
+  // Skill folder, so its refusal blocks the import rather than being skipped.
+  const skillFolderNames = new Set([
+    ...skillFolders.map(([folder]) => folder),
+    ...refusals.filter((refusal) => refusal.path === SKILL_MANIFEST_PATH).map((refusal) => refusal.folder),
+  ]);
+  const relevantRefusals = refusals
+    .filter((refusal) => skillFolderNames.has(refusal.folder))
+    .map((refusal) => refusal.message);
   if (relevantRefusals.length > 0) {
     throw new ValidationError(`Cannot import skills: ${relevantRefusals.join('; ')}`);
   }

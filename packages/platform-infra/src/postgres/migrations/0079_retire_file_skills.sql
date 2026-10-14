@@ -29,6 +29,26 @@ LANGUAGE sql IMMUTABLE AS $$
   END
 $$;
 
+-- Same collapsing as `normalizeRepoPath`: drops `.` and empty segments, folds `..`.
+CREATE FUNCTION pg_temp.normalize_repo_path(path text) RETURNS text
+LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE
+  segments text[] := ARRAY[]::text[];
+  segment text;
+BEGIN
+  FOREACH segment IN ARRAY string_to_array(path, '/') LOOP
+    IF segment = '' OR segment = '.' THEN CONTINUE; END IF;
+    IF segment = '..' THEN
+      IF cardinality(segments) = 0 THEN RETURN NULL; END IF;
+      segments := segments[1:cardinality(segments) - 1];
+    ELSE
+      segments := segments || segment;
+    END IF;
+  END LOOP;
+  RETURN array_to_string(segments, '/');
+END
+$$;
+
 CREATE FUNCTION pg_temp.with_build_repo(config jsonb, ext jsonb, artifacts jsonb) RETURNS jsonb
 LANGUAGE plpgsql IMMUTABLE AS $$
 DECLARE
@@ -40,7 +60,7 @@ BEGIN
   END IF;
   IF dockerfile IS NOT NULL AND NOT names_repo AND NOT EXISTS (
     SELECT 1 FROM jsonb_array_elements(COALESCE(artifacts, '[]'::jsonb)) AS artifact
-    WHERE artifact->>'path' = regexp_replace(dockerfile, '^(\./)+', '')
+    WHERE artifact->>'path' = pg_temp.normalize_repo_path(dockerfile)
   ) THEN
     config := config || jsonb_build_object(
       'repo', COALESCE(NULLIF(config->>'repo', ''), ext->>'url'),

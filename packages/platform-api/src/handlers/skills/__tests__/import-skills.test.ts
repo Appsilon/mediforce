@@ -88,6 +88,14 @@ describe('importSkills', () => {
     expect(await skillRepo.getById('alpha', 'rank-changes', { publicOnly: false })).toBeNull();
   });
 
+  it('imports nothing when a folder\'s SKILL.md cannot be read', async () => {
+    reader.files['skills/draft-posts/SKILL.md'] = 'x'.repeat(1024 * 1024 + 1);
+
+    await expect(importSkills({ namespace: 'alpha', repo: REPO, ref: SHA, dir: 'skills' }, scopeFor(['alpha'])))
+      .rejects.toThrow(/skills\/draft-posts\/SKILL.md is over/);
+    expect(await skillRepo.getById('alpha', 'rank-changes', { publicOnly: false })).toBeNull();
+  });
+
   it('refuses a directory with no skill folders', async () => {
     await expect(importSkills({ namespace: 'alpha', repo: REPO, ref: SHA, dir: 'docs' }, scopeFor(['alpha'])))
       .rejects.toBeInstanceOf(ValidationError);

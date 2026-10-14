@@ -119,7 +119,7 @@ test.describe('skills API journey', () => {
 
     expect((await post({ files: [{ path: 'README.md', contents: '' }] })).status()).toBe(400);
     expect((await post({ files: [skillMd, { path: '../escape.md', contents: '' }] })).status()).toBe(400);
-    const big = Array.from({ length: 5 }, (_, index) => ({ path: `references/${String(index)}.md`, contents: 'x'.repeat(60 * 1024) }));
+    const big = Array.from({ length: 20 }, (_, index) => ({ path: `references/${String(index)}.md`, contents: 'x'.repeat(60 * 1024) }));
     expect((await post({ files: [skillMd, ...big] })).status()).toBe(400);
     expect((await post({ files: [skillMd], name: 'e2e-bad' })).status()).toBe(400);
   });

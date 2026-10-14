@@ -58,6 +58,7 @@ describe.skipIf(skipPg)('migration 0079 — file skills and externalSkillsRepo r
       { id: 'own-repo', agent: { dockerfile: 'Dockerfile', repo: 'https://github.com/acme/app', commit: 'b'.repeat(40), prompt: 'Go.' } },
       { id: 'own-auth', agent: { dockerfile: 'Dockerfile', repo: 'https://github.com/acme/app', commit: 'b'.repeat(40), repoAuth: 'MINE', prompt: 'Go.' } },
       { id: 'carried', agent: { dockerfile: 'carried/Dockerfile', prompt: 'Go.' } },
+      { id: 'carried-spelled', agent: { dockerfile: '/carried/./sub/../Dockerfile', prompt: 'Go.' } },
       { id: 'prebuilt', agent: { image: 'mediforce-golden-image', prompt: 'Go.' } },
     ], EXT, [{ path: 'carried/Dockerfile', contents: 'FROM r-base\n' }]);
 
@@ -97,6 +98,7 @@ describe.skipIf(skipPg)('migration 0079 — file skills and externalSkillsRepo r
     expect(byId['own-repo']?.agent).toMatchObject({ repo: 'https://github.com/acme/app', repoAuth: 'GITHUB_TOKEN' });
     expect(byId['own-auth']?.agent).toMatchObject({ repo: 'https://github.com/acme/app', repoAuth: 'MINE' });
     expect(byId.carried?.agent).toEqual({ dockerfile: 'carried/Dockerfile', prompt: 'Go.' });
+    expect(byId['carried-spelled']?.agent).toEqual({ dockerfile: '/carried/./sub/../Dockerfile', prompt: 'Go.' });
     expect(byId.prebuilt?.agent).toEqual({ image: 'mediforce-golden-image', prompt: 'Go.' });
   });
 
