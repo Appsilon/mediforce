@@ -20,7 +20,7 @@ import { FALLBACK_PINNED_MODEL } from './model-registry';
  * may do with them.
  *
  * *Proposals* never run: the call comes back to the person as a card to
- * accept, edit or reject, and accepting goes through the same handler a
+ * accept or reject, and accepting goes through the same handler a
  * person's own form uses. *Platform* tools run as the person asking — reads,
  * a draft check against real outputs, preparing an Eval Run, and starting one
  * only under an unattended budget the person granted for the request. Nothing here
@@ -262,7 +262,7 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
 export type EvaluationAssistantProposalToolName = keyof typeof EVALUATION_ASSISTANT_PROPOSAL_TOOLS;
 export type EvaluationAssistantPlatformToolName = keyof typeof EVALUATION_ASSISTANT_PLATFORM_TOOLS;
 
-/** What the assistant proposed this turn, for the person to accept, edit or reject. */
+/** What the assistant proposed this turn, for the person to accept or reject. */
 export const EvaluationAssistantProposalSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('propose_evaluation_plan'), arguments: ProposeEvaluationPlanToolSchema }),
   z.object({ tool: z.literal('propose_evaluator'), arguments: ProposeEvaluatorToolSchema }),

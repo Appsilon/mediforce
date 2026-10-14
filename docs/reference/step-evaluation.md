@@ -55,7 +55,7 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   tries a check on real outputs before proposing it.
 - **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
   written or synthesized), Brief drafts and Acceptance Criteria come back as
-  cards to accept, edit or reject. Accepting one is the same write the forms
+  cards to accept or reject. Accepting one is the same write the forms
   make, recorded with `origin: assistant`. A routing recommendation (a Control
   Mode) comes back as a card to apply in the workflow editor. So does a **diagnosis** of an Eval Run's failures
   (`propose_diagnosis`) — see below. Nothing is applied to the step by the
