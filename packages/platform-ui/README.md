@@ -61,7 +61,9 @@ are on and ends when you leave it; a *scenario* (`src/lib/demo-content.ts`)
 walks one job across pages, navigates to the page and tab each step is about,
 and folds into a pill in the top bar when the viewer touches the app. Where a
 step cannot be reached — an empty workspace has no run for `:runId` — it says
-what is missing rather than spotlighting nothing. Every routing decision is one
+what is missing rather than spotlighting nothing. A step sends the viewer to its
+page once; a later URL change on that page (picking a step in a select, switching
+a tab) is theirs and is not navigated back. Every routing decision is one
 pure function, `nextRouteAction` in `src/lib/demo.ts`; keep it that way, because
 the bugs here come from two rules disagreeing about the same pathname.
 

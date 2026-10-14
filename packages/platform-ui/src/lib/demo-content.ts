@@ -1,8 +1,9 @@
 import type { DemoScenario } from './demo';
 
 /**
- * Three scenarios, in the order a process actually lives: someone builds it,
- * someone runs it and reads back what happened, and someone decides on it.
+ * Four scenarios, in the order a process actually lives: someone builds it,
+ * someone runs it and reads back what happened, someone decides on it, and
+ * someone measures how often its agent steps get it right.
  * Each is narrated over the real app — nothing is seeded and nothing is
  * clicked for you, so what a scenario shows is whatever this workspace
  * genuinely has.
@@ -165,6 +166,63 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
         title: 'The run picks up where it stopped',
         body: 'Your verdict chooses the next step, and the agent work resumes from there. The pause was part of the process, not an interruption to it.',
         target: 'tasks-list',
+      },
+    ],
+  },
+  {
+    id: 'evaluate',
+    title: 'Evaluate an agent step',
+    blurb: 'Measure how often an agent step is right, then sign off the result.',
+    minutes: 5,
+    steps: [
+      {
+        id: 'premise',
+        title: 'An agent answers differently every time it runs',
+        body: 'An evaluation tells you how often the answer is right: collect example inputs, say what a good output looks like, re-run the step on all of them, and read the pass rate. Nothing here changes the workflow.',
+        route: '/:handle/workflows/:name?tab=evaluation',
+        target: 'eval-selectors',
+        action: 'Pick an agent step',
+      },
+      {
+        id: 'assistant',
+        title: 'Start by asking what to check',
+        body: 'The assistant reads the step and returns a plan of risks, most important first, each with the cheapest check that catches it. Nothing is created until you Accept a card.',
+        target: 'eval-assistant',
+        action: 'Ask what you should check on this step',
+      },
+      {
+        id: 'evaluators',
+        title: 'Each check is an Evaluator',
+        body: 'Draft this check on a risk builds one and tries it on real production outputs before showing you. A Code Evaluator stays Not counted until you read the script and approve it.',
+        target: 'eval-evaluators',
+        action: 'Accept a drafted check',
+      },
+      {
+        id: 'cases',
+        title: 'Cases are inputs the step is re-run on',
+        body: 'Starting a case from a production run gives it exactly what the step received, and its output as the expectation. Add a few ordinary ones, a tricky one, and at least one that should fail.',
+        target: 'eval-cases',
+        action: 'Add a case from a production run, then Save',
+      },
+      {
+        id: 'bar',
+        title: 'The threshold is the bar the step must clear',
+        body: 'Every counting Evaluator must reach the minimum pass rate, 100% by default. The status here stays Not verified until an Eval Run finishes, and resets whenever the step, a check, the cases or the threshold change.',
+        target: 'eval-status',
+      },
+      {
+        id: 'run',
+        title: 'An Eval Run re-runs every case several times',
+        body: 'Trials per case and the budget set what it costs, and the confirmation shows the estimate before anything is spent. For a first run keep it small: a few cases, one trial each.',
+        target: 'eval-runs',
+        action: 'Start an Eval Run',
+      },
+      {
+        id: 'sign',
+        title: 'A person signs the result off',
+        body: 'Open Details to read the pass rate and review any LLM judge verdicts, then confirm the result or overwrite it with a reason. The status flips to Validation passed or failed on your signature.',
+        target: 'eval-runs',
+        action: 'Open the run and sign it',
       },
     ],
   },

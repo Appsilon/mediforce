@@ -29,6 +29,9 @@ function ScenarioStarter() {
       <button type="button" onClick={() => startScenario('run')} data-testid="start-run-scenario">
         run
       </button>
+      <button type="button" onClick={() => startScenario('evaluate')} data-testid="start-evaluate-scenario">
+        evaluate
+      </button>
       <button type="button" onClick={() => startScenario('build')} data-testid="start-build-scenario">
         build
       </button>
@@ -173,6 +176,24 @@ describe('demo scenarios', () => {
     mount();
     fireEvent.click(screen.getByTestId('start-run-scenario'));
     expect(pushMock).toHaveBeenCalledWith('/test/workflows/etymology-checker?tab=triggers');
+  });
+
+  it('leaves the viewer on the step they picked instead of navigating back', () => {
+    pathname = '/test/workflows/etymology-checker';
+    const view = mount();
+    fireEvent.click(screen.getByTestId('start-evaluate-scenario'));
+    expect(pushMock).toHaveBeenCalledWith('/test/workflows/etymology-checker?tab=evaluation');
+    pushMock.mockClear();
+
+    search = 'tab=evaluation&version=1&step=grade-aes';
+    view.rerender(
+      <TourProvider>
+        <GuideTrigger />
+        <ScenarioStarter />
+        <TourPill />
+      </TourProvider>,
+    );
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   it('starts where the viewer already stands rather than marching them back', () => {

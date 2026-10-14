@@ -123,11 +123,15 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   // when the URL actually changed. Without this, stepping Back re-ran it on the
   // page you were already on and threw you forward again.
   const arrivedFrom = React.useRef<string | null>(null);
+  // A step sends the viewer to its page once. A later URL change on that page —
+  // picking a step in a select, switching a tab — is theirs, not a drift to undo.
+  const navigatedFor = React.useRef<string | null>(null);
 
   // A scenario navigates only; opening the panel or the tab is the viewer's.
   React.useEffect(() => {
     if (active === null || active.kind !== 'scenario') {
       arrivedFrom.current = null;
+      navigatedFor.current = null;
       return;
     }
     const action = nextRouteAction({
@@ -146,7 +150,15 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     arrivedFrom.current = currentUrl;
-    if (action.kind === 'navigate') router.push(action.url);
+    if (action.kind === 'navigate') {
+      const stepKey = `${active.title}:${active.index}`;
+      if (navigatedFor.current === stepKey) {
+        setUnreachable(null);
+        return;
+      }
+      navigatedFor.current = stepKey;
+      router.push(action.url);
+    }
     setUnreachable(action.kind === 'unreachable' ? action.needs : null);
   }, [active, pathname, currentUrl, demoRun, router]);
 

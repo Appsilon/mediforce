@@ -122,8 +122,8 @@ describe('startingIndex', () => {
 });
 
 describe('demo scenarios', () => {
-  it('ships three, each with a unique id', () => {
-    expect(DEMO_SCENARIOS).toHaveLength(3);
+  it('ships four, each with a unique id', () => {
+    expect(DEMO_SCENARIOS).toHaveLength(4);
     const ids = DEMO_SCENARIOS.map((scenario) => scenario.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
