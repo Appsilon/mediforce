@@ -74,6 +74,12 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
 - **Never:** approving a `code` check's source, accepting or denying a judge's
   verdict, signing a Step Qualification. There is no tool for these.
 
+The assistant answers for a person who may not be technical: a few sentences
+ending in the one next step, in the Evaluation tab's terms (from
+[`CONTEXT.md`](../../CONTEXT.md); Control Modes as `CM0`–`CM4`), with results
+as counts ("7 of 10 trials passed") and without tool names, field names, IDs or
+raw JSON.
+
 The step's Brief is sent to the assistant on every turn. What it can help with:
 
 - **Evaluation plan.** It reads the step, a few of its runs and the Brief, and

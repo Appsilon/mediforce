@@ -42,6 +42,17 @@ describe('Evaluation Assistant prompt', () => {
     }
   });
 
+  it('answers a non-technical person briefly, in the Evaluation tab\'s terms, without its own internals', () => {
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('the one next step the person can take');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Output schema, Code, LLM judge and Expected output');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('never "test case", "metric", "grader", "threshold"');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Never show the person tool names');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('"7 of 10 trials passed"');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('"Waiting for human approval"');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('"CM4 — Autonomous agent');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toMatch(/frozen Dataset|Control Mode 4/);
+  });
+
   it('says whether the request carries an unattended budget', () => {
     expect(unattendedBudgetMessage(undefined)).toContain('start_eval_run is refused');
     expect(unattendedBudgetMessage(5)).toContain('unattended budget of $5');
