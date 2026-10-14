@@ -208,6 +208,8 @@ export const queryKeys = {
   workflowsByImage: (images: readonly string[]) =>
     ['workflows-by-image', [...images].sort().join(' ')] as const,
   workflowsByImageAll: () => ['workflows-by-image'] as const,
+  /** Skills and agents each live workflow runs with — "used in N workflows". */
+  workflowSkillUsage: () => ['workflow-skill-usage'] as const,
   /** Workspace-wide audit trail (Monitoring → Users / Tasks tabs) —
    *  keyset-paginated, server-side filtered by action set + actor +
    *  date range. Each tab passes its own `actions` slice, so the two

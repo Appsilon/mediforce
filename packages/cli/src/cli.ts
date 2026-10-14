@@ -34,6 +34,7 @@ import { runLogsCommand } from './commands/run-logs';
 import { runWatchCommand } from './commands/run-watch';
 import { workflowArchiveCommand } from './commands/workflow-archive';
 import { workflowSetVisibilityCommand } from './commands/workflow-set-visibility';
+import { workflowSetDefaultVersionCommand } from './commands/workflow-set-default-version';
 import { workflowAccessCommand, workflowSetAccessCommand } from './commands/workflow-access';
 import { workflowCopyCommand } from './commands/workflow-copy';
 import { workflowDeleteCommand } from './commands/workflow-delete';
@@ -208,6 +209,10 @@ export const TREE: Record<string, BranchEntry> = {
       },
       get: { description: 'Fetch a workflow definition', fn: workflowGetCommand },
       'set-visibility': { description: 'Set workflow visibility (public|private)', fn: workflowSetVisibilityCommand },
+      'set-default-version': {
+        description: 'Set the version unpinned runs execute',
+        fn: workflowSetDefaultVersionCommand,
+      },
       access: { description: 'Show who may run and who may edit a workflow', fn: workflowAccessCommand },
       'set-access': { description: 'Set who may run and who may edit a workflow', fn: workflowSetAccessCommand },
       copy: { description: 'Copy workflow to another namespace', fn: workflowCopyCommand },

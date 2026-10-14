@@ -19,5 +19,5 @@ export default function NewSkillPage() {
       </div>
     );
   }
-  return <SkillEditor handle={handle} skill={null} readOnly={false} holders={[]} />;
+  return <SkillEditor handle={handle} skill={null} readOnly={false} holders={[]} workflows={[]} />;
 }

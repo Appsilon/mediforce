@@ -14,16 +14,18 @@ import { primaryButtonClass, secondaryButtonClass } from '@/components/ui/button
 import { routes } from '@/lib/routes';
 import { formatBytes } from '@/lib/format';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
-import { skillKey, useSkillHolders, useSkills } from '@/hooks/use-skills';
+import { skillKey, useSkillHolders, useSkills, useSkillWorkflows, type SkillWorkflow } from '@/hooks/use-skills';
 
 function SkillCard({
   skill,
   handle,
   holders,
+  workflows,
 }: {
   skill: SkillSummary;
   handle: string;
   holders: AgentDefinition[];
+  workflows: SkillWorkflow[];
 }) {
   const VisibilityIcon = skill.visibility === 'public' ? Globe : Lock;
   return (
@@ -55,18 +57,19 @@ function SkillCard({
           {skill.visibility === 'public' ? 'Public' : 'Private'}
         </span>
         <span className="text-right text-muted-foreground">
-          <SkillHolders holders={holders} handle={handle} />
+          <SkillHolders holders={holders} workflows={workflows} handle={handle} />
         </span>
       </div>
     </div>
   );
 }
 
-function SkillGrid({ title, skills, handle, holders }: {
+function SkillGrid({ title, skills, handle, holders, workflows }: {
   title: string;
   skills: SkillSummary[];
   handle: string;
   holders: Map<string, AgentDefinition[]>;
+  workflows: Map<string, SkillWorkflow[]>;
 }) {
   return (
     <section>
@@ -81,6 +84,7 @@ function SkillGrid({ title, skills, handle, holders }: {
             skill={skill}
             handle={handle}
             holders={holders.get(skillKey(skill.namespace, skill.id)) ?? []}
+            workflows={workflows.get(skillKey(skill.namespace, skill.id)) ?? []}
           />
         ))}
       </div>
@@ -93,6 +97,7 @@ export default function SkillsPage() {
   const { role } = useNamespaceRole(handle);
   const skills = useSkills(handle);
   const holders = useSkillHolders();
+  const workflows = useSkillWorkflows(holders);
   const [query, setQuery] = useState('');
   const [importing, setImporting] = useState(false);
 
@@ -165,9 +170,9 @@ export default function SkillsPage() {
         </div>
       ) : (
         <div className="space-y-8">
-          {own.length > 0 && <SkillGrid title={`@${handle}`} skills={own} handle={handle} holders={holders} />}
+          {own.length > 0 && <SkillGrid title={`@${handle}`} skills={own} handle={handle} holders={holders} workflows={workflows} />}
           {others.length > 0 && (
-            <SkillGrid title="Public, from other workspaces" skills={others} handle={handle} holders={holders} />
+            <SkillGrid title="Public, from other workspaces" skills={others} handle={handle} holders={holders} workflows={workflows} />
           )}
         </div>
       )}
