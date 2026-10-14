@@ -57,8 +57,8 @@ describe('runProposalToolLoop', () => {
       messages: [{ role: 'user', content: 'go' }], executePlatformTool: execute,
     });
     expect(result.reply).toContain('3 consecutive rounds');
-    expect(result.reply).toContain(toolName);
-    expect(result.reply).toContain(kind === 'platform' ? 'expected object' : 'expected string');
+    expect(result.reply).not.toContain(toolName);
+    expect(result.reply).not.toContain('expected');
     expect(result.reply).not.toContain('tool-use limit');
     expect(result.proposals).toEqual([{ tool: 'propose_note', arguments: { text: 'Keep this card.' } }]);
     expect(bodies).toHaveLength(5);

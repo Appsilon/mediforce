@@ -248,7 +248,7 @@ export async function runProposalToolLoop<TPlatform extends string>(
         nextStreaks.set(signature, count);
         if (count >= MAX_REPEATED_VALIDATION_ROUNDS) {
           console.warn('[assistant-tool-loop] repeated validation failure', { requestId, round: iteration + 1, ...failure, count });
-          return finishPartial(`The assistant stopped after ${count} consecutive rounds with the same invalid arguments for '${failure.tool}': ${failure.error}. The invalid calls were not executed.`);
+          return finishPartial(`The assistant stopped after ${count} consecutive rounds of the same invalid request. The invalid calls were not executed.`);
         }
       }
       validationStreaks = nextStreaks;
