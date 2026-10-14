@@ -45,7 +45,7 @@ describe('Evaluation Assistant prompt', () => {
   it('answers a non-technical person briefly, in the Evaluation tab\'s terms, without its own internals', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('the one next step the person can take');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Output schema, Code, LLM judge and Expected output');
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('never "test case", "metric", "grader", "threshold"');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('never "test case", "metric" or "grader"; never "threshold" for Acceptance Criteria');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Never show the person tool names');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('"7 of 10 trials passed"');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('"Waiting for human approval"');
