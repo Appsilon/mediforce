@@ -3,7 +3,7 @@ import { WorkflowEngine } from '@mediforce/workflow-engine';
 import type { CallerScope } from '../../../repositories/index';
 import { createEvaluator } from '../../evaluation/evaluators';
 import { createEvalCaseFromAgentRun } from '../../evaluation/eval-cases';
-import { freezeEvalDataset } from '../../evaluation/eval-datasets';
+import { saveEvalDataset } from '../../evaluation/eval-datasets';
 import { setEvaluationBrief } from '../../evaluation/briefs';
 import { askEvaluationAssistant } from '../ask-evaluation-assistant';
 import { evalScenario } from '../../evaluation/__tests__/finished-eval-run';
@@ -90,7 +90,7 @@ describe('askEvaluationAssistant', () => {
     Object.assign(scope.system, { engine: new WorkflowEngine(fixture.processRepo, fixture.instanceRepo, fixture.auditRepo) });
     await createEvaluator({ ...STEP, name: 'findings-present', rule: 'r', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
     await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, expectation: 'positive', comparison: 'exact', agreementInstructions: null, evaluatorIds: null, split: 'dev', origin: 'user' }, scope);
-    await freezeEvalDataset(STEP, scope);
+    await saveEvalDataset(STEP, scope);
     const requests = scriptOpenRouter([
       () => ({ toolCalls: [{ name: 'prepare_eval_run', arguments: { trialsPerCase: 2, budgetUsd: 2 } }] }),
       (request) => {

@@ -69,7 +69,7 @@ flowchart TD
 | A rule that needs judgment (rationale supports the grade, tone, completeness) | a rule in plain language | `llm_judge` Evaluator — counts at once; verdicts below its minimum confidence are left out until a person accepts them | **Evaluators → Add**; review verdicts in the Eval Run report |
 | The output matches a known answer | a case with an expected output | `expected_output` Evaluator — exact match, or an agreement score | **Evaluators → Add**; set the expected output on the case |
 | The step behaves on inputs production never sent (missing file, edge values, renamed columns, an injected instruction) | a production run to start from | synthesized case | the assistant's case synthesis, or `mediforce eval case-perturb` |
-| How often the step passes, with a confidence interval | Evaluators and a frozen Dataset | Eval Run + report | **Eval Runs**, `mediforce eval run-prepare` |
+| How often the step passes, with a confidence interval | Evaluators and a saved Dataset | Eval Run + report | **Eval Runs**, `mediforce eval run-prepare` |
 | Whether the step is good enough to ship | the above plus a floor | **Acceptance Criteria** judged in the Eval Run report | **Set the threshold**; the assistant proposes a floor; `mediforce eval criteria-set` |
 | Why a run failed | a finished Eval Run with failures | **diagnosis** card | ask the assistant; `mediforce eval failures <evalRunId>` |
 | Whether the step can drop its reviewer | a finished Eval Run | routing recommendation (Control Mode 4 when the criteria were met) | the report; apply it in the workflow editor |
@@ -119,9 +119,9 @@ expected of it (positive: it must match; negative: it must not).
 Then:
 
 1. Mark cases **dev** or **holdout** as you add them.
-2. **Save** (`dataset-freeze`). An Eval Run runs a frozen Dataset version,
+2. **Save** (`dataset-save`). An Eval Run runs a saved Dataset version,
    never the live list, so a case you add or edit reaches the next run only
-   after a freeze.
+   after a save.
 3. If the step uses MCP servers, set the **MCP eval policy** with
    `mediforce eval mcp-policy-set`: `live` for read-only servers, `replay` for
    side-effecting ones once a trial has recorded them, `deny` for anything the
@@ -138,7 +138,7 @@ guarded in production needs steps 2 and 7, not a qualification.
 3. **Criteria.** Accept the suggested floor, or set your own with **Set the
    threshold**.
 4. **Cases.** Harvest from production, add negatives and synthesized cases;
-   split dev / holdout; **Save** to freeze a Dataset.
+   split dev / holdout; **Save** to save a Dataset.
 5. **Eval Run.** Check the cost estimate, start, confirm the budget. Read the
    report: pass rate with Wilson interval, pass@k, pass^k, flakiness, criteria
    met / missed / not judged. Accept or deny model verdicts.

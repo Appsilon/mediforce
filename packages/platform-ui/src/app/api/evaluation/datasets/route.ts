@@ -1,8 +1,8 @@
 import { createRouteAdapter } from '@/lib/route-adapter';
-import { freezeEvalDataset, listEvalDatasets } from '@mediforce/platform-api/handlers';
-import { FreezeEvalDatasetInputSchema, ListEvalDatasetsInputSchema } from '@mediforce/platform-api/contract';
+import { saveEvalDataset, listEvalDatasets } from '@mediforce/platform-api/handlers';
+import { SaveEvalDatasetInputSchema, ListEvalDatasetsInputSchema } from '@mediforce/platform-api/contract';
 
-/** GET /api/evaluation/datasets — The Step's frozen Eval Dataset versions, newest first. */
+/** GET /api/evaluation/datasets — The Step's saved Eval Dataset versions, newest first. */
 export const GET = createRouteAdapter(
   ListEvalDatasetsInputSchema,
   (req) => {
@@ -16,10 +16,10 @@ export const GET = createRouteAdapter(
   listEvalDatasets,
 );
 
-/** POST /api/evaluation/datasets — Freezes the Step's live Eval Cases (or the named ones) as a new Dataset version. */
+/** POST /api/evaluation/datasets — Saves the Step's live Eval Cases (or the named ones) as a new Dataset version. */
 export const POST = createRouteAdapter(
-  FreezeEvalDatasetInputSchema,
+  SaveEvalDatasetInputSchema,
   async (req) => req.json().catch(() => ({})),
-  freezeEvalDataset,
+  saveEvalDataset,
   { successStatus: 201 },
 );

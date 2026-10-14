@@ -1090,19 +1090,19 @@ function AddCase({ step, evaluation, cases, evaluators, onClose }: {
 }
 
 /** How the live cases differ from a Dataset version: cases added or edited since, and cases it has that were archived or replaced. */
-export function datasetDrift(cases: readonly EvalCase[], dataset: EvalDatasetVersion | undefined): { unfrozen: Set<string>; dropped: number } {
-  const frozen = new Set(dataset?.caseIds ?? []);
+export function datasetDrift(cases: readonly EvalCase[], dataset: EvalDatasetVersion | undefined): { unsaved: Set<string>; dropped: number } {
+  const saved = new Set(dataset?.caseIds ?? []);
   const live = new Set(cases.map((evalCase) => evalCase.id));
   return {
-    unfrozen: new Set(cases.filter((evalCase) => !frozen.has(evalCase.id)).map((evalCase) => evalCase.id)),
-    dropped: [...frozen].filter((caseId) => !live.has(caseId)).length,
+    unsaved: new Set(cases.filter((evalCase) => !saved.has(evalCase.id)).map((evalCase) => evalCase.id)),
+    dropped: [...saved].filter((caseId) => !live.has(caseId)).length,
   };
 }
 
 /** Live cases the newest Dataset version does not hold, so Save would make a new version. */
 export function hasUnsavedCases(cases: readonly EvalCase[], dataset: EvalDatasetVersion | undefined): boolean {
-  const { unfrozen, dropped } = datasetDrift(cases, dataset);
-  return cases.length > 0 && (dataset === undefined || unfrozen.size > 0 || dropped > 0);
+  const { unsaved, dropped } = datasetDrift(cases, dataset);
+  return cases.length > 0 && (dataset === undefined || unsaved.size > 0 || dropped > 0);
 }
 
 function pluralCases(count: number): string {
@@ -1116,11 +1116,11 @@ function pluralCases(count: number): string {
 function DatasetStatus({ cases, datasets }: { cases: readonly EvalCase[]; datasets: readonly EvalDatasetVersion[] }) {
   const [latest] = datasets;
   if (latest === undefined) return null;
-  const { unfrozen, dropped } = datasetDrift(cases, latest);
+  const { unsaved, dropped } = datasetDrift(cases, latest);
   const saved = <span className="font-medium">Dataset v{latest.version}</span>;
   return (
     <div className="space-y-1 rounded-md bg-muted/40 p-2 text-xs" data-testid="dataset-status">
-      {unfrozen.size === 0 && dropped === 0 ? (
+      {unsaved.size === 0 && dropped === 0 ? (
         <p>All saved — the next Eval Run uses {saved} ({pluralCases(latest.caseIds.length)}).{latest.containsProductionData ? ' Contains production data.' : ''}</p>
       ) : (
         <p className="text-amber-700 dark:text-amber-300">
@@ -1182,11 +1182,11 @@ export function CasesSection({ step, evaluation, mayEdit }: {
   evaluation: StepEvaluation;
   mayEdit: boolean;
 }) {
-  const save = useStepEvaluationMutation(step, () => mediforce.evaluation.freezeDataset(step));
+  const save = useStepEvaluationMutation(step, () => mediforce.evaluation.saveDataset(step));
   const cases = evaluation.cases.data?.cases ?? [];
   const datasets = evaluation.datasets.data?.datasets ?? [];
   const [latest] = datasets;
-  const { unfrozen, dropped } = datasetDrift(cases, latest);
+  const { unsaved, dropped } = datasetDrift(cases, latest);
   const hasUnsavedChanges = hasUnsavedCases(cases, latest);
   const [adding, setAdding] = React.useState(false);
   const evaluators = evaluation.evaluators.data?.evaluators ?? [];
@@ -1255,7 +1255,7 @@ export function CasesSection({ step, evaluation, mayEdit }: {
               evalCase={evalCase}
               evaluators={evaluators}
               mayEdit={mayEdit}
-              unsaved={latest !== undefined && unfrozen.has(evalCase.id)}
+              unsaved={latest !== undefined && unsaved.has(evalCase.id)}
               selected={selectedIds.has(evalCase.id)}
               onSelect={(selected) => setSelectedIds((current) => {
                 const next = new Set(current);
@@ -1431,7 +1431,7 @@ function ValidationReason({ validation }: { validation: StepValidation }) {
  * workflow version, passed or failed on its Acceptance Criteria, not verified
  * once anything it rested on changed. The signed Step Qualification, if any,
  * opens from the same status. The threshold — 100% until set — is tuned in
- * a dialog; the next Eval Run freezes the one in force.
+ * a dialog; the next Eval Run takes the one in force.
  */
 export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEdit }: {
   step: EvaluatedStep;
@@ -1635,7 +1635,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
    */
   definitionVersion: number;
   data: StepEvaluation['runs'];
-  /** The Step's frozen Dataset versions, newest first: the one a new run takes, and the one each run ran. */
+  /** The Step's saved Dataset versions, newest first: the one a new run takes, and the one each run ran. */
   datasets: StepEvaluation['datasets'];
   /** The Step's live Eval Cases: a run takes the saved Dataset, so it waits while they differ. */
   cases: readonly EvalCase[];

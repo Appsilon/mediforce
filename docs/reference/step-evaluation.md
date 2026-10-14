@@ -55,7 +55,7 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   tries a check on real outputs before proposing it.
 - **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
   written or synthesized), Brief drafts and Acceptance Criteria come back as
-  cards to accept, edit or reject. Accepting one is the same write the forms
+  cards to accept or reject. Accepting one is the same write the forms
   make, recorded with `origin: assistant`. A routing recommendation (a Control
   Mode) comes back as a card to apply in the workflow editor. So does a **diagnosis** of an Eval Run's failures
   (`propose_diagnosis`) — see below. Nothing is applied to the step by the
@@ -73,6 +73,12 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   audit event records the grant. Without the field nothing changes.
 - **Never:** approving a `code` check's source, accepting or denying a judge's
   verdict, signing a Step Qualification. There is no tool for these.
+
+The assistant answers for a person who may not be technical: a few sentences
+ending in the one next step, in the Evaluation tab's terms (from
+[`CONTEXT.md`](../../CONTEXT.md); Control Modes as `CM0`–`CM4`), with results
+as counts ("7 of 10 trials passed") and without tool names, field names, IDs or
+raw JSON.
 
 The step's Brief is sent to the assistant on every turn. What it can help with:
 
@@ -430,9 +436,9 @@ change its name, split, input, expected output and how it is compared, or the
 Evaluators that grade it (`case-edit <caseId> --file`, `PATCH
 /api/evaluation/cases/:caseId`). Ticking cases in the list and **Set
 evaluators…** sets the Evaluators of all of them at once, one edit per case that
-changes; **Archive** takes it out of the next freeze (`case-archive`). An edit
+changes; **Archive** takes it out of the next save (`case-archive`). An edit
 is a new case that replaces the old one, which is archived, so a Dataset version
-frozen with the old case keeps exactly what it ran. A production case whose input is edited becomes `manual` — production never
+saved with the old case keeps exactly what it ran. A production case whose input is edited becomes `manual` — production never
 saw that input — and keeps the run it came from. MCP recordings are kept per
 case, so an edited case is recorded afresh by its next trial, `live` or `replay`.
 
@@ -450,11 +456,11 @@ workspace — is refused. It is built from production data, so it is flagged as
 containing it. It takes the same expected output, expectation, comparison and
 Evaluators as a written case.
 
-`dataset-freeze` (**Save** in the tab) freezes the live cases into a
+`dataset-save` (**Save** in the tab) saves the live cases as a
 numbered Eval Dataset version. A version never changes, and an Eval Run runs one
 — by default the newest — never the live list, so every run can be read against
 exactly the cases it ran. Adding, editing or archiving a case therefore reaches
-the next Eval Run only after the next freeze. The tab says which version the next
+the next Eval Run only after the next save. The tab says which version the next
 run takes and whether it is behind the list (cases added or edited since are
 tagged *unsaved*), lists the versions, and disables **Save** while the newest
 version already has every live case; while it does not, leaving or reloading the
@@ -515,7 +521,7 @@ A Step Qualification cites the policy's modes only.
 
 An Eval Run runs the Step, as its runnable Definition version has it — or the
 version named (`run-prepare --version N`, `definitionVersion`; the tab prepares
-for the version selected), never an archived one — over a frozen Dataset
+for the version selected), never an archived one — over a saved Dataset
 version: every case, `trialsPerCase` times. Starting, stopping and reviewing a
 run go by the version it was prepared for.
 
@@ -523,7 +529,7 @@ run go by the version it was prepared for.
    what a run of the same input would cost and the budget cap prepare would
    set, and creates nothing — the tab shows it next to the budget as the trial
    count changes.
-1. **Prepare** (`run-prepare`, `POST /api/evaluation/runs`) freezes the Dataset
+1. **Prepare** (`run-prepare`, `POST /api/evaluation/runs`) takes the saved Dataset
    version (the newest unless named), the latest version of every live
    Evaluator — and whether each one counts — the MCP eval policy, the step's
    current Acceptance Criteria, and the Step Fingerprint,

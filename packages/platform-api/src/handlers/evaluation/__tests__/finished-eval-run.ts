@@ -5,14 +5,14 @@ import { noopRunKicker, type NoopRunKicker } from '../../../runtime/run-kicker';
 import type { CallerScope } from '../../../repositories/index';
 import { createEvalCase } from '../eval-cases';
 import { createEvaluator } from '../evaluators';
-import { freezeEvalDataset } from '../eval-datasets';
+import { saveEvalDataset } from '../eval-datasets';
 import { advanceEvalRunOfInstance, prepareEvalRun, startEvalRun } from '../eval-runs';
 import { STEP, type EvaluationFixture } from './fixture';
 
 export interface EvalScenario {
   readonly scope: CallerScope;
   readonly kicker: NoopRunKicker;
-  /** Case ids by name, in the frozen Dataset. */
+  /** Case ids by name, in the saved Dataset. */
   readonly caseIds: Readonly<Record<string, string>>;
 }
 
@@ -42,7 +42,7 @@ export async function evalScenario(fixture: EvaluationFixture): Promise<EvalScen
     }, scope);
     caseIds[name] = evalCase.id;
   }
-  await freezeEvalDataset(STEP, scope);
+  await saveEvalDataset(STEP, scope);
   return { scope, kicker, caseIds };
 }
 

@@ -210,7 +210,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       expect(await repo.listCases(otherStep)).toEqual([]);
     });
 
-    it('freezes Dataset versions, newest first, unique per step', async () => {
+    it('saves Dataset versions, newest first, unique per step', async () => {
       const caseIds = [randomUUID(), randomUUID()];
       const base = { ...step, containsProductionData: true, createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z' };
       const first = await repo.appendDatasetVersion({ ...base, id: randomUUID(), version: 1, caseIds });

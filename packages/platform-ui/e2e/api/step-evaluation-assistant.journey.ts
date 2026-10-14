@@ -229,8 +229,8 @@ test.describe('Evaluation Assistant — API E2E', () => {
     ]);
     const answer = await ask(request, step, question);
     expect(answer.reply).toContain('3 consecutive rounds');
-    expect(answer.reply).toContain('preview_evaluator');
-    expect(answer.reply).toContain('expected object, received string');
+    expect(answer.reply).not.toContain('preview_evaluator');
+    expect(answer.reply).not.toContain('expected object, received string');
     expect(answer.reply).not.toContain('tool-use limit');
     expect(answer.proposals).toEqual([expect.objectContaining({ tool: 'propose_evaluator', arguments: proposal })]);
     const requests = await openRouterRequests(question);

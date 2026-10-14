@@ -198,14 +198,14 @@ export async function archiveEvalCase(
     entityType: 'eval_case',
     entityId: evalCase.id,
     inputSnapshot: { archived: input.archived },
-    basis: 'An archived case is left out of new Dataset versions; frozen versions keep it',
+    basis: 'An archived case is left out of new Dataset versions; saved versions keep it',
   });
   return { evalCase: { ...evalCase, archived: input.archived } };
 }
 
 /**
  * Edits an Eval Case as a replacement: a new case with the changes, and the
- * old one archived — a Dataset version frozen with it keeps exactly what it
+ * old one archived — a Dataset version saved with it keeps exactly what it
  * ran. A production case whose input is edited becomes a manual one, since
  * production never saw that input; it keeps the run it came from.
  */
@@ -241,7 +241,7 @@ export async function updateEvalCase(
     entityType: 'eval_case',
     entityId: stored.id,
     inputSnapshot: { replaces: evalCase.id, changed, ...Object.fromEntries(changed.map((field) => [field, stored[field]])) },
-    basis: 'An Eval Case edit is a new case; frozen Dataset versions keep the case they froze (ADR-0023)',
+    basis: 'An Eval Case edit is a new case; saved Dataset versions keep the case they saved (ADR-0023)',
   });
   return { evalCase: stored };
 }

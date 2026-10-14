@@ -10,7 +10,7 @@ import {
 
 /**
  * An Eval Run (ADR-0023 D4, D5, D10): a Step, as its pinned Definition version
- * has it, run over a frozen Eval Dataset version, `trialsPerCase` times per
+ * has it, run over a saved Eval Dataset version, `trialsPerCase` times per
  * case. Each trial is a real single-step Workflow Run flagged with the
  * Eval Run's id.
  */

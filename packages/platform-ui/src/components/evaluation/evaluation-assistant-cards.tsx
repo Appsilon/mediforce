@@ -157,23 +157,13 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
   editReason: string | undefined;
   onDecided: (status: ProposalStatus) => void;
 }) {
-  const [editing, setEditing] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const accept = useStepEvaluationMutation(step, (proposal: DecidableProposal) => acceptProposal(step, proposal));
   const { proposal } = state;
 
   const onAccept = () => {
-    let decided = proposal;
-    if (editing !== null) {
-      try {
-        decided = { tool: proposal.tool, arguments: JSON.parse(editing) } as DecidableProposal;
-      } catch {
-        setError('Not valid JSON.');
-        return;
-      }
-    }
     setError(null);
-    accept.mutate(decided, {
+    accept.mutate(proposal, {
       onSuccess: () => onDecided('accepted'),
       onError: (err) => setError(err.message),
     });
@@ -182,14 +172,10 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
   return (
     <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="proposal-card">
       <div className="mb-1 font-medium">Proposed {TITLES[proposal.tool]}</div>
-      {editing === null ? (
-        proposal.tool === 'propose_brief'
-          ? <MarkdownPresentation content={proposal.arguments.text} />
-          : <p className="whitespace-pre-wrap text-muted-foreground"><ProposalSummary step={step} proposal={proposal} /></p>
-      ) : (
-        <textarea className="w-full min-h-32 rounded border bg-background p-1.5 font-mono" value={editing} onChange={(event) => setEditing(event.target.value)} />
-      )}
-      {proposal.selfTest !== undefined && (editing === null || editing === JSON.stringify(proposal.arguments, null, 2)) && <SelfTestSummary selfTest={proposal.selfTest} />}
+      {proposal.tool === 'propose_brief'
+        ? <MarkdownPresentation content={proposal.arguments.text} />
+        : <p className="whitespace-pre-wrap text-muted-foreground"><ProposalSummary step={step} proposal={proposal} /></p>}
+      {proposal.selfTest !== undefined && <SelfTestSummary selfTest={proposal.selfTest} />}
       {error !== null && <p className="mt-1 text-destructive">{error}</p>}
       {state.status === 'open' ? (
         <div className="mt-2 flex gap-1.5">
@@ -200,9 +186,6 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
               </button>
             </span>
           </InstantTooltip>
-          {mayEdit && editing === null && (
-            <button type="button" className={buttonClass} onClick={() => setEditing(JSON.stringify(proposal.arguments, null, 2))}>Edit</button>
-          )}
           <button type="button" className={buttonClass} onClick={() => onDecided('rejected')}>
             <X className="h-3 w-3" />Reject
           </button>

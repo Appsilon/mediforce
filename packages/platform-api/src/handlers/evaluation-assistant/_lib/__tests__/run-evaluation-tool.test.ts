@@ -7,7 +7,7 @@ import { createTestScope } from '../../../../repositories/__tests__/create-test-
 import { loadEvaluatedStep } from '../../../evaluation/_lib/evaluated-step';
 import { createEvalCase } from '../../../evaluation/eval-cases';
 import { createEvaluator } from '../../../evaluation/evaluators';
-import { freezeEvalDataset } from '../../../evaluation/eval-datasets';
+import { saveEvalDataset } from '../../../evaluation/eval-datasets';
 import { prepareEvalRun } from '../../../evaluation/eval-runs';
 import { setAcceptanceCriteria } from '../../../evaluation/acceptance-criteria';
 import { recordScore } from '../../../scores/record-score';
@@ -236,7 +236,7 @@ describe('executeEvaluationTool', () => {
       containsProductionData: false,
       origin: 'user',
     }, scope);
-    await freezeEvalDataset(STEP, scope);
+    await saveEvalDataset(STEP, scope);
     const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 1 }, scope);
 
     await expect(executeEvaluationTool('get_eval_run_report', { evalRunId: evalRun.id }, scope, {
@@ -259,7 +259,7 @@ describe('executeEvaluationTool', () => {
       containsProductionData: false,
       origin: 'user',
     }, scope);
-    await freezeEvalDataset(STEP, scope);
+    await saveEvalDataset(STEP, scope);
 
     await fixture.processRepo.saveWorkflowDefinition(buildWorkflowDefinition({ ...context.definition, version: 2 }));
     await fixture.processRepo.setDefaultWorkflowVersion(NAMESPACE, WORKFLOW, 2);

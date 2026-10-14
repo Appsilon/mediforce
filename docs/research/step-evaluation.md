@@ -85,7 +85,7 @@ Eval Case        input fixture + expectations
   input:     stepInput, previousStepOutputs, previousRun, workspaceSeed (commit | files)
   expect:    reference outputs / must pairs, must-NOT pairs (negative cases)
   source:    production | synthetic | manual;   split: dev | holdout
-Eval Dataset     versioned, frozen set of Eval Cases for one step
+Eval Dataset     versioned, saved set of Eval Cases for one step
 Eval Run         step config × variants × dataset version × n trials
   trial      = an AgentRun tagged {evalRunId, caseId, variantId, trialIndex}
 Score            one Evaluator × one trial (layer-2 schema + evaluatorId)

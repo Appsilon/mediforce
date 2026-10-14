@@ -110,7 +110,7 @@ export const evalCaseArchiveCommand = defineCommand({
 export const evalCaseEditCommand = defineCommand({
   name: 'mediforce eval case-edit',
   description: 'Edit an Eval Case from a JSON file of the fields to change: { name?, input?, expectedOutput?, expectation?, comparison?, agreementInstructions?, evaluatorIds?, split? }. '
-    + 'The edit is a new case that replaces it; the old one is archived, so frozen Dataset versions keep it.',
+    + 'The edit is a new case that replaces it; the old one is archived, so saved Dataset versions keep it.',
   args: {
     caseId: { type: 'positional', required: true, description: 'Eval Case id' },
     file: { type: 'string', required: true, description: 'JSON file with the changes' },
@@ -126,7 +126,7 @@ export const evalCaseEditCommand = defineCommand({
 
 export const evalDatasetListCommand = defineCommand({
   name: 'mediforce eval dataset-list',
-  description: 'List a step\'s frozen Eval Dataset versions.',
+  description: 'List a step\'s saved Eval Dataset versions.',
   args: { ...STEP_ARGS },
   async run({ args, output, mediforce, jsonMode }) {
     const result = await mediforce.evaluation.listDatasets(stepFrom(args));
@@ -142,17 +142,17 @@ export const evalDatasetListCommand = defineCommand({
   },
 });
 
-export const evalDatasetFreezeCommand = defineCommand({
-  name: 'mediforce eval dataset-freeze',
-  description: 'Freeze the step\'s live Eval Cases (or --cases) as a new Dataset version.',
+export const evalDatasetSaveCommand = defineCommand({
+  name: 'mediforce eval dataset-save',
+  description: 'Save the step\'s live Eval Cases (or --cases) as a new Dataset version.',
   args: { ...STEP_ARGS, cases: { type: 'string', description: 'Comma-separated case ids (default: all live cases)' } },
   async run({ args, output, mediforce, jsonMode }) {
-    const result = await mediforce.evaluation.freezeDataset({
+    const result = await mediforce.evaluation.saveDataset({
       ...stepFrom(args),
       ...(args.cases !== undefined ? { caseIds: args.cases.split(',') } : {}),
     });
     if (jsonMode) printJson(output, result);
-    else output.stdout(`Eval Dataset v${result.dataset.version} frozen with ${result.dataset.caseIds.length} case(s)`);
+    else output.stdout(`Eval Dataset v${result.dataset.version} saved with ${result.dataset.caseIds.length} case(s)`);
     return 0;
   },
 });

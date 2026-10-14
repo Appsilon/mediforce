@@ -3,7 +3,7 @@ import type { EvaluatedStep } from '@mediforce/platform-core';
 import { userCaller } from '../../../../repositories/__tests__/create-test-scope';
 import { createEvaluator } from '../../../evaluation/evaluators';
 import { createEvalCase } from '../../../evaluation/eval-cases';
-import { freezeEvalDataset } from '../../../evaluation/eval-datasets';
+import { saveEvalDataset } from '../../../evaluation/eval-datasets';
 import { prepareEvalRun } from '../../../evaluation/eval-runs';
 import { reviewEvaluationProposal } from '../review-proposal';
 import { evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, type EvaluationFixture } from '../../../evaluation/__tests__/fixture';
@@ -96,7 +96,7 @@ describe('reviewEvaluationProposal', () => {
       ...STEP, name: 'Grade 5 sepsis', input: { triggerPayload: {}, previousStepOutputs: {} }, workspaceSeedCommit: null,
       expectation: 'positive', expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null, split: 'dev', containsProductionData: false, origin: 'user',
     }, scope);
-    await freezeEvalDataset(STEP, scope);
+    await saveEvalDataset(STEP, scope);
     const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 1 }, scope);
     const propose = (step: EvaluatedStep = STEP) => reviewEvaluationProposal('propose_control_settings', {
       evalRunId: evalRun.id, autonomyLevel: 'L3', rationale: 'Criteria missed.',
@@ -114,7 +114,7 @@ describe('reviewEvaluationProposal', () => {
         ...STEP, name: 'Grade 5 sepsis', input: { triggerPayload: {}, previousStepOutputs: {} }, workspaceSeedCommit: null,
         expectation: 'positive', expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null, split: 'dev', containsProductionData: false, origin: 'user',
       }, scope);
-      await freezeEvalDataset(STEP, scope);
+      await saveEvalDataset(STEP, scope);
       const { evalRun } = await prepareEvalRun({
         ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 1,
       }, scope);

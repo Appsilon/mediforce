@@ -588,7 +588,7 @@ describe('Adding an Eval Case by hand', () => {
   });
 });
 
-describe('Freezing a Dataset', () => {
+describe('Saving a Dataset', () => {
   const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
   const datasetOf = (version: number, caseIds: string[]) => ({
     ...step, id: `d-${version}`, version, caseIds, containsProductionData: true, createdBy: 'author-1', createdAt: '2026-09-24T09:00:00.000Z',
@@ -602,7 +602,7 @@ describe('Freezing a Dataset', () => {
 
   it('tells cases added since the newest version from cases it has that are gone', () => {
     const drift = datasetDrift([evalCaseOf({ id: 'c-1' }), evalCaseOf({ id: 'c-3' })] as never, datasetOf(1, ['c-1', 'c-2']) as never);
-    expect([...drift.unfrozen]).toEqual(['c-3']);
+    expect([...drift.unsaved]).toEqual(['c-3']);
     expect(drift.dropped).toBe(1);
   });
 

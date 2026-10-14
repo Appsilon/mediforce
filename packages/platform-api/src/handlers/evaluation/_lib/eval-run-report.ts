@@ -137,7 +137,7 @@ function confidenceOutcomes(run: EvalRun, trials: readonly EvalTrial[], scores: 
 }
 
 /**
- * A criterion is met on the whole frozen Dataset or not at all: while some
+ * A criterion is met on the whole saved Dataset or not at all: while some
  * trial failed or was skipped, one the scored trials reached is not judged.
  */
 function judgedOnEveryTrial(verdict: AcceptanceCriterionVerdict | null, counts: EvalRunReport['trials']): AcceptanceCriterionVerdict | null {

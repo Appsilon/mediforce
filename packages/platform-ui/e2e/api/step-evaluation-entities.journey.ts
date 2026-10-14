@@ -3,7 +3,7 @@ import type { APIRequestContext } from '@playwright/test';
 import {
   EvalCaseOutputSchema,
   EvaluatorOutputSchema,
-  FreezeEvalDatasetOutputSchema,
+  SaveEvalDatasetOutputSchema,
   GetAgentRunIoOutputSchema,
   GetMcpEvalPolicyOutputSchema,
   ListStepAgentRunsOutputSchema,
@@ -33,7 +33,7 @@ import { seedPostgresOrganizationNamespace, seedPostgresWorkspaceMember } from '
 /**
  * API E2E for the Evaluation entities of ADR-0023 phase 1b: a step's
  * Evaluators with their trust gate, a draft check previewed against a real
- * production output, "add to eval set" from that run, a frozen Eval Dataset,
+ * production output, "add to eval set" from that run, a saved Eval Dataset,
  * and the MCP eval policy — all scoped to the step's workspace.
  *
  * The production run is driven with MOCK_AGENT=true (result `{ mock, summary }`);
@@ -193,7 +193,7 @@ test.describe('Step Evaluation entities — API E2E', () => {
     expect(((await scoresRes.json()) as { scores: unknown[] }).scores).toEqual([]);
   });
 
-  test('a production run becomes an Eval Case, and the live cases freeze into a Dataset version', async ({ request }) => {
+  test('a production run becomes an Eval Case, and the live cases are saved as a Dataset version', async ({ request }) => {
     const otherStep = await request.post('/api/evaluation/cases/from-agent-run', {
       headers: JSON_HEADERS, data: { agentRunId, expectation: 'positive', step: { ...step, stepId: 'another-step' } },
     });
@@ -213,7 +213,7 @@ test.describe('Step Evaluation entities — API E2E', () => {
       containsProductionData: true,
     });
 
-    const { dataset } = FreezeEvalDatasetOutputSchema.parse(await post(request, '/api/evaluation/datasets', step, 201));
+    const { dataset } = SaveEvalDatasetOutputSchema.parse(await post(request, '/api/evaluation/datasets', step, 201));
     expect(dataset).toMatchObject({ version: 1, caseIds: [evalCase.id], containsProductionData: true });
 
     // Another workspace's user cannot reach the case by id, and does not touch it.
@@ -260,11 +260,11 @@ test.describe('Step Evaluation entities — API E2E', () => {
     expect(outsider.status(), await outsider.text()).toBe(404);
   });
 
-  test('editing a case replaces it, and the Dataset frozen before keeps the case it froze', async ({ request }) => {
+  test('editing a case replaces it, and the Dataset saved before keeps the case it saved', async ({ request }) => {
     const { evalCase } = EvalCaseOutputSchema.parse(await post(request, '/api/evaluation/cases/from-agent-run', {
       agentRunId, step, expectation: 'positive',
     }, 201));
-    const { dataset } = FreezeEvalDatasetOutputSchema.parse(await post(request, '/api/evaluation/datasets', step, 201));
+    const { dataset } = SaveEvalDatasetOutputSchema.parse(await post(request, '/api/evaluation/datasets', step, 201));
 
     const outsiderEdit = await request.patch(`/api/evaluation/cases/${evalCase.id}`, {
       headers: sessionCookieHeaders(callers.outsider), data: { expectation: 'negative' },
@@ -295,9 +295,9 @@ test.describe('Step Evaluation entities — API E2E', () => {
       `/api/evaluation/datasets?namespace=${step.namespace}&workflowName=${step.workflowName}&stepId=${step.stepId}`,
       { headers: AUTH_HEADERS },
     );
-    const frozen = ListEvalDatasetsOutputSchema.parse(await datasetsRes.json()).datasets.find((listed) => listed.id === dataset.id);
-    expect(frozen?.caseIds).toContain(evalCase.id);
-    expect(frozen?.caseIds).not.toContain(edited.id);
+    const saved = ListEvalDatasetsOutputSchema.parse(await datasetsRes.json()).datasets.find((listed) => listed.id === dataset.id);
+    expect(saved?.caseIds).toContain(evalCase.id);
+    expect(saved?.caseIds).not.toContain(edited.id);
   });
 
   test('an agent with no MCP servers has nothing to deny; an unknown server is refused', async ({ request }) => {

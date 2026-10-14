@@ -253,8 +253,8 @@ export const ArchiveEvalCaseInputSchema = z.object({
 
 /**
  * Edits an Eval Case. The edit is a new case that replaces it, and the old one
- * is archived: a frozen Dataset version keeps the case it ran, and the next
- * one freezes the edit.
+ * is archived: a saved Dataset version keeps the case it ran, and the next
+ * one saves the edit.
  */
 export const UpdateEvalCaseInputSchema = z.object({
   caseId: z.uuid(),
@@ -271,11 +271,11 @@ export const UpdateEvalCaseInputSchema = z.object({
 export const ListEvalDatasetsInputSchema = EvaluatedStepSchema;
 export const ListEvalDatasetsOutputSchema = z.object({ datasets: z.array(EvalDatasetVersionSchema) });
 
-/** Freezes the Step's live cases (or the named ones) as a new Dataset version. */
-export const FreezeEvalDatasetInputSchema = EvaluatedStepSchema.extend({
+/** Saves the Step's live cases (or the named ones) as a new Dataset version. */
+export const SaveEvalDatasetInputSchema = EvaluatedStepSchema.extend({
   caseIds: z.array(z.uuid()).min(1).optional(),
 });
-export const FreezeEvalDatasetOutputSchema = z.object({ dataset: EvalDatasetVersionSchema });
+export const SaveEvalDatasetOutputSchema = z.object({ dataset: EvalDatasetVersionSchema });
 
 /** How one of the Step agent's MCP servers behaves in a trial, defaults applied. */
 export const EffectiveMcpEvalServerSchema = McpEvalServerPolicySchema.extend({
@@ -314,7 +314,7 @@ export const SetAcceptanceCriteriaInputSchema = EvaluatedStepSchema.extend({
 export const SetAcceptanceCriteriaOutputSchema = z.object({ criteria: AcceptanceCriteriaVersionSchema });
 
 /**
- * Prepares an Eval Run (ADR-0023 D4, D5, D10): freezes the Dataset version (the
+ * Prepares an Eval Run (ADR-0023 D4, D5, D10): takes the saved Dataset version (the
  * newest when none is named), the Step's live Evaluator versions, its MCP eval
  * policy, its Acceptance Criteria, and the Step with its Step Fingerprint —
  * and estimates the cost. Nothing runs until `start`.
@@ -635,8 +635,8 @@ export type ArchiveEvalCaseInput = z.input<typeof ArchiveEvalCaseInputSchema>;
 export type UpdateEvalCaseInput = z.input<typeof UpdateEvalCaseInputSchema>;
 export type ListEvalDatasetsInput = z.infer<typeof ListEvalDatasetsInputSchema>;
 export type ListEvalDatasetsOutput = z.infer<typeof ListEvalDatasetsOutputSchema>;
-export type FreezeEvalDatasetInput = z.infer<typeof FreezeEvalDatasetInputSchema>;
-export type FreezeEvalDatasetOutput = z.infer<typeof FreezeEvalDatasetOutputSchema>;
+export type SaveEvalDatasetInput = z.infer<typeof SaveEvalDatasetInputSchema>;
+export type SaveEvalDatasetOutput = z.infer<typeof SaveEvalDatasetOutputSchema>;
 export type GetMcpEvalPolicyInput = z.infer<typeof GetMcpEvalPolicyInputSchema>;
 export type GetMcpEvalPolicyOutput = z.infer<typeof GetMcpEvalPolicyOutputSchema>;
 export type SetMcpEvalPolicyInput = z.infer<typeof SetMcpEvalPolicyInputSchema>;

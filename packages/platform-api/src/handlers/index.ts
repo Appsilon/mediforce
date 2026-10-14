@@ -193,7 +193,7 @@ export {
   updateEvalCase,
   getAgentRunIo,
   listEvalDatasets,
-  freezeEvalDataset,
+  saveEvalDataset,
   getMcpEvalPolicy,
   setMcpEvalPolicy,
   estimateEvalRunCost,

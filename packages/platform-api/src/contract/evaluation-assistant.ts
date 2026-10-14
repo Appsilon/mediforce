@@ -5,7 +5,7 @@ import { PreviewEvaluatorOutputSchema } from './evaluation';
 /**
  * Contract for `POST /api/evaluation/assistant` — one turn with a Step's
  * Evaluation Assistant (ADR-0023 D14–D16). Proposals come back for the person
- * to accept, edit or reject; a prepared Eval Run comes back for them to start
+ * to accept or reject; a prepared Eval Run comes back for them to start
  * by confirming its budget.
  */
 export const AskEvaluationAssistantInputSchema = EvaluatedStepSchema.extend({

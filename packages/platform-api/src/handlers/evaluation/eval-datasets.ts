@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type {
-  FreezeEvalDatasetInput,
-  FreezeEvalDatasetOutput,
+  SaveEvalDatasetInput,
+  SaveEvalDatasetOutput,
   ListEvalDatasetsInput,
   ListEvalDatasetsOutput,
 } from '../../contract/evaluation';
@@ -16,11 +16,11 @@ export async function listEvalDatasets(input: ListEvalDatasetsInput, scope: Call
 }
 
 /**
- * Freezes a new Eval Dataset version: the Step's live cases, or the ones named.
+ * Saves a new Eval Dataset version: the Step's live cases, or the ones named.
  * A version never changes afterwards, so an Eval Run that ran it can always be
  * read against exactly the cases it ran.
  */
-export async function freezeEvalDataset(input: FreezeEvalDatasetInput, scope: CallerScope): Promise<FreezeEvalDatasetOutput> {
+export async function saveEvalDataset(input: SaveEvalDatasetInput, scope: CallerScope): Promise<SaveEvalDatasetOutput> {
   const step = stepRef(input);
   await loadEvaluatedStep(scope, step, 'edit');
   const cases = await scope.evaluation.listCases(step);
@@ -31,7 +31,7 @@ export async function freezeEvalDataset(input: FreezeEvalDatasetInput, scope: Ca
       if (evalCase === undefined) throw new ValidationError(`Eval Case '${caseId}' is not a case of step '${step.stepId}'`);
       return evalCase;
     });
-  if (selected.length === 0) throw new ValidationError(`Step '${step.stepId}' has no Eval Cases to freeze`);
+  if (selected.length === 0) throw new ValidationError(`Step '${step.stepId}' has no Eval Cases to save`);
 
   const [current] = await scope.evaluation.listDatasetVersions(step);
   const dataset = await scope.evaluation.appendDatasetVersion({
@@ -44,14 +44,14 @@ export async function freezeEvalDataset(input: FreezeEvalDatasetInput, scope: Ca
     createdAt: new Date().toISOString(),
   });
   await appendEvaluationAudit(scope, {
-    action: 'eval_dataset.frozen',
-    description: `Eval Dataset v${dataset.version} frozen for step '${step.stepId}' with ${dataset.caseIds.length} case(s)`,
+    action: 'eval_dataset.saved',
+    description: `Eval Dataset v${dataset.version} saved for step '${step.stepId}' with ${dataset.caseIds.length} case(s)`,
     namespace: step.namespace,
     entityType: 'eval_dataset',
     entityId: dataset.id,
     inputSnapshot: { ...step, caseIds: dataset.caseIds },
     outputSnapshot: { version: dataset.version, containsProductionData: dataset.containsProductionData },
-    basis: 'An Eval Dataset version is a frozen set of Eval Cases (ADR-0023)',
+    basis: 'An Eval Dataset version is a saved set of Eval Cases (ADR-0023)',
   });
   return { dataset };
 }
