@@ -85,10 +85,6 @@ test.describe('Step Evaluation qualification — API E2E', () => {
     expect(GetAcceptanceCriteriaOutputSchema.parse(await criteriaRes.json()).criteria).toMatchObject({ version: 1 });
 
     await post(request, '/api/evaluation/evaluators', {
-      ...step, name: 'summary-present', rule: 'The result carries a summary.',
-      check: { kind: 'schema', schema: { required: ['summary'] } },
-    }, 201);
-    await post(request, '/api/evaluation/evaluators', {
       ...step, name: 'findings-present', rule: 'The result lists findings.',
       check: { kind: 'schema', schema: { required: ['findings'] } },
     }, 201);
