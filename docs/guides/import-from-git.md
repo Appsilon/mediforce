@@ -41,6 +41,11 @@ pnpm exec mediforce skill import \
 Same rules as above, and the same source: a public GitHub repository, read at
 the commit the ref resolves to, without the deployment's credentials.
 
+A deployment that still has stored workflows naming file skills
+(`agent.skill` + `agent.skillsDir`) moves them onto catalog Skills with
+`scripts/migrations/migrate_file_skills_to_catalog.py` — its docstring walks the
+four phases ([ADR-0028](../adr/0028-retire-file-skills.md)).
+
 ## Entry points
 
 - **UI** — workspace home → *Import from git*. Either **Browse** a repo's

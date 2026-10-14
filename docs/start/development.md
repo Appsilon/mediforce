@@ -231,7 +231,8 @@ the task is there, waiting for the grant.
 A workflow's own **Access** tab is the same idea one level up: it names the
 Roles that may `run` it (start a run) and the Roles that may `edit` it —
 register a version, archive, delete, transfer, change visibility, move the
-default version. Owner/admin set it; `mediforce workflow access <name>
+default version (`mediforce workflow set-default-version <name> --namespace
+<handle> --version <n>`). Owner/admin set it; `mediforce workflow access <name>
 --namespace <handle>` reads it back. A member who holds neither sees the
 controls greyed out with the reason on them — Start on the Runs tab, and Save,
 Edit and the workflow's ⋯ menu for `edit` — rather than a 403 arriving as a raw
