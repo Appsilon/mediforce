@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { AcceptanceCriteriaSection, CasesSection, DriftAlert, EvaluatorsSection, caseFromFile, datasetDrift, toEvaluatorName } from '../step-evaluation-sections';
+import { AcceptanceCriteriaSection, CasesSection, EvalRunsSection, DriftAlert, EvaluatorsSection, caseFromFile, datasetDrift, toEvaluatorName } from '../step-evaluation-sections';
 
 const verdicts = vi.hoisted((): Record<string, 'positive' | 'negative'> => ({}));
 
 vi.mock('@/hooks/use-step-evaluation', () => ({
+  useEvalRunEstimate: () => ({ data: undefined, isError: false, isPlaceholderData: false, error: null }),
   useAgentRunIo: (agentRunId: string | null) => ({
     isError: false,
     error: null,
@@ -638,5 +639,42 @@ describe('AcceptanceCriteriaSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(evaluation.setAcceptanceCriteria).toHaveBeenCalledTimes(1);
     expect(evaluation.setAcceptanceCriteria).toHaveBeenCalledWith({ ...step, criteria: { minPassRate: 0.95, minPassHatK: 1 } });
+  });
+});
+
+describe('Starting an Eval Run', () => {
+  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const dataset = { ...step, id: 'd-1', version: 1, caseIds: ['c-1'], containsProductionData: true, createdBy: 'author-1', createdAt: '2026-09-24T09:00:00.000Z' };
+  const renderRuns = (cases: unknown[], datasets: unknown[]) => render(
+    <EvalRunsSection
+      step={step}
+      definitionVersion={1}
+      data={{ isLoading: false, data: { evalRuns: [] } } as never}
+      datasets={{ data: { datasets } } as never}
+      cases={cases as never}
+      mayRun={true}
+      runReason={undefined}
+    />,
+  );
+  const startButton = () => screen.getByRole('button', { name: 'Start' }) as HTMLButtonElement;
+
+  it('locks Start before any save, saying why', () => {
+    renderRuns([evalCaseOf({})], []);
+
+    expect(startButton().disabled).toBe(true);
+    expect(screen.getByTestId('eval-run-dataset').textContent).toContain('Save your cases to run');
+  });
+
+  it('locks Start while cases are added or edited since the newest Dataset', () => {
+    renderRuns([evalCaseOf({ id: 'c-1' }), evalCaseOf({ id: 'c-2' })], [dataset]);
+
+    expect(startButton().disabled).toBe(true);
+    expect(screen.getByTestId('eval-run-dataset').textContent).toContain('Save your cases to run');
+  });
+
+  it('unlocks Start once the newest Dataset holds every live case', () => {
+    renderRuns([evalCaseOf({ id: 'c-1' })], [dataset]);
+
+    expect(startButton().disabled).toBe(false);
   });
 });

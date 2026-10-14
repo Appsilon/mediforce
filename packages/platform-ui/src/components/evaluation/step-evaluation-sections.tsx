@@ -1033,6 +1033,12 @@ export function datasetDrift(cases: readonly EvalCase[], dataset: EvalDatasetVer
   };
 }
 
+/** Live cases the newest Dataset version does not hold, so Save would make a new version. */
+export function hasUnsavedCases(cases: readonly EvalCase[], dataset: EvalDatasetVersion | undefined): boolean {
+  const { unfrozen, dropped } = datasetDrift(cases, dataset);
+  return cases.length > 0 && (dataset === undefined || unfrozen.size > 0 || dropped > 0);
+}
+
 /**
  * What freezing means and where it stands: an Eval Run runs the newest frozen
  * Dataset version, never the live list, and a version never changes.
@@ -1113,7 +1119,7 @@ export function CasesSection({ step, evaluation, mayEdit }: {
   const datasets = evaluation.datasets.data?.datasets ?? [];
   const [latest] = datasets;
   const { unfrozen, dropped } = datasetDrift(cases, latest);
-  const hasUnsavedChanges = cases.length > 0 && (latest === undefined || unfrozen.size > 0 || dropped > 0);
+  const hasUnsavedChanges = hasUnsavedCases(cases, latest);
   const [adding, setAdding] = React.useState(false);
   const evaluators = evaluation.evaluators.data?.evaluators ?? [];
   const [selectedIds, setSelectedIds] = React.useState<ReadonlySet<string>>(new Set());
@@ -1521,7 +1527,7 @@ function parseBudgetUsd(text: string): number | null {
  * Start, confirm and read the Step's Eval Runs. Starting one is the workflow's
  * `run` verb; signing a qualification from a report is its `edit` verb.
  */
-export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRun, runReason }: {
+export function EvalRunsSection({ step, definitionVersion, data, datasets, cases, mayRun, runReason }: {
   step: EvaluatedStep;
   /**
    * The workflow version whose step a new run runs. Its finished runs are
@@ -1532,6 +1538,8 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRu
   data: StepEvaluation['runs'];
   /** The Step's frozen Dataset versions, newest first: the one a new run takes, and the one each run ran. */
   datasets: StepEvaluation['datasets'];
+  /** The Step's live Eval Cases: a run takes the saved Dataset, so it waits while they differ. */
+  cases: readonly EvalCase[];
   mayRun: boolean;
   runReason: string | undefined;
 }) {
@@ -1542,7 +1550,8 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRu
   const budgetUsd = parseBudgetUsd(budgetText);
   const versions = datasets.data?.datasets ?? [];
   const [nextDataset] = versions;
-  const estimate = useEvalRunEstimate(step, definitionVersion, mayRun && nextDataset !== undefined ? trials : null);
+  const casesUnsaved = hasUnsavedCases(cases, nextDataset);
+  const estimate = useEvalRunEstimate(step, definitionVersion, mayRun && nextDataset !== undefined && casesUnsaved === false ? trials : null);
   const budget: BudgetChoice = budgetUsd === null
     ? { kind: 'auto', suggestedUsd: estimate.data?.suggestedBudgetUsd ?? null }
     : { kind: 'set', budgetUsd };
@@ -1592,11 +1601,11 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, mayRu
           <button
             type="button"
             className={primaryButtonClass}
-            disabled={trials === null || start.isPending || (budgetUsd === null && estimate.isPlaceholderData)}
+            disabled={trials === null || casesUnsaved || nextDataset === undefined || start.isPending || (budgetUsd === null && estimate.isPlaceholderData)}
             onClick={() => { start.reset(); setConfirming(true); }}
           >Start</button>
-          <span className={nextDataset === undefined ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'} data-testid="eval-run-dataset">
-            {nextDataset === undefined ? 'No Dataset saved yet — save the Eval Cases first.' : `Runs Dataset v${nextDataset.version} (${nextDataset.caseIds.length} case(s)).`}
+          <span className={nextDataset === undefined || casesUnsaved ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'} data-testid="eval-run-dataset">
+            {nextDataset === undefined ? 'Save your cases to run.' : casesUnsaved ? `Save your cases to run: Dataset v${nextDataset.version} is behind the list.` : `Runs Dataset v${nextDataset.version} (${nextDataset.caseIds.length} case(s)).`}
           </span>
           {trials === null && <span className="text-destructive">Trials per case must be a whole number from 1 to 10.</span>}
           {estimate.error instanceof Error && <span className="text-destructive" data-testid="eval-run-estimate-error">{estimate.error.message}</span>}
