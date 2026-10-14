@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Layers, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, EyeOff, Copy, Link2, ShieldCheck, FlaskConical } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -251,6 +251,19 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
     tabParam === 'secrets' || tabParam === 'triggers' || tabParam === 'access' || tabParam === 'evaluation' ? tabParam : 'runs';
   const setupParam = searchParams.get('setup');
   const [activeTab, setActiveTab] = React.useState(initialTab);
+  const pathname = usePathname();
+  // The URL names the tab, so the guide, a reload and a shared link all agree
+  // with what is on screen. `version` and `step` belong to the Evaluation tab.
+  const selectTab = (tab: string) => {
+    setActiveTab(tab);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', tab);
+    if (tab !== 'evaluation') {
+      params.delete('version');
+      params.delete('step');
+    }
+    router.replace(`${pathname}?${params}`, { scroll: false });
+  };
 
   // `?tab=` seeds the initial state only, so a mounted page needs this to
   // follow back/forward and any deep link opened from inside the app.
@@ -663,7 +676,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
       </div>
 
       {/* Tabs */}
-      <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex flex-1 flex-col">
+      <Tabs.Root value={activeTab} onValueChange={selectTab} className="flex flex-1 flex-col">
         <Tabs.List className="flex border-b px-6 gap-0" data-tour="workflow-tabs">
           {['runs', 'definitions', 'triggers', 'secrets', 'access', 'evaluation'].map((tab) => (
             <Tabs.Trigger
