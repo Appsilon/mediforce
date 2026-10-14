@@ -550,21 +550,22 @@ function validateArtifacts(
   ctx: z.RefinementCtx,
 ): void {
   if (!wd.artifacts) return;
-  validateFileTree(wd.artifacts, ['artifacts'], ctx, 'put what is bigger in an image or a repository');
+  validateFileTree(wd.artifacts, ['artifacts'], ctx, 'put what is bigger in an image or a repository', WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES);
 }
 
 /**
  * The checks any set of text files written to one directory needs: no path
  * used twice, no path used as both a file and a directory, and the whole set
- * within {@link WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES}. `field` is where the files
- * sit in the parsed object, so an issue points at the offending entry;
- * `overflowHint` tells the author where bigger content belongs.
+ * within `maxBytes`. `field` is where the files sit in the parsed object, so an
+ * issue points at the offending entry; `overflowHint` tells the author where
+ * bigger content belongs.
  */
 export function validateFileTree(
   files: ReadonlyArray<{ path: string; contents: string }>,
   field: ReadonlyArray<string>,
   ctx: z.RefinementCtx,
   overflowHint: string,
+  maxBytes: number,
 ): void {
   const label = field[field.length - 1] ?? 'files';
   const byPath = new Map<string, number>();
@@ -600,11 +601,11 @@ export function validateFileTree(
   });
 
   const total = fileTreeBytes(files);
-  if (total > WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES) {
+  if (total > maxBytes) {
     ctx.addIssue({
       code: 'custom',
       path: [...field],
-      message: `${label} total ${String(total)} bytes, over the ${String(WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES)} byte limit — ${overflowHint}`,
+      message: `${label} total ${String(total)} bytes, over the ${String(maxBytes)} byte limit — ${overflowHint}`,
     });
   }
 }
@@ -762,7 +763,8 @@ function utf8Bytes(text: string): number {
   return new TextEncoder().encode(text).length;
 }
 
-/** The bytes a set of files costs against {@link WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES}:
+/** The bytes a set of files costs against a total cap
+ *  ({@link WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES}, {@link SKILL_MAX_TOTAL_BYTES}):
  *  every path and its contents, as UTF-8. */
 export function fileTreeBytes(files: ReadonlyArray<{ path: string; contents: string }>): number {
   return files.reduce((sum, file) => sum + utf8Bytes(file.path) + utf8Bytes(file.contents), 0);

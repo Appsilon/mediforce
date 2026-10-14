@@ -1,7 +1,7 @@
 import {
   SKILL_MANIFEST_PATH,
   SkillFilesSchema,
-  WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES,
+  SKILL_MAX_TOTAL_BYTES,
   skillManifest,
   type SkillFile,
 } from '@mediforce/platform-core';
@@ -48,7 +48,7 @@ export async function readSkillFolders(
     commit: source.commit,
     dir: source.dir,
     // One file may take the whole Skill cap; SkillFilesSchema checks the total.
-    maxBytes: WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES,
+    maxBytes: SKILL_MAX_TOTAL_BYTES,
     anonymousOnly: true,
   });
 

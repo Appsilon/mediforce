@@ -12,6 +12,11 @@ import { ArtifactTextSchema, WorkflowArtifactPathSchema, validateFileTree } from
 
 export const SKILL_MANIFEST_PATH = 'SKILL.md';
 
+/** Bytes one Skill may hold across its files. Larger than a workflow's artifact
+ *  set because a skill carries reference data (CDISC rule CSVs) beside its
+ *  instructions, and it lives in its own row rather than in a definition. */
+export const SKILL_MAX_TOTAL_BYTES = 1024 * 1024;
+
 export const SkillVisibilitySchema = z.enum(['private', 'public']);
 export type SkillVisibility = z.infer<typeof SkillVisibilitySchema>;
 
@@ -67,11 +72,11 @@ export type SkillFile = z.infer<typeof SkillFileSchema>;
 
 /**
  * The files of one Skill. The set passes the same file-tree checks, including
- * the total size cap, that a workflow's artifacts do, and it must hold a
+ * a total size cap ({@link SKILL_MAX_TOTAL_BYTES}), and it must hold a
  * `SKILL.md` at its root whose frontmatter parses.
  */
 export const SkillFilesSchema = z.array(SkillFileSchema).superRefine((files, ctx) => {
-  validateFileTree(files, [], ctx, 'a skill is text an agent reads, so keep large data out of it');
+  validateFileTree(files, [], ctx, 'a skill is text an agent reads, so keep large data out of it', SKILL_MAX_TOTAL_BYTES);
   const manifest = files.find((file) => file.path === SKILL_MANIFEST_PATH);
   if (manifest === undefined) {
     ctx.addIssue({ code: 'custom', message: `a skill needs a ${SKILL_MANIFEST_PATH} at its root` });
@@ -110,7 +115,7 @@ export type Skill = z.infer<typeof SkillSchema>;
 /** A Skill without its file contents — what a listing returns. */
 export const SkillSummarySchema = SkillSchema.omit({ files: true }).extend({
   paths: z.array(z.string()),
-  /** `fileTreeBytes` of its files: what they cost against the 256 KB cap. */
+  /** `fileTreeBytes` of its files: what they cost against the 1 MB cap. */
   size: z.number().int().nonnegative(),
 });
 export type SkillSummary = z.infer<typeof SkillSummarySchema>;

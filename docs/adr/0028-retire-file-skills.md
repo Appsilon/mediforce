@@ -73,7 +73,7 @@ have named Skills that did not exist there.
   import reads; nothing at run time reads them from disk.
 - The Docker `MOCK_AGENT` mode found its fixtures beside `skillsDir`; it reads
   `MOCK_FIXTURES_DIR` instead, and mounts none when it is unset.
-- A Skill is still capped at 256 KB (ADR-0025 §1). A skill in git larger than
+- A Skill is capped at 1 MB (ADR-0025 §1). A skill in git larger than
   that cannot be imported as it stands.
 - A stored version whose step built through the `externalSkillsRepo` fallback
   gains `repo` / `commit` / `repoAuth` on the step, so its Fingerprint's

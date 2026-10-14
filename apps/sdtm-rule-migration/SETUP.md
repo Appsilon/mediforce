@@ -97,9 +97,8 @@ pnpm exec mediforce skill import \
   --ref 6424cdc75fd164ab0e9165f9f425c79edbab3361 --dir skills --namespace appsilon
 ```
 
-Each of them carries a CSV over the 256 KB Skill cap (ADR-0025 §1) at that
-commit, so the import is refused until the cap is raised or the CSVs leave the
-skills.
+Both are over the old 256 KB cap (about 574 KB and 450 KB, mostly CSVs) and fit
+the 1 MB Skill cap (ADR-0025 §1).
 
 To take a change to the skills, push it to `Appsilon/mediforce-sdtm-skills` and
 re-run the import with the new ref: an import updates a Skill whose files

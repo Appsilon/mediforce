@@ -669,6 +669,7 @@ export {
   parseSkillFrontmatter,
   skillManifest,
   SKILL_MANIFEST_PATH,
+  SKILL_MAX_TOTAL_BYTES,
   type SkillVisibility,
   type SkillFile,
   type Skill,
