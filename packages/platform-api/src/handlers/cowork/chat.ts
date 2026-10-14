@@ -8,6 +8,7 @@ import {
   PreconditionFailedError,
 } from '../../errors';
 import { loadOr404 } from '../_helpers';
+import { OPENROUTER_KEY_MISSING_MESSAGE } from '../../services/openrouter-key';
 import type { CallerScope } from '../../repositories/index';
 import type {
   ChatCoworkSessionInput,
@@ -121,10 +122,7 @@ async function loadChatContext(
   const secrets = await scope.workspaceSecrets.getRuntimeSecrets(namespace, workflowName);
   const openRouterKey = secrets['OPENROUTER_API_KEY'];
   if (!openRouterKey) {
-    throw new HandlerError(
-      'validation',
-      'OPENROUTER_API_KEY not configured in workspace secrets',
-    );
+    throw new HandlerError('validation', OPENROUTER_KEY_MISSING_MESSAGE);
   }
 
   return {

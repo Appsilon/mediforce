@@ -60,9 +60,20 @@ export interface OpenRouterRequest {
 /** The connection to OpenRouter dropped or never completed (no HTTP response), even after one retry. */
 export class OpenRouterNetworkError extends Error {
   constructor(cause: unknown) {
-    super(`Could not reach the model API: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+    super(`Could not reach the model provider (${cause instanceof Error ? cause.message : String(cause)}). Check your connection and try again in a moment.`, { cause });
     this.name = 'OpenRouterNetworkError';
   }
+}
+
+/** What a failing HTTP status means for the person, and what they can do about it. */
+function describeModelApiFailure(status: number): string {
+  if (status === 401 || status === 403) return 'OpenRouter rejected the API key. Check that OPENROUTER_API_KEY in the workspace secrets is valid and not revoked.';
+  if (status === 402) return 'The OpenRouter account is out of credits. Top it up, then try again.';
+  if (status === 404) return 'OpenRouter does not offer the selected model. Pick another model in the assistant settings.';
+  if (status === 408 || status === 504) return 'The model took too long to answer. Try again, or pick a faster model in the assistant settings.';
+  if (status === 429) return 'OpenRouter is rate-limiting requests. Wait a minute, then try again.';
+  if (status >= 500) return 'OpenRouter is having trouble right now. Try again in a moment, or pick another model in the assistant settings.';
+  return 'OpenRouter rejected the request. Try again, or pick another model in the assistant settings.';
 }
 
 async function postChatCompletion(request: RequestInit): Promise<Response> {
@@ -97,7 +108,8 @@ export async function callOpenRouter(req: OpenRouterRequest): Promise<OpenRouter
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Model API error ${response.status}: ${errorText}`);
+    console.warn('[openrouter] model API error', { status: response.status, model: req.model, body: errorText.slice(0, 600) });
+    throw new Error(`Model API error ${String(response.status)}: ${describeModelApiFailure(response.status)}`);
   }
 
   const data = (await response.json()) as {

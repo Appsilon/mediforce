@@ -213,7 +213,7 @@ describe('runProposalToolLoop', () => {
     const result = await runProposalToolLoop({
       ...config, messages: [{ role: 'user', content: 'go' }], executePlatformTool: vi.fn(),
     });
-    expect(result.reply).toContain('truncated');
+    expect(result.reply).toContain('too long for the assistant to finish');
     expect(result.reply).not.toContain('The first thing to check is');
     expect(result.proposals).toHaveLength(1);
   });

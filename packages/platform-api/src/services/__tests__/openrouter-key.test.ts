@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { requireOpenRouterApiKey } from '../openrouter-key';
+import { OPENROUTER_KEY_MISSING_MESSAGE, requireOpenRouterApiKey } from '../openrouter-key';
 import { createTestScope } from '../../repositories/__tests__/create-test-scope';
 import { buildNamespaceSecretsRepo } from '../../handlers/secrets/__tests__/fakes';
 
@@ -17,7 +17,7 @@ describe('requireOpenRouterApiKey', () => {
     });
     await expect(requireOpenRouterApiKey(scope, 'acme')).rejects.toMatchObject({
       code: 'validation',
-      message: 'OPENROUTER_API_KEY not configured in workspace secrets',
+      message: OPENROUTER_KEY_MISSING_MESSAGE,
     });
   });
 });

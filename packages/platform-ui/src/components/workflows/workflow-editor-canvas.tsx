@@ -692,7 +692,7 @@ export function WorkflowEditorCanvas({
           narration: true,
         }]);
       } else {
-        const description = err instanceof ApiError || err instanceof Error ? err.message : 'Failed to reach the assistant';
+        const description = err instanceof ApiError || err instanceof Error ? err.message : 'Could not reach the assistant. Check your connection and try again.';
         toast({ variant: 'error', title: 'Assistant error', description });
       }
     } finally {
@@ -1147,10 +1147,14 @@ export function WorkflowEditorCanvas({
               {assistantMessages.length === 0 ? (
                 <div className="text-sm text-muted-foreground text-center py-6 space-y-3">
                   <p>Describe the workflow you want to build, or ask a question.</p>
-                  <p className="text-xs">
-                    It writes the steps, the routing, and the files the workflow needs —
-                    a script, a Dockerfile, a skill.
-                  </p>
+                  <ul className="inline-flex flex-col gap-1.5 text-xs text-left">
+                    {['Add and edit steps', 'Wire up the routing', 'Write scripts, Dockerfiles and skills', 'Answer questions about your workflow'].map((capability) => (
+                      <li key={capability} className="flex items-center gap-2">
+                        <Check className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-500" />
+                        {capability}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ) : (
                 assistantMessages.map((message, index) => (
