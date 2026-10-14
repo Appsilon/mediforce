@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { STEP_FINGERPRINT_COMPONENTS } from '../eval-run';
-import { StepQualificationSchema } from '../step-qualification';
+import { StepQualificationSchema, qualificationOutcome } from '../step-qualification';
 import { describeAcceptanceCriteria } from '../../evaluation/acceptance';
 
 describe('StepQualificationSchema', () => {
@@ -46,5 +46,23 @@ describe('StepQualificationSchema', () => {
     expect(read.verdicts.map((verdict) => [verdict.severity, verdict.status])).toEqual([['critical', 'met'], ['major', 'not_evaluable']]);
     expect(read.deviations).toEqual(signed.deviations);
     expect(describeAcceptanceCriteria(read.acceptanceCriteria)).toBe('critical: pass rate ≥ 1; major: pass rate ≥ 0.9');
+  });
+
+  it('reads a qualification signed before decisions existed as the decision its signature carried', () => {
+    const hash = 'c'.repeat(64);
+    const unmet = { criterion: { minPassRate: 0.9 }, status: 'not_evaluable', evaluators: [], reason: 'No counted Evaluator' };
+    const signed = {
+      namespace: 'ws-1', workflowName: 'ae-grading', stepId: 'grade-aes',
+      id: '5e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', evalRunId: '6e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', definitionVersion: 3,
+      fingerprint: { hash, components: Object.fromEntries(STEP_FINGERPRINT_COMPONENTS.map((component) => [component, hash])) },
+      evaluators: [], mcpPolicy: {}, acceptanceCriteria: { minPassRate: 0.9 },
+      signature: { signerId: 'author-1', signerName: 'Ada Author', meaning: 'Approval', signedAt: '2026-09-23T10:00:00.000Z', reauthentication: 'password' },
+    };
+
+    const missed = StepQualificationSchema.parse({ ...signed, verdicts: [unmet], deviations: [{ justification: 'Accepted for now.' }] });
+    const met = StepQualificationSchema.parse({ ...signed, verdicts: [{ ...unmet, status: 'met' }], deviations: [] });
+
+    expect(qualificationOutcome(missed)).toBe('passed');
+    expect(qualificationOutcome(met)).toBe('passed');
   });
 });

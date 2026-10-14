@@ -15,7 +15,7 @@ import { createEvalCase } from '../eval-cases';
 import { freezeEvalDataset } from '../eval-datasets';
 import { advanceEvalRunOfInstance, cancelEvalRun, prepareEvalRun, startEvalRun } from '../eval-runs';
 import { getStepQualification, getWorkflowValidation, signStepQualification } from '../step-qualification';
-import { evaluationFixture, NAMESPACE, STEP, WORKFLOW, type EvaluationFixture } from './fixture';
+import { evaluationFixture, NAMESPACE, seedSchemaEvaluator, STEP, WORKFLOW, type EvaluationFixture } from './fixture';
 
 describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
   let fixture: EvaluationFixture;
@@ -40,7 +40,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
 
     await setAcceptanceCriteria({ ...STEP, criteria: strict, origin: 'user' }, scope);
     await createEvaluator({ ...STEP, name: 'findings-present', rule: 'The result lists findings.', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
-    await createEvaluator({ ...STEP, name: 'grades-present', rule: 'The result lists grades.', check: { kind: 'schema', schema: { required: ['grades'] } }, origin: 'user' }, scope);
+    await seedSchemaEvaluator(scope, { name: 'grades-present', rule: 'The result lists grades.', required: ['grades'] });
     for (const name of ['Grade 5 sepsis', 'Grade 4 neutropenia']) {
       await createEvalCase({
         ...STEP,

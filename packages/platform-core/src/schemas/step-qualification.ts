@@ -56,7 +56,7 @@ export function qualificationSignatureMeaning(decision: QualificationDecision, o
  * policy — and is never changed; one signed before variants were removed
  * still carries their keys, which reads ignore. It is informational: nothing is blocked without one.
  */
-export const StepQualificationSchema = EvaluatedStepSchema.extend({
+const StepQualificationRecordSchema = EvaluatedStepSchema.extend({
   id: z.uuid(),
   evalRunId: z.uuid(),
   definitionVersion: z.number().int().positive(),
@@ -67,11 +67,23 @@ export const StepQualificationSchema = EvaluatedStepSchema.extend({
   acceptanceCriteria: SignedAcceptanceCriteriaSchema,
   /** The verdict on the criteria, when the run had them; one signed while Evaluators had a severity has one per severity. */
   verdicts: z.array(AcceptanceCriterionVerdictSchema.extend({ severity: LegacyEvaluatorSeveritySchema.optional() })),
-  /** One signed before decisions existed agreed with its verdict. */
-  decision: QualificationDecisionSchema.default('confirmed'),
+  decision: QualificationDecisionSchema,
   deviations: z.array(QualificationDeviationSchema),
   signature: ElectronicSignatureSchema,
 });
+
+/**
+ * One signed before decisions existed was qualified whatever its verdict: it
+ * agreed with a met verdict, and over a missed or not judged one it carried a
+ * deviation, which is an overwrite.
+ */
+export const StepQualificationSchema = z.preprocess((record) => {
+  if (typeof record !== 'object' || record === null || 'decision' in record) return record;
+  const verdicts: unknown = 'verdicts' in record ? record.verdicts : undefined;
+  const met = Array.isArray(verdicts) && verdicts.length > 0
+    && verdicts.every((verdict) => typeof verdict === 'object' && verdict !== null && 'status' in verdict && verdict.status === 'met');
+  return { ...record, decision: met ? 'confirmed' : 'overwritten' };
+}, StepQualificationRecordSchema);
 
 /**
  * The badge (D11): `qualified` when any signed qualification binds the Step's
@@ -89,5 +101,5 @@ export function qualificationOutcome(qualification: Pick<StepQualification, 'dec
 export type QualificationDecision = z.infer<typeof QualificationDecisionSchema>;
 export type QualificationDeviation = z.infer<typeof QualificationDeviationSchema>;
 export type ElectronicSignature = z.infer<typeof ElectronicSignatureSchema>;
-export type StepQualification = z.infer<typeof StepQualificationSchema>;
+export type StepQualification = z.infer<typeof StepQualificationRecordSchema>;
 export type StepQualificationStatus = z.infer<typeof StepQualificationStatusSchema>;

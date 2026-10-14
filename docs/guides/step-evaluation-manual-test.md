@@ -104,7 +104,7 @@ cases come from 13, 15 and 16 — see §4.1.
 check as the Details view shows it. The one `schema` check a step may have takes only its JSON
 Schema and is always named `output-schema`):
 
-- **`grading-fields`** · `schema` · *"The result carries a grade, Hy's Law and seriousness"*
+- **`output-schema`** · `schema` · *"The output matches the JSON Schema."* (fixed; the form asks only for the Schema)
   ```json
   {"kind":"schema","schema":{"required":["ctcaeTerm","ctcaeGrade","serious","hysLawCandidate"],"properties":{"ctcaeGrade":{"type":"integer"},"serious":{"type":"boolean"},"hysLawCandidate":{"type":"boolean"}}}}
   ```
@@ -207,7 +207,7 @@ every output goes back to the assistant instead of to you.
 - *"Refine the <name> evaluator"* → ✅ **Proposed Evaluator version** card; accepting bumps to v2.
 - 🔍 As a user without the `run` verb: the card says the check was not tried.
 
-> 🧪 Add the four checks above: `grading-fields` → *Counts*; approve the source of the two code
+> 🧪 Add the four checks above: `output-schema` → *Counts*; approve the source of the two code
 > checks → *Counts*; `grade-justified` → *Counts*. Ask the assistant for a rule such as *"no
 > patient name, MRN or date of birth in the output"* → expect a `code` check (a judge only when a
 > script cannot decide it), previewed on sample 08's run.
@@ -271,7 +271,7 @@ never reviewed, gives no expected output — choose the expectation yourself
 | 10 bilirubin in µmol/L | Converted units; Hy's Law false | no — correct | `hys-law-consistent` |
 | 11 ALT exactly 5.0× ULN | G2 | no — correct | — |
 | 12 cholestatic | Hy's Law false (ALP ≥ 2×) | no — correct | `hys-law-consistent` |
-| 13 serious but grade 2 | Correct fields, but written as prose, not JSON → `output_schema` fallback, sent to review | **yes** | `grading-fields` (schema) |
+| 13 serious but grade 2 | Correct fields, but written as prose, not JSON → `output_schema` fallback, sent to review | **yes** | `output-schema` (schema) |
 | 14 afebrile neutropenia | Neutrophil count decreased G4 | no — correct | — |
 | 15 term not in reference | Myocarditis **G3 "from standard criteria"**, and **filed a real safety report**; JSON inside a markdown fence | **yes** | schema; `grade-justified`; a new check "grade only terms returned by `lookup_ctcae_term`" |
 | 16 no adverse event | `ctcaeTerm: "None"` with **`ctcaeGrade: 1`** | **yes** (negative) | new code check: `ctcaeTerm` must not be `None`/empty |
@@ -285,7 +285,7 @@ investigator's description."* to the prompt, or switch to a tiny model. Run 07 a
 default.
 
 > 🧪 Run 13, 15 and 16 and add each as a negative case. ✅ In the Eval Run report,
-> `grading-fields` fails on 13 and 15 whenever Gemma repeats the formatting slip, and the new
+> `output-schema` fails on 13 and 15 whenever Gemma repeats the formatting slip, and the new
 > "term must exist" / "no None term" checks fail on 15 and 16. That gives your first real failure
 > rates for §6.
 
@@ -365,7 +365,7 @@ Open a run with **Details**: **Summary**, **Trials**, **Evaluators**, **Model ve
   (agent confidence against pass rate in five bins, and expected calibration error), the routing
   recommendation and the MCP line.
 
-> 🧪 9 cases × 2 trials ≈ **$0.20–0.30**. ✅ `grading-fields` ≈ 100%; `hys-law-consistent` high;
+> 🧪 9 cases × 2 trials ≈ **$0.20–0.30**. ✅ `output-schema` ≈ 100%; `hys-law-consistent` high;
 > `safety-report-consistent` fails where 03/05 lack a report or a non-serious case got one. Flaky
 > > 0 on 06/07 is normal. Gemma reports high confidence on everything → check the calibration
 > numbers in the CLI report.

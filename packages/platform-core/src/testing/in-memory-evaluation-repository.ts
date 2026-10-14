@@ -197,6 +197,9 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
 
   async createQualification(qualification: StepQualification): Promise<StepQualification> {
     const parsed = StepQualificationSchema.parse(qualification);
+    if (this.qualifications.some((existing) => existing.evalRunId === parsed.evalRunId)) {
+      throw new Error(`Eval Run '${parsed.evalRunId}' already has a qualification`);
+    }
     this.qualifications.push(parsed);
     return parsed;
   }

@@ -280,6 +280,8 @@ export async function signStepQualification(
   const outcome = qualificationOutcome({ decision: input.decision, verdicts: [verdict] });
 
   const metadata = scope.system.userDirectory === null ? null : await scope.system.userDirectory.getUserMetadata(uid).catch(() => null);
+  const signedConcurrently = async (): Promise<boolean> =>
+    (await scope.evaluation.listQualifications(step)).some((existing) => existing.evalRunId === run.id);
   const qualification = await scope.evaluation.createQualification({
     ...step,
     id: randomUUID(),
@@ -299,6 +301,10 @@ export async function signStepQualification(
       signedAt: new Date().toISOString(),
       reauthentication: 'session',
     },
+  }).catch(async (error: unknown) => {
+    // The run's unique index refuses a second signature; a reader of the first one gets the same answer as the check above.
+    if (await signedConcurrently()) throw new ConflictError(`Eval Run '${run.id}' was already signed`);
+    throw error;
   });
   await appendEvaluationAudit(scope, {
     action: 'step_qualification.signed',

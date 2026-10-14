@@ -331,11 +331,13 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z',
       });
       const run = storedRun(dataset.id, dataset.caseIds);
+      const otherRun = storedRun(dataset.id, dataset.caseIds);
       await repo.createEvalRun(run, []);
-      const qualification = (signedAt: string): StepQualification => ({
+      await repo.createEvalRun(otherRun, []);
+      const qualification = (signedAt: string, evalRunId = run.id): StepQualification => ({
         ...step,
         id: randomUUID(),
-        evalRunId: run.id,
+        evalRunId,
         definitionVersion: 3,
         fingerprint: fingerprint('a'),
         evaluators: run.evaluators,
@@ -347,7 +349,8 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         signature: { signerId: 'author-1', signerName: 'Ada Author', meaning: 'Approval', signedAt, reauthentication: 'password' },
       });
       const older = await repo.createQualification(qualification('2026-09-23T10:00:00.000Z'));
-      const newer = await repo.createQualification(qualification('2026-09-23T11:00:00.000Z'));
+      const newer = await repo.createQualification(qualification('2026-09-23T11:00:00.000Z', otherRun.id));
+      await expect(repo.createQualification(qualification('2026-09-23T12:00:00.000Z'))).rejects.toThrow();
 
       expect(await repo.listQualifications(step)).toEqual([newer, older]);
       expect(await repo.listQualifications(otherStep)).toEqual([]);
