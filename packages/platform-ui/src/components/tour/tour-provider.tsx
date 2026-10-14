@@ -57,10 +57,10 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const [active, setActive] = React.useState<TourState | null>(null);
 
   const start = React.useCallback(() => {
-    const chapter = chapterForPath(GUIDE_CHAPTERS, pathname);
+    const chapter = chapterForPath(GUIDE_CHAPTERS, pathname, searchParams?.toString());
     if (chapter === null) return;
     setActive({ kind: 'guide', title: chapter.title, steps: chapter.steps, index: 0, collapsed: false });
-  }, [pathname]);
+  }, [pathname, searchParams]);
 
   const startScenario = React.useCallback((scenarioId: string) => {
     const scenario = DEMO_SCENARIOS.find((entry) => entry.id === scenarioId);

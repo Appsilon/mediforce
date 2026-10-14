@@ -63,9 +63,9 @@ import {
 
 type StepEvaluation = ReturnType<typeof useStepEvaluation>;
 
-function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
+function Section({ title, children, action, 'data-tour': tourAnchor }: { title: string; children: React.ReactNode; action?: React.ReactNode; 'data-tour'?: string }) {
   return (
-    <section className="rounded-lg border p-4 space-y-3">
+    <section className="rounded-lg border p-4 space-y-3" data-tour={tourAnchor}>
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">{title}</h3>
         {action}
@@ -343,7 +343,7 @@ export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
   const evaluators = data.data?.evaluators ?? [];
   const schemaTaken = evaluators.some((evaluator) => evaluator.latest.check.kind === 'schema');
   return (
-    <Section title="Evaluators" action={mayEdit && !adding && <button type="button" className={buttonClass} onClick={() => setAdding(true)}>Add</button>}>
+    <Section title="Evaluators" data-tour="eval-evaluators" action={mayEdit && !adding && <button type="button" className={buttonClass} onClick={() => setAdding(true)}>Add</button>}>
       {data.isLoading ? <Loading /> : evaluators.length === 0 && !adding ? (
         <p className="text-sm text-muted-foreground">No Evaluators yet. Ask the assistant what to check, or add one.</p>
       ) : (
@@ -1197,6 +1197,7 @@ export function CasesSection({ step, evaluation, mayEdit }: {
   return (
     <Section
       title="Eval Cases"
+      data-tour="eval-cases"
       action={mayEdit && (
         <div className="flex gap-1.5">
           <button type="button" className={buttonClass} onClick={() => setAdding(true)}>Add case</button>
@@ -1446,7 +1447,7 @@ export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEd
   const validation = status === undefined ? null : VALIDATION_STATUS[status.validation.status];
   const saveThresholds = (next: AcceptanceCriteria) => save.mutate(next, { onSuccess: () => setEditing(false) });
   return (
-    <section className="rounded-lg border p-3 space-y-3" data-testid="acceptance-criteria">
+    <section className="rounded-lg border p-3 space-y-3" data-testid="acceptance-criteria" data-tour="eval-status">
       <div className="flex flex-wrap items-center justify-between gap-2">
         {status === undefined || validation === null ? <Loading /> : (
           <InstantTooltip label="Show the step's qualification">
@@ -1684,7 +1685,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
   }));
 
   return (
-    <Section title="Eval Runs">
+    <Section title="Eval Runs" data-tour="eval-runs">
       {mayRun && (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <label className="flex items-center gap-1">Trials per case

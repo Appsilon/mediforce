@@ -52,7 +52,9 @@ runs and narrates centred, so a guide survives a panel that renders only when
 it has something to show. Route matching and the card geometry live in
 `src/lib/tour.ts`; the chapters themselves in `src/lib/tour-content.ts`, where
 a test holds each one to at least three steps and forbids ringing the same
-element more than twice.
+element more than twice. A chapter's `match` may end in `?key=value` (the
+Evaluation tab is `…/workflows/:name?tab=evaluation`), so a page that swaps
+content by tab gets one chapter per tab; the one with a matching query wins.
 
 **Demo is the same overlay with a different job.** A guide explains the page you
 are on and ends when you leave it; a *scenario* (`src/lib/demo-content.ts`)

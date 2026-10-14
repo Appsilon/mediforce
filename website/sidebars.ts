@@ -2,7 +2,7 @@ import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 
 /**
  * Product documentation, ordered the way a reader meets Mediforce: install it,
- * run something, build something, run it properly, add agents, evaluate them, then the traps.
+ * run something, build something, run it properly, add agents, then the traps.
  * The repository's own `docs/` is engineering documentation and is not here.
  *
  * One-page sections are plain entries — a category wrapping a single item of the
@@ -23,7 +23,6 @@ const sidebars: SidebarsConfig = {
       items: ['run/verify', 'run/triggers'],
     },
     'agents/index',
-    'evaluate/index',
     'workspace/index',
     'gotchas/index',
     {

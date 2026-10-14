@@ -308,6 +308,73 @@ export const GUIDE_CHAPTERS: readonly TourChapter[] = [
     ],
   },
   {
+    id: 'workflow-evaluation',
+    title: 'Evaluating an agent step',
+    match: '/:handle/workflows/:name?tab=evaluation',
+    steps: [
+      {
+        id: 'pick',
+        title: 'Evaluate one agent step of one version',
+        body: 'Version starts on the one new runs use. Step lists the agent steps, each with its status. Nothing on this tab changes the workflow or mints a new version.',
+        target: 'eval-selectors',
+      },
+      {
+        id: 'assistant',
+        title: 'The assistant proposes; nothing exists until you Accept',
+        body: 'Ask it what to check on this step and it returns a plan of risks, each with a Draft this check button. Its step brief, kept in the header, tells it what the step is for.',
+        target: 'eval-assistant',
+      },
+      {
+        id: 'evaluators',
+        title: 'An Evaluator is one pass-or-fail check on an output',
+        body: 'Pick the cheapest type that can decide the rule: Output schema is free and instant, Code is a short script, LLM judge is for rules that need judgment, Expected output compares to a known answer.',
+        target: 'eval-evaluators',
+      },
+      {
+        id: 'approval',
+        title: 'A Code Evaluator does not count until a person approves it',
+        body: 'It still grades, but is tagged Not counted. Read the script and click Approve source. Editing the script makes a new version that needs approving again.',
+        target: 'eval-evaluators',
+      },
+      {
+        id: 'cases',
+        title: 'An Eval Case is one input to run the step on',
+        body: 'Start from a production run to get exactly what the step received, with its output as the expected output. An approved run expects a match, a rejected one expects not to match.',
+        target: 'eval-cases',
+      },
+      {
+        id: 'save',
+        title: 'Save, or the next Eval Run will not see your cases',
+        body: 'Save writes the list as a new Dataset version. An Eval Run always uses the last saved Dataset, so a case marked unsaved is left out until you save again.',
+        target: 'eval-cases',
+      },
+      {
+        id: 'threshold',
+        title: 'The status is the verdict, the threshold is the bar',
+        body: 'Set the threshold chooses the minimum pass rate every counting Evaluator must reach; the default is 100%. Changing the step, an Evaluator, the cases or the threshold sets the status back to Not verified.',
+        target: 'eval-status',
+      },
+      {
+        id: 'run',
+        title: 'An Eval Run re-runs the step on every case, several times',
+        body: 'Trials per case runs from 1 to 10. The budget stops new trials, though ones already running finish, so the cost can end slightly over it. Keep a first run small.',
+        target: 'eval-runs',
+      },
+      {
+        id: 'report',
+        title: 'Open Details to read the pass rate and review the judges',
+        body: 'The Summary says whether the acceptance criteria were met, missed or not judged. Model verdicts is where you Accept or Deny each LLM judge verdict it was unsure of.',
+        target: 'eval-runs',
+      },
+      {
+        id: 'sign',
+        title: 'A person signs every Eval Run off',
+        body: 'Until then the status reads Waiting for human approval. On the run\u2019s Summary, confirm the result or overwrite it with a reason, then Sign. The version shows Verified once all its agent steps pass.',
+        target: 'eval-status',
+      },
+    ],
+  },
+  {
     id: 'workflow-detail',
     title: 'This workflow',
     match: '/:handle/workflows/:name',

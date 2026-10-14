@@ -59,7 +59,6 @@ Every engineering doc, what it is for, and how far to trust it.
 | Keep Redis inside its limits, or recover it | [`guides/redis-operations.md`](guides/redis-operations.md) | operators | living |
 | Look up what a workflow *can* do | [`reference/workflow-capabilities.md`](reference/workflow-capabilities.md) | workflow-authors | living |
 | Choose which part of Step Evaluation to use | [`guides/choose-an-evaluation.md`](guides/choose-an-evaluation.md) | workflow-authors | living |
-| Set up and run an evaluation in the app, step by step (user guide, linked from the Evaluation tab — update it when the tab's wording changes) | [`../website/docs/evaluate/index.md`](../website/docs/evaluate/index.md) | everyone | living |
 | Walk through Step Evaluation by hand on a sandbox workflow | [`guides/step-evaluation-manual-test.md`](guides/step-evaluation-manual-test.md) | engineers | living |
 | Evaluate an agent step — Evaluators, Eval Cases, Datasets | [`reference/step-evaluation.md`](reference/step-evaluation.md) | workflow-authors | living |
 | Know the rules a production workflow must satisfy | [`reference/workflow-authoring-golden-rules.md`](reference/workflow-authoring-golden-rules.md) | workflow-authors | living |
