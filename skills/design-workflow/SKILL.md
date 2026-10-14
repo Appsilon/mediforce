@@ -146,7 +146,7 @@ runtime as `${triggerPayload.<field>}` whichever one fired; transport-only
 whether a step needs a custom container or runs on `mediforce-golden-image`; and
 any MCPs, skills, or agents needed (flag platform setup as MANUAL).
 
-If the design needs a custom image, external skills, or `workspace.remote`, also
+If the design needs a custom image or `workspace.remote`, also
 ask **now** for the **git repo URL** the package will live in (and whether the
 repo holds one workflow or many — see Phase 2 layout). The URL is not part of the
 chicken-and-egg; only the commit SHA is. Fill the URL at generation time so the
@@ -188,7 +188,8 @@ root:**
     src/<workflow-name>.wd.json     # authored from the confirmed spec
     scripts/                       # ONLY if needed
     tests/                         # behavior tests + TEST_SUMMARY.md (Phase 3c)
-    skills/<skill>/SKILL.md        # ONLY if an agent step uses one (§4)
+    skills/<skill>/SKILL.md        # ONLY if an agent step uses one (§4); imported as a
+                                   #   catalog Skill with the workflow, named in agent.skills
     setup/                         # MANUAL: tool-catalog-entry.json, agent-definition.json,
                                    #   ONLY if the workflow uses governable MCPs (§7)
 ```
@@ -247,7 +248,7 @@ package can be imported from git.
 ### Edit mode: edit in place, diff for regressions
 
 Edit the `.wd.json` and only the package files the change touches. **Preserve
-what you did not change** — existing `repo`/`commit` pins, `externalSkillsRepo`,
+what you did not change** — existing `repo`/`commit` pins,
 MANUAL `setup/` entries, and steps/transitions unrelated to the change. Do not
 hand-bump a `version` field; re-registering is what creates a new version
 (`version` and `namespace` are filled in server-side).
@@ -381,7 +382,8 @@ running once and reporting is still enough; the `tests/` folder is for pinned
 package code.
 
 Then walk the golden-rules §9 production-ready checklist by hand: workflow
-validates; README complete; Docker/skills sources pinned by commit; secrets
+validates; README complete; Docker sources pinned by commit; skills named in
+`agent.skills`; secrets
 platform-managed; agent steps have output contracts and timeouts; governable
 MCPs in Tool Catalog and Agent Definitions; review steps have explicit verdicts;
 failure behavior intentional. **If any runtime source is still UNPINNED (see
@@ -395,7 +397,7 @@ Say so.
 
 ## Phase 4 — Pin runtime sources, then handoff
 
-### Pin (only when the package has a custom image, external skills, or `workspace.remote`)
+### Pin (only when the package has a custom image or `workspace.remote`)
 
 The `repo` URL is already filled (gathered in Phase 1). Only the **commit SHA**
 is chicken-and-egg: it cannot exist until the package is committed. **You** drive
@@ -408,15 +410,14 @@ commit the **only** remaining change is filling the SHA. If you change structure
 (move the Dockerfile, rename a script) after the commit, the build context
 changes and the user must re-commit — that is the loop, and it is avoidable.
 
-1. Author every `commit` / `externalSkillsRepo.commit` field as the sentinel
+1. Author every `commit` field as the sentinel
    `0000000000000000000000000000000000000000` (40 zeros). Never invent a real
    SHA. The all-zeros value is format-valid so the Phase 3 dry-run still passes,
    and is obviously a placeholder. Mark it `UNPINNED` in the README.
 2. Ask the user to commit the package once (you do **not** commit — see
    Non-goals) and give you the SHA, or derive it with `git rev-parse HEAD` if the
    package is in this checkout.
-3. **You** `Edit` that SHA into every `commit` build-context field and
-   `externalSkillsRepo.commit`. The README's pinning section then records **state**
+3. **You** `Edit` that SHA into every `commit` build-context field. The README's pinning section then records **state**
    (`pinned to <repo>@<sha>`), not a to-do list for the user.
 4. Re-run the Phase 3 dry-run after filling the SHA.
 

@@ -1,3 +1,4 @@
+import { skillManifest } from '@mediforce/platform-core';
 import {
   RegisterWorkflowInputSchema,
   type ImportWorkflowInput,
@@ -5,8 +6,20 @@ import {
 } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
+import { normalizeRepoDir, readSkillFolders, upsertSkills } from '../skills/import-skills';
 import { buildRawUrl, fetchJsonOrThrow, resolveGitHubSource } from './_github';
+import { assertStepsMayAddSkills } from '../skills/may-hold-skills';
 import { registerWorkflow } from './register-workflow';
+import { validateWorkflow } from './validate-workflow';
+
+/** Where a package keeps its Skills: `skills/` in the package folder, which is
+ *  the folder of the `.wd.json`, or its parent when that is `src/` (the
+ *  canonical `<workflow>/src/<workflow>.wd.json` layout). */
+export function packageSkillsDir(workflowPath: string): string {
+  const folder = workflowPath.split('/').slice(0, -1);
+  const packageFolder = folder.at(-1) === 'src' ? folder.slice(0, -1) : folder;
+  return normalizeRepoDir([...packageFolder, 'skills'].join('/'));
+}
 
 export async function importWorkflow(
   input: ImportWorkflowInput,
@@ -32,9 +45,67 @@ export async function importWorkflow(
     );
   }
 
-  return registerWorkflow(
+  // The package's Skills become the importing workspace's before the workflow
+  // is registered, since registering checks that every step Skill exists. A
+  // step naming one of them in the file's own namespace (or in none, when the
+  // file declares none) is pointed at the imported copy, so a package imports
+  // into any workspace; a reference to another namespace is left alone.
+  const workflowPath = [source.pathPrefix, input.path].filter(Boolean).join('/');
+  const folders = await readSkillFolders(
+    { repo: source.repo, commit: source.commit, dir: packageSkillsDir(workflowPath) },
+    scope,
+  );
+  const shipped = new Set(folders.map((files) => skillManifest(files).name));
+  const fileNamespace = typeof (json as { namespace?: unknown }).namespace === 'string'
+    ? (json as { namespace: string }).namespace
+    : undefined;
+  const steps = parsed.data.steps.map((step) => {
+    if (step.agent?.skills === undefined) return step;
+    const refs = step.agent.skills.map((ref) =>
+      shipped.has(ref.id) && (fileNamespace === undefined || ref.namespace === fileNamespace)
+        ? { namespace: input.namespace, id: ref.id }
+        : ref);
+    return { ...step, agent: { ...step.agent, skills: refs } };
+  });
+
+  // Everything registration checks without the Skills is checked before one is
+  // written, so a definition that cannot register leaves the workspace as it was.
+  const checked = await validateWorkflow({ ...parsed.data, steps }, scope);
+  if (checked.valid === false) {
+    throw new ValidationError(checked.errors.map((error) => error.message).join(', '), checked.errors);
+  }
+  // Skills the package ships are checked by registration once written, but a
+  // reference to any other Skill can already fail now; so can a shipped Skill
+  // that already exists, whose visibility the upsert keeps.
+  const existing = await Promise.all(
+    [...shipped].map(async (id) => [id, await scope.skills.getById(input.namespace, id)] as const),
+  );
+  const created = new Set(existing.filter(([, skill]) => skill === null).map(([id]) => id));
+  await assertStepsMayAddSkills(
+    {
+      namespace: input.namespace,
+      visibility: parsed.data.visibility,
+      steps: steps.map((step) => step.agent?.skills === undefined ? step : {
+        ...step,
+        agent: {
+          ...step.agent,
+          skills: step.agent.skills.filter((ref) => !(ref.namespace === input.namespace && created.has(ref.id))),
+        },
+      }),
+    },
+    scope,
+  );
+  const skills = await upsertSkills(
+    input.namespace,
+    folders,
+    `Skill imported with workflow ${source.repo}@${source.commit} (${workflowPath})`,
+    scope,
+  );
+
+  const registered = await registerWorkflow(
     {
       ...parsed.data,
+      steps,
       namespace: input.namespace,
       // Provenance is recorded against the canonical repo and a repo-root-relative
       // path, so `url` + `path` + `commit` locates the file forever — the tree URL
@@ -42,10 +113,11 @@ export async function importWorkflow(
       // relative to, neither of which survives the branch moving.
       source: {
         url: source.repo,
-        path: [source.pathPrefix, input.path].filter(Boolean).join('/'),
+        path: workflowPath,
         commit: source.commit,
       },
     },
     scope,
   );
+  return skills.length === 0 ? registered : { ...registered, skills };
 }

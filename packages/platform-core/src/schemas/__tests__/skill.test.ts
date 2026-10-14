@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SkillFilesSchema, parseSkillFrontmatter, skillManifest } from '../skill';
-import { WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES } from '../workflow-definition';
+import { SKILL_MAX_TOTAL_BYTES, SkillFilesSchema, parseSkillFrontmatter, skillManifest } from '../skill';
 
 const manifest = (frontmatter: string, body = '# Body\n') => `---\n${frontmatter}\n---\n${body}`;
 const skillMd = manifest('name: sdtm-mapping\ndescription: Map raw clinical data to SDTM domains');
@@ -104,13 +103,13 @@ describe('SkillFilesSchema', () => {
 
   it('refuses a skill over the byte cap, counted in UTF-8 bytes', () => {
     // Four-byte characters: under the cap by character count, over it in bytes.
-    const chunk = '😀'.repeat(15 * 1024);
+    const chunk = '😀'.repeat(60 * 1024);
     const files = [
       { path: 'SKILL.md', contents: skillMd },
       ...Array.from({ length: 5 }, (_, index) => ({ path: `references/${String(index)}.md`, contents: chunk })),
     ];
     const characters = files.reduce((sum, file) => sum + file.contents.length, 0);
-    expect(characters).toBeLessThan(WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES);
-    expect(firstIssue(files)).toContain(`over the ${String(WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES)} byte limit`);
+    expect(characters).toBeLessThan(SKILL_MAX_TOTAL_BYTES);
+    expect(firstIssue(files)).toContain(`over the ${String(SKILL_MAX_TOTAL_BYTES)} byte limit`);
   });
 });

@@ -359,20 +359,6 @@ describe('applyWorkflowAssistantToolCalls — a Dockerfile an imported workflow 
     const draft = steps.find((step) => step.id === 'draft');
     expect(draft?.executor === 'script' ? draft.script?.dockerfile : undefined).toBe('container/Dockerfile');
   });
-
-  it('keeps it when the workflow takes its files from an external repo', () => {
-    const canvas = baseCanvas();
-    const withRepoFiles: typeof canvas.steps = canvas.steps.map((step) => (step.id === 'draft'
-      ? { ...step, executor: 'agent' as const, plugin: 'claude-code-agent', agent: { dockerfile: 'container/Dockerfile' } }
-      : step));
-    const { steps } = applyWorkflowAssistantToolCalls(
-      withRepoFiles, canvas.transitions,
-      [{ tool: 'update_step', arguments: { stepId: 'draft', name: 'Interpret' } }],
-      { externalSkillsRepo: { url: 'https://github.com/acme/pipelines.git', commit: 'b'.repeat(40) } },
-    );
-    const draft = steps.find((step) => step.id === 'draft');
-    expect(draft?.executor === 'agent' ? draft.agent?.dockerfile : undefined).toBe('container/Dockerfile');
-  });
 });
 
 describe('applyWorkflowAssistantToolCalls — removing a transition', () => {

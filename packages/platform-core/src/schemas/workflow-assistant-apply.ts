@@ -19,18 +19,8 @@ export interface ToolCallOutcome {
 /** The workflow-level fields the assistant can now write, held alongside the
  *  graph because a step tool and a settings tool arrive in the same batch. */
 export type WorkflowSettings = Partial<
-  Omit<
-    z.infer<typeof WorkflowAuthorableSchema>,
-    'name' | 'steps' | 'transitions' | 'inputForNextRun' | 'externalSkillsRepo'
-  >
-> & {
-  /** Partial because an editor holds it while it is being typed: the definition
-   *  requires `commit`, but demanding it on the first keystroke would make the
-   *  field unfillable. Registration is what validates the finished value. */
-  externalSkillsRepo?: Partial<
-    NonNullable<z.infer<typeof WorkflowAuthorableSchema>['externalSkillsRepo']>
-  >;
-};
+  Omit<z.infer<typeof WorkflowAuthorableSchema>, 'name' | 'steps' | 'transitions' | 'inputForNextRun'>
+>;
 
 export interface ApplyToolCallsResult {
   steps: WorkflowStep[];
@@ -53,8 +43,6 @@ function withoutUncarriedDockerfile(
   if (config === undefined || typeof dockerfile !== 'string' || dockerfile === '') return step;
   if (carriedDockerfile(config, settings.artifacts) !== null) return step;
   if (typeof config.repo === 'string' && typeof config.commit === 'string') return step;
-  const repoFiles = settings.externalSkillsRepo;
-  if (typeof repoFiles?.url === 'string' && typeof repoFiles.commit === 'string') return step;
   const { dockerfile: _dropped, ...rest } = config;
   return step.executor === 'script'
     ? ({ ...step, script: rest } as WorkflowStep)
@@ -183,9 +171,6 @@ export function applyWorkflowAssistantToolCalls(
         ...patch,
         ...(patch.env === undefined ? {} : { env: { ...workingSettings.env, ...patch.env } }),
         ...(patch.metadata === undefined ? {} : { metadata: { ...workingSettings.metadata, ...patch.metadata } }),
-        ...(patch.externalSkillsRepo === undefined
-          ? {}
-          : { externalSkillsRepo: { ...workingSettings.externalSkillsRepo, ...patch.externalSkillsRepo } }),
       };
       outcomes.push({ tool: 'update_workflow', stepId: supplied.map(([key]) => key).join(', ') });
     } else if (call.tool === 'write_workflow_file') {

@@ -13,10 +13,8 @@ export const NotificationTargetSchema = z.object({
 });
 
 export const AgentConfigSchema = z.object({
-  skill: z.string().optional(),
   prompt: z.string().optional(),
   model: z.string().optional(),
-  skillsDir: z.string().optional(),
   timeoutMs: z.number().positive().optional(),
   timeoutMinutes: z.number().optional(),
   command: z.string().optional(),

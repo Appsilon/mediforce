@@ -26,6 +26,6 @@ completes.
 ```
 container/Dockerfile      R + teal runtime image
 container/sample_data/    Demo datasets
-plugins/tealflow/         Packaged skills
+skills/                   Skills the agent step uses, imported with the workflow
 src/tealflow.wd.json      Workflow definition
 ```

@@ -104,7 +104,7 @@ describe('WorkflowAgentConfigSchema with mcpServers', () => {
   it('should accept mcpServers array', () => {
     const result = WorkflowAgentConfigSchema.safeParse({
       model: 'sonnet',
-      skill: 'extract-data',
+      prompt: 'Extract the data.',
       mcpServers: [
         {
           name: 'cdisc-library',
@@ -131,7 +131,7 @@ describe('WorkflowAgentConfigSchema with mcpServers', () => {
   it('should accept agent config without mcpServers', () => {
     const result = WorkflowAgentConfigSchema.safeParse({
       model: 'sonnet',
-      skill: 'extract-data',
+      prompt: 'Extract the data.',
     });
     expect(result.success).toBe(true);
     if (result.success) {

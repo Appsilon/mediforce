@@ -50,6 +50,7 @@ export {
 export {
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
+  ImportWorkflowOutputSchema,
   ValidateWorkflowInputSchema,
   ValidateWorkflowOutputSchema,
   WorkflowValidationIssueSchema,
@@ -527,6 +528,9 @@ export {
   UpdateSkillOutputSchema,
   DeleteSkillInputSchema,
   DeleteSkillOutputSchema,
+  ImportSkillsInputSchema,
+  ImportSkillsOutputSchema,
+  ImportedSkillSchema,
   type ListSkillsInput,
   type ListSkillsOutput,
   type GetSkillInput,
@@ -537,6 +541,9 @@ export {
   type UpdateSkillOutput,
   type DeleteSkillInput,
   type DeleteSkillOutput,
+  type ImportSkillsInput,
+  type ImportSkillsOutput,
+  type ImportedSkill,
 } from './skills';
 
 export {

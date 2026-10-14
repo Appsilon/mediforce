@@ -50,10 +50,10 @@ apps/landing-zone/
       sftp_poll.py
       validate.py
       accept_delivery.py
-  plugins/landing-zone/
-    skills/
-      data-validator/SKILL.md
-      draft-rejection-note/SKILL.md
+  skills/                     Imported with the workflow as catalog Skills
+    data-validator/SKILL.md
+    draft-rejection-note/SKILL.md
+    propose-rules/SKILL.md
 ```
 
 ## Local development

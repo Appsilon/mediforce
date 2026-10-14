@@ -5,6 +5,7 @@ import {
   GetTaskOutputSchema,
   RegisterWorkflowInputSchema,
   RegisterWorkflowOutputSchema,
+  ImportWorkflowOutputSchema,
   AskWorkflowAssistantInputSchema,
   PlanWorkflowBuildInputSchema,
   PlanWorkflowBuildOutputSchema,
@@ -210,6 +211,8 @@ import {
   UpdateSkillOutputSchema,
   DeleteSkillInputSchema,
   DeleteSkillOutputSchema,
+  ImportSkillsInputSchema,
+  ImportSkillsOutputSchema,
   DiscoverMcpToolsInputApiSchema,
   DiscoverMcpToolsOutputSchema,
   ListImageCatalogEntriesInputSchema,
@@ -331,6 +334,8 @@ import {
   type UpdateSkillOutput,
   type DeleteSkillInput,
   type DeleteSkillOutput,
+  type ImportSkillsInput,
+  type ImportSkillsOutput,
   type DiscoverMcpToolsInputApi,
   type DiscoverMcpToolsOutput,
   type ListImageCatalogEntriesInput,
@@ -1027,6 +1032,9 @@ export class Mediforce {
     create: (input: CreateSkillInput) => Promise<CreateSkillOutput>;
     update: (input: UpdateSkillInput) => Promise<UpdateSkillOutput>;
     delete: (input: DeleteSkillInput) => Promise<DeleteSkillOutput>;
+    /** Create or update a Skill from every `<dir>/<name>/SKILL.md` folder of a
+     *  public GitHub repository, read at the commit `ref` resolves to. */
+    importFromRepo: (input: ImportSkillsInput) => Promise<ImportSkillsOutput>;
   };
 
   readonly imageCatalog: {
@@ -1718,7 +1726,7 @@ export class Mediforce {
           'POST',
           `/api/workflow-definitions/import${qs}`,
           { repo: validated.repo, path: validated.path, ref: validated.ref },
-          RegisterWorkflowOutputSchema,
+          ImportWorkflowOutputSchema,
           'mediforce.workflows.importFromRepo',
         );
       },
@@ -2449,6 +2457,16 @@ export class Mediforce {
         });
         const body = await parseJsonOrThrow(res, 'mediforce.skills.delete');
         return DeleteSkillOutputSchema.parse(body);
+      },
+      importFromRepo: async (input) => {
+        const { namespace, ...importBody } = ImportSkillsInputSchema.parse(input);
+        return this.sendJson(
+          'POST',
+          `/api/skills/import${toSearchParams({ namespace })}`,
+          importBody,
+          ImportSkillsOutputSchema,
+          'mediforce.skills.importFromRepo',
+        );
       },
     };
 

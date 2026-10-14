@@ -41,7 +41,11 @@ developer uploads a Skill ([ADR-0025](../../docs/adr/0025-skill-catalog.md)): it
 reads a local skill folder into the API's `files[]`, skipping hidden entries and
 refusing, by name, a symlink or any file that is not UTF-8 text. The skill's id, name and
 description come from the folder's `SKILL.md` frontmatter — there are no flags
-for them.
+for them. `skill import --repo <url> --dir <dir>` does the same for every
+`<dir>/<name>/SKILL.md` folder of a public GitHub repository, server-side:
+new Skills are created, changed ones updated, identical ones left alone
+([ADR-0028](../../docs/adr/0028-retire-file-skills.md)). `workflow import` runs
+it for the `skills/` folder of the package it imports.
 
 `agent set-skills <id> --skills <list>` replaces the Skills an agent holds. Each
 entry is `<namespace>/<id>`, or a bare `<id>` for a Skill in the agent's own

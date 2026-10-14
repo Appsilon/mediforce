@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Layers, GitBranch, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, EyeOff, Copy, Link2, ShieldCheck, FlaskConical } from 'lucide-react';
+import { ArrowLeft, Layers, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, EyeOff, Copy, Link2, ShieldCheck, FlaskConical } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
@@ -127,7 +127,6 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
                 <Layers className="h-3 w-3" />
                 {definition.steps.length} steps
               </span>
-              <RepoLink definition={definition} />
               <AppLink definition={definition} />
             </div>
           </div>
@@ -520,7 +519,6 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                   )}
                 </span>
               ))}
-              <RepoLink definition={latest} />
               <AppLink definition={latest} />
             </div>
           </div>
@@ -914,24 +912,6 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
         </div>
       )}
     </div>
-  );
-}
-
-function RepoLink({ definition }: { definition: { externalSkillsRepo?: { url: string; commit?: string } } | null }) {
-  if (!definition?.externalSkillsRepo?.url) return null;
-  const { url, commit } = definition.externalSkillsRepo;
-  const href = commit ? `${url}/tree/${commit}` : url;
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-      title={commit ?? undefined}
-    >
-      <GitBranch className="h-3 w-3" />
-      Repo
-    </a>
   );
 }
 

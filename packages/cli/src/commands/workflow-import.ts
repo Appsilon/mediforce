@@ -4,7 +4,8 @@ import { printJson, printError } from '../output';
 export const workflowImportCommand = defineCommand({
   name: 'mediforce workflow import',
   description:
-    'Import a workflow definition from a public GitHub repo (one-time copy). The .wd.json file is fetched server-side, validated, and registered as a new WorkflowDefinition.',
+    'Import a workflow definition from a public GitHub repo (one-time copy). The .wd.json file is fetched server-side, validated, and registered as a new WorkflowDefinition. ' +
+    'Skill folders the package ships in its skills/ folder become Skills of the namespace first.',
   args: {
     repo: {
       type: 'string',
@@ -38,6 +39,9 @@ export const workflowImportCommand = defineCommand({
         printJson(output, result);
       } else {
         output.stdout(`Imported ${result.name} v${String(result.version)} into namespace: ${args.namespace}`);
+        for (const skill of result.skills ?? []) {
+          output.stdout(`  skill ${skill.id}  ${skill.outcome}`);
+        }
       }
       return 0;
     }

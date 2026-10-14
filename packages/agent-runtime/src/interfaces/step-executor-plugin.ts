@@ -120,13 +120,14 @@ export interface WorkflowAgentContext {
   oauthTokens?: Record<string, ResolvedOAuthBinding>;
   /** The systemPrompt of the AgentDefinition referenced by step.agentId.
    *  Populated by platform-ui's executeAgentStep. Injected into
-   *  buildPrompt() after the workflow preamble. Skills are step-level
-   *  (agentConfig.skillsDir) and are resolved separately. */
+   *  buildPrompt() after the workflow preamble. Skills are resolved
+   *  separately, into agentSkills. */
   agentIdentityPrompt?: string;
-  /** The Skills the AgentDefinition referenced by step.agentId holds
-   *  (ADR-0025), resolved by resolveSkillsForStep in platform-ui's
-   *  executeAgentStep. Offered to Claude Code through the plugin folder, never
-   *  pasted into the prompt. undefined when step.agentId is unset. */
+  /** The Skills the step offers: its agent's (ADR-0025) and its own
+   *  `agent.skills` (ADR-0027), resolved by resolveSkillsForStep in
+   *  platform-ui's executeAgentStep. Offered to Claude Code through the plugin
+   *  folder, never pasted into the prompt. undefined when the step has neither
+   *  an agentId nor skills of its own. */
   agentSkills?: Skill[];
   /** Set by AgentRunner on the one retry after `result` broke
    *  `step.agent.outputSchema`: the validation error, for the prompt. */

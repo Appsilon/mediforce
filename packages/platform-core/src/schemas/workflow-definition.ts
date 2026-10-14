@@ -108,11 +108,8 @@ export type ActionConfig = z.infer<typeof ActionConfigSchema>;
  *                    Supply `image` explicitly to control the registry tag
  *                    or when you push to a shared registry.
  *
- * Fallback: when a step sets `dockerfile` but no step-level `repo`/`commit`,
- * the workflow's `externalSkillsRepo` (or the deprecated `repo`) field is
- * used as the build context. This fallback is retained for backward
- * compatibility and will be removed once the deprecated `repo` field is
- * dropped (see follow-up issue for that migration).
+ * A `dockerfile` with no `repo`/`commit` builds from the files the workflow
+ * carries (`artifacts`); see `carriedDockerfile`.
  */
 export const ContainerSchema = z.object({
   /**
@@ -159,14 +156,26 @@ export const AgentOutputSchemaSchema = z.looseObject({
  *  (agent, script, databricks); see {@link resolveStepTimeoutMinutes}. */
 export const StepTimeoutMinutesSchema = z.number().positive();
 
+const FILE_SKILL_RETIRED =
+  'file skills (skill / skillsDir) were retired (ADR-0028): name the skill in agent.skills from the Skill catalog, ' +
+  'and import it with `mediforce skill import` if it lives in git';
+
 export const WorkflowAgentConfigSchema = z.object({
   model: z.string().optional(),
-  skill: z.string().optional(),
   prompt: z.string().optional(),
-  skillsDir: z.string().optional(),
   /** Catalog Skills this step offers on top of its agent's (ADR-0027). A
    *  Skill of the agent's with the same id is replaced by the step's. */
   skills: AgentSkillRefsSchema.optional(),
+  /** Refused with a pointer to `skills`, so a file written before ADR-0028 is
+   *  not registered without the skill it names. */
+  skill: z.never({ error: FILE_SKILL_RETIRED }).optional(),
+  skillsDir: z.never({ error: FILE_SKILL_RETIRED }).optional(),
+  /**
+   * The file skill (`<skillsDir>/<skill>`) a version stored before ADR-0028
+   * named, set by migration 0079 and never by a caller. Saving refuses it and
+   * running fails on it, rather than running the step without its skill.
+   */
+  retiredFileSkill: z.string().optional(),
   timeoutMinutes: StepTimeoutMinutesSchema.optional(),
   /** Shown to the agent in its prompt and checked against `result` after the
    *  run: one retry with the validation error, then the run is escalated. */
@@ -520,6 +529,24 @@ function validateSteps(
   });
 }
 
+/** A stored step that still names a retired file skill (ADR-0028) is not
+ *  saved again as it is: the new version would fail on its first run. */
+function validateNoRetiredFileSkills(
+  wd: { steps: WorkflowStep[] },
+  ctx: z.RefinementCtx,
+): void {
+  wd.steps.forEach((step, index) => {
+    const retired = step.agent?.retiredFileSkill;
+    if (retired === undefined) return;
+    ctx.addIssue({
+      code: 'custom',
+      path: ['steps', index, 'agent', 'retiredFileSkill'],
+      message: `step '${step.id}' uses the file skill '${retired}', which no longer runs (ADR-0028): ` +
+        'remove it and name the skill in agent.skills from the Skill catalog',
+    });
+  });
+}
+
 /**
  * Artifacts have to survive being written to a directory: two files cannot
  * share a path, a file cannot sit where another needs a directory, and the set
@@ -531,21 +558,22 @@ function validateArtifacts(
   ctx: z.RefinementCtx,
 ): void {
   if (!wd.artifacts) return;
-  validateFileTree(wd.artifacts, ['artifacts'], ctx, 'put what is bigger in an image or a repository');
+  validateFileTree(wd.artifacts, ['artifacts'], ctx, 'put what is bigger in an image or a repository', WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES);
 }
 
 /**
  * The checks any set of text files written to one directory needs: no path
  * used twice, no path used as both a file and a directory, and the whole set
- * within {@link WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES}. `field` is where the files
- * sit in the parsed object, so an issue points at the offending entry;
- * `overflowHint` tells the author where bigger content belongs.
+ * within `maxBytes`. `field` is where the files sit in the parsed object, so an
+ * issue points at the offending entry; `overflowHint` tells the author where
+ * bigger content belongs.
  */
 export function validateFileTree(
   files: ReadonlyArray<{ path: string; contents: string }>,
   field: ReadonlyArray<string>,
   ctx: z.RefinementCtx,
   overflowHint: string,
+  maxBytes: number,
 ): void {
   const label = field[field.length - 1] ?? 'files';
   const byPath = new Map<string, number>();
@@ -581,11 +609,11 @@ export function validateFileTree(
   });
 
   const total = fileTreeBytes(files);
-  if (total > WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES) {
+  if (total > maxBytes) {
     ctx.addIssue({
       code: 'custom',
       path: [...field],
-      message: `${label} total ${String(total)} bytes, over the ${String(WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES)} byte limit — ${overflowHint}`,
+      message: `${label} total ${String(total)} bytes, over the ${String(maxBytes)} byte limit — ${overflowHint}`,
     });
   }
 }
@@ -743,7 +771,8 @@ function utf8Bytes(text: string): number {
   return new TextEncoder().encode(text).length;
 }
 
-/** The bytes a set of files costs against {@link WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES}:
+/** The bytes a set of files costs against a total cap
+ *  ({@link WORKFLOW_ARTIFACTS_MAX_TOTAL_BYTES}, {@link SKILL_MAX_TOTAL_BYTES}):
  *  every path and its contents, as UTF-8. */
 export function fileTreeBytes(files: ReadonlyArray<{ path: string; contents: string }>): number {
   return files.reduce((sum, file) => sum + utf8Bytes(file.path) + utf8Bytes(file.contents), 0);
@@ -791,6 +820,24 @@ export const WorkflowArtifactSchema = z.object({
 });
 export type WorkflowArtifact = z.infer<typeof WorkflowArtifactSchema>;
 
+/**
+ * What a version looked like before migration 0079 (ADR-0028) retired file
+ * skills and `externalSkillsRepo`: its steps verbatim (`skill` / `skillsDir`
+ * included) and the repo the definition read skills and build contexts from.
+ * Written once by the migration, read-only afterwards, so the author can see
+ * what to move into the Skill catalog. Steps stay `unknown`: they no longer
+ * parse as {@link WorkflowStepSchema}.
+ */
+export const LegacyDefinitionSchema = z.object({
+  steps: z.array(z.unknown()),
+  externalSkillsRepo: z.object({
+    url: z.string(),
+    commit: z.string(),
+    auth: z.string().optional(),
+  }).optional(),
+});
+export type LegacyDefinition = z.infer<typeof LegacyDefinitionSchema>;
+
 export const WorkflowDefinitionBaseSchema = z.object({
   name: z.string().min(1),
   version: z.number().int().positive(),
@@ -803,16 +850,11 @@ export const WorkflowDefinitionBaseSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   preamble: z.string().optional(),
-  /**
-   * External git repository that provides skills for this workflow.
-   * The runtime clones the repo at `commit` and mounts the directory
-   * containing the skill files into the agent container.
-   *
-   * `commit` is required — omitting it silently no-ops the skills fetch.
-   * `auth` names a workflow secret that holds the clone token for private repos.
-   */
-  externalSkillsRepo: RepoSchema.extend({
-    commit: CommitShaSchema,
+  /** Refused, so a file written before ADR-0028 does not register with its
+   *  skills gone and a bare `dockerfile` quietly handed the golden image. */
+  externalSkillsRepo: z.never({
+    error: 'externalSkillsRepo was retired (ADR-0028): import its skills with `mediforce skill import` and name them in ' +
+      'agent.skills; a step that built from it sets its own repo + commit',
   }).optional(),
   url: z.string().url().optional(),
   roles: z.array(z.string()).optional(),
@@ -836,12 +878,14 @@ export const WorkflowDefinitionBaseSchema = z.object({
   /** Files this workflow carries: scripts its steps run, a Dockerfile its image
    *  is built from, skills its agents read. See {@link WorkflowArtifactSchema}. */
   artifacts: z.array(WorkflowArtifactSchema).optional(),
+  /** Server-managed, see {@link LegacyDefinitionSchema}. */
+  legacyDefinition: LegacyDefinitionSchema.optional(),
 });
 
 /**
  * Fields the platform injects or manages at registration — never authored by
  * template files, the design LLM, or `validate` callers. The loader supplies
- * `namespace`; `version` and `createdAt` are assigned server-side. Single
+ * `namespace`; `version` and `createdAt` are assigned server-side (so is `legacyDefinition`, which only a migration writes). Single
  * source for every `.omit()` / strip that drops them, so the three call sites
  * that used to redeclare this set can no longer drift apart.
  */
@@ -849,6 +893,7 @@ export const SERVER_MANAGED_WORKFLOW_FIELDS = {
   namespace: true,
   version: true,
   createdAt: true,
+  legacyDefinition: true,
 } as const;
 
 /**
@@ -865,7 +910,6 @@ export const WorkflowAuthorableSchema = WorkflowDefinitionBaseSchema.pick({
   title: true,
   description: true,
   preamble: true,
-  externalSkillsRepo: true,
   url: true,
   roles: true,
   env: true,
@@ -927,13 +971,14 @@ export {
  * `.data` or `.error`.
  */
 export function parseWorkflowDefinitionForCreation(input: unknown) {
-  return WorkflowDefinitionBaseSchema.omit({ version: true, createdAt: true })
+  return WorkflowDefinitionBaseSchema.omit({ version: true, createdAt: true, legacyDefinition: true })
     .superRefine((wd, ctx) => {
       validateInputForNextRun(wd, ctx);
       validateSteps(wd, ctx);
       validateVerdicts(wd, ctx);
       validateTriggerInput(wd, ctx);
       validateArtifacts(wd, ctx);
+      validateNoRetiredFileSkills(wd, ctx);
     })
     .safeParse(input);
 }
@@ -956,6 +1001,7 @@ export const WorkflowTemplateSchema = WorkflowDefinitionBaseSchema.omit(
   validateVerdicts(wd, ctx);
   validateTriggerInput(wd, ctx);
   validateArtifacts(wd, ctx);
+  validateNoRetiredFileSkills(wd, ctx);
 });
 
 export type WorkflowTemplate = z.infer<typeof WorkflowTemplateSchema>;

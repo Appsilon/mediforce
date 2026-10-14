@@ -100,7 +100,7 @@ Watch the run in the UI. The first poll lists whatever is currently on the CRO S
 The study repo owns the contract and its validation rules. Everything else is a platform-engineering change in `Appsilon/mediforce`:
 
 - `apps/landing-zone/scripts/` — SFTP poll, CDISC validation, custom-validation wrapper, accept-delivery, rules PR
-- `apps/landing-zone/plugins/landing-zone/skills/` — agent prompts (`data-validator`, `draft-rejection-note`, `propose-rules`)
+- `apps/landing-zone/skills/` — the agent steps' Skills (`data-validator`, `draft-rejection-note`, `propose-rules`), imported with the workflow
 - `apps/landing-zone/container/Dockerfile` — the shared image
 - `apps/landing-zone/src/*.wd.json` — workflow definitions
 

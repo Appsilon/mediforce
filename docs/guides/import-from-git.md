@@ -14,8 +14,32 @@ is a **one-time copy** — no live link back to the repo, no automatic sync (see
 Import runs the same handler as `mediforce workflow register`, so anything that
 registers also imports: every step type, both image modes (prebuilt `image` and
 build-mode `repo` + `commit` + `dockerfile`), and fields like
-`externalSkillsRepo` / `workspace.remote` are copied verbatim. A top-level
-`namespace` in the file is ignored — the import target namespace wins.
+`workspace.remote` are copied verbatim. A top-level `namespace` in the file is
+ignored — the import target namespace wins.
+
+## Skills a package ships
+
+Before registering, import also turns the package's skills into Skills of the
+target namespace ([ADR-0028](../adr/0028-retire-file-skills.md)): every
+`skills/<name>/SKILL.md` folder beside the `.wd.json`, or beside its `src/`
+folder in the canonical `<workflow>/src/<workflow>.wd.json` layout. A step that
+names one of them in `agent.skills`, in the namespace the file declares, is
+pointed at the imported copy, so a package imports into any workspace; a
+reference to another namespace is left alone. The definition is validated first,
+so one that cannot register creates no Skills. A Skill
+already there is updated when its files differ (its visibility kept) and left
+alone when they do not; a folder that is not a valid skill imports nothing.
+
+To import skills on their own — a skills repository, or a package's skills
+before `workflow register --file` — use *Import from git* on the Skills page or:
+
+```bash
+pnpm exec mediforce skill import \
+  --repo <url> --dir <directory> --namespace <ns> [--ref <branch|tag|sha>]
+```
+
+Same rules as above, and the same source: a public GitHub repository, read at
+the commit the ref resolves to, without the deployment's credentials.
 
 ## Entry points
 

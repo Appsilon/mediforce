@@ -14,10 +14,9 @@ const REFERENCE_OUTPUT_PATH = resolve(
   'apps/protocol-to-tfl/data/outputs/cdiscpilot01-outputs/cdiscpilot01-trial-metadata.json',
 );
 
-const SKILLS_DIR = resolve(
-  PROJECT_ROOT,
-  'apps/protocol-to-tfl/plugins/protocol-to-tfl/skills',
-);
+const EXTRACT_PROMPT =
+  'Extract the trial metadata from the protocol and SAP PDFs. Return JSON with ' +
+  'study_identification (including study_id) and study_design.';
 
 const PROCESS_CONFIG: ProcessConfig = {
   processName: 'protocol-to-tfl',
@@ -32,8 +31,7 @@ const PROCESS_CONFIG: ProcessConfig = {
       autonomyLevel: 'L3',
       timeoutMinutes: 15,
       agentConfig: {
-        skill: 'trial-metadata-extractor',
-        skillsDir: SKILLS_DIR,
+        prompt: EXTRACT_PROMPT,
         model: 'sonnet',
         image: 'mediforce-agent:protocol-to-tfl',
       },
@@ -103,7 +101,7 @@ describe('ClaudeCodeAgentPlugin E2E', () => {
       plugin = new StubClaudeCodeAgentPlugin(REFERENCE_OUTPUT_PATH);
     });
 
-    it('[E2E] runs extract-metadata workflow and emits status event mentioning skill name', async () => {
+    it('[E2E] runs extract-metadata workflow and emits a spawning status event', async () => {
       const context = buildContext();
       await plugin.initialize(context);
 
@@ -112,7 +110,7 @@ describe('ClaudeCodeAgentPlugin E2E', () => {
 
       const statusEvents = events.filter((event) => event.type === 'status');
       expect(statusEvents.length).toBeGreaterThanOrEqual(1);
-      expect(statusEvents[0].payload).toContain('trial-metadata-extractor');
+      expect(statusEvents[0].payload).toBe('spawning Claude Code');
     });
 
     it('[E2E] emits result event with confidence > 0', async () => {
@@ -213,6 +211,7 @@ describe('ClaudeCodeAgentPlugin E2E', () => {
       { timeout: 60_000 },
       async () => {
         setEnv('MOCK_AGENT', 'true');
+        setEnv('MOCK_FIXTURES_DIR', 'apps/protocol-to-tfl/mock-fixtures');
         setEnv('ANTHROPIC_API_KEY', 'test-dummy-key');
 
         const plugin = new ClaudeCodeAgentPlugin();
@@ -229,8 +228,7 @@ describe('ClaudeCodeAgentPlugin E2E', () => {
                 plugin: 'claude-code-agent',
                 autonomyLevel: 'L3',
                 agentConfig: {
-                  skill: 'trial-metadata-extractor',
-                  skillsDir: SKILLS_DIR,
+                  prompt: EXTRACT_PROMPT,
                   model: 'sonnet',
                   image: 'mediforce-agent:protocol-to-tfl',
                   // No repo/commit — standalone mode
@@ -280,7 +278,7 @@ describe('ClaudeCodeAgentPlugin E2E', () => {
 
         const statusEvents = events.filter((event) => event.type === 'status');
         expect(statusEvents.length).toBeGreaterThanOrEqual(1);
-        expect(statusEvents[0].payload).toContain('trial-metadata-extractor');
+        expect(statusEvents[0].payload).toBe('spawning Claude Code');
 
         const resultEvent = events.find((event) => event.type === 'result');
         expect(resultEvent).toBeDefined();

@@ -62,7 +62,6 @@ export const workflowDefinitions = pgTable(
     notifications: jsonb('notifications'),
     gitWorkspace: jsonb('git_workspace'),
     metadata: jsonb('metadata'),
-    externalSkillsRepo: jsonb('external_skills_repo'),
     url: text('url'),
     copiedFrom: jsonb('copied_from'),
     source: jsonb('source'),
@@ -70,6 +69,10 @@ export const workflowDefinitions = pgTable(
     /** Files this version carries: scripts, a Dockerfile, skills. Capped by
      *  `WorkflowArtifactSchema` so a definition row stays a definition row. */
     artifacts: jsonb('artifacts'),
+    /** Migration 0079's record of what this version looked like before file
+     *  skills and `externalSkillsRepo` were retired (ADR-0028). Null for every
+     *  version that never used them; never written by the application. */
+    legacyDefinition: jsonb('legacy_definition'),
 
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),

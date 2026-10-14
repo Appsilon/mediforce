@@ -7,10 +7,6 @@
   "env": {
     "APP_BASE_URL": "{{APP_BASE_URL}}"
   },
-  "externalSkillsRepo": {
-    "url": "https://github.com/Appsilon/mediforce.git",
-    "commit": "1e51d23c1fb72d1728acfa081887fd2b95f99dda"
-  },
   "triggerInput": [
     {
       "name": "studyId",
@@ -151,8 +147,8 @@
         "dockerfile": "container/Dockerfile",
         "repo": "https://github.com/Appsilon/mediforce.git",
         "commit": "1e51d23c1fb72d1728acfa081887fd2b95f99dda",
-        "skill": "summarize-record",
-        "skillsDir": "apps/golden-standard-workflow/skills",
+        "prompt": "Use the `summarize-record` skill: it holds this step's instructions. Load it first and follow it.",
+        "skills": [{ "namespace": "appsilon", "id": "summarize-record" }],
         "timeoutMinutes": 10
       },
       "mcpRestrictions": {
@@ -217,10 +213,9 @@
         "dockerfile": "container/Dockerfile",
         "repo": "https://github.com/Appsilon/mediforce.git",
         "commit": "1e51d23c1fb72d1728acfa081887fd2b95f99dda",
-        "skill": "summarize-record",
-        "skillsDir": "apps/golden-standard-workflow/skills",
+        "skills": [{ "namespace": "appsilon", "id": "summarize-record" }],
         "timeoutMinutes": 10,
-        "prompt": "Create the final operator summary. Write /output/result.json with {\"summary\": string, \"ready\": true}."
+        "prompt": "Use the `summarize-record` skill: it holds this step's instructions. Load it first and follow it.\n\nCreate the final operator summary. Write /output/result.json with {\"summary\": string, \"ready\": true}."
       }
     },
     {

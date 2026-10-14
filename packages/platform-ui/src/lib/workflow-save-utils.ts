@@ -90,6 +90,17 @@ export function handleSaveFailure(err: unknown, steps: WorkflowStep[]): SaveFail
 
   const issues = extractIssues(err);
   const stepErrors = parseStepErrors(issues, steps);
+  const retiredSkillSteps = issues
+    .filter((issue) => issue.path[0] === 'steps' && issue.path[2] === 'agent' && issue.path[3] === 'retiredFileSkill')
+    .map((issue) => steps[Number(issue.path[1])]?.name ?? `#${issue.path[1]}`);
+  if (retiredSkillSteps.length > 0) {
+    const names = retiredSkillSteps.map((name) => `'${name}'`).join(', ');
+    return {
+      stepErrors,
+      message: `Step${retiredSkillSteps.length > 1 ? 's' : ''} ${names} still ${retiredSkillSteps.length > 1 ? 'name' : 'names'} a retired file skill — ` +
+        'open it, expand Prompt & model, and remove the notice under Skills (pick the imported Skill there instead).',
+    };
+  }
   if (Object.keys(stepErrors).length > 0) {
     return { stepErrors, message: 'Some steps have errors — check the highlighted steps in the diagram.' };
   }

@@ -4,6 +4,11 @@ Picks an open PR on `Appsilon/mediforce` that is not a draft and has no human
 comments yet, runs the `code-review` skill against the diff, and posts the
 review as a single comment.
 
+The package carries its Skill in [`skills/code-review`](skills/code-review):
+importing the workflow creates it in the importing workspace. It is the same
+skill this repository's coding agents use; the repo-root `skills/code-review`
+is a symlink to it, so there is one copy.
+
 ## Steps
 
 `find-pr` (agent) → `review` (agent) → `post-comment` (agent) → `done`, with

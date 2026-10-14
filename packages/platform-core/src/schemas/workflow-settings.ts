@@ -9,14 +9,12 @@ import type { WorkflowSettings } from './workflow-assistant-apply';
  */
 export type WorkflowSettingsDraft = WorkflowSettings;
 
-/** What registers: the draft with every half-finished value resolved away, so
- *  `externalSkillsRepo` is either complete or absent. */
+/** What registers: the draft with every half-finished value resolved away. */
 export type RegisterableWorkflowSettings = Partial<
   Pick<
     WorkflowDefinition,
     | 'title' | 'description' | 'preamble' | 'url' | 'env' | 'notifications'
     | 'workspace' | 'triggerInput' | 'visibility' | 'roles' | 'metadata'
-    | 'externalSkillsRepo'
   >
 >;
 
@@ -58,9 +56,8 @@ export function pruneWorkflowSettings(draft: WorkflowSettingsDraft): Registerabl
     }
 
     if (Array.isArray(value)) {
-      // A notification with no roles notifies nobody, so it is the same class
-      // of half-finished value as a skills repo missing its commit: dropped
-      // rather than registered, and the panel warns.
+      // A notification with no roles notifies nobody: a half-finished value,
+      // dropped rather than registered, and the panel warns.
       const entries = key === 'notifications'
         ? (value as { roles?: string[] }[]).filter((n) => (n.roles ?? []).length > 0)
         : value;
@@ -76,8 +73,8 @@ export function pruneWorkflowSettings(draft: WorkflowSettingsDraft): Registerabl
         continue;
       }
 
-      // `workspace` and `externalSkillsRepo`: drop the blank members, then drop
-      // the object itself if nothing survived.
+      // `workspace`: drop the blank members, then drop the object itself if
+      // nothing survived.
       const kept: Record<string, unknown> = {};
       for (const [member, memberValue] of Object.entries(value as Record<string, unknown>)) {
         if (typeof memberValue === 'string') {
@@ -86,14 +83,6 @@ export function pruneWorkflowSettings(draft: WorkflowSettingsDraft): Registerabl
           continue;
         }
         if (memberValue !== undefined && memberValue !== null) kept[member] = memberValue;
-      }
-      // A skills repo needs both: without a url there is nothing to clone, and
-      // without a commit the runtime silently fetches nothing. Half of one is
-      // held in the draft so the author can finish typing it, but it is not
-      // registered — the panel says so inline rather than dropping it quietly.
-      if (key === 'externalSkillsRepo' && (kept.url === undefined || kept.commit === undefined)) {
-        Object.assign(pruned, { [key]: undefined });
-        continue;
       }
       Object.assign(pruned, { [key]: Object.keys(kept).length > 0 ? kept : undefined });
       continue;

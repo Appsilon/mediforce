@@ -13,7 +13,7 @@
       "author": {
         "name": "vedha"
       },
-      "source": "./plugins/protocol-to-tfl",
+      "source": "./",
       "category": "clinical-research"
     }
   ]

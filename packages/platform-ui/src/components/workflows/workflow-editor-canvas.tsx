@@ -64,7 +64,6 @@ export interface WorkflowEditorCanvasProps {
    *  which is what registers them. */
   settingsDraft?: WorkflowSettingsDraft;
   onSettingsChange?: (draft: WorkflowSettingsDraft) => void;
-  workflowExternalSkillsRepo?: WorkflowDefinition['externalSkillsRepo'];
   workflowName?: string;
   namespace?: string;
   renderSavePanel?: (
@@ -106,7 +105,6 @@ export function WorkflowEditorCanvas({
   onNonGraphFieldsChange,
   settingsDraft,
   onSettingsChange,
-  workflowExternalSkillsRepo,
   workflowName,
   namespace,
   renderSavePanel,
@@ -1069,7 +1067,6 @@ export function WorkflowEditorCanvas({
               workflowArtifacts={settingsDraft?.artifacts}
               workflowVisibility={settingsDraft?.visibility}
               catalogEntries={catalogEntries}
-              workflowExternalSkillsRepo={workflowExternalSkillsRepo}
             />
           </div>
         )}

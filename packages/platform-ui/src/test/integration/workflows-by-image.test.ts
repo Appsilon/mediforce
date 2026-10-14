@@ -263,33 +263,6 @@ describe('GET /api/workflow-definitions/by-image', () => {
     expect(body.workflows[0].steps).toEqual(['build-step']);
   });
 
-  it('matches a step that inherits the build repo from the workflow', async () => {
-    fake.definitions.push({
-      name: 'wf-inherited',
-      namespace: 'acme',
-      version: 1,
-      visibility: 'private',
-      externalSkillsRepo: { url: 'git@github.com:org/skills.git', commit: 'def5678' },
-      steps: [
-        {
-          id: 'script-step',
-          name: 'Script step',
-          type: 'creation',
-          executor: 'script',
-          script: { command: 'run.sh', dockerfile: 'Dockerfile' },
-        },
-      ],
-      transitions: [],
-    } as unknown as WorkflowDefinition);
-
-    const derived = deriveBuildTag('git@github.com:org/skills.git', 'def5678', 'Dockerfile');
-    const res = await GET(req(derived));
-    const body = await res.json();
-
-    expect(body.workflows).toHaveLength(1);
-    expect(body.workflows[0].name).toBe('wf-inherited');
-  });
-
   it('returns 401 without auth header', async () => {
     const res = await GET(
       new NextRequest('http://localhost/api/workflow-definitions/by-image?image=x:y'),

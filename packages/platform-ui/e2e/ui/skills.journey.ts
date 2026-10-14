@@ -5,6 +5,7 @@ import type { Page } from '@playwright/test';
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { allowPageErrors, trackPageErrors } from '../helpers/page-errors';
+import { probeGitHub } from '../helpers/github-reachable';
 
 /**
  * Skills catalog UI (#1463, ADR-0025): a member creates a skill in the editor,
@@ -151,6 +152,35 @@ test.describe('Skills Catalog Journey', () => {
     } finally {
       await page.request.delete(`/api/agents/${agentId}`);
       await deleteSkill(page, id);
+    }
+  });
+
+  test('import a repository\'s skill folders from git and find them in the list', async ({ page }) => {
+    test.setTimeout(90_000);
+    test.skip((await probeGitHub()).apiReachable === false, 'GitHub unreachable or rate limited');
+    trackPageErrors(page);
+    // A pinned main commit whose community-digest skills folder holds two skills.
+    const ids = ['draft-discord-posts', 'rank-changes'];
+    await Promise.all(ids.map((id) => deleteSkill(page, id)));
+
+    try {
+      await page.goto(`/${TEST_ORG_HANDLE}/skills`);
+      await page.getByRole('button', { name: 'Import from git' }).click();
+      await page.getByLabel('Repository URL').fill('https://github.com/Appsilon/mediforce');
+      await page.getByLabel(/^Directory/).fill('apps/community-digest/plugins/community-digest/skills');
+      await page.getByLabel(/^Branch, tag, or commit/).fill('a19d8bf1ceaae1f9c331ab129efb4f9998e158f0');
+      await page.getByRole('button', { name: 'Import', exact: true }).click();
+
+      const imported = page.getByTestId('imported-skills');
+      await expect(imported).toContainText('draft-discord-posts', { timeout: 60_000 });
+      await expect(imported).toContainText('rank-changes');
+      await page.getByRole('button', { name: 'Done' }).click();
+
+      for (const id of ids) {
+        await expect(page.getByTestId('skill-card').filter({ hasText: id })).toBeVisible({ timeout: 15_000 });
+      }
+    } finally {
+      await Promise.all(ids.map((id) => deleteSkill(page, id)));
     }
   });
 });

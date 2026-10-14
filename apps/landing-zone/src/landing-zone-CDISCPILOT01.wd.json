@@ -88,11 +88,16 @@
       "autonomyLevel": "L2",
       "description": "Read deterministic classification (clean / minor-fix / recovery / escalate / chaos) from validate-script output and render an HTML report. Does not classify — the rules engine + router_rules.py decide the class. Surfaces script-failure path (chaos) prominently with traceback when present.",
       "agent": {
-        "skill": "data-validator",
-        "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
         "model": "haiku",
         "image": "mediforce-landing-zone:latest",
-        "timeoutMinutes": 15
+        "timeoutMinutes": 15,
+        "prompt": "Use the `data-validator` skill: it holds this step's instructions. Load it first and follow it.",
+        "skills": [
+          {
+            "namespace": "appsilon",
+            "id": "data-validator"
+          }
+        ]
       }
     },
     {
@@ -148,11 +153,16 @@
       "autonomyLevel": "L1",
       "description": "Compose a markdown note explaining why the delivery was rejected — what was wrong, what the operator should ask the CRO to fix. Output feeds into the send-rejection-email action step.",
       "agent": {
-        "skill": "draft-rejection-note",
-        "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
         "model": "haiku",
         "image": "mediforce-landing-zone:latest",
-        "timeoutMinutes": 5
+        "timeoutMinutes": 5,
+        "prompt": "Use the `draft-rejection-note` skill: it holds this step's instructions. Load it first and follow it.",
+        "skills": [
+          {
+            "namespace": "appsilon",
+            "id": "draft-rejection-note"
+          }
+        ]
       }
     },
     {
@@ -190,11 +200,16 @@
         }
       },
       "agent": {
-        "skill": "propose-rules",
-        "skillsDir": "apps/landing-zone/plugins/landing-zone/skills",
         "model": "haiku",
         "image": "mediforce-landing-zone:latest",
-        "timeoutMinutes": 10
+        "timeoutMinutes": 10,
+        "prompt": "Use the `propose-rules` skill: it holds this step's instructions. Load it first and follow it.",
+        "skills": [
+          {
+            "namespace": "appsilon",
+            "id": "propose-rules"
+          }
+        ]
       }
     },
     {

@@ -30,8 +30,8 @@ The pipeline consists of 5 skills, each handling a discrete step:
 src/
   process-definition.yaml  # Workflow definition (steps, transitions)
   __tests__/               # Process definition validation tests
-plugins/
-  protocol-to-tfl/skills/  # Skill definitions and reference docs
+skills/                    # Skill definitions and reference docs
+mock-fixtures/             # Canned step results for MOCK_AGENT Docker runs
 data/
   test-docs/               # Trial protocol/SAP documents and SDTM data
   outputs/                 # Generated ADaM datasets, TLGs, and teal apps
@@ -55,10 +55,12 @@ Agent work is committed to the workspace remote
 `Appsilon/mediforce-clinical-workspace`, declared in the definition's
 `workspace` block — reviewers read the diff there rather than a JSON blob.
 
-**Skill paths are hardcoded.** All four agent steps set
-`skillsDir: "apps/protocol-to-tfl/plugins/protocol-to-tfl/skills"`. Moving or
-renaming the skills directory breaks the workflow at run time, not at
-validation — update the definition in the same commit.
+**Skills come from the catalog.** Each agent step names its Skill in
+`agent.skills` and its prompt tells the agent to use it. Importing the workflow
+from git creates the Skills in `skills/` in the importing workspace and points
+the steps at them; registering the file with `mediforce workflow register`
+needs them there first (`mediforce skill import --repo <this repo> --dir
+apps/protocol-to-tfl/skills --namespace <ns>`).
 
 ## Usage
 

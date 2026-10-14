@@ -1,7 +1,7 @@
 /**
  * An agent's Skills reaching a Claude Code container (ADR-0025 decision 6): the
  * materialized plugin folder is mounted read-only at `/plugin` and handed to
- * the CLI as `--plugin-dir`, with no skill or skillsDir on the step.
+ * the CLI as `--plugin-dir`, with no skills on the step itself.
  */
 import { EventEmitter } from 'node:events';
 import { Readable, Writable } from 'node:stream';

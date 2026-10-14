@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { WorkflowDefinitionSchema, buildTaskVerdicts } from '@mediforce/platform-core';
 
@@ -76,7 +76,7 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
     }
   });
 
-  it('agent steps reference claude-code-agent plugin with skill + skillsDir', () => {
+  it('agent steps reference claude-code-agent plugin with a Skill the package ships', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
@@ -86,8 +86,11 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
 
     for (const step of agentSteps) {
       expect(step.plugin).toBe('claude-code-agent');
-      expect(step.agent?.skill).toBeDefined();
-      expect(step.agent?.skillsDir).toBe('apps/landing-zone/plugins/landing-zone/skills');
+      const skills = step.agent?.skills ?? [];
+      expect(skills.length).toBeGreaterThan(0);
+      for (const skill of skills) {
+        expect(existsSync(resolve(appDir, 'skills', skill.id, 'SKILL.md'))).toBe(true);
+      }
     }
   });
 

@@ -22,6 +22,9 @@ pnpm dev:mock
 Serves Next on port **9007** with:
 - `MOCK_AGENT=true` — LLM agent plugins run the mock bash command instead of
   Claude/OpenCode. Script-container steps are unaffected — they run real scripts.
+  A Docker mock run copies canned results from `MOCK_FIXTURES_DIR`
+  (`<dir>/<stepId>.json`, path from the repo root, e.g.
+  `apps/protocol-to-tfl/mock-fixtures`) when it is set.
 - `MEDIFORCE_DATA_DIR=/tmp/mediforce-e2e-data` — workspace bare repos + worktrees
   land here instead of `~/.mediforce`
 - `NEXT_PUBLIC_APP_URL` / `APP_BASE_URL` on :9007 — self-calls hit the right port

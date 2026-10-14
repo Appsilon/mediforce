@@ -439,6 +439,10 @@ export function StartRunButton({
                     title="Ambiguous image"
                     warnings={warnings.filter((w) => w.category === 'image-and-dockerfile')}
                   />
+                  <WarningGroup
+                    title="Retired file skills"
+                    warnings={warnings.filter((w) => w.category === 'retired-file-skill')}
+                  />
                 </div>
               </>
               )}

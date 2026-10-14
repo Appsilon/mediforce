@@ -83,7 +83,10 @@ export function StepSkillsField({
         </div>
       )}
       {selected.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">{selected.map((ref) => chip(ref, true))}</div>
+        <div className="space-y-1">
+          <p className="text-[11px] text-muted-foreground">from step definition</p>
+          <div className="flex flex-wrap gap-1.5">{selected.map((ref) => chip(ref, true))}</div>
+        </div>
       )}
       <select aria-label="Add skill" value="" onChange={(e) => add(e.target.value)} className={selectBase}>
         <option value="">

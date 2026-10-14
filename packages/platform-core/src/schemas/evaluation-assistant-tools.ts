@@ -202,8 +202,8 @@ const NoArguments = z.object({});
 export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
   /**
    * The step as it runs: config, agent prompt, input/output descriptions,
-   * allowed tools, effective MCP servers with their eval policy, SKILL.md, and
-   * the steps upstream of it.
+   * allowed tools, effective MCP servers with their eval policy, the catalog
+   * Skills it is offered with their SKILL.md, and the steps upstream of it.
    */
   get_step: NoArguments,
   /** Recent finished production Agent Runs of the step, with the reviewer's verdict where there was one. */

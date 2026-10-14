@@ -25,7 +25,7 @@ significant and the text that resulted.
 ```
 container/Dockerfile          mediforce-agent:community-digest
 scripts/gather-github-changes.ts   GitHub API collection for the script step
-plugins/community-digest/     Packaged skills for the agent steps
+skills/                       Skills the agent steps use, imported with the workflow
 src/*.wd.json                 Workflow definitions
 ```
 

@@ -1,3 +1,8 @@
+---
+name: summarize-record
+description: Summarize the golden-standard workflow's normalized intake and quality gate output into an operator-facing verdict, summary and findings.
+---
+
 # Summarize Record
 
 Use this skill when a golden-standard workflow agent step needs to summarize
