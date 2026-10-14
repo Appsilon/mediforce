@@ -45,7 +45,9 @@ test.describe('Step Evaluation tab', () => {
       { content: 'The summary check passed on the recent run. I drafted a Brief and proposed the check.' },
     ]);
 
-    await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
+    await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}`);
+    await page.getByRole('tab', { name: /evaluation/i }).click();
+    await expect(page).toHaveURL(/tab=evaluation/);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
     await expect(page.getByText('No Evaluators yet.')).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Show the step brief' }).click();

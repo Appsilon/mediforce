@@ -22,7 +22,9 @@ export type TourStep = {
 export type TourChapter = {
   id: string;
   title: string;
-  /** Route pattern: `:name` matches one segment, a trailing `*` matches the rest. */
+  /** Route pattern: `:name` matches one segment, a trailing `*` matches the rest.
+   *  An optional `?key=value` also requires that query parameter, so a page
+   *  that swaps its content by tab can give each tab its own chapter. */
   match: string;
   steps: TourStep[];
 };
@@ -51,12 +53,16 @@ function specificity(pattern: string): number {
   return literals * 100 + params * 10 + (wildcard ? 0 : 1);
 }
 
-export function chapterForPath(chapters: readonly TourChapter[], pathname: string): TourChapter | null {
+export function chapterForPath(chapters: readonly TourChapter[], pathname: string, search = ''): TourChapter | null {
+  const params = new URLSearchParams(search);
   let best: TourChapter | null = null;
   let bestScore = -1;
   for (const chapter of chapters) {
-    if (!matchesRoute(chapter.match, pathname)) continue;
-    const score = specificity(chapter.match);
+    const [pattern = '', requiredQuery] = chapter.match.split('?');
+    if (!matchesRoute(pattern, pathname)) continue;
+    const required = new URLSearchParams(requiredQuery ?? '');
+    if (![...required].every(([key, value]) => params.get(key) === value)) continue;
+    const score = specificity(pattern) + [...required].length * 1000;
     if (score > bestScore) {
       best = chapter;
       bestScore = score;

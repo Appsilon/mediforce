@@ -207,7 +207,7 @@ export function EvaluationTab({ handle, workflowName, runnableVersion, mayEdit, 
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4" data-tour="eval-selectors">
         <label className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">Version</span>
           <select

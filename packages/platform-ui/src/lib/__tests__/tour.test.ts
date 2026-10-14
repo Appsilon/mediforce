@@ -52,6 +52,23 @@ describe('chapterForPath', () => {
   it('returns null when nothing matches', () => {
     expect(chapterForPath([chapters[1]!], '/test/settings')).toBeNull();
   });
+
+  describe('a chapter tied to a query', () => {
+    const tabbed: TourChapter[] = [
+      { id: 'workflow', title: 'Workflow', match: '/:handle/workflows/:name', steps: [] },
+      { id: 'evaluation', title: 'Evaluation', match: '/:handle/workflows/:name?tab=evaluation', steps: [] },
+    ];
+
+    it('wins over the plain route only when the query agrees', () => {
+      expect(chapterForPath(tabbed, '/test/workflows/etl', 'tab=evaluation&step=grade')?.id).toBe('evaluation');
+      expect(chapterForPath(tabbed, '/test/workflows/etl', 'tab=runs')?.id).toBe('workflow');
+      expect(chapterForPath(tabbed, '/test/workflows/etl')?.id).toBe('workflow');
+    });
+
+    it('never matches without its query', () => {
+      expect(chapterForPath([tabbed[1]!], '/test/workflows/etl', 'tab=runs')).toBeNull();
+    });
+  });
 });
 
 describe('cardPlacement', () => {
@@ -155,11 +172,13 @@ describe('tour content', () => {
       '/test/runs',
       '/test/workflows/new',
       '/test/workflows/etymology-checker',
+      '/test/workflows/etymology-checker?tab=evaluation',
       '/test/workflows/etymology-checker/runs/abc',
       '/test/workflows/etymology-checker/definitions/3',
     ];
     for (const route of routes) {
-      const chapter = chapterForPath(GUIDE_CHAPTERS, route);
+      const [path, query] = route.split('?');
+      const chapter = chapterForPath(GUIDE_CHAPTERS, path!, query);
       expect([route, chapter?.id]).not.toEqual([route, 'anywhere']);
     }
   });
