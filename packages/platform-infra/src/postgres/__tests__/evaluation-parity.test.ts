@@ -342,6 +342,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         mcpPolicy: run.mcpPolicy,
         acceptanceCriteria: { minPassRate: 0.9 },
         verdicts: [{ criterion: { minPassRate: 0.9 }, status: 'missed', evaluators: [], reason: 'findings-present: pass rate 80% < 90%' }],
+        decision: 'overwritten',
         deviations: [{ justification: 'Every miss was a formatting slip a reviewer catches.' }],
         signature: { signerId: 'author-1', signerName: 'Ada Author', meaning: 'Approval', signedAt, reauthentication: 'password' },
       });

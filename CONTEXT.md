@@ -538,7 +538,8 @@ or by an agreement score, never assumed to be the only right answer), "notes"
 The output an Eval Case expects of the step, compared with each trial's output
 by an `expected_output` Evaluator: an *exact match*, where any difference fails,
 or an *output agreement score* (0–1) that the check's model gives, with the
-case's own instructions on which differences are trivial or decisive.
+case's own instructions on which differences are trivial or decisive. The
+Evaluation tab labels the two *exactly* and *by meaning*.
 _Avoid_: "label" (Scores already have labels), "ground truth".
 
 **Judge review**:
@@ -562,21 +563,23 @@ _Avoid_: "step version", "config hash".
 
 **Acceptance Criteria**:
 The pass thresholds an Eval Run is judged against, fixed before it starts;
-signing a Step Qualification despite a missed criterion records a deviation
-with a written justification.
+overwriting an Eval Run's verdict when signing a Step Qualification records a
+deviation with a written justification.
 _Avoid_: "threshold" alone, "target".
 
 **Step Qualification**:
-A signed decision that one Step Fingerprint met its acceptance criteria in an
-Eval Run; it goes stale when the Workflow Step's current Fingerprint differs.
-Not the step's **validation** — passed, failed or not verified — which is read
-from the newest finished Eval Run of the workflow version and needs no signature.
+A person's signed decision on an Eval Run's verdict — confirmed or overwritten —
+for one Step Fingerprint; it qualifies the step only when it leaves the verdict
+passed, and goes stale when the Workflow Step's current Fingerprint differs.
+The step's **validation** — passed, failed, waiting for human approval or not
+verified — is read from the newest finished Eval Run of the workflow version
+and that sign-off.
 _Avoid_: "validated", "certified", "approved step".
 
 **Verified** *(Workflow Definition version)*:
 A Workflow Definition version in which every agent Workflow Step's validation
-passed; **failed** when any step's failed, otherwise **not verified**. Read,
-never signed. Archived versions are not evaluated, so they have none.
+passed; **failed** when any step's failed, **awaiting approval** when one waits
+for a signature, otherwise **not verified**. Read, never signed. Archived versions are not evaluated, so they have none.
 _Avoid_: "validated version", "qualified version" (only a step is qualified).
 
 **Eval Run**:

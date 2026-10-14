@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-07
+last_reviewed: 2026-10-14
 ---
 
 # Step Evaluation
@@ -19,7 +19,7 @@ Everything below belongs to one agent Step, keyed by
 Definition: adding a check never mints a definition version. Reading needs only
 access to the workflow; changing anything needs its `edit` verb, and
 previewing checks or preparing, starting and cancelling Eval Runs its `run`
-verb. Signing a Step Qualification needs `edit` and a signed-in person. A
+verb. Confirming or overwriting a run's verdict (signing a Step Qualification) needs `edit` and a signed-in person. A
 Step that still declares MCP servers inline on `agent.mcpServers` cannot be
 evaluated — an eval policy cannot deny them, so move them onto its
 agent first.
@@ -192,7 +192,9 @@ that crashes, or a judge that gives no usable verdict, is an *error*, never a
 failed output.
 
 Every change is a new immutable version; a `code` version's source approval
-attaches to it.
+attaches to it. In the tab's form, what blocks a save — no name, no rule, a
+schema that is not JSON, a judge with no model or question — is said under the
+field it is about, and cleared once that field is edited.
 
 An `llm_judge` check is `{ kind, model, rubric, minConfidence }`
 (`minConfidence` 0–1, 0.8 when not set). The judge is given the step's input,
@@ -406,11 +408,15 @@ for), or only its input (`{ triggerPayload, previousStepOutputs, previousRun?
 }`). It is saved with `POST /api/evaluation/cases` as a `manual` case, flagged as
 containing production data when the case it started from was.
 
-Either way the form shows the **Input** beside the **Expected output** (left
-empty for none), whether the case is **positive** or **negative**, how it is
-**compared** — exact match or output agreement score, with instructions for this
-case — and under **Graded by** **All evaluators** or **Selected evaluators**,
-which opens a checkbox per Evaluator.
+Either way the form shows the **Input** beside the **Expected output**
+(optional). Once there is an expected output, one line sets whether the output
+must **match it** (positive) or **not match it** (negative), compared
+**exactly** or **by meaning** (an agreement score, with optional instructions for
+this case). Under **Checked by**, **All evaluators** or **Only these**, which
+opens a checkbox per Evaluator. What blocks a save — no name, an input or
+expected output that is not JSON, an input missing `triggerPayload` or
+`previousStepOutputs` — is said in plain words under the field it is about,
+and cleared once that field is edited.
 
 Each case in the list shows its labels (positive or negative, split, source),
 for a case made from a run whether it is **as run** or **edited** — its input
@@ -635,8 +641,8 @@ model's verdict, so the list never rebuilds a report. **Details** opens the run 
 acceptance, Dataset, trials, cost, Cancel while it runs, Start while
 prepared) and five views, from the whole run to one trial:
 
-- **Summary** — the report: criteria, Evaluators, verdict calibration, and **Approve step
-  configuration** (signs a Step Qualification). The criteria are one line: met,
+- **Summary** — the report: criteria, Evaluators, verdict calibration, and the sign-off: **Confirm that evaluation passed** / **failed** (agrees with the
+  criteria's verdict) or **Overwrite the evaluation verdict** (signs a Step Qualification). The criteria are one line: met,
   missed or not judged, and how many counted Evaluators fell below the floor —
   each Evaluator is judged on its own pass rate, so the trials pooled across
   Evaluators say nothing about the verdict. In the Evaluators table a counted
@@ -724,41 +730,49 @@ matters.
 
 ## Step Qualification
 
-A person signs a Step Qualification from a finished Eval Run — not a cancelled one —
-with **Approve step configuration** in its report (web only; an API key
-cannot sign, so the CLI has no command for it). The run must have Acceptance
-Criteria frozen into it; the Evaluation Brief plays no part. The signer reads
-what the signature means ("Approved: I reviewed this Eval Run and qualify this
-Step configuration as it ran in it."),
-writes a justification when the run missed its criteria or they could not
-be judged — recorded as a deviation; a justification for criteria that were
-met is refused — and re-enters their password; a wrong one is refused and
-audited against the Eval Run as `step_qualification.signature_refused`. On a
-deployment without password sign-in the form asks for no password and the
-signature is recorded as made from the session; a user without a password on
-one with it must set one first. The qualification cites
+Every finished Eval Run waits for a person to sign off its verdict — not a
+cancelled one. In its report (web only; an API key cannot sign, so the CLI has
+no command for it) the person **confirms** the verdict the Acceptance Criteria
+gave (*Confirm that evaluation passed*, or *failed* when the criteria were
+missed or could not be judged) or **overwrites** it (*Overwrite the evaluation
+verdict*, which reverses it). The run must have Acceptance Criteria frozen
+into it; the Evaluation Brief plays no part. The signer reads what the
+signature means (e.g. "Confirmed: I reviewed this Eval Run and agree with its
+verdict: the Step configuration as it ran in it failed validation."). Only
+overwriting takes a written justification — mandatory, recorded as a
+deviation; one for a confirmation is refused. A run is signed once. The
+signature is recorded as made from the session — no password is asked. The qualification cites
 the Eval Run and what was frozen into it — its Fingerprint,
 the Evaluator versions, the MCP eval policy, the criteria and their verdict, and
-is never changed; signing is audited as `step_qualification.signed`.
+is never changed; signing is audited as `step_qualification.signed`. The
+signed `decision` (`confirmed` or `overwritten`) and the verdict it leaves —
+passed or failed — decide the step's validation (below).
 
 The badge (`mediforce eval qualification [--version N]`,
 `GET /api/evaluation/qualification`) is **Qualified** when a qualification
 binds the step's Fingerprint as it is now, **Stale** when qualifications exist
 but none does — naming the components that changed — and **Not qualified**
-when none was signed. On an agent step of a run it shows for the Definition
+when none was signed. Only a qualification that leaves the verdict **passed**
+counts: a confirmed failure is signed and cited, but qualifies nothing. On an agent step of a run it shows for the Definition
 version that run ran. Evaluators added,
 archived or given a new version since are flagged beside it, without making
 it stale. The badge is informational: nothing is blocked without one.
 
 ## Validation
 
-Separate from signing, every step has a **validation** status for its runnable
-workflow version (or the version asked for), read from the newest finished
-Eval Run of that version (`completed` or `budget_exceeded`; a cancelled run
-does not count):
+Every step has a **validation** status for its runnable workflow version (or
+the version asked for), read from the newest finished Eval Run of that version
+(`completed` or `budget_exceeded`; a cancelled run does not count) and the
+person's sign-off on it:
 
-- **Passed** — that run met the Acceptance Criteria frozen into it.
-- **Failed** — the criteria were missed or could not be judged.
+- **Waiting for human approval** (`awaiting_approval`) — that run finished and
+  is still fresh, but nobody signed it. The reason reads *Eval Run xxxx passed*
+  or *missed* (green / red; `runVerdict` in the API, with *not judged* in amber)
+  followed by why, and the Evaluation tab links to the run.
+- **Passed** — the run was signed off as passed: its criteria were met and the
+  verdict confirmed, or missed and the verdict overwritten.
+- **Failed** — signed off as failed: the criteria were missed or could not be
+  judged and the verdict confirmed, or met and the verdict overwritten.
 - **Not verified** — no Eval Run of the version has finished, or something the
   run rested on changed since: the step's Fingerprint, an Evaluator (added,
   archived or given a new version), the live Eval Cases (added, edited or
@@ -770,19 +784,21 @@ It comes with `GET /api/evaluation/qualification` as `validation: { status,
 evalRunId, reason, runInProgress }`, as the first line of `mediforce eval
 qualification`, and in the assistant's `get_qualification`. In the Evaluation
 tab it is the status at the top — **Validation passed**,
-**Validation failed** or **Not verified**, with the reason on hover; clicking it
-also shows the signed Step Qualification, if any. The tab reads it again every
-few seconds while an Eval Run of the step is running. A signed qualification
-does not change it, and it blocks nothing.
+**Validation failed**, **Waiting for human approval** or **Not verified**, with the reason in plain words
+right under it (for a miss, e.g. *findings-present passed 2 of 3 trials (66.7%,
+needs 100%)*); clicking it shows the signed Step Qualification, if any. The tab
+reads it again every few seconds while an Eval Run of the step is running. It
+blocks nothing.
 
 A **workflow version** is **Verified** when every agent step's validation in it
-passed, **Failed** when any failed, and **Not verified** otherwise (also with
+passed, **Failed** when any failed, **Awaiting approval** when none failed but one waits for a
+signature, and **Not verified** otherwise (also with
 no agent step, where no badge is shown). `mediforce eval validation`,
 `GET /api/evaluation/workflow-validation?namespace=&workflowName=` list every
 live version, newest first, with each agent step's validation; archived
 versions are left out. The **Definitions** tab shows the badge on each version,
 linking to that version on the Evaluation tab on its first failed step, else
-its first not verified one; in the workflow editor, each agent step's box
+its first one awaiting approval, else its first not verified one; in the workflow editor, each agent step's box
 carries its validation icon for the version being edited, linking to the
 Evaluation tab on that step and version. The icon speaks of the step as saved:
 a step added or edited since carries none until the version is saved and run.

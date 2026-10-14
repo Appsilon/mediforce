@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { buttonClass, inputClass } from './evaluation-styles';
+import { FieldError, describeIssues, invalidClass, parseJson } from './field-errors';
 
 type CodeRuntime = (typeof CodeCheckSchema.shape.runtime.options)[number];
 
@@ -30,19 +31,19 @@ export type CheckDraftKind = CheckDraft['kind'];
 export const CHECK_KINDS: Record<CheckDraftKind, { label: string; description: string }> = {
   schema: {
     label: 'Output schema',
-    description: 'The step\'s result must match a JSON Schema: required keys and each property\'s type.',
+    description: 'The output must have the required keys, each of the right type.',
   },
   code: {
     label: 'Code',
-    description: 'A script run in a sandbox decides pass or fail. It needs a person to approve its source before it counts.',
+    description: 'Your script decides pass or fail. Counts once a person approves its source.',
   },
   llm_judge: {
     label: 'LLM judge',
-    description: 'A model reads the step\'s input, the agent\'s log and its output, explains its judgment, then answers pass or fail with a confidence. Use it for what code cannot check: meaning, tone, clinical judgement.',
+    description: 'A model answers your question about each output: pass or fail. For what code cannot check.',
   },
   expected_output: {
     label: 'Expected output',
-    description: 'Compares the output with each Eval Case\'s expected output, the way the case says: an exact match, where any difference fails, or an agreement score from 0 to 1 that the model below gives. A negative case passes when the output does not match, or agrees no more than the maximum. It grades only cases with an expected output, and never runs in production.',
+    description: 'Compares the output with each case\'s expected output. Eval Cases only, never production.',
   },
 };
 
@@ -90,23 +91,25 @@ export function draftFromCheck(check: EvaluatorCheck): CheckDraft {
   }
 }
 
-/** The check a draft stands for, or why it does not make one. */
-export function checkFromDraft(draft: CheckDraft): { check: EvaluatorCheck } | { error: string } {
+/** The field of a check draft a problem is about; none for one about the check as a whole. */
+export type CheckField = 'schemaText' | 'model' | 'rubric';
+
+/** The check a draft stands for, or why it does not make one and which field that is about. */
+export function checkFromDraft(draft: CheckDraft): { check: EvaluatorCheck } | { error: string; field?: CheckField } {
   let candidate: unknown;
   switch (draft.kind) {
-    case 'schema':
-      try {
-        candidate = { kind: 'schema', schema: JSON.parse(draft.schemaText) };
-      } catch {
-        return { error: 'The schema is not valid JSON.' };
-      }
+    case 'schema': {
+      const schema = parseJson(draft.schemaText);
+      if ('error' in schema) return { error: schema.error, field: 'schemaText' };
+      candidate = { kind: 'schema', schema: schema.value };
       break;
+    }
     case 'code':
       candidate = { kind: 'code', runtime: draft.runtime, source: draft.source };
       break;
     case 'llm_judge':
-      if (draft.model.trim() === '') return { error: 'Pick the model that judges.' };
-      if (draft.rubric.trim() === '') return { error: 'Write the question the judge answers.' };
+      if (draft.model.trim() === '') return { error: 'Pick the model that judges.', field: 'model' };
+      if (draft.rubric.trim() === '') return { error: 'Write the question the judge answers.', field: 'rubric' };
       candidate = {
         kind: 'llm_judge',
         model: draft.model.trim(),
@@ -115,7 +118,7 @@ export function checkFromDraft(draft: CheckDraft): { check: EvaluatorCheck } | {
       };
       break;
     case 'expected_output':
-      if (draft.model.trim() === '') return { error: 'Pick the model that scores agreement.' };
+      if (draft.model.trim() === '') return { error: 'Pick the model that scores agreement.', field: 'model' };
       candidate = {
         kind: 'expected_output',
         model: draft.model.trim(),
@@ -127,27 +130,38 @@ export function checkFromDraft(draft: CheckDraft): { check: EvaluatorCheck } | {
   }
   const parsed = EvaluatorCheckSchema.safeParse(candidate);
   if (parsed.success === false) {
-    return { error: parsed.error.issues.map((issue) => `${issue.path.join('.') || 'check'}: ${issue.message}`).join('; ') };
+    return { error: describeIssues(parsed.error.issues, candidate) };
   }
   return { check: parsed.data };
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) {
   return (
-    <label className="block space-y-1">
-      <span className="text-xs font-medium">{label}</span>
-      {children}
-      {hint !== undefined && <span className="block text-xs text-muted-foreground">{hint}</span>}
-    </label>
+    <div className="space-y-1">
+      <label className="block space-y-1">
+        <span className="text-xs font-medium">{label}</span>
+        {children}
+        {hint !== undefined && <span className="block text-xs text-muted-foreground">{hint}</span>}
+      </label>
+      <FieldError message={error} />
+    </div>
   );
 }
 
+/** A problem with one field of the check, said under that field. */
+export interface CheckFieldError {
+  field: CheckField;
+  message: string;
+}
+
 /** The fields of one kind of check. The kind itself is picked outside, in the form's type dropdown. */
-export function CheckEditor({ draft, onChange, stepOutputSchema }: {
+export function CheckEditor({ draft, onChange, stepOutputSchema, error = null }: {
   draft: CheckDraft;
   onChange: (draft: CheckDraft) => void;
   stepOutputSchema?: AgentOutputSchema;
+  error?: CheckFieldError | null;
 }) {
+  const errorOf = (field: CheckField) => (error?.field === field ? error.message : undefined);
   switch (draft.kind) {
     case 'schema': {
       const stepSchemaText = stepOutputSchema === undefined ? null : JSON.stringify(stepOutputSchema, null, 2);
@@ -161,10 +175,11 @@ export function CheckEditor({ draft, onChange, stepOutputSchema }: {
               )}
             </div>
           )}
-          <Field label="JSON Schema" hint="Checked: the required keys and each property's type. Other keywords are ignored.">
+          <Field label="JSON Schema" hint="Only required keys and property types are checked." error={errorOf('schemaText')}>
             <textarea
               aria-label="JSON Schema"
-              className={cn(inputClass, 'w-full min-h-32 font-mono text-xs')}
+              aria-invalid={errorOf('schemaText') !== undefined}
+              className={cn(inputClass, 'w-full min-h-32 font-mono text-xs', errorOf('schemaText') !== undefined && invalidClass)}
               value={draft.schemaText}
               onChange={(event) => onChange({ ...draft, schemaText: event.target.value })}
             />
@@ -192,7 +207,7 @@ export function CheckEditor({ draft, onChange, stepOutputSchema }: {
           </Field>
           <Field
             label="Source"
-            hint={'/output/input.json holds result, stepInput, trajectory and case (the Eval Case); the step\'s workspace is read-only at /workspace. Write {"passed": true|false, "comment"?: "…"} to /output/result.json.'}
+            hint={'Read /output/input.json (result, stepInput, trajectory, case); write {"passed": true|false, "comment"?: "…"} to /output/result.json. The step\'s files are read-only at /workspace.'}
           >
             <textarea
               aria-label="Source"
@@ -205,19 +220,20 @@ export function CheckEditor({ draft, onChange, stepOutputSchema }: {
         </div>
       );
     case 'llm_judge':
-      return <JudgeEditor draft={draft} onChange={onChange} />;
+      return <JudgeEditor draft={draft} onChange={onChange} errorOf={errorOf} />;
     case 'expected_output':
-      return <AgreementJudgeEditor draft={draft} onChange={onChange} />;
+      return <AgreementJudgeEditor draft={draft} onChange={onChange} errorOf={errorOf} />;
   }
 }
 
-function AgreementJudgeEditor({ draft, onChange }: {
+function AgreementJudgeEditor({ draft, onChange, errorOf }: {
   draft: Extract<CheckDraft, { kind: 'expected_output' }>;
   onChange: (draft: CheckDraft) => void;
+  errorOf: (field: CheckField) => string | undefined;
 }) {
   return (
     <div className="space-y-3">
-      <Field label="Agreement judge model" hint="Scores cases compared by agreement; an exact comparison calls no model.">
+      <Field label="Agreement judge model" hint="Used only for cases compared by meaning." error={errorOf('model')}>
         <ModelPicker
           ariaLabel="Agreement judge model"
           className={cn(inputClass, 'w-full')}
@@ -227,7 +243,7 @@ function AgreementJudgeEditor({ draft, onChange }: {
       </Field>
       <Field
         label="Instructions for every case"
-        hint="The judge sees only the expected output and the output, plus these and the case's own instructions. Say which differences are trivial and which change what the output means."
+        hint="Which differences don't matter, and which do."
       >
         <textarea
           aria-label="Agreement instructions"
@@ -238,7 +254,7 @@ function AgreementJudgeEditor({ draft, onChange }: {
         />
       </Field>
       <div className="flex flex-wrap gap-4">
-        <Field label="Minimum agreement — positive cases" hint="A positive case passes at this agreement (0 to 1) or above.">
+        <Field label="Minimum agreement — positive cases" hint="Pass at or above (0–1).">
           <input
             aria-label="Minimum agreement for positive cases"
             type="number" min={0} max={1} step={0.05}
@@ -247,7 +263,7 @@ function AgreementJudgeEditor({ draft, onChange }: {
             onChange={(event) => onChange({ ...draft, minAgreement: Number(event.target.value) })}
           />
         </Field>
-        <Field label="Maximum agreement — negative cases" hint="A negative case passes at this agreement (0 to 1) or below.">
+        <Field label="Maximum agreement — negative cases" hint="Pass at or below (0–1).">
           <input
             aria-label="Maximum agreement for negative cases"
             type="number" min={0} max={1} step={0.05}
@@ -261,13 +277,14 @@ function AgreementJudgeEditor({ draft, onChange }: {
   );
 }
 
-function JudgeEditor({ draft, onChange }: {
+function JudgeEditor({ draft, onChange, errorOf }: {
   draft: Extract<CheckDraft, { kind: 'llm_judge' }>;
   onChange: (draft: CheckDraft) => void;
+  errorOf: (field: CheckField) => string | undefined;
 }) {
   return (
     <div className="space-y-3">
-      <Field label="Judge model">
+      <Field label="Judge model" error={errorOf('model')}>
         <ModelPicker
           ariaLabel="Judge model"
           className={cn(inputClass, 'w-full')}
@@ -277,11 +294,13 @@ function JudgeEditor({ draft, onChange }: {
       </Field>
       <Field
         label="Question for the judge"
-        hint="The judge sees the step's input, the agent's whole log — its reasoning, tool calls and their results — and its output. Say what a good output does and what makes it fail; it explains what decided its verdict, then answers pass or fail."
+        hint="It sees the input, the agent's log and the output. Say what passes and what fails."
+        error={errorOf('rubric')}
       >
         <textarea
           aria-label="Question for the judge"
-          className={cn(inputClass, 'w-full min-h-24')}
+          aria-invalid={errorOf('rubric') !== undefined}
+          className={cn(inputClass, 'w-full min-h-24', errorOf('rubric') !== undefined && invalidClass)}
           placeholder="Does every adverse event carry the CTCAE grade its narrative supports? Fail if a grade is missing, or a Grade 5 is given without a fatal outcome."
           value={draft.rubric}
           onChange={(event) => onChange({ ...draft, rubric: event.target.value })}
@@ -289,7 +308,7 @@ function JudgeEditor({ draft, onChange }: {
       </Field>
       <Field
         label="Minimum confidence"
-        hint="A verdict the judge is less confident of (0 to 1) is shown in the report but left out of the Acceptance Criteria, unless a person accepts it."
+        hint="Less confident verdicts (0–1) don't count unless a person accepts them."
       >
         <input
           aria-label="Minimum confidence"

@@ -112,6 +112,7 @@ describe('EvaluatorsSection', () => {
   function openForm() {
     render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [] } } as never} mayEdit={true} />);
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'code' } });
     fireEvent.change(screen.getByLabelText('Evaluator name'), { target: { value: 'grades valid' } });
     fireEvent.change(screen.getByLabelText('Rule'), { target: { value: 'Every grade is 1 to 5.' } });
   }
@@ -179,12 +180,59 @@ describe('EvaluatorsSection', () => {
 
   it('says what is wrong with a schema that is not JSON instead of sending it', () => {
     evaluation.createEvaluator.mockClear();
-    openForm();
+    render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [] } } as never} mayEdit={true} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     fireEvent.change(screen.getByLabelText('JSON Schema'), { target: { value: '{ nope' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
-    expect(screen.getByText('The schema is not valid JSON.')).toBeTruthy();
+    expect(screen.getByLabelText('JSON Schema').getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByLabelText('JSON Schema').closest('div')!.textContent).toContain('Not valid JSON (line 1)');
     expect(evaluation.createEvaluator).not.toHaveBeenCalled();
+  });
+
+  it('says beside the name and the rule that they are needed instead of greying out Create', () => {
+    evaluation.createEvaluator.mockClear();
+    render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [] } } as never} mayEdit={true} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'code' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect(screen.getByTestId('evaluator-name-error').textContent).toBe('Give the evaluator a name.');
+    expect(screen.getByTestId('evaluator-rule-error').textContent).toBe('Say in one sentence what it checks.');
+    expect(evaluation.createEvaluator).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Rule'), { target: { value: 'The output carries a summary.' } });
+    expect(screen.queryByTestId('evaluator-rule-error')).toBeNull();
+    expect(screen.getByTestId('evaluator-name-error')).toBeTruthy();
+  });
+});
+
+describe('The output schema check', () => {
+  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+
+  it('asks only for the JSON Schema, under a fixed name', () => {
+    evaluation.createEvaluator.mockClear();
+    render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [] } } as never} mayEdit={true} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(screen.queryByLabelText('Evaluator name')).toBeNull();
+    expect(screen.queryByLabelText('Rule')).toBeNull();
+    fireEvent.change(screen.getByLabelText('JSON Schema'), { target: { value: '{"required": ["summary"]}' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect(evaluation.createEvaluator).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'output-schema',
+      check: expect.objectContaining({ kind: 'schema' }),
+    }));
+  });
+
+  it('is offered once: a step with one cannot add another', () => {
+    const version = { rule: 'x', check: { kind: 'schema', schema: { required: [] } }, origin: 'user', sourceApproval: null, version: 1, createdBy: 'a', createdAt: '2026-09-24T08:00:00.000Z' };
+    const existing = { ...step, id: 'e1', name: 'output-schema', archived: false, runInProduction: false, latest: version, versions: [version], trust: { trusted: true }, production: { active: false } };
+    render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [existing] } } as never} mayEdit={true} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect((screen.getByRole('option', { name: 'Output schema' }) as HTMLOptionElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Type') as HTMLSelectElement).value).toBe('code');
   });
 });
 
@@ -303,7 +351,7 @@ describe('Adding an Eval Case from a production run', () => {
     render(<CasesSection step={step} evaluation={withRuns([[agentRun('run-rejected', '')]], { hasNextPage: false })} mayEdit={true} />);
     const dialog = openDialog();
 
-    expect((dialog.getByLabelText('Negative — the output must not match') as HTMLInputElement).checked).toBe(true);
+    expect((dialog.getByLabelText('Expectation') as HTMLSelectElement).value).toBe('negative');
     expect(dialog.getByTestId('case-form').textContent).not.toContain('Nobody reviewed this run');
   });
 
@@ -336,9 +384,9 @@ describe('Eval Case view and edit', () => {
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={true} />);
 
     const details = screen.getByTestId('eval-case-details');
-    expect(screen.getByTestId('eval-case-expected-output').textContent).toContain('An output that matches this, by exact match');
+    expect(screen.getByTestId('eval-case-expected-output').textContent).toContain('The output must match this, exactly');
     expect(screen.getByTestId('eval-case-expected-output').textContent).toContain('"grade": 5');
-    expect(details.textContent).toContain('Graded by: all evaluators');
+    expect(details.textContent).toContain('Checked by: all evaluators');
     expect(screen.getByTestId('eval-case-input').textContent).toContain('"studyId": "CDISCPILOT01"');
     expect(details.textContent).not.toContain('Source:');
     expect(details.textContent).not.toContain('The source run');
@@ -395,9 +443,9 @@ describe('Eval Case view and edit', () => {
     evaluation.updateCase.mockClear();
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={true} />);
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    fireEvent.click(screen.getByLabelText('Negative — the output must not match'));
-    fireEvent.click(screen.getByLabelText('Selected evaluators'));
-    fireEvent.click(screen.getByLabelText('Graded by findings-present'));
+    fireEvent.change(screen.getByLabelText('Expectation'), { target: { value: 'negative' } });
+    fireEvent.click(screen.getByLabelText('Only these'));
+    fireEvent.click(screen.getByLabelText('Checked by findings-present'));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(evaluation.updateCase).toHaveBeenCalledWith({ caseId: 'c-1', expectation: 'negative', evaluatorIds: ['e-expected'] });
@@ -406,16 +454,15 @@ describe('Eval Case view and edit', () => {
   it('says when nothing would compare a case\'s expected output', () => {
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}), [SCHEMA_CHECK])} mayEdit={true} />);
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    expect(screen.getByTestId('case-comparison').textContent).toContain('The step has no Expected output check yet');
+    expect(screen.getByTestId('case-comparison').textContent).toContain('Nothing compares this yet');
   });
 
-  it('offers positive or negative and the comparison even with no expected output, and saves clearing it as none', () => {
+  it('asks how to compare only once there is an expected output, and saves clearing it as none', () => {
     evaluation.updateCase.mockClear();
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={true} />);
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.change(screen.getByLabelText('Expected output'), { target: { value: '' } });
-    expect(screen.getByTestId('case-comparison').textContent).toContain('only the Evaluators grade the case');
-    expect(screen.getByLabelText('Comparison')).toBeTruthy();
+    expect(screen.queryByTestId('case-comparison')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(evaluation.updateCase).toHaveBeenCalledWith({ caseId: 'c-1', expectedOutput: null });
@@ -433,8 +480,8 @@ describe('Eval Case view and edit', () => {
     fireEvent.click(screen.getByLabelText('Select One'));
     fireEvent.click(screen.getByLabelText('Select Three'));
     fireEvent.click(screen.getByRole('button', { name: 'Set evaluators…' }));
-    fireEvent.click(screen.getByLabelText('Selected evaluators'));
-    fireEvent.click(screen.getByLabelText('Graded by matches-expected'));
+    fireEvent.click(screen.getByLabelText('Only these'));
+    fireEvent.click(screen.getByLabelText('Checked by matches-expected'));
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 
     await waitFor(() => expect(evaluation.updateCase).toHaveBeenCalledTimes(2));
@@ -442,14 +489,30 @@ describe('Eval Case view and edit', () => {
     expect(evaluation.updateCase).toHaveBeenCalledWith({ caseId: 'c-3', evaluatorIds: ['e-schema'] });
   });
 
-  it('says what is wrong with an input that does not fit instead of sending it', () => {
+  it('says under the input what is wrong with it instead of sending it, and clears that once it is edited', () => {
     evaluation.updateCase.mockClear();
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={true} />);
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    fireEvent.change(screen.getByLabelText('Case input'), { target: { value: '{"triggerPayload": {}}' } });
+    fireEvent.change(screen.getByLabelText('Case input'), { target: { value: '{"triggerPayload": "CDISCPILOT01"}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(screen.getByTestId('case-form').textContent).toContain('previousStepOutputs');
+    const problem = screen.getByTestId('case-input-error').textContent;
+    expect(problem).toContain('"triggerPayload" must be an object { … }, not text.');
+    expect(problem).toContain('"previousStepOutputs" is missing — add it, even as {}.');
+    expect(screen.getByLabelText('Case input').getAttribute('aria-invalid')).toBe('true');
+    expect(evaluation.updateCase).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Case input'), { target: { value: '{' } });
+    expect(screen.queryByTestId('case-input-error')).toBeNull();
+  });
+
+  it('asks for a name beside the name field instead of greying out the button', () => {
+    evaluation.updateCase.mockClear();
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={true} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByLabelText('Case name'), { target: { value: ' ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(screen.getByTestId('case-name-error').textContent).toBe('Give the case a name.');
     expect(evaluation.updateCase).not.toHaveBeenCalled();
   });
 });
@@ -499,10 +562,10 @@ describe('Adding an Eval Case by hand', () => {
     render(<CasesSection step={step} evaluation={withCases([])} mayEdit={true} />);
     fireEvent.click(screen.getByRole('button', { name: 'Add case' }));
     fireEvent.change(screen.getByLabelText('Case name'), { target: { value: 'Broken' } });
-    fireEvent.change(screen.getByLabelText('Expected output'), { target: { value: '{grade: 5' } });
+    fireEvent.change(screen.getByLabelText('Expected output'), { target: { value: '{\n  "grade": 5\n  "term": "Sepsis"\n}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add case' }));
 
-    expect(screen.getByTestId('case-form').textContent).toContain('The expected output is not valid JSON.');
+    expect(screen.getByTestId('case-expected-output-error').textContent).toBe('Not valid JSON (line 3) — check for a missing comma, quote or bracket.');
     expect(evaluation.createCase).not.toHaveBeenCalled();
   });
 
@@ -514,7 +577,7 @@ describe('Adding an Eval Case by hand', () => {
 
     await waitFor(() => expect((screen.getByLabelText('Case name') as HTMLInputElement).value).toBe('Grade 4 neutropenia'));
     expect(JSON.parse((screen.getByLabelText('Expected output') as HTMLTextAreaElement).value)).toEqual({ grade: 4 });
-    expect((screen.getByLabelText('Negative — the output must not match') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('Expectation') as HTMLSelectElement).value).toBe('negative');
     expect(JSON.parse((screen.getByLabelText('Case input') as HTMLTextAreaElement).value)).toEqual(written.input);
   });
 
@@ -552,7 +615,7 @@ describe('Freezing a Dataset', () => {
   it('marks unsaved cases, enables Save and warns before the page is left', () => {
     render(<CasesSection step={step} evaluation={withDatasets([evalCaseOf({ id: 'c-2', name: 'Edited' }), evalCaseOf({ id: 'c-1' })], [datasetOf(1, ['c-1'])])} mayEdit={true} />);
 
-    expect(screen.getByTestId('dataset-status').textContent).toContain('runs Dataset v1 (1 case(s)), which is behind the list: 1 case(s) added or edited since are not in it. Save to make v2.');
+    expect(screen.getByTestId('dataset-status').textContent).toContain('Unsaved changes: the next Eval Run still uses Dataset v1 (1 case). Save to include them.');
     expect(screen.getAllByTestId('eval-case-unsaved')).toHaveLength(1);
     expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
     const leaving = new Event('beforeunload', { cancelable: true });
@@ -563,7 +626,7 @@ describe('Freezing a Dataset', () => {
   it('has nothing to save when the newest version has every live case', () => {
     render(<CasesSection step={step} evaluation={withDatasets([evalCaseOf({ id: 'c-1' })], [datasetOf(2, ['c-1']), datasetOf(1, ['c-1'])])} mayEdit={true} />);
 
-    expect(screen.getByTestId('dataset-status').textContent).toContain('The next Eval Run runs Dataset v2: all 1 live case(s)');
+    expect(screen.getByTestId('dataset-status').textContent).toContain('All saved — the next Eval Run uses Dataset v2 (1 case).');
     expect(screen.queryByTestId('eval-case-unsaved')).toBeNull();
     expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
     const leaving = new Event('beforeunload', { cancelable: true });
@@ -591,15 +654,29 @@ describe('AcceptanceCriteriaSection', () => {
   it.each([
     ['passed', 'Validation passed'],
     ['failed', 'Validation failed'],
+    ['awaiting_approval', 'Waiting for human approval'],
     ['not_verified', 'Not verified'],
-  ])('shows the validation from the newest Eval Run as one status icon — %s: %s, whether signed or not', (status, label) => {
-    const validation = { status, evalRunId: 'run-0000aaaa-0000-0000-0000-000000000000', reason: 'Eval Run run-0000: findings-present: pass rate 80% < 90%.', runInProgress: false };
+  ])('shows the validation from the newest Eval Run as one status icon with why beside it — %s: %s, whether signed or not', (status, label) => {
+    const validation = { status, evalRunId: 'run-0000aaaa-0000-0000-0000-000000000000', reason: 'Eval Run run-0000: findings-present passed 8 of 10 trials (80%, needs 90%).', runInProgress: false };
     render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
 
     expect(screen.getByTestId('validation-status').textContent).toBe(label);
+    expect(screen.getByTestId('validation-reason').textContent).toContain('passed 8 of 10 trials (80%, needs 90%)');
     expect(screen.queryByTestId('step-qualification')).toBeNull();
-    fireEvent.click(screen.getByTestId('validation-status'));
-    expect(screen.getByTestId('validation-reason').textContent).toContain('pass rate 80% < 90%');
+    expect(screen.queryByTestId('review-eval-run') !== null).toBe(status === 'awaiting_approval');
+  });
+
+  it.each([
+    ['passed', 'green'],
+    ['missed', 'red'],
+  ])('colours how the run waiting for approval fared — %s is %s', (runVerdict, colour) => {
+    const validation = { status: 'awaiting_approval', evalRunId: 'run-0000aaaa-0000-0000-0000-000000000000', runVerdict, reason: `Eval Run run-0000 ${runVerdict}: because. Waiting for a person.`, runInProgress: false };
+    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
+
+    const word = screen.getByTestId('validation-run-verdict');
+    expect(word.textContent).toBe(runVerdict);
+    expect(word.className).toContain(`text-${colour}-700`);
+    expect(screen.getByTestId('validation-reason').textContent).toContain(`Eval Run run-0000 ${runVerdict}: because.`);
   });
 
   it('opens what the qualification rests on — its Eval Run, not a Brief — from the icon', () => {

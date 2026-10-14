@@ -1,62 +1,74 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
-import type { EvalRunEvaluatorReport, EvalRunReport } from '@mediforce/platform-core';
-import type { EvalRunOutput } from '@mediforce/platform-api/contract';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { EvalRunSummary } from '../eval-run-report';
 
+const signQualification = vi.hoisted(() => vi.fn());
+const history = vi.hoisted((): { current: unknown[] } => ({ current: [] }));
+
+vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation: { signQualification } } }));
 vi.mock('@/hooks/use-step-evaluation', () => ({
-  useStepEvaluationMutation: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useStepEvaluationMutation: (_step: unknown, mutationFn: (value: unknown) => unknown) => ({
+    mutate: (value: unknown) => { void mutationFn(value); },
+    isPending: false,
+    error: null,
+    reset: () => undefined,
+  }),
+  useStepQualification: () => ({ data: { history: history.current } }),
 }));
-vi.mock('@/contexts/auth-context', () => ({ useAuth: () => ({ passwordAuthEnabled: true }) }));
-vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation: {} } }));
 
 const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+const outputWith = (status: 'met' | 'missed') => ({
+  evalRun: { id: 'run-1', status: 'completed', definitionVersion: 1, acceptanceCriteria: { minPassRate: 1 }, fingerprint: { hash: 'f' } },
+  report: {
+    k: 1, evaluators: [], judgeVerdicts: [], trials: { inProgress: 0 },
+    criteriaVerdict: { status, reason: 'findings-present passed 0 of 2 trials', criterion: { minPassRate: 1 }, evaluators: [] },
+  },
+}) as never;
 
-function evaluator(index: number, name: string, passes: number, failures: number, counted = true): EvalRunEvaluatorReport {
-  return {
-    evaluatorId: `${index}e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c`, name, version: 1, kind: 'schema', counted,
-    passes, failures, errors: 0, excluded: 0, passRate: passes / (passes + failures),
-    wilsonLower: null, wilsonUpper: null, passAtK: null, passHatK: null, flakiness: null,
-  };
-}
+describe('EvalRunSummary — signing off a run\'s verdict', () => {
+  it('confirms a missed verdict as failed, with no justification', () => {
+    signQualification.mockClear();
+    history.current = [];
+    render(<EvalRunSummary output={outputWith('missed')} step={step} mayEdit={true} editReason={undefined} />);
 
-function renderSummary(evaluators: EvalRunEvaluatorReport[], criteriaVerdict: EvalRunReport['criteriaVerdict']) {
-  const report = {
-    k: 1, trials: { total: 5, scored: 5, failed: 0, skipped: 0, inProgress: 0 },
-    mcp: { live: [], replayed: [], denied: [], recordedFirst: [], unrecordedCalls: [] },
-    evaluators, criteriaVerdict, confidence: null, recommendation: null, judgeVerdicts: [], trialResults: [],
-    costUsd: 0, meanCostUsd: null, inputTokens: 0, outputTokens: 0, meanDurationMs: null, maxDurationMs: null,
-  } as unknown as EvalRunReport;
-  const evalRun = { id: 'run-1', status: 'completed', acceptanceCriteria: { minPassRate: 0.7 }, fingerprint: null };
-  render(<EvalRunSummary output={{ evalRun, report } as unknown as EvalRunOutput} step={step} mayEdit={true} editReason={undefined} />);
-}
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm that evaluation failed' }));
+    expect(screen.queryByLabelText('Justification for overwriting the verdict')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign' }));
 
-describe('EvalRunSummary', () => {
-  it('states the criteria in one line and colours each counted Evaluator by whether it reached the floor', () => {
-    const passing = evaluator(1, 'summary-present', 5, 0);
-    const failing = evaluator(2, 'result-stable', 2, 3);
-    const notCounted = evaluator(3, 'unapproved-code', 0, 5, false);
-    renderSummary([passing, failing, notCounted], {
-      criterion: { minPassRate: 0.7 }, status: 'missed', reason: 'result-stable: pass rate 40% < 70%',
-      evaluators: [
-        { evaluatorId: passing.evaluatorId, name: passing.name, wilsonLower: null, passHatK: null, met: true },
-        { evaluatorId: failing.evaluatorId, name: failing.name, wilsonLower: null, passHatK: null, met: false },
-      ],
-    });
-
-    expect(screen.getByTestId('criteria-verdict').textContent).toBe('Acceptance criteria missed — 1 of 2 counted Evaluators below pass rate ≥ 70%');
-    expect(screen.queryByTestId('criteria-verdicts')).toBeNull();
-    const metOf = (name: string) => within(screen.getByText(name).closest('tr')!).getByTestId('evaluator-pass-rate').getAttribute('data-met');
-    expect([metOf('summary-present'), metOf('result-stable'), metOf('unapproved-code')]).toEqual(['true', 'false', null]);
+    expect(signQualification).toHaveBeenCalledWith({ evalRunId: 'run-1', decision: 'confirmed' });
   });
 
-  it('says every counted Evaluator reached the floor when the criteria are met', () => {
-    const passing = evaluator(1, 'summary-present', 5, 0);
-    renderSummary([passing], {
-      criterion: { minPassRate: 0.7, minPassHatK: 0.9 }, status: 'met', reason: 'Every counted Evaluator reached it',
-      evaluators: [{ evaluatorId: passing.evaluatorId, name: passing.name, wilsonLower: null, passHatK: 1, met: true }],
-    });
+  it('says the verdict met is confirmed as passed', () => {
+    history.current = [];
+    render(<EvalRunSummary output={outputWith('met')} step={step} mayEdit={true} editReason={undefined} />);
 
-    expect(screen.getByTestId('criteria-verdict').textContent).toBe('Acceptance criteria met — the one counted Evaluator at pass rate ≥ 70% and pass^k ≥ 90%');
+    expect(screen.getByRole('button', { name: 'Confirm that evaluation passed' })).toBeTruthy();
+  });
+
+  it('will not overwrite a verdict until a justification is written', () => {
+    signQualification.mockClear();
+    history.current = [];
+    render(<EvalRunSummary output={outputWith('missed')} step={step} mayEdit={true} editReason={undefined} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Overwrite the evaluation verdict' }));
+    const sign = screen.getByRole('button', { name: 'Sign' }) as HTMLButtonElement;
+    expect(sign.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('Justification for overwriting the verdict'), { target: { value: ' A reviewer read every grade. ' } });
+    expect(sign.disabled).toBe(false);
+    fireEvent.click(sign);
+
+    expect(signQualification).toHaveBeenCalledWith({ evalRunId: 'run-1', decision: 'overwritten', justification: 'A reviewer read every grade.' });
+  });
+
+  it('offers no decision once the run is signed, and shows who decided what', () => {
+    history.current = [{
+      evalRunId: 'run-1', decision: 'overwritten', verdicts: [{ status: 'missed' }],
+      deviations: [{ justification: 'A reviewer read every grade.' }], signature: { signerName: 'Dr Q' },
+    }];
+    render(<EvalRunSummary output={outputWith('missed')} step={step} mayEdit={true} editReason={undefined} />);
+
+    expect(screen.queryByTestId('confirm-verdict')).toBeNull();
+    expect(screen.getByTestId('run-decision').getAttribute('data-outcome')).toBe('passed');
+    expect(screen.getByTestId('run-decision').textContent).toContain('A reviewer read every grade.');
   });
 });

@@ -1,14 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { hash } from 'bcryptjs';
 import { WorkflowEngine } from '@mediforce/workflow-engine';
 import {
-  InMemoryCredentialsRepository,
   buildAgentOutputEnvelope,
   buildAgentRun,
   buildStepExecution,
   buildWorkflowDefinition,
 } from '@mediforce/platform-core/testing';
-import { ConflictError, ForbiddenError, PreconditionFailedError, ValidationError } from '../../../errors';
+import { ConflictError } from '../../../errors';
 import { noopRunKicker, type NoopRunKicker } from '../../../runtime/run-kicker';
 import type { CallerScope } from '../../../repositories/index';
 import { setAcceptanceCriteria } from '../acceptance-criteria';
@@ -19,12 +17,9 @@ import { advanceEvalRunOfInstance, cancelEvalRun, prepareEvalRun, startEvalRun }
 import { getStepQualification, getWorkflowValidation, signStepQualification } from '../step-qualification';
 import { evaluationFixture, NAMESPACE, STEP, WORKFLOW, type EvaluationFixture } from './fixture';
 
-const PASSWORD = 'correct horse battery';
-
 describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
   let fixture: EvaluationFixture;
   let kicker: NoopRunKicker;
-  let credentials: InMemoryCredentialsRepository;
   let scope: CallerScope;
   let previousAllowLocal: string | undefined;
   // grades-present fails every trial: the strict floor misses on it, the lenient one is met.
@@ -41,9 +36,7 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     process.env.ALLOW_LOCAL_AGENTS = 'true';
     fixture = await evaluationFixture();
     kicker = noopRunKicker();
-    credentials = new InMemoryCredentialsRepository();
-    await credentials.setPasswordHash('author-1', await hash(PASSWORD, 4));
-    scope = withEngine(fixture.scope(undefined, { credentialsRepo: credentials }));
+    scope = withEngine(fixture.scope());
 
     await setAcceptanceCriteria({ ...STEP, criteria: strict, origin: 'user' }, scope);
     await createEvaluator({ ...STEP, name: 'findings-present', rule: 'The result lists findings.', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
@@ -101,26 +94,27 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
 
   const justification = 'grades-present is new; a reviewer reads every grade until it passes.';
 
-  it('is not qualified until signed, then qualified for the Fingerprint it signed — with no Evaluation Brief', async () => {
+  it('is not qualified until a verdict is overwritten to passed, then qualified for the Fingerprint it signed — with no Evaluation Brief', async () => {
     const before = await getStepQualification(STEP, scope);
     expect(before).toMatchObject({ status: 'not_qualified', qualification: null, definitionVersion: 1, changed: [] });
 
     const evalRunId = await finishedRun();
-    const { qualification } = await signStepQualification({ evalRunId, justification, password: PASSWORD }, scope);
+    const { qualification } = await signStepQualification({ evalRunId, decision: 'overwritten', justification }, scope);
 
     expect(qualification).toMatchObject({
       evalRunId,
       definitionVersion: 1,
       acceptanceCriteria: strict,
+      decision: 'overwritten',
       deviations: [{ justification }],
       signature: {
         signerId: 'author-1',
         signerName: 'author-1',
-        reauthentication: 'password',
-        meaning: 'Approved: I reviewed this Eval Run and qualify this Step configuration as it ran in it.',
+        reauthentication: 'session',
+        meaning: 'Overwritten: I reviewed this Eval Run and overwrite its verdict: the Step configuration as it ran in it passed validation.',
       },
     });
-    expect(qualification.verdicts.map((verdict) => [verdict.status, verdict.reason])).toEqual([['missed', 'grades-present: pass rate 0% < 90%']]);
+    expect(qualification.verdicts.map((verdict) => [verdict.status, verdict.reason])).toEqual([['missed', 'grades-present passed 0 of 2 trials (0%, needs 90%)']]);
     expect(qualification.fingerprint.hash).toBe(before.fingerprint.hash);
 
     const after = await getStepQualification(STEP, scope);
@@ -129,12 +123,11 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
 
     const [event] = await fixture.auditRepo.getByEntity('step_qualification', qualification.id);
     expect(event).toMatchObject({ action: 'step_qualification.signed' });
-    expect(JSON.stringify(event)).not.toContain(PASSWORD);
   });
 
   it('goes stale when the step changes, naming what changed, and flags Evaluators changed since', async () => {
     const evalRunId = await finishedRun();
-    await signStepQualification({ evalRunId, justification, password: PASSWORD }, scope);
+    await signStepQualification({ evalRunId, decision: 'overwritten', justification }, scope);
 
     const [findings] = await fixture.evaluationRepo.listEvaluators(STEP);
     await addEvaluatorVersion({ evaluatorId: findings!.id, rule: 'The result lists every finding.', origin: 'user' }, scope);
@@ -160,60 +153,65 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     expect(await getStepQualification({ ...STEP, definitionVersion: 1 }, scope)).toMatchObject({ status: 'qualified' });
   });
 
-  it('needs a justification when the criteria were missed, and none when they were met', async () => {
+  it('takes a justification only to overwrite the verdict; confirming a missed verdict qualifies nothing', async () => {
     const missedRunId = await finishedRun();
-    await expect(signStepQualification({ evalRunId: missedRunId, password: PASSWORD }, scope))
-      .rejects.toThrow(/Acceptance Criteria were missed/);
+    await expect(signStepQualification({ evalRunId: missedRunId, decision: 'overwritten' }, scope))
+      .rejects.toThrow(/give a written justification/);
+    await expect(signStepQualification({ evalRunId: missedRunId, decision: 'confirmed', justification: 'Just in case.' }, scope))
+      .rejects.toThrow(/Confirming the verdict records no deviation/);
+
+    const { qualification } = await signStepQualification({ evalRunId: missedRunId, decision: 'confirmed' }, scope);
+    expect(qualification).toMatchObject({ decision: 'confirmed', deviations: [] });
+    expect(qualification.signature.meaning).toContain('failed validation');
+    expect(await getStepQualification(STEP, scope)).toMatchObject({ status: 'not_qualified', qualification: { id: qualification.id } });
+    expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'failed', evalRunId: missedRunId });
+    await expect(signStepQualification({ evalRunId: missedRunId, decision: 'confirmed' }, scope))
+      .rejects.toThrow(/already signed/);
+  });
+
+  it('qualifies a run that met its criteria when the verdict is confirmed, and fails it when overwritten', async () => {
     await setAcceptanceCriteria({ ...STEP, criteria: lenient, origin: 'user' }, scope);
     const metRunId = await finishedRun();
-    await expect(signStepQualification({ evalRunId: metRunId, justification: 'Just in case.', password: PASSWORD }, scope))
-      .rejects.toThrow(/Acceptance Criteria were met/);
-    expect((await getStepQualification(STEP, scope)).status).toBe('not_qualified');
+    const confirmed = await signStepQualification({ evalRunId: metRunId, decision: 'confirmed' }, scope);
+    expect(confirmed.qualification.signature.meaning).toContain('agree with its verdict');
+    expect((await getStepQualification(STEP, scope)).status).toBe('qualified');
+
+    const overwrittenRunId = await finishedRun();
+    await signStepQualification({ evalRunId: overwrittenRunId, decision: 'overwritten', justification: 'A reviewer found a Grade 5 miscoded.' }, scope);
+    const { validation } = await getStepQualification(STEP, scope);
+    expect(validation).toMatchObject({ status: 'failed', evalRunId: overwrittenRunId });
+    expect(validation.reason).toContain('A reviewer found a Grade 5 miscoded.');
   });
 
-  it('needs a justification for criteria the scored trials met while some trial failed', async () => {
+  it('records a run whose criteria could not be judged as failed when confirmed', async () => {
     await setAcceptanceCriteria({ ...STEP, criteria: lenient, origin: 'user' }, scope);
     const evalRunId = await finishedRun(1);
-    const signing = { evalRunId, password: PASSWORD };
 
-    await expect(signStepQualification(signing, scope))
-      .rejects.toThrow(/Acceptance Criteria were not judged \(1 of 2 trials failed or were skipped/);
-    const { qualification } = await signStepQualification({ ...signing, justification: 'The one trial lost to an OOM kill is re-run in the next Eval Run.' }, scope);
+    const { qualification } = await signStepQualification({ evalRunId, decision: 'confirmed' }, scope);
     expect(qualification.verdicts.map((verdict) => verdict.status)).toEqual(['not_evaluable']);
+    expect((await getStepQualification(STEP, scope)).validation.status).toBe('failed');
   });
 
-  it('asks the signer for their password again, and refuses an API key', async () => {
+  it('signs from the session, asks for no password, and refuses an API key', async () => {
     const evalRunId = await finishedRun();
-    const signing = { evalRunId, justification };
+    const signing = { evalRunId, decision: 'overwritten' as const, justification };
 
-    await expect(signStepQualification(signing, scope)).rejects.toBeInstanceOf(ValidationError);
-    await expect(signStepQualification({ ...signing, password: 'wrong' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
-    const refusals = (await fixture.auditRepo.getByEntity('eval_run', evalRunId))
-      .filter((event) => event.action === 'step_qualification.signature_refused');
-    expect(refusals).toHaveLength(1);
-    expect(refusals[0]).toMatchObject({ actorId: 'author-1' });
-    expect(JSON.stringify(refusals[0])).not.toContain('wrong');
-    await expect(signStepQualification({ ...signing, password: PASSWORD }, withEngine(fixture.scope({ kind: 'apiKey', isSystemActor: true }))))
+    await expect(signStepQualification(signing, withEngine(fixture.scope({ kind: 'apiKey', isSystemActor: true }))))
       .rejects.toThrow(/signed by a person/);
-
-    const withoutPassword = withEngine(fixture.scope(undefined, { credentialsRepo: new InMemoryCredentialsRepository() }));
-    await expect(signStepQualification(signing, withoutPassword)).rejects.toBeInstanceOf(PreconditionFailedError);
-
-    const sessionOnly = withEngine(fixture.scope(undefined, { passwordAuthEnabled: false }));
-    const { qualification } = await signStepQualification(signing, sessionOnly);
+    const { qualification } = await signStepQualification(signing, scope);
     expect(qualification.signature.reauthentication).toBe('session');
   });
 
   it('signs only a finished run', async () => {
     const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
-    await expect(signStepQualification({ evalRunId: evalRun.id, password: PASSWORD }, scope))
+    await expect(signStepQualification({ evalRunId: evalRun.id, decision: 'confirmed' }, scope))
       .rejects.toBeInstanceOf(ConflictError);
   });
 
   it('does not sign a cancelled run', async () => {
     const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await cancelEvalRun({ evalRunId: evalRun.id }, scope);
-    await expect(signStepQualification({ evalRunId: evalRun.id, justification, password: PASSWORD }, scope))
+    await expect(signStepQualification({ evalRunId: evalRun.id, decision: 'confirmed' }, scope))
       .rejects.toThrow(/cancelled/);
   });
   describe('validation status — the newest finished Eval Run of the version, judged on its criteria', () => {
@@ -231,6 +229,8 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     async function passedRun(): Promise<string> {
       await setAcceptanceCriteria({ ...STEP, criteria: lenient, origin: 'user' }, scope);
       const evalRunId = await finishedRun();
+      expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'awaiting_approval', evalRunId, runVerdict: 'passed', runInProgress: false });
+      await signStepQualification({ evalRunId, decision: 'confirmed' }, scope);
       expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'passed', evalRunId, runInProgress: false });
       return evalRunId;
     }
@@ -239,10 +239,15 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
       expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'not_verified', evalRunId: null, runInProgress: false });
     });
 
-    it('passes when the run met the criteria, and fails when they were missed or not judged — signed or not', async () => {
+    it('waits for a person after a finished run, then passes or fails as they confirm or overwrite its verdict', async () => {
       await passedRun();
       await setAcceptanceCriteria({ ...STEP, criteria: strict, origin: 'user' }, scope);
       const evalRunId = await finishedRun();
+      const waiting = (await getStepQualification(STEP, scope)).validation;
+      expect(waiting).toMatchObject({ status: 'awaiting_approval', evalRunId, runVerdict: 'missed' });
+      expect(waiting.reason).toMatch(/^Eval Run [0-9a-f]{8} missed: grades-present/);
+
+      await signStepQualification({ evalRunId, decision: 'confirmed' }, scope);
       const { validation } = await getStepQualification(STEP, scope);
       expect(validation).toMatchObject({ status: 'failed', evalRunId });
       expect(validation.reason).toContain('grades-present');
@@ -313,6 +318,8 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
       });
 
       const evalRunId = await finishedRun(0, 1);
+      expect((await getWorkflowValidation(workflow, scope)).versions[1]).toMatchObject({ definitionVersion: 1, status: 'awaiting_approval' });
+      await signStepQualification({ evalRunId, decision: 'confirmed' }, scope);
       expect(await getWorkflowValidation(workflow, scope)).toMatchObject({
         versions: [
           { definitionVersion: 2, status: 'not_verified' },
@@ -321,7 +328,8 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
       });
 
       await setAcceptanceCriteria({ ...STEP, criteria: strict, origin: 'user' }, scope);
-      await finishedRun(0, 2);
+      const newestRunId = await finishedRun(0, 2);
+      await signStepQualification({ evalRunId: newestRunId, decision: 'confirmed' }, scope);
       const [newest] = (await getWorkflowValidation(workflow, scope)).versions;
       expect(newest).toMatchObject({ definitionVersion: 2, status: 'failed' });
 
