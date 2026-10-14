@@ -466,6 +466,13 @@ function validateSteps(
         message: `step '${step.id}' has assignedTo but executor is '${step.executor}' (assignedTo is only valid on executor='human' or 'agent')`,
       });
     }
+    if (step.assignedTo !== undefined && step.executor === 'agent' && (step.autonomyLevel ?? 'L2') !== 'L3') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['steps', i, 'assignedTo'],
+        message: `step '${step.id}' has assignedTo on an agent step that is not autonomyLevel 'L3' (only L3 creates a human review task to assign)`,
+      });
+    }
     if (step.executor === 'action' && step.action === undefined) {
       ctx.addIssue({
         code: 'custom',

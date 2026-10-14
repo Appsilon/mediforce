@@ -317,7 +317,7 @@ export function StepEditor({
   const isCowork = step.executor === 'cowork';
   const isAction = step.executor === 'action';
   const isReview = step.type === 'review';
-  const hasHumanReviewer = isHuman || (isAgent && (step.autonomyLevel ?? 'L3') === 'L3');
+  const hasHumanReviewer = isHuman || (isAgent && (step.autonomyLevel ?? 'L2') === 'L3');
   const isDecision = step.type === 'decision';
   const hasVerdicts = isReview || isDecision;
   const isTerminal = step.type === 'terminal';
