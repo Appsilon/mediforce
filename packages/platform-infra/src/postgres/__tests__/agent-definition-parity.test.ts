@@ -213,10 +213,10 @@ function contract(
 
     it('keeps an agent\'s versions after the agent is deleted, since Eval Runs name them', async () => {
       await repo.upsert('d2', inputBase());
-      const version = {
+      const version: Parameters<typeof repo.appendVersion>[0] = {
         agentId: 'd2', version: 1, hash: 'a'.repeat(64), config: { kind: 'plugin', runtimeId: 'claude-code-agent', foundationModel: 'anthropic/claude-sonnet-4', systemPrompt: 'You are a reviewer.', mcpServers: {}, skills: [] },
         createdBy: 'u-1', createdAt: '2026-10-15T00:00:00.000Z',
-      } as const;
+      };
       await repo.appendVersion(version);
       await repo.delete('d2');
       expect(await repo.getVersion('d2', 1)).toMatchObject({ agentId: 'd2', version: 1, hash: 'a'.repeat(64) });
