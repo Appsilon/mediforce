@@ -46,6 +46,14 @@ describe('Evaluator outages on an Eval Run', () => {
     expect(openProblems).toHaveBeenCalled();
   });
 
+  it('omits the Decide in Problems link when no outage offers a decision', () => {
+    evaluators.current = [liveEvaluator(SANDBOXED, 'grade-5-flagged', { runInProduction: false })];
+    render(<EvaluatorOutageAlert output={output} step={step} onOpenProblems={vi.fn()} />);
+
+    expect(screen.getByRole('alert').textContent).toContain('Not run in production');
+    expect(screen.queryByRole('button', { name: 'Decide in Problems' })).toBeNull();
+  });
+
   it('shows nothing when every Evaluator could grade every trial', () => {
     const clean = { report: { evaluators: [reportLine(OFFLINE, 'findings-present', 0)] } } as never;
     const { container } = render(<EvaluatorOutageAlert output={clean} step={step} onOpenProblems={vi.fn()} />);
@@ -62,11 +70,11 @@ describe('Evaluator outages on an Eval Run', () => {
     expect(screen.getByRole('button', { name: 'Ignore' }).getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('offers no choice for an Evaluator that does not run in production', () => {
+  it('lists nothing on Problems for an Evaluator that does not run in production', () => {
     evaluators.current = [liveEvaluator(SANDBOXED, 'grade-5-flagged', { runInProduction: false })];
     render(<EvaluatorOutageSummary output={output} step={step} mayEdit={true} editReason={undefined} />);
 
     expect(screen.queryByRole('button', { name: 'Escalate' })).toBeNull();
-    expect(screen.getByTestId('evaluator-outages').textContent).toContain('Not run in production');
+    expect(screen.queryByTestId('evaluator-outages')).toBeNull();
   });
 });

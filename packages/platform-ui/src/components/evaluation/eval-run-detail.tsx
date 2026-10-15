@@ -78,8 +78,8 @@ function problemOf(trial: EvalTrial, result: EvalTrialResult | undefined, evalua
   if (trial.error !== null) return trial.error;
   const errored = (result?.evaluators ?? [])
     .filter((entry) => entry.outcome === 'errored')
-    .map((entry) => evaluators.find((evaluator) => evaluator.evaluatorId === entry.evaluatorId)?.name ?? entry.evaluatorId);
-  if (errored.length > 0) return `Could not be graded by ${errored.join(', ')}.`;
+    .map((entry) => `${evaluators.find((evaluator) => evaluator.evaluatorId === entry.evaluatorId)?.name ?? entry.evaluatorId}: ${entry.comment ?? 'could not grade this trial'}`);
+  if (errored.length > 0) return errored.join('\n');
   return trial.status === 'failed' ? 'Failed without a recorded reason.' : null;
 }
 
@@ -265,7 +265,7 @@ function ProblemsTab({ output, step, trialHref, mayEdit, editReason }: RunContex
           {problems.map(({ trial, result, problem }) => {
             return (
               <li key={trial.id} className="flex items-start gap-3 px-3 py-2">
-                <TrialStatusBadge status={trial.status} />
+                {trial.status !== 'scored' && <TrialStatusBadge status={trial.status} />}
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{result === undefined ? `trial ${trial.trialIndex + 1}` : trialLabel(result, trial)}</p>
                   <p className="whitespace-pre-wrap text-muted-foreground">{problem}</p>

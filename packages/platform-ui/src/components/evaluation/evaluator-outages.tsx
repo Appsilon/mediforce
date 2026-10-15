@@ -89,6 +89,7 @@ export function EvaluatorOutageAlert({ output, step, onOpenProblems }: {
 }) {
   const outages = useOutages(output, step);
   if (outages.length === 0) return null;
+  const hasDecision = outages.some(({ live }) => live !== undefined && mayEscalate(live));
   return (
     <section role="alert" className="space-y-1.5 rounded-lg border border-red-500/50 bg-red-500/10 p-4 text-xs" data-testid="evaluator-outage-alert">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-red-800 dark:text-red-200">
@@ -100,9 +101,11 @@ export function EvaluatorOutageAlert({ output, step, onOpenProblems }: {
           <span className="font-medium">{line.name}</span> could not grade {trials(line.errors)}. {productionEffect(live)}
         </p>
       ))}
-      <button type="button" className="font-medium text-red-800 underline hover:no-underline dark:text-red-200" onClick={onOpenProblems}>
-        Decide in Problems
-      </button>
+      {hasDecision && (
+        <button type="button" className="font-medium text-red-800 underline hover:no-underline dark:text-red-200" onClick={onOpenProblems}>
+          Decide in Problems
+        </button>
+      )}
     </section>
   );
 }
@@ -114,7 +117,7 @@ export function EvaluatorOutageSummary({ output, step, mayEdit, editReason }: {
   mayEdit: boolean;
   editReason: string | undefined;
 }) {
-  const outages = useOutages(output, step);
+  const outages = useOutages(output, step).filter(({ live }) => live !== undefined && mayEscalate(live));
   if (outages.length === 0) return null;
   return (
     <section className="space-y-2" data-testid="evaluator-outages">
@@ -129,7 +132,7 @@ export function EvaluatorOutageSummary({ output, step, mayEdit, editReason }: {
               <p><span className="font-mono font-medium">{line.name}</span> could not grade {trials(line.errors)}.</p>
               <p className="text-muted-foreground">{productionEffect(live)}</p>
             </div>
-            {live !== undefined && mayEscalate(live) && <OnErrorChoice step={step} evaluator={live} mayEdit={mayEdit} editReason={editReason} />}
+            {live !== undefined && <OnErrorChoice step={step} evaluator={live} mayEdit={mayEdit} editReason={editReason} />}
           </li>
         ))}
       </ul>
