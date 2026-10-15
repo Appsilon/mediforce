@@ -80,7 +80,8 @@ async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, s
   if (step.kind === 'agent' && input.definitionVersion !== undefined) {
     throw new ValidationError(`${subjectName(step)} runs as it is now; it has no workflow version to pick`);
   }
-  const { definition, step: workflowStep, agent: evaluatedAgent } = await loadEvaluationSubject(scope, step, 'run', input.definitionVersion ?? 'runnable');
+  const policy = await scope.evaluation.getMcpPolicy(step);
+  const { definition, step: workflowStep, agent: evaluatedAgent } = await loadEvaluationSubject(scope, step, 'run', input.definitionVersion ?? 'runnable', policy?.env);
   if (step.kind === 'step' && definition.archived === true) {
     throw new ValidationError(`'${step.workflowName}' v${definition.version} is archived; evaluate a version still in use`);
   }
@@ -121,7 +122,6 @@ async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, s
     );
   }
   const agentServers = Object.keys(agent?.mcpServers ?? {});
-  const policy = await scope.evaluation.getMcpPolicy(step);
   const mcpPolicy: Record<string, McpEvalServerPolicy> = Object.fromEntries(
     agentServers.map((name) => [name, policy?.servers[name] ?? DEFAULT_MCP_EVAL_SERVER_POLICY]),
   );
@@ -130,7 +130,7 @@ async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, s
   const caseIds = dataset.caseIds;
   const estimate = await estimateEvalRun(scope, step, workflowStep, frozenEvaluators, caseIds.length * input.trialsPerCase);
   const suggestedBudgetUsd = estimate.totalUsd === null ? null : defaultBudget(estimate.totalUsd);
-  return { step, definition, evaluatedAgent, dataset, frozenEvaluators, mcpPolicy, fingerprint, caseIds, estimate, suggestedBudgetUsd };
+  return { step, definition, evaluatedAgent, dataset, frozenEvaluators, mcpPolicy, env: policy?.env ?? {}, fingerprint, caseIds, estimate, suggestedBudgetUsd };
 }
 
 /**
@@ -159,7 +159,7 @@ export async function prepareEvalRun(
   input: z.output<typeof PrepareEvalRunInputSchema>,
   scope: CallerScope,
 ): Promise<EvalRunOutput> {
-  const { step, definition, evaluatedAgent, dataset, frozenEvaluators, mcpPolicy, fingerprint, caseIds, estimate, suggestedBudgetUsd } = await planEvalRun(input, scope);
+  const { step, definition, evaluatedAgent, dataset, frozenEvaluators, mcpPolicy, env, fingerprint, caseIds, estimate, suggestedBudgetUsd } = await planEvalRun(input, scope);
   const [criteria] = await scope.evaluation.listAcceptanceCriteria(step);
   const trialCount = caseIds.length * input.trialsPerCase;
   const budgetUsd = input.budgetUsd ?? suggestedBudgetUsd;
@@ -184,6 +184,7 @@ export async function prepareEvalRun(
     fingerprint,
     acceptanceCriteria: criteria?.criteria ?? DEFAULT_ACCEPTANCE_CRITERIA,
     mcpPolicy,
+    env,
     estimate,
     budgetUsd,
     spentUsd: 0,

@@ -43,12 +43,15 @@ export const AGENT_EVAL_STEP_ID = 'agent';
 /**
  * The single-step Workflow Definition an Agent's eval trial runs (ADR-0029):
  * one agent Step that names the Agent and adds nothing to it — no prompt,
- * model, Skills or MCP restrictions of its own, and no preamble. It is never
- * stored as a Workflow; each trial carries it on its run.
+ * model, Skills or MCP restrictions of its own, and no preamble. The one thing
+ * it may add is `env` — the step env a Workflow Step would declare, such as
+ * `{{OPENROUTER_API_KEY}}` templates — so the trial resolves its secrets like
+ * any run. It is never stored as a Workflow; each trial carries it on its run.
  */
 export function agentEvalDefinition(
   agent: Pick<AgentDefinition, 'id' | 'name'> & { namespace: string; runtimeId: string },
   agentVersion: number,
+  env: Record<string, string> = {},
 ): WorkflowDefinition {
   return {
     name: `agent:${agent.id}`,
@@ -64,6 +67,7 @@ export function agentEvalDefinition(
       plugin: agent.runtimeId,
       agentId: agent.id,
       agent: {},
+      ...(Object.keys(env).length === 0 ? {} : { env }),
     }],
     transitions: [],
   };

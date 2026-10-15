@@ -107,7 +107,11 @@ agentId)` — and reaches it through the one `scope.evaluation` wrapper.
 caller: a Step's reads need only to see the workflow and its writes the `edit`
 verb; an Agent's need to see it, or to be allowed to change it. An Agent comes
 back as the single-step Definition its trials run, carried on each trial's run
-(`evalDefinition`). Production-only features — harvesting, previews, drift,
+(`evalDefinition`); its one step has no env of its own unless the Agent's
+Evaluation holds one (`mcp_eval_policies.env`, set once with
+`setMcpEvalPolicy`; secret templates such as `{{OPENROUTER_API_KEY}}`), which
+each Eval Run freezes at prepare and the auto-runner's pre-flight and executor
+resolve like a Workflow Step's. Production-only features — harvesting, previews, drift,
 production Evaluators — refuse an Agent (`stepOnly`). Agent versions are
 recorded by `handlers/agents/_lib/agent-version.ts` on every agent save and
 every Eval Run prepare.

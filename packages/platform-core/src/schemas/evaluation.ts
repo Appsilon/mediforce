@@ -397,6 +397,8 @@ export const McpReplayMissSchema = z.object({
 
 export const McpEvalPolicySchema = EvaluationOwnerSchema.extend({
   servers: z.record(z.string().min(1), McpEvalServerPolicySchema),
+  /** An Agent's Evaluation only: the step env its trials run with, as a Workflow Step declares it — secret templates, never values. */
+  env: z.record(z.string(), z.string()).default({}),
   updatedBy: z.string().min(1),
   updatedAt: z.iso.datetime(),
 });

@@ -41,7 +41,7 @@ import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { AgentRunLog } from '@/components/agents/agent-log-panel';
 import { useAgentRun } from '@/hooks/use-agent-runs';
-import { useAgentRunIo, useEvalRunEstimate, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
+import { useAgentEvalPolicy, useAgentRunIo, useEvalRunEstimate, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { formatCostUsd } from '@/lib/format';
 import { routes } from '@/lib/routes';
@@ -1631,6 +1631,57 @@ function parseBudgetUsd(text: string): number | null {
   return text.trim() !== '' && Number.isFinite(budget) && budget > 0 ? budget : null;
 }
 
+/** The step env typed for an Agent's trials: empty for none, null when it is not a JSON object of strings. */
+function parseStepEnv(text: string): Record<string, string> | null {
+  if (text.trim() === '') return {};
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+    const entries = Object.entries(parsed);
+    return entries.every(([, value]) => typeof value === 'string') ? Object.fromEntries(entries) as Record<string, string> : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The step env an Agent's trials run with, set once for all its Eval Runs: the
+ * secret templates a Workflow Step would declare, since an Agent evaluated on
+ * its own has no Workflow Step to declare them. Each run freezes a copy.
+ */
+function AgentTrialEnv({ step, mayEdit }: { step: Extract<EvaluationSubject, { kind: 'agent' }>; mayEdit: boolean }) {
+  const policy = useAgentEvalPolicy(step);
+  const saved = JSON.stringify(policy.data?.policy?.env ?? {});
+  const [text, setText] = React.useState<string | null>(null);
+  const shown = text ?? (saved === '{}' ? '' : saved);
+  const env = parseStepEnv(shown);
+  const save = useStepEvaluationMutation(step, async () => {
+    await mediforce.evaluation.setMcpPolicy({ ...step, env: env ?? {} });
+    setText(null);
+  });
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <label className="flex items-center gap-1">Trial env
+        <input
+          type="text"
+          className={cn(inputClass, 'w-96')}
+          placeholder='{"OPENROUTER_API_KEY":"{{OPENROUTER_API_KEY}}"}'
+          value={shown}
+          disabled={mayEdit === false}
+          onChange={(event) => setText(event.target.value)}
+          data-testid="agent-trial-env"
+        />
+      </label>
+      {mayEdit && (
+        <button type="button" className={primaryButtonClass} disabled={env === null || text === null || save.isPending} onClick={() => save.mutate(undefined)}>Save env</button>
+      )}
+      <span className="text-muted-foreground">Env every trial of this agent runs with, as a workflow step declares it.</span>
+      {env === null && <span className="text-destructive">Trial env must be a JSON object of string values.</span>}
+      {save.error instanceof Error && <span className="text-destructive">{save.error.message}</span>}
+    </div>
+  );
+}
+
 /**
  * Start, confirm and read the Step's Eval Runs — or an Agent's, each of which
  * assesses the Agent version it had when prepared (ADR-0029). Starting one is
@@ -1703,6 +1754,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
 
   return (
     <Section title="Eval Runs" data-tour="eval-runs">
+      {step.kind === 'agent' && <AgentTrialEnv step={step} mayEdit={mayRun} />}
       {mayRun && (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <label className="flex items-center gap-1">Trials per case

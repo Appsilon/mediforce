@@ -1,6 +1,17 @@
+import { z } from 'zod';
 import { defineCommand, enumArg } from '../define-command';
 import { printJson } from '../output';
 import { readJsonFile, STEP_ARGS, stepFrom, SUBJECT_ARGS, subjectFrom } from './eval-step-args';
+
+const EnvArgSchema = z.record(z.string(), z.string());
+
+function parseEnvArg(text: string): Record<string, string> | null {
+  try {
+    return EnvArgSchema.parse(JSON.parse(text));
+  } catch {
+    return null;
+  }
+}
 
 export const evalCaseListCommand = defineCommand({
   name: 'mediforce eval case-list',
@@ -179,13 +190,30 @@ export const evalMcpPolicyGetCommand = defineCommand({
 
 export const evalMcpPolicySetCommand = defineCommand({
   name: 'mediforce eval mcp-policy-set',
-  description: 'Replace the step\'s MCP eval policy from a JSON file: { "<server>": { "mode": "live"|"replay"|"deny", "denyTools"?: [] } }. A live trial records each server\'s responses per case; replay answers from them, and runs a case with no recording yet live to record it.',
-  args: { ...SUBJECT_ARGS, file: { type: 'string', required: true, description: 'JSON file with the servers map' } },
+  description: 'Replace the step\'s MCP eval policy from a JSON file: { "<server>": { "mode": "live"|"replay"|"deny", "denyTools"?: [] } }. A live trial records each server\'s responses per case; replay answers from them, and runs a case with no recording yet live to record it. For an agent, --env replaces the step env its trials run with; what is left out is kept.',
+  args: {
+    ...SUBJECT_ARGS,
+    file: { type: 'string', description: 'JSON file with the servers map' },
+    env: { type: 'string', description: 'An agent\'s trial env as JSON of secret templates, e.g. \'{"OPENROUTER_API_KEY":"{{OPENROUTER_API_KEY}}"}\'' },
+  },
   async run({ args, output, mediforce, jsonMode }) {
-    const servers = readJsonFile(args.file) as Parameters<typeof mediforce.evaluation.setMcpPolicy>[0]['servers'];
-    const result = await mediforce.evaluation.setMcpPolicy({ ...subjectFrom(args), servers });
+    if (args.file === undefined && args.env === undefined) {
+      output.stderr('Give --file (the servers map), --env, or both');
+      return 2;
+    }
+    const servers = args.file === undefined ? undefined : readJsonFile(args.file) as Parameters<typeof mediforce.evaluation.setMcpPolicy>[0]['servers'];
+    const env = args.env === undefined ? undefined : parseEnvArg(args.env);
+    if (env === null) {
+      output.stderr('--env must be a JSON object of string values');
+      return 2;
+    }
+    const result = await mediforce.evaluation.setMcpPolicy({
+      ...subjectFrom(args),
+      ...(servers === undefined ? {} : { servers }),
+      ...(env === undefined ? {} : { env }),
+    });
     if (jsonMode) printJson(output, result);
-    else output.stdout(`MCP eval policy set for ${Object.keys(result.policy.servers).length} server(s)`);
+    else output.stdout(`MCP eval policy set for ${Object.keys(result.policy.servers).length} server(s), ${Object.keys(result.policy.env).length} env var(s)`);
     return 0;
   },
 });

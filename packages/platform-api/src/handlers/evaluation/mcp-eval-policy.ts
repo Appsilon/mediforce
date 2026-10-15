@@ -37,7 +37,7 @@ export async function getMcpEvalPolicy(input: GetMcpEvalPolicyInput, scope: Call
 }
 
 /**
- * Replaces the Step's MCP eval policy. Only servers the agent binds may be
+ * Replaces the Step's MCP eval policy, and an Agent's trial env. Only servers the agent binds may be
  * named; `denyTools` on a server whose binding lists no `allowedTools` is
  * refused, as it is for step restrictions — there is no allowlist to subtract
  * from. A replayed server's `denyTools` hold while it runs live to record a
@@ -49,7 +49,12 @@ export async function setMcpEvalPolicy(input: SetMcpEvalPolicyInput, scope: Call
   const loaded = await loadEvaluationSubject(scope, step, 'edit');
   const bindings = await agentBindings(scope, loaded);
   const known = Object.keys(bindings).sort();
-  for (const [name, serverPolicy] of Object.entries(input.servers)) {
+  if (input.env !== undefined && step.kind !== 'agent') {
+    throw new ValidationError('A step runs with its own env; only an agent\'s Evaluation takes one');
+  }
+  const current = await scope.evaluation.getMcpPolicy(step);
+  const servers = input.servers ?? current?.servers ?? {};
+  for (const [name, serverPolicy] of Object.entries(input.servers ?? {})) {
     const binding = bindings[name];
     if (binding === undefined) {
       throw new ValidationError(`'${name}' is not an MCP server of this step's agent (${known.join(', ') || 'it has none'})`);
@@ -61,7 +66,8 @@ export async function setMcpEvalPolicy(input: SetMcpEvalPolicyInput, scope: Call
 
   const policy = await scope.evaluation.putMcpPolicy({
     ...evaluationOwnerOf(step),
-    servers: input.servers,
+    servers,
+    env: input.env ?? current?.env ?? {},
     updatedBy: authorId(scope),
     updatedAt: new Date().toISOString(),
   });
@@ -71,7 +77,7 @@ export async function setMcpEvalPolicy(input: SetMcpEvalPolicyInput, scope: Call
     namespace: step.namespace,
     entityType: 'mcp_eval_policy',
     entityId: subjectKey(step),
-    inputSnapshot: { ...step, servers: input.servers },
+    inputSnapshot: { ...step, servers: input.servers, env: input.env },
     basis: 'MCP servers run live in eval trials unless declared replayed or denied (ADR-0023 D6)',
   });
   return { policy };

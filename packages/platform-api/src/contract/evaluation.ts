@@ -303,8 +303,11 @@ export const GetMcpEvalPolicyOutputSchema = z.object({
   servers: z.array(EffectiveMcpEvalServerSchema),
 });
 
+/** Each part left out keeps what the policy has now. */
 export const SetMcpEvalPolicyInputSchema = EvaluationSubjectRefSchema.extend({
-  servers: z.record(z.string().min(1), McpEvalServerPolicySchema),
+  servers: z.record(z.string().min(1), McpEvalServerPolicySchema).optional(),
+  /** An Agent's only: the step env its trials run with, e.g. `{ OPENROUTER_API_KEY: '{{OPENROUTER_API_KEY}}' }`. */
+  env: z.record(z.string(), z.string()).optional(),
 });
 export const SetMcpEvalPolicyOutputSchema = z.object({ policy: McpEvalPolicySchema });
 

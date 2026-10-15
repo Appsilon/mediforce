@@ -247,6 +247,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         fingerprint: fingerprint('a'),
         acceptanceCriteria: { minPassRate: 0.9, minPassHatK: 0.8 },
         mcpPolicy: { edc: { mode: 'deny' as const } },
+        env: { OPENROUTER_API_KEY: '{{OPENROUTER_API_KEY}}' },
         estimate: { perTrialUsd: 0.25, totalUsd: 0.5, basis: 'history' as const, sampleSize: 4 },
         budgetUsd: 1,
         spentUsd: 0,
@@ -367,8 +368,8 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
 
     it('replaces a step\'s MCP eval policy', async () => {
       expect(await repo.getMcpPolicy(subject(step))).toBeNull();
-      await repo.putMcpPolicy({ ...step, servers: { edc: { mode: 'deny' } }, updatedBy: 'author-1', updatedAt: '2026-09-23T08:00:00.000Z' });
-      const replaced = { ...step, servers: { edc: { mode: 'live' as const, denyTools: ['write_record'] } }, updatedBy: 'author-2', updatedAt: '2026-09-23T09:00:00.000Z' };
+      await repo.putMcpPolicy({ ...step, servers: { edc: { mode: 'deny' } }, env: {}, updatedBy: 'author-1', updatedAt: '2026-09-23T08:00:00.000Z' });
+      const replaced = { ...step, servers: { edc: { mode: 'live' as const, denyTools: ['write_record'] } }, env: { OPENROUTER_API_KEY: '{{OPENROUTER_API_KEY}}' }, updatedBy: 'author-2', updatedAt: '2026-09-23T09:00:00.000Z' };
       await repo.putMcpPolicy(replaced);
 
       expect(await repo.getMcpPolicy(subject(step))).toEqual(replaced);
@@ -456,6 +457,7 @@ function storedRun(datasetVersionId: string, caseIds: string[]): EvalRun {
     fingerprint: fingerprint('a'),
     acceptanceCriteria: null,
     mcpPolicy: {},
+    env: {},
     estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
     budgetUsd: 1,
     spentUsd: 0,

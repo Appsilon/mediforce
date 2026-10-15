@@ -15,6 +15,7 @@ type Section =
   | 'runs'
   | 'agent-runs'
   | 'criteria'
+  | 'mcp-policy'
   | 'drift'
   | `qualification:${number | 'runnable'}`
   | `estimate:${number}:${number}`;
@@ -55,6 +56,11 @@ export function useStepEvaluatorHistory(step: EvaluationSubject) {
     queryFn: () => mediforce.evaluation.listEvaluators({ ...step, includeArchived: 'true' }),
     retry: stopRetryOn4xx,
   });
+}
+
+/** The Agent's eval policy: the step env its trials run with. */
+export function useAgentEvalPolicy(step: EvaluationSubject) {
+  return useQuery({ queryKey: sectionKey(step, 'mcp-policy'), queryFn: () => mediforce.evaluation.getMcpPolicy(step), retry: stopRetryOn4xx });
 }
 
 /** The Step's saved Dataset versions, newest first. */

@@ -101,6 +101,8 @@ export const EvalRunSchema = EvaluationOwnerSchema.extend({
   acceptanceCriteria: StoredAcceptanceCriteriaSchema.nullable(),
   /** The MCP eval policy the trials ran under, one entry per server of the Step's agent (D6). */
   mcpPolicy: z.record(z.string(), McpEvalServerPolicySchema),
+  /** An Agent's run: the step env its trials run with, as a Workflow Step declares it — secret templates, never values. */
+  env: z.record(z.string(), z.string()).default({}),
   estimate: EvalRunEstimateSchema,
   /** Spend cap: no trial starts once `spentUsd` reaches it. */
   budgetUsd: z.number().positive(),

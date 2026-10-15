@@ -167,6 +167,7 @@ function toPolicy(row: typeof mcpEvalPolicies.$inferSelect): McpEvalPolicy {
   return McpEvalPolicySchema.parse({
     ...ownerFields(row),
     servers: row.servers,
+    env: row.env,
     updatedBy: row.updatedBy,
     updatedAt: row.updatedAt.toISOString(),
   });
@@ -199,6 +200,7 @@ function toEvalRun(row: typeof evalRuns.$inferSelect): EvalRun {
     fingerprint: row.fingerprint,
     acceptanceCriteria: row.acceptanceCriteria,
     mcpPolicy: row.mcpPolicy,
+    env: row.env,
     estimate: row.estimate,
     budgetUsd: row.budgetUsd,
     spentUsd: row.spentUsd,
@@ -404,13 +406,14 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     const values = {
       ...ownerColumns(parsed),
       servers: parsed.servers,
+      env: parsed.env,
       updatedBy: parsed.updatedBy,
       updatedAt: new Date(parsed.updatedAt),
     };
     const [row] = await this.db.insert(mcpEvalPolicies).values(values)
       .onConflictDoUpdate({
         target: [mcpEvalPolicies.workspace, mcpEvalPolicies.workflowName, mcpEvalPolicies.stepId, mcpEvalPolicies.agentId],
-        set: { servers: values.servers, updatedBy: values.updatedBy, updatedAt: values.updatedAt },
+        set: { servers: values.servers, env: values.env, updatedBy: values.updatedBy, updatedAt: values.updatedAt },
       })
       .returning();
     return toPolicy(row!);
@@ -507,6 +510,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
         fingerprint: parsed.fingerprint,
         acceptanceCriteria: parsed.acceptanceCriteria,
         mcpPolicy: parsed.mcpPolicy,
+        env: parsed.env,
         estimate: parsed.estimate,
         budgetUsd: parsed.budgetUsd,
         spentUsd: parsed.spentUsd,

@@ -59,9 +59,10 @@ export async function loadEvaluationSubject(
   ref: EvaluationRef,
   verb: 'read' | 'edit' | 'run',
   version?: number | 'runnable',
+  agentEnv?: Record<string, string>,
 ): Promise<LoadedSubject> {
   const subject = subjectRef(ref);
-  if (subject.kind === 'agent') return loadEvaluatedAgent(scope, subject, verb, typeof version === 'number' ? version : undefined);
+  if (subject.kind === 'agent') return loadEvaluatedAgent(scope, subject, verb, typeof version === 'number' ? version : undefined, agentEnv);
 
   const definition = typeof version === 'number'
     ? await scope.workflowDefinitions.get(subject.namespace, subject.workflowName, version)
@@ -95,6 +96,7 @@ async function loadEvaluatedAgent(
   subject: Extract<EvaluationSubject, { kind: 'agent' }>,
   verb: 'read' | 'edit' | 'run',
   agentVersion: number | undefined,
+  env: Record<string, string> | undefined,
 ): Promise<LoadedSubject> {
   const agent = verb === 'read'
     ? await scope.agentDefinitions.getById(subject.agentId)
@@ -112,7 +114,7 @@ async function loadEvaluatedAgent(
     throw new ValidationError(`Agent '${agent.name}' names no runtime; set one before evaluating it`);
   }
   const version = agentVersion ?? await upcomingAgentVersion(scope, agent);
-  const definition = agentEvalDefinition({ id: agent.id, name: agent.name, namespace: agent.namespace, runtimeId: agent.runtimeId }, version);
+  const definition = agentEvalDefinition({ id: agent.id, name: agent.name, namespace: agent.namespace, runtimeId: agent.runtimeId }, version, env);
   return { subject, definition, step: definition.steps[0]!, agent };
 }
 

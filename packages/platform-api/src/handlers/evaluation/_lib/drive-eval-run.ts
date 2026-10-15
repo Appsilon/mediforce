@@ -181,7 +181,7 @@ async function startTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
   }
   try {
     // An Agent's trial runs the single-step Definition its run assessed, which no stored Workflow holds (ADR-0029).
-    const target = run.agentId === null ? null : await loadEvaluationSubject(scope, subjectRef(run), 'read', runVersionOf(run));
+    const target = run.agentId === null ? null : await loadEvaluationSubject(scope, subjectRef(run), 'read', runVersionOf(run), run.env);
     await scope.system.engine.createEvalTrial({
       id: processInstanceId,
       namespace: run.namespace,

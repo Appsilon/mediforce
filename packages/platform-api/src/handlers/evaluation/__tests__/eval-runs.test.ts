@@ -8,6 +8,7 @@ import type { CallerScope } from '../../../repositories/index';
 import { createEvaluator } from '../evaluators';
 import { createEvalCase } from '../eval-cases';
 import { saveEvalDataset } from '../eval-datasets';
+import { setMcpEvalPolicy } from '../mcp-eval-policy';
 import { listStepAgentRuns } from '../step-agent-runs';
 import { advanceEvalRunOfInstance, cancelEvalRun, getEvalRun, listEvalRuns, prepareEvalRun, startEvalRun } from '../eval-runs';
 import { setEvaluationBrief } from '../briefs';
@@ -144,6 +145,35 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
       await setStepModel(ALIAS);
       await expect(prepareEvalRun(run, scope)).rejects.toThrow(ALIAS);
     });
+  });
+
+  it('runs an Agent\'s trials with the step env its Evaluation holds', async () => {
+    const agent = await fixture.agentDefinitionRepo.getById('ae-grader');
+    await fixture.agentDefinitionRepo.upsert('ae-grader', { ...agent!, runtimeId: 'claude-code-agent' });
+    const AGENT = { kind: 'agent', namespace: STEP.namespace, workflowName: null, stepId: null, agentId: 'ae-grader' } as const;
+    await createEvaluator({ ...AGENT, name: 'findings-present', rule: 'The result lists findings.', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
+    await createEvalCase({
+      ...AGENT,
+      name: 'Grade 5 sepsis',
+      input: { triggerPayload: {}, previousStepOutputs: {} },
+      workspaceSeedCommit: null,
+      expectation: 'positive',
+      expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null,
+      split: 'dev',
+      containsProductionData: false,
+      origin: 'user',
+    }, scope);
+    await saveEvalDataset(AGENT, scope);
+    const env = { ANTHROPIC_BASE_URL: 'https://openrouter.ai/api', OPENROUTER_API_KEY: '{{OPENROUTER_API_KEY}}' };
+
+    await setMcpEvalPolicy({ ...AGENT, env }, scope);
+
+    const { evalRun } = await prepareEvalRun({ ...AGENT, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    expect(evalRun.env).toEqual(env);
+    await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
+
+    const trial = await fixture.instanceRepo.getById(kicker.kicks[0]!.instanceId);
+    expect(trial?.evalDefinition?.steps[0]).toMatchObject({ plugin: 'claude-code-agent', env });
   });
 
   it('refuses to start without the person confirming the budget', async () => {
