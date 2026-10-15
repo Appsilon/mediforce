@@ -1,3 +1,4 @@
+import { evaluationOwnerOf } from '@mediforce/platform-core';
 import { randomUUID } from 'node:crypto';
 import type {
   SaveEvalDatasetInput,
@@ -7,7 +8,7 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
-import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
+import { loadEvaluatedStep, stepRef, subjectName } from './_lib/evaluated-step';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
 
 export async function listEvalDatasets(input: ListEvalDatasetsInput, scope: CallerScope): Promise<ListEvalDatasetsOutput> {
@@ -28,14 +29,14 @@ export async function saveEvalDataset(input: SaveEvalDatasetInput, scope: Caller
     ? cases.filter((evalCase) => !evalCase.archived)
     : input.caseIds.map((caseId) => {
       const evalCase = cases.find((candidate) => candidate.id === caseId);
-      if (evalCase === undefined) throw new ValidationError(`Eval Case '${caseId}' is not a case of step '${step.stepId}'`);
+      if (evalCase === undefined) throw new ValidationError(`Eval Case '${caseId}' is not a case of ${subjectName(step, false)}`);
       return evalCase;
     });
-  if (selected.length === 0) throw new ValidationError(`Step '${step.stepId}' has no Eval Cases to save`);
+  if (selected.length === 0) throw new ValidationError(`${subjectName(step)} has no Eval Cases to save`);
 
   const [current] = await scope.evaluation.listDatasetVersions(step);
   const dataset = await scope.evaluation.appendDatasetVersion({
-    ...step,
+    ...evaluationOwnerOf(step),
     id: randomUUID(),
     version: (current?.version ?? 0) + 1,
     caseIds: selected.map((evalCase) => evalCase.id),
@@ -45,7 +46,7 @@ export async function saveEvalDataset(input: SaveEvalDatasetInput, scope: Caller
   });
   await appendEvaluationAudit(scope, {
     action: 'eval_dataset.saved',
-    description: `Eval Dataset v${dataset.version} saved for step '${step.stepId}' with ${dataset.caseIds.length} case(s)`,
+    description: `Eval Dataset v${dataset.version} saved for ${subjectName(step, false)} with ${dataset.caseIds.length} case(s)`,
     namespace: step.namespace,
     entityType: 'eval_dataset',
     entityId: dataset.id,

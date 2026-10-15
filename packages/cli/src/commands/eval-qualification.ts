@@ -2,7 +2,7 @@ import { DEFAULT_ACCEPTANCE_CRITERIA, describeAcceptanceCriteria as describeCrit
 import type { GetStepQualificationOutput, StepValidation } from '@mediforce/platform-api/contract';
 import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson } from '../output';
-import { readJsonFile, STEP_ARGS, stepFrom } from './eval-step-args';
+import { readJsonFile, SUBJECT_ARGS, subjectFrom } from './eval-step-args';
 
 const QUALIFICATION_LABEL: Record<GetStepQualificationOutput['status'], string> = { qualified: 'qualified', stale: 'stale', not_qualified: 'not qualified' };
 const STEP_VALIDATION_LABEL: Record<StepValidation['status'], string> = { passed: 'passed', failed: 'failed', awaiting_approval: 'waiting for human approval', not_verified: 'not verified' };
@@ -11,9 +11,9 @@ const VERSION_VALIDATION_LABEL: Record<StepValidation['status'], string> = { pas
 export const evalCriteriaGetCommand = defineCommand({
   name: 'mediforce eval criteria-get',
   description: 'Print a step\'s Acceptance Criteria — the floors the next Eval Run is judged against.',
-  args: { ...STEP_ARGS },
+  args: { ...SUBJECT_ARGS },
   async run({ args, output, mediforce, jsonMode }) {
-    const result = await mediforce.evaluation.getAcceptanceCriteria(stepFrom(args));
+    const result = await mediforce.evaluation.getAcceptanceCriteria(subjectFrom(args));
     if (jsonMode) {
       printJson(output, result);
       return 0;
@@ -28,10 +28,10 @@ export const evalCriteriaGetCommand = defineCommand({
 export const evalCriteriaSetCommand = defineCommand({
   name: 'mediforce eval criteria-set',
   description: 'Set a step\'s Acceptance Criteria from a JSON file: { "minPassRate": 0.95, "minPassHatK": 0.9 }. Every counted Evaluator must reach them.',
-  args: { ...STEP_ARGS, file: { type: 'string', required: true, description: 'JSON file with minPassRate and, optionally, minPassHatK' } },
+  args: { ...SUBJECT_ARGS, file: { type: 'string', required: true, description: 'JSON file with minPassRate and, optionally, minPassHatK' } },
   async run({ args, output, mediforce, jsonMode }) {
     const result = await mediforce.evaluation.setAcceptanceCriteria({
-      ...stepFrom(args),
+      ...subjectFrom(args),
       criteria: readJsonFile(args.file) as AcceptanceCriteria,
     });
     if (jsonMode) printJson(output, result);
@@ -43,7 +43,7 @@ export const evalCriteriaSetCommand = defineCommand({
 export const evalQualificationCommand = defineCommand({
   name: 'mediforce eval qualification',
   description: 'Print a step\'s qualification: Qualified, Stale (and what changed) or Not qualified. A person confirms or overwrites an Eval Run\'s verdict in the Evaluation tab.',
-  args: { ...STEP_ARGS, version: { type: 'string', description: 'Definition version (default: the runnable one)' } },
+  args: { ...SUBJECT_ARGS, version: { type: 'string', description: 'Definition version (default: the runnable one)' } },
   async run({ args, output, mediforce, jsonMode }) {
     const version = parsePositiveIntArg(args.version);
     if (version === 'invalid') {
@@ -51,7 +51,7 @@ export const evalQualificationCommand = defineCommand({
       return 2;
     }
     const result = await mediforce.evaluation.getQualification({
-      ...stepFrom(args),
+      ...subjectFrom(args),
       ...(version === undefined ? {} : { definitionVersion: version }),
     });
     if (jsonMode) {

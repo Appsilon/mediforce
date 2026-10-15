@@ -1,8 +1,10 @@
-import type {
-  AgentRun,
-  EvaluatedStep,
-  ProcessInstance,
-  StoredAgentTrajectoryEntry,
+import {
+  AGENT_EVAL_STEP_ID,
+  type AgentRun,
+  type EvaluatedStep,
+  type EvaluationSubject as EvaluatedSubject,
+  type ProcessInstance,
+  type StoredAgentTrajectoryEntry,
 } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { NotFoundError, ValidationError } from '../../../errors';
@@ -16,19 +18,33 @@ export interface EvaluationSubject {
   readonly trajectory: StoredAgentTrajectoryEntry[];
 }
 
+/** Whether a run is one of an Agent's eval trials (ADR-0029): its carried single step names the Agent. */
+function isTrialOfAgent(agentRun: AgentRun, instance: ProcessInstance, agent: Extract<EvaluatedSubject, { kind: 'agent' }>): boolean {
+  return (instance.namespace ?? '') === agent.namespace
+    && agentRun.stepId === AGENT_EVAL_STEP_ID
+    && instance.evalDefinition?.steps[0]?.agentId === agent.agentId;
+}
+
 /**
  * Loads an Agent Run gated through its parent Workflow Run —
  * `agentRuns.getById` is not workspace-gated (#588), so a run in another
- * workspace reads as missing here. With `step`, the run must belong to it.
+ * workspace reads as missing here. With `step`, the run must belong to it —
+ * for an Agent, be one of its eval trials.
  */
 export async function loadGatedAgentRun(
   scope: CallerScope,
   agentRunId: string,
-  step?: EvaluatedStep,
+  step?: EvaluatedStep | EvaluatedSubject,
 ): Promise<{ agentRun: AgentRun; instance: ProcessInstance }> {
   const agentRun = await scope.agentRuns.getById(agentRunId);
   const instance = agentRun === null ? null : await scope.runs.getById(agentRun.processInstanceId);
   if (agentRun === null || instance === null) throw new NotFoundError(`Agent Run '${agentRunId}' not found`);
+  if (step !== undefined && 'kind' in step && step.kind === 'agent') {
+    if (isTrialOfAgent(agentRun, instance, step) === false) {
+      throw new ValidationError(`Agent Run '${agentRunId}' is not an eval trial of agent '${step.agentId}'`);
+    }
+    return { agentRun, instance };
+  }
   if (step !== undefined && (
     (instance.namespace ?? '') !== step.namespace
     || instance.definitionName !== step.workflowName
@@ -52,7 +68,7 @@ export async function loadStepInput(scope: CallerScope, agentRun: AgentRun, inst
 export async function loadEvaluationSubject(
   scope: CallerScope,
   agentRunId: string,
-  step?: EvaluatedStep,
+  step?: EvaluatedStep | EvaluatedSubject,
 ): Promise<EvaluationSubject> {
   const { agentRun, instance } = await loadGatedAgentRun(scope, agentRunId, step);
   return {

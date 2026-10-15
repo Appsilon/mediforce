@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
-import type { EvaluatedStep, JudgeReviewDecision, JudgeVerdict } from '@mediforce/platform-core';
+import type { EvaluationSubject, JudgeReviewDecision, JudgeVerdict } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { useEvalRunMutation } from '@/hooks/use-step-evaluation';
@@ -33,7 +33,7 @@ function confidenceText(verdict: JudgeVerdict): string {
 
 /** One model verdict with its rationale, and the Accept / Deny a person reviews it with. */
 export function JudgeVerdictRow({ step, evalRunId, verdict, mayEdit, editReason, trialHref, rationale }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   evalRunId: string;
   verdict: JudgeVerdict;
   mayEdit: boolean;
@@ -127,7 +127,7 @@ export function JudgeVerdictRow({ step, evalRunId, verdict, mayEdit, editReason,
  * out of the Acceptance Criteria.
  */
 export function JudgeVerdicts({ step, evalRunId, verdicts, mayEdit, editReason, trialHref }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   evalRunId: string;
   verdicts: readonly JudgeVerdict[];
   mayEdit: boolean;

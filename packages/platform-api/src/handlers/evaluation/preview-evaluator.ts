@@ -2,10 +2,13 @@ import type { z } from 'zod';
 import type { PreviewEvaluatorInputSchema, PreviewEvaluatorOutput } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
-import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
+import { loadEvaluatedStep, stepOnly, stepRef } from './_lib/evaluated-step';
 import { loadEvaluationSubject } from './_lib/evaluation-subject';
 import { runEvaluatorCheck } from './_lib/run-evaluator-check';
 import { listStepProductionAgentRuns } from './_lib/step-agent-runs';
+
+/** An Agent evaluated on its own (ADR-0029) has no production outputs; a check is first tried in its Eval Run. */
+export const AGENT_NOT_PREVIEWED = 'An agent evaluated on its own has no production outputs to try a check on; the check is first tried in its next Eval Run.';
 
 export const EXPECTED_OUTPUT_NOT_PREVIEWED = 'An expected-output check compares an Eval Case trial\'s output with the case\'s expected output; a production output has none, so it cannot be tried on one.';
 
@@ -19,7 +22,7 @@ export async function previewEvaluator(
   input: z.output<typeof PreviewEvaluatorInputSchema>,
   scope: CallerScope,
 ): Promise<PreviewEvaluatorOutput> {
-  const step = stepRef(input);
+  const step = stepOnly(stepRef(input), 'A preview');
   await loadEvaluatedStep(scope, step, 'run');
   if (input.check.kind === 'expected_output') throw new ValidationError(EXPECTED_OUTPUT_NOT_PREVIEWED);
   const agentRunIds = input.agentRunIds

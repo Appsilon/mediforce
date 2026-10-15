@@ -201,7 +201,7 @@ export default function StepDetailPage() {
             </span>
           )}
           {executorType === 'agent' && handle !== undefined && runVersion !== null && Number.isNaN(runVersion) === false && (
-            <StepQualificationBadge step={{ namespace: handle, workflowName: decodedName, stepId: decodedStepId }} definitionVersion={runVersion} />
+            <StepQualificationBadge step={{ kind: 'step', namespace: handle, workflowName: decodedName, stepId: decodedStepId }} definitionVersion={runVersion} />
           )}
         </div>
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">

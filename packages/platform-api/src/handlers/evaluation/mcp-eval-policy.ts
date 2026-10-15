@@ -4,10 +4,11 @@ import type {
   SetMcpEvalPolicyInput,
   SetMcpEvalPolicyOutput,
 } from '../../contract/evaluation';
+import { describeEvaluationSubject, evaluationOwnerOf } from '@mediforce/platform-core';
 import type { AgentMcpBinding, McpEvalServerPolicy } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
-import { loadEvaluatedStep, stepRef, type LoadedStep } from './_lib/evaluated-step';
+import { loadEvaluatedStep, stepRef, type LoadedStep, subjectKey } from './_lib/evaluated-step';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
 
 /** What a server the Step's MCP eval policy does not name does in a trial. */
@@ -59,17 +60,17 @@ export async function setMcpEvalPolicy(input: SetMcpEvalPolicyInput, scope: Call
   }
 
   const policy = await scope.evaluation.putMcpPolicy({
-    ...step,
+    ...evaluationOwnerOf(step),
     servers: input.servers,
     updatedBy: authorId(scope),
     updatedAt: new Date().toISOString(),
   });
   await appendEvaluationAudit(scope, {
     action: 'mcp_eval_policy.updated',
-    description: `MCP eval policy for step '${step.stepId}' of '${step.workflowName}' updated`,
+    description: `MCP eval policy for ${describeEvaluationSubject(step)} updated`,
     namespace: step.namespace,
     entityType: 'mcp_eval_policy',
-    entityId: `${step.workflowName}/${step.stepId}`,
+    entityId: subjectKey(step),
     inputSnapshot: { ...step, servers: input.servers },
     basis: 'MCP servers run live in eval trials unless declared replayed or denied (ADR-0023 D6)',
   });

@@ -16,7 +16,7 @@ import {
   CreatePerturbedEvalCaseInputSchema,
 } from '../../../contract/evaluation';
 import { listCommitFiles, readCommitFile } from '@mediforce/agent-runtime';
-import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, type EvaluationFixture } from './fixture';
+import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, type EvaluationFixture, STEP_OWNER } from './fixture';
 import { gitWorkspace } from './git-workspace';
 
 async function reviewVerdict(fixture: EvaluationFixture, agentRunId: string, value: number, comment: string | null) {
@@ -54,7 +54,7 @@ describe('Eval Cases', () => {
     const { evalCase } = await harvest({ agentRunId: UNGRADED_RUN });
 
     expect(evalCase).toMatchObject({
-      ...STEP,
+      ...STEP_OWNER,
       source: 'production',
       sourceAgentRunId: UNGRADED_RUN,
       expectation: 'negative',

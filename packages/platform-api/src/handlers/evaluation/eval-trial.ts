@@ -8,7 +8,7 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
-import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
+import { loadEvaluatedStep, stepRef, runVersionOf } from './_lib/evaluated-step';
 import { loadEvaluationSubject, type EvaluationSubject } from './_lib/evaluation-subject';
 import {
   checkOutcome,
@@ -53,7 +53,7 @@ function judgePromptOf(check: EvaluatorCheck | null, subject: EvaluationSubject 
 export async function getEvalTrial(input: GetEvalTrialInput, scope: CallerScope): Promise<GetEvalTrialOutput> {
   const run = await scope.evaluation.getEvalRun(input.evalRunId);
   if (run === null) throw new NotFoundError(`Eval Run '${input.evalRunId}' not found`);
-  await loadEvaluatedStep(scope, stepRef(run), 'read', run.definitionVersion);
+  await loadEvaluatedStep(scope, stepRef(run), 'read', runVersionOf(run));
   const trial = (await scope.evaluation.listTrials(run.id)).find((candidate) => candidate.id === input.trialId);
   if (trial === undefined) throw new NotFoundError(`Eval Run '${run.id}' has no trial '${input.trialId}'`);
 

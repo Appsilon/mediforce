@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import { mediforce, ApiError } from '@/lib/mediforce';
@@ -12,6 +12,7 @@ import type { AgentSkillRef } from '@mediforce/platform-core';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 import { AgentSkillsSection } from '@/components/agents/agent-skills-section';
 import { AGENT_ICON_OPTIONS, RecognitionLabel } from '@/components/agents/agent-form-parts';
+import { AgentEvaluation } from '@/components/evaluation/agent-evaluation';
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 
@@ -33,7 +34,17 @@ function FormSkeleton() {
 export default function EditAgentPage({ params }: { params: Promise<{ id: string }> }) {
   const { handle } = useParams<{ handle: string }>();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { id } = React.use(params);
+  // The Agent's own Evaluation (ADR-0029) sits beside its configuration.
+  const tab = searchParams.get('tab') === 'evaluation' ? 'evaluation' : 'configuration';
+  const selectTab = (next: 'configuration' | 'evaluation') => {
+    const query = new URLSearchParams(searchParams.toString());
+    if (next === 'evaluation') query.set('tab', 'evaluation');
+    else query.delete('tab');
+    router.replace(query.size === 0 ? pathname : `${pathname}?${query}`, { scroll: false });
+  };
 
   const [loadingDef, setLoadingDef] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -108,13 +119,35 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6 max-w-2xl">
+    <div className={cn('flex flex-1 flex-col gap-6 p-6', tab === 'configuration' && 'max-w-2xl')}>
+      {notFound === false && (
+        <div className="flex gap-0 border-b" role="tablist">
+          {(['configuration', 'evaluation'] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={tab === value}
+              data-testid={`agent-tab-${value}`}
+              onClick={() => selectTab(value)}
+              className={cn(
+                'border-b-2 px-3 py-2 text-sm transition-colors',
+                tab === value ? 'border-primary font-medium text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {value === 'configuration' ? 'Configuration' : 'Evaluation'}
+            </button>
+          ))}
+        </div>
+      )}
       {loadingDef ? (
         <FormSkeleton />
       ) : notFound ? (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
           Agent definition not found.
         </div>
+      ) : tab === 'evaluation' ? (
+        <AgentEvaluation handle={handle} agentId={id} />
       ) : (
         <div className="space-y-6">
 

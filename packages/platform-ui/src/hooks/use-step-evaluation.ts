@@ -1,7 +1,7 @@
 'use client';
 
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { EvaluatedStep } from '@mediforce/platform-core';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import type { EvaluationSubject } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
@@ -21,8 +21,8 @@ type Section =
 
 const STEP_AGENT_RUNS_PAGE = 20;
 
-function sectionKey(step: EvaluatedStep, section: Section) {
-  return queryKeys.evaluation.section(step.namespace, step.workflowName, step.stepId, section);
+function sectionKey(step: EvaluationSubject, section: Section) {
+  return queryKeys.evaluation.section(step, section);
 }
 
 /** What one Agent Run's step was given and what it returned; fetched only while `agentRunId` is set. */
@@ -37,7 +37,7 @@ export function useAgentRunIo(agentRunId: string | null) {
 }
 
 /** The Step's live Evaluators with whether each counts. */
-export function useStepEvaluators(step: EvaluatedStep) {
+export function useStepEvaluators(step: EvaluationSubject) {
   return useQuery({
     queryKey: sectionKey(step, 'evaluators'),
     queryFn: () => mediforce.evaluation.listEvaluators(step),
@@ -49,7 +49,7 @@ export function useStepEvaluators(step: EvaluatedStep) {
  * Every Evaluator the Step ever had, archived ones too, with all their
  * versions — what an Eval Run froze may since have been archived.
  */
-export function useStepEvaluatorHistory(step: EvaluatedStep) {
+export function useStepEvaluatorHistory(step: EvaluationSubject) {
   return useQuery({
     queryKey: sectionKey(step, 'evaluators-with-archived'),
     queryFn: () => mediforce.evaluation.listEvaluators({ ...step, includeArchived: 'true' }),
@@ -58,7 +58,7 @@ export function useStepEvaluatorHistory(step: EvaluatedStep) {
 }
 
 /** The Step's saved Dataset versions, newest first. */
-export function useStepDatasets(step: EvaluatedStep) {
+export function useStepDatasets(step: EvaluationSubject) {
   return useQuery({ queryKey: sectionKey(step, 'datasets'), queryFn: () => mediforce.evaluation.listDatasets(step), retry: stopRetryOn4xx });
 }
 
@@ -66,7 +66,7 @@ export function useStepDatasets(step: EvaluatedStep) {
  * The Step's qualification badge (ADR-0023 D11) — for its runnable version, or
  * for `definitionVersion`, what a run of that version ran.
  */
-export function useStepQualification(step: EvaluatedStep, definitionVersion?: number) {
+export function useStepQualification(step: EvaluationSubject, definitionVersion?: number) {
   return useQuery({
     queryKey: sectionKey(step, `qualification:${definitionVersion ?? 'runnable'}`),
     queryFn: () => mediforce.evaluation.getQualification({ ...step, ...(definitionVersion === undefined ? {} : { definitionVersion }) }),
@@ -96,19 +96,28 @@ export function useWorkflowValidation(namespace: string, workflowName: string) {
  * while the trial count is not valid; the last estimate stays shown while the
  * next one loads.
  */
-export function useEvalRunEstimate(step: EvaluatedStep, definitionVersion: number, trialsPerCase: number | null) {
+export function useEvalRunEstimate(step: EvaluationSubject, definitionVersion: number | null, trialsPerCase: number | null) {
   return useQuery({
-    queryKey: sectionKey(step, `estimate:${definitionVersion}:${trialsPerCase ?? 0}`),
-    queryFn: () => mediforce.evaluation.estimateRun({ ...step, definitionVersion, trialsPerCase: trialsPerCase! }),
+    queryKey: sectionKey(step, `estimate:${definitionVersion ?? 0}:${trialsPerCase ?? 0}`),
+    queryFn: () => mediforce.evaluation.estimateRun({
+      ...step,
+      ...(definitionVersion === null ? {} : { definitionVersion }),
+      trialsPerCase: trialsPerCase!,
+    }),
     enabled: trialsPerCase !== null,
     placeholderData: keepPreviousData,
     retry: stopRetryOn4xx,
   });
 }
 
-/** Every read the Evaluation tab shows for one agent Step (ADR-0023), its validation in `definitionVersion`. */
-export function useStepEvaluation(step: EvaluatedStep, definitionVersion: number) {
+/**
+ * Every read the Evaluation tab shows for one agent Step (ADR-0023), its
+ * validation in `definitionVersion` — or for an Agent on its own (ADR-0029),
+ * which has no production runs to drift or harvest from, and no version to pick.
+ */
+export function useStepEvaluation(step: EvaluationSubject, definitionVersion: number | null) {
   const options = { retry: stopRetryOn4xx } as const;
+  const production = step.kind === 'step';
   return {
     brief: useQuery({ queryKey: sectionKey(step, 'brief'), queryFn: () => mediforce.evaluation.getBrief(step), ...options }),
     evaluators: useStepEvaluators(step),
@@ -116,13 +125,19 @@ export function useStepEvaluation(step: EvaluatedStep, definitionVersion: number
     datasets: useStepDatasets(step),
     runs: useQuery({ queryKey: sectionKey(step, 'runs'), queryFn: () => mediforce.evaluation.listRuns(step), ...options }),
     criteria: useQuery({ queryKey: sectionKey(step, 'criteria'), queryFn: () => mediforce.evaluation.getAcceptanceCriteria(step), ...options }),
-    qualification: useStepQualification(step, definitionVersion),
-    drift: useQuery({ queryKey: sectionKey(step, 'drift'), queryFn: () => mediforce.evaluation.getDrift(step), ...options }),
+    qualification: useStepQualification(step, definitionVersion ?? undefined),
+    drift: useQuery({
+      queryKey: sectionKey(step, 'drift'),
+      queryFn: () => mediforce.evaluation.getDrift(stepOnly(step)),
+      enabled: production,
+      ...options,
+    }),
     agentRuns: useInfiniteQuery({
       queryKey: sectionKey(step, 'agent-runs'),
-      queryFn: ({ pageParam }) => mediforce.evaluation.listStepAgentRuns({ ...step, limit: STEP_AGENT_RUNS_PAGE, cursor: pageParam }),
+      queryFn: ({ pageParam }) => mediforce.evaluation.listStepAgentRuns({ ...stepOnly(step), limit: STEP_AGENT_RUNS_PAGE, cursor: pageParam }),
       initialPageParam: undefined as string | undefined,
       getNextPageParam: (page) => page.nextCursor,
+      enabled: production,
       ...options,
     }),
   };
@@ -134,22 +149,35 @@ export function useStepEvaluation(step: EvaluatedStep, definitionVersion: number
  * more than one section shows.
  */
 export function useStepEvaluationMutation<TInput, TOutput>(
-  step: EvaluatedStep,
+  step: EvaluationSubject,
   write: (input: TInput) => Promise<TOutput>,
 ) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: write,
-    onSuccess: () => Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.evaluation.step(step.namespace, step.workflowName, step.stepId) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.workflowValidation(step.namespace, step.workflowName) }),
-    ]),
+    onSuccess: () => invalidateSubject(queryClient, step),
   });
+}
+
+/** Refreshes every section of the subject's Evaluation, and a Step's workflow validation. */
+export function invalidateSubject(queryClient: QueryClient, step: EvaluationSubject) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.evaluation.subject(step) }),
+    step.kind === 'step'
+      ? queryClient.invalidateQueries({ queryKey: queryKeys.workflowValidation(step.namespace, step.workflowName) })
+      : queryClient.invalidateQueries({ queryKey: queryKeys.agentVersions(step.agentId) }),
+  ]);
+}
+
+/** The Step a production-only read is about; an Agent's never runs one (`enabled` keeps it off). */
+function stepOnly(step: EvaluationSubject): Extract<EvaluationSubject, { kind: 'step' }> {
+  if (step.kind === 'agent') throw new Error(`Agent '${step.agentId}' has no production runs`);
+  return step;
 }
 
 /** A write that changes one Eval Run's report: refreshes the run, and the Step's sections its validation shows in. */
 export function useEvalRunMutation<TInput, TOutput>(
-  step: EvaluatedStep,
+  step: EvaluationSubject,
   evalRunId: string,
   write: (input: TInput) => Promise<TOutput>,
 ) {
@@ -158,8 +186,7 @@ export function useEvalRunMutation<TInput, TOutput>(
     mutationFn: write,
     onSuccess: () => Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.evalRun(evalRunId) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.evaluation.step(step.namespace, step.workflowName, step.stepId) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.workflowValidation(step.namespace, step.workflowName) }),
+      invalidateSubject(queryClient, step),
     ]),
   });
 }
@@ -195,5 +222,14 @@ export function useEvalTrial(evalRunId: string, trialId: string) {
       const status = query.state.data?.trial.status;
       return status === 'pending' || status === 'running' || status === 'scoring' ? 3000 : false;
     },
+  });
+}
+
+/** The Agent's versions, newest first, and the one it has now (ADR-0029). */
+export function useAgentVersions(agentId: string) {
+  return useQuery({
+    queryKey: queryKeys.agentVersions(agentId),
+    queryFn: () => mediforce.agents.listVersions({ id: agentId }),
+    retry: stopRetryOn4xx,
   });
 }

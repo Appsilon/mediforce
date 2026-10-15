@@ -134,6 +134,12 @@ export {
 
 export {
   EvaluatedStepSchema,
+  EvaluationSubjectRefSchema,
+  EvaluationOwnerSchema,
+  evaluationSubjectOf,
+  evaluationOwnerOf,
+  isOwnedBy,
+  describeEvaluationSubject,
   EvaluationOriginSchema,
   EvaluationBriefSchema,
   EvaluatorKindSchema,
@@ -180,6 +186,9 @@ export {
   type SignedAcceptanceCriteria,
   type AcceptanceCriteriaVersion,
   type EvaluatedStep,
+  type EvaluationSubject,
+  type EvaluationSubjectRef,
+  type EvaluationOwner,
   type EvaluationOrigin,
   type EvaluationBrief,
   type EvaluatorKind,

@@ -4,14 +4,15 @@ import * as React from 'react';
 import { flushSync } from 'react-dom';
 import Link from 'next/link';
 import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
-import type { EvalCase, EvaluatedStep, EvaluatorCheck, JudgeVerdict, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
+import type { EvalCase, EvaluationSubject, EvaluatorCheck, JudgeVerdict, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import type { EvalTrialEvaluator, GetEvalTrialOutput } from '@mediforce/platform-api/contract';
 import { routes } from '@/lib/routes';
 import { formatCostUsd, formatDuration } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { secondaryButtonClass } from '@/components/ui/button-styles';
 import { useEvalRun, useEvalTrial } from '@/hooks/use-step-evaluation';
-import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
+import type { EvaluationGates } from '@/hooks/use-evaluation-gates';
+import { evalRunHref, subjectOfRow } from '@/lib/evaluation-subject';
 import { OutcomeChip, TrialResultBadge, TrialStatusBadge } from './eval-run-badges';
 import { JudgeVerdictRow } from './judge-verdicts';
 import { CHECK_KINDS, CheckDetails } from './evaluator-check-editor';
@@ -126,7 +127,7 @@ function EvaluatorLog({ entry }: { entry: EvalTrialEvaluator }) {
 function EvaluatorResult({ entry, context }: {
   entry: EvalTrialEvaluator;
   context: {
-    step: EvaluatedStep;
+    step: EvaluationSubject;
     evalRunId: string;
     output: GetEvalTrialOutput;
     verdicts: readonly JudgeVerdict[];
@@ -232,15 +233,15 @@ function AgentLog({ entries, citedBy }: { entries: readonly StoredAgentTrajector
  * logs: what it was sent and answered, and a person's review; and the agent's
  * whole log, as the judges read it, collapsed until opened or cited.
  */
-export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
+export function EvalTrialDetail({ handle, evalRunId, trialId, gates }: {
   handle: string;
-  workflowName: string;
   evalRunId: string;
   trialId: string;
+  gates: EvaluationGates;
 }) {
   const trial = useEvalTrial(evalRunId, trialId);
   const run = useEvalRun(evalRunId);
-  const { mayEdit, reason: editReason } = useWorkflowEditGate(handle, workflowName);
+  const { mayEdit, editReason } = gates;
   const [logOpen, setLogOpen] = React.useState(false);
 
   // A link to a log entry — a judge's citation, or a shared URL — opens the log first, so the entry is there to scroll to.
@@ -261,7 +262,7 @@ export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
   const output = trial.data;
   const { trial: evalTrial, evalCase, evaluators } = output;
   const { evalRun, report } = run.data;
-  const step: EvaluatedStep = { namespace: evalRun.namespace, workflowName: evalRun.workflowName, stepId: evalRun.stepId };
+  const step = subjectOfRow(evalRun);
   const passed = report.trialResults.find((result) => result.trialId === evalTrial.id)?.passed ?? null;
   const verdicts = report.judgeVerdicts.filter((verdict) => verdict.trialId === evalTrial.id);
   const logEntries = new Set(output.trajectory.map((entry) => entry.seq));
@@ -278,7 +279,7 @@ export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
   return (
     <div className="space-y-8 p-6" data-testid="eval-trial-detail" onClickCapture={openLogOnCitation}>
       <div className="space-y-3">
-        <Link href={`${routes.workflowEvalRun(handle, workflowName, evalRunId)}?tab=trials`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+        <Link href={`${evalRunHref(step, evalRunId)}?tab=trials`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-3 w-3" /> Eval Run {evalRunId.slice(0, 8)}
         </Link>
         <div className="flex flex-wrap items-center gap-3">
@@ -334,12 +335,13 @@ export function EvalTrialDetail({ handle, workflowName, evalRunId, trialId }: {
               {logOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               Agent log ({output.trajectory.length})
             </button>
-            {instanceId !== null && (
+            {/* An Agent's trial runs a Definition no stored Workflow holds, so it has no workflow run page. */}
+            {instanceId !== null && step.kind === 'step' && (
               <span className="flex flex-wrap gap-x-4 text-xs font-normal">
-                <Link href={routes.workflowRunStep(handle, workflowName, instanceId, evalRun.stepId)} className="inline-flex items-center gap-1 text-primary hover:underline">
+                <Link href={routes.workflowRunStep(handle, step.workflowName, instanceId, step.stepId)} className="inline-flex items-center gap-1 text-primary hover:underline">
                   Step execution and full agent log <ExternalLink className="h-3 w-3" />
                 </Link>
-                <Link href={routes.workflowRun(handle, workflowName, instanceId)} className="inline-flex items-center gap-1 text-primary hover:underline">
+                <Link href={routes.workflowRun(handle, step.workflowName, instanceId)} className="inline-flex items-center gap-1 text-primary hover:underline">
                   Trial&apos;s workflow run <ExternalLink className="h-3 w-3" />
                 </Link>
               </span>

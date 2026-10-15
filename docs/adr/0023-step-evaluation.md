@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-10-07
+last_reviewed: 2026-10-15
 ---
 
 # 0023 — Step Evaluation: Evaluation Assistant, Evaluators, single-step Eval Runs, Step Qualification
@@ -34,6 +34,10 @@ last_reviewed: 2026-10-07
   deleted, not only out of the UI; ADR-0024 pins the commit that has it.
   From 2026-10-05 an Eval Run carries the Step Fingerprint itself, with no
   variants (D5).
+- **Partially superseded 2026-10-15 by [ADR-0029](./0029-agent-evaluation.md):**
+  D2 — an Evaluation is owned by a Step or by an Agent, and an Agent's Eval Run
+  assesses one Agent version. Everything else here holds for an Agent's
+  Evaluation except where ADR-0029 names it.
 - **Vocabulary:** Evaluation, Evaluation Assistant, Evaluation Brief, Evaluator, Eval Case, Eval Dataset, Eval Run,
   Agent Trajectory, Step Fingerprint, Acceptance Criteria, Step Qualification
   — all in [`CONTEXT.md`](../../CONTEXT.md) § Evaluation domain.
@@ -57,6 +61,8 @@ names schema-shape checking of a Definition. The activity is Evaluation, a rule
 is an Evaluator, the signed outcome is a Step Qualification.
 
 **D2 — Evaluators and Eval Datasets are platform entities owned by one Step.**
+_Superseded in part by [ADR-0029](./0029-agent-evaluation.md): they are owned
+by one Step or by one Agent._
 Keyed by `(namespace, workflow name, stepId)`, outside the immutable Workflow
 Definition, so adding a check never mints a Definition version. Exportable to
 an `evals/` folder of the workflow package (ADR-0013). Reuse is by copy —

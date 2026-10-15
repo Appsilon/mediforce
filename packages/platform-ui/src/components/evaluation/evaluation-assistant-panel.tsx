@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Bot, Check, Loader2, Send, Settings, Sparkles, User, X } from 'lucide-react';
 import { DEFAULT_MODEL } from '@mediforce/platform-core';
 import type {
-  EvaluatedStep,
+  EvaluationSubject,
   EvaluationAssistantPlatformToolName,
   EvaluationAssistantProposalToolName,
 } from '@mediforce/platform-core';
@@ -135,9 +135,10 @@ function StepsSummary({ steps }: { steps: ActivityStep[] }) {
  * every turn, opens from the header.
  */
 export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEdit, editReason, mayRun, runReason }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   /** The workflow version whose step the assistant reads and runs. */
-  definitionVersion: number;
+  /** Null for an Agent evaluated on its own (ADR-0029), which runs as it is now. */
+  definitionVersion: number | null;
   brief: BriefQuery;
   mayEdit: boolean;
   editReason: string | undefined;
@@ -187,7 +188,7 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
     try {
       const result = await mediforce.evaluation.askAssistant({
         ...step,
-        definitionVersion,
+        ...(definitionVersion === null ? {} : { definitionVersion }),
         messages: thread.map((message) => ({
           role: message.role,
           content: [message.content, ...(message.proposals ?? []).map(({ proposal }) => `[proposal: ${JSON.stringify(proposal)}]`)].join('\n'),
@@ -201,7 +202,7 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
         },
       });
       if (result.preparedEvalRuns.length > 0 || result.startedEvalRuns.length > 0) {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.evaluation.step(step.namespace, step.workflowName, step.stepId) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.evaluation.subject(step) });
       }
       setMessages([...thread, {
         role: 'assistant',

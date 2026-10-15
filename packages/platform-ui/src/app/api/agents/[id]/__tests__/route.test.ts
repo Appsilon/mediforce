@@ -15,6 +15,8 @@ vi.mock('@/lib/platform-services', () => ({
       getByIdVisibleTo: mockAgentGetByIdVisibleTo,
       update: mockAgentUpdate,
       delete: mockAgentDelete,
+      listVersions: async () => [],
+      appendVersion: async (version: unknown) => version,
     },
     auditRepo: { append: mockAuditAppend },
     namespaceRepo: {},

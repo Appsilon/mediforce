@@ -130,9 +130,10 @@ export async function POST(
     // Load WorkflowDefinition — try exact version, fall back to latest
     const versionNum = parseInt(initialInstance.definitionVersion, 10);
     const runNamespace = initialInstance.namespace ?? '';
-    let workflowDefinition = !isNaN(versionNum)
+    // An Agent's eval trial carries its single-step Definition; no stored Workflow holds it (ADR-0029).
+    let workflowDefinition = initialInstance.evalDefinition ?? (!isNaN(versionNum)
       ? await processRepo.getWorkflowDefinition(runNamespace, initialInstance.definitionName, versionNum)
-      : null;
+      : null);
     if (!workflowDefinition) {
       const latestVersion = await processRepo.getLatestWorkflowVersion(runNamespace, initialInstance.definitionName);
       if (latestVersion > 0) {

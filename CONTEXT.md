@@ -238,8 +238,8 @@ _Avoid_: "Step skill" for a Skill a Step adds — that is a Skill.
 **Agent**:
 A reusable, mutable agent configuration: system prompt, foundation model and
 MCP server bindings. Workflow Steps reference Agents; one Agent can power many
-Steps and is not versioned today.
-_Avoid_: Agent Definition (legacy code term; there is no versioned definition).
+Steps. Each configuration it is saved or evaluated with is an **Agent version**.
+_Avoid_: Agent Definition (legacy code term for the Agent itself, not a version).
 _Note_: A Step inherits two things from the Agent it names — `systemPrompt`
 reaches the prompt as `agentIdentityPrompt`, and `foundationModel` supplies the
 run's model whenever the Step leaves `step.agent.model` unset. A Step also
@@ -247,6 +247,14 @@ gets the Agent's Skills. Everything else the Step sets adds to the Agent:
 `step.agent.prompt` follows the system prompt and `step.agent.skills` follow
 the Agent's Skills. Only `step.agent.model` (and `step.plugin`, which the editor fills
 in from the Agent's `runtimeId`) replaces what the Agent names.
+
+**Agent version**:
+One immutable snapshot of what shapes an Agent's behaviour — runtime, model,
+system prompt, MCP bindings, and each Skill it holds by content hash — with the
+hash of that snapshot. A new one is recorded when a save or an Eval Run finds
+the Agent's configuration changed; a rename is not a new version (ADR-0029).
+_Avoid_: "agent revision", "Step Fingerprint" (that is a Step's identity, which
+also covers what the Step adds to its Agent).
 
 **MCP Server**:
 External tool host (stdio or HTTP) accessible to an agent via Model Context
@@ -501,8 +509,9 @@ _Avoid_: confusing with **Trace** (external telemetry, may not exist) and
 "transcript" / "log" (the transient activity log it replaces).
 
 **Evaluation**:
-The activity of measuring whether one agent Workflow Step, in one configuration, is
-trustworthy for its context of use.
+The activity of measuring whether one agent Workflow Step — or one Agent on its
+own, outside any workflow — in one configuration, is trustworthy for its
+context of use.
 _Avoid_: "validation" — in pharma that means Computer System Validation of
 the platform itself (GAMP 5, 21 CFR Part 11), and here it already names
 schema-shape checking of a Definition.
@@ -584,9 +593,10 @@ for a signature, otherwise **not verified**. Read, never signed. Archived versio
 _Avoid_: "validated version", "qualified version" (only a step is qualified).
 
 **Eval Run**:
-One execution of an Eval Dataset against a Workflow Step, repeated per case,
-producing Scores judged against Acceptance Criteria; it carries the Step
-Fingerprint it ran. (Running variants of the step beside it is parked in
+One execution of an Eval Dataset against a Workflow Step — or an Agent, as one
+Agent version — repeated per case, producing Scores judged against Acceptance
+Criteria; it carries the Step Fingerprint it ran, and an Agent's run the Agent
+version it assessed. (Running variants of the step beside it is parked in
 ADR-0024.) Fits the existing Run family (Workflow
 Run, Agent Run).
 _Avoid_: "Experiment" (vague, collides with nothing but explains nothing).
@@ -623,7 +633,9 @@ the user-facing immutable log.
   A `public` **Agent** has only `public` **Skills**.
 - An agent **Workflow Step** owns 0..N **Evaluators** and 0..N
   versioned **Eval Datasets**; neither is shared with another Workflow Step (reuse
-  is by copy).
+  is by copy). An **Agent** can own its own, evaluated on it alone (ADR-0029).
+- An **Agent** has 1..N **Agent versions** once saved; an Agent's **Eval Run**
+  assesses exactly one.
 - An agent **Workflow Step** has 0..1 **Evaluation Brief** (versioned); it
   guides the **Evaluation Assistant** and is not part of an **Eval Run** or a
   **Step Qualification**.

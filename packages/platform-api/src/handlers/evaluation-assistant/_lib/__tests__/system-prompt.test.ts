@@ -60,7 +60,7 @@ describe('Evaluation Assistant prompt', () => {
 
   it('carries the step\'s Brief every turn, or asks for one', () => {
     expect(briefMessage({
-      namespace: 'n', workflowName: 'w', stepId: 's', version: 3, text: 'A missed grade 5 is critical.',
+      namespace: 'n', workflowName: 'w', stepId: 's', agentId: null, version: 3, text: 'A missed grade 5 is critical.',
       origin: 'user', createdBy: 'u', createdAt: '2026-09-23T08:00:00.000Z',
     })).toBe("The step's Evaluation Brief (v3), its context of use:\nA missed grade 5 is critical.");
     expect(briefMessage(null)).toContain('offer to draft a Brief with propose_brief');

@@ -55,6 +55,12 @@ export {
   ScoreSourceSchema,
   ScoreSchema,
   EvaluatedStepSchema,
+  EvaluationSubjectRefSchema,
+  EvaluationOwnerSchema,
+  evaluationSubjectOf,
+  evaluationOwnerOf,
+  isOwnedBy,
+  describeEvaluationSubject,
   EvaluationOriginSchema,
   EvaluationBriefSchema,
   EvaluatorKindSchema,
@@ -287,6 +293,9 @@ export {
 export type { Handle } from './schemas/handle';
 export type {
   EvaluatedStep,
+  EvaluationSubject,
+  EvaluationSubjectRef,
+  EvaluationOwner,
   EvaluationOrigin,
   EvaluationBrief,
   EvaluatorKind,
@@ -664,6 +673,14 @@ export type {
   UpdateAgentDefinitionInput,
 } from './schemas/agent-definition';
 export type { AgentDefinitionRepository } from './repositories/agent-definition-repository';
+export {
+  AgentConfigSnapshotSchema,
+  AgentVersionSchema,
+  AGENT_EVAL_STEP_ID,
+  agentEvalDefinition,
+  type AgentConfigSnapshot,
+  type AgentVersion,
+} from './schemas/agent-version';
 
 // Skill (ADR-0025)
 export {

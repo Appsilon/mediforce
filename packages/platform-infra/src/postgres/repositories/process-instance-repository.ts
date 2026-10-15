@@ -151,6 +151,7 @@ export class PostgresProcessInstanceRepository
         createdBy: parsed.createdBy,
         dryRun: parsed.dryRun === true,
         evalRunId: parsed.evalRunId ?? null,
+        evalDefinition: parsed.evalDefinition ?? null,
         workspaceStartCommit: parsed.workspaceStartCommit ?? null,
         archivedAt: parsed.archived === true ? new Date() : null,
         deletedAt: parsed.deleted === true ? new Date() : null,
@@ -809,6 +810,7 @@ function toInstance(row: typeof processInstances.$inferSelect): ProcessInstance 
     totalCostUsd: row.totalCostUsd !== null ? Number(row.totalCostUsd) : undefined,
     dryRun: row.dryRun === true,
     ...(row.evalRunId === null ? {} : { evalRunId: row.evalRunId }),
+    ...(row.evalDefinition === null ? {} : { evalDefinition: row.evalDefinition }),
     ...(row.workspaceStartCommit === null ? {} : { workspaceStartCommit: row.workspaceStartCommit }),
   });
 }

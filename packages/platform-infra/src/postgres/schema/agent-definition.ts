@@ -1,4 +1,4 @@
-import { pgTable, text, jsonb, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, jsonb, timestamp, index, integer, primaryKey } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { workspaces } from './workspace';
 
@@ -62,5 +62,24 @@ export const agents = pgTable(
     namespaceIdx: index('agents_namespace_idx')
       .on(table.namespace)
       .where(sql`${table.namespace} is not null`),
+  }),
+);
+
+/**
+ * Agent versions (ADR-0029): insert-only, one row per configuration an Agent
+ * was saved or evaluated with. `hash` is the SHA-256 of `config`.
+ */
+export const agentVersions = pgTable(
+  'agent_versions',
+  {
+    agentId: text('agent_id').notNull().references(() => agents.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    hash: text('hash').notNull(),
+    config: jsonb('config').notNull(),
+    createdBy: text('created_by').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.agentId, table.version] }),
   }),
 );

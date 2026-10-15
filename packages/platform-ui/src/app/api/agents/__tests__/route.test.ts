@@ -7,7 +7,13 @@ const mockAuditAppend = vi.fn();
 
 vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
-    agentDefinitionRepo: { create: mockAgentCreate },
+    agentDefinitionRepo: {
+      create: mockAgentCreate,
+      getById: async () => null,
+      getByIdVisibleTo: async () => null,
+      listVersions: async () => [],
+      appendVersion: async (version: unknown) => version,
+    },
     auditRepo: { append: mockAuditAppend },
     namespaceRepo: {},
   }),

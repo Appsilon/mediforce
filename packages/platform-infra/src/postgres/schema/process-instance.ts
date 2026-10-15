@@ -83,6 +83,7 @@ export const processInstances = pgTable(
     dryRun: boolean('dry_run').notNull().default(false),
     // Eval trial (ADR-0023 D4): the Eval Run that started this single-step run.
     evalRunId: text('eval_run_id'),
+    evalDefinition: jsonb('eval_definition'),
     workspaceStartCommit: text('workspace_start_commit'),
 
     // Tombstones — null when not set.

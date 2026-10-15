@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  EvaluatedStepSchema,
+  EvaluationOwnerSchema,
   LegacyEvaluatorSeveritySchema,
   McpEvalServerPolicySchema,
   SignedAcceptanceCriteriaSchema,
@@ -42,8 +42,12 @@ export const ElectronicSignatureSchema = z.object({
 });
 
 /** What a signature on a Step Qualification means, shown to the signer before they sign and kept with it. */
-export function qualificationSignatureMeaning(decision: QualificationDecision, outcome: 'passed' | 'failed'): string {
-  const verdict = `the Step configuration as it ran in it ${outcome} validation`;
+export function qualificationSignatureMeaning(
+  decision: QualificationDecision,
+  outcome: 'passed' | 'failed',
+  subject: 'step' | 'agent' = 'step',
+): string {
+  const verdict = `the ${subject === 'agent' ? 'Agent' : 'Step'} configuration as it ran in it ${outcome} validation`;
   return decision === 'confirmed'
     ? `Confirmed: I reviewed this Eval Run and agree with its verdict: ${verdict}.`
     : `Overwritten: I reviewed this Eval Run and overwrite its verdict: ${verdict}.`;
@@ -56,10 +60,12 @@ export function qualificationSignatureMeaning(decision: QualificationDecision, o
  * policy — and is never changed; one signed before variants were removed
  * still carries their keys, which reads ignore. It is informational: nothing is blocked without one.
  */
-const StepQualificationRecordSchema = EvaluatedStepSchema.extend({
+const StepQualificationRecordSchema = EvaluationOwnerSchema.extend({
   id: z.uuid(),
   evalRunId: z.uuid(),
-  definitionVersion: z.number().int().positive(),
+  /** Null on an Agent's qualification, which names the Agent version instead (ADR-0029). */
+  definitionVersion: z.number().int().positive().nullable(),
+  agentVersion: z.number().int().positive().nullable().default(null),
   fingerprint: StepFingerprintSchema,
   evaluators: z.array(EvalRunEvaluatorSchema),
   mcpPolicy: z.record(z.string(), McpEvalServerPolicySchema),

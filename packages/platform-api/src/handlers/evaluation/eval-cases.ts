@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { z } from 'zod';
-import type { EvalCase, EvalCaseLabel, EvaluatedStep } from '@mediforce/platform-core';
+import { evaluationOwnerOf, type EvalCase, type EvalCaseLabel, type EvaluationSubject } from '@mediforce/platform-core';
 import type {
   ArchiveEvalCaseInputSchema,
   CreateEvalCaseFromAgentRunInputSchema,
@@ -14,7 +14,7 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError, ValidationError } from '../../errors';
-import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
+import { loadEvaluatedStep, stepOnly, stepRef, subjectName } from './_lib/evaluated-step';
 import { loadCaseSource, loadVerdictExpectation } from './_lib/case-source';
 import { perturbCase } from './_lib/perturb-case';
 import { commitWorkspaceChanges } from './_lib/workspace-seed';
@@ -30,11 +30,11 @@ export async function listEvalCases(
 }
 
 /** A case selects only live Evaluators of its own step: an archived one is in no Eval Run, so it would grade nothing. */
-async function checkSelectedEvaluators(scope: CallerScope, step: EvaluatedStep, evaluatorIds: readonly string[] | null): Promise<void> {
+async function checkSelectedEvaluators(scope: CallerScope, step: EvaluationSubject, evaluatorIds: readonly string[] | null): Promise<void> {
   if (evaluatorIds === null) return;
   const own = new Set((await scope.evaluation.listEvaluators(step)).filter((evaluator) => evaluator.archived === false).map((evaluator) => evaluator.id));
   const foreign = evaluatorIds.filter((evaluatorId) => own.has(evaluatorId) === false);
-  if (foreign.length > 0) throw new ValidationError(`Step '${step.stepId}' has no live Evaluator ${foreign.map((evaluatorId) => `'${evaluatorId}'`).join(', ')}`);
+  if (foreign.length > 0) throw new ValidationError(`${subjectName(step)} has no live Evaluator ${foreign.map((evaluatorId) => `'${evaluatorId}'`).join(', ')}`);
 }
 
 function labelOf(input: EvalCaseLabel): EvalCaseLabel {
@@ -52,13 +52,14 @@ async function storeCase(scope: CallerScope, evalCase: EvalCase): Promise<EvalCa
   const stored = await scope.evaluation.createCase(evalCase);
   await appendEvaluationAudit(scope, {
     action: 'eval_case.created',
-    description: `Eval Case '${stored.name}' (${stored.source}, ${stored.expectation}) added to step '${stored.stepId}'${stored.origin === 'assistant' ? ' from an Evaluation Assistant proposal' : ''}`,
+    description: `Eval Case '${stored.name}' (${stored.source}, ${stored.expectation}) added to ${subjectName(stepRef(stored), false)}${stored.origin === 'assistant' ? ' from an Evaluation Assistant proposal' : ''}`,
     namespace: stored.namespace,
     entityType: 'eval_case',
     entityId: stored.id,
     inputSnapshot: {
       workflowName: stored.workflowName,
       stepId: stored.stepId,
+      ...(stored.agentId === null ? {} : { agentId: stored.agentId }),
       source: stored.source,
       sourceAgentRunId: stored.sourceAgentRunId,
       perturbation: stored.perturbation,
@@ -82,8 +83,11 @@ export async function createEvalCase(
 ): Promise<EvalCaseOutput> {
   const step = stepRef(input);
   await loadEvaluatedStep(scope, step, 'edit');
+  if (step.kind === 'agent' && input.workspaceSeedCommit !== null) {
+    throw new ValidationError(`An Eval Case of ${subjectName(step, false)} starts from an empty workspace; it takes no workspace seed commit`);
+  }
   return storeCase(scope, {
-    ...step,
+    ...evaluationOwnerOf(step),
     id: randomUUID(),
     name: input.name,
     input: input.input,
@@ -123,7 +127,7 @@ export async function createEvalCaseFromAgentRun(
   const expectedOutput = fromRun ? (verdictLabel === null ? null : agentRun.envelope?.result ?? null) : input.expectedOutput;
   const caseInput = input.input ?? source.input;
   return storeCase(scope, {
-    ...source.step,
+    ...evaluationOwnerOf({ kind: 'step', ...source.step }),
     id: randomUUID(),
     name: input.name ?? `From run ${instance.id.slice(0, 8)} (${agentRun.startedAt.slice(0, 10)})`,
     input: caseInput,
@@ -151,7 +155,7 @@ export async function createPerturbedEvalCase(
   input: z.output<typeof CreatePerturbedEvalCaseInputSchema>,
   scope: CallerScope,
 ): Promise<EvalCaseOutput> {
-  const step = stepRef(input);
+  const step = stepOnly(stepRef(input), 'A perturbed case');
   await loadEvaluatedStep(scope, step, 'edit');
   const source = await loadCaseSource(scope, input.baseAgentRunId, step, 'edit');
   const perturbed = await perturbCase(source, input);
@@ -165,7 +169,7 @@ export async function createPerturbedEvalCase(
     });
 
   return storeCase(scope, {
-    ...step,
+    ...evaluationOwnerOf(step),
     id,
     name: input.name,
     input: perturbed.input,

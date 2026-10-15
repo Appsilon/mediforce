@@ -107,6 +107,8 @@ import {
   DeleteAgentMcpBindingOutputSchema,
   ListAgentMcpBindingsInputSchema,
   ListAgentMcpBindingsOutputSchema,
+  ListAgentVersionsInputSchema,
+  ListAgentVersionsOutputSchema,
   ListAgentOAuthTokensInputSchema,
   ListAgentOAuthTokensOutputSchema,
   GetAgentOAuthTokenInputSchema,
@@ -460,6 +462,8 @@ import {
   type DeleteAgentMcpBindingInput,
   type DeleteAgentMcpBindingOutput,
   type ListAgentMcpBindingsInput,
+  type ListAgentVersionsInput,
+  type ListAgentVersionsOutput,
   type ListAgentMcpBindingsOutput,
   type ListAgentOAuthTokensInput,
   type ListAgentOAuthTokensOutput,
@@ -954,6 +958,8 @@ export class Mediforce {
     listMcpBindings: (
       input: ListAgentMcpBindingsInput,
     ) => Promise<ListAgentMcpBindingsOutput>;
+    /** The Agent's versions, newest first, and the one it has now (ADR-0029). */
+    listVersions: (input: ListAgentVersionsInput) => Promise<ListAgentVersionsOutput>;
     upsertMcpBinding: (
       input: UpsertAgentMcpBindingInput,
     ) => Promise<UpsertAgentMcpBindingOutput>;
@@ -1872,6 +1878,12 @@ export class Mediforce {
         const body = await parseJsonOrThrow(res, 'mediforce.agents.listMcpBindings');
         return ListAgentMcpBindingsOutputSchema.parse(body);
       },
+      listVersions: async (input) => {
+        const v = ListAgentVersionsInputSchema.parse(input);
+        const res = await this.request(`/api/agents/${encodeURIComponent(v.id)}/versions`);
+        const body = await parseJsonOrThrow(res, 'mediforce.agents.listVersions');
+        return ListAgentVersionsOutputSchema.parse(body);
+      },
       upsertMcpBinding: (input) => {
         const v = UpsertAgentMcpBindingInputSchema.parse(input);
         return this.sendJson(
@@ -2663,6 +2675,7 @@ export class Mediforce {
           namespace: validated.namespace,
           workflowName: validated.workflowName,
           stepId: validated.stepId,
+          agentId: validated.agentId,
           includeArchived: validated.includeArchived === undefined ? undefined : String(validated.includeArchived),
         });
         return this.getJson(`/api/evaluation/evaluators${qs}`, ListEvaluatorsOutputSchema, 'mediforce.evaluation.listEvaluators');
@@ -2720,6 +2733,7 @@ export class Mediforce {
           namespace: validated.namespace,
           workflowName: validated.workflowName,
           stepId: validated.stepId,
+          agentId: validated.agentId,
           includeArchived: validated.includeArchived === undefined ? undefined : String(validated.includeArchived),
         });
         return this.getJson(`/api/evaluation/cases${qs}`, ListEvalCasesOutputSchema, 'mediforce.evaluation.listCases');
@@ -2817,6 +2831,7 @@ export class Mediforce {
           namespace: validated.namespace,
           workflowName: validated.workflowName,
           stepId: validated.stepId,
+          agentId: validated.agentId,
           definitionVersion: validated.definitionVersion === undefined ? undefined : String(validated.definitionVersion),
         });
         return this.getJson(`/api/evaluation/qualification${qs}`, GetStepQualificationOutputSchema, 'mediforce.evaluation.getQualification');
@@ -3215,11 +3230,11 @@ export class Mediforce {
 }
 
 function toSearchParams(
-  input: Record<string, string | readonly string[] | undefined>,
+  input: Record<string, string | readonly string[] | null | undefined>,
 ): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(input)) {
-    if (value === undefined) continue;
+    if (value === undefined || value === null) continue;
     if (Array.isArray(value)) {
       for (const item of value) params.append(key, item);
     } else {

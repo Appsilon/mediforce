@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import type { ListStepAgentRunsInputSchema, ListStepAgentRunsOutput } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
-import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
+import { loadEvaluatedStep, stepOnly, stepRef } from './_lib/evaluated-step';
 import { listStepProductionAgentRunsPage } from './_lib/step-agent-runs';
 
 /** What an author harvests Eval Cases from and a preview runs against. */
@@ -10,5 +10,5 @@ export async function listStepAgentRuns(
   scope: CallerScope,
 ): Promise<ListStepAgentRunsOutput> {
   await loadEvaluatedStep(scope, input, 'read');
-  return listStepProductionAgentRunsPage(scope, stepRef(input), input.limit, input.cursor);
+  return listStepProductionAgentRunsPage(scope, stepOnly(stepRef(input), 'Listing production runs'), input.limit, input.cursor);
 }

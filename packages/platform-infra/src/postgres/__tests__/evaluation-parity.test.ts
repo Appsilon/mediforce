@@ -5,11 +5,12 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { InMemoryEvaluationRepository, STEP_FINGERPRINT_COMPONENTS, type StepFingerprint } from '@mediforce/platform-core';
+import { InMemoryEvaluationRepository, STEP_FINGERPRINT_COMPONENTS, evaluationSubjectOf, type StepFingerprint } from '@mediforce/platform-core';
 import type {
   EvalCase,
   EvalRun,
-  EvaluatedStep,
+  EvaluationOwner,
+  EvaluationSubject,
   EvaluationRepository,
   Evaluator,
   EvaluatorVersion,
@@ -24,8 +25,13 @@ const MIGRATIONS_DIR = resolve(__dirname, '..', 'migrations');
 const DATABASE_URL = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const skipPg = !DATABASE_URL;
 
-const step: EvaluatedStep = { namespace: 'ws-1', workflowName: 'ae-grading', stepId: 'grade-aes' };
-const otherStep: EvaluatedStep = { ...step, stepId: 'extract-aes' };
+const step: EvaluationOwner = { namespace: 'ws-1', workflowName: 'ae-grading', stepId: 'grade-aes', agentId: null };
+const otherStep: EvaluationOwner = { ...step, stepId: 'extract-aes' };
+const agent: EvaluationOwner = { namespace: 'ws-1', workflowName: null, stepId: null, agentId: 'ae-grader' };
+
+function subject(owner: EvaluationOwner): EvaluationSubject {
+  return evaluationSubjectOf(owner)!;
+}
 
 function fingerprint(digit: string): StepFingerprint {
   return {
@@ -103,7 +109,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       await repo.appendBrief({ ...base, version: 2, text: 'Grades AEs; a missed grade 5 is critical.', createdAt: '2026-09-23T09:00:00.000Z' });
       await repo.appendBrief({ ...base, ...otherStep, version: 1, text: 'Extracts AEs.', createdAt: '2026-09-23T09:00:00.000Z' });
 
-      expect((await repo.listBriefs(step)).map((brief) => brief.version)).toEqual([2, 1]);
+      expect((await repo.listBriefs(subject(step))).map((brief) => brief.version)).toEqual([2, 1]);
       await expect(repo.appendBrief({ ...base, version: 2, text: 'x', createdAt: '2026-09-23T10:00:00.000Z' })).rejects.toThrow();
     });
 
@@ -160,7 +166,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       await expect(repo.createEvaluator(buildEvaluator({ name: 'alpha' }), buildVersion(randomUUID()))).rejects.toThrow();
       await repo.setEvaluatorArchived(zeta.id, true);
 
-      expect((await repo.listEvaluators(step)).map((row) => [row.name, row.archived]))
+      expect((await repo.listEvaluators(subject(step))).map((row) => [row.name, row.archived]))
         .toEqual([['alpha', false], ['zeta', true]]);
       expect(await repo.getEvaluator(randomUUID())).toBeNull();
     });
@@ -174,7 +180,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       await repo.setEvaluatorRunInProduction(flagged.id, false);
       await repo.setEvaluatorRunInProduction(plain.id, true);
 
-      expect((await repo.listEvaluators(step)).map((row) => [row.name, row.runInProduction]))
+      expect((await repo.listEvaluators(subject(step))).map((row) => [row.name, row.runInProduction]))
         .toEqual([['flagged', false], ['plain', true]]);
     });
 
@@ -205,9 +211,9 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       await repo.createCase(synthesized);
       await repo.setCaseArchived(older.id, true);
 
-      expect(await repo.listCases(step)).toEqual([synthesized, newer, { ...older, archived: true }]);
+      expect(await repo.listCases(subject(step))).toEqual([synthesized, newer, { ...older, archived: true }]);
       expect(await repo.getCase(newer.id)).toEqual(newer);
-      expect(await repo.listCases(otherStep)).toEqual([]);
+      expect(await repo.listCases(subject(otherStep))).toEqual([]);
     });
 
     it('saves Dataset versions, newest first, unique per step', async () => {
@@ -216,7 +222,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       const first = await repo.appendDatasetVersion({ ...base, id: randomUUID(), version: 1, caseIds });
       const second = await repo.appendDatasetVersion({ ...base, id: randomUUID(), version: 2, caseIds: [caseIds[0]!] });
 
-      expect(await repo.listDatasetVersions(step)).toEqual([second, first]);
+      expect(await repo.listDatasetVersions(subject(step))).toEqual([second, first]);
       expect(await repo.getDatasetVersion(first.id)).toEqual(first);
       await expect(repo.appendDatasetVersion({ ...base, id: randomUUID(), version: 2, caseIds })).rejects.toThrow();
     });
@@ -231,6 +237,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         ...step,
         id: randomUUID(),
         definitionVersion: 3,
+        agentVersion: null,
         datasetVersionId: dataset.id,
         caseIds: dataset.caseIds,
         trialsPerCase: 2,
@@ -257,7 +264,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       await repo.createEvalRun(run, trials);
 
       expect(await repo.getEvalRun(run.id)).toEqual(run);
-      expect(await repo.listEvalRuns(step)).toEqual([run]);
+      expect(await repo.listEvalRuns(subject(step))).toEqual([run]);
       expect(await repo.transitionEvalRun(run.id, 'running', { status: 'completed' })).toBe(false);
       expect(await repo.transitionEvalRun(run.id, 'prepared', { status: 'running', startedAt: '2026-09-23T09:00:00.000Z' })).toBe(true);
       expect(await repo.listEvalRunIdsToDrive()).toEqual([run.id]);
@@ -320,8 +327,8 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         ...base, version: 2, origin: 'assistant', criteria: { minPassRate: 0.95, minPassHatK: 0.9 },
       });
 
-      expect(await repo.listAcceptanceCriteria(step)).toEqual([second, first]);
-      expect(await repo.listAcceptanceCriteria(otherStep)).toEqual([]);
+      expect(await repo.listAcceptanceCriteria(subject(step))).toEqual([second, first]);
+      expect(await repo.listAcceptanceCriteria(subject(otherStep))).toEqual([]);
       await expect(repo.appendAcceptanceCriteria({ ...base, version: 2, criteria: { minPassRate: 0.8 } })).rejects.toThrow();
     });
 
@@ -339,6 +346,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         id: randomUUID(),
         evalRunId,
         definitionVersion: 3,
+        agentVersion: null,
         fingerprint: fingerprint('a'),
         evaluators: run.evaluators,
         mcpPolicy: run.mcpPolicy,
@@ -352,18 +360,18 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       const newer = await repo.createQualification(qualification('2026-09-23T11:00:00.000Z', otherRun.id));
       await expect(repo.createQualification(qualification('2026-09-23T12:00:00.000Z'))).rejects.toThrow();
 
-      expect(await repo.listQualifications(step)).toEqual([newer, older]);
-      expect(await repo.listQualifications(otherStep)).toEqual([]);
+      expect(await repo.listQualifications(subject(step))).toEqual([newer, older]);
+      expect(await repo.listQualifications(subject(otherStep))).toEqual([]);
     });
 
     it('replaces a step\'s MCP eval policy', async () => {
-      expect(await repo.getMcpPolicy(step)).toBeNull();
+      expect(await repo.getMcpPolicy(subject(step))).toBeNull();
       await repo.putMcpPolicy({ ...step, servers: { edc: { mode: 'deny' } }, updatedBy: 'author-1', updatedAt: '2026-09-23T08:00:00.000Z' });
       const replaced = { ...step, servers: { edc: { mode: 'live' as const, denyTools: ['write_record'] } }, updatedBy: 'author-2', updatedAt: '2026-09-23T09:00:00.000Z' };
       await repo.putMcpPolicy(replaced);
 
-      expect(await repo.getMcpPolicy(step)).toEqual(replaced);
-      expect(await repo.getMcpPolicy(otherStep)).toBeNull();
+      expect(await repo.getMcpPolicy(subject(step))).toEqual(replaced);
+      expect(await repo.getMcpPolicy(subject(otherStep))).toBeNull();
     });
 
     it('keeps every MCP recording, oldest first, by case and server — the newest few on request — and a trial\'s replay misses', async () => {
@@ -388,20 +396,47 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       const other = recording('meddra', '2026-09-23T08:30:00.000Z', 'term');
       for (const row of [newer, older, other]) await repo.appendMcpRecording(row);
 
-      expect(await repo.listMcpRecordings(step, { caseId, server: 'edc' })).toEqual([older, newer]);
-      expect(await repo.listMcpRecordings(step)).toEqual([older, other, newer]);
-      expect(await repo.listMcpRecordings(otherStep)).toEqual([]);
-      expect(await repo.listMcpRecordings(step, { caseId, server: 'edc', limit: 1 })).toEqual([newer]);
-      const recorded = await repo.listMcpRecordedCases(step);
+      expect(await repo.listMcpRecordings(subject(step), { caseId, server: 'edc' })).toEqual([older, newer]);
+      expect(await repo.listMcpRecordings(subject(step))).toEqual([older, other, newer]);
+      expect(await repo.listMcpRecordings(subject(otherStep))).toEqual([]);
+      expect(await repo.listMcpRecordings(subject(step), { caseId, server: 'edc', limit: 1 })).toEqual([newer]);
+      const recorded = await repo.listMcpRecordedCases(subject(step));
       expect(recorded.sort((left, right) => left.server.localeCompare(right.server)))
         .toEqual([{ server: 'edc', caseId }, { server: 'meddra', caseId }]);
-      expect(await repo.listMcpRecordedCases(otherStep)).toEqual([]);
-      expect(await repo.listMcpRecordedCases(step, { evalRunId: run.id })).toHaveLength(2);
-      expect(await repo.listMcpRecordedCases(step, { evalRunId: randomUUID() })).toEqual([]);
+      expect(await repo.listMcpRecordedCases(subject(otherStep))).toEqual([]);
+      expect(await repo.listMcpRecordedCases(subject(step), { evalRunId: run.id })).toHaveLength(2);
+      expect(await repo.listMcpRecordedCases(subject(step), { evalRunId: randomUUID() })).toEqual([]);
 
       const miss = { server: 'edc', tool: 'read_record', arguments: { subject: '9999' } };
       await repo.transitionTrial(trialId, 'scoring', { status: 'scored', mcpReplayMisses: [miss] });
       expect((await repo.listTrials(run.id))[0]?.mcpReplayMisses).toEqual([miss]);
+    });
+
+    it('keeps an Agent\'s Evaluation apart from a Step\'s in the same workspace', async () => {
+      const stepEvaluator = buildEvaluator({ name: 'grade-present' });
+      const agentEvaluator = buildEvaluator({ ...agent, name: 'grade-present' });
+      await repo.createEvaluator(stepEvaluator, buildVersion(stepEvaluator.id));
+      await repo.createEvaluator(agentEvaluator, buildVersion(agentEvaluator.id));
+      const agentCase = buildCase({ ...agent, source: 'manual', sourceAgentRunId: null });
+      await repo.createCase(buildCase());
+      await repo.createCase(agentCase);
+      const base = { origin: 'user' as const, createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z' };
+      await repo.appendAcceptanceCriteria({ ...step, ...base, version: 1, criteria: { minPassRate: 1 } });
+      await repo.appendAcceptanceCriteria({ ...agent, ...base, version: 1, criteria: { minPassRate: 0.8 } });
+      const dataset = await repo.appendDatasetVersion({
+        ...agent, id: randomUUID(), version: 1, caseIds: [agentCase.id], containsProductionData: false,
+        createdBy: 'author-1', createdAt: '2026-09-23T08:00:00.000Z',
+      });
+      const run: EvalRun = { ...storedRun(dataset.id, [agentCase.id]), ...agent, definitionVersion: null, agentVersion: 2 };
+      await repo.createEvalRun(run, []);
+
+      expect(await repo.listEvaluators(subject(agent))).toEqual([agentEvaluator]);
+      expect(await repo.listEvaluators(subject(step))).toEqual([stepEvaluator]);
+      expect(await repo.listCases(subject(agent))).toEqual([agentCase]);
+      expect((await repo.listAcceptanceCriteria(subject(agent))).map((row) => row.criteria)).toEqual([{ minPassRate: 0.8 }]);
+      expect(await repo.listEvalRuns(subject(agent))).toEqual([run]);
+      expect(await repo.listEvalRuns(subject(step))).toEqual([]);
+      expect(await repo.getEvalRun(run.id)).toEqual(run);
     });
   });
 }
@@ -411,6 +446,7 @@ function storedRun(datasetVersionId: string, caseIds: string[]): EvalRun {
     ...step,
     id: randomUUID(),
     definitionVersion: 3,
+    agentVersion: null,
     datasetVersionId,
     caseIds,
     trialsPerCase: 2,

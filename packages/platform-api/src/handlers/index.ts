@@ -30,6 +30,7 @@ export { bulkArchiveRuns } from './processes/bulk-archive-runs';
 export { createAgent } from './agents/create-agent';
 export { updateAgent } from './agents/update-agent';
 export { deleteAgent } from './agents/delete-agent';
+export { listAgentVersions } from './agents/list-agent-versions';
 export {
   listAgentMcpBindings,
   upsertAgentMcpBinding,

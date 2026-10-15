@@ -8,7 +8,7 @@ import type {
   EvalTrialStatus,
   EvalCase,
   EvalDatasetVersion,
-  EvaluatedStep,
+  EvaluationSubject,
   EvaluationBrief,
   EvaluationRepository,
   Evaluator,
@@ -43,8 +43,8 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
     return this.raw.appendBrief(brief);
   };
 
-  listBriefs = async (step: EvaluatedStep): Promise<EvaluationBrief[]> =>
-    this.canSeeNamespace(step.namespace) ? this.raw.listBriefs(step) : [];
+  listBriefs = async (subject: EvaluationSubject): Promise<EvaluationBrief[]> =>
+    this.canSeeNamespace(subject.namespace) ? this.raw.listBriefs(subject) : [];
 
   createEvaluator = async (evaluator: Evaluator, firstVersion: EvaluatorVersion): Promise<void> => {
     this.assertNamespaceWrite(evaluator.namespace);
@@ -53,8 +53,8 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
 
   getEvaluator = async (id: string): Promise<Evaluator | null> => this.visible(await this.raw.getEvaluator(id));
 
-  listEvaluators = async (step: EvaluatedStep): Promise<Evaluator[]> =>
-    this.canSeeNamespace(step.namespace) ? this.raw.listEvaluators(step) : [];
+  listEvaluators = async (subject: EvaluationSubject): Promise<Evaluator[]> =>
+    this.canSeeNamespace(subject.namespace) ? this.raw.listEvaluators(subject) : [];
 
   /** The versions of an Evaluator the caller can see, oldest first; `[]` when it is not visible. */
   listEvaluatorVersions = async (evaluatorId: string): Promise<EvaluatorVersion[]> =>
@@ -87,8 +87,8 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
 
   getCase = async (id: string): Promise<EvalCase | null> => this.visible(await this.raw.getCase(id));
 
-  listCases = async (step: EvaluatedStep): Promise<EvalCase[]> =>
-    this.canSeeNamespace(step.namespace) ? this.raw.listCases(step) : [];
+  listCases = async (subject: EvaluationSubject): Promise<EvalCase[]> =>
+    this.canSeeNamespace(subject.namespace) ? this.raw.listCases(subject) : [];
 
   setCaseArchived = async (evalCase: EvalCase, archived: boolean): Promise<void> => {
     this.assertNamespaceWrite(evalCase.namespace);
@@ -103,11 +103,11 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   getDatasetVersion = async (id: string): Promise<EvalDatasetVersion | null> =>
     this.visible(await this.raw.getDatasetVersion(id));
 
-  listDatasetVersions = async (step: EvaluatedStep): Promise<EvalDatasetVersion[]> =>
-    this.canSeeNamespace(step.namespace) ? this.raw.listDatasetVersions(step) : [];
+  listDatasetVersions = async (subject: EvaluationSubject): Promise<EvalDatasetVersion[]> =>
+    this.canSeeNamespace(subject.namespace) ? this.raw.listDatasetVersions(subject) : [];
 
-  getMcpPolicy = async (step: EvaluatedStep): Promise<McpEvalPolicy | null> =>
-    this.canSeeNamespace(step.namespace) ? this.raw.getMcpPolicy(step) : null;
+  getMcpPolicy = async (subject: EvaluationSubject): Promise<McpEvalPolicy | null> =>
+    this.canSeeNamespace(subject.namespace) ? this.raw.getMcpPolicy(subject) : null;
 
   putMcpPolicy = async (policy: McpEvalPolicy): Promise<McpEvalPolicy> => {
     this.assertNamespaceWrite(policy.namespace);
@@ -119,27 +119,27 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
     await this.raw.appendMcpRecording(recording);
   };
 
-  listMcpRecordings = async (step: EvaluatedStep, filter?: McpRecordingFilter): Promise<McpRecording[]> =>
-    this.canSeeNamespace(step.namespace) ? this.raw.listMcpRecordings(step, filter) : [];
+  listMcpRecordings = async (subject: EvaluationSubject, filter?: McpRecordingFilter): Promise<McpRecording[]> =>
+    this.canSeeNamespace(subject.namespace) ? this.raw.listMcpRecordings(subject, filter) : [];
 
-  listMcpRecordedCases = async (step: EvaluatedStep, filter?: McpRecordedCaseFilter): Promise<McpRecordedCase[]> =>
-    this.canSeeNamespace(step.namespace) ? this.raw.listMcpRecordedCases(step, filter) : [];
+  listMcpRecordedCases = async (subject: EvaluationSubject, filter?: McpRecordedCaseFilter): Promise<McpRecordedCase[]> =>
+    this.canSeeNamespace(subject.namespace) ? this.raw.listMcpRecordedCases(subject, filter) : [];
 
   appendAcceptanceCriteria = async (criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> => {
     this.assertNamespaceWrite(criteria.namespace);
     return this.raw.appendAcceptanceCriteria(criteria);
   };
 
-  listAcceptanceCriteria = async (step: EvaluatedStep): Promise<AcceptanceCriteriaVersion[]> =>
-    this.canSeeNamespace(step.namespace) ? this.raw.listAcceptanceCriteria(step) : [];
+  listAcceptanceCriteria = async (subject: EvaluationSubject): Promise<AcceptanceCriteriaVersion[]> =>
+    this.canSeeNamespace(subject.namespace) ? this.raw.listAcceptanceCriteria(subject) : [];
 
   createQualification = async (qualification: StepQualification): Promise<StepQualification> => {
     this.assertNamespaceWrite(qualification.namespace);
     return this.raw.createQualification(qualification);
   };
 
-  listQualifications = async (step: EvaluatedStep): Promise<StepQualification[]> =>
-    this.canSeeNamespace(step.namespace) ? this.raw.listQualifications(step) : [];
+  listQualifications = async (subject: EvaluationSubject): Promise<StepQualification[]> =>
+    this.canSeeNamespace(subject.namespace) ? this.raw.listQualifications(subject) : [];
 
   createEvalRun = async (run: EvalRun, trials: readonly EvalTrial[]): Promise<void> => {
     this.assertNamespaceWrite(run.namespace);
@@ -148,8 +148,8 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
 
   getEvalRun = async (id: string): Promise<EvalRun | null> => this.visible(await this.raw.getEvalRun(id));
 
-  listEvalRuns = async (step: EvaluatedStep): Promise<EvalRun[]> =>
-    this.canSeeNamespace(step.namespace) ? this.raw.listEvalRuns(step) : [];
+  listEvalRuns = async (subject: EvaluationSubject): Promise<EvalRun[]> =>
+    this.canSeeNamespace(subject.namespace) ? this.raw.listEvalRuns(subject) : [];
 
   /** The Eval Runs the heartbeat moves on, across workspaces — system actors only. */
   listEvalRunIdsToDrive = async (): Promise<string[]> =>

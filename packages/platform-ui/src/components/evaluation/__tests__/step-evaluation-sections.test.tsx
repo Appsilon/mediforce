@@ -108,7 +108,7 @@ describe('toEvaluatorName', () => {
 });
 
 describe('EvaluatorsSection', () => {
-  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
 
   function openForm() {
     render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [] } } as never} mayEdit={true} />);
@@ -208,7 +208,7 @@ describe('EvaluatorsSection', () => {
 });
 
 describe('The output schema check', () => {
-  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
 
   it('asks only for the JSON Schema, under a fixed name', () => {
     evaluation.createEvaluator.mockClear();
@@ -238,7 +238,7 @@ describe('The output schema check', () => {
 });
 
 describe('Evaluator view and edit', () => {
-  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
   const version = {
     evaluatorId: '5b0f2f3e-8f5c-4c55-9d0a-3f1f7c1b2a10', version: 1, rule: 'Every grade is justified.',
     check: { kind: 'llm_judge', model: 'anthropic/claude-sonnet-4', rubric: 'Is every grade justified?', minConfidence: 0.75 },
@@ -281,7 +281,7 @@ describe('Evaluator view and edit', () => {
 });
 
 describe('Adding an Eval Case from a production run', () => {
-  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
   const agentRun = (id: string, summary: string) => ({
     id, status: 'completed', fallbackReason: null, startedAt: '2026-09-24T08:00:00.000Z', envelope: { reasoning_summary: summary },
   });
@@ -373,7 +373,7 @@ const EXPECTED_OUTPUT_CHECK = evaluatorOf('e-expected', 'matches-expected', 'exp
 const SCHEMA_CHECK = evaluatorOf('e-schema', 'findings-present', 'schema');
 
 describe('Eval Case view and edit', () => {
-  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
   const withCase = (evalCase: unknown, evaluators: unknown[] = [EXPECTED_OUTPUT_CHECK, SCHEMA_CHECK]) => ({
     cases: { isLoading: false, data: { cases: [evalCase] } },
     agentRuns: { data: { pages: [] }, hasNextPage: false },
@@ -519,7 +519,7 @@ describe('Eval Case view and edit', () => {
 });
 
 describe('Adding an Eval Case by hand', () => {
-  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
   const withCases = (cases: unknown[]) => ({
     cases: { isLoading: false, data: { cases } },
     agentRuns: { data: { pages: [] }, hasNextPage: false },
@@ -589,7 +589,7 @@ describe('Adding an Eval Case by hand', () => {
 });
 
 describe('Saving a Dataset', () => {
-  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
   const datasetOf = (version: number, caseIds: string[]) => ({
     ...step, id: `d-${version}`, version, caseIds, containsProductionData: true, createdBy: 'author-1', createdAt: '2026-09-24T09:00:00.000Z',
   });
@@ -638,7 +638,7 @@ describe('Saving a Dataset', () => {
 });
 
 describe('AcceptanceCriteriaSection', () => {
-  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
   const criteriaOf = (criteria: unknown) => ({ isLoading: false, data: { criteria: criteria === null ? null : { version: 2, criteria, origin: 'user', createdBy: 'author-1' } } }) as never;
   const qualificationOf = (status: string, changed: string[] = [], validation: Record<string, unknown> = { status: 'not_verified', evalRunId: null, reason: 'No Eval Run of version 1 has finished yet.', runInProgress: false }) => ({
     isLoading: false,
@@ -720,7 +720,7 @@ describe('AcceptanceCriteriaSection', () => {
 });
 
 describe('Starting an Eval Run', () => {
-  const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+  const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
   const dataset = { ...step, id: 'd-1', version: 1, caseIds: ['c-1'], containsProductionData: true, createdBy: 'author-1', createdAt: '2026-09-24T09:00:00.000Z' };
   const renderRuns = (cases: unknown[], datasets: unknown[]) => render(
     <EvalRunsSection

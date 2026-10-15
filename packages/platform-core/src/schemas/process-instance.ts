@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { WorkflowDefinitionSchema } from './workflow-definition';
 
 export const InstanceStatusSchema = z.enum([
   'created',
@@ -87,6 +88,12 @@ export const ProcessInstanceSchema = z.object({
    * leave these out.
    */
   evalRunId: z.string().min(1).optional(),
+  /**
+   * The single-step Definition an Agent's eval trial runs (ADR-0029), which no
+   * stored Workflow holds; its run reads it instead of loading
+   * `definitionName`. Absent on every other run.
+   */
+  evalDefinition: WorkflowDefinitionSchema.optional(),
   /** Commit on the workflow's bare repo the run branch starts from, instead of the default branch. */
   workspaceStartCommit: z.string().min(1).optional(),
 });

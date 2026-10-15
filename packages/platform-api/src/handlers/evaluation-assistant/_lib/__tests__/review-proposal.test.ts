@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { EvaluatedStep } from '@mediforce/platform-core';
+import type { EvaluationSubject } from '@mediforce/platform-core';
 import { userCaller } from '../../../../repositories/__tests__/create-test-scope';
 import { createEvaluator } from '../../../evaluation/evaluators';
 import { createEvalCase } from '../../../evaluation/eval-cases';
@@ -98,7 +98,7 @@ describe('reviewEvaluationProposal', () => {
     }, scope);
     await saveEvalDataset(STEP, scope);
     const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 1 }, scope);
-    const propose = (step: EvaluatedStep = STEP) => reviewEvaluationProposal('propose_control_settings', {
+    const propose = (step: EvaluationSubject = STEP) => reviewEvaluationProposal('propose_control_settings', {
       evalRunId: evalRun.id, autonomyLevel: 'L3', rationale: 'Criteria missed.',
     }, scope, step, []);
 
@@ -128,7 +128,7 @@ describe('reviewEvaluationProposal', () => {
     it('offers a diagnosis only over trials of that run', async () => {
       const { scope, evalRun, trials } = await preparedRun();
       const [trial] = trials;
-      const diagnose = (trialIds: string[], step: EvaluatedStep = STEP) =>
+      const diagnose = (trialIds: string[], step: EvaluationSubject = STEP) =>
         reviewEvaluationProposal('propose_diagnosis', { evalRunId: evalRun.id, clusters: [cluster(trialIds)] }, scope, step, []);
 
       expect(await diagnose([trial!.id])).toEqual({ ok: true });

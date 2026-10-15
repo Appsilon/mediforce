@@ -16,7 +16,7 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
   useStepQualification: () => ({ data: { history: history.current } }),
 }));
 
-const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
 const outputWith = (status: 'met' | 'missed') => ({
   evalRun: { id: 'run-1', status: 'completed', definitionVersion: 1, acceptanceCriteria: { minPassRate: 1 }, fingerprint: { hash: 'f' } },
   report: {

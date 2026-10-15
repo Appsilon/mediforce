@@ -3,6 +3,7 @@ import type { CallerScope } from '../../repositories/index';
 import { actorFromCaller } from '../_helpers';
 import { assertAgentMayHoldSkills } from '../skills/may-hold-skills';
 import { assertBindingsTargetCatalogEntries } from './mcp-bindings';
+import { recordAgentVersion } from './_lib/agent-version';
 
 // Body is merged into input by the route adapter — see route.ts for the
 // inputFromRequest shape. Wrapper enforces namespace-write on the existing
@@ -23,6 +24,7 @@ export async function updateAgent(
     if (touchesBindings) await assertBindingsTargetCatalogEntries(scope, merged.namespace, merged.mcpServers);
   }
   const agent = await scope.agentDefinitions.update(input.id, input.body);
+  await recordAgentVersion(scope, agent);
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
     ...actor,

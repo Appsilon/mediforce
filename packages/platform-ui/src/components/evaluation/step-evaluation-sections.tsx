@@ -24,7 +24,7 @@ import {
   type EvalCaseExpectation,
   type EvalCaseInput,
   type EvalDatasetVersion,
-  type EvaluatedStep,
+  type EvaluationSubject,
   type EvaluatorCheck,
   type StepFingerprintComponent,
 } from '@mediforce/platform-core';
@@ -45,6 +45,7 @@ import { useAgentRunIo, useEvalRunEstimate, useStepEvaluation, useStepEvaluation
 import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { formatCostUsd } from '@/lib/format';
 import { routes } from '@/lib/routes';
+import { evalRunHref } from '@/lib/evaluation-subject';
 import { AcceptanceBadge, EvalRunStatusBadge } from './eval-run-badges';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 import { VALIDATION_STATUS } from './validation-status';
@@ -94,7 +95,7 @@ const OUTPUT_SCHEMA_NAME = 'output-schema';
 const OUTPUT_SCHEMA_RULE = 'The output matches the JSON Schema.';
 
 function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   evaluator: EvaluatorView;
   mayEdit: boolean;
   stepOutputSchema: AgentOutputSchema | undefined;
@@ -139,7 +140,9 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
             'mt-1 inline-block rounded px-1.5 py-0.5 text-[11px] font-medium',
             evaluator.trust.trusted ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
           )}>{evaluator.trust.trusted ? 'Counts' : `Not counted — ${evaluator.trust.reason}`}</span>
-          {check.kind === 'expected_output' ? (
+          {step.kind === 'agent' ? (
+            <p className="mt-1.5 text-xs text-muted-foreground">Checks this agent&apos;s Eval Runs; production runs belong to the workflow steps that use it.</p>
+          ) : check.kind === 'expected_output' ? (
             <p className="mt-1.5 text-xs text-muted-foreground">Only checks cases that have an expected output; never runs in production.</p>
           ) : <label className="mt-1.5 flex items-center gap-1.5 text-xs" data-testid="evaluator-production">
             <input
@@ -330,7 +333,7 @@ function EvaluatorForm({ initial, editing = false, schemaTaken = false, stepOutp
 
 /** The Step's Evaluators with whether each counts (D9); code source is approved here, by a person. */
 export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   data: StepEvaluation['evaluators'];
   mayEdit: boolean;
   /** The step's `agent.outputSchema`, offered as the start of a schema check. */
@@ -788,7 +791,7 @@ function CaseExpectationMark({ evalCase }: { evalCase: EvalCase }) {
 
 /** One Eval Case: what it expects, which Evaluators grade it, editing and removing it, and in its details what it gives the step and expects. */
 function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSelect }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   evalCase: EvalCase;
   evaluators: readonly EvaluatorView[];
   mayEdit: boolean;
@@ -929,7 +932,7 @@ export function caseFromFile(text: string): { values: Partial<CaseFormValues> } 
  * step is given, from a `.json` file, or from an empty input.
  */
 function AddCase({ step, evaluation, cases, evaluators, onClose }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   evaluation: StepEvaluation;
   cases: readonly EvalCase[];
   evaluators: readonly EvaluatorView[];
@@ -949,7 +952,7 @@ function AddCase({ step, evaluation, cases, evaluators, onClose }: {
   const template = fromFile === null ? cases.find((evalCase) => caseOption(evalCase.id) === startFrom) : undefined;
   const runIo = useAgentRunIo(run?.id ?? null);
   const createFromRun = useStepEvaluationMutation(step, ({ agentRunId, values }: { agentRunId: string; values: CaseFormResult }) =>
-    mediforce.evaluation.createCaseFromAgentRun({ agentRunId, step, ...values }));
+    mediforce.evaluation.createCaseFromAgentRun({ agentRunId, ...(step.kind === 'step' ? { step } : {}), ...values }));
   const create = useStepEvaluationMutation(step, (values: CaseFormResult) => mediforce.evaluation.createCase({
     ...step,
     ...values,
@@ -1146,7 +1149,7 @@ function DatasetStatus({ cases, datasets }: { cases: readonly EvalCase[]; datase
  * as any case edit does; a case that already has the selection is left alone.
  */
 function SetCaseEvaluators({ step, cases, evaluators, onDone }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   cases: readonly EvalCase[];
   evaluators: readonly EvaluatorView[];
   onDone: () => void;
@@ -1178,7 +1181,7 @@ function SetCaseEvaluators({ step, cases, evaluators, onDone }: {
 
 /** Eval Cases, added from production runs, by hand or by the assistant, and the Dataset versions Save snapshots them into. */
 export function CasesSection({ step, evaluation, mayEdit }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   evaluation: StepEvaluation;
   mayEdit: boolean;
 }) {
@@ -1434,7 +1437,7 @@ function ValidationReason({ validation }: { validation: StepValidation }) {
  * a dialog; the next Eval Run takes the one in force.
  */
 export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEdit }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   criteria: StepEvaluation['criteria'];
   qualification: StepEvaluation['qualification'];
   mayEdit: boolean;
@@ -1481,7 +1484,7 @@ export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEd
           <ValidationReason validation={status.validation} />{status.validation.runInProgress && ' An Eval Run is running; this updates when it ends.'}
           {status.validation.status === 'awaiting_approval' && status.validation.evalRunId !== null && (
             <Link
-              href={routes.workflowEvalRun(step.namespace, step.workflowName, status.validation.evalRunId)}
+              href={evalRunHref(step, status.validation.evalRunId)}
               className="ml-2 inline-flex items-center gap-0.5 font-medium text-primary hover:underline"
               data-testid="review-eval-run"
             >
@@ -1565,7 +1568,7 @@ function StartEvalRunDialog({ trials, estimatedUsd, budget, starting, error, onS
  * the CLI: the person starts it by confirming the budget shown (D15).
  */
 export function StartEvalRunCard({ step, prepared, otherVersion, mayRun, runReason }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   prepared: PreparedEvalRun;
   /** The workflow version the run was prepared for, when it is not the one shown. */
   otherVersion?: number;
@@ -1623,17 +1626,20 @@ function parseBudgetUsd(text: string): number | null {
 }
 
 /**
- * Start, confirm and read the Step's Eval Runs. Starting one is the workflow's
- * `run` verb; signing a qualification from a report is its `edit` verb.
+ * Start, confirm and read the Step's Eval Runs — or an Agent's, each of which
+ * assesses the Agent version it had when prepared (ADR-0029). Starting one is
+ * the workflow's `run` verb; signing a qualification from a report is its
+ * `edit` verb.
  */
 export function EvalRunsSection({ step, definitionVersion, data, datasets, cases, mayRun, runReason }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   /**
    * The workflow version whose step a new run runs. Its finished runs are
    * listed; a prepared or running run of any version stays listed, so it can
-   * be started or followed from here.
+   * be started or followed from here. Null for an Agent: every run of it is
+   * listed, with the Agent version it assessed.
    */
-  definitionVersion: number;
+  definitionVersion: number | null;
   data: StepEvaluation['runs'];
   /** The Step's saved Dataset versions, newest first: the one a new run takes, and the one each run ran. */
   datasets: StepEvaluation['datasets'];
@@ -1658,7 +1664,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
   const start = useStepEvaluationMutation(step, async () => {
     const prepared = await mediforce.evaluation.prepareRun({
       ...step,
-      definitionVersion,
+      ...(definitionVersion === null ? {} : { definitionVersion }),
       trialsPerCase: trials ?? undefined,
       ...(budgetUsd === null ? {} : { budgetUsd }),
     });
@@ -1670,8 +1676,13 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
       : estimate.data === undefined ? '(estimating…)'
         : estimate.data.estimate.totalUsd === null ? '(no estimate)'
           : `(estimated ${formatCostUsd(estimate.data.estimate.totalUsd)})`;
-  const runs = (data.data?.evalRuns ?? []).filter((run) => run.definitionVersion === definitionVersion || run.status === 'prepared' || run.status === 'running');
-  const otherVersion = (run: { definitionVersion: number }) => (run.definitionVersion === definitionVersion ? undefined : run.definitionVersion);
+  const runs = (data.data?.evalRuns ?? []).filter((run) =>
+    step.kind === 'agent' || run.definitionVersion === definitionVersion || run.status === 'prepared' || run.status === 'running');
+  const otherVersion = (run: { definitionVersion: number | null; agentVersion: number | null }) => (
+    step.kind === 'agent'
+      ? run.agentVersion ?? undefined
+      : run.definitionVersion === definitionVersion ? undefined : run.definitionVersion ?? undefined
+  );
   const datasetVersion = new Map(versions.map((dataset) => [dataset.id, dataset.version]));
   // Prepared by the assistant or from the CLI, or left when starting one failed: each waits for a person to confirm its budget.
   const waiting: { prepared: PreparedEvalRun; otherVersion: number | undefined }[] = runs.filter((run) => run.status === 'prepared').map((run) => ({
@@ -1723,7 +1734,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
       )}
       {waiting.map((run) => <StartEvalRunCard key={run.prepared.evalRunId} step={step} prepared={run.prepared} otherVersion={run.otherVersion} mayRun={mayRun} runReason={runReason} />)}
       {data.isLoading ? <Loading /> : runs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No Eval Runs of v{definitionVersion} yet.</p>
+        <p className="text-sm text-muted-foreground">{step.kind === 'agent' ? 'No Eval Runs of this agent yet.' : `No Eval Runs of v${definitionVersion} yet.`}</p>
       ) : (
         <div className="overflow-x-auto rounded-md border">
           <table className="w-full text-sm" data-testid="eval-runs-table">
@@ -1747,7 +1758,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
                 <tr key={run.id} className="border-b last:border-0 hover:bg-muted/30" data-testid="eval-run-row">
                   <td className="px-3 py-2 font-mono text-xs">
                     {run.id.slice(0, 8)}
-                    {otherVersion(run) !== undefined && <span className="ml-1.5 text-muted-foreground">v{run.definitionVersion}</span>}
+                    {otherVersion(run) !== undefined && <span className="ml-1.5 text-muted-foreground">{step.kind === 'agent' ? 'agent ' : ''}v{otherVersion(run)}</span>}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground" title={run.createdAt}>
                     {formatDistanceToNow(new Date(run.createdAt), { addSuffix: true })}
@@ -1757,7 +1768,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
                   <td className="px-3 py-2 text-xs">{datasetVersion.has(run.datasetVersionId) ? `v${datasetVersion.get(run.datasetVersionId)}` : '—'}</td>
                   <td className="px-3 py-2"><AcceptanceBadge acceptance={run.acceptance} /></td>
                   <td className="px-3 py-2 text-right">
-                    <Link href={routes.workflowEvalRun(step.namespace, step.workflowName, run.id)} className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline">
+                    <Link href={evalRunHref(step, run.id)} className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline">
                       Details <ChevronRight className="h-3 w-3" />
                     </Link>
                   </td>

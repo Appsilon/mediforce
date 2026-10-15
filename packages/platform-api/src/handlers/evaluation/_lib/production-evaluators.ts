@@ -21,7 +21,7 @@ interface ProductionEvaluator {
 
 /** The step's Evaluators that score live runs now: flagged, not archived, latest version counted (D9, D13). */
 export async function listProductionEvaluators(scope: CallerScope, step: EvaluatedStep): Promise<ProductionEvaluator[]> {
-  const flagged = (await scope.evaluation.listEvaluators(step))
+  const flagged = (await scope.evaluation.listEvaluators({ kind: 'step', ...step }))
     .filter((evaluator) => evaluator.runInProduction === true && evaluator.archived === false);
   const active: ProductionEvaluator[] = [];
   for (const evaluator of flagged) {
@@ -35,7 +35,7 @@ export async function listProductionEvaluators(scope: CallerScope, step: Evaluat
 
 /** Whether the step has any Evaluator marked for production, counted or not — one cheap query for the runner to skip the gate. */
 export async function hasProductionEvaluators(scope: CallerScope, step: EvaluatedStep): Promise<boolean> {
-  return (await scope.evaluation.listEvaluators(step))
+  return (await scope.evaluation.listEvaluators({ kind: 'step', ...step }))
     .some((evaluator) => evaluator.runInProduction === true && evaluator.archived === false);
 }
 

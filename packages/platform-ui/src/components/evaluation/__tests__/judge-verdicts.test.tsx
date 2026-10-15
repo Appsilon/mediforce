@@ -14,7 +14,7 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
 const evaluation = vi.hoisted(() => ({ reviewJudgeVerdict: vi.fn() }));
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
 
-const step = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
 const EVAL_RUN = '7e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
 
 function verdictOf(overrides: Partial<JudgeVerdict>): JudgeVerdict {

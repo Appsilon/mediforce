@@ -4,7 +4,7 @@ import {
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   SKILL_MANIFEST_PATH,
   type Evaluator,
-  type EvaluatedStep,
+  type EvaluationSubject,
   type EvaluationAssistantPlatformToolName,
   type WorkflowDefinition,
   type WorkflowStep,
@@ -24,7 +24,7 @@ import { getMcpEvalPolicy } from '../../evaluation/mcp-eval-policy';
 import { listStepAgentRuns } from '../../evaluation/step-agent-runs';
 import { loadEvaluationSubject } from '../../evaluation/_lib/evaluation-subject';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
-import { isSameStep } from '../../evaluation/_lib/evaluated-step';
+import { isSameStep, stepOnly } from '../../evaluation/_lib/evaluated-step';
 import { loadEvaluator } from '../../evaluation/_lib/evaluator-view';
 import { isBinary } from '../../evaluation/_lib/workspace-seed';
 import { HUMAN_VERDICT_SCORE_NAME } from '../../scores/record-human-verdict';
@@ -92,7 +92,7 @@ function upstreamSteps(definition: WorkflowDefinition, stepId: string): Workflow
  * a trial do with the server. A configuration production refuses is reported
  * as such: the step does not start.
  */
-async function effectiveMcpServers(scope: CallerScope, step: EvaluatedStep, workflowStep: WorkflowStep) {
+async function effectiveMcpServers(scope: CallerScope, step: EvaluationSubject, workflowStep: WorkflowStep) {
   const [{ servers }, production] = await Promise.all([
     getMcpEvalPolicy(step, scope),
     resolveMcpForStep(workflowStep, {
@@ -116,7 +116,7 @@ async function effectiveMcpServers(scope: CallerScope, step: EvaluatedStep, work
 }
 
 /** An Evaluator of this step — any other reads as missing. */
-export async function loadStepEvaluator(scope: CallerScope, step: EvaluatedStep, evaluatorId: string): Promise<Evaluator> {
+export async function loadStepEvaluator(scope: CallerScope, step: EvaluationSubject, evaluatorId: string): Promise<Evaluator> {
   const evaluator = await loadEvaluator(scope, evaluatorId);
   if (isSameStep(evaluator, step) === false) {
     throw new NotFoundError(`Evaluator '${evaluatorId}' is not an Evaluator of this step`);
@@ -125,7 +125,7 @@ export async function loadStepEvaluator(scope: CallerScope, step: EvaluatedStep,
 }
 
 /** An Eval Run of this step, with its trials and report — any other reads as missing. */
-async function loadStepEvalRun(scope: CallerScope, step: EvaluatedStep, evalRunId: string) {
+async function loadStepEvalRun(scope: CallerScope, step: EvaluationSubject, evalRunId: string) {
   const output = await getEvalRun({ evalRunId }, scope);
   const { evalRun } = output;
   if (isSameStep(evalRun, step) === false) {
@@ -146,7 +146,7 @@ export interface UnattendedGrant {
 }
 
 export interface EvaluationToolContext {
-  readonly step: EvaluatedStep;
+  readonly step: EvaluationSubject;
   readonly definition: WorkflowDefinition;
   readonly workflowStep: WorkflowStep;
   /** Present only when the request was granted an unattended budget. */
@@ -192,7 +192,7 @@ export async function executeEvaluationTool(
     }
     case 'list_step_runs': {
       const { limit } = args as Args<'list_step_runs'>;
-      const { runs } = await listStepAgentRuns({ ...step, limit: limit ?? 10 }, scope);
+      const { runs } = await listStepAgentRuns({ ...stepOnly(step, 'Listing production runs'), limit: limit ?? 10 }, scope);
       const reviewed = await Promise.all(runs.map(async (run) => ({
         run,
         verdict: (await scope.scores.list({ agentRunId: run.id, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 }))[0] ?? null,
@@ -235,7 +235,7 @@ export async function executeEvaluationTool(
     }
     case 'list_workspace_files': {
       const { agentRunId } = args as Args<'list_workspace_files'>;
-      const source = await loadCaseSource(scope, agentRunId, step, 'read');
+      const source = await loadCaseSource(scope, agentRunId, stepOnly(step, 'Reading a production workspace'), 'read');
       if (source.bareRepoPath === null || source.workspaceSeedCommit === null) {
         return { files: [], note: 'This run had no workspace; a case from it starts from an empty one.' };
       }
@@ -244,7 +244,7 @@ export async function executeEvaluationTool(
     }
     case 'read_workspace_file': {
       const { agentRunId, path } = args as Args<'read_workspace_file'>;
-      const source = await loadCaseSource(scope, agentRunId, step, 'read');
+      const source = await loadCaseSource(scope, agentRunId, stepOnly(step, 'Reading a production workspace'), 'read');
       const content = source.bareRepoPath === null || source.workspaceSeedCommit === null
         ? null
         : await readCommitFile(source.bareRepoPath, source.workspaceSeedCommit, path);
@@ -310,7 +310,7 @@ export async function executeEvaluationTool(
     }
     case 'preview_evaluator': {
       const { check, agentRunIds } = args as Args<'preview_evaluator'>;
-      return previewEvaluator({ ...step, check, limit: 5, ...(agentRunIds === undefined ? {} : { agentRunIds }) }, scope);
+      return previewEvaluator({ ...stepOnly(step, 'A preview'), check, limit: 5, ...(agentRunIds === undefined ? {} : { agentRunIds }) }, scope);
     }
     case 'get_qualification': {
       const [qualification, { criteria }] = await Promise.all([
@@ -338,7 +338,7 @@ export async function executeEvaluationTool(
       const { trialsPerCase, budgetUsd } = args as Args<'prepare_eval_run'>;
       const { evalRun } = await prepareEvalRun({
         ...step,
-        definitionVersion: definition.version,
+        ...(step.kind === 'step' ? { definitionVersion: definition.version } : {}),
         trialsPerCase: trialsPerCase ?? 3,
         concurrency: 2,
         ...(budgetUsd === undefined ? {} : { budgetUsd }),

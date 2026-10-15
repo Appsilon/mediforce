@@ -7,7 +7,7 @@ import {
   type AcceptanceCriterionVerdict,
   type QualificationDecision,
   type EvalRunReport,
-  type EvaluatedStep,
+  type EvaluationSubject,
   type JudgeVerdict,
 } from '@mediforce/platform-core';
 import type { EvalRunOutput } from '@mediforce/platform-api/contract';
@@ -145,7 +145,7 @@ function computedOutcome(verdict: AcceptanceCriterionVerdict): 'passed' | 'faile
  * means.
  */
 function SignQualificationForm({ step, evalRunId, verdict, decision, onDone }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   evalRunId: string;
   verdict: AcceptanceCriterionVerdict;
   decision: QualificationDecision;
@@ -209,14 +209,14 @@ const DECISION_EXPLANATION = 'A person signs off every Eval Run. The step\'s val
  */
 export function EvalRunSummary({ output, step, mayEdit, editReason }: {
   output: EvalRunOutput;
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   mayEdit: boolean;
   editReason: string | undefined;
 }) {
   const { evalRun, report } = output;
   const [signing, setSigning] = React.useState<QualificationDecision | null>(null);
   const blocked = signingBlocked(output, mayEdit, editReason);
-  const qualification = useStepQualification(step, evalRun.definitionVersion);
+  const qualification = useStepQualification(step, evalRun.definitionVersion ?? undefined);
   const signed = qualification.data?.history.find((candidate) => candidate.evalRunId === evalRun.id);
   const verdict = report.criteriaVerdict;
   return (

@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Check, X } from 'lucide-react';
 import {
   describeAcceptanceCriteria,
-  type EvaluatedStep,
+  type EvaluationSubject,
 } from '@mediforce/platform-core';
 import type { EvaluatorSelfTest, ProposalView } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
@@ -43,7 +43,7 @@ const TITLES: Record<DecidableProposal['tool'], string> = {
 };
 
 /** Accepting a proposal is the same write a person's own form makes, marked as the assistant's. */
-async function acceptProposal(step: EvaluatedStep, proposal: DecidableProposal): Promise<unknown> {
+async function acceptProposal(step: EvaluationSubject, proposal: DecidableProposal): Promise<unknown> {
   switch (proposal.tool) {
     case 'propose_evaluator': {
       const { rationale: _rationale, ...evaluator } = proposal.arguments;
@@ -56,11 +56,13 @@ async function acceptProposal(step: EvaluatedStep, proposal: DecidableProposal):
     case 'propose_eval_case': {
       const { agentRunId, input, rationale: _rationale, ...written } = proposal.arguments;
       return agentRunId !== undefined
-        ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, step, ...written, origin: 'assistant' })
+        ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, ...(step.kind === 'step' ? { step } : {}), ...written, origin: 'assistant' })
         : mediforce.evaluation.createCase({ ...step, ...written, input: input!, origin: 'assistant' });
     }
     case 'propose_perturbed_case': {
       const { rationale: _rationale, ...synthesized } = proposal.arguments;
+      // The assistant proposes no perturbed case for an Agent, which has no production run to perturb (ADR-0029).
+      if (step.kind === 'agent') throw new Error('An agent evaluated on its own has no production run to perturb');
       return mediforce.evaluation.createPerturbedCase({ ...step, ...synthesized, origin: 'assistant' });
     }
     case 'propose_brief':
@@ -117,7 +119,7 @@ function perturbedCaseSummary(proposal: Proposal<'propose_perturbed_case'>['argu
   ].join('\n');
 }
 
-function ProposalSummary({ step, proposal }: { step: EvaluatedStep; proposal: DecidableProposal }) {
+function ProposalSummary({ step, proposal }: { step: EvaluationSubject; proposal: DecidableProposal }) {
   const evaluators = useStepEvaluators(step);
   switch (proposal.tool) {
     case 'propose_brief':
@@ -151,7 +153,7 @@ function ProposalSummary({ step, proposal }: { step: EvaluatedStep; proposal: De
 }
 
 export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   state: { proposal: DecidableProposal; status: ProposalStatus };
   mayEdit: boolean;
   editReason: string | undefined;
@@ -204,7 +206,7 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
  * picks a risk and the assistant drafts, previews and proposes its check.
  */
 export function PlanCard({ step, plan, onDraft, busy, mayEdit, editReason }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   plan: Proposal<'propose_evaluation_plan'>['arguments'];
   onDraft: (message: string) => void;
   busy: boolean;

@@ -8,7 +8,7 @@ describe('loadCaseSource', () => {
     const fixture = await evaluationFixture();
     const source = await loadCaseSource(fixture.scope(), GRADED_RUN, STEP, 'read');
     expect(source).toMatchObject({
-      step: STEP,
+      step: { namespace: STEP.namespace, workflowName: STEP.workflowName, stepId: STEP.stepId },
       input: {
         triggerPayload: { studyId: 'CDISCPILOT01' },
         previousStepOutputs: { 'extract-aes': { events: [{ term: 'Sepsis', outcome: 'fatal' }] } },

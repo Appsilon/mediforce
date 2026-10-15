@@ -7,6 +7,7 @@ import { storeEvalRunAcceptance } from './eval-run-report';
 import { loadModelPrices } from './model-prices';
 import { runEvaluatorCheck } from './run-evaluator-check';
 import { evaluatorsOfCase, judgeConfidenceMetadata, scoresOfTrial } from './trial-scores';
+import { loadEvaluatedStep, runVersionOf, stepRef, trialStepId } from './evaluated-step';
 
 /**
  * How long a driver may hold a trial — between claiming it and creating its
@@ -34,7 +35,7 @@ function schedulingOrder(trials: readonly EvalTrial[]): EvalTrial[] {
 /** What the trial's step execution recorded of its Agent Run: cost, tokens, duration. */
 async function trialAgentOutput(scope: CallerScope, run: EvalRun, instanceId: string): Promise<AgentOutputSnapshot | null> {
   const execution = (await scope.runs.getStepExecutions(instanceId))
-    .filter((candidate) => candidate.stepId === run.stepId)
+    .filter((candidate) => candidate.stepId === trialStepId(run))
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt))[0];
   return execution?.agentOutput ?? null;
 }
@@ -70,7 +71,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
   const instanceId = trial.processInstanceId!;
   const instance = await scope.runs.getById(instanceId);
   const agentRun = (await scope.agentRuns.getByInstanceId(instanceId))
-    .filter((candidate) => candidate.stepId === run.stepId && candidate.status !== 'running')
+    .filter((candidate) => candidate.stepId === trialStepId(run) && candidate.status !== 'running')
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt))[0];
 
   if (agentRun === undefined) {
@@ -138,7 +139,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
       },
       namespace: run.namespace,
       processInstanceId: instanceId,
-      stepId: run.stepId,
+      stepId: trialStepId(run),
       evaluatorId: frozen.evaluatorId,
       supersedes: null,
       basis: `Evaluator '${frozen.name}' v${frozen.version} on Eval Run '${run.id}' (ADR-0023)`,
@@ -179,12 +180,15 @@ async function startTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
     return;
   }
   try {
+    // An Agent's trial runs the single-step Definition its run assessed, which no stored Workflow holds (ADR-0029).
+    const target = run.agentId === null ? null : await loadEvaluatedStep(scope, stepRef(run), 'read', runVersionOf(run));
     await scope.system.engine.createEvalTrial({
       id: processInstanceId,
       namespace: run.namespace,
-      definitionName: run.workflowName,
-      version: run.definitionVersion,
-      stepId: run.stepId,
+      ...(target === null
+        ? { definitionName: run.workflowName!, version: run.definitionVersion! }
+        : { definition: target.definition }),
+      stepId: trialStepId(run),
       evalRunId: run.id,
       triggerPayload: evalCase.input.triggerPayload,
       variables: evalCase.input.previousStepOutputs,

@@ -1,15 +1,17 @@
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import {
   AgentDefinitionSchema,
+  AgentVersionSchema,
   parseRow,
+  type AgentVersion,
   type AgentDefinition,
   type AgentDefinitionRepository,
   type CreateAgentDefinitionInput,
   type UpdateAgentDefinitionInput,
 } from '@mediforce/platform-core';
 import type { Database } from '../client';
-import { agents } from '../schema/agent-definition';
+import { agents, agentVersions } from '../schema/agent-definition';
 
 /**
  * Postgres-backed AgentDefinitionRepository (ADR-0001, PLAN §1.2 agents).
@@ -157,6 +159,37 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
   async delete(id: string): Promise<void> {
     await this.db.delete(agents).where(eq(agents.id, id));
   }
+
+  async appendVersion(version: AgentVersion): Promise<AgentVersion> {
+    const parsed = AgentVersionSchema.parse(version);
+    const [row] = await this.db.insert(agentVersions).values({
+      agentId: parsed.agentId,
+      version: parsed.version,
+      hash: parsed.hash,
+      config: parsed.config,
+      createdBy: parsed.createdBy,
+      createdAt: new Date(parsed.createdAt),
+    }).returning();
+    return toAgentVersion(row!);
+  }
+
+  async listVersions(agentId: string): Promise<AgentVersion[]> {
+    const rows = await this.db.select().from(agentVersions)
+      .where(eq(agentVersions.agentId, agentId))
+      .orderBy(desc(agentVersions.version));
+    return rows.map(toAgentVersion);
+  }
+}
+
+function toAgentVersion(row: typeof agentVersions.$inferSelect): AgentVersion {
+  return AgentVersionSchema.parse({
+    agentId: row.agentId,
+    version: row.version,
+    hash: row.hash,
+    config: row.config,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt.toISOString(),
+  });
 }
 
 function visibilityFilter(allowed: readonly string[]) {

@@ -15,7 +15,8 @@ variants, applying them, few-shot examples, fix variants and GEPA — is parked 
 pinned there for reuse.
 
 Everything below belongs to one agent Step, keyed by
-`(namespace, workflowName, stepId)`, and lives outside the Workflow
+`(namespace, workflowName, stepId)` — or to one Agent evaluated on its own (see
+[Evaluating an Agent](#evaluating-an-agent)) — and lives outside the Workflow
 Definition: adding a check never mints a definition version. Reading needs only
 access to the workflow; changing anything needs its `edit` verb, and
 previewing checks or preparing, starting and cancelling Eval Runs its `run`
@@ -808,3 +809,29 @@ its first one awaiting approval, else its first not verified one; in the workflo
 carries its validation icon for the version being edited, linking to the
 Evaluation tab on that step and version. The icon speaks of the step as saved:
 a step added or edited since carries none until the version is saved and run.
+
+## Evaluating an Agent
+
+An Agent can own an Evaluation of its own, independent of any workflow step
+([ADR-0029](../adr/0029-agent-evaluation.md)): the **Evaluation** tab of the
+Agent's page, or any `mediforce eval` command that takes `--agent <id>` in place
+of `--workflow` and `--step` (and the API with `agentId` in place of
+`workflowName` + `stepId`). Its Evaluators, Eval Cases, Datasets, Acceptance
+Criteria, Eval Runs and Qualification work as above, with these differences:
+
+- **Each Eval Run assesses one Agent version.** An Agent version is a snapshot
+  of its runtime, model, system prompt, MCP bindings and Skills (by content
+  hash). Saving the Agent records a new version when one of those changed — a
+  rename does not; preparing an Eval Run records one when a Skill it holds was
+  edited since. The run names the version (`agentVersion`) and its output
+  carries that version's configuration (`assessedAgentVersion`), shown on the
+  run's page as *Configuration assessed*. `mediforce agent versions <id>` lists
+  them. Validation reads the newest finished run of the current version.
+- **A trial runs the Agent alone**: a single agent step with no prompt, model,
+  Skills or MCP restrictions of its own. A case's `triggerPayload` is the whole
+  input, and the workspace starts empty — a case takes no workspace seed.
+- **No production features.** An Agent has no production runs of its own, so
+  harvesting or perturbing cases, previewing a check, drift and production
+  Evaluators are refused. Write cases by hand.
+- Only a container agent of the workspace, with a runtime, is evaluated.
+

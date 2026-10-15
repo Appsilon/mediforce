@@ -15,6 +15,7 @@ export const GET = createRouteAdapter(
       namespace: params.get('namespace') ?? undefined,
       workflowName: params.get('workflowName') ?? undefined,
       stepId: params.get('stepId') ?? undefined,
+      agentId: params.get('agentId') ?? undefined,
       definitionVersion: params.get('definitionVersion') ?? undefined,
     };
   },

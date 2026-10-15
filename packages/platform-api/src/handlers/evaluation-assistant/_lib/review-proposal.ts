@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from 'node:util';
 import type { z } from 'zod';
 import type {
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
-  EvaluatedStep,
+  EvaluationSubject,
   EvaluationAssistantProposalToolName,
   EvaluatorCheck,
 } from '@mediforce/platform-core';
@@ -10,9 +10,9 @@ import type { ProposalReview } from '../../../assistant-core';
 import type { EvaluatorOutcome } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { HandlerError } from '../../../errors';
-import { EXPECTED_OUTPUT_NOT_PREVIEWED, previewEvaluator } from '../../evaluation/preview-evaluator';
+import { AGENT_NOT_PREVIEWED, EXPECTED_OUTPUT_NOT_PREVIEWED, previewEvaluator } from '../../evaluation/preview-evaluator';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
-import { isSameStep } from '../../evaluation/_lib/evaluated-step';
+import { isSameStep, stepOnly } from '../../evaluation/_lib/evaluated-step';
 import { perturbCase } from '../../evaluation/_lib/perturb-case';
 import { loadStepEvaluator } from './run-evaluation-tool';
 
@@ -33,12 +33,15 @@ export interface PreviewedCheck {
  */
 async function selfTest(
   scope: CallerScope,
-  step: EvaluatedStep,
+  step: EvaluationSubject,
   check: EvaluatorCheck,
   previewed: readonly PreviewedCheck[],
 ): Promise<ProposalReview> {
   if (check.kind === 'expected_output') {
     return { ok: true, evidence: { selfTest: { unavailable: EXPECTED_OUTPUT_NOT_PREVIEWED } } };
+  }
+  if (step.kind === 'agent') {
+    return { ok: true, evidence: { selfTest: { unavailable: AGENT_NOT_PREVIEWED } } };
   }
   let results = previewed.find((preview) => isDeepStrictEqual(preview.check, check))?.results;
   if (results === undefined) {
@@ -71,7 +74,7 @@ export async function reviewEvaluationProposal(
   toolName: string,
   args: unknown,
   scope: CallerScope,
-  step: EvaluatedStep,
+  step: EvaluationSubject,
   previewed: readonly PreviewedCheck[],
 ): Promise<ProposalReview> {
   switch (toolName as EvaluationAssistantProposalToolName) {
@@ -94,7 +97,7 @@ export async function reviewEvaluationProposal(
     }
     case 'propose_perturbed_case': {
       const proposal = args as Args<'propose_perturbed_case'>;
-      await perturbCase(await loadCaseSource(scope, proposal.baseAgentRunId, step, 'read'), proposal);
+      await perturbCase(await loadCaseSource(scope, proposal.baseAgentRunId, stepOnly(step, 'A perturbed case'), 'read'), proposal);
       return { ok: true };
     }
     case 'propose_control_settings': {
@@ -119,7 +122,7 @@ export async function reviewEvaluationProposal(
     }
     case 'propose_eval_case': {
       const { agentRunId } = args as Args<'propose_eval_case'>;
-      if (agentRunId !== undefined) await loadCaseSource(scope, agentRunId, step, 'read');
+      if (agentRunId !== undefined) await loadCaseSource(scope, agentRunId, stepOnly(step, 'Harvesting a case'), 'read');
       return { ok: true };
     }
     default:

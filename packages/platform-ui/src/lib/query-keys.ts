@@ -1,4 +1,4 @@
-import type { HumanTaskStatus } from '@mediforce/platform-core';
+import type { EvaluationSubject, HumanTaskStatus } from '@mediforce/platform-core';
 
 /**
  * Cache key factories per ADR-0006 §2.
@@ -17,6 +17,12 @@ import type { HumanTaskStatus } from '@mediforce/platform-core';
  * namespace (detail), agent-runs, monitoring. Future work extends with
  * `workflows`.
  */
+function evaluationSubjectKey(subject: EvaluationSubject) {
+  return subject.kind === 'agent'
+    ? ['evaluation', subject.namespace, 'agent', subject.agentId] as const
+    : ['evaluation', subject.namespace, 'step', subject.workflowName, subject.stepId] as const;
+}
+
 export const queryKeys = {
   tasks: {
     /** Prefix matcher — `['tasks']` invalidates every list slice. */
@@ -197,6 +203,8 @@ export const queryKeys = {
   skill: (namespace: string, id: string) => ['skill', namespace, id] as const,
   /** Every agent definition the caller can see — what "used by" counts. */
   agentDefinitions: () => ['agent-definitions'] as const,
+  /** One agent definition (singular `agent-definition`). */
+  agentDefinition: (agentId: string) => ['agent-definition', agentId] as const,
   /** Whether one image resolves one command. Keyed by reference, which a deploy
    *  can rebuild (`:latest`), so an answer is refreshed on a live interval. */
   imageCommandCheck: (handle: string, image: string, command: string) =>
@@ -214,17 +222,21 @@ export const queryKeys = {
    *  keyset-paginated, server-side filtered by action set + actor +
    *  date range. Each tab passes its own `actions` slice, so the two
    *  tabs' pages don't share a cache entry. */
-  /** A Step's Evaluation (ADR-0023). `step` is the prefix every write invalidates. */
+  /**
+   * A Step's Evaluation (ADR-0023), or an Agent's (ADR-0029). `subject` is the
+   * prefix every write invalidates.
+   */
   evaluation: {
-    step: (namespace: string, workflowName: string, stepId: string) =>
-      ['evaluation', namespace, workflowName, stepId] as const,
-    section: (namespace: string, workflowName: string, stepId: string, section: string) =>
-      ['evaluation', namespace, workflowName, stepId, section] as const,
+    subject: evaluationSubjectKey,
+    section: (subject: EvaluationSubject, section: string) =>
+      [...evaluationSubjectKey(subject), section] as const,
   },
   /** Whether each version of a workflow is verified; every Evaluation write refreshes it. */
   workflowValidation: (namespace: string, workflowName: string) =>
     ['workflow-validation', namespace, workflowName] as const,
   /** One Eval Run with its trials and report — its own domain so it polls alone while running. */
+  /** An Agent's versions (ADR-0029); every save of the Agent and every Eval Run of it may add one. */
+  agentVersions: (agentId: string) => ['agent-versions', agentId] as const,
   evalRun: (evalRunId: string) => ['eval-run', evalRunId] as const,
   evalTrial: (evalRunId: string, trialId: string) => ['eval-run', evalRunId, 'trial', trialId] as const,
   /** What one Agent Run's step was given and returned; fixed once the run finished. */

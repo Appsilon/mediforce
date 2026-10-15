@@ -13,6 +13,7 @@ import {
 } from '@mediforce/platform-core';
 import { z } from 'zod';
 import type { CallerScope } from '../../../repositories/index';
+import { trialStepId } from './evaluated-step';
 
 /** What an Eval Run recorded on one trial: its checks' Scores, and people's reviews of its judges' verdicts. */
 export interface TrialScores {
@@ -35,7 +36,7 @@ function newestReviews(reviews: readonly Score[]): Map<string, Score> {
 
 export async function trialScores(scope: CallerScope, run: EvalRun, trial: EvalTrial): Promise<TrialScores> {
   if (trial.processInstanceId === null) return { checks: [], reviews: new Map() };
-  const scores = (await scope.scores.list({ processInstanceId: trial.processInstanceId, stepId: run.stepId, limit: 1000 }))
+  const scores = (await scope.scores.list({ processInstanceId: trial.processInstanceId, stepId: trialStepId(run), limit: 1000 }))
     .filter((score) => score.metadata?.evalRunId === run.id && score.metadata?.trialId === trial.id);
   return {
     checks: scores.filter((score) => score.source !== 'human'),

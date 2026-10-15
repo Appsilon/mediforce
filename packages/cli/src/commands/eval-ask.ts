@@ -1,12 +1,12 @@
 import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson } from '../output';
-import { STEP_ARGS, stepFrom } from './eval-step-args';
+import { SUBJECT_ARGS, subjectFrom } from './eval-step-args';
 
 export const evalAskCommand = defineCommand({
   name: 'mediforce eval ask',
   description: 'Ask a step\'s Evaluation Assistant one question. Proposals are printed, not applied.',
   args: {
-    ...STEP_ARGS,
+    ...SUBJECT_ARGS,
     message: { type: 'positional', required: true, description: 'What to ask' },
     version: { type: 'string', description: 'Workflow Definition version whose step the assistant reads and runs (default: the runnable one)' },
     model: { type: 'string', description: 'OpenRouter model id' },
@@ -24,7 +24,7 @@ export const evalAskCommand = defineCommand({
       return 2;
     }
     const result = await mediforce.evaluation.askAssistant({
-      ...stepFrom(args),
+      ...subjectFrom(args),
       ...(version !== undefined ? { definitionVersion: version } : {}),
       messages: [{ role: 'user', content: args.message }],
       ...(args.model !== undefined ? { model: args.model } : {}),

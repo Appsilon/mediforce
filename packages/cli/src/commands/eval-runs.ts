@@ -2,7 +2,7 @@ import { describeMcpReport } from '@mediforce/platform-core';
 import type { EvalRunOutput } from '@mediforce/platform-api/contract';
 import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson, type OutputSink } from '../output';
-import { STEP_ARGS, stepFrom } from './eval-step-args';
+import { SUBJECT_ARGS, subjectFrom } from './eval-step-args';
 
 function percent(value: number | null): string {
   return value === null ? '   -' : `${(value * 100).toFixed(0).padStart(3)}%`;
@@ -41,7 +41,7 @@ export const evalRunEstimateCommand = defineCommand({
   name: 'mediforce eval run-estimate',
   description: 'Print what an Eval Run of a step would cost and the budget cap run-prepare would set. Prepares nothing.',
   args: {
-    ...STEP_ARGS,
+    ...SUBJECT_ARGS,
     version: { type: 'string', description: 'Workflow Definition version whose step runs (default: the runnable one)' },
     dataset: { type: 'string', description: 'Eval Dataset version id (default: the newest)' },
     trials: { type: 'string', description: 'Trials per case (default: 3)' },
@@ -54,7 +54,7 @@ export const evalRunEstimateCommand = defineCommand({
       return 2;
     }
     const result = await mediforce.evaluation.estimateRun({
-      ...stepFrom(args),
+      ...subjectFrom(args),
       ...(version !== undefined ? { definitionVersion: version } : {}),
       ...(args.dataset !== undefined ? { datasetVersionId: args.dataset } : {}),
       ...(trials !== undefined ? { trialsPerCase: trials } : {}),
@@ -74,7 +74,7 @@ export const evalRunPrepareCommand = defineCommand({
   name: 'mediforce eval run-prepare',
   description: 'Prepare an Eval Run of a step and print its cost estimate. Nothing runs until run-start.',
   args: {
-    ...STEP_ARGS,
+    ...SUBJECT_ARGS,
     version: { type: 'string', description: 'Workflow Definition version whose step runs (default: the runnable one)' },
     dataset: { type: 'string', description: 'Eval Dataset version id (default: the newest)' },
     trials: { type: 'string', description: 'Trials per case (default: 3)' },
@@ -90,7 +90,7 @@ export const evalRunPrepareCommand = defineCommand({
       return 2;
     }
     const result = await mediforce.evaluation.prepareRun({
-      ...stepFrom(args),
+      ...subjectFrom(args),
       ...(version !== undefined ? { definitionVersion: version } : {}),
       ...(args.dataset !== undefined ? { datasetVersionId: args.dataset } : {}),
       ...(trials !== undefined ? { trialsPerCase: trials } : {}),
@@ -140,9 +140,9 @@ export const evalRunGetCommand = defineCommand({
 export const evalRunListCommand = defineCommand({
   name: 'mediforce eval run-list',
   description: 'List a step\'s Eval Runs, newest first.',
-  args: { ...STEP_ARGS },
+  args: { ...SUBJECT_ARGS },
   async run({ args, output, mediforce, jsonMode }) {
-    const result = await mediforce.evaluation.listRuns(stepFrom(args));
+    const result = await mediforce.evaluation.listRuns(subjectFrom(args));
     if (jsonMode) {
       printJson(output, result);
       return 0;

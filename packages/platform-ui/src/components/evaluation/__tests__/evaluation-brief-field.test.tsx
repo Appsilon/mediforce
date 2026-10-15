@@ -12,7 +12,7 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
 const evaluation = vi.hoisted(() => ({ setBrief: vi.fn() }));
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
 
-const STEP = { namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+const STEP = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
 const written = {
   isLoading: false,
   isError: false,

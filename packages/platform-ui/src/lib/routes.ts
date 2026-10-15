@@ -78,6 +78,10 @@ export const routes = {
   agentDefinition: (handle: string, definitionId: string) =>
     `/${handle}/agents/definitions/${definitionId}`,
   agentNew: (handle: string) => `/${handle}/agents/new`,
+  agentEvalRun: (handle: string, agentId: string, evalRunId: string) =>
+    `/${handle}/agents/definitions/${agentId}/eval-runs/${evalRunId}`,
+  agentEvalTrial: (handle: string, agentId: string, evalRunId: string, trialId: string) =>
+    `/${handle}/agents/definitions/${agentId}/eval-runs/${evalRunId}/trials/${trialId}`,
 
   // ── Configs ────────────────────────────────────────────────────
   configs: (handle: string) => `/${handle}/configs`,
