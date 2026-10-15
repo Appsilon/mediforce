@@ -84,9 +84,9 @@ async function scoreProduction(
 /**
  * Scores one live Agent Run with the step's production Evaluators (D13).
  * `schema` and `code` run now, each writing a Score marked `production`; a
- * failing one is the verdict's `failure`. A check that cannot run is
- * an `error` — and a failure too when its Evaluator is set to escalate. `llm_judge` ones start and are returned in
- * `judges` — they only write Scores.
+ * failing one is the verdict's `failure`. A check that cannot run is an
+ * `error` — and a failure too when its Evaluator is set to escalate.
+ * `llm_judge` ones start and are returned in `judges` — they only write Scores.
  */
 export async function scoreProductionRun(
   scope: CallerScope,

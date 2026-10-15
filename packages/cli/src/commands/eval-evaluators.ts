@@ -1,11 +1,15 @@
+import { EvaluatorOnErrorSchema } from '@mediforce/platform-core';
 import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson } from '../output';
 import { readJsonFile, STEP_ARGS, stepFrom } from './eval-step-args';
-import { EvaluatorOnErrorSchema } from '@mediforce/platform-core';
 import type { EvaluatorView } from '@mediforce/platform-api/contract';
 
 function describeProduction(evaluator: EvaluatorView): string {
-  if (evaluator.production.active === true) return evaluator.onError === 'escalate' ? '  in production, escalates when it cannot run' : '  in production';
+  if (evaluator.production.active === true) {
+    return evaluator.onError === 'escalate'
+      ? '  in production, escalates when it cannot run'
+      : '  in production';
+  }
   return evaluator.production.reason === undefined ? '' : `  production: ${evaluator.production.reason}`;
 }
 
