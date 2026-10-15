@@ -17,7 +17,7 @@ import type { PreviewEvaluatorOutput } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { recordAssistantPrompt, runProposalToolLoop } from '../../assistant-core';
 import { requireOpenRouterApiKey } from '../../services/openrouter-key';
-import { loadEvaluatedStep, stepRef, subjectKey, subjectName } from '../evaluation/_lib/evaluated-step';
+import { loadEvaluationSubject, subjectRef, subjectKey, subjectName } from '../evaluation/_lib/evaluation-subject';
 import { EVALUATION_ASSISTANT_SYSTEM_PROMPT, briefMessage, unattendedBudgetMessage } from './_lib/system-prompt';
 import { executeEvaluationTool, type UnattendedGrant } from './_lib/run-evaluation-tool';
 import { reviewEvaluationProposal, type PreviewedCheck } from './_lib/review-proposal';
@@ -61,8 +61,8 @@ export async function askEvaluationAssistant(
   scope: CallerScope,
   onProgress?: (event: EvaluationAssistantProgress) => void,
 ): Promise<AskEvaluationAssistantOutput> {
-  const step = stepRef(input);
-  const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'read', step.kind === 'step' ? input.definitionVersion : undefined);
+  const step = subjectRef(input);
+  const { definition, step: workflowStep } = await loadEvaluationSubject(scope, step, 'read', step.kind === 'step' ? input.definitionVersion : undefined);
   const apiKey = await requireOpenRouterApiKey(scope, step.namespace);
   const model = input.model ?? DEFAULT_MODEL;
 

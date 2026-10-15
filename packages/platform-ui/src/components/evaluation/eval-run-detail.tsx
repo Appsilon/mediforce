@@ -282,7 +282,7 @@ function ProblemsTab({ output, trialHref }: RunContext) {
 function evaluationHref(handle: string, step: EvaluationSubject, definitionVersion: number | null): string {
   return step.kind === 'agent'
     ? `${routes.agentDefinition(handle, step.agentId)}?tab=evaluation`
-    : routes.workflowEvaluation(handle, step.workflowName, { version: definitionVersion ?? 1, step: step.stepId });
+    : routes.workflowEvaluation(handle, step.workflowName, { version: definitionVersion ?? undefined, step: step.stepId });
 }
 
 function RunHeader({ handle, output, step, mayRun, runReason }: {

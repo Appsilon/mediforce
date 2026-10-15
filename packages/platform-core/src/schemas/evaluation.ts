@@ -67,13 +67,17 @@ export function evaluationOwnerOf(subject: EvaluationSubject): EvaluationOwner {
     : { namespace: subject.namespace, workflowName: subject.workflowName, stepId: subject.stepId, agentId: null };
 }
 
+/** Whether two rows have the same owner. */
+export function isSameOwner(left: EvaluationOwner, right: EvaluationOwner): boolean {
+  return left.namespace === right.namespace
+    && left.workflowName === right.workflowName
+    && left.stepId === right.stepId
+    && left.agentId === right.agentId;
+}
+
 /** Whether a row belongs to `subject`. */
 export function isOwnedBy(row: EvaluationOwner, subject: EvaluationSubject): boolean {
-  const owner = evaluationOwnerOf(subject);
-  return row.namespace === owner.namespace
-    && row.workflowName === owner.workflowName
-    && row.stepId === owner.stepId
-    && row.agentId === owner.agentId;
+  return isSameOwner(row, evaluationOwnerOf(subject));
 }
 
 /** A subject in words: `step 'extract' of 'intake'`, or `agent 'reviewer'`. */

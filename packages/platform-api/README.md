@@ -103,7 +103,7 @@ production Scores when read, never stored.
 keys every Brief, Evaluator, Eval Case, Dataset version, MCP eval policy and MCP
 recording by its owner — `(namespace, workflowName, stepId)` or `(namespace,
 agentId)` — and reaches it through the one `scope.evaluation` wrapper.
-`_lib/evaluated-step.ts` resolves a request to its subject and checks the
+`_lib/evaluation-subject.ts` resolves a request to its subject and checks the
 caller: a Step's reads need only to see the workflow and its writes the `edit`
 verb; an Agent's need to see it, or to be allowed to change it. An Agent comes
 back as the single-step Definition its trials run, carried on each trial's run

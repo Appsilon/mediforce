@@ -1,27 +1,42 @@
 import { describe, it, expect } from 'vitest';
 import { NotFoundError, ValidationError } from '../../../../errors';
+import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { userCaller } from '../../../../repositories/__tests__/create-test-scope';
 import { loadEvaluationSubject } from '../evaluation-subject';
-import { evaluationFixture, GRADED_RUN, STEP } from '../../__tests__/fixture';
+import { evaluationFixture, STEP } from '../../__tests__/fixture';
 
 describe('loadEvaluationSubject', () => {
-  it('pairs the Agent Run with the input its execution was given', async () => {
+  it('returns the agent step as the runnable version has it', async () => {
     const fixture = await evaluationFixture();
-    const subject = await loadEvaluationSubject(fixture.scope(), GRADED_RUN, STEP);
-    expect(subject.instance.id).toBe('run-graded');
-    expect(subject.stepInput).toMatchObject({ steps: { 'extract-aes': { events: [{ term: 'Sepsis', outcome: 'fatal' }] } } });
-    expect(subject.trajectory).toEqual([]);
+    const { definition, step } = await loadEvaluationSubject(fixture.scope(), STEP, 'edit');
+    expect(definition.name).toBe('ae-grading');
+    expect(step).toMatchObject({ id: 'grade-aes', executor: 'agent', agentId: 'ae-grader' });
   });
 
-  it('refuses a run of another step', async () => {
+  it('refuses a step that is not an agent step, and a step that does not exist', async () => {
     const fixture = await evaluationFixture();
-    await expect(loadEvaluationSubject(fixture.scope(), GRADED_RUN, { ...STEP, stepId: 'extract-aes' }))
-      .rejects.toBeInstanceOf(ValidationError);
+    await expect(loadEvaluationSubject(fixture.scope(), { ...STEP, stepId: 'extract-aes' }, 'read')).rejects.toBeInstanceOf(ValidationError);
+    await expect(loadEvaluationSubject(fixture.scope(), { ...STEP, stepId: 'nope' }, 'read')).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it('reads a run in another workspace as missing — Agent Runs themselves are not gated', async () => {
+  it('refuses a step that still declares MCP servers inline — an eval policy cannot deny them', async () => {
     const fixture = await evaluationFixture();
-    await expect(loadEvaluationSubject(fixture.scope(userCaller('outsider', ['pharma-b'])), GRADED_RUN))
+    await fixture.processRepo.saveWorkflowDefinition(buildWorkflowDefinition({
+      name: 'legacy-mcp',
+      namespace: STEP.namespace,
+      steps: [
+        { id: 'grade', name: 'Grade', type: 'creation', executor: 'agent', agent: { prompt: 'Grade.', mcpServers: [{ name: 'edc', command: 'edc-mcp', args: [] }] } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'grade', to: 'done' }],
+    }));
+    await expect(loadEvaluationSubject(fixture.scope(), { ...STEP, workflowName: 'legacy-mcp', stepId: 'grade' }, 'read'))
+      .rejects.toThrow(/declares MCP servers inline.*edc/);
+  });
+
+  it('reads another workspace\'s workflow as missing', async () => {
+    const fixture = await evaluationFixture();
+    await expect(loadEvaluationSubject(fixture.scope(userCaller('outsider', ['pharma-b'])), STEP, 'read'))
       .rejects.toBeInstanceOf(NotFoundError);
   });
 });

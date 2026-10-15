@@ -34,7 +34,7 @@ const agentIdColumn = () => text('agent_id').notNull().default('');
 
 /** Exactly one owner: a Step (`workflow_name`, `step_id`) or an Agent (`agent_id`). */
 const ownerCheck = (name: string, table: { workflowName: AnyPgColumn; stepId: AnyPgColumn; agentId: AnyPgColumn }) =>
-  check(name, sql`(${table.agentId} = '') = (${table.workflowName} <> '' AND ${table.stepId} <> '')`);
+  check(name, sql`(${table.agentId} <> '' AND ${table.workflowName} = '' AND ${table.stepId} = '') OR (${table.agentId} = '' AND ${table.workflowName} <> '' AND ${table.stepId} <> '')`);
 
 const workspaceColumn = () =>
   text('workspace')

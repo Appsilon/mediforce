@@ -7,7 +7,7 @@ import type {
   SetAcceptanceCriteriaOutput,
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
-import { loadEvaluatedStep, subjectKey } from './_lib/evaluated-step';
+import { loadEvaluationSubject, subjectKey } from './_lib/evaluation-subject';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
 
 /** The Step's current Acceptance Criteria and every earlier version (D10). */
@@ -15,7 +15,7 @@ export async function getAcceptanceCriteria(
   input: GetAcceptanceCriteriaInput,
   scope: CallerScope,
 ): Promise<GetAcceptanceCriteriaOutput> {
-  const { subject } = await loadEvaluatedStep(scope, input, 'read');
+  const { subject } = await loadEvaluationSubject(scope, input, 'read');
   const versions = await scope.evaluation.listAcceptanceCriteria(subject);
   return { criteria: versions[0] ?? null, versions };
 }
@@ -29,7 +29,7 @@ export async function setAcceptanceCriteria(
   input: z.output<typeof SetAcceptanceCriteriaInputSchema>,
   scope: CallerScope,
 ): Promise<SetAcceptanceCriteriaOutput> {
-  const { subject: step } = await loadEvaluatedStep(scope, input, 'edit');
+  const { subject: step } = await loadEvaluationSubject(scope, input, 'edit');
   const [current] = await scope.evaluation.listAcceptanceCriteria(step);
   const criteria = await scope.evaluation.appendAcceptanceCriteria({
     ...evaluationOwnerOf(step),

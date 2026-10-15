@@ -1,15 +1,15 @@
 import type { EvalCaseExpectation, EvalCaseInput, EvaluatedStep, ProcessInstance } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { ValidationError } from '../../../errors';
-import { loadEvaluatedStep } from './evaluated-step';
-import { loadEvaluationSubject, type EvaluationSubject } from './evaluation-subject';
+import { loadEvaluationSubject } from './evaluation-subject';
+import { loadScoredRun, type ScoredRun } from './scored-run';
 import { parentCommit } from './workspace-seed';
 import { HUMAN_VERDICT_SCORE_NAME } from '../../scores/record-human-verdict';
 
 /** What an Eval Case taken from a production Agent Run starts from. */
 export interface CaseSource {
   readonly step: EvaluatedStep;
-  readonly subject: EvaluationSubject;
+  readonly subject: ScoredRun;
   /** The trigger payload and the outputs of the steps before it — the step's input, rebuilt. */
   readonly input: EvalCaseInput;
   /** The workflow's bare repo; null when the run had no workspace. */
@@ -41,13 +41,13 @@ export async function loadCaseSource(
   step: EvaluatedStep | undefined,
   verb: 'read' | 'edit',
 ): Promise<CaseSource> {
-  const subject = await loadEvaluationSubject(scope, agentRunId, step);
+  const subject = await loadScoredRun(scope, agentRunId, step);
   const runStep = {
     namespace: subject.instance.namespace ?? '',
     workflowName: subject.instance.definitionName,
     stepId: subject.agentRun.stepId,
   };
-  await loadEvaluatedStep(scope, runStep, verb);
+  await loadEvaluationSubject(scope, runStep, verb);
   if (subject.instance.evalRunId !== undefined) {
     throw new ValidationError(`Agent Run '${agentRunId}' is an eval trial, not a production run`);
   }

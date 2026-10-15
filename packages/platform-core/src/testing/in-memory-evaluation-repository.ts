@@ -21,9 +21,9 @@ import {
   McpRecordingSchema,
   type EvalCase,
   type EvalDatasetVersion,
-  type EvaluationOwner,
   type EvaluationSubject,
   isOwnedBy,
+  isSameOwner,
   type EvaluationBrief,
   type Evaluator,
   type EvaluatorVersion,
@@ -31,13 +31,6 @@ import {
   type McpRecording,
   type SourceApproval,
 } from '../schemas/evaluation';
-
-function sameOwner(left: EvaluationOwner, right: EvaluationOwner): boolean {
-  return left.namespace === right.namespace
-    && left.workflowName === right.workflowName
-    && left.stepId === right.stepId
-    && left.agentId === right.agentId;
-}
 
 function newestFirst<T extends { createdAt: string }>(rows: T[]): T[] {
   return [...rows].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
@@ -58,7 +51,7 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
 
   async appendBrief(brief: EvaluationBrief): Promise<EvaluationBrief> {
     const parsed = EvaluationBriefSchema.parse(brief);
-    if (this.briefs.some((row) => sameOwner(row, parsed) && row.version === parsed.version)) {
+    if (this.briefs.some((row) => isSameOwner(row, parsed) && row.version === parsed.version)) {
       throw new Error(`Evaluation Brief version ${parsed.version} already exists`);
     }
     this.briefs.push(parsed);
@@ -71,7 +64,7 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
 
   async createEvaluator(evaluator: Evaluator, firstVersion: EvaluatorVersion): Promise<void> {
     const parsed = EvaluatorSchema.parse(evaluator);
-    const clash = [...this.evaluators.values()].some((row) => sameOwner(row, parsed) && row.name === parsed.name);
+    const clash = [...this.evaluators.values()].some((row) => isSameOwner(row, parsed) && row.name === parsed.name);
     if (clash) throw new Error(`Evaluator '${parsed.name}' already exists on this subject`);
     this.evaluators.set(parsed.id, parsed);
     this.versions.push(EvaluatorVersionSchema.parse(firstVersion));
@@ -137,7 +130,7 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
 
   async appendDatasetVersion(dataset: EvalDatasetVersion): Promise<EvalDatasetVersion> {
     const parsed = EvalDatasetVersionSchema.parse(dataset);
-    if (this.datasets.some((row) => sameOwner(row, parsed) && row.version === parsed.version)) {
+    if (this.datasets.some((row) => isSameOwner(row, parsed) && row.version === parsed.version)) {
       throw new Error(`Eval Dataset version ${parsed.version} already exists`);
     }
     this.datasets.push(parsed);
@@ -158,7 +151,7 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
 
   async putMcpPolicy(policy: McpEvalPolicy): Promise<McpEvalPolicy> {
     const parsed = McpEvalPolicySchema.parse(policy);
-    const index = this.policies.findIndex((row) => sameOwner(row, parsed));
+    const index = this.policies.findIndex((row) => isSameOwner(row, parsed));
     if (index === -1) this.policies.push(parsed);
     else this.policies[index] = parsed;
     return parsed;
@@ -187,7 +180,7 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
 
   async appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> {
     const parsed = AcceptanceCriteriaVersionSchema.parse(criteria);
-    if (this.criteria.some((row) => sameOwner(row, parsed) && row.version === parsed.version)) {
+    if (this.criteria.some((row) => isSameOwner(row, parsed) && row.version === parsed.version)) {
       throw new Error(`Acceptance Criteria version ${parsed.version} already exists`);
     }
     this.criteria.push(parsed);

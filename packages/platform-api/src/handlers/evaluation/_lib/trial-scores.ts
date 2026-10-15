@@ -13,7 +13,7 @@ import {
 } from '@mediforce/platform-core';
 import { z } from 'zod';
 import type { CallerScope } from '../../../repositories/index';
-import { trialStepId } from './evaluated-step';
+import { trialStepId } from './evaluation-subject';
 
 /** What an Eval Run recorded on one trial: its checks' Scores, and people's reviews of its judges' verdicts. */
 export interface TrialScores {

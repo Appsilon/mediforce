@@ -2,8 +2,8 @@ import type { z } from 'zod';
 import type { PreviewEvaluatorInputSchema, PreviewEvaluatorOutput } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
-import { loadEvaluatedStep, stepOnly, stepRef } from './_lib/evaluated-step';
-import { loadEvaluationSubject } from './_lib/evaluation-subject';
+import { loadEvaluationSubject, stepOnly, subjectRef } from './_lib/evaluation-subject';
+import { loadScoredRun } from './_lib/scored-run';
 import { runEvaluatorCheck } from './_lib/run-evaluator-check';
 import { listStepProductionAgentRuns } from './_lib/step-agent-runs';
 
@@ -22,15 +22,15 @@ export async function previewEvaluator(
   input: z.output<typeof PreviewEvaluatorInputSchema>,
   scope: CallerScope,
 ): Promise<PreviewEvaluatorOutput> {
-  const step = stepOnly(stepRef(input), 'A preview');
-  await loadEvaluatedStep(scope, step, 'run');
+  const step = stepOnly(subjectRef(input), 'A preview');
+  await loadEvaluationSubject(scope, step, 'run');
   if (input.check.kind === 'expected_output') throw new ValidationError(EXPECTED_OUTPUT_NOT_PREVIEWED);
   const agentRunIds = input.agentRunIds
     ?? (await listStepProductionAgentRuns(scope, step, input.limit)).map((run) => run.id);
 
   const results: PreviewEvaluatorOutput['results'] = [];
   for (const agentRunId of agentRunIds) {
-    const subject = await loadEvaluationSubject(scope, agentRunId, step);
+    const subject = await loadScoredRun(scope, agentRunId, step);
     results.push(await runEvaluatorCheck(scope, input.check, subject, null));
   }
   return { results };

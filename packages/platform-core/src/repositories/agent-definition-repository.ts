@@ -36,4 +36,6 @@ export interface AgentDefinitionRepository {
   appendVersion(version: AgentVersion): Promise<AgentVersion>;
   /** The Agent's versions, newest first. */
   listVersions(agentId: string): Promise<AgentVersion[]>;
+  /** One version of the Agent; it outlives the Agent, since Eval Runs name it. */
+  getVersion(agentId: string, version: number): Promise<AgentVersion | null>;
 }

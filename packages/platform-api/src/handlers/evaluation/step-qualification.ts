@@ -28,7 +28,7 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, ForbiddenError, NotFoundError, PreconditionFailedError, ValidationError } from '../../errors';
-import { inlineMcpReason, loadEvaluatedStep, stepRef, runVersionOf } from './_lib/evaluated-step';
+import { inlineMcpReason, loadEvaluationSubject, subjectRef, runVersionOf } from './_lib/evaluation-subject';
 import { appendEvaluationAudit } from './_lib/audit';
 import { currentAgentVersion } from '../agents/_lib/agent-version';
 import { buildEvalRunReport, rebuildEvalRunAcceptance } from './_lib/eval-run-report';
@@ -45,7 +45,7 @@ interface StepEvaluator {
  * The Step's own Evaluation rows — the same in every Definition version — each
  * read at most once, however many versions' validations ask for it.
  */
-interface StepRows {
+interface SubjectRows {
   readonly runs: () => Promise<readonly EvalRun[]>;
   readonly evaluators: () => Promise<readonly StepEvaluator[]>;
   readonly liveCaseIds: () => Promise<readonly string[]>;
@@ -58,7 +58,7 @@ function once<Value>(read: () => Promise<Value>): () => Promise<Value> {
   return () => (pending ??= read());
 }
 
-function stepRows(scope: CallerScope, step: EvaluationSubject): StepRows {
+function subjectRows(scope: CallerScope, step: EvaluationSubject): SubjectRows {
   return {
     runs: once(() => scope.evaluation.listEvalRuns(step)),
     evaluators: once(async () => Promise.all((await scope.evaluation.listEvaluators(step)).map(async (evaluator) => ({
@@ -115,7 +115,7 @@ function definitionVersionOf(definitionVersion: number): ValidatedVersion {
  */
 async function stepValidation(
   scope: CallerScope,
-  rows: StepRows,
+  rows: SubjectRows,
   workflowStep: WorkflowStep,
   version: ValidatedVersion,
   stepFingerprint: () => Promise<StepFingerprint>,
@@ -185,10 +185,10 @@ export async function getStepQualification(
   input: z.output<typeof GetStepQualificationInputSchema>,
   scope: CallerScope,
 ): Promise<GetStepQualificationOutput> {
-  const step = stepRef(input);
-  const { definition, step: workflowStep, agent } = await loadEvaluatedStep(scope, step, 'read', step.kind === 'step' ? input.definitionVersion : undefined);
+  const step = subjectRef(input);
+  const { definition, step: workflowStep, agent } = await loadEvaluationSubject(scope, step, 'read', step.kind === 'step' ? input.definitionVersion : undefined);
   const fingerprint = await computeStepFingerprint(scope, definition, workflowStep);
-  const rows = stepRows(scope, step);
+  const rows = subjectRows(scope, step);
   const agentVersion = agent === null ? null : await currentAgentVersion(scope, agent);
   const version: ValidatedVersion = agent === null
     ? definitionVersionOf(definition.version)
@@ -229,9 +229,9 @@ export async function getWorkflowValidation(
 ): Promise<GetWorkflowValidationOutput> {
   const definitions = await scope.workflowDefinitions.listVersions(input.namespace, input.workflowName);
   if (definitions.length === 0) throw new NotFoundError(`Workflow '${input.workflowName}' not found`);
-  const rowsByStep = new Map<string, StepRows>();
-  const rowsOf = (stepId: string): StepRows => {
-    if (rowsByStep.has(stepId) === false) rowsByStep.set(stepId, stepRows(scope, { kind: 'step', namespace: input.namespace, workflowName: input.workflowName, stepId }));
+  const rowsByStep = new Map<string, SubjectRows>();
+  const rowsOf = (stepId: string): SubjectRows => {
+    if (rowsByStep.has(stepId) === false) rowsByStep.set(stepId, subjectRows(scope, { kind: 'step', namespace: input.namespace, workflowName: input.workflowName, stepId }));
     return rowsByStep.get(stepId)!;
   };
 
@@ -271,8 +271,8 @@ export async function signStepQualification(
   const uid = scope.caller.uid;
   const run = await scope.evaluation.getEvalRun(input.evalRunId);
   if (run === null) throw new NotFoundError(`Eval Run '${input.evalRunId}' not found`);
-  const step = stepRef(run);
-  await loadEvaluatedStep(scope, step, 'edit', runVersionOf(run));
+  const step = subjectRef(run);
+  await loadEvaluationSubject(scope, step, 'edit', runVersionOf(run));
 
   const trials = await scope.evaluation.listTrials(run.id);
   const inFlight = trials.some((trial) => trial.status === 'pending' || trial.status === 'running' || trial.status === 'scoring');

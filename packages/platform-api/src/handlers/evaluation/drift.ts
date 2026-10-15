@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import { detectDrift } from '@mediforce/platform-core';
 import type { EvaluatorDrift, GetStepDriftInputSchema, GetStepDriftOutput } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
-import { loadEvaluatedStep, stepOnly, stepRef } from './_lib/evaluated-step';
+import { loadEvaluationSubject, stepOnly, subjectRef } from './_lib/evaluation-subject';
 import { listProductionEvaluators } from './_lib/production-evaluators';
 
 /**
@@ -15,8 +15,8 @@ export async function getStepDrift(
   input: z.output<typeof GetStepDriftInputSchema>,
   scope: CallerScope,
 ): Promise<GetStepDriftOutput> {
-  const step = stepOnly(stepRef(input), 'Drift');
-  await loadEvaluatedStep(scope, step, 'read');
+  const step = stepOnly(subjectRef(input), 'Drift');
+  await loadEvaluationSubject(scope, step, 'read');
   const settings = {
     window: input.window ?? scope.system.driftSettings.window,
     threshold: input.threshold ?? scope.system.driftSettings.threshold,

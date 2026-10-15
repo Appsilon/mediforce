@@ -1,10 +1,11 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { z } from 'zod';
-import type {
-  EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
-  EvaluationSubject,
-  EvaluationAssistantProposalToolName,
-  EvaluatorCheck,
+import {
+  isOwnedBy,
+  type EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
+  type EvaluationSubject,
+  type EvaluationAssistantProposalToolName,
+  type EvaluatorCheck,
 } from '@mediforce/platform-core';
 import type { ProposalReview } from '../../../assistant-core';
 import type { EvaluatorOutcome } from '../../../contract/evaluation';
@@ -12,7 +13,7 @@ import type { CallerScope } from '../../../repositories/index';
 import { HandlerError } from '../../../errors';
 import { AGENT_NOT_PREVIEWED, EXPECTED_OUTPUT_NOT_PREVIEWED, previewEvaluator } from '../../evaluation/preview-evaluator';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
-import { isSameStep, stepOnly } from '../../evaluation/_lib/evaluated-step';
+import { stepOnly } from '../../evaluation/_lib/evaluation-subject';
 import { perturbCase } from '../../evaluation/_lib/perturb-case';
 import { loadStepEvaluator } from './run-evaluation-tool';
 
@@ -103,7 +104,7 @@ export async function reviewEvaluationProposal(
     case 'propose_control_settings': {
       const { evalRunId } = args as Args<'propose_control_settings'>;
       const run = await scope.evaluation.getEvalRun(evalRunId);
-      if (run === null || isSameStep(run, step) === false) {
+      if (run === null || isOwnedBy(run, step) === false) {
         return { ok: false, error: `Eval Run '${evalRunId}' is not a run of this step` };
       }
       return { ok: true };
@@ -111,7 +112,7 @@ export async function reviewEvaluationProposal(
     case 'propose_diagnosis': {
       const { evalRunId, clusters } = args as Args<'propose_diagnosis'>;
       const run = await scope.evaluation.getEvalRun(evalRunId);
-      if (run === null || isSameStep(run, step) === false) {
+      if (run === null || isOwnedBy(run, step) === false) {
         return { ok: false, error: `Eval Run '${evalRunId}' is not a run of this step` };
       }
       const known = new Set((await scope.evaluation.listTrials(evalRunId)).map((trial) => trial.id));

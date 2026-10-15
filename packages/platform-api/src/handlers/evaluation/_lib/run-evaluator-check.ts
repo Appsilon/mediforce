@@ -10,7 +10,7 @@ import type { EvaluatorOutcome } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { callOpenRouter } from '../../../services/openrouter-client';
 import { requireOpenRouterApiKey } from '../../../services/openrouter-key';
-import type { EvaluationSubject } from './evaluation-subject';
+import type { ScoredRun } from './scored-run';
 
 type LlmJudgeCheck = Extract<EvaluatorCheck, { kind: 'llm_judge' }>;
 type ExpectedOutputCheck = Extract<EvaluatorCheck, { kind: 'expected_output' }>;
@@ -49,7 +49,7 @@ function binary(agentRunId: string, passed: boolean, comment: string | null): Ev
 async function runJudgeCheck(
   scope: CallerScope,
   check: LlmJudgeCheck,
-  subject: EvaluationSubject,
+  subject: ScoredRun,
   onJudgeCall: (call: JudgeCall) => void,
 ): Promise<EvaluatorOutcome> {
   const { agentRun } = subject;
@@ -79,7 +79,7 @@ async function runJudgeCheck(
 async function runExpectedOutputCheck(
   scope: CallerScope,
   check: ExpectedOutputCheck,
-  subject: EvaluationSubject,
+  subject: ScoredRun,
   evalCase: EvalCase | null,
   result: unknown,
   onJudgeCall: (call: JudgeCall) => void,
@@ -120,7 +120,7 @@ async function runExpectedOutputCheck(
 export async function runEvaluatorCheck(
   scope: CallerScope,
   check: EvaluatorCheck,
-  subject: EvaluationSubject,
+  subject: ScoredRun,
   evalCase: EvalCase | null,
   onJudgeCall: (call: JudgeCall) => void = () => {},
 ): Promise<EvaluatorOutcome> {

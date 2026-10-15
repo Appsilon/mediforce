@@ -29,7 +29,7 @@ function buildScope(overrides: Record<string, unknown> = {}): CallerScope {
       create: vi.fn().mockImplementation((input: Record<string, unknown>) =>
         Promise.resolve({ id: 'agent-new', ...input })),
       listVersions: vi.fn().mockResolvedValue([]),
-      appendVersion: vi.fn().mockImplementation((_agent: unknown, version: unknown) => Promise.resolve(version)),
+      appendVersion: vi.fn().mockImplementation((version: unknown) => Promise.resolve(version)),
     },
     workspaces: {
       getMembers: vi.fn().mockResolvedValue([

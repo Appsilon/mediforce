@@ -2,12 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { mcpReplayMissesOf, type AgentOutputSnapshot, type EvalCase, type EvalRun, type EvalTrial, type JudgeCall, type Score } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { recordScore } from '../../scores/record-score';
-import { loadEvaluationSubject } from './evaluation-subject';
+import { loadScoredRun } from './scored-run';
 import { storeEvalRunAcceptance } from './eval-run-report';
 import { loadModelPrices } from './model-prices';
 import { runEvaluatorCheck } from './run-evaluator-check';
 import { evaluatorsOfCase, judgeConfidenceMetadata, scoresOfTrial } from './trial-scores';
-import { loadEvaluatedStep, runVersionOf, stepRef, trialStepId } from './evaluated-step';
+import { loadEvaluationSubject, runVersionOf, subjectRef, trialStepId } from './evaluation-subject';
 
 /**
  * How long a driver may hold a trial — between claiming it and creating its
@@ -84,7 +84,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
   }
 
   const agentOutput = await trialAgentOutput(scope, run, instanceId);
-  const subject = await loadEvaluationSubject(scope, agentRun.id);
+  const subject = await loadScoredRun(scope, agentRun.id);
   const priceOf = await loadModelPrices(scope);
   const earlier = await scoresOfTrial(scope, run, trial);
   const alreadyScored = new Set(earlier.map((score) => score.evaluatorId));
@@ -181,7 +181,7 @@ async function startTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
   }
   try {
     // An Agent's trial runs the single-step Definition its run assessed, which no stored Workflow holds (ADR-0029).
-    const target = run.agentId === null ? null : await loadEvaluatedStep(scope, stepRef(run), 'read', runVersionOf(run));
+    const target = run.agentId === null ? null : await loadEvaluationSubject(scope, subjectRef(run), 'read', runVersionOf(run));
     await scope.system.engine.createEvalTrial({
       id: processInstanceId,
       namespace: run.namespace,

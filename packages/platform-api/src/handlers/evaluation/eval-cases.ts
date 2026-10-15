@@ -14,7 +14,7 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError, ValidationError } from '../../errors';
-import { loadEvaluatedStep, stepOnly, stepRef, subjectName } from './_lib/evaluated-step';
+import { loadEvaluationSubject, stepOnly, subjectRef, subjectName } from './_lib/evaluation-subject';
 import { loadCaseSource, loadVerdictExpectation } from './_lib/case-source';
 import { perturbCase } from './_lib/perturb-case';
 import { commitWorkspaceChanges } from './_lib/workspace-seed';
@@ -24,8 +24,8 @@ export async function listEvalCases(
   input: z.output<typeof ListEvalCasesInputSchema>,
   scope: CallerScope,
 ): Promise<ListEvalCasesOutput> {
-  await loadEvaluatedStep(scope, input, 'read');
-  const cases = await scope.evaluation.listCases(stepRef(input));
+  await loadEvaluationSubject(scope, input, 'read');
+  const cases = await scope.evaluation.listCases(subjectRef(input));
   return { cases: input.includeArchived === true ? cases : cases.filter((evalCase) => !evalCase.archived) };
 }
 
@@ -48,11 +48,11 @@ function labelOf(input: EvalCaseLabel): EvalCaseLabel {
 }
 
 async function storeCase(scope: CallerScope, evalCase: EvalCase): Promise<EvalCaseOutput> {
-  await checkSelectedEvaluators(scope, stepRef(evalCase), evalCase.evaluatorIds);
+  await checkSelectedEvaluators(scope, subjectRef(evalCase), evalCase.evaluatorIds);
   const stored = await scope.evaluation.createCase(evalCase);
   await appendEvaluationAudit(scope, {
     action: 'eval_case.created',
-    description: `Eval Case '${stored.name}' (${stored.source}, ${stored.expectation}) added to ${subjectName(stepRef(stored), false)}${stored.origin === 'assistant' ? ' from an Evaluation Assistant proposal' : ''}`,
+    description: `Eval Case '${stored.name}' (${stored.source}, ${stored.expectation}) added to ${subjectName(subjectRef(stored), false)}${stored.origin === 'assistant' ? ' from an Evaluation Assistant proposal' : ''}`,
     namespace: stored.namespace,
     entityType: 'eval_case',
     entityId: stored.id,
@@ -81,8 +81,8 @@ export async function createEvalCase(
   input: z.output<typeof CreateEvalCaseInputSchema>,
   scope: CallerScope,
 ): Promise<EvalCaseOutput> {
-  const step = stepRef(input);
-  await loadEvaluatedStep(scope, step, 'edit');
+  const step = subjectRef(input);
+  await loadEvaluationSubject(scope, step, 'edit');
   if (step.kind === 'agent' && input.workspaceSeedCommit !== null) {
     throw new ValidationError(`An Eval Case of ${subjectName(step, false)} starts from an empty workspace; it takes no workspace seed commit`);
   }
@@ -155,8 +155,8 @@ export async function createPerturbedEvalCase(
   input: z.output<typeof CreatePerturbedEvalCaseInputSchema>,
   scope: CallerScope,
 ): Promise<EvalCaseOutput> {
-  const step = stepOnly(stepRef(input), 'A perturbed case');
-  await loadEvaluatedStep(scope, step, 'edit');
+  const step = stepOnly(subjectRef(input), 'A perturbed case');
+  await loadEvaluationSubject(scope, step, 'edit');
   const source = await loadCaseSource(scope, input.baseAgentRunId, step, 'edit');
   const perturbed = await perturbCase(source, input);
   const id = randomUUID();
@@ -193,7 +193,7 @@ export async function archiveEvalCase(
 ): Promise<EvalCaseOutput> {
   const evalCase = await scope.evaluation.getCase(input.caseId);
   if (evalCase === null) throw new NotFoundError(`Eval Case '${input.caseId}' not found`);
-  await loadEvaluatedStep(scope, stepRef(evalCase), 'edit');
+  await loadEvaluationSubject(scope, subjectRef(evalCase), 'edit');
   await scope.evaluation.setCaseArchived(evalCase, input.archived);
   await appendEvaluationAudit(scope, {
     action: input.archived ? 'eval_case.archived' : 'eval_case.restored',
@@ -219,7 +219,7 @@ export async function updateEvalCase(
 ): Promise<EvalCaseOutput> {
   const evalCase = await scope.evaluation.getCase(input.caseId);
   if (evalCase === null) throw new NotFoundError(`Eval Case '${input.caseId}' not found`);
-  await loadEvaluatedStep(scope, stepRef(evalCase), 'edit');
+  await loadEvaluationSubject(scope, subjectRef(evalCase), 'edit');
   if (evalCase.archived) throw new ValidationError(`Eval Case '${evalCase.name}' is archived — restore it before editing it`);
 
   const { caseId: _caseId, ...changes } = input;
@@ -227,7 +227,7 @@ export async function updateEvalCase(
     .filter((field) => changes[field] !== undefined && JSON.stringify(changes[field]) !== JSON.stringify(evalCase[field]));
   if (changed.length === 0) throw new ValidationError(`The edit changes nothing in Eval Case '${evalCase.name}'`);
 
-  if (changed.includes('evaluatorIds')) await checkSelectedEvaluators(scope, stepRef(evalCase), changes.evaluatorIds ?? null);
+  if (changed.includes('evaluatorIds')) await checkSelectedEvaluators(scope, subjectRef(evalCase), changes.evaluatorIds ?? null);
   const inputEdited = changed.includes('input');
   const stored = await scope.evaluation.createCase({
     ...evalCase,

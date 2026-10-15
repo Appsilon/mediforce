@@ -133,6 +133,12 @@ test.describe('Agent Evaluation — API E2E', () => {
 
     const runs = ListEvalRunsOutputSchema.parse(await getJson(request, `/api/evaluation/runs?namespace=${TEST_ORG_HANDLE}&agentId=${agentId}`));
     expect(runs.evalRuns.map((run) => run.id)).toEqual([prepared.evalRun.id]);
+
+    // The Eval Run outlives its Agent and still shows the configuration it assessed.
+    const deleted = await request.delete(`/api/agents/${agentId}`, { headers: AUTH_HEADERS });
+    expect(deleted.ok(), await deleted.text()).toBe(true);
+    const afterDelete = EvalRunOutputSchema.parse(await getJson(request, `/api/evaluation/runs/${prepared.evalRun.id}`));
+    expect(afterDelete.assessedAgentVersion).toMatchObject({ agentId, version: 1, config: { systemPrompt: 'You grade adverse events by CTCAE v5.' } });
   });
 
   test('refuses what only a workflow step has: production Evaluators, workspace seeds, and naming both owners', async ({ request }) => {

@@ -1,7 +1,7 @@
 // TODO: rename AgentDefinition* → Agent* (schema, type, file). Canonical
-// glossary entry is `Agent` (CONTEXT.md); Agents are not versioned, so the
-// "Definition" suffix is a historical artifact. See CONTEXT.md
-// "Agent vs Agent Definition" flagged ambiguity.
+// glossary entry is `Agent` (CONTEXT.md); its versions are `AgentVersion`
+// (ADR-0029), so the "Definition" suffix is a historical artifact. See
+// CONTEXT.md "Agent vs Agent Definition" flagged ambiguity.
 import { z } from 'zod';
 import { AgentMcpBindingMapSchema } from './agent-mcp-binding';
 import type { Skill } from './skill';

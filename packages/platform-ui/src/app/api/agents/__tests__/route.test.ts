@@ -9,7 +9,7 @@ vi.mock('@/lib/platform-services', () => ({
   getPlatformServices: () => ({
     agentDefinitionRepo: {
       create: mockAgentCreate,
-      getById: async () => null,
+      getById: async () => (await mockAgentCreate.mock.results.at(-1)?.value) ?? null,
       getByIdVisibleTo: async () => null,
       listVersions: async () => [],
       appendVersion: async (version: unknown) => version,

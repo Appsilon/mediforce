@@ -6,7 +6,7 @@ import {
 } from '@mediforce/platform-core/testing';
 import type { AgentDefinition } from '@mediforce/platform-core';
 import { createTestScope, userCaller } from '../../../../repositories/__tests__/create-test-scope';
-import { currentAgentVersion, recordAgentVersion } from '../agent-version';
+import { currentAgentVersion, recordAgentVersion, upcomingAgentVersion } from '../agent-version';
 
 const SKILL_MD = '---\nname: ctcae-grading\ndescription: Grades by CTCAE\n---\nGrade every event.';
 
@@ -43,6 +43,29 @@ describe('recordAgentVersion (ADR-0029)', () => {
     });
     expect(await currentAgentVersion(scope(), agent)).toBeNull();
     expect(await recordAgentVersion(scope(), agent)).toMatchObject({ version: 2, config: { skills: [{ contentHash: 'hash-v2' }] } });
+  });
+
+  it('hashes a private Skill the same for a caller outside its namespace, so the version does not depend on who asks', async () => {
+    const first = await recordAgentVersion(scope(), agent);
+    const outsider = createTestScope({ agentDefinitionRepo, skillRepo, caller: userCaller('u-2', ['team-beta']) });
+    await agentDefinitionRepo.update(agent.id, { visibility: 'public' });
+    const publicAgent = { ...agent, visibility: 'public' as const };
+    expect(await currentAgentVersion(outsider, publicAgent)).toEqual(first);
+  });
+
+  it('refuses to record a version of an agent the caller may not write, whatever agent it says the version is for', async () => {
+    const outsider = createTestScope({ agentDefinitionRepo, skillRepo, caller: userCaller('u-2', ['team-beta']) });
+    const version = await recordAgentVersion(scope(), agent);
+    await expect(outsider.agentDefinitions.appendVersion({ ...version, version: 2 })).rejects.toThrow();
+    expect(await agentDefinitionRepo.listVersions(agent.id)).toHaveLength(1);
+  });
+
+  it('names the version recording would give, without recording it', async () => {
+    expect(await upcomingAgentVersion(scope(), agent)).toBe(1);
+    await recordAgentVersion(scope(), agent);
+    expect(await upcomingAgentVersion(scope(), agent)).toBe(1);
+    expect(await upcomingAgentVersion(scope(), { ...agent, systemPrompt: 'Grade AEs by CTCAE v6.' })).toBe(2);
+    expect(await agentDefinitionRepo.listVersions(agent.id)).toHaveLength(1);
   });
 
   it('records a Skill that no longer resolves as missing, so the version still says the agent named it', async () => {

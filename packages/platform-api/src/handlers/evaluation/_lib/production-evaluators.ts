@@ -9,7 +9,7 @@ import type { AgentOutputGate, AgentOutputGateVerdict } from '@mediforce/agent-r
 import type { CallerScope } from '../../../repositories/index';
 import { recordScore } from '../../scores/record-score';
 import { evaluatorProduction } from './evaluator-view';
-import type { EvaluationSubject } from './evaluation-subject';
+import type { ScoredRun } from './scored-run';
 import { loadModelPrices } from './model-prices';
 import { judgeConfidenceMetadata } from './trial-scores';
 import { runEvaluatorCheck } from './run-evaluator-check';
@@ -47,7 +47,7 @@ export interface ProductionScoring {
 
 async function scoreProduction(
   scope: CallerScope,
-  subject: EvaluationSubject,
+  subject: ScoredRun,
   { evaluator, version }: ProductionEvaluator,
   judgeCalls: readonly JudgeCall[],
   priceOf: Awaited<ReturnType<typeof loadModelPrices>>,
@@ -91,7 +91,7 @@ async function scoreProduction(
 export async function scoreProductionRun(
   scope: CallerScope,
   step: EvaluatedStep,
-  subject: EvaluationSubject,
+  subject: ScoredRun,
 ): Promise<ProductionScoring> {
   const evaluators = await listProductionEvaluators(scope, step);
   if (evaluators.length === 0) return { verdict: { failure: null, errors: [] }, judges: [] };
@@ -134,7 +134,7 @@ export function productionEvaluatorGate(scope: CallerScope): AgentOutputGate {
     const agentRun = await scope.agentRuns.getById(agentRunId);
     const instance = await scope.runs.getById(context.processInstanceId);
     if (agentRun === null || instance === null) return { failure: null, errors: ['the Agent Run is not visible to the gate'] };
-    const subject: EvaluationSubject = {
+    const subject: ScoredRun = {
       agentRun: { ...agentRun, envelope },
       instance,
       stepInput: context.stepInput,

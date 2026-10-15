@@ -8,12 +8,12 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
-import { loadEvaluatedStep, stepRef, subjectName } from './_lib/evaluated-step';
+import { loadEvaluationSubject, subjectRef, subjectName } from './_lib/evaluation-subject';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
 
 export async function listEvalDatasets(input: ListEvalDatasetsInput, scope: CallerScope): Promise<ListEvalDatasetsOutput> {
-  await loadEvaluatedStep(scope, input, 'read');
-  return { datasets: await scope.evaluation.listDatasetVersions(stepRef(input)) };
+  await loadEvaluationSubject(scope, input, 'read');
+  return { datasets: await scope.evaluation.listDatasetVersions(subjectRef(input)) };
 }
 
 /**
@@ -22,8 +22,8 @@ export async function listEvalDatasets(input: ListEvalDatasetsInput, scope: Call
  * read against exactly the cases it ran.
  */
 export async function saveEvalDataset(input: SaveEvalDatasetInput, scope: CallerScope): Promise<SaveEvalDatasetOutput> {
-  const step = stepRef(input);
-  await loadEvaluatedStep(scope, step, 'edit');
+  const step = subjectRef(input);
+  await loadEvaluationSubject(scope, step, 'edit');
   const cases = await scope.evaluation.listCases(step);
   const selected = input.caseIds === undefined
     ? cases.filter((evalCase) => !evalCase.archived)

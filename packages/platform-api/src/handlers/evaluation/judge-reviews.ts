@@ -4,7 +4,7 @@ import type { CallerScope } from '../../repositories/index';
 import { NotFoundError, ValidationError } from '../../errors';
 import { resolveTargetUid } from '../_helpers';
 import { recordScore } from '../scores/record-score';
-import { loadEvaluatedStep, stepRef, runVersionOf, trialStepId } from './_lib/evaluated-step';
+import { loadEvaluationSubject, subjectRef, runVersionOf, trialStepId } from './_lib/evaluation-subject';
 import { storeEvalRunAcceptance } from './_lib/eval-run-report';
 import { isModelVerdict, trialScores } from './_lib/trial-scores';
 
@@ -64,7 +64,7 @@ export async function reviewJudgeVerdict(
   const reviewedBy = resolveTargetUid(input, scope, 'review', 'review a judge verdict');
   const run = await scope.evaluation.getEvalRun(input.evalRunId);
   if (run === null) throw new NotFoundError(`Eval Run '${input.evalRunId}' not found`);
-  await loadEvaluatedStep(scope, stepRef(run), 'edit', runVersionOf(run));
+  await loadEvaluationSubject(scope, subjectRef(run), 'edit', runVersionOf(run));
   const trial = (await scope.evaluation.listTrials(run.id)).find((candidate) => candidate.id === input.trialId);
   if (trial === undefined) throw new NotFoundError(`Eval Run '${run.id}' has no trial '${input.trialId}'`);
   const judge = run.evaluators.find((evaluator) => evaluator.evaluatorId === input.evaluatorId);

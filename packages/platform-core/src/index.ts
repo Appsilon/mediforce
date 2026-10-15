@@ -60,6 +60,7 @@ export {
   evaluationSubjectOf,
   evaluationOwnerOf,
   isOwnedBy,
+  isSameOwner,
   describeEvaluationSubject,
   EvaluationOriginSchema,
   EvaluationBriefSchema,

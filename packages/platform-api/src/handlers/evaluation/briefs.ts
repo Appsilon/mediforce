@@ -7,7 +7,7 @@ import type {
   SetEvaluationBriefOutput,
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
-import { loadEvaluatedStep, subjectKey } from './_lib/evaluated-step';
+import { loadEvaluationSubject, subjectKey } from './_lib/evaluation-subject';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
 
 /** The Step's current Evaluation Brief and every earlier version (D16). */
@@ -15,7 +15,7 @@ export async function getEvaluationBrief(
   input: z.output<typeof GetEvaluationBriefInputSchema>,
   scope: CallerScope,
 ): Promise<GetEvaluationBriefOutput> {
-  const { subject } = await loadEvaluatedStep(scope, input, 'read');
+  const { subject } = await loadEvaluationSubject(scope, input, 'read');
   const versions = await scope.evaluation.listBriefs(subject);
   return { brief: versions[0] ?? null, versions };
 }
@@ -25,7 +25,7 @@ export async function setEvaluationBrief(
   input: z.output<typeof SetEvaluationBriefInputSchema>,
   scope: CallerScope,
 ): Promise<SetEvaluationBriefOutput> {
-  const { subject: step } = await loadEvaluatedStep(scope, input, 'edit');
+  const { subject: step } = await loadEvaluationSubject(scope, input, 'edit');
   const [current] = await scope.evaluation.listBriefs(step);
   const brief = await scope.evaluation.appendBrief({
     ...evaluationOwnerOf(step),

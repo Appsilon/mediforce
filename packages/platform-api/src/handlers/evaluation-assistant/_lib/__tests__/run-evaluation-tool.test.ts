@@ -4,7 +4,7 @@ import type { CallerScope } from '../../../../repositories/index';
 import { EVALUATION_ASSISTANT_PLATFORM_TOOLS, type StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import { InMemoryAgentTrajectoryRepository, buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { createTestScope } from '../../../../repositories/__tests__/create-test-scope';
-import { loadEvaluatedStep } from '../../../evaluation/_lib/evaluated-step';
+import { loadEvaluationSubject } from '../../../evaluation/_lib/evaluation-subject';
 import { createEvalCase } from '../../../evaluation/eval-cases';
 import { createEvaluator } from '../../../evaluation/evaluators';
 import { saveEvalDataset } from '../../../evaluation/eval-datasets';
@@ -26,7 +26,7 @@ async function setup(entries?: StoredAgentTrajectoryEntry[]) {
     await agentTrajectoryRepo.append(GRADED_RUN, entries);
     scope = createTestScope({ ...fixture, agentTrajectoryRepo, caller: scope.caller });
   }
-  const { definition, step } = await loadEvaluatedStep(scope, STEP, 'read');
+  const { definition, step } = await loadEvaluationSubject(scope, STEP, 'read');
   return { fixture, scope, context: { step: STEP, definition, workflowStep: step } };
 }
 
@@ -299,7 +299,7 @@ describe('executeEvaluationTool', () => {
     async function scenarioContext() {
       const fixture = await evaluationFixture();
       const scenario = await evalScenario(fixture);
-      const { definition, step } = await loadEvaluatedStep(scenario.scope, STEP, 'read');
+      const { definition, step } = await loadEvaluationSubject(scenario.scope, STEP, 'read');
       return { fixture, scenario, scope: scenario.scope, context: { step: STEP, definition, workflowStep: step } };
     }
 

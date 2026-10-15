@@ -19,8 +19,8 @@ const MISSING_SKILL_HASH = 'missing';
  */
 export async function agentConfigOf(scope: CallerScope, agent: AgentDefinition): Promise<AgentConfigSnapshot> {
   const skills = await Promise.all((agent.skills ?? []).map(async (ref) => {
-    const skill = await scope.skills.getById(ref.namespace, ref.id);
-    return skill === null ? { ...ref, contentHash: MISSING_SKILL_HASH } : offeredSkill(skill);
+    const contentHash = await scope.skills.heldContentHash(ref.namespace, ref.id);
+    return offeredSkill({ ...ref, contentHash: contentHash ?? MISSING_SKILL_HASH });
   }));
   return {
     kind: agent.kind,
@@ -56,12 +56,19 @@ export async function recordAgentVersion(scope: CallerScope, agent: AgentDefinit
     createdAt: new Date().toISOString(),
   };
   try {
-    return await scope.agentDefinitions.appendVersion(agent, version);
+    return await scope.agentDefinitions.appendVersion(version);
   } catch (error) {
     const [winner] = await scope.agentDefinitions.listVersions(agent.id);
     if (winner !== undefined && winner.hash === hash) return winner;
     throw error;
   }
+}
+
+/** The version `recordAgentVersion` would return for the Agent's configuration now, without recording it. */
+export async function upcomingAgentVersion(scope: CallerScope, agent: AgentDefinition): Promise<number> {
+  const [newest] = await scope.agentDefinitions.listVersions(agent.id);
+  if (newest === undefined) return 1;
+  return newest.hash === agentConfigHash(await agentConfigOf(scope, agent)) ? newest.version : newest.version + 1;
 }
 
 /** The Agent's newest version when it still has that configuration; null when it changed since, or was never recorded. */

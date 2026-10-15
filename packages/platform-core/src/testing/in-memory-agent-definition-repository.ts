@@ -120,7 +120,6 @@ export class InMemoryAgentDefinitionRepository implements AgentDefinitionReposit
 
   async delete(id: string): Promise<void> {
     this.byId.delete(id);
-    this.versions.splice(0, this.versions.length, ...this.versions.filter((version) => version.agentId !== id));
   }
 
   async appendVersion(version: AgentVersion): Promise<AgentVersion> {
@@ -134,5 +133,9 @@ export class InMemoryAgentDefinitionRepository implements AgentDefinitionReposit
 
   async listVersions(agentId: string): Promise<AgentVersion[]> {
     return this.versions.filter((row) => row.agentId === agentId).sort((left, right) => right.version - left.version);
+  }
+
+  async getVersion(agentId: string, version: number): Promise<AgentVersion | null> {
+    return this.versions.find((row) => row.agentId === agentId && row.version === version) ?? null;
   }
 }

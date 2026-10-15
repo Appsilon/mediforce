@@ -179,6 +179,12 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
       .orderBy(desc(agentVersions.version));
     return rows.map(toAgentVersion);
   }
+
+  async getVersion(agentId: string, version: number): Promise<AgentVersion | null> {
+    const [row] = await this.db.select().from(agentVersions)
+      .where(and(eq(agentVersions.agentId, agentId), eq(agentVersions.version, version)));
+    return row === undefined ? null : toAgentVersion(row);
+  }
 }
 
 function toAgentVersion(row: typeof agentVersions.$inferSelect): AgentVersion {

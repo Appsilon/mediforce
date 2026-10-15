@@ -17,6 +17,8 @@ import type { EvaluationSubject, HumanTaskStatus } from '@mediforce/platform-cor
  * namespace (detail), agent-runs, monitoring. Future work extends with
  * `workflows`.
  */
+
+/** The key prefix of one Evaluation subject's cache: a Step's or an Agent's. */
 function evaluationSubjectKey(subject: EvaluationSubject) {
   return subject.kind === 'agent'
     ? ['evaluation', subject.namespace, 'agent', subject.agentId] as const
@@ -234,9 +236,9 @@ export const queryKeys = {
   /** Whether each version of a workflow is verified; every Evaluation write refreshes it. */
   workflowValidation: (namespace: string, workflowName: string) =>
     ['workflow-validation', namespace, workflowName] as const,
-  /** One Eval Run with its trials and report — its own domain so it polls alone while running. */
   /** An Agent's versions (ADR-0029); every save of the Agent and every Eval Run of it may add one. */
   agentVersions: (agentId: string) => ['agent-versions', agentId] as const,
+  /** One Eval Run with its trials and report — its own domain so it polls alone while running. */
   evalRun: (evalRunId: string) => ['eval-run', evalRunId] as const,
   evalTrial: (evalRunId: string, trialId: string) => ['eval-run', evalRunId, 'trial', trialId] as const,
   /** What one Agent Run's step was given and returned; fixed once the run finished. */

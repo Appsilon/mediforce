@@ -3,15 +3,18 @@ import type { z } from 'zod';
 import {
   DEFAULT_ACCEPTANCE_CRITERIA,
   applyAgentModel,
+  evaluationOwnerOf,
   evaluatorTrust,
   isMovingModelAlias,
+  isOwnedBy,
   resolveDefinitionModels,
   type EvalRun,
   type EvalRunEvaluator,
   type EvalTrial,
   type EvaluatedStep,
   type McpEvalServerPolicy,
-  type WorkflowDefinition, evaluationOwnerOf } from '@mediforce/platform-core';
+  type WorkflowDefinition,
+} from '@mediforce/platform-core';
 import type {
   CancelEvalRunInput,
   EstimateEvalRunInputSchema,
@@ -25,7 +28,7 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
-import { isSameStep, loadEvaluatedStep, stepRef, subjectName, runVersionOf } from './_lib/evaluated-step';
+import { loadEvaluationSubject, subjectRef, subjectName, runVersionOf } from './_lib/evaluation-subject';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
 import { estimateEvalRun } from './_lib/estimate-eval-run';
 import { buildEvalRunReport, rebuildEvalRunAcceptance, storeEvalRunAcceptance } from './_lib/eval-run-report';
@@ -44,9 +47,7 @@ async function loadEvalRun(scope: CallerScope, evalRunId: string): Promise<EvalR
 async function evalRunOutput(scope: CallerScope, evalRunId: string): Promise<EvalRunOutput> {
   const evalRun = await loadEvalRun(scope, evalRunId);
   const trials = await scope.evaluation.listTrials(evalRunId);
-  const assessedAgentVersion = evalRun.agentId === null || evalRun.agentVersion === null
-    ? null
-    : (await scope.agentDefinitions.listVersions(evalRun.agentId)).find((version) => version.version === evalRun.agentVersion) ?? null;
+  const assessedAgentVersion = await scope.evaluation.getAssessedAgentVersion(evalRunId);
   return { evalRun, trials, report: await buildEvalRunReport(scope, evalRun, trials), assessedAgentVersion };
 }
 
@@ -75,11 +76,11 @@ function defaultBudget(totalUsd: number): number {
  * trials will run under, and a cost estimate. Reads only.
  */
 async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, scope: CallerScope) {
-  const step = stepRef(input);
+  const step = subjectRef(input);
   if (step.kind === 'agent' && input.definitionVersion !== undefined) {
     throw new ValidationError(`${subjectName(step)} runs as it is now; it has no workflow version to pick`);
   }
-  const { definition, step: workflowStep, agent: evaluatedAgent } = await loadEvaluatedStep(scope, step, 'run', input.definitionVersion ?? 'runnable');
+  const { definition, step: workflowStep, agent: evaluatedAgent } = await loadEvaluationSubject(scope, step, 'run', input.definitionVersion ?? 'runnable');
   if (step.kind === 'step' && definition.archived === true) {
     throw new ValidationError(`'${step.workflowName}' v${definition.version} is archived; evaluate a version still in use`);
   }
@@ -90,8 +91,8 @@ async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, s
   if (dataset === undefined || dataset === null) {
     throw new ValidationError(`${subjectName(step)} has no saved Eval Dataset — save its cases first`);
   }
-  if (isSameStep(dataset, step) === false) {
-    throw new ValidationError(`Eval Dataset '${dataset.id}' belongs to another step`);
+  if (isOwnedBy(dataset, step) === false) {
+    throw new ValidationError(`Eval Dataset '${dataset.id}' belongs to another ${step.kind}`);
   }
 
   const frozenEvaluators = [];
@@ -243,7 +244,7 @@ export async function prepareEvalRun(
  */
 export async function startEvalRun(input: StartEvalRunInput, scope: CallerScope): Promise<EvalRunOutput> {
   const run = await loadEvalRun(scope, input.evalRunId);
-  const { definition } = await loadEvaluatedStep(scope, stepRef(run), 'run', runVersionOf(run));
+  const { definition } = await loadEvaluationSubject(scope, subjectRef(run), 'run', runVersionOf(run));
   if (input.confirmedBudgetUsd !== run.budgetUsd) {
     const estimate = run.estimate.totalUsd === null ? 'no estimate' : `estimated $${run.estimate.totalUsd}`;
     throw new ValidationError(
@@ -280,8 +281,8 @@ export async function getEvalRun(input: GetEvalRunInput, scope: CallerScope): Pr
  * stored has it rebuilt from its report; a read never writes it.
  */
 export async function listEvalRuns(input: ListEvalRunsInput, scope: CallerScope): Promise<ListEvalRunsOutput> {
-  await loadEvaluatedStep(scope, input, 'read');
-  const runs = await scope.evaluation.listEvalRuns(stepRef(input));
+  await loadEvaluationSubject(scope, input, 'read');
+  const runs = await scope.evaluation.listEvalRuns(subjectRef(input));
   return {
     evalRuns: await Promise.all(runs.map(async (run) => {
       if (run.acceptance !== null || run.status === 'prepared' || run.status === 'running') return run;
@@ -293,7 +294,7 @@ export async function listEvalRuns(input: ListEvalRunsInput, scope: CallerScope)
 /** Stops an Eval Run: no new trial starts; trials already running finish and are scored. */
 export async function cancelEvalRun(input: CancelEvalRunInput, scope: CallerScope): Promise<EvalRunOutput> {
   const run = await loadEvalRun(scope, input.evalRunId);
-  await loadEvaluatedStep(scope, stepRef(run), 'run', runVersionOf(run));
+  await loadEvaluationSubject(scope, subjectRef(run), 'run', runVersionOf(run));
   const now = new Date().toISOString();
   const cancelled = await scope.evaluation.transitionEvalRun(run.id, run.status === 'prepared' ? 'prepared' : 'running', {
     status: 'cancelled',

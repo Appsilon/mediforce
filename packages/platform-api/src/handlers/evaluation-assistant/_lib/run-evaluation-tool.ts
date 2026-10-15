@@ -3,6 +3,7 @@ import {
   DEFAULT_ACCEPTANCE_CRITERIA,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   SKILL_MANIFEST_PATH,
+  isOwnedBy,
   type Evaluator,
   type EvaluationSubject,
   type EvaluationAssistantPlatformToolName,
@@ -22,9 +23,9 @@ import type { CallerScope } from '../../../repositories/index';
 import { NotFoundError, ValidationError } from '../../../errors';
 import { getMcpEvalPolicy } from '../../evaluation/mcp-eval-policy';
 import { listStepAgentRuns } from '../../evaluation/step-agent-runs';
-import { loadEvaluationSubject } from '../../evaluation/_lib/evaluation-subject';
+import { loadScoredRun } from '../../evaluation/_lib/scored-run';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
-import { isSameStep, stepOnly } from '../../evaluation/_lib/evaluated-step';
+import { stepOnly } from '../../evaluation/_lib/evaluation-subject';
 import { loadEvaluator } from '../../evaluation/_lib/evaluator-view';
 import { isBinary } from '../../evaluation/_lib/workspace-seed';
 import { HUMAN_VERDICT_SCORE_NAME } from '../../scores/record-human-verdict';
@@ -118,7 +119,7 @@ async function effectiveMcpServers(scope: CallerScope, step: EvaluationSubject, 
 /** An Evaluator of this step — any other reads as missing. */
 export async function loadStepEvaluator(scope: CallerScope, step: EvaluationSubject, evaluatorId: string): Promise<Evaluator> {
   const evaluator = await loadEvaluator(scope, evaluatorId);
-  if (isSameStep(evaluator, step) === false) {
+  if (isOwnedBy(evaluator, step) === false) {
     throw new NotFoundError(`Evaluator '${evaluatorId}' is not an Evaluator of this step`);
   }
   return evaluator;
@@ -128,7 +129,7 @@ export async function loadStepEvaluator(scope: CallerScope, step: EvaluationSubj
 async function loadStepEvalRun(scope: CallerScope, step: EvaluationSubject, evalRunId: string) {
   const output = await getEvalRun({ evalRunId }, scope);
   const { evalRun } = output;
-  if (isSameStep(evalRun, step) === false) {
+  if (isOwnedBy(evalRun, step) === false) {
     throw new NotFoundError(`Eval Run '${evalRunId}' is not a run of this step`);
   }
   return output;
@@ -210,7 +211,7 @@ export async function executeEvaluationTool(
     }
     case 'get_agent_run': {
       const { agentRunId } = args as Args<'get_agent_run'>;
-      const subject = await loadEvaluationSubject(scope, agentRunId, step);
+      const subject = await loadScoredRun(scope, agentRunId, step);
       return {
         agentRunId,
         status: subject.agentRun.status,
@@ -224,7 +225,7 @@ export async function executeEvaluationTool(
     }
     case 'get_trajectory': {
       const { agentRunId, offset, limit } = EVALUATION_ASSISTANT_PLATFORM_TOOLS.get_trajectory.parse(args);
-      const subject = await loadEvaluationSubject(scope, agentRunId, step);
+      const subject = await loadScoredRun(scope, agentRunId, step);
       const entries = subject.trajectory.slice(offset, offset + limit);
       const total = subject.trajectory.length;
       return {
@@ -364,7 +365,7 @@ export async function executeEvaluationTool(
         return startEvalRun({ evalRunId }, scope);
       }
       const run = await scope.evaluation.getEvalRun(evalRunId);
-      if (run === null || isSameStep(run, step) === false) {
+      if (run === null || isOwnedBy(run, step) === false) {
         throw new NotFoundError(`Eval Run '${evalRunId}' is not a run of this step`);
       }
       if (run.budgetUsd > unattended.remainingUsd) {

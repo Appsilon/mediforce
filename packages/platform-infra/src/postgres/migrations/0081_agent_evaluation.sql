@@ -34,15 +34,15 @@ CREATE INDEX "eval_mcp_recordings_case_idx" ON "eval_mcp_recordings" USING btree
 DROP INDEX "step_qualifications_step_idx";--> statement-breakpoint
 CREATE INDEX "step_qualifications_step_idx" ON "step_qualifications" USING btree ("workspace","workflow_name","step_id","agent_id","signed_at" DESC);--> statement-breakpoint
 
-ALTER TABLE "evaluation_briefs" ADD CONSTRAINT "evaluation_briefs_owner_check" CHECK (("agent_id" = '') = ("workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
-ALTER TABLE "evaluators" ADD CONSTRAINT "evaluators_owner_check" CHECK (("agent_id" = '') = ("workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
-ALTER TABLE "eval_cases" ADD CONSTRAINT "eval_cases_owner_check" CHECK (("agent_id" = '') = ("workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
-ALTER TABLE "eval_dataset_versions" ADD CONSTRAINT "eval_dataset_versions_owner_check" CHECK (("agent_id" = '') = ("workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
-ALTER TABLE "mcp_eval_policies" ADD CONSTRAINT "mcp_eval_policies_owner_check" CHECK (("agent_id" = '') = ("workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
-ALTER TABLE "eval_acceptance_criteria" ADD CONSTRAINT "eval_acceptance_criteria_owner_check" CHECK (("agent_id" = '') = ("workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
-ALTER TABLE "eval_runs" ADD CONSTRAINT "eval_runs_owner_check" CHECK (("agent_id" = '') = ("workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
-ALTER TABLE "eval_mcp_recordings" ADD CONSTRAINT "eval_mcp_recordings_owner_check" CHECK (("agent_id" = '') = ("workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
-ALTER TABLE "step_qualifications" ADD CONSTRAINT "step_qualifications_owner_check" CHECK (("agent_id" = '') = ("workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
+ALTER TABLE "evaluation_briefs" ADD CONSTRAINT "evaluation_briefs_owner_check" CHECK (("agent_id" <> '' AND "workflow_name" = '' AND "step_id" = '') OR ("agent_id" = '' AND "workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
+ALTER TABLE "evaluators" ADD CONSTRAINT "evaluators_owner_check" CHECK (("agent_id" <> '' AND "workflow_name" = '' AND "step_id" = '') OR ("agent_id" = '' AND "workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
+ALTER TABLE "eval_cases" ADD CONSTRAINT "eval_cases_owner_check" CHECK (("agent_id" <> '' AND "workflow_name" = '' AND "step_id" = '') OR ("agent_id" = '' AND "workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
+ALTER TABLE "eval_dataset_versions" ADD CONSTRAINT "eval_dataset_versions_owner_check" CHECK (("agent_id" <> '' AND "workflow_name" = '' AND "step_id" = '') OR ("agent_id" = '' AND "workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
+ALTER TABLE "mcp_eval_policies" ADD CONSTRAINT "mcp_eval_policies_owner_check" CHECK (("agent_id" <> '' AND "workflow_name" = '' AND "step_id" = '') OR ("agent_id" = '' AND "workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
+ALTER TABLE "eval_acceptance_criteria" ADD CONSTRAINT "eval_acceptance_criteria_owner_check" CHECK (("agent_id" <> '' AND "workflow_name" = '' AND "step_id" = '') OR ("agent_id" = '' AND "workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
+ALTER TABLE "eval_runs" ADD CONSTRAINT "eval_runs_owner_check" CHECK (("agent_id" <> '' AND "workflow_name" = '' AND "step_id" = '') OR ("agent_id" = '' AND "workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
+ALTER TABLE "eval_mcp_recordings" ADD CONSTRAINT "eval_mcp_recordings_owner_check" CHECK (("agent_id" <> '' AND "workflow_name" = '' AND "step_id" = '') OR ("agent_id" = '' AND "workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
+ALTER TABLE "step_qualifications" ADD CONSTRAINT "step_qualifications_owner_check" CHECK (("agent_id" <> '' AND "workflow_name" = '' AND "step_id" = '') OR ("agent_id" = '' AND "workflow_name" <> '' AND "step_id" <> ''));--> statement-breakpoint
 
 -- A Step's Eval Run names its Definition version, an Agent's its Agent version.
 ALTER TABLE "eval_runs" ALTER COLUMN "definition_version" DROP NOT NULL;--> statement-breakpoint
@@ -51,8 +51,10 @@ ALTER TABLE "eval_runs" ADD COLUMN "agent_version" integer;--> statement-breakpo
 -- An Agent's eval trial carries the single-step Definition it runs, which no stored Workflow holds.
 ALTER TABLE "process_instances" ADD COLUMN "eval_definition" jsonb;--> statement-breakpoint
 
+-- No foreign key to "agents": an Eval Run or Qualification outlives its Agent
+-- (ADR-0023 D2) and still shows the configuration it assessed.
 CREATE TABLE "agent_versions" (
-  "agent_id" text NOT NULL REFERENCES "agents"("id") ON DELETE CASCADE,
+  "agent_id" text NOT NULL,
   "version" integer NOT NULL,
   "hash" text NOT NULL,
   "config" jsonb NOT NULL,

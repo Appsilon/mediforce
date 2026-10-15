@@ -1,5 +1,7 @@
 import type {
   AcceptanceCriteriaVersion,
+  AgentDefinitionRepository,
+  AgentVersion,
   StepQualification,
   EvalRun,
   EvalRunAcceptance,
@@ -34,6 +36,7 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   constructor(
     caller: CallerIdentity,
     private readonly raw: EvaluationRepository,
+    private readonly agentDefinitions: AgentDefinitionRepository,
   ) {
     super(caller);
   }
@@ -147,6 +150,17 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   };
 
   getEvalRun = async (id: string): Promise<EvalRun | null> => this.visible(await this.raw.getEvalRun(id));
+
+  /**
+   * The Agent version an Agent's Eval Run assessed (ADR-0029), for whoever may
+   * read the run — even once the Agent is deleted or out of the caller's
+   * sight, since the run shows the configuration it assessed.
+   */
+  getAssessedAgentVersion = async (evalRunId: string): Promise<AgentVersion | null> => {
+    const run = await this.getEvalRun(evalRunId);
+    if (run === null || run.agentId === null || run.agentVersion === null) return null;
+    return this.agentDefinitions.getVersion(run.agentId, run.agentVersion);
+  };
 
   listEvalRuns = async (subject: EvaluationSubject): Promise<EvalRun[]> =>
     this.canSeeNamespace(subject.namespace) ? this.raw.listEvalRuns(subject) : [];

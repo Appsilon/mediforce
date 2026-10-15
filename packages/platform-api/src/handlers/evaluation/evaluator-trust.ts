@@ -2,7 +2,7 @@ import type { ApproveEvaluatorSourceInput, EvaluatorOutput } from '../../contrac
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError, ValidationError } from '../../errors';
 import { resolveTargetUid } from '../_helpers';
-import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
+import { loadEvaluationSubject, subjectRef } from './_lib/evaluation-subject';
 import { evaluatorView, loadEvaluator } from './_lib/evaluator-view';
 import { appendEvaluationAudit } from './_lib/audit';
 
@@ -18,7 +18,7 @@ export async function approveEvaluatorSource(
 ): Promise<EvaluatorOutput> {
   const approvedBy = resolveTargetUid(input, scope, 'approval', 'approve an Evaluator\'s source');
   const evaluator = await loadEvaluator(scope, input.evaluatorId);
-  await loadEvaluatedStep(scope, stepRef(evaluator), 'edit');
+  await loadEvaluationSubject(scope, subjectRef(evaluator), 'edit');
   const view = await evaluatorView(scope, evaluator);
   const version = view.versions.find((candidate) => candidate.version === input.version);
   if (version === undefined) throw new NotFoundError(`Evaluator '${evaluator.name}' has no version ${input.version}`);

@@ -67,12 +67,14 @@ export const agents = pgTable(
 
 /**
  * Agent versions (ADR-0029): insert-only, one row per configuration an Agent
- * was saved or evaluated with. `hash` is the SHA-256 of `config`.
+ * was saved or evaluated with. `hash` is the SHA-256 of `config`. No foreign
+ * key to `agents`: an Eval Run outlives its Agent and still shows the
+ * configuration it assessed.
  */
 export const agentVersions = pgTable(
   'agent_versions',
   {
-    agentId: text('agent_id').notNull().references(() => agents.id, { onDelete: 'cascade' }),
+    agentId: text('agent_id').notNull(),
     version: integer('version').notNull(),
     hash: text('hash').notNull(),
     config: jsonb('config').notNull(),

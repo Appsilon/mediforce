@@ -508,4 +508,15 @@ describe.skipIf(skipPg)('PostgresEvaluationRepository (parity)', () => {
     );
     return new PostgresEvaluationRepository(drizzle(testClient, { schema }));
   });
+
+  it('refuses a row that names an agent and part of a step: exactly one owner', async () => {
+    const insert = (workflowName: string, stepId: string, agentId: string) => testClient.unsafe(
+      `INSERT INTO "${schemaName}"."mcp_eval_policies" (workspace, workflow_name, step_id, agent_id, servers, updated_by) VALUES ('ws-1', $1, $2, $3, '{}', 'u-1')`,
+      [workflowName, stepId, agentId],
+    );
+    await expect(insert('ae-grading', '', 'ae-grader')).rejects.toThrow(/mcp_eval_policies_owner_check/);
+    await expect(insert('', 'grade-aes', 'ae-grader')).rejects.toThrow(/mcp_eval_policies_owner_check/);
+    await expect(insert('', '', '')).rejects.toThrow(/mcp_eval_policies_owner_check/);
+    await expect(insert('', '', 'ae-grader')).resolves.toBeDefined();
+  });
 });

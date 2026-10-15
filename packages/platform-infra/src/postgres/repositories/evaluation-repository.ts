@@ -81,7 +81,7 @@ function ownedBy(table: OwnerColumns, subject: EvaluationSubject) {
   );
 }
 
-function stepFields(row: { workspace: string; workflowName: string; stepId: string; agentId: string }): EvaluationOwner {
+function ownerFields(row: { workspace: string; workflowName: string; stepId: string; agentId: string }): EvaluationOwner {
   return {
     namespace: row.workspace,
     workflowName: row.workflowName === '' ? null : row.workflowName,
@@ -92,7 +92,7 @@ function stepFields(row: { workspace: string; workflowName: string; stepId: stri
 
 function toBrief(row: typeof evaluationBriefs.$inferSelect): EvaluationBrief {
   return EvaluationBriefSchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     version: row.version,
     text: row.text,
     origin: row.origin,
@@ -103,7 +103,7 @@ function toBrief(row: typeof evaluationBriefs.$inferSelect): EvaluationBrief {
 
 function toEvaluator(row: typeof evaluators.$inferSelect): Evaluator {
   return EvaluatorSchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     id: row.id,
     name: row.name,
     archived: row.archived,
@@ -128,7 +128,7 @@ function toVersion(row: typeof evaluatorVersions.$inferSelect): EvaluatorVersion
 
 function toCase(row: typeof evalCases.$inferSelect): EvalCase {
   return EvalCaseSchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     id: row.id,
     name: row.name,
     input: row.input,
@@ -152,7 +152,7 @@ function toCase(row: typeof evalCases.$inferSelect): EvalCase {
 
 function toDataset(row: typeof evalDatasetVersions.$inferSelect): EvalDatasetVersion {
   return EvalDatasetVersionSchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     id: row.id,
     version: row.version,
     caseIds: row.caseIds,
@@ -164,7 +164,7 @@ function toDataset(row: typeof evalDatasetVersions.$inferSelect): EvalDatasetVer
 
 function toPolicy(row: typeof mcpEvalPolicies.$inferSelect): McpEvalPolicy {
   return McpEvalPolicySchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     servers: row.servers,
     updatedBy: row.updatedBy,
     updatedAt: row.updatedAt.toISOString(),
@@ -173,7 +173,7 @@ function toPolicy(row: typeof mcpEvalPolicies.$inferSelect): McpEvalPolicy {
 
 function toRecording(row: typeof evalMcpRecordings.$inferSelect): McpRecording {
   return McpRecordingSchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     id: row.id,
     caseId: row.caseId,
     server: row.server,
@@ -186,7 +186,7 @@ function toRecording(row: typeof evalMcpRecordings.$inferSelect): McpRecording {
 
 function toEvalRun(row: typeof evalRuns.$inferSelect): EvalRun {
   return EvalRunSchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     id: row.id,
     definitionVersion: row.definitionVersion,
     agentVersion: row.agentVersion,
@@ -212,7 +212,7 @@ function toEvalRun(row: typeof evalRuns.$inferSelect): EvalRun {
 
 function toCriteria(row: typeof evalAcceptanceCriteria.$inferSelect): AcceptanceCriteriaVersion {
   return AcceptanceCriteriaVersionSchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     version: row.version,
     criteria: row.criteria,
     origin: row.origin,

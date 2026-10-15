@@ -8,14 +8,14 @@ import { describeEvaluationSubject, evaluationOwnerOf } from '@mediforce/platfor
 import type { AgentMcpBinding, McpEvalServerPolicy } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index';
 import { ValidationError } from '../../errors';
-import { loadEvaluatedStep, stepRef, type LoadedStep, subjectKey } from './_lib/evaluated-step';
+import { loadEvaluationSubject, subjectRef, type LoadedSubject, subjectKey } from './_lib/evaluation-subject';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
 
 /** What a server the Step's MCP eval policy does not name does in a trial. */
 export const DEFAULT_MCP_EVAL_SERVER_POLICY: McpEvalServerPolicy = { mode: 'live' };
 
 /** The MCP servers the Step's agent binds — what an eval policy speaks about. */
-async function agentBindings(scope: CallerScope, loaded: LoadedStep): Promise<Record<string, AgentMcpBinding>> {
+async function agentBindings(scope: CallerScope, loaded: LoadedSubject): Promise<Record<string, AgentMcpBinding>> {
   if (loaded.step.agentId === undefined) return {};
   const agent = await scope.agentDefinitions.getById(loaded.step.agentId);
   return agent?.mcpServers ?? {};
@@ -23,9 +23,9 @@ async function agentBindings(scope: CallerScope, loaded: LoadedStep): Promise<Re
 
 /** The Step's MCP eval policy and what every server of its agent does in a trial (D6). */
 export async function getMcpEvalPolicy(input: GetMcpEvalPolicyInput, scope: CallerScope): Promise<GetMcpEvalPolicyOutput> {
-  const loaded = await loadEvaluatedStep(scope, input, 'read');
-  const policy = await scope.evaluation.getMcpPolicy(stepRef(input));
-  const recorded = await scope.evaluation.listMcpRecordedCases(stepRef(input));
+  const loaded = await loadEvaluationSubject(scope, input, 'read');
+  const policy = await scope.evaluation.getMcpPolicy(subjectRef(input));
+  const recorded = await scope.evaluation.listMcpRecordedCases(subjectRef(input));
   const servers = Object.keys(await agentBindings(scope, loaded)).sort().map((name) => {
     const serverPolicy = policy?.servers[name];
     const recordedCaseIds = recorded.filter((entry) => entry.server === name).map((entry) => entry.caseId).sort();
@@ -45,8 +45,8 @@ export async function getMcpEvalPolicy(input: GetMcpEvalPolicyInput, scope: Call
  * they have no effect.
  */
 export async function setMcpEvalPolicy(input: SetMcpEvalPolicyInput, scope: CallerScope): Promise<SetMcpEvalPolicyOutput> {
-  const step = stepRef(input);
-  const loaded = await loadEvaluatedStep(scope, step, 'edit');
+  const step = subjectRef(input);
+  const loaded = await loadEvaluationSubject(scope, step, 'edit');
   const bindings = await agentBindings(scope, loaded);
   const known = Object.keys(bindings).sort();
   for (const [name, serverPolicy] of Object.entries(input.servers)) {

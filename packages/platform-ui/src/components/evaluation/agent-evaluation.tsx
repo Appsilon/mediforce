@@ -22,7 +22,7 @@ function AgentVersionLine({ agentId }: { agentId: string }) {
         ? <>An Eval Run started now assesses <span className="font-medium text-foreground">agent version {current}</span>.</>
         : newest === undefined
           ? 'This agent has no recorded version yet; its first Eval Run records version 1.'
-          : `The agent changed since version ${newest.version} (a Skill it holds was edited); its next Eval Run records version ${newest.version + 1}.`}
+          : `The agent changed since version ${newest.version}; its next Eval Run records version ${newest.version + 1}.`}
       {' '}Saving a change to its runtime, model, system prompt, MCP servers or Skills makes it a new version.
     </p>
   );
