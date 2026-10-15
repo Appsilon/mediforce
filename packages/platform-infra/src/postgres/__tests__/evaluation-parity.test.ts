@@ -41,6 +41,7 @@ function buildEvaluator(overrides: Partial<Evaluator> = {}): Evaluator {
     name: 'grade-present',
     archived: false,
     runInProduction: false,
+    onError: 'ignore',
     createdBy: 'author-1',
     createdAt: '2026-09-23T08:00:00.000Z',
     ...overrides,
@@ -165,17 +166,17 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       expect(await repo.getEvaluator(randomUUID())).toBeNull();
     });
 
-    it('stores whether an Evaluator runs in production and flips it', async () => {
+    it('stores an Evaluator\'s production settings and changes them', async () => {
       const flagged = buildEvaluator({ name: 'flagged', runInProduction: true });
       const plain = buildEvaluator({ name: 'plain' });
       await repo.createEvaluator(flagged, buildVersion(flagged.id));
       await repo.createEvaluator(plain, buildVersion(plain.id));
 
-      await repo.setEvaluatorRunInProduction(flagged.id, false);
-      await repo.setEvaluatorRunInProduction(plain.id, true);
+      await repo.setEvaluatorProduction(flagged.id, { runInProduction: false, onError: 'ignore' });
+      await repo.setEvaluatorProduction(plain.id, { runInProduction: true, onError: 'escalate' });
 
-      expect((await repo.listEvaluators(step)).map((row) => [row.name, row.runInProduction]))
-        .toEqual([['flagged', false], ['plain', true]]);
+      expect((await repo.listEvaluators(step)).map((row) => [row.name, row.runInProduction, row.onError]))
+        .toEqual([['flagged', false, 'ignore'], ['plain', true, 'escalate']]);
     });
 
     it('round-trips Eval Cases, newest first, and archives them', async () => {

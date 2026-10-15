@@ -1,10 +1,11 @@
 import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson } from '../output';
 import { readJsonFile, STEP_ARGS, stepFrom } from './eval-step-args';
+import { EvaluatorOnErrorSchema } from '@mediforce/platform-core';
 import type { EvaluatorView } from '@mediforce/platform-api/contract';
 
 function describeProduction(evaluator: EvaluatorView): string {
-  if (evaluator.production.active === true) return '  in production';
+  if (evaluator.production.active === true) return evaluator.onError === 'escalate' ? '  in production, escalates when it cannot run' : '  in production';
   return evaluator.production.reason === undefined ? '' : `  production: ${evaluator.production.reason}`;
 }
 
@@ -127,18 +128,24 @@ export const evalEvaluatorArchiveCommand = defineCommand({
 
 export const evalEvaluatorProductionCommand = defineCommand({
   name: 'mediforce eval evaluator-production',
-  description: 'Set whether an Evaluator also scores live production runs of its step (--on / --off); it takes effect while it counts (ADR-0023 D13).',
+  description: 'Set whether an Evaluator also scores live production runs of its step (--on / --off), and what a run does when its check cannot run there (--on-error); it takes effect while it counts (ADR-0023 D13).',
   args: {
     evaluatorId: { type: 'positional', required: true, description: 'Evaluator id' },
     on: { type: 'boolean', description: 'Run it in production' },
     off: { type: 'boolean', description: 'Stop running it in production' },
+    'on-error': { type: 'enum', options: ['ignore', 'escalate'], description: 'When the check cannot run in production: let the run continue (ignore) or send it to a person (escalate)' },
   },
   async run({ args, output, mediforce, jsonMode }) {
-    if ((args.on === true) === (args.off === true)) {
-      output.stderr('Pass exactly one of --on or --off');
+    const onError = EvaluatorOnErrorSchema.optional().parse(args['on-error']);
+    if ((args.on === true && args.off === true) || (args.on !== true && args.off !== true && onError === undefined)) {
+      output.stderr('Pass one of --on or --off, --on-error, or both');
       return 2;
     }
-    const result = await mediforce.evaluation.setEvaluatorProduction({ evaluatorId: args.evaluatorId, runInProduction: args.on === true });
+    const result = await mediforce.evaluation.setEvaluatorProduction({
+      evaluatorId: args.evaluatorId,
+      ...(args.on === true || args.off === true ? { runInProduction: args.on === true } : {}),
+      ...(onError === undefined ? {} : { onError }),
+    });
     if (jsonMode) printJson(output, result);
     else output.stdout(describeEvaluator(result.evaluator));
     return 0;

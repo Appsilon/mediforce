@@ -7,7 +7,7 @@ interface RouteContext {
   params: Promise<{ evaluatorId: string }>;
 }
 
-/** POST /api/evaluation/evaluators/:evaluatorId/production — Sets whether an Evaluator also scores live production Agent Runs. */
+/** POST /api/evaluation/evaluators/:evaluatorId/production — Sets whether an Evaluator also scores live production Agent Runs, and whether one that cannot run there escalates the run. */
 export const POST = createRouteAdapter<typeof SetEvaluatorProductionInputSchema, z.infer<typeof SetEvaluatorProductionInputSchema>, unknown, RouteContext>(
   SetEvaluatorProductionInputSchema,
   async (req, ctx) => ({

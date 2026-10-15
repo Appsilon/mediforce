@@ -94,6 +94,21 @@ describe('Evaluators', () => {
     expect(events.map((event) => event.action)).toContain('evaluator.production_enabled');
   });
 
+  it('lets a production run continue when the check cannot run, until set to escalate; the flag stays', async () => {
+    const { evaluator } = await createEvaluator(
+      { ...STEP, name: 'findings-present', rule: 'r', check: findingsSchema, origin: 'user', runInProduction: true },
+      fixture.scope(),
+    );
+    expect(evaluator.onError).toBe('ignore');
+
+    const { evaluator: escalating } = await setEvaluatorProduction({ evaluatorId: evaluator.id, onError: 'escalate' }, fixture.scope());
+
+    expect(escalating).toMatchObject({ runInProduction: true, onError: 'escalate', production: { active: true } });
+    expect(await fixture.evaluationRepo.getEvaluator(evaluator.id)).toMatchObject({ runInProduction: true, onError: 'escalate' });
+    const events = await fixture.auditRepo.getByEntity('evaluator', evaluator.id);
+    expect(events.map((event) => event.action)).toContain('evaluator.production_on_error_set');
+  });
+
   it('never runs an expected-output check in production, and keeps it one', async () => {
     const check = { kind: 'expected_output' as const, model: 'anthropic/claude-haiku-4.5', minAgreement: 0.8, maxAgreement: 0.1 };
     const input = { ...STEP, name: 'matches-expected', rule: 'The output matches the expected output.' as const, check, origin: 'user' as const };

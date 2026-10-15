@@ -89,9 +89,9 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     if (row !== undefined) this.evaluators.set(id, { ...row, archived });
   }
 
-  async setEvaluatorRunInProduction(id: string, runInProduction: boolean): Promise<void> {
+  async setEvaluatorProduction(id: string, settings: Pick<Evaluator, 'runInProduction' | 'onError'>): Promise<void> {
     const row = this.evaluators.get(id);
-    if (row !== undefined) this.evaluators.set(id, { ...row, runInProduction });
+    if (row !== undefined) this.evaluators.set(id, { ...row, ...settings });
   }
 
   async appendEvaluatorVersion(version: EvaluatorVersion): Promise<EvaluatorVersion> {

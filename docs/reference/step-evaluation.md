@@ -230,7 +230,8 @@ check's agreement score is a model's verdict too, reviewed the same way; an
 exact comparison is not reviewable.
 
 `evaluator-archive` archives or restores an Evaluator; `evaluator-production`
-sets whether it also runs in production (see below).
+sets whether it also runs in production, and what a run does when it cannot
+(see below).
 
 ### Expected outputs
 
@@ -302,8 +303,18 @@ autonomy routing, `AgentRunner` hands it to the gate
   Score (`source: llm_judge`, its cost in `metadata.judgeCostUsd`, its
   confidence as in an Eval Run). Its errors
   are logged and never block or fail the step.
-- A check that cannot run, or a gate that throws, never fails the run; it is
-  recorded in the activity log.
+- A `schema` or `code` check that cannot run is recorded in the activity log.
+  What the run does then is the Evaluator's `onError`: `ignore` (the default)
+  lets it continue unchecked; `escalate` fails it with reason
+  `production_evaluator`, as a failing check does. Set it with
+  `evaluator-production <evaluatorId> --on-error ignore|escalate` (the same
+  endpoint, `{ onError }`), the **Ignore / Escalate** choice under the
+  Evaluator's production toggle, or the same choice in an Eval Run's
+  **Problems** tab. A gate that throws as a whole never fails the run.
+- An Eval Run whose Evaluators could not grade some trials says so in a red
+  alert at the top of its **Summary** tab, with what each one does in
+  production; **Problems** lists them with the Ignore / Escalate choice for
+  each production `schema` or `code` one.
 
 ### Drift alerts
 

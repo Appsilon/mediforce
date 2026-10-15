@@ -47,6 +47,7 @@ import { formatCostUsd } from '@/lib/format';
 import { routes } from '@/lib/routes';
 import { AcceptanceBadge, EvalRunStatusBadge } from './eval-run-badges';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
+import { OnErrorChoice, mayEscalate } from './evaluator-outages';
 import { VALIDATION_STATUS } from './validation-status';
 import { VERDICT_CLASSES } from './eval-run-report';
 import { FieldError, describeIssues, invalidClass, parseJson } from './field-errors';
@@ -93,10 +94,11 @@ export function toEvaluatorName(text: string): string {
 const OUTPUT_SCHEMA_NAME = 'output-schema';
 const OUTPUT_SCHEMA_RULE = 'The output matches the JSON Schema.';
 
-function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
+function EvaluatorRow({ step, evaluator, mayEdit, editReason, stepOutputSchema }: {
   step: EvaluatedStep;
   evaluator: EvaluatorView;
   mayEdit: boolean;
+  editReason: string | undefined;
   stepOutputSchema: AgentOutputSchema | undefined;
 }) {
   const approve = useStepEvaluationMutation(step, () =>
@@ -141,7 +143,8 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
           )}>{evaluator.trust.trusted ? 'Counts' : `Not counted — ${evaluator.trust.reason}`}</span>
           {check.kind === 'expected_output' ? (
             <p className="mt-1.5 text-xs text-muted-foreground">Only checks cases that have an expected output; never runs in production.</p>
-          ) : <label className="mt-1.5 flex items-center gap-1.5 text-xs" data-testid="evaluator-production">
+          ) : <>
+          <label className="mt-1.5 flex items-center gap-1.5 text-xs" data-testid="evaluator-production">
             <input
               type="checkbox"
               checked={evaluator.runInProduction}
@@ -154,7 +157,9 @@ function EvaluatorRow({ step, evaluator, mayEdit, stepOutputSchema }: {
                 {evaluator.production.active ? '— scoring live runs' : `— ${evaluator.production.reason ?? 'not active'}`}
               </span>
             )}
-          </label>}
+          </label>
+          {mayEscalate(evaluator) && <div className="mt-1"><OnErrorChoice step={step} evaluator={evaluator} mayEdit={mayEdit} editReason={editReason} /></div>}
+          </>}
         </div>
         {mayEdit && (
           <div className="flex shrink-0 gap-1.5">
@@ -329,10 +334,11 @@ function EvaluatorForm({ initial, editing = false, schemaTaken = false, stepOutp
 }
 
 /** The Step's Evaluators with whether each counts (D9); code source is approved here, by a person. */
-export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
+export function EvaluatorsSection({ step, data, mayEdit, editReason, stepOutputSchema }: {
   step: EvaluatedStep;
   data: StepEvaluation['evaluators'];
   mayEdit: boolean;
+  editReason?: string;
   /** The step's `agent.outputSchema`, offered as the start of a schema check. */
   stepOutputSchema?: AgentOutputSchema;
 }) {
@@ -347,7 +353,7 @@ export function EvaluatorsSection({ step, data, mayEdit, stepOutputSchema }: {
       {data.isLoading ? <Loading /> : evaluators.length === 0 && !adding ? (
         <p className="text-sm text-muted-foreground">No Evaluators yet. Ask the assistant what to check, or add one.</p>
       ) : (
-        <ul className="space-y-2">{evaluators.map((evaluator) => <EvaluatorRow key={evaluator.id} step={step} evaluator={evaluator} mayEdit={mayEdit} stepOutputSchema={stepOutputSchema} />)}</ul>
+        <ul className="space-y-2">{evaluators.map((evaluator) => <EvaluatorRow key={evaluator.id} step={step} evaluator={evaluator} mayEdit={mayEdit} editReason={editReason} stepOutputSchema={stepOutputSchema} />)}</ul>
       )}
       {adding && (
         <EvaluatorForm

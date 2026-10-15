@@ -118,10 +118,16 @@ export const ArchiveEvaluatorInputSchema = z.object({
   archived: z.boolean().default(true),
 });
 
-/** Marks an Evaluator to also score live production Agent Runs of its step (D13). */
+/**
+ * Marks an Evaluator to also score live production Agent Runs of its step
+ * (D13), and what it does there when its check cannot run. What is omitted stays.
+ */
 export const SetEvaluatorProductionInputSchema = z.object({
   evaluatorId: z.uuid(),
-  runInProduction: z.boolean(),
+  runInProduction: z.boolean().optional(),
+  onError: EvaluatorSchema.shape.onError.optional(),
+}).refine((input) => input.runInProduction !== undefined || input.onError !== undefined, {
+  message: 'Set at least one of runInProduction or onError',
 });
 
 /** Records a person's approval of one `code` version's source (D9). */

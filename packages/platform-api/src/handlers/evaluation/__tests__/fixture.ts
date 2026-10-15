@@ -166,7 +166,7 @@ export async function seedSchemaEvaluator(
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   await scope.evaluation.createEvaluator(
-    { ...STEP, id, name: evaluator.name, archived: false, runInProduction: false, createdBy: 'author-1', createdAt },
+    { ...STEP, id, name: evaluator.name, archived: false, runInProduction: false, onError: 'ignore', createdBy: 'author-1', createdAt },
     { evaluatorId: id, version: 1, rule: evaluator.rule, check: { kind: 'schema', schema: { required: evaluator.required } }, origin: 'user', sourceApproval: null, createdBy: 'author-1', createdAt },
   );
 }

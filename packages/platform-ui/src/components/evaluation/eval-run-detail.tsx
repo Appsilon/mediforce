@@ -28,6 +28,7 @@ import { JudgeVerdicts } from './judge-verdicts';
 import { CHECK_KINDS, CheckDetails } from './evaluator-check-editor';
 import { StartEvalRunCard } from './step-evaluation-sections';
 import { buttonClass } from './evaluation-styles';
+import { EvaluatorOutageAlert, EvaluatorOutageSummary } from './evaluator-outages';
 
 const RUN_TABS = ['summary', 'trials', 'evaluators', 'verdicts', 'problems'] as const;
 type RunTab = (typeof RUN_TABS)[number];
@@ -45,6 +46,8 @@ interface RunContext {
   output: EvalRunOutput;
   step: EvaluatedStep;
   trialHref: (trialId: string) => string;
+  mayEdit: boolean;
+  editReason: string | undefined;
 }
 
 function Meta({ label, children }: { label: string; children: React.ReactNode }) {
@@ -244,13 +247,14 @@ function EvaluatorsTab(context: RunContext) {
   );
 }
 
-/** Trials that failed, or that a check could not grade, with why. */
-function ProblemsTab({ output, trialHref }: RunContext) {
+/** Evaluators that could not grade, with what production does then; trials that failed, or that a check could not grade, with why. */
+function ProblemsTab({ output, step, trialHref, mayEdit, editReason }: RunContext) {
   const problems = trialProblems(output);
   const { unrecordedCalls } = output.report.mcp;
   if (problems.length === 0 && unrecordedCalls.length === 0) return <p className="text-sm text-muted-foreground">No trial had a problem.</p>;
   return (
     <div className="space-y-3">
+      <EvaluatorOutageSummary output={output} step={step} mayEdit={mayEdit} editReason={editReason} />
       {unrecordedCalls.length > 0 && (
         <p className="text-xs text-amber-700 dark:text-amber-300">
           Replayed MCP calls no recording answered: {unrecordedCalls.map((call) => `${call.server}.${call.tool} ×${call.count}`).join(', ')}.
@@ -373,6 +377,8 @@ export function EvalRunDetail({ handle, workflowName, evalRunId }: { handle: str
     output,
     step,
     trialHref: (trialId) => routes.workflowEvalTrial(handle, workflowName, evalRun.id, trialId),
+    mayEdit,
+    editReason,
   };
   const leftOut = report.judgeVerdicts.filter((verdict) => verdict.counts === false).length;
   const problems = trialProblems(output).length;
@@ -398,7 +404,8 @@ export function EvalRunDetail({ handle, workflowName, evalRunId }: { handle: str
             <Tabs.Trigger key={value} value={value} className={tabTriggerClass} data-testid={`eval-run-tab-${value}`}>{labels[value]}</Tabs.Trigger>
           ))}
         </Tabs.List>
-        <Tabs.Content value="summary" className="pt-4">
+        <Tabs.Content value="summary" className="space-y-5 pt-4">
+          <EvaluatorOutageAlert output={output} step={step} onOpenProblems={() => select('problems')} />
           <EvalRunSummary output={output} step={step} mayEdit={mayEdit} editReason={editReason} />
         </Tabs.Content>
         <Tabs.Content value="trials" className="pt-4"><TrialsTab {...context} /></Tabs.Content>
