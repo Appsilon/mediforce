@@ -65,9 +65,9 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
     await this.raw.setEvaluatorArchived(evaluator.id, archived);
   };
 
-  setEvaluatorRunInProduction = async (evaluator: Evaluator, runInProduction: boolean): Promise<void> => {
+  setEvaluatorProduction = async (evaluator: Evaluator, settings: Pick<Evaluator, 'runInProduction' | 'onError'>): Promise<void> => {
     this.assertNamespaceWrite(evaluator.namespace);
-    await this.raw.setEvaluatorRunInProduction(evaluator.id, runInProduction);
+    await this.raw.setEvaluatorProduction(evaluator.id, settings);
   };
 
   appendEvaluatorVersion = async (evaluator: Evaluator, version: EvaluatorVersion): Promise<EvaluatorVersion> => {

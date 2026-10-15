@@ -228,7 +228,7 @@ describe('The output schema check', () => {
 
   it('is offered once: a step with one cannot add another', () => {
     const version = { rule: 'x', check: { kind: 'schema', schema: { required: [] } }, origin: 'user', sourceApproval: null, version: 1, createdBy: 'a', createdAt: '2026-09-24T08:00:00.000Z' };
-    const existing = { ...step, id: 'e1', name: 'output-schema', archived: false, runInProduction: false, latest: version, versions: [version], trust: { trusted: true }, production: { active: false } };
+    const existing = { ...step, id: 'e1', name: 'output-schema', archived: false, runInProduction: false, onError: 'ignore', latest: version, versions: [version], trust: { trusted: true }, production: { active: false } };
     render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [existing] } } as never} mayEdit={true} />);
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
 
@@ -245,7 +245,7 @@ describe('Evaluator view and edit', () => {
     origin: 'user', sourceApproval: null, createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z',
   };
   const evaluator = {
-    ...step, id: version.evaluatorId, name: 'grades-justified', archived: false, runInProduction: false,
+    ...step, id: version.evaluatorId, name: 'grades-justified', archived: false, runInProduction: false, onError: 'ignore',
     createdBy: 'author-1', createdAt: '2026-09-24T08:00:00.000Z',
     latest: version, versions: [version], trust: { trusted: true }, production: { active: false },
   };

@@ -85,6 +85,7 @@ function toEvaluator(row: typeof evaluators.$inferSelect): Evaluator {
     name: row.name,
     archived: row.archived,
     runInProduction: row.runInProduction,
+    onError: row.onError,
     createdBy: row.createdBy,
     createdAt: row.createdAt.toISOString(),
   });
@@ -258,6 +259,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
         name: parsed.name,
         archived: parsed.archived,
         runInProduction: parsed.runInProduction,
+        onError: parsed.onError,
         createdBy: parsed.createdBy,
         createdAt: new Date(parsed.createdAt),
       });
@@ -281,8 +283,8 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     await this.db.update(evaluators).set({ archived }).where(eq(evaluators.id, id));
   }
 
-  async setEvaluatorRunInProduction(id: string, runInProduction: boolean): Promise<void> {
-    await this.db.update(evaluators).set({ runInProduction }).where(eq(evaluators.id, id));
+  async setEvaluatorProduction(id: string, settings: Pick<Evaluator, 'runInProduction' | 'onError'>): Promise<void> {
+    await this.db.update(evaluators).set(settings).where(eq(evaluators.id, id));
   }
 
   async appendEvaluatorVersion(version: EvaluatorVersion): Promise<EvaluatorVersion> {

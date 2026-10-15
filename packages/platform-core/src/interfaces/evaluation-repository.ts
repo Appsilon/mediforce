@@ -48,7 +48,7 @@ export interface EvaluationRepository {
   getEvaluator(id: string): Promise<Evaluator | null>;
   listEvaluators(step: EvaluatedStep): Promise<Evaluator[]>;
   setEvaluatorArchived(id: string, archived: boolean): Promise<void>;
-  setEvaluatorRunInProduction(id: string, runInProduction: boolean): Promise<void>;
+  setEvaluatorProduction(id: string, settings: Pick<Evaluator, 'runInProduction' | 'onError'>): Promise<void>;
   appendEvaluatorVersion(version: EvaluatorVersion): Promise<EvaluatorVersion>;
   /** Oldest first. */
   listEvaluatorVersions(evaluatorId: string): Promise<EvaluatorVersion[]>;
