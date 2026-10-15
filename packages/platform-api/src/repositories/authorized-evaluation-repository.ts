@@ -62,7 +62,7 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
     await this.raw.createEvaluator(evaluator, firstVersion);
   };
 
-  getEvaluator = async (id: string): Promise<Evaluator | null> => await this.visible(await this.raw.getEvaluator(id));
+  getEvaluator = async (id: string): Promise<Evaluator | null> => this.visible(await this.raw.getEvaluator(id));
 
   listEvaluators = async (subject: EvaluationSubject): Promise<Evaluator[]> =>
     (await this.canRead(subject)) ? this.raw.listEvaluators(subject) : [];
@@ -96,7 +96,7 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
     return this.raw.createCase(evalCase);
   };
 
-  getCase = async (id: string): Promise<EvalCase | null> => await this.visible(await this.raw.getCase(id));
+  getCase = async (id: string): Promise<EvalCase | null> => this.visible(await this.raw.getCase(id));
 
   listCases = async (subject: EvaluationSubject): Promise<EvalCase[]> =>
     (await this.canRead(subject)) ? this.raw.listCases(subject) : [];
@@ -112,7 +112,7 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   };
 
   getDatasetVersion = async (id: string): Promise<EvalDatasetVersion | null> =>
-    await this.visible(await this.raw.getDatasetVersion(id));
+    this.visible(await this.raw.getDatasetVersion(id));
 
   listDatasetVersions = async (subject: EvaluationSubject): Promise<EvalDatasetVersion[]> =>
     (await this.canRead(subject)) ? this.raw.listDatasetVersions(subject) : [];
@@ -157,7 +157,7 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
     await this.raw.createEvalRun(run, trials);
   };
 
-  getEvalRun = async (id: string): Promise<EvalRun | null> => await this.visible(await this.raw.getEvalRun(id));
+  getEvalRun = async (id: string): Promise<EvalRun | null> => this.visible(await this.raw.getEvalRun(id));
 
   /**
    * The Agent version an Agent's Eval Run assessed (ADR-0029), for whoever may

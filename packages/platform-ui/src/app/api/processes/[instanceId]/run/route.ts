@@ -853,9 +853,7 @@ export async function POST(
               ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
               : {};
             // An Agent's eval trial is given its case's trigger payload and nothing else (ADR-0029 D4).
-            const agentTrialInput = instance.evalDefinition === undefined
-              ? null
-              : (instance.triggerPayload as Record<string, unknown> | undefined) ?? {};
+            const agentTrialInput = instance.evalDefinition === undefined ? null : instance.triggerPayload;
             const stepInput = agentTrialInput ?? { ...previousStepOutput, steps: instance.variables };
 
             const executionId = crypto.randomUUID();

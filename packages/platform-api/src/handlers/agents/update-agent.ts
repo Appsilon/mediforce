@@ -1,4 +1,5 @@
 import type { UpdateAgentInput, UpdateAgentBody, UpdateAgentOutput } from '../../contract/agents';
+import type { AgentDefinition } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
@@ -21,10 +22,8 @@ export async function updateAgent(
   const touchesBindings = input.body.mcpServers !== undefined || input.body.namespace !== undefined;
   if (touchesSkills || touchesBindings) {
     const existing = await scope.agentDefinitions.getForUpdate(input.id);
+    if (input.body.namespace !== undefined) await assertMayLeaveWorkspace(scope, existing, input.body.namespace);
     const merged = { ...existing, ...input.body };
-    if (existing.namespace !== undefined && merged.namespace !== existing.namespace && await ownsEvaluation(scope, existing.namespace, existing.id)) {
-      throw new ConflictError(`Agent '${existing.name}' owns an Evaluation in '${existing.namespace}'; it cannot move to another workspace`);
-    }
     if (touchesSkills) await assertAgentMayHoldSkills(merged, scope);
     if (touchesBindings) await assertBindingsTargetCatalogEntries(scope, merged.namespace, merged.mcpServers);
   }
@@ -47,12 +46,14 @@ export async function updateAgent(
 }
 
 /**
- * Whether an Agent owns Evaluation rows (ADR-0029). They live in its workspace,
- * so moving it would leave its suite behind. Datasets, Qualifications and MCP
- * recordings need a case or an Eval Run, so these lists cover every row.
+ * An Agent that owns Evaluation rows cannot move to another workspace
+ * (ADR-0029): they live in its workspace, so the move would leave its suite
+ * behind. Datasets, Qualifications and MCP recordings need a case or an Eval
+ * Run, so these lists cover every row.
  */
-async function ownsEvaluation(scope: CallerScope, namespace: string, agentId: string): Promise<boolean> {
-  const subject = { kind: 'agent', namespace, agentId } as const;
+async function assertMayLeaveWorkspace(scope: CallerScope, agent: AgentDefinition, namespace: string): Promise<void> {
+  if (agent.namespace === undefined || agent.namespace === namespace) return;
+  const subject = { kind: 'agent', namespace: agent.namespace, agentId: agent.id } as const;
   const { evaluation } = scope;
   const owned = await Promise.all([
     evaluation.listBriefs(subject),
@@ -61,5 +62,7 @@ async function ownsEvaluation(scope: CallerScope, namespace: string, agentId: st
     evaluation.listAcceptanceCriteria(subject),
     evaluation.listEvalRuns(subject),
   ]);
-  return owned.some((rows) => rows.length > 0) || (await evaluation.getMcpPolicy(subject)) !== null;
+  if (owned.some((rows) => rows.length > 0) || (await evaluation.getMcpPolicy(subject)) !== null) {
+    throw new ConflictError(`Agent '${agent.name}' owns an Evaluation in '${agent.namespace}'; it cannot move to another workspace`);
+  }
 }

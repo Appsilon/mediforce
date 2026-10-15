@@ -11,6 +11,7 @@ import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { pollUntil } from '../helpers/poll-until';
 import { AUTH_HEADERS, JSON_HEADERS } from '../helpers/agent-step-runs';
+import { OUTSIDER_NAMESPACE, sessionCookieHeaders, setupMultiNamespaceCallers } from '../helpers/multi-namespace';
 
 /**
  * API E2E for an Agent evaluated on its own (ADR-0029): the Agent owns its
@@ -36,7 +37,7 @@ async function getJson(request: APIRequestContext, path: string) {
   return res.json();
 }
 
-async function createAgent(request: APIRequestContext, name: string): Promise<string> {
+async function createAgent(request: APIRequestContext, name: string, visibility: 'public' | 'private' = 'private'): Promise<string> {
   const { agent } = await post(request, '/api/agents', {
     name,
     iconName: 'Bot',
@@ -47,6 +48,7 @@ async function createAgent(request: APIRequestContext, name: string): Promise<st
     inputDescription: 'Extracted AEs',
     outputDescription: 'Graded AEs',
     namespace: TEST_ORG_HANDLE,
+    visibility,
   }, 201) as { agent: { id: string } };
   return agent.id;
 }
@@ -172,5 +174,27 @@ test.describe('Agent Evaluation — API E2E', () => {
       { headers: AUTH_HEADERS },
     );
     expect(both.status(), await both.text()).toBe(400);
+  });
+
+  test('a public Agent\'s suite is read from any workspace and changed only from its own, and stays with it', async ({ request }) => {
+    const { outsider } = await setupMultiNamespaceCallers();
+    const agentId = await createAgent(request, `AE grader ${randomUUID().slice(0, 8)}`, 'public');
+    const subject = { namespace: TEST_ORG_HANDLE, agentId };
+    const input = { triggerPayload: { events: [{ term: 'Neutropenia', anc: 0.4 }] }, previousStepOutputs: {} };
+    await post(request, '/api/evaluation/cases', { ...subject, name: 'Grade 4 neutropenia', expectation: 'positive', input }, 201);
+
+    const outsiderHeaders = sessionCookieHeaders(outsider);
+    const read = await request.get(`/api/evaluation/cases?namespace=${TEST_ORG_HANDLE}&agentId=${agentId}`, { headers: outsiderHeaders });
+    expect(read.status(), await read.text()).toBe(200);
+    expect(((await read.json()) as { cases: Array<{ name: string }> }).cases.map((evalCase) => evalCase.name)).toEqual(['Grade 4 neutropenia']);
+    const write = await request.post('/api/evaluation/cases', {
+      headers: { ...outsiderHeaders, 'Content-Type': 'application/json' },
+      data: { ...subject, name: 'Outsider case', expectation: 'positive', input },
+    });
+    expect(write.status(), await write.text()).toBe(404);
+
+    // Its suite lives in its workspace, so it cannot move to another one.
+    const moved = await request.put(`/api/agents/${agentId}`, { headers: JSON_HEADERS, data: { namespace: OUTSIDER_NAMESPACE } });
+    expect(moved.status(), await moved.text()).toBe(409);
   });
 });
