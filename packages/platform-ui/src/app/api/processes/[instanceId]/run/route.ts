@@ -852,7 +852,11 @@ export async function POST(
             const previousStepOutput = previousStepId
               ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
               : {};
-            const stepInput = { ...previousStepOutput, steps: instance.variables };
+            // An Agent's eval trial is given its case's trigger payload and nothing else (ADR-0029 D4).
+            const agentTrialInput = instance.evalDefinition === undefined
+              ? null
+              : (instance.triggerPayload as Record<string, unknown> | undefined) ?? {};
+            const stepInput = agentTrialInput ?? { ...previousStepOutput, steps: instance.variables };
 
             const executionId = crypto.randomUUID();
             // Iteration count = number of prior executions of this same step on
@@ -897,7 +901,7 @@ export async function POST(
               processDefinitionVersion: initialInstance.definitionVersion,
             });
 
-            const mergedAppContext = { ...appContext, ...stepInput };
+            const mergedAppContext = agentTrialInput ?? { ...appContext, ...stepInput };
             // Register this execution as in-flight for the shutdown hook
             // (ADR-0010 §4): if a deploy SIGTERMs this process while the plugin
             // is running, the hook marks `executionId` interrupted so the next

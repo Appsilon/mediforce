@@ -25,12 +25,20 @@ import type {
 import type { CallerIdentity } from '../auth';
 import { AuthorizedScope } from './authorized-repository';
 
+/** What a subject or row names its owner by: a Step's has no `agentId`, an Agent's does. */
+interface EvaluationOwnerRef {
+  readonly namespace: string;
+  readonly agentId?: string | null;
+}
+
 /**
- * The Evaluation domain (ADR-0023), gated on the Step's workspace. A call that
+ * The Evaluation domain (ADR-0023), gated on its owner's workspace. A call that
  * names a Step outside the caller's workspaces reads as empty; a row fetched by
- * id from another workspace reads as `null`, which handlers turn into 404.
- * Writes into another workspace are refused. Whether the caller may *change* a
- * Step's evaluation is the workflow's `edit` verb, asked by the handler.
+ * id from another workspace reads as `null`, which handlers turn into 404. An
+ * Agent's Evaluation is read by whoever may see the Agent (ADR-0029), so a
+ * public Agent's reads from every workspace. Writes into another workspace are
+ * refused. Whether the caller may *change* a Step's evaluation is the
+ * workflow's `edit` verb, asked by the handler.
  */
 export class AuthorizedEvaluationRepository extends AuthorizedScope {
   constructor(
@@ -47,17 +55,17 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   };
 
   listBriefs = async (subject: EvaluationSubject): Promise<EvaluationBrief[]> =>
-    this.canSeeNamespace(subject.namespace) ? this.raw.listBriefs(subject) : [];
+    (await this.canRead(subject)) ? this.raw.listBriefs(subject) : [];
 
   createEvaluator = async (evaluator: Evaluator, firstVersion: EvaluatorVersion): Promise<void> => {
     this.assertNamespaceWrite(evaluator.namespace);
     await this.raw.createEvaluator(evaluator, firstVersion);
   };
 
-  getEvaluator = async (id: string): Promise<Evaluator | null> => this.visible(await this.raw.getEvaluator(id));
+  getEvaluator = async (id: string): Promise<Evaluator | null> => await this.visible(await this.raw.getEvaluator(id));
 
   listEvaluators = async (subject: EvaluationSubject): Promise<Evaluator[]> =>
-    this.canSeeNamespace(subject.namespace) ? this.raw.listEvaluators(subject) : [];
+    (await this.canRead(subject)) ? this.raw.listEvaluators(subject) : [];
 
   /** The versions of an Evaluator the caller can see, oldest first; `[]` when it is not visible. */
   listEvaluatorVersions = async (evaluatorId: string): Promise<EvaluatorVersion[]> =>
@@ -88,10 +96,10 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
     return this.raw.createCase(evalCase);
   };
 
-  getCase = async (id: string): Promise<EvalCase | null> => this.visible(await this.raw.getCase(id));
+  getCase = async (id: string): Promise<EvalCase | null> => await this.visible(await this.raw.getCase(id));
 
   listCases = async (subject: EvaluationSubject): Promise<EvalCase[]> =>
-    this.canSeeNamespace(subject.namespace) ? this.raw.listCases(subject) : [];
+    (await this.canRead(subject)) ? this.raw.listCases(subject) : [];
 
   setCaseArchived = async (evalCase: EvalCase, archived: boolean): Promise<void> => {
     this.assertNamespaceWrite(evalCase.namespace);
@@ -104,13 +112,13 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   };
 
   getDatasetVersion = async (id: string): Promise<EvalDatasetVersion | null> =>
-    this.visible(await this.raw.getDatasetVersion(id));
+    await this.visible(await this.raw.getDatasetVersion(id));
 
   listDatasetVersions = async (subject: EvaluationSubject): Promise<EvalDatasetVersion[]> =>
-    this.canSeeNamespace(subject.namespace) ? this.raw.listDatasetVersions(subject) : [];
+    (await this.canRead(subject)) ? this.raw.listDatasetVersions(subject) : [];
 
   getMcpPolicy = async (subject: EvaluationSubject): Promise<McpEvalPolicy | null> =>
-    this.canSeeNamespace(subject.namespace) ? this.raw.getMcpPolicy(subject) : null;
+    (await this.canRead(subject)) ? this.raw.getMcpPolicy(subject) : null;
 
   putMcpPolicy = async (policy: McpEvalPolicy): Promise<McpEvalPolicy> => {
     this.assertNamespaceWrite(policy.namespace);
@@ -123,10 +131,10 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   };
 
   listMcpRecordings = async (subject: EvaluationSubject, filter?: McpRecordingFilter): Promise<McpRecording[]> =>
-    this.canSeeNamespace(subject.namespace) ? this.raw.listMcpRecordings(subject, filter) : [];
+    (await this.canRead(subject)) ? this.raw.listMcpRecordings(subject, filter) : [];
 
   listMcpRecordedCases = async (subject: EvaluationSubject, filter?: McpRecordedCaseFilter): Promise<McpRecordedCase[]> =>
-    this.canSeeNamespace(subject.namespace) ? this.raw.listMcpRecordedCases(subject, filter) : [];
+    (await this.canRead(subject)) ? this.raw.listMcpRecordedCases(subject, filter) : [];
 
   appendAcceptanceCriteria = async (criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> => {
     this.assertNamespaceWrite(criteria.namespace);
@@ -134,7 +142,7 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   };
 
   listAcceptanceCriteria = async (subject: EvaluationSubject): Promise<AcceptanceCriteriaVersion[]> =>
-    this.canSeeNamespace(subject.namespace) ? this.raw.listAcceptanceCriteria(subject) : [];
+    (await this.canRead(subject)) ? this.raw.listAcceptanceCriteria(subject) : [];
 
   createQualification = async (qualification: StepQualification): Promise<StepQualification> => {
     this.assertNamespaceWrite(qualification.namespace);
@@ -142,14 +150,14 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   };
 
   listQualifications = async (subject: EvaluationSubject): Promise<StepQualification[]> =>
-    this.canSeeNamespace(subject.namespace) ? this.raw.listQualifications(subject) : [];
+    (await this.canRead(subject)) ? this.raw.listQualifications(subject) : [];
 
   createEvalRun = async (run: EvalRun, trials: readonly EvalTrial[]): Promise<void> => {
     this.assertNamespaceWrite(run.namespace);
     await this.raw.createEvalRun(run, trials);
   };
 
-  getEvalRun = async (id: string): Promise<EvalRun | null> => this.visible(await this.raw.getEvalRun(id));
+  getEvalRun = async (id: string): Promise<EvalRun | null> => await this.visible(await this.raw.getEvalRun(id));
 
   /**
    * The Agent version an Agent's Eval Run assessed (ADR-0029), for whoever may
@@ -163,7 +171,7 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   };
 
   listEvalRuns = async (subject: EvaluationSubject): Promise<EvalRun[]> =>
-    this.canSeeNamespace(subject.namespace) ? this.raw.listEvalRuns(subject) : [];
+    (await this.canRead(subject)) ? this.raw.listEvalRuns(subject) : [];
 
   /** The Eval Runs the heartbeat moves on, across workspaces — system actors only. */
   listEvalRunIdsToDrive = async (): Promise<string[]> =>
@@ -216,7 +224,14 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
     this.assertNamespaceWrite(run?.namespace);
   }
 
-  private visible<T extends { namespace: string }>(row: T | null): T | null {
-    return row !== null && this.canSeeNamespace(row.namespace) ? row : null;
+  private async visible<T extends EvaluationOwnerRef>(row: T | null): Promise<T | null> {
+    return row !== null && (await this.canRead(row)) ? row : null;
+  }
+
+  private async canRead(owner: EvaluationOwnerRef): Promise<boolean> {
+    if (this.caller.isSystemActor || this.canSeeNamespace(owner.namespace)) return true;
+    if (typeof owner.agentId !== 'string') return false;
+    const agent = await this.agentDefinitions.getByIdVisibleTo(owner.agentId, [...this.caller.namespaces]);
+    return agent !== null && agent.namespace === owner.namespace;
   }
 }

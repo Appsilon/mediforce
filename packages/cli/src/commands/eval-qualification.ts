@@ -43,7 +43,7 @@ export const evalCriteriaSetCommand = defineCommand({
 export const evalQualificationCommand = defineCommand({
   name: 'mediforce eval qualification',
   description: 'Print a step\'s qualification: Qualified, Stale (and what changed) or Not qualified. A person confirms or overwrites an Eval Run\'s verdict in the Evaluation tab.',
-  args: { ...SUBJECT_ARGS, version: { type: 'string', description: 'Definition version (default: the runnable one)' } },
+  args: { ...SUBJECT_ARGS, version: { type: 'string', description: 'Definition version of a step (default: the runnable one); an agent is read as it is now' } },
   async run({ args, output, mediforce, jsonMode }) {
     const version = parsePositiveIntArg(args.version);
     if (version === 'invalid') {
@@ -59,7 +59,10 @@ export const evalQualificationCommand = defineCommand({
       return 0;
     }
     output.stdout(`validation ${STEP_VALIDATION_LABEL[result.validation.status]}: ${result.validation.reason}${result.validation.runInProgress ? ' (an Eval Run is running)' : ''}`);
-    output.stdout(`${QUALIFICATION_LABEL[result.status]}  (v${result.definitionVersion}, fingerprint ${result.fingerprint.hash.slice(0, 12)})`);
+    const versionLabel = result.definitionVersion === null
+      ? result.agentVersion === null ? 'agent changed since its newest version' : `agent v${result.agentVersion}`
+      : `v${result.definitionVersion}`;
+    output.stdout(`${QUALIFICATION_LABEL[result.status]}  (${versionLabel}, fingerprint ${result.fingerprint.hash.slice(0, 12)})`);
     const { qualification } = result;
     if (qualification === null) return 0;
     output.stdout(`verdict ${qualification.decision} by ${qualification.signature.signerName} at ${qualification.signature.signedAt} for Eval Run ${qualification.evalRunId}`);

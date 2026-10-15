@@ -153,6 +153,11 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     expect(await getStepQualification({ ...STEP, definitionVersion: 1 }, scope)).toMatchObject({ status: 'qualified' });
   });
 
+  it('refuses a workflow version for an agent, which is read as it is now', async () => {
+    await expect(getStepQualification({ namespace: NAMESPACE, agentId: 'ae-grader', definitionVersion: 1 }, fixture.scope()))
+      .rejects.toThrow('has no workflow version to pick');
+  });
+
   it('takes a justification only to overwrite the verdict; confirming a missed verdict qualifies nothing', async () => {
     const missedRunId = await finishedRun();
     await expect(signStepQualification({ evalRunId: missedRunId, decision: 'overwritten' }, scope))

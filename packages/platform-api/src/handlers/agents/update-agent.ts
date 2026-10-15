@@ -1,5 +1,6 @@
 import type { UpdateAgentInput, UpdateAgentBody, UpdateAgentOutput } from '../../contract/agents';
 import type { CallerScope } from '../../repositories/index';
+import { ConflictError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
 import { assertAgentMayHoldSkills } from '../skills/may-hold-skills';
 import { assertBindingsTargetCatalogEntries } from './mcp-bindings';
@@ -19,7 +20,11 @@ export async function updateAgent(
   const touchesSkills = input.body.skills !== undefined || input.body.visibility !== undefined || input.body.namespace !== undefined;
   const touchesBindings = input.body.mcpServers !== undefined || input.body.namespace !== undefined;
   if (touchesSkills || touchesBindings) {
-    const merged = { ...(await scope.agentDefinitions.getForUpdate(input.id)), ...input.body };
+    const existing = await scope.agentDefinitions.getForUpdate(input.id);
+    const merged = { ...existing, ...input.body };
+    if (existing.namespace !== undefined && merged.namespace !== existing.namespace && await ownsEvaluation(scope, existing.namespace, existing.id)) {
+      throw new ConflictError(`Agent '${existing.name}' owns an Evaluation in '${existing.namespace}'; it cannot move to another workspace`);
+    }
     if (touchesSkills) await assertAgentMayHoldSkills(merged, scope);
     if (touchesBindings) await assertBindingsTargetCatalogEntries(scope, merged.namespace, merged.mcpServers);
   }
@@ -39,4 +44,22 @@ export async function updateAgent(
     ...(agent.namespace !== undefined ? { namespace: agent.namespace } : {}),
   });
   return { agent };
+}
+
+/**
+ * Whether an Agent owns Evaluation rows (ADR-0029). They live in its workspace,
+ * so moving it would leave its suite behind. Datasets, Qualifications and MCP
+ * recordings need a case or an Eval Run, so these lists cover every row.
+ */
+async function ownsEvaluation(scope: CallerScope, namespace: string, agentId: string): Promise<boolean> {
+  const subject = { kind: 'agent', namespace, agentId } as const;
+  const { evaluation } = scope;
+  const owned = await Promise.all([
+    evaluation.listBriefs(subject),
+    evaluation.listEvaluators(subject),
+    evaluation.listCases(subject),
+    evaluation.listAcceptanceCriteria(subject),
+    evaluation.listEvalRuns(subject),
+  ]);
+  return owned.some((rows) => rows.length > 0) || (await evaluation.getMcpPolicy(subject)) !== null;
 }

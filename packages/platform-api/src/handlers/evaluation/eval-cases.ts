@@ -76,6 +76,21 @@ async function storeCase(scope: CallerScope, evalCase: EvalCase): Promise<EvalCa
   return { evalCase: stored };
 }
 
+/**
+ * An Agent's case gives it its trigger payload alone, from an empty workspace
+ * (ADR-0029 D4): earlier steps, a previous run and a workspace seed belong to a
+ * Step's case.
+ */
+function assertAgentCaseInput(subject: EvaluationSubject, evalCase: Pick<EvalCase, 'input' | 'workspaceSeedCommit'>): void {
+  if (subject.kind !== 'agent') return;
+  if (evalCase.workspaceSeedCommit !== null) {
+    throw new ValidationError(`An Eval Case of ${subjectName(subject, false)} starts from an empty workspace; it takes no workspace seed commit`);
+  }
+  if (Object.keys(evalCase.input.previousStepOutputs).length > 0 || evalCase.input.previousRun !== undefined) {
+    throw new ValidationError(`An Eval Case of ${subjectName(subject, false)} is given its trigger payload alone; it takes no previousStepOutputs or previousRun`);
+  }
+}
+
 /** A hand-written Eval Case. */
 export async function createEvalCase(
   input: z.output<typeof CreateEvalCaseInputSchema>,
@@ -83,9 +98,7 @@ export async function createEvalCase(
 ): Promise<EvalCaseOutput> {
   const step = subjectRef(input);
   await loadEvaluationSubject(scope, step, 'edit');
-  if (step.kind === 'agent' && input.workspaceSeedCommit !== null) {
-    throw new ValidationError(`An Eval Case of ${subjectName(step, false)} starts from an empty workspace; it takes no workspace seed commit`);
-  }
+  assertAgentCaseInput(step, input);
   return storeCase(scope, {
     ...evaluationOwnerOf(step),
     id: randomUUID(),
@@ -229,6 +242,7 @@ export async function updateEvalCase(
 
   if (changed.includes('evaluatorIds')) await checkSelectedEvaluators(scope, subjectRef(evalCase), changes.evaluatorIds ?? null);
   const inputEdited = changed.includes('input');
+  if (inputEdited && changes.input !== undefined) assertAgentCaseInput(subjectRef(evalCase), { ...evalCase, input: changes.input });
   const stored = await scope.evaluation.createCase({
     ...evalCase,
     ...Object.fromEntries(changed.map((field) => [field, changes[field]])),

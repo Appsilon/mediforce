@@ -66,9 +66,10 @@ test.describe('Agent Evaluation — API E2E', () => {
       ...subject, name: 'summary-present', rule: 'The result carries a summary.',
       check: { kind: 'schema', schema: { required: ['summary'] } },
     }, 201);
+    const triggerPayload = { events: [{ term: 'Neutropenia', anc: 0.4 }] };
     await post(request, '/api/evaluation/cases', {
       ...subject, name: 'Grade 4 neutropenia', expectation: 'positive',
-      input: { triggerPayload: { events: [{ term: 'Neutropenia', anc: 0.4 }] }, previousStepOutputs: {} },
+      input: { triggerPayload, previousStepOutputs: {} },
     }, 201);
     await post(request, '/api/evaluation/acceptance-criteria', { ...subject, criteria: { minPassRate: 1 } }, 201);
     await post(request, '/api/evaluation/datasets', subject, 201);
@@ -102,6 +103,9 @@ test.describe('Agent Evaluation — API E2E', () => {
       // A real single-step run of the Agent, which no stored Workflow holds.
       const instance = await getJson(request, `/api/processes/${trial.processInstanceId}`) as Record<string, unknown>;
       expect(instance).toMatchObject({ evalRunId: prepared.evalRun.id, status: 'completed', definitionName: `agent:${agentId}`, definitionVersion: '1' });
+      // The case's trigger payload is the Agent's whole input: no outputs of earlier steps.
+      const detail = await getJson(request, `/api/evaluation/runs/${prepared.evalRun.id}/trials/${trial.id}`) as { stepInput: unknown };
+      expect(detail.stepInput).toEqual(triggerPayload);
     }
     expect(finished.report.evaluators[0]).toMatchObject({ name: 'summary-present', passes: 2, failures: 0 });
     expect(finished.evalRun.acceptance?.status).toBe('met');
@@ -141,7 +145,7 @@ test.describe('Agent Evaluation — API E2E', () => {
     expect(afterDelete.assessedAgentVersion).toMatchObject({ agentId, version: 1, config: { systemPrompt: 'You grade adverse events by CTCAE v5.' } });
   });
 
-  test('refuses what only a workflow step has: production Evaluators, workspace seeds, and naming both owners', async ({ request }) => {
+  test('refuses what only a workflow step has: production Evaluators, workspace seeds, earlier step outputs, and naming both owners', async ({ request }) => {
     const agentId = await createAgent(request, `AE grader ${randomUUID().slice(0, 8)}`);
     const subject = { namespace: TEST_ORG_HANDLE, agentId };
 
@@ -156,6 +160,12 @@ test.describe('Agent Evaluation — API E2E', () => {
       data: { ...subject, name: 'Seeded', expectation: 'positive', input: { triggerPayload: {}, previousStepOutputs: {} }, workspaceSeedCommit: 'a1b2c3d4e5f6' },
     });
     expect(seeded.status(), await seeded.text()).toBe(400);
+
+    const withEarlierSteps = await request.post('/api/evaluation/cases', {
+      headers: JSON_HEADERS,
+      data: { ...subject, name: 'Earlier steps', expectation: 'positive', input: { triggerPayload: {}, previousStepOutputs: { extract: { events: [] } } } },
+    });
+    expect(withEarlierSteps.status(), await withEarlierSteps.text()).toBe(400);
 
     const both = await request.get(
       `/api/evaluation/cases?namespace=${TEST_ORG_HANDLE}&agentId=${agentId}&workflowName=some-workflow&stepId=grade-aes`,

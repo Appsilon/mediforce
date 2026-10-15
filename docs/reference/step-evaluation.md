@@ -829,7 +829,14 @@ Criteria, Eval Runs and Qualification work as above, with these differences:
   them. Validation reads the newest finished run of the current version.
 - **A trial runs the Agent alone**: a single agent step with no prompt, model,
   Skills or MCP restrictions of its own. A case's `triggerPayload` is the whole
-  input, and the workspace starts empty — a case takes no workspace seed.
+  input — a case takes no `previousStepOutputs` or `previousRun` — and the
+  workspace starts empty, so it takes no workspace seed either.
+- **The suite follows the Agent.** Whoever can see the Agent can read its
+  Evaluation — every workspace, for a public Agent; only its own workspace can
+  change it or run it. An Agent that owns an Evaluation cannot move to another
+  workspace (409): its suite lives in the workspace it has now.
+- `mediforce eval qualification --agent <id>` reads the Agent as it is now and
+  prints its Agent version; `--version` is for a step.
 - **No production features.** An Agent has no production runs of its own, so
   harvesting or perturbing cases, previewing a check, drift and production
   Evaluators are refused. Write cases by hand.

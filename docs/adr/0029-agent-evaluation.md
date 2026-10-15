@@ -64,8 +64,9 @@ point at.
    carries it as `evalDefinition`, and the engine, the auto-runner and the agent
    step executor read it from there. Engine, executors, Agent Run, Trajectory,
    cost and audit stay the production path. The Eval Case's `triggerPayload`
-   is the Agent's whole input; its workspace starts empty, so an Agent's case
-   takes no workspace seed.
+   is the Agent's whole input — the trial's step is given it alone, and an
+   Agent's case takes no `previousStepOutputs` or `previousRun`; its workspace
+   starts empty, so the case takes no workspace seed.
 
 5. **Production-only features stay a Step's.** An Agent has no production runs
    of its own — its runs belong to the Steps that use it. Harvesting a case
@@ -81,7 +82,9 @@ point at.
    and `not_verified` once the Agent changed since; a Qualification of it
    cites `agentVersion` and is signed as for a Step (ADR-0023 D10, D11).
    Reading and changing an Agent's Evaluation follows the Agent: reading needs
-   to see it, editing and running need to be allowed to change it.
+   to see it, editing and running need to be allowed to change it. Its rows
+   stay in the Agent's workspace, so an Agent that owns any cannot move to
+   another workspace.
 
 ## Considered options
 

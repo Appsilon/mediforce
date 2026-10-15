@@ -266,6 +266,20 @@ describe('mediforce eval', () => {
     expect(output.stdoutLines).toEqual(['validation not verified: No Eval Run of version 3 has finished yet.', `not qualified  (v3, fingerprint ${'a'.repeat(12)})`]);
   });
 
+  it('qualification of an agent prints the agent version it is about', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      status: 'not_qualified', qualification: null, definitionVersion: null, agentVersion: 2,
+      validation: { status: 'not_verified', evalRunId: null, reason: 'No Eval Run of agent version 2 has finished yet.', runInProgress: false },
+      fingerprint: { hash: 'a'.repeat(64), components: Object.fromEntries(['step', 'model', 'systemPrompt', 'skill', 'image', 'mcpServers', 'preamble'].map((component) => [component, 'b'.repeat(64)])) },
+      changed: [], evaluatorsChanged: [], history: [],
+    }));
+    const output = captureOutput();
+    const code = await evalQualificationCommand({ argv: ['--namespace', 'pharma-a', '--agent', 'ae-grader', ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    expect(output.stdoutLines).toEqual(['validation not verified: No Eval Run of agent version 2 has finished yet.', `not qualified  (agent v2, fingerprint ${'a'.repeat(12)})`]);
+  });
+
   it('validation prints each workflow version and its agent steps', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
       versions: [

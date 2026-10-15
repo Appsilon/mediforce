@@ -28,7 +28,7 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, ForbiddenError, NotFoundError, PreconditionFailedError, ValidationError } from '../../errors';
-import { inlineMcpReason, loadEvaluationSubject, subjectRef, runVersionOf } from './_lib/evaluation-subject';
+import { inlineMcpReason, loadEvaluationSubject, subjectName, subjectRef, runVersionOf } from './_lib/evaluation-subject';
 import { appendEvaluationAudit } from './_lib/audit';
 import { currentAgentVersion } from '../agents/_lib/agent-version';
 import { buildEvalRunReport, rebuildEvalRunAcceptance } from './_lib/eval-run-report';
@@ -186,7 +186,10 @@ export async function getStepQualification(
   scope: CallerScope,
 ): Promise<GetStepQualificationOutput> {
   const step = subjectRef(input);
-  const { definition, step: workflowStep, agent } = await loadEvaluationSubject(scope, step, 'read', step.kind === 'step' ? input.definitionVersion : undefined);
+  if (step.kind === 'agent' && input.definitionVersion !== undefined) {
+    throw new ValidationError(`${subjectName(step)} is read as it is now; it has no workflow version to pick`);
+  }
+  const { definition, step: workflowStep, agent } = await loadEvaluationSubject(scope, step, 'read', input.definitionVersion);
   const fingerprint = await computeStepFingerprint(scope, definition, workflowStep);
   const rows = subjectRows(scope, step);
   const agentVersion = agent === null ? null : await currentAgentVersion(scope, agent);
