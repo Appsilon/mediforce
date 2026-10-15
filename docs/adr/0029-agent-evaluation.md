@@ -72,7 +72,12 @@ point at.
    of its own — its runs belong to the Steps that use it. Harvesting a case
    from a run, perturbing one, previewing a check on past outputs, drift, and
    production Evaluators (ADR-0023 D13) are refused for an Agent; the
-   Evaluation Assistant is told so and writes cases by hand. Only a container
+   Evaluation Assistant is told so and writes cases by hand. _Amended
+   2026-10-15: it may read the production runs of the Steps that use the Agent
+   — in a version that gave the step this Agent — and write the Agent's cases
+   from what they were given, flagged as containing production data. They
+   stay written cases: nothing is harvested. The assistant is one, with a
+   toolset per subject (ADR-0023 D14)._ Only a container
    (`plugin`) Agent of a workspace, with a runtime, is evaluated: a cowork
    Agent has no single output to grade, and a platform-global Agent has no
    workspace for its Evaluation to live in.

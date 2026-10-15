@@ -177,6 +177,17 @@ interleaved with its graph-completeness gates and truncation salvage. The
 cowork chat (`handlers/cowork/`) is a separate OpenRouter loop and does not use
 the core.
 
+The Evaluation Assistant is one assistant for a Step and for an Agent
+evaluated on its own ([ADR-0029](../../docs/adr/0029-agent-evaluation.md)): one
+catalog of tool schemas (`EVALUATION_ASSISTANT_PLATFORM_TOOLS` /
+`…_PROPOSAL_TOOLS`), one executor (`_lib/run-evaluation-tool.ts`) and one
+system prompt with a shared core (`_lib/system-prompt.ts`). What each subject
+is offered is a selection from the catalog, `EVALUATION_ASSISTANT_TOOLSETS`:
+an Agent reads itself (`get_agent`) and the production runs of the Steps that
+use it (`list_agent_production_runs`, from `evaluation/_lib/agent-production-runs.ts`)
+in place of a Step's own reads, previews, synthesized cases and routing. A
+tool added for both lands in both toolsets; one for a single subject, in its own.
+
 A request may grant the Evaluation Assistant an unattended budget
 (`unattendedBudgetUsd`): `start_eval_run` then starts prepared runs of the step
 that fit what is left of it, as a person confirming each run's budget

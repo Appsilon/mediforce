@@ -291,6 +291,8 @@ export {
   FixKindSchema,
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
+  EVALUATION_ASSISTANT_TOOLSETS,
+  pickTools,
   EvaluationAssistantProposalSchema,
   type EvaluationAssistantProposalToolName,
   type EvaluationAssistantPlatformToolName,

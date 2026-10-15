@@ -59,6 +59,8 @@ const FOLLOW_LATEST_THRESHOLD = 48;
 
 const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssistantProposalToolName, string> = {
   get_step: 'Reading the step',
+  get_agent: 'Reading the agent',
+  list_agent_production_runs: 'Finding production runs of steps using the agent',
   list_step_runs: 'Listing recent runs',
   get_agent_run: 'Reading an agent run',
   get_trajectory: 'Reading a run trajectory',
@@ -71,7 +73,7 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   preview_evaluator: 'Previewing a check on real runs',
   prepare_eval_run: 'Preparing an eval run',
   start_eval_run: 'Starting an eval run',
-  get_qualification: 'Reading the step\'s qualification',
+  get_qualification: 'Reading the qualification',
   propose_evaluation_plan: 'Drafting an evaluation plan',
   propose_evaluator: 'Drafting an evaluator',
   propose_evaluator_version: 'Drafting a new evaluator version',

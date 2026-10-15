@@ -4,6 +4,7 @@ import {
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   SKILL_MANIFEST_PATH,
   isOwnedBy,
+  type AgentDefinition,
   type Evaluator,
   type EvaluationSubject,
   type EvaluationAssistantPlatformToolName,
@@ -23,7 +24,8 @@ import type { CallerScope } from '../../../repositories/index';
 import { NotFoundError, ValidationError } from '../../../errors';
 import { getMcpEvalPolicy } from '../../evaluation/mcp-eval-policy';
 import { listStepAgentRuns } from '../../evaluation/step-agent-runs';
-import { loadScoredRun } from '../../evaluation/_lib/scored-run';
+import { isTrialOfAgent, loadScoredRun, type ScoredRun } from '../../evaluation/_lib/scored-run';
+import { isProductionRunOfAgent, listAgentProductionRuns } from '../../evaluation/_lib/agent-production-runs';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
 import { stepOnly } from '../../evaluation/_lib/evaluation-subject';
 import { loadEvaluator } from '../../evaluation/_lib/evaluator-view';
@@ -135,6 +137,26 @@ async function loadStepEvalRun(scope: CallerScope, step: EvaluationSubject, eval
   return output;
 }
 
+/**
+ * An Agent Run the assistant may read: of a Step, one of its own; of an Agent
+ * (ADR-0029), one of its eval trials or a production run of a Step that used
+ * it — any other reads as refused.
+ */
+async function loadSubjectRun(scope: CallerScope, subject: EvaluationSubject, agentRunId: string): Promise<ScoredRun> {
+  if (subject.kind === 'step') return loadScoredRun(scope, agentRunId, subject);
+  const run = await loadScoredRun(scope, agentRunId);
+  if (isTrialOfAgent(run.agentRun, run.instance, subject) || await isProductionRunOfAgent(scope, subject, run.agentRun, run.instance)) {
+    return run;
+  }
+  throw new ValidationError(`Agent Run '${agentRunId}' is neither an eval trial of this agent nor a production run of a step that uses it`);
+}
+
+/** The reviewer's newest verdict on a run, as the assistant reads it. */
+async function reviewVerdict(scope: CallerScope, agentRunId: string) {
+  const [verdict] = await scope.scores.list({ agentRunId, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 });
+  return verdict === undefined ? null : { verdict: verdict.label, comment: verdict.comment };
+}
+
 const MAX_LISTED_FILES = 300;
 
 /**
@@ -150,6 +172,8 @@ export interface EvaluationToolContext {
   readonly step: EvaluationSubject;
   readonly definition: WorkflowDefinition;
   readonly workflowStep: WorkflowStep;
+  /** The Agent an Agent's Evaluation is about; null for a Step's. */
+  readonly agent: AgentDefinition | null;
   /** Present only when the request was granted an unattended budget. */
   readonly unattended?: UnattendedGrant;
 }
@@ -165,7 +189,7 @@ export async function executeEvaluationTool(
   scope: CallerScope,
   context: EvaluationToolContext,
 ): Promise<unknown> {
-  const { step, definition, workflowStep, unattended } = context;
+  const { step, definition, workflowStep, agent, unattended } = context;
   switch (toolName) {
     case 'get_step': {
       const agent = workflowStep.agentId === undefined ? null : await scope.agentDefinitions.getById(workflowStep.agentId);
@@ -191,31 +215,71 @@ export async function executeEvaluationTool(
         skills: await offeredSkills(scope, definition, workflowStep),
       };
     }
+    case 'get_agent': {
+      if (agent === null) throw new ValidationError('get_agent reads an Agent evaluated on its own; this is a step — read it with get_step');
+      return {
+        agent: {
+          name: agent.name,
+          description: agent.description,
+          runtimeId: agent.runtimeId ?? null,
+          foundationModel: agent.foundationModel,
+          inputDescription: agent.inputDescription,
+          outputDescription: agent.outputDescription,
+          systemPrompt: clip(agent.systemPrompt, 8000),
+        },
+        version: definition.version,
+        mcpServers: await effectiveMcpServers(scope, step, workflowStep),
+        skills: await offeredSkills(scope, definition, workflowStep),
+      };
+    }
+    case 'list_agent_production_runs': {
+      if (step.kind !== 'agent') throw new ValidationError('list_agent_production_runs is for an Agent evaluated on its own; a step lists its runs with list_step_runs');
+      const { limit } = args as Args<'list_agent_production_runs'>;
+      const { usages, runs } = await listAgentProductionRuns(scope, step, limit ?? 10);
+      const reviewed = await Promise.all(runs.map(async ({ usage, agentRun, instance }) => ({
+        agentRunId: agentRun.id,
+        workflowName: usage.workflowName,
+        stepId: usage.stepId,
+        status: agentRun.status,
+        fallbackReason: agentRun.fallbackReason,
+        startedAt: agentRun.startedAt,
+        reviewVerdict: await reviewVerdict(scope, agentRun.id),
+        triggerPayload: clip(instance.triggerPayload ?? {}, 2000),
+        result: clip(agentRun.envelope?.result ?? null, 600),
+      })));
+      return {
+        steps: usages.map((usage) => ({
+          workflowName: usage.workflowName,
+          stepId: usage.stepId,
+          stepName: usage.step.name,
+          versions: usage.versions,
+          stepAgentConfig: clip(usage.step.agent ?? {}, 2000),
+        })),
+        runs: reviewed,
+      };
+    }
     case 'list_step_runs': {
       const { limit } = args as Args<'list_step_runs'>;
       const { runs } = await listStepAgentRuns({ ...stepOnly(step, 'Listing production runs'), limit: limit ?? 10 }, scope);
-      const reviewed = await Promise.all(runs.map(async (run) => ({
-        run,
-        verdict: (await scope.scores.list({ agentRunId: run.id, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 }))[0] ?? null,
-      })));
       return {
-        runs: reviewed.map(({ run, verdict }) => ({
+        runs: await Promise.all(runs.map(async (run) => ({
           agentRunId: run.id,
           status: run.status,
           fallbackReason: run.fallbackReason,
           startedAt: run.startedAt,
-          reviewVerdict: verdict === null ? null : { verdict: verdict.label, comment: verdict.comment },
+          reviewVerdict: await reviewVerdict(scope, run.id),
           result: clip(run.envelope?.result ?? null, 600),
-        })),
+        }))),
       };
     }
     case 'get_agent_run': {
       const { agentRunId } = args as Args<'get_agent_run'>;
-      const subject = await loadScoredRun(scope, agentRunId, step);
+      const subject = await loadSubjectRun(scope, step, agentRunId);
       return {
         agentRunId,
         status: subject.agentRun.status,
         fallbackReason: subject.agentRun.fallbackReason,
+        triggerPayload: clip(subject.instance.triggerPayload ?? {}, 6000),
         stepInput: clip(subject.stepInput, 6000),
         result: clip(subject.agentRun.envelope?.result ?? null, 8000),
         confidence: subject.agentRun.envelope?.confidence ?? null,
@@ -225,7 +289,7 @@ export async function executeEvaluationTool(
     }
     case 'get_trajectory': {
       const { agentRunId, offset, limit } = EVALUATION_ASSISTANT_PLATFORM_TOOLS.get_trajectory.parse(args);
-      const subject = await loadScoredRun(scope, agentRunId, step);
+      const subject = await loadSubjectRun(scope, step, agentRunId);
       const entries = subject.trajectory.slice(offset, offset + limit);
       const total = subject.trajectory.length;
       return {

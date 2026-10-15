@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { z } from 'zod';
 import type { CallerScope } from '../../../../repositories/index';
 import { EVALUATION_ASSISTANT_PLATFORM_TOOLS, type StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
-import { InMemoryAgentTrajectoryRepository, buildWorkflowDefinition } from '@mediforce/platform-core/testing';
+import { InMemoryAgentTrajectoryRepository, buildAgentRun, buildProcessInstance, buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { createTestScope } from '../../../../repositories/__tests__/create-test-scope';
 import { loadEvaluationSubject } from '../../../evaluation/_lib/evaluation-subject';
 import { createEvalCase } from '../../../evaluation/eval-cases';
@@ -26,8 +26,8 @@ async function setup(entries?: StoredAgentTrajectoryEntry[]) {
     await agentTrajectoryRepo.append(GRADED_RUN, entries);
     scope = createTestScope({ ...fixture, agentTrajectoryRepo, caller: scope.caller });
   }
-  const { definition, step } = await loadEvaluationSubject(scope, STEP, 'read');
-  return { fixture, scope, context: { step: STEP, definition, workflowStep: step } };
+  const { definition, step, agent } = await loadEvaluationSubject(scope, STEP, 'read');
+  return { fixture, scope, context: { step: STEP, definition, workflowStep: step, agent } };
 }
 
 describe('executeEvaluationTool', () => {
@@ -299,8 +299,8 @@ describe('executeEvaluationTool', () => {
     async function scenarioContext() {
       const fixture = await evaluationFixture();
       const scenario = await evalScenario(fixture);
-      const { definition, step } = await loadEvaluationSubject(scenario.scope, STEP, 'read');
-      return { fixture, scenario, scope: scenario.scope, context: { step: STEP, definition, workflowStep: step } };
+      const { definition, step, agent } = await loadEvaluationSubject(scenario.scope, STEP, 'read');
+      return { fixture, scenario, scope: scenario.scope, context: { step: STEP, definition, workflowStep: step, agent } };
     }
 
     it('reads a run\'s failing trials with their cases, and only of this step\'s runs', async () => {
@@ -359,6 +359,66 @@ describe('executeEvaluationTool', () => {
       const viewer = fixture.scope(userCaller('author-1', [STEP.namespace]));
       await expect(executeEvaluationTool('start_eval_run', { evalRunId }, viewer, { ...context, unattended: { remainingUsd: 10, started: [] } }))
         .rejects.toThrow();
+    });
+  });
+
+  describe('for an Agent evaluated on its own (ADR-0029)', () => {
+    const AGENT = { kind: 'agent', namespace: NAMESPACE, agentId: 'ae-grader' } as const;
+
+    async function agentSetup() {
+      const fixture = await evaluationFixture();
+      const grader = (await fixture.agentDefinitionRepo.getById('ae-grader'))!;
+      await fixture.agentDefinitionRepo.upsert('ae-grader', { ...grader, runtimeId: 'claude-code-agent' });
+      // v2 gives the step another agent: its runs are not the AE grader's.
+      await fixture.processRepo.saveWorkflowDefinition(buildWorkflowDefinition({
+        name: WORKFLOW,
+        namespace: NAMESPACE,
+        version: 2,
+        steps: [
+          { id: 'grade-aes', name: 'Grade AEs', type: 'creation', executor: 'agent', agentId: 'other-grader', agent: {} },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [{ from: 'grade-aes', to: 'done' }],
+      }));
+      await fixture.instanceRepo.create(buildProcessInstance({ id: 'run-v2', namespace: NAMESPACE, definitionName: WORKFLOW, definitionVersion: '2' }));
+      await fixture.agentRunRepo.create(buildAgentRun({ id: 'agent-run-v2', processInstanceId: 'run-v2', stepId: 'grade-aes', startedAt: '2026-09-22T11:00:00.000Z' }));
+      const scope = fixture.scope();
+      const { definition, step, agent } = await loadEvaluationSubject(scope, AGENT, 'read');
+      return { scope, context: { step: AGENT, definition, workflowStep: step, agent } };
+    }
+
+    it('reads the Agent itself, with the MCP servers and Skills it runs with', async () => {
+      const { scope, context } = await agentSetup();
+      expect(await executeEvaluationTool('get_agent', {}, scope, context)).toMatchObject({
+        agent: { name: 'AE grader', runtimeId: 'claude-code-agent', systemPrompt: 'You grade adverse events.', inputDescription: 'Extracted AEs' },
+        mcpServers: [expect.objectContaining({ name: 'edc' }), expect.objectContaining({ name: 'email' })],
+        skills: [],
+      });
+    });
+
+    it('lists the production runs of the Steps that ran with the Agent, with what each Step adds to it', async () => {
+      const { scope, context } = await agentSetup();
+      expect(await executeEvaluationTool('list_agent_production_runs', {}, scope, context)).toEqual({
+        steps: [{ workflowName: WORKFLOW, stepId: 'grade-aes', stepName: 'Grade AEs', versions: [1], stepAgentConfig: { prompt: 'Grade each AE.' } }],
+        runs: [UNGRADED_RUN, GRADED_RUN].map((agentRunId) => expect.objectContaining({
+          agentRunId, workflowName: WORKFLOW, stepId: 'grade-aes', triggerPayload: { studyId: 'CDISCPILOT01' },
+        })),
+      });
+    });
+
+    it('reads one of those runs, and refuses a run of a version that gave the Step another agent', async () => {
+      const { scope, context } = await agentSetup();
+      expect(await executeEvaluationTool('get_agent_run', { agentRunId: GRADED_RUN }, scope, context)).toMatchObject({
+        agentRunId: GRADED_RUN, triggerPayload: { studyId: 'CDISCPILOT01' }, result: { findings: [{ term: 'Sepsis', grade: 5 }] },
+      });
+      await expect(executeEvaluationTool('get_trajectory', { agentRunId: 'agent-run-v2' }, scope, context))
+        .rejects.toThrow('neither an eval trial of this agent nor a production run of a step that uses it');
+    });
+
+    it('is refused for a Step, which reads itself and its own runs', async () => {
+      const { scope, context } = await setup();
+      await expect(executeEvaluationTool('get_agent', {}, scope, context)).rejects.toThrow('read it with get_step');
+      await expect(executeEvaluationTool('list_agent_production_runs', {}, scope, context)).rejects.toThrow('a step lists its runs');
     });
   });
 });

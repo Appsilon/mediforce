@@ -141,4 +141,23 @@ describe('reviewEvaluationProposal', () => {
       expect(review).toMatchObject({ ok: true });
     });
   });
+
+  describe('an Agent\'s case (ADR-0029)', () => {
+    const AGENT: EvaluationSubject = { kind: 'agent', namespace: NAMESPACE, agentId: 'ae-grader' };
+    const triggerPayload = { events: [{ term: 'Sepsis', outcome: 'fatal' }] };
+
+    it('is written from a production run, not harvested from it', async () => {
+      const review = await reviewEvaluationProposal('propose_eval_case', { name: 'From production', agentRunId: GRADED_RUN }, fixture.scope(), AGENT, []);
+      expect(review).toEqual({ ok: false, error: expect.stringContaining('write its input from what get_agent_run shows') });
+    });
+
+    it('is given its trigger payload alone', async () => {
+      const scope = fixture.scope();
+      const withEarlierSteps = { name: 'Fatal sepsis', input: { triggerPayload, previousStepOutputs: { 'extract-aes': triggerPayload } } };
+      expect(await reviewEvaluationProposal('propose_eval_case', withEarlierSteps, scope, AGENT, []))
+        .toEqual({ ok: false, error: expect.stringContaining('trigger payload alone') });
+      expect(await reviewEvaluationProposal('propose_eval_case', { name: 'Fatal sepsis', input: { triggerPayload, previousStepOutputs: {} }, containsProductionData: true }, scope, AGENT, []))
+        .toEqual({ ok: true });
+    });
+  });
 });

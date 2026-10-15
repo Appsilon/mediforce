@@ -54,10 +54,10 @@ async function acceptProposal(step: EvaluationSubject, proposal: DecidablePropos
       return mediforce.evaluation.addEvaluatorVersion({ ...version, origin: 'assistant' });
     }
     case 'propose_eval_case': {
-      const { agentRunId, input, rationale: _rationale, ...written } = proposal.arguments;
+      const { agentRunId, input, containsProductionData, rationale: _rationale, ...written } = proposal.arguments;
       return agentRunId !== undefined
         ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, ...(step.kind === 'step' ? { step } : {}), ...written, origin: 'assistant' })
-        : mediforce.evaluation.createCase({ ...step, ...written, input: input!, origin: 'assistant' });
+        : mediforce.evaluation.createCase({ ...step, ...written, input: input!, ...(containsProductionData === undefined ? {} : { containsProductionData }), origin: 'assistant' });
     }
     case 'propose_perturbed_case': {
       const { rationale: _rationale, ...synthesized } = proposal.arguments;

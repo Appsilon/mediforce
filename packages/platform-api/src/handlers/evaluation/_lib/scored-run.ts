@@ -19,7 +19,7 @@ export interface ScoredRun {
 }
 
 /** Whether a run is one of an Agent's eval trials (ADR-0029): its carried single step names the Agent. */
-function isTrialOfAgent(agentRun: AgentRun, instance: ProcessInstance, agent: Extract<EvaluationSubject, { kind: 'agent' }>): boolean {
+export function isTrialOfAgent(agentRun: AgentRun, instance: ProcessInstance, agent: Extract<EvaluationSubject, { kind: 'agent' }>): boolean {
   return (instance.namespace ?? '') === agent.namespace
     && agentRun.stepId === AGENT_EVAL_STEP_ID
     && instance.evalDefinition?.steps[0]?.agentId === agent.agentId;

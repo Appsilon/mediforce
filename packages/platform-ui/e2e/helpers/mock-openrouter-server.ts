@@ -29,6 +29,7 @@ export interface ScriptedTurn {
 
 interface ChatRequest {
   messages: Array<{ role: string; content: string }>;
+  tools?: Array<{ function: { name: string } }>;
 }
 
 export interface MockOpenRouterHandle {

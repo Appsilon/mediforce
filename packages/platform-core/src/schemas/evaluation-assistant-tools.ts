@@ -12,6 +12,7 @@ import {
   PerturbedEvalCaseSpecSchema,
   WorkspaceFilePathSchema,
   hasPerturbationChange,
+  type EvaluationSubject,
 } from './evaluation';
 import { FALLBACK_PINNED_MODEL } from './model-registry';
 
@@ -68,6 +69,9 @@ export const ProposeEvalCaseToolSchema = z.object({
   comparison: EvalCaseComparisonSchema.optional(),
   agreementInstructions: z.string().max(4000).optional(),
   split: EvalCaseSplitSchema.optional(),
+  /** A written input copied from a production run carries its data. */
+  containsProductionData: z.boolean().optional()
+    .describe('true when the written input is copied from, or built on, a production run\'s data'),
   rationale: z.string().max(1000).optional(),
 }).refine((value) => (value.agentRunId === undefined) !== (value.input === undefined), {
   message: 'give exactly one of agentRunId (harvest a production run) or input (a written case)',
@@ -206,6 +210,18 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
    * Skills it is offered with their SKILL.md, and the steps upstream of it.
    */
   get_step: NoArguments,
+  /**
+   * The Agent as it runs on its own (ADR-0029): system prompt, model, runtime,
+   * input/output descriptions, effective MCP servers with their eval policy and
+   * the catalog Skills it is offered with their SKILL.md.
+   */
+  get_agent: NoArguments,
+  /**
+   * The Steps that use the Agent, with what each adds to it, and their recent
+   * finished production Agent Runs — the input each was given and the
+   * reviewer's verdict — to write the Agent's cases from.
+   */
+  list_agent_production_runs: z.object({ limit: z.number().int().min(1).max(50).optional() }),
   /** Recent finished production Agent Runs of the step, with the reviewer's verdict where there was one. */
   list_step_runs: z.object({ limit: z.number().int().min(1).max(50).optional() }),
   /** One Agent Run: status, fallback, input it was given and the result it produced. */
@@ -261,6 +277,46 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
 
 export type EvaluationAssistantProposalToolName = keyof typeof EVALUATION_ASSISTANT_PROPOSAL_TOOLS;
 export type EvaluationAssistantPlatformToolName = keyof typeof EVALUATION_ASSISTANT_PLATFORM_TOOLS;
+
+/** The tools of one Evaluation Assistant: a selection from the shared catalogs. */
+interface EvaluationAssistantToolset {
+  readonly platform: readonly EvaluationAssistantPlatformToolName[];
+  readonly proposals: readonly EvaluationAssistantProposalToolName[];
+}
+
+const READ_EVALUATION = ['list_evaluators', 'list_eval_cases', 'list_eval_runs', 'get_eval_run_report', 'get_failures', 'get_qualification'] as const;
+const RUN_EVALUATION = ['prepare_eval_run', 'start_eval_run'] as const;
+const READ_RUNS = ['get_agent_run', 'get_trajectory'] as const;
+const SHARED_PROPOSALS = [
+  'propose_evaluation_plan', 'propose_evaluator', 'propose_evaluator_version', 'propose_eval_case',
+  'propose_brief', 'propose_acceptance_criteria', 'propose_diagnosis',
+] as const;
+
+/**
+ * Which tools the assistant has, by what it evaluates. One catalog and one
+ * executor serve both: a Step reads its own production runs and workspaces,
+ * previews checks on them, synthesizes cases from them and recommends a
+ * Control Mode; an Agent (ADR-0029) reads itself and the production runs of
+ * the Steps that use it, to write its cases from.
+ */
+export const EVALUATION_ASSISTANT_TOOLSETS = {
+  step: {
+    platform: ['get_step', 'list_step_runs', ...READ_RUNS, 'list_workspace_files', 'read_workspace_file', ...READ_EVALUATION, 'preview_evaluator', ...RUN_EVALUATION],
+    proposals: [...SHARED_PROPOSALS, 'propose_perturbed_case', 'propose_control_settings'],
+  },
+  agent: {
+    platform: ['get_agent', 'list_agent_production_runs', ...READ_RUNS, ...READ_EVALUATION, ...RUN_EVALUATION],
+    proposals: SHARED_PROPOSALS,
+  },
+} as const satisfies Record<EvaluationSubject['kind'], EvaluationAssistantToolset>;
+
+/** The catalog entries `names` select. */
+export function pickTools<Name extends string, Selected extends Name, Schema extends z.ZodType>(
+  catalog: Readonly<Record<Name, Schema>>,
+  names: readonly Selected[],
+): Record<Selected, Schema> {
+  return Object.fromEntries(names.map((name) => [name, catalog[name]])) as Record<Selected, Schema>;
+}
 
 /** What the assistant proposed this turn, for the person to accept or reject. */
 export const EvaluationAssistantProposalSchema = z.discriminatedUnion('tool', [

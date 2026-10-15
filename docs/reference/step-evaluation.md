@@ -851,5 +851,12 @@ Criteria, Eval Runs and Qualification work as above, with these differences:
 - **No production features.** An Agent has no production runs of its own, so
   harvesting or perturbing cases, previewing a check, drift and production
   Evaluators are refused. Write cases by hand.
+- **Its Evaluation Assistant reads the Steps that use it.** The assistant is the
+  Step's, with the Agent's toolset: it reads the Agent (`get_agent`) instead of a
+  step, and finds the Steps that use the Agent with their recent production runs
+  (`list_agent_production_runs`), reading one as for a step (`get_agent_run`,
+  `get_trajectory`). From what a run was given it proposes a *written* case — the
+  trigger payload carrying what the Agent used, flagged as containing production
+  data. It has no step reads, previews, synthesized cases or routing.
 - Only a container agent of the workspace, with a runtime, is evaluated.
 

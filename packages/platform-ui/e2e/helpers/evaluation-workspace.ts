@@ -14,7 +14,8 @@ export async function seedEvaluationWorkspace(): Promise<void> {
   await seedPostgresOrganizationNamespace(EVALUATION_WORKSPACE, TEST_USER_ID, 'Evaluation Assistant E2E');
   const { client, db } = createPostgresClient();
   try {
-    await new PostgresNamespaceSecretsRepository(db).setSecrets(EVALUATION_WORKSPACE, { OPENROUTER_API_KEY: 'sk-mock-openrouter' });
+    // An upsert, not a replace: journeys in parallel workers seed it at once.
+    await new PostgresNamespaceSecretsRepository(db).upsertSecret(EVALUATION_WORKSPACE, 'OPENROUTER_API_KEY', 'sk-mock-openrouter');
   } finally {
     await client.end({ timeout: 5 });
   }
