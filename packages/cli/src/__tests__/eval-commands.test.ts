@@ -151,7 +151,7 @@ describe('mediforce eval', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
       evaluator: {
         namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', id: evaluatorId, name: 'grade-5-flagged', archived: false,
-        runInProduction: true, createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z', latest, versions: [latest],
+        runInProduction: true, onError: 'ignore', createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z', latest, versions: [latest],
         trust: { trusted: false, reason: 'source not approved' },
         production: { active: false, reason: 'in production once it counts (source not approved)' },
       },
@@ -166,7 +166,28 @@ describe('mediforce eval', () => {
     expect(output.stdoutLines.join('\n')).toContain('production: in production once it counts (source not approved)');
   });
 
-  it('evaluator-production refuses both or neither of --on and --off', async () => {
+  it('evaluator-production --on-error alone posts only the policy', async () => {
+    const evaluatorId = '0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
+    const latest = {
+      evaluatorId, version: 1, rule: 'The result lists findings.', check: { kind: 'schema', schema: { required: ['findings'] } },
+      origin: 'user', sourceApproval: null, createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
+    };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      evaluator: {
+        namespace: 'pharma-a', workflowName: 'ae-grading', stepId: 'grade-aes', id: evaluatorId, name: 'findings-present', archived: false,
+        runInProduction: true, onError: 'escalate', createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z', latest, versions: [latest],
+        trust: { trusted: true }, production: { active: true },
+      },
+    }));
+    const output = captureOutput();
+    const code = await evalEvaluatorProductionCommand({ argv: [evaluatorId, '--on-error', 'escalate', ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body))).toEqual({ onError: 'escalate' });
+    expect(output.stdoutLines.join('\n')).toContain('in production, escalates when it cannot run');
+  });
+
+  it('evaluator-production refuses both --on and --off, or nothing to set', async () => {
     const output = captureOutput();
     expect(await evalEvaluatorProductionCommand({ argv: ['0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', ...BASE], env: ENV, output })).toBe(2);
     expect(await evalEvaluatorProductionCommand({ argv: ['0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', '--on', '--off', ...BASE], env: ENV, output })).toBe(2);

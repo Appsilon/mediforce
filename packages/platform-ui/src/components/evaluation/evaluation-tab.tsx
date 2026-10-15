@@ -128,6 +128,7 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
           step={step}
           data={evaluation.evaluators}
           mayEdit={mayEdit}
+          editReason={editReason}
           stepOutputSchema={outputSchema}
         />
         <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />

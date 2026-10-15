@@ -71,6 +71,7 @@ export const evaluators = pgTable(
     name: text('name').notNull(),
     archived: boolean('archived').notNull().default(false),
     runInProduction: boolean('run_in_production').notNull().default(false),
+    onError: text('on_error').notNull().default('ignore'),
     createdBy: text('created_by').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

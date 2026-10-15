@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
-import { evaluationOwnerOf, isMovingModelAlias, type EvaluatorCheck } from '@mediforce/platform-core';
+import { evaluationOwnerOf, isMovingModelAlias, type Evaluator, type EvaluatorCheck } from '@mediforce/platform-core';
 import type {
   AddEvaluatorVersionInputSchema,
   ArchiveEvaluatorInputSchema,
@@ -87,6 +87,7 @@ export async function createEvaluator(
     name: input.name,
     archived: false,
     runInProduction,
+    onError: 'ignore' as const,
     createdBy,
     createdAt: now,
   };
@@ -182,10 +183,24 @@ export async function archiveEvaluator(
   return { evaluator: await evaluatorView(scope, { ...evaluator, archived: input.archived }) };
 }
 
+function describeProductionChange(evaluator: Evaluator, input: SetEvaluatorProductionInput): { action: string; description: string } {
+  if (input.runInProduction !== undefined) {
+    return {
+      action: input.runInProduction === true ? 'evaluator.production_enabled' : 'evaluator.production_disabled',
+      description: `Evaluator '${evaluator.name}' ${input.runInProduction === true ? 'set to' : 'no longer set to'} run in production`,
+    };
+  }
+  return {
+    action: 'evaluator.production_on_error_set',
+    description: `Evaluator '${evaluator.name}' set to ${input.onError === 'escalate' ? 'escalate the run' : 'let the run continue'} when it cannot run in production`,
+  };
+}
+
 /**
  * Marks an Evaluator to also score live production Agent Runs of its step
- * (D13). The flag may be set on any Evaluator; it takes effect only while
- * the latest version counts (D9), which the view's `production` states.
+ * (D13), and whether a check that cannot run there escalates the run. The
+ * flag may be set on any Evaluator; it takes effect only while the latest
+ * version counts (D9), which the view's `production` states.
  */
 export async function setEvaluatorProduction(
   input: SetEvaluatorProductionInput,
@@ -197,17 +212,20 @@ export async function setEvaluatorProduction(
   if (input.runInProduction === true && (await evaluatorView(scope, evaluator)).latest.check.kind === 'expected_output') {
     throw new ValidationError(NOT_IN_PRODUCTION);
   }
-  await scope.evaluation.setEvaluatorRunInProduction(evaluator, input.runInProduction);
-  const view = await evaluatorView(scope, { ...evaluator, runInProduction: input.runInProduction });
+  const settings = {
+    runInProduction: input.runInProduction ?? evaluator.runInProduction,
+    onError: input.onError ?? evaluator.onError,
+  };
+  await scope.evaluation.setEvaluatorProduction(evaluator, settings);
+  const view = await evaluatorView(scope, { ...evaluator, ...settings });
   await appendEvaluationAudit(scope, {
-    action: input.runInProduction === true ? 'evaluator.production_enabled' : 'evaluator.production_disabled',
-    description: `Evaluator '${evaluator.name}' ${input.runInProduction === true ? 'set to' : 'no longer set to'} run in production`,
+    ...describeProductionChange(evaluator, input),
     namespace: evaluator.namespace,
     entityType: 'evaluator',
     entityId: evaluator.id,
-    inputSnapshot: { runInProduction: input.runInProduction },
-    outputSnapshot: { production: view.production },
-    basis: 'A production Evaluator scores live Agent Runs while it counts; a failing deterministic one takes the step\'s fallback (ADR-0023 D13)',
+    inputSnapshot: { runInProduction: input.runInProduction, onError: input.onError },
+    outputSnapshot: { production: view.production, onError: view.onError },
+    basis: 'A production Evaluator scores live Agent Runs while it counts; a failing deterministic one, or one set to escalate that cannot run, sends the run to a person (ADR-0023 D13)',
   });
   return { evaluator: view };
 }

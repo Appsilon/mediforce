@@ -30,6 +30,7 @@ import { CHECK_KINDS, CheckDetails } from './evaluator-check-editor';
 import { StartEvalRunCard } from './step-evaluation-sections';
 import { buttonClass } from './evaluation-styles';
 import { AssessedAgentConfiguration } from './assessed-agent-configuration';
+import { EvaluatorOutageAlert, EvaluatorOutageSummary } from './evaluator-outages';
 
 const RUN_TABS = ['summary', 'trials', 'evaluators', 'verdicts', 'problems'] as const;
 type RunTab = (typeof RUN_TABS)[number];
@@ -47,6 +48,8 @@ interface RunContext {
   output: EvalRunOutput;
   step: EvaluationSubject;
   trialHref: (trialId: string) => string;
+  mayEdit: boolean;
+  editReason: string | undefined;
 }
 
 function Meta({ label, children }: { label: string; children: React.ReactNode }) {
@@ -77,8 +80,8 @@ function problemOf(trial: EvalTrial, result: EvalTrialResult | undefined, evalua
   if (trial.error !== null) return trial.error;
   const errored = (result?.evaluators ?? [])
     .filter((entry) => entry.outcome === 'errored')
-    .map((entry) => evaluators.find((evaluator) => evaluator.evaluatorId === entry.evaluatorId)?.name ?? entry.evaluatorId);
-  if (errored.length > 0) return `Could not be graded by ${errored.join(', ')}.`;
+    .map((entry) => `${evaluators.find((evaluator) => evaluator.evaluatorId === entry.evaluatorId)?.name ?? entry.evaluatorId}: ${entry.comment ?? 'could not grade this trial'}`);
+  if (errored.length > 0) return errored.join('\n');
   return trial.status === 'failed' ? 'Failed without a recorded reason.' : null;
 }
 
@@ -246,13 +249,14 @@ function EvaluatorsTab(context: RunContext) {
   );
 }
 
-/** Trials that failed, or that a check could not grade, with why. */
-function ProblemsTab({ output, trialHref }: RunContext) {
+/** Evaluators that could not grade, with what production does then; trials that failed, or that a check could not grade, with why. */
+function ProblemsTab({ output, step, trialHref, mayEdit, editReason }: RunContext) {
   const problems = trialProblems(output);
   const { unrecordedCalls } = output.report.mcp;
   if (problems.length === 0 && unrecordedCalls.length === 0) return <p className="text-sm text-muted-foreground">No trial had a problem.</p>;
   return (
     <div className="space-y-3">
+      <EvaluatorOutageSummary output={output} step={step} mayEdit={mayEdit} editReason={editReason} />
       {unrecordedCalls.length > 0 && (
         <p className="text-xs text-amber-700 dark:text-amber-300">
           Replayed MCP calls no recording answered: {unrecordedCalls.map((call) => `${call.server}.${call.tool} ×${call.count}`).join(', ')}.
@@ -263,7 +267,7 @@ function ProblemsTab({ output, trialHref }: RunContext) {
           {problems.map(({ trial, result, problem }) => {
             return (
               <li key={trial.id} className="flex items-start gap-3 px-3 py-2">
-                <TrialStatusBadge status={trial.status} />
+                {trial.status !== 'scored' && <TrialStatusBadge status={trial.status} />}
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{result === undefined ? `trial ${trial.trialIndex + 1}` : trialLabel(result, trial)}</p>
                   <p className="whitespace-pre-wrap text-muted-foreground">{problem}</p>
@@ -382,6 +386,8 @@ export function EvalRunDetail({ handle, evalRunId, gates }: { handle: string; ev
     output,
     step,
     trialHref: (trialId) => evalTrialHref(step, evalRun.id, trialId),
+    mayEdit,
+    editReason,
   };
   const leftOut = report.judgeVerdicts.filter((verdict) => verdict.counts === false).length;
   const problems = trialProblems(output).length;
@@ -408,7 +414,8 @@ export function EvalRunDetail({ handle, evalRunId, gates }: { handle: string; ev
             <Tabs.Trigger key={value} value={value} className={tabTriggerClass} data-testid={`eval-run-tab-${value}`}>{labels[value]}</Tabs.Trigger>
           ))}
         </Tabs.List>
-        <Tabs.Content value="summary" className="pt-4">
+        <Tabs.Content value="summary" className="space-y-5 pt-4">
+          <EvaluatorOutageAlert output={output} step={step} onOpenProblems={() => select('problems')} />
           <EvalRunSummary output={output} step={step} mayEdit={mayEdit} editReason={editReason} />
         </Tabs.Content>
         <Tabs.Content value="trials" className="pt-4"><TrialsTab {...context} /></Tabs.Content>

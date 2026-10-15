@@ -103,7 +103,7 @@ point at.
 
 ## Consequences
 
-- Migration `0081_agent_evaluation` adds `agent_id` to every Evaluation table,
+- Migration `0082_agent_evaluation` adds `agent_id` to every Evaluation table,
   rebuilds their keys, makes `eval_runs.definition_version` nullable, and adds
   `eval_runs.agent_version`, `process_instances.eval_definition` and
   `agent_versions`.

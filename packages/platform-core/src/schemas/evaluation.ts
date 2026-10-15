@@ -172,6 +172,13 @@ export const SourceApprovalSchema = z.object({
   approvedAt: z.iso.datetime(),
 });
 
+/**
+ * What a production `schema` or `code` Evaluator does when its check cannot
+ * run: `ignore` lets the run continue unchecked, `escalate` sends it to a
+ * person as a failure would (D13).
+ */
+export const EvaluatorOnErrorSchema = z.enum(['ignore', 'escalate']);
+
 /** Evaluator identity. What it checks lives on its versions. */
 export const EvaluatorSchema = EvaluationOwnerSchema.extend({
   id: z.uuid(),
@@ -184,6 +191,7 @@ export const EvaluatorSchema = EvaluationOwnerSchema.extend({
    * run to a person; an `llm_judge` only writes Scores.
    */
   runInProduction: z.boolean(),
+  onError: EvaluatorOnErrorSchema,
   createdBy: z.string().min(1),
   createdAt: z.iso.datetime(),
 });
@@ -450,6 +458,7 @@ export type EvaluationBrief = z.infer<typeof EvaluationBriefSchema>;
 export type EvaluatorKind = z.infer<typeof EvaluatorKindSchema>;
 export type EvaluatorCheck = z.infer<typeof EvaluatorCheckSchema>;
 export type SourceApproval = z.infer<typeof SourceApprovalSchema>;
+export type EvaluatorOnError = z.infer<typeof EvaluatorOnErrorSchema>;
 export type Evaluator = z.infer<typeof EvaluatorSchema>;
 export type EvaluatorVersion = z.infer<typeof EvaluatorVersionSchema>;
 export type EvalCaseInput = z.infer<typeof EvalCaseInputSchema>;

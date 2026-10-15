@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import type { EvaluatorCheck, EvaluatorVersion } from '@mediforce/platform-core';
+import type { Evaluator, EvaluatorCheck, EvaluatorVersion } from '@mediforce/platform-core';
 import { scoreProductionRun, hasProductionEvaluators } from '../production-evaluators';
 import { loadScoredRun } from '../scored-run';
 import { evaluationFixture, GRADED_RUN, STEP, UNGRADED_RUN, type EvaluationFixture } from '../../__tests__/fixture';
@@ -24,7 +24,7 @@ async function addEvaluator(
   fixture: EvaluationFixture,
   name: string,
   check: EvaluatorCheck,
-  options: { runInProduction?: boolean; approved?: boolean } = {},
+  options: { runInProduction?: boolean; approved?: boolean; onError?: Evaluator['onError'] } = {},
 ) {
   const id = randomUUID();
   const now = '2026-09-23T08:00:00.000Z';
@@ -34,7 +34,7 @@ async function addEvaluator(
     createdBy: 'author-1', createdAt: now,
   };
   await fixture.evaluationRepo.createEvaluator(
-    { ...STEP, id, name, archived: false, runInProduction: options.runInProduction ?? true, createdBy: 'author-1', createdAt: now },
+    { ...STEP, id, name, archived: false, runInProduction: options.runInProduction ?? true, onError: options.onError ?? 'ignore', createdBy: 'author-1', createdAt: now },
     version,
   );
   return id;
@@ -74,7 +74,7 @@ describe('production Evaluators (ADR-0023 D13)', () => {
     expect((await fixture.scoreRepo.list({ agentRunId: GRADED_RUN, limit: 100 }))[0]).toMatchObject({ value: 1 });
   });
 
-  it('reports a check that cannot run as an error, never a failure, and writes no Score', async () => {
+  it('reports a check that cannot run as an error and, by default, not a failure; writes no Score', async () => {
     await addEvaluator(fixture, 'grade-5-flagged', code, { approved: true });
     runCodeCheck.mockRejectedValue(new Error('sandbox unavailable'));
 
@@ -82,6 +82,18 @@ describe('production Evaluators (ADR-0023 D13)', () => {
 
     expect(verdict).toEqual({ failure: null, errors: ['grade-5-flagged: sandbox unavailable'] });
     expect(await fixture.scoreRepo.list({ agentRunId: UNGRADED_RUN, limit: 100 })).toEqual([]);
+  });
+
+  it('escalates the run when an Evaluator set to escalate cannot run', async () => {
+    await addEvaluator(fixture, 'grade-5-flagged', code, { approved: true, onError: 'escalate' });
+    runCodeCheck.mockRejectedValue(new Error('sandbox unavailable'));
+
+    const { verdict } = await score(UNGRADED_RUN);
+
+    expect(verdict).toEqual({
+      failure: "Evaluator 'grade-5-flagged' v1 could not run: sandbox unavailable",
+      errors: ['grade-5-flagged: sandbox unavailable'],
+    });
   });
 
   it('skips Evaluators that are not flagged, not counted or archived', async () => {

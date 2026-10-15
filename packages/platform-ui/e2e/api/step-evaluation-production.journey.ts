@@ -72,6 +72,30 @@ test.describe('Step Evaluation production Evaluators — API E2E', () => {
     expect(await scoresOf(request, freeRunRes.run.id)).toEqual([]);
   });
 
+  test('an Evaluator lets runs continue when it cannot run, until set to escalate', async ({ request }) => {
+    const workflowName = `e2e-production-on-error-${randomUUID().slice(0, 8)}`;
+    await awaitFinishedAgentRun(request, await startRun(request, agentStepWorkflow(workflowName, {
+      autonomyLevel: 'L4',
+      agent: { prompt: 'Grade each AE.' },
+    })));
+    const created = EvaluatorOutputSchema.parse(await post(request, '/api/evaluation/evaluators', {
+      namespace: TEST_ORG_HANDLE, workflowName, stepId: 'grade-aes', name: 'summary-present',
+      rule: 'The result has a summary.', runInProduction: true,
+      check: { kind: 'schema', schema: { required: ['summary'] } },
+    }, 201));
+    expect(created.evaluator.onError).toBe('ignore');
+    const path = `/api/evaluation/evaluators/${created.evaluator.id}/production`;
+
+    const escalating = EvaluatorOutputSchema.parse(await post(request, path, { onError: 'escalate' }));
+    expect(escalating.evaluator).toMatchObject({ runInProduction: true, onError: 'escalate', production: { active: true } });
+
+    // Taking it out of production keeps the choice for when it is back.
+    const off = EvaluatorOutputSchema.parse(await post(request, path, { runInProduction: false }));
+    expect(off.evaluator).toMatchObject({ runInProduction: false, onError: 'escalate' });
+
+    await post(request, path, {}, 400);
+  });
+
   test('a flagged code Evaluator waits until its source is approved', async ({ request }) => {
     const workflowName = `e2e-production-code-${randomUUID().slice(0, 8)}`;
     await awaitFinishedAgentRun(request, await startRun(request, agentStepWorkflow(workflowName, {

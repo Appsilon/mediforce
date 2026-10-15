@@ -73,7 +73,7 @@ flowchart TD
 | Whether the step is good enough to ship | the above plus a floor | **Acceptance Criteria** judged in the Eval Run report | **Set the threshold**; the assistant proposes a floor; `mediforce eval criteria-set` |
 | Why a run failed | a finished Eval Run with failures | **diagnosis** card | ask the assistant; `mediforce eval failures <evalRunId>` |
 | Whether the step can drop its reviewer | a finished Eval Run | routing recommendation (Control Mode 4 when the criteria were met) | the report; apply it in the workflow editor |
-| Bad outputs stopped in live runs | a `schema` or `code` Evaluator | **Also run in production** | Evaluator toggle, `mediforce eval evaluator-production` |
+| Bad outputs stopped in live runs | a `schema` or `code` Evaluator | **Also run in production**; **Escalate** so an outage of the check stops the run too | Evaluator toggle, `mediforce eval evaluator-production` (`--on-error`) |
 | Live quality has dropped | production Evaluators | drift alerts | banner on the tab, `mediforce eval drift` |
 | Someone signed that this configuration is fit for use | a finished Eval Run | Step Qualification | **Confirm** or **Overwrite** the run's verdict in the report (web only) |
 
