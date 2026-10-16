@@ -26,6 +26,7 @@ import { workspaces } from './workspace';
  * `jsonb` (variable-size map of bindings, never queried by element).
  * `skills` is a `jsonb` array of `{ namespace, id }` Skill references
  * (ADR-0025), GIN-indexed for the "which agents hold this skill" lookup.
+ * `output_schema` is the `jsonb` JSON Schema the agent's result must satisfy.
  */
 export const agents = pgTable(
   'agents',
@@ -43,6 +44,7 @@ export const agents = pgTable(
     systemPrompt: text('system_prompt').notNull(),
     inputDescription: text('input_description').notNull(),
     outputDescription: text('output_description').notNull(),
+    outputSchema: jsonb('output_schema'),
     mcpServers: jsonb('mcp_servers'),
     skills: jsonb('skills'),
     namespace: text('namespace'),

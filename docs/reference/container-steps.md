@@ -171,7 +171,8 @@ Code in its `system/init` event, OpenCode in its log under
 ## Result and Agent Trajectory
 
 An agent step's `result.json` becomes the envelope's `result`. When the step
-sets `agent.outputSchema`, the schema is added to the prompt and `AgentRunner`
+sets `agent.outputSchema` — or inherits its Agent's `outputSchema` by setting
+none — the schema is added to the prompt and `AgentRunner`
 checks `result` against it after the run: a violation records a `status` event
 and runs the plugin once more with the error in the prompt; a second violation
 escalates the run to a person with `fallbackReason: output_schema`

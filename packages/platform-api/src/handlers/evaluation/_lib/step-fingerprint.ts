@@ -13,6 +13,7 @@ import {
 } from '@mediforce/agent-runtime';
 import {
   STEP_FINGERPRINT_COMPONENTS,
+  applyAgentOutputSchema,
   canonicalJson,
   offeredSkill,
   type StepFingerprint,
@@ -107,9 +108,10 @@ function imageIdentity(definition: WorkflowDefinition, step: WorkflowStep): unkn
 
 /**
  * The Step Fingerprint (ADR-0023 D5): a SHA-256 over the parts of an agent
- * Step that shape its behaviour — the step config, the model it runs, its
- * agent's system prompt, the skills it loads, its image, the MCP servers and
- * tools production resolves for it, and the workflow preamble. Each part is
+ * Step that shape its behaviour — the step config with the output schema it
+ * inherits from its agent, the model it runs, its agent's system prompt, the
+ * skills it loads, its image, the MCP servers and tools production resolves
+ * for it, and the workflow preamble. Each part is
  * hashed on its own, so two Fingerprints can say what differs. The MCP eval
  * policy is not part of it (D6); a Step Qualification states it instead.
  */
@@ -128,7 +130,7 @@ export async function computeStepFingerprint(
     () => ({ refused: true }),
   );
   const material: Record<StepFingerprintComponent, unknown> = {
-    step: behaviouralStep(step),
+    step: behaviouralStep(applyAgentOutputSchema(step, agent?.outputSchema)),
     model: step.agent?.model ?? agent?.foundationModel ?? null,
     systemPrompt: agent?.systemPrompt ?? null,
     skill: await skillComponent(repos, definition, step),

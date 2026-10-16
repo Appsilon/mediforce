@@ -4,6 +4,7 @@
 // CONTEXT.md "Agent vs Agent Definition" flagged ambiguity.
 import { z } from 'zod';
 import { AgentMcpBindingMapSchema } from './agent-mcp-binding';
+import { AgentOutputSchemaSchema } from './agent-output-schema';
 import type { Skill } from './skill';
 
 export const AgentVisibilitySchema = z.enum(['public', 'private']);
@@ -51,6 +52,10 @@ export const AgentDefinitionSchema = z.object({
   systemPrompt: z.string(),
   inputDescription: z.string(),
   outputDescription: z.string(),
+  /** The JSON Schema the agent's `result` must satisfy, wherever it runs: shown
+   *  in its prompt and checked after the run (one retry, then escalation). A
+   *  Step's own `agent.outputSchema` replaces it. */
+  outputSchema: AgentOutputSchemaSchema.optional(),
   /** Canonical MCP server configuration for this agent. Map of server
    *  name → AgentMcpBinding. Step-level restrictions can only narrow
    *  (disable servers or deny tools) — they cannot broaden. */
@@ -88,11 +93,22 @@ export const CreateAgentDefinitionInputSchema = AgentDefinitionSchema.omit({
 });
 
 /** A patch. `.partial()` keeps each field's `.default()`, which would reset an
- *  omitted `kind` or `visibility` on every update, so those two drop it. */
+ *  omitted `kind` or `visibility` on every update, so those two drop it. An
+ *  omitted `outputSchema` is kept and `null` removes it. */
 export const UpdateAgentDefinitionInputSchema = CreateAgentDefinitionInputSchema.partial().extend({
   kind: AgentDefinitionSchema.shape.kind.unwrap().optional(),
   visibility: AgentVisibilitySchema.optional(),
+  outputSchema: AgentOutputSchemaSchema.nullable().optional(),
 });
 
 export type CreateAgentDefinitionInput = z.infer<typeof CreateAgentDefinitionInputSchema>;
 export type UpdateAgentDefinitionInput = z.infer<typeof UpdateAgentDefinitionInputSchema>;
+
+/** The Agent with a patch applied, before the repository stamps and parses it. */
+export function mergeAgentUpdate(current: AgentDefinition, patch: UpdateAgentDefinitionInput): AgentDefinition {
+  const { outputSchema, ...rest } = patch;
+  const merged: AgentDefinition = { ...current, ...rest };
+  if (outputSchema === null) delete merged.outputSchema;
+  if (outputSchema !== undefined && outputSchema !== null) merged.outputSchema = outputSchema;
+  return merged;
+}

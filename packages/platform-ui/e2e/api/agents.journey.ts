@@ -1,3 +1,4 @@
+import type { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
@@ -130,5 +131,62 @@ test.describe('POST /api/agents — API E2E', () => {
       },
     });
     expect(res.status(), await res.text()).toBe(400);
+  });
+});
+
+test.describe('Agent output schema — API E2E', () => {
+  const verdictSchema = {
+    type: 'object',
+    required: ['classification', 'scriptFailedFlag'],
+    properties: { classification: { type: 'string' }, scriptFailedFlag: { type: 'boolean' } },
+  };
+
+  async function readAgent(request: APIRequestContext, id: string) {
+    const res = await request.get(`/api/agents/${id}`, { headers: apiKeyHeaders() });
+    expect(res.status(), await res.text()).toBe(200);
+    return (await res.json() as { agent: { outputSchema?: unknown } }).agent;
+  }
+
+  async function versionNumbers(request: APIRequestContext, id: string) {
+    const res = await request.get(`/api/agents/${id}/versions`, { headers: apiKeyHeaders() });
+    expect(res.status(), await res.text()).toBe(200);
+    return (await res.json() as { versions: Array<{ version: number }> }).versions.map((version) => version.version);
+  }
+
+  test('is stored, kept by a patch that omits it, cleared by null, and versions the agent', async ({ request }) => {
+    const created = await request.post('/api/agents', {
+      headers: apiKeyHeaders(),
+      data: {
+        name: `L3 Output Schema Agent ${Date.now()}`,
+        iconName: 'Bot',
+        description: '',
+        foundationModel: 'anthropic/claude-sonnet-4',
+        systemPrompt: '',
+        inputDescription: '',
+        outputDescription: '',
+        outputSchema: verdictSchema,
+        namespace: 'test',
+      },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    const { agent } = await created.json() as { agent: { id: string } };
+    expect((await readAgent(request, agent.id)).outputSchema).toEqual(verdictSchema);
+    expect(await versionNumbers(request, agent.id)).toEqual([1]);
+
+    const renamed = await request.put(`/api/agents/${agent.id}`, {
+      headers: apiKeyHeaders(),
+      data: { description: 'renamed' },
+    });
+    expect(renamed.status(), await renamed.text()).toBe(200);
+    expect((await readAgent(request, agent.id)).outputSchema).toEqual(verdictSchema);
+    expect(await versionNumbers(request, agent.id)).toEqual([1]);
+
+    const cleared = await request.put(`/api/agents/${agent.id}`, {
+      headers: apiKeyHeaders(),
+      data: { outputSchema: null },
+    });
+    expect(cleared.status(), await cleared.text()).toBe(200);
+    expect((await readAgent(request, agent.id)).outputSchema).toBeUndefined();
+    expect(await versionNumbers(request, agent.id)).toEqual([2, 1]);
   });
 });

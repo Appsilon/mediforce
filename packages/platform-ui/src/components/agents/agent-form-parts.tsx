@@ -6,9 +6,11 @@ import {
   Shield, Code, Database, Globe, Sparkles, Settings, Info,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { AgentOutputSchemaSchema, type AgentOutputSchema } from '@mediforce/platform-core';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { usePlugins } from '@/hooks/use-plugins';
 import { humanizeToken } from '@/components/workflows/workflow-editor/step-editor-fields';
+import { OutputSchemaEditor } from '@/components/workflows/workflow-editor/output-schema-editor';
 
 export const AGENT_ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [
   { icon: Bot,      label: 'Bot'      },
@@ -70,6 +72,21 @@ export function AgentRuntimeField({ kind, runtimeId, onChange }: {
         {kind === 'plugin'
           ? 'What executes this agent. Required before the agent can be evaluated.'
           : 'The chat or voice runtime of this cowork agent.'}
+      </p>
+    </div>
+  );
+}
+
+export function AgentOutputSchemaField({ value, onChange }: {
+  value: AgentOutputSchema | undefined;
+  onChange: (outputSchema: AgentOutputSchema | undefined) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-sm font-medium">Output schema (optional)</label>
+      <OutputSchemaEditor value={value} onChange={onChange} schema={AgentOutputSchemaSchema} />
+      <p className="text-xs text-muted-foreground">
+        JSON Schema the agent&apos;s result must match. It is shown to the agent and checked after every run, unless the step sets its own.
       </p>
     </div>
   );

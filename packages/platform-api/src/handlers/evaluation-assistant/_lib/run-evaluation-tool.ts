@@ -204,7 +204,7 @@ export async function executeEvaluationTool(
           outputDescription: agent.outputDescription,
           systemPrompt: clip(agent.systemPrompt, 4000),
         },
-        outputSchema: workflowStep.agent?.outputSchema ?? null,
+        outputSchema: workflowStep.agent?.outputSchema ?? agent?.outputSchema ?? null,
         mcpServers: await effectiveMcpServers(scope, step, workflowStep),
         upstreamSteps: upstreamSteps(definition, workflowStep.id).map((upstream) => ({
           id: upstream.id,
@@ -227,6 +227,7 @@ export async function executeEvaluationTool(
           outputDescription: agent.outputDescription,
           systemPrompt: clip(agent.systemPrompt, 8000),
         },
+        outputSchema: agent.outputSchema ?? null,
         version: definition.version,
         mcpServers: await effectiveMcpServers(scope, step, workflowStep),
         skills: await offeredSkills(scope, definition, workflowStep),

@@ -159,5 +159,16 @@ describe('reviewEvaluationProposal', () => {
       expect(await reviewEvaluationProposal('propose_eval_case', { name: 'Fatal sepsis', input: { triggerPayload, previousStepOutputs: {} }, containsProductionData: true }, scope, AGENT, []))
         .toEqual({ ok: true });
     });
+
+    it('gets a schema check only once the agent declares an output schema', async () => {
+      const refused = await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(findings), fixture.scope(), AGENT, []);
+      expect(refused).toEqual({ ok: false, error: expect.stringContaining('declares no Output schema') });
+      expect(await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(judge), fixture.scope(), AGENT, []))
+        .toMatchObject({ ok: true });
+
+      await fixture.agentDefinitionRepo.update('ae-grader', { outputSchema: { type: 'object', required: ['findings'] } });
+      expect(await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(findings), fixture.scope(), AGENT, []))
+        .toMatchObject({ ok: true });
+    });
   });
 });

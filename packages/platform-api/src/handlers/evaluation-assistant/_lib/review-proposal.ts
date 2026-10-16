@@ -65,6 +65,24 @@ async function selfTest(
 }
 
 /**
+ * A schema check on an Agent that declares no output schema grades text the
+ * agent was never asked to write as JSON, so it fails every trial.
+ */
+async function reviewAgentSchemaCheck(
+  scope: CallerScope,
+  step: EvaluationSubject,
+  check: EvaluatorCheck | undefined,
+): Promise<ProposalReview> {
+  if (step.kind !== 'agent' || check?.kind !== 'schema') return { ok: true };
+  const agent = await scope.agentDefinitions.getById(step.agentId);
+  if (agent?.outputSchema !== undefined) return { ok: true };
+  return {
+    ok: false,
+    error: 'This agent declares no Output schema, so it is never asked to answer as JSON and a schema check fails every trial. Do not propose one: tell the person to set the agent\'s Output schema on its page first, or check the rule with code or a judge.',
+  };
+}
+
+/**
  * An Agent's case is written, never harvested (ADR-0029 D5), and is given its
  * trigger payload alone (D4) — what accepting it would refuse goes back to the
  * model with how to write it from a production run instead.
@@ -109,12 +127,16 @@ export async function reviewEvaluationProposal(
           error: `This step has an Evaluator named '${name}' already (${taken.id}${taken.archived ? ', archived' : ''}) — propose a new version of it with propose_evaluator_version, or choose another name.`,
         };
       }
+      const schemaReview = await reviewAgentSchemaCheck(scope, step, check);
+      if (schemaReview.ok === false) return schemaReview;
       return selfTest(scope, step, check, previewed);
     }
     case 'propose_evaluator_version': {
       const { evaluatorId, check } = args as Args<'propose_evaluator_version'>;
       const evaluator = await loadStepEvaluator(scope, step, evaluatorId);
       if (evaluator.archived) return { ok: false, error: `Evaluator '${evaluator.name}' is archived` };
+      const schemaReview = await reviewAgentSchemaCheck(scope, step, check);
+      if (schemaReview.ok === false) return schemaReview;
       return check === undefined ? { ok: true } : selfTest(scope, step, check, previewed);
     }
     case 'propose_perturbed_case': {

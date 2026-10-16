@@ -14,8 +14,8 @@ const MISSING_SKILL_HASH = 'missing';
 
 /**
  * What shapes the Agent's behaviour (ADR-0029): its runtime, model, system
- * prompt, MCP bindings, and each Skill it holds by content hash, sorted, so a
- * Skill edited in the catalog makes the Agent a new version.
+ * prompt, output schema, MCP bindings, and each Skill it holds by content hash,
+ * sorted, so a Skill edited in the catalog makes the Agent a new version.
  */
 export async function agentConfigOf(scope: CallerScope, agent: AgentDefinition): Promise<AgentConfigSnapshot> {
   const skills = await Promise.all((agent.skills ?? []).map(async (ref) => {
@@ -27,6 +27,7 @@ export async function agentConfigOf(scope: CallerScope, agent: AgentDefinition):
     runtimeId: agent.runtimeId ?? null,
     foundationModel: agent.foundationModel,
     systemPrompt: agent.systemPrompt,
+    ...(agent.outputSchema === undefined ? {} : { outputSchema: agent.outputSchema }),
     mcpServers: agent.mcpServers ?? {},
     skills: skills.sort((left, right) => `${left.namespace}/${left.id}`.localeCompare(`${right.namespace}/${right.id}`)),
   };

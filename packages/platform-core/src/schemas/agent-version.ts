@@ -1,20 +1,24 @@
 import { z } from 'zod';
 import { AgentMcpBindingMapSchema } from './agent-mcp-binding';
+import { AgentOutputSchemaSchema } from './agent-output-schema';
 import type { AgentDefinition } from './agent-definition';
 import { OfferedSkillSchema } from './step-execution';
 import type { WorkflowDefinition } from './workflow-definition';
 
 /**
  * Everything about an Agent that shapes what it does (ADR-0029): its runtime,
- * model, system prompt, MCP bindings and the Skills it is offered, each by
- * content hash. Its name, icon, descriptions and visibility are left out, so
- * renaming an Agent does not make it a new version.
+ * model, system prompt, output schema, MCP bindings and the Skills it is
+ * offered, each by content hash. Its name, icon, descriptions and visibility
+ * are left out, so renaming an Agent does not make it a new version. An Agent
+ * with no output schema has none in its snapshot, so its hash is the one it
+ * had before Agents could declare one.
  */
 export const AgentConfigSnapshotSchema = z.object({
   kind: z.enum(['plugin', 'cowork']),
   runtimeId: z.string().nullable(),
   foundationModel: z.string(),
   systemPrompt: z.string(),
+  outputSchema: AgentOutputSchemaSchema.optional(),
   mcpServers: AgentMcpBindingMapSchema,
   skills: z.array(OfferedSkillSchema),
 });

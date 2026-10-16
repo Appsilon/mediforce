@@ -47,7 +47,9 @@ point at.
    prepared, whenever the snapshot's hash differs from its newest version's.
    A Skill edited in the catalog therefore becomes a new Agent version at the
    next save or Eval Run. `GET /api/agents/:id/versions` (`mediforce agent
-   versions`) lists them and says which one the Agent has now.
+   versions`) lists them and says which one the Agent has now. _Amended
+   2026-10-16: the snapshot also holds the Agent's `outputSchema` when it
+   declares one (decision 7); an Agent without one keeps the hash it had._
 
 3. **An Agent's Eval Run assesses one Agent version.** Prepare records the
    version and freezes `agentVersion` on the run (`definitionVersion` is null);
@@ -90,6 +92,17 @@ point at.
    to see it, editing and running need to be allowed to change it. Its rows
    stay in the Agent's workspace, so an Agent that owns any cannot move to
    another workspace.
+
+7. **An Agent may declare its output schema.** _Added 2026-10-16._ An Agent's
+   `outputSchema` is the JSON Schema subset `step.agent.outputSchema` uses
+   (ADR-0023 D13). A Step that runs the Agent and declares no `outputSchema` of
+   its own inherits it, as it inherits the model — so the schema reaches the
+   prompt, `AgentRunner` checks `result` against it, and the trial of decision 4
+   (which declares nothing) runs under it. It is part of the Step Fingerprint
+   through the step config. Without it an Agent is never asked to answer as
+   JSON, so a `schema` Evaluator fails every trial on its prose: the Evaluation
+   Assistant does not propose one for an Agent that declares no output schema,
+   and tells the person to declare it first.
 
 ## Considered options
 

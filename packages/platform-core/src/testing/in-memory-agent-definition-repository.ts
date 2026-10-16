@@ -4,7 +4,7 @@ import type {
   CreateAgentDefinitionInput,
   UpdateAgentDefinitionInput,
 } from '../index';
-import { AgentDefinitionSchema } from '../schemas/agent-definition';
+import { AgentDefinitionSchema, mergeAgentUpdate } from '../schemas/agent-definition';
 import { AgentVersionSchema, type AgentVersion } from '../schemas/agent-version';
 
 /**
@@ -109,8 +109,7 @@ export class InMemoryAgentDefinitionRepository implements AgentDefinitionReposit
       throw new Error(`Agent definition ${id} not found`);
     }
     const merged = AgentDefinitionSchema.parse({
-      ...existing,
-      ...input,
+      ...mergeAgentUpdate(existing, input),
       id,
       updatedAt: this.now(),
     });

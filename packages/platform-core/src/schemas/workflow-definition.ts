@@ -13,6 +13,9 @@ import { BuildContextSchema } from '../utils/docker-build-paths';
 import { McpServerConfigSchema } from './mcp-server-config';
 import { StepMcpRestrictionSchema } from './agent-mcp-binding';
 import { AgentSkillRefsSchema } from './agent-definition';
+import { AgentOutputSchemaSchema, OutputSchemaPropertyTypeSchema } from './agent-output-schema';
+
+export { AgentOutputSchemaSchema, OutputSchemaPropertyTypeSchema };
 
 /** HTTP method enum used by the http action handler and (via the detached
  *  Trigger resource) webhook triggers. */
@@ -137,19 +140,6 @@ export const ContainerSchema = z.object({
   commit: CommitShaSchema.optional(),
   /** Name of a workflow secret containing a token for cloning a private repo. */
   repoAuth: z.string().optional(),
-});
-
-/**
- * JSON Schema an agent step's `result` must satisfy. The same structural subset
- * cowork enforces (`type`, `required`, per-property `type`); other keywords pass
- * through to the prompt as guidance but are not checked.
- */
-export const OutputSchemaPropertyTypeSchema = z.enum(['string', 'number', 'integer', 'boolean', 'null', 'array', 'object']);
-
-export const AgentOutputSchemaSchema = z.looseObject({
-  type: z.literal('object').optional(),
-  required: z.array(z.string()).optional(),
-  properties: z.record(z.string(), z.looseObject({ type: OutputSchemaPropertyTypeSchema.optional() })).optional(),
 });
 
 /** Maximum run time of a step, shared by every executor flavour that runs one
@@ -1031,8 +1021,7 @@ export function parseWorkflowTemplate(input: unknown) {
 
 export type ContainerConfig = z.infer<typeof ContainerSchema>;
 export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
-export type AgentOutputSchema = z.infer<typeof AgentOutputSchemaSchema>;
-export type OutputSchemaPropertyType = z.infer<typeof OutputSchemaPropertyTypeSchema>;
+export type { AgentOutputSchema, OutputSchemaPropertyType } from './agent-output-schema';
 export type ScriptStepConfig = z.infer<typeof ScriptStepConfigSchema>;
 export type DatabricksJobConfig = z.infer<typeof DatabricksJobConfigSchema>;
 export type WorkflowCoworkConfig = z.infer<typeof WorkflowCoworkConfigSchema>;

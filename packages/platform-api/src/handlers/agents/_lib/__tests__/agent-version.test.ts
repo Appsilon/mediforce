@@ -45,6 +45,21 @@ describe('recordAgentVersion (ADR-0029)', () => {
     expect(await recordAgentVersion(scope(), agent)).toMatchObject({ version: 2, config: { skills: [{ contentHash: 'hash-v2' }] } });
   });
 
+  it('versions the agent on its output schema, and an agent without one keeps the hash it had before Agents could declare one', async () => {
+    const first = await recordAgentVersion(scope(), agent);
+    expect('outputSchema' in first.config).toBe(false);
+
+    const outputSchema = { type: 'object' as const, required: ['classification'] };
+    const withSchema = await agentDefinitionRepo.update(agent.id, { outputSchema });
+    expect(await recordAgentVersion(scope(), withSchema)).toMatchObject({ version: 2, config: { outputSchema } });
+
+    const cleared = await agentDefinitionRepo.update(agent.id, { outputSchema: null });
+    expect(cleared.outputSchema).toBeUndefined();
+    const third = await recordAgentVersion(scope(), cleared);
+    expect(third.version).toBe(3);
+    expect(third.hash).toBe(first.hash);
+  });
+
   it('hashes a private Skill the same for a caller outside its namespace, so the version does not depend on who asks', async () => {
     const first = await recordAgentVersion(scope(), agent);
     const outsider = createTestScope({ agentDefinitionRepo, skillRepo, caller: userCaller('u-2', ['team-beta']) });

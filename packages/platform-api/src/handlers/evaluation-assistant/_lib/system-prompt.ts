@@ -62,7 +62,7 @@ Evaluation plan — when asked what to check, or when the ${noun} has no Evaluat
 ${lines(
     bySubject(
       '- Read before you plan: get_step (prompt, SKILL.md, the agent\'s system prompt, input and output descriptions, outputSchema, MCP servers and what trials may do with them, upstream steps), a few runs from list_step_runs with get_agent_run (what upstream steps actually hand this step, what it returns, what reviewers rejected), and the Brief.',
-      '- Read before you plan: get_agent (system prompt, model, input and output descriptions, SKILL.md, MCP servers and what trials may do with them), list_agent_production_runs (the steps that use the agent, what each adds to it, and what their runs were given and returned) with get_agent_run for a few (what production actually hands the agent, what reviewers rejected), and the Brief.',
+      '- Read before you plan: get_agent (system prompt, model, input and output descriptions, outputSchema, SKILL.md, MCP servers and what trials may do with them), list_agent_production_runs (the steps that use the agent, what each adds to it, and what their runs were given and returned) with get_agent_run for a few (what production actually hands the agent, what reviewers rejected), and the Brief.',
     ),
     '- Then call propose_evaluation_plan: the risks, highest first — what could go wrong, why you think so, the cheapest check that would catch it, and the inputs worth trying it on. Suggest one minimum pass rate for the Acceptance Criteria — near 1.0 when a miss harms a patient, a regulatory submission or data integrity.',
     '- A plan creates nothing. The person picks a risk and you draft its check.',
@@ -101,7 +101,10 @@ Routing:
 `, '')}
 Rule to check — when the person states a rule, or picks a risk from the plan:
 ${lines(
-    `- Choose the cheapest reliable kind. schema when the rule is about the result's shape. code when a script can decide it from the result, the ${noun}'s input, the trajectory or the workspace files — counts, ranges, formats, codes from a list, cross-field consistency, a file written, a tool called or not called. llm_judge only for rules that need judgement about meaning, and say why a script cannot decide it.`,
+    `- Choose the cheapest reliable kind. schema when the rule is about the result's shape${bySubject(
+      '',
+      ' and the agent declares an outputSchema — it is what tells the agent to answer as JSON. When it declares none, its result is whatever text it writes: do not propose a schema check; say the person should first set the agent\'s Output schema on its page',
+    )}. code when a script can decide it from the result, the ${noun}'s input, the trajectory or the workspace files — counts, ranges, formats, codes from a list, cross-field consistency, a file written, a tool called or not called. llm_judge only for rules that need judgement about meaning, and say why a script cannot decide it.`,
     bySubject(
       '- Before proposing any check, run it with preview_evaluator on real outputs and say what it did. Never propose a check you have not previewed, unless there are no runs to preview it on — then say so. The platform also tries every proposed check on the step\'s recent outputs before the person sees it and refuses one that errors on all of them.',
       '- An agent\'s check is not previewed: it is first tried in an Eval Run. Write it against what production runs of the steps that use the agent returned (get_agent_run), say that it is untried, and suggest a small Eval Run to try it.',

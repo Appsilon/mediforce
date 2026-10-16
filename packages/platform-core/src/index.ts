@@ -667,6 +667,7 @@ export {
   AgentVisibilitySchema,
   CreateAgentDefinitionInputSchema,
   UpdateAgentDefinitionInputSchema,
+  mergeAgentUpdate,
   mayHoldSkill,
   type SkillHolder,
 } from './schemas/agent-definition';
@@ -814,7 +815,7 @@ export type {
 } from './workflows/resolve-runnable-version';
 export { carriedDockerfile, stepHasBuildSource } from './workflows/build-source';
 export { resolveStepAssignee, resolveInstanceAssignee, type ResolvedStepAssignee } from './workflows/step-assignee';
-export { applyAgentModel, resolveDefinitionModels } from './workflows/agent-models';
+export { applyAgentModel, applyAgentOutputSchema, resolveDefinitionModels } from './workflows/agent-models';
 export {
   stepContainerConfig,
   allowedRepoHosts,

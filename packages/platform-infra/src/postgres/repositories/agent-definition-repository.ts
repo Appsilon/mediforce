@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import {
   AgentDefinitionSchema,
   AgentVersionSchema,
+  mergeAgentUpdate,
   parseRow,
   type AgentVersion,
   type AgentDefinition,
@@ -56,6 +57,7 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
           systemPrompt: values.systemPrompt,
           inputDescription: values.inputDescription,
           outputDescription: values.outputDescription,
+          outputSchema: values.outputSchema,
           mcpServers: values.mcpServers,
           skills: values.skills,
           namespace: values.namespace,
@@ -129,8 +131,7 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
       throw new Error(`Agent definition ${id} not found`);
     }
     const merged: AgentDefinition = AgentDefinitionSchema.parse({
-      ...current,
-      ...input,
+      ...mergeAgentUpdate(current, input),
       id,
     });
     const [row] = await this.db
@@ -145,6 +146,7 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
         systemPrompt: merged.systemPrompt,
         inputDescription: merged.inputDescription,
         outputDescription: merged.outputDescription,
+        outputSchema: merged.outputSchema ?? null,
         mcpServers: merged.mcpServers ?? null,
         skills: merged.skills ?? null,
         namespace: merged.namespace ?? null,
@@ -233,6 +235,7 @@ function toRow(id: string, input: CreateAgentDefinitionInput) {
     systemPrompt: parsed.systemPrompt,
     inputDescription: parsed.inputDescription,
     outputDescription: parsed.outputDescription,
+    outputSchema: parsed.outputSchema ?? null,
     mcpServers: parsed.mcpServers ?? null,
     skills: parsed.skills ?? null,
     namespace: parsed.namespace ?? null,
@@ -255,6 +258,7 @@ function toAgent(row: typeof agents.$inferSelect): AgentDefinition {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     runtimeId: row.runtimeId ?? undefined,
+    outputSchema: row.outputSchema ?? undefined,
     mcpServers: row.mcpServers ?? undefined,
     skills: row.skills ?? undefined,
     namespace: row.namespace ?? undefined,

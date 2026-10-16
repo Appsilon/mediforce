@@ -267,8 +267,8 @@ an `expected_output` Evaluator stays one, and no other kind becomes one. In the
 tab, a case whose expected output no Expected output check grades says so.
 
 In the Evaluation tab, **Evaluators → Add** picks the kind from a dropdown and
-shows its fields — a JSON Schema (started from the step's `agent.outputSchema`
-when it declares one), a language and source, a judge model with the question
+shows its fields — a JSON Schema (started from the step's `agent.outputSchema`,
+or an Agent's `outputSchema`, when it declares one), a language and source, a judge model with the question
 it answers and its minimum confidence — never the check's JSON.
 Each Evaluator's **Details** show the whole check and its versions; **Edit**
 saves a new version with what changed (`POST
@@ -839,15 +839,19 @@ of `--workflow` and `--step` (and the API with `agentId` in place of
 Criteria, Eval Runs and Qualification work as above, with these differences:
 
 - **Each Eval Run assesses one Agent version.** An Agent version is a snapshot
-  of its runtime, model, system prompt, MCP bindings and Skills (by content
-  hash). Saving the Agent records a new version when one of those changed — a
+  of its runtime, model, system prompt, output schema, MCP bindings and Skills
+  (by content hash). Saving the Agent records a new version when one of those changed — a
   rename does not; preparing an Eval Run records one when a Skill it holds was
   edited since. The run names the version (`agentVersion`) and its output
   carries that version's configuration (`assessedAgentVersion`), shown on the
   run's page as *Configuration assessed*. `mediforce agent versions <id>` lists
   them. Validation reads the newest finished run of the current version.
 - **A trial runs the Agent alone**: a single agent step with no prompt, model,
-  Skills or MCP restrictions of its own. A case's `triggerPayload` is the whole
+  Skills or MCP restrictions of its own. It runs under the Agent's
+  `outputSchema`, when the Agent declares one; without one the agent is never
+  asked to answer as JSON, so the Evaluation Assistant does not propose a
+  `schema` Evaluator for it and asks for the Output schema to be set on the
+  Agent's page first. A case's `triggerPayload` is the whole
   input — a case takes no `previousStepOutputs` or `previousRun` — and the
   workspace starts empty, so it takes no workspace seed either.
 - **The suite follows the Agent.** Whoever can see the Agent can read its

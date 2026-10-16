@@ -22,6 +22,7 @@ import {
 } from '@mediforce/agent-runtime';
 import {
   applyAgentModel,
+  applyAgentOutputSchema,
   evaluationOwnerOf,
   evaluationSubjectOf,
   inlineMcpServerNames,
@@ -205,7 +206,8 @@ export async function executeAgentStep(
     : undefined;
 
   // Resolve what the step inherits from its AgentDefinition: the identity
-  // prompt (systemPrompt) and the model. Empty when the step has no agentId.
+  // prompt (systemPrompt), the model and the output schema. Empty when the
+  // step has no agentId.
   const agentDefaults = !reapTimedOut && workflowStep.agentId !== undefined
     ? await resolveAgentDefaults(workflowStep.agentId, agentDefinitionRepo)
     : {};
@@ -219,8 +221,8 @@ export async function executeAgentStep(
     ? undefined
     : (await resolveSkillsForStep(workflowStep, { agentDefinitionRepo, skillRepo: runtimeSkillRepo }, workflowDefinition)) ?? undefined;
 
-  // Picking an agent picks its model unless the step deliberately overrides it.
-  const resolvedStep = applyAgentModel(workflowStep, agentDefaults.model);
+  // Picking an agent picks its model and output schema unless the step deliberately overrides them.
+  const resolvedStep = applyAgentOutputSchema(applyAgentModel(workflowStep, agentDefaults.model), agentDefaults.outputSchema);
 
   const workflowAgentContext: WorkflowAgentContext = {
     stepId,

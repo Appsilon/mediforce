@@ -1,5 +1,5 @@
 import type { UpdateAgentInput, UpdateAgentBody, UpdateAgentOutput } from '../../contract/agents';
-import type { AgentDefinition } from '@mediforce/platform-core';
+import { mergeAgentUpdate, type AgentDefinition } from '@mediforce/platform-core';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
@@ -23,7 +23,7 @@ export async function updateAgent(
   if (touchesSkills || touchesBindings) {
     const existing = await scope.agentDefinitions.getForUpdate(input.id);
     if (input.body.namespace !== undefined) await assertMayLeaveWorkspace(scope, existing, input.body.namespace);
-    const merged = { ...existing, ...input.body };
+    const merged = mergeAgentUpdate(existing, input.body);
     if (touchesSkills) await assertAgentMayHoldSkills(merged, scope);
     if (touchesBindings) await assertBindingsTargetCatalogEntries(scope, merged.namespace, merged.mcpServers);
   }

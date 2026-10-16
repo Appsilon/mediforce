@@ -8,10 +8,10 @@ import { Eye, EyeOff } from 'lucide-react';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { cn } from '@/lib/utils';
-import type { AgentSkillRef } from '@mediforce/platform-core';
+import type { AgentOutputSchema, AgentSkillRef } from '@mediforce/platform-core';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 import { AgentSkillsSection } from '@/components/agents/agent-skills-section';
-import { AGENT_ICON_OPTIONS, AgentRuntimeField, RecognitionLabel } from '@/components/agents/agent-form-parts';
+import { AGENT_ICON_OPTIONS, AgentOutputSchemaField, AgentRuntimeField, RecognitionLabel } from '@/components/agents/agent-form-parts';
 import { AgentEvaluation } from '@/components/evaluation/agent-evaluation';
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
@@ -54,6 +54,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const [description, setDescription] = useState('');
   const [inputDescription, setInputDescription] = useState('');
   const [outputDescription, setOutputDescription] = useState('');
+  const [outputSchema, setOutputSchema] = useState<AgentOutputSchema | undefined>(undefined);
   const [selectedModelId, setSelectedModelId] = useState('');
   const [prompt, setPrompt] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
@@ -73,6 +74,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         setDescription(def.description);
         setInputDescription(def.inputDescription);
         setOutputDescription(def.outputDescription);
+        setOutputSchema(def.outputSchema);
         setSelectedModelId(def.foundationModel);
         setPrompt(def.systemPrompt);
         setVisibility(def.visibility ?? 'private');
@@ -103,6 +105,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         description,
         inputDescription,
         outputDescription,
+        outputSchema: outputSchema ?? null,
         foundationModel: selectedModelId,
         systemPrompt: prompt,
         visibility,
@@ -281,6 +284,8 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
               className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none font-mono"
             />
           </div>
+
+          <AgentOutputSchemaField value={outputSchema} onChange={setOutputSchema} />
 
           {/* MCP Servers — bindings persisted separately via /mcp-servers endpoints */}
           <AgentMcpSection agentId={id} handle={handle} />

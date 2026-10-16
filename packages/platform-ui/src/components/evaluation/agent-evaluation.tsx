@@ -23,7 +23,7 @@ function AgentVersionLine({ agentId }: { agentId: string }) {
         : newest === undefined
           ? 'This agent has no recorded version yet; its first Eval Run records version 1.'
           : `The agent changed since version ${newest.version}; its next Eval Run records version ${newest.version + 1}.`}
-      {' '}Saving a change to its runtime, model, system prompt, MCP servers or Skills makes it a new version.
+      {' '}Saving a change to its runtime, model, system prompt, output schema, MCP servers or Skills makes it a new version.
     </p>
   );
 }
@@ -62,7 +62,7 @@ export function AgentEvaluation({ handle, agentId }: { handle: string; agentId: 
       <StepEvaluation
         step={subject}
         definitionVersion={null}
-        outputSchema={undefined}
+        outputSchema={definition.outputSchema}
         mayEdit={gates.mayEdit}
         editReason={gates.editReason}
         mayRun={gates.mayRun}
