@@ -388,6 +388,41 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(String(warning?.payload)).not.toContain('undefined');
     });
 
+    it.each(['local', 'docker'] as const)(
+      '[DATA] reads result.json when the agent closes with prose (%s mode)',
+      async (mode) => {
+        process.env.ALLOW_LOCAL_AGENTS = 'true';
+        const context = buildMockContext({
+          config: {
+            processName: 'p', configName: 'c', configVersion: 'v1',
+            stepConfigs: [{
+              stepId: 'extract', executorType: 'agent', plugin: 'claude-code-agent',
+              agentConfig: { prompt: 'Extract trial metadata from the protocol', ...(mode === 'docker' ? { image: 'mediforce-agent:test' } : {}) },
+            }],
+          } as ProcessConfig,
+        });
+        await plugin.initialize(context);
+
+        const spawned = async (_prompt: string, options?: Record<string, unknown>) => {
+          const outputDir = options?.outputDir as string;
+          await writeFile(join(outputDir, 'result.json'), JSON.stringify({ classification: 'recovery', confidence: 0.8 }));
+          return {
+            cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: 'All done, result written.' }),
+            gitMetadata: null, presentation: null, outputDir, injectedEnvVars: [],
+          };
+        };
+        if (mode === 'local') mockSpawnLocal(plugin).mockImplementation(spawned);
+        else mockSpawn(plugin).mockImplementation(spawned);
+
+        const { emit, events } = buildEmitSpy();
+        await plugin.run(emit);
+
+        const resultEvent = events.find((e) => e.type === 'result');
+        expect(resultEvent?.payload).toMatchObject({ confidence: 0.8, result: { classification: 'recovery' } });
+        expect((resultEvent?.payload as { result: Record<string, unknown> }).result).not.toHaveProperty('raw');
+      },
+    );
+
     it('[DATA] parses an answer the agent wrapped in a ```json fence', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);

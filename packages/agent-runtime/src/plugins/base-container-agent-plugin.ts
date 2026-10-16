@@ -1100,8 +1100,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
       const duration_ms = Date.now() - startTime;
 
+      // Local mode: the agent saw the real host path, so the mapping is the identity.
       const outputDirMapping = isLocalMode
-        ? undefined  // Local mode: paths in prompt are already real host paths
+        ? { containerPath: dockerOutputDir + '/', hostPath: dockerOutputDir + '/' }
         : spawnResult.outputDir
           ? { containerPath: '/output/', hostPath: spawnResult.outputDir + '/' }
           : undefined;
