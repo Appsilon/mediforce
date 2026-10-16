@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import * as Tabs from '@radix-ui/react-tabs';
 import { useState, useEffect } from 'react';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -127,24 +128,24 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   return (
     <div className={cn('flex flex-1 flex-col gap-6 p-6', tab === 'configuration' && 'max-w-2xl')}>
       {notFound === false && (
-        <div className="flex gap-0 border-b" role="tablist">
-          {(['configuration', 'evaluation'] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={tab === value}
-              data-testid={`agent-tab-${value}`}
-              onClick={() => selectTab(value)}
-              className={cn(
-                'border-b-2 px-3 py-2 text-sm transition-colors',
-                tab === value ? 'border-primary font-medium text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {value === 'configuration' ? 'Configuration' : 'Evaluation'}
-            </button>
-          ))}
-        </div>
+        <Tabs.Root value={tab} onValueChange={(next) => selectTab(next === 'evaluation' ? 'evaluation' : 'configuration')}>
+          <Tabs.List className="flex gap-0 border-b" data-tour="agent-tabs">
+            {(['configuration', 'evaluation'] as const).map((value) => (
+              <Tabs.Trigger
+                key={value}
+                value={value}
+                data-testid={`agent-tab-${value}`}
+                className={cn(
+                  'border-b-2 px-3 py-2 text-sm transition-colors',
+                  'border-transparent text-muted-foreground hover:text-foreground',
+                  'data-[state=active]:border-primary data-[state=active]:font-medium data-[state=active]:text-foreground',
+                )}
+              >
+                {value === 'configuration' ? 'Configuration' : 'Evaluation'}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        </Tabs.Root>
       )}
       {loadingDef ? (
         <FormSkeleton />

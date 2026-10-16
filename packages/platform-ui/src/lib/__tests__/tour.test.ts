@@ -164,6 +164,7 @@ describe('tour content', () => {
       '/test/agents',
       '/test/models',
       '/test/agents/new',
+      '/test/agents/definitions/abc?tab=evaluation',
       '/test/mcp',
       '/test/images',
       '/test/tasks',
@@ -181,6 +182,10 @@ describe('tour content', () => {
       const chapter = chapterForPath(GUIDE_CHAPTERS, path!, query);
       expect([route, chapter?.id]).not.toEqual([route, 'anywhere']);
     }
+  });
+
+  it('explains an agent\u2019s Evaluation tab apart from its configuration', () => {
+    expect(chapterForPath(GUIDE_CHAPTERS, '/test/agents/definitions/abc', 'tab=evaluation')?.id).toBe('agent-evaluation');
   });
 
   it('gives every guide chapter a unique id', () => {

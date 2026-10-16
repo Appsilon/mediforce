@@ -17,7 +17,7 @@ function AgentVersionLine({ agentId }: { agentId: string }) {
   const [newest] = versions.data.versions;
   const current = versions.data.current;
   return (
-    <p className="text-sm text-muted-foreground" data-testid="agent-version">
+    <p className="text-sm text-muted-foreground" data-testid="agent-version" data-tour="agent-version">
       {current !== null
         ? <>An Eval Run started now assesses <span className="font-medium text-foreground">agent version {current}</span>.</>
         : newest === undefined
