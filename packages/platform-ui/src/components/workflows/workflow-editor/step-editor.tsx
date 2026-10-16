@@ -142,7 +142,7 @@ const TIP = {
   agentModel:              'Leave on the default to run the agent\'s own model. Picking a model here replaces it for this step only; the agent itself is unchanged.',
   agentSkills:             'Skills offered to the agent in this step, on top of its own. The agent loads one when its description fits the task. A step skill replaces the agent\'s skill of the same name.',
   stepTimeoutMinutes:      `How long the step may run before it is stopped as timed out. Blank means ${DEFAULT_STEP_TIMEOUT_MINUTES} minutes.`,
-  agentOutputSchema:       'JSON Schema the agent\'s result must match. Shown to the agent; a result that breaks it gets one retry with the error, then the run is escalated to a person.',
+  agentOutputSchema:       'JSON Schema the agent\'s result must match. Shown to the agent; a result that breaks it is reshaped once from what it already says (the agent is not rerun), and if that cannot fix it the run is escalated to a person with the reason.',
   agentPrompt:             'Instructions for this step, added after the agent\'s system prompt. The agent\'s own prompt still applies.',
 
   scriptRuntime:           'Language runtime for the inline script: javascript, python, r, or bash.',

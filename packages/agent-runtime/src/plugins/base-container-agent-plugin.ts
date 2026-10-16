@@ -1410,13 +1410,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         `a non-conforming result is rejected.\n` +
         '```json\n' + JSON.stringify(this.context.step.agent.outputSchema, null, 2) + '\n```',
       );
-      if (this.context.outputSchemaViolation !== undefined) {
-        parts.push(
-          `## Previous Attempt Rejected\n` +
-          `Your previous result did not match the Output Schema: ${this.context.outputSchemaViolation}\n` +
-          `Produce a result that conforms to the schema.`,
-        );
-      }
     }
 
     // 5. Input context

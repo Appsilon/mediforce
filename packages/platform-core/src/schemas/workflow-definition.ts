@@ -168,7 +168,7 @@ export const WorkflowAgentConfigSchema = z.object({
   retiredFileSkill: z.string().optional(),
   timeoutMinutes: StepTimeoutMinutesSchema.optional(),
   /** Shown to the agent in its prompt and checked against `result` after the
-   *  run: one retry with the validation error, then the run is escalated. */
+   *  run: one LLM call reshapes a violating result, then the run is escalated. */
   outputSchema: AgentOutputSchemaSchema.optional(),
   /** @deprecated Step-level MCP configuration is being removed.
    *  Move servers onto the agent via AgentDefinition.mcpServers and

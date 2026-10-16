@@ -76,3 +76,31 @@ describe('OpenRouterLlmClient tracing', () => {
     expect(span.attributes['gen_ai.completion.0.content']).toBe('Accepted.');
   });
 });
+
+describe('OpenRouterLlmClient endpoint', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it('posts to OPENROUTER_BASE_URL at temperature 0, and reads a response without usage as zero tokens', async () => {
+    vi.stubEnv('OPENROUTER_BASE_URL', 'http://127.0.0.1:9019/api/v1/');
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '{"findings": []}' } }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await new OpenRouterLlmClient('test-api-key')
+      .complete([{ role: 'user', content: 'Reshape this.' }], 'anthropic/claude-sonnet-4');
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('http://127.0.0.1:9019/api/v1/chat/completions');
+    expect(JSON.parse(init.body as string)).toMatchObject({ temperature: 0 });
+    expect(response).toEqual({
+      content: '{"findings": []}',
+      model: 'anthropic/claude-sonnet-4',
+      usage: { promptTokens: 0, completionTokens: 0 },
+    });
+  });
+});

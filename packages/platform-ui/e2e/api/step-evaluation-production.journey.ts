@@ -1,16 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import type { APIRequestContext } from '@playwright/test';
-import { EvaluatorOutputSchema, ListScoresOutputSchema } from '@mediforce/platform-api/contract';
+import { EvaluatorOutputSchema, GetRunOutputSchema, ListScoresOutputSchema } from '@mediforce/platform-api/contract';
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
+import { pollUntil } from '../helpers/poll-until';
 
 /**
  * API E2E for production Evaluators (ADR-0023 D13): a `schema`
  * Evaluator marked "also run in production" fails a live run's output, which
  * escalates it to a person with reason `production_evaluator`, and
- * scores the run with a Score marked `production`. The flag reports whether
- * it is in effect.
+ * scores the run with a Score marked `production`; the paused run's error
+ * names the Evaluator and why it failed. The flag reports whether it is in
+ * effect.
  *
  * MOCK_AGENT=true: the mock agent's result is `{ mock, summary }`, so a
  * schema requiring `findings` fails it and one requiring `summary` passes.
@@ -55,6 +57,15 @@ test.describe('Step Evaluation production Evaluators — API E2E', () => {
     const gated = await awaitFinishedAgentRun(request, gatedRunRes.run.id);
 
     expect(gated).toMatchObject({ status: 'escalated', fallbackReason: 'production_evaluator' });
+    const pausedRun = await pollUntil(async () => {
+      const res = await request.get(`/api/runs/${gatedRunRes.run.id}`, { headers: AUTH_HEADERS });
+      const run = GetRunOutputSchema.parse(await res.json());
+      return run.error === null ? null : run;
+    }, { description: `the error of paused run ${gatedRunRes.run.id}` });
+    expect(pausedRun).toMatchObject({
+      status: 'paused',
+      error: "Agent step 'grade-aes' failed a production Evaluator: Evaluator 'findings-present' v1 failed: missing required keys: findings",
+    });
     const [score] = await scoresOf(request, gatedRunRes.run.id);
     expect(score).toMatchObject({
       name: 'findings-present', value: 0, source: 'deterministic', evaluatorId: created.evaluator.id,

@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-14
+last_reviewed: 2026-10-16
 ---
 
 # Step Evaluation
@@ -298,8 +298,10 @@ autonomy routing, `AgentRunner` hands it to the gate
 - `schema` and `code` run synchronously and each writes a Score marked
   `metadata.production: true` (no `evalRunId`). A failing one fails
   the run with reason `production_evaluator`: the run is escalated to a
-  person, and the failure message is the run's
-  `errorMessage`, an activity-log line and part of the `agent.run` audit event.
+  person, and the failure message is the Agent Run's
+  `errorMessage`, the step's and the paused run's `error` (`Agent step '<id>'
+  failed a production Evaluator: …`), an activity-log line and part of the
+  `agent.run` audit event. It is not retried or reshaped.
 - `llm_judge` runs asynchronously after the run has moved on and only writes a
   Score (`source: llm_judge`, its cost in `metadata.judgeCostUsd`, its
   confidence as in an Eval Run). Its errors

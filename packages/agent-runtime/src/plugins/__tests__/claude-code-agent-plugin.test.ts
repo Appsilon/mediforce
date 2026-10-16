@@ -673,7 +673,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(promptArg).toContain('100 cases like this');
     });
 
-    it('[DATA] includes agent.outputSchema and the rejected attempt\'s error in the prompt', async () => {
+    it('[DATA] includes agent.outputSchema in the prompt', async () => {
       const outputSchema = { type: 'object' as const, required: ['findings'] };
       const context: WorkflowAgentContext = {
         stepId: 'extract',
@@ -699,7 +699,6 @@ describe('ClaudeCodeAgentPlugin', () => {
         },
         llm: { complete: vi.fn() },
         getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
-        outputSchemaViolation: 'missing required keys: findings',
       };
       await plugin.initialize(context);
 
@@ -712,8 +711,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       const promptArg = spawnSpy.mock.calls[0][0] as string;
       expect(promptArg).toContain('## Output Schema');
       expect(promptArg).toContain('"required": [\n    "findings"\n  ]');
-      expect(promptArg).toContain('## Previous Attempt Rejected');
-      expect(promptArg).toContain('missing required keys: findings');
     });
 
     it('[DATA] accepts standalone Docker mode (image only, no repo/commit)', async () => {

@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-10-15
+last_reviewed: 2026-10-16
 ---
 
 # 0023 — Step Evaluation: Evaluation Assistant, Evaluators, single-step Eval Runs, Step Qualification
@@ -247,7 +247,15 @@ only writes Scores. Human verdicts on CM3 reviews become Scores automatically,
 best-effort until handlers get a cross-repository transaction (#516): the verdict
 itself is always on the task and its `task.completed` audit event.
 `outputSchema` violations, after one retry with the first violation, follow
-the same fallback route; the retry shares the step's timeout.
+the same fallback route; the retry shares the step's timeout. _Amended
+2026-10-16: the retry no longer reruns the agent — one LLM call on the step's
+model reshapes the rejected result to the schema, using only what the result
+already says (checked: a value the original does not contain rejects it), and
+the result is validated again. A reshaped result keeps the agent's original in
+an annotation and the audit event; a key it cannot fill stays missing and the
+run escalates. Production Evaluators get no retry. Every escalation that
+fails the step writes its reason to the step and the run, so the paused run
+says why._
 
 **D14 — One Evaluation Assistant, built on the workflow assistant's
 blocks.** A single assistant per Step covers the whole Evaluation: suggest a

@@ -129,9 +129,6 @@ export interface WorkflowAgentContext {
    *  folder, never pasted into the prompt. undefined when the step has neither
    *  an agentId nor skills of its own. */
   agentSkills?: Skill[];
-  /** Set by AgentRunner on the one retry after `result` broke
-   *  `step.agent.outputSchema`: the validation error, for the prompt. */
-  outputSchemaViolation?: string;
   /** Where a plugin records its Agent Trajectory (ADR-0023 D8). Set by
    *  AgentRunner, keyed to its Agent Run; absent for script steps and in tests. */
   trajectory?: { record(entries: readonly AgentTrajectoryEntry[]): void };

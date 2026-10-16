@@ -15,6 +15,7 @@ import {
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { pollUntil } from '../helpers/poll-until';
+import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
 import {
   setupMultiNamespaceCallers,
   sessionCookieHeaders,
@@ -23,15 +24,17 @@ import {
 
 /**
  * API E2E for the evaluation groundwork on agent steps (ADR-0023 D8, D13):
- * a result that breaks `agent.outputSchema` is retried once and then
- * escalated to a person; every Agent Run's Agent Trajectory is persisted and
+ * a result that breaks `agent.outputSchema` is reshaped by one LLM call — the
+ * agent is not rerun — and escalated to a person, with the reason on the run,
+ * when that cannot fix it; every Agent Run's Agent Trajectory is persisted and
  * readable only from the run's workspace; and a Control Mode 3 review verdict
  * is recorded as a `human_verdict` Score on the reviewed Agent Run, likewise
  * invisible from other workspaces.
  *
  * Every run is driven through the platform with MOCK_AGENT=true. The mock
  * agent's result is `{ mock, summary }` and it records two trajectory entries
- * per attempt, which is what these assertions lean on.
+ * per attempt, which is what these assertions lean on. The reshape call goes to
+ * the mock OpenRouter, which answers an unscripted request with prose.
  */
 
 async function getTrajectory(
@@ -53,7 +56,7 @@ test.describe('Step Evaluation foundations — API E2E', () => {
     callers = await setupMultiNamespaceCallers();
   });
 
-  test('a result that breaks agent.outputSchema is retried once, then escalated', async ({ request }) => {
+  test('a result that breaks agent.outputSchema and cannot be reshaped escalates, saying why', async ({ request }) => {
     const runId = await startRun(request, agentStepWorkflow(`e2e-output-schema-${Date.now()}`, {
       autonomyLevel: 'L4',
       agent: {
@@ -69,24 +72,48 @@ test.describe('Step Evaluation foundations — API E2E', () => {
     const eventsRes = await request.get(`/api/processes/${runId}/agent-events?stepId=grade-aes`, { headers: AUTH_HEADERS });
     expect(eventsRes.status()).toBe(200);
     const { events } = (await eventsRes.json()) as { events: Array<{ type: string; payload: unknown }> };
-    expect(events.filter((event) => event.type === 'result')).toHaveLength(2);
+    // The agent ran once; the reshape is an LLM call, not a second attempt.
+    expect(events.filter((event) => event.type === 'result')).toHaveLength(1);
     expect(events.some((event) =>
       event.type === 'status' && String(event.payload).includes('missing required keys: findings'),
     )).toBe(true);
 
-    // Both attempts land in the one Agent Run's trajectory.
     const entries = await getTrajectory(request, agentRun.id);
-    expect(entries.map((entry) => entry.seq)).toEqual([0, 1, 2, 3]);
+    expect(entries.map((entry) => entry.seq)).toEqual([0, 1]);
 
     const run = await pollUntil(
       async () => {
         const res = await request.get(`/api/processes/${runId}`, { headers: AUTH_HEADERS });
-        const body = (await res.json()) as { status: string; pauseReason: string | null };
-        return body.status === 'paused' ? body : null;
+        const body = (await res.json()) as { status: string; pauseReason: string | null; error: string | null };
+        return body.status === 'paused' && body.error !== null ? body : null;
       },
-      { description: `run ${runId} to pause` },
+      { description: `run ${runId} to pause with its reason` },
     );
     expect(run.pauseReason).toBe('agent_escalated');
+    expect(run.error).toBe(
+      "Agent step 'grade-aes' escalated: result does not match agent.outputSchema: missing required keys: findings "
+      + '(reshaping it did not fix it: the answer was not a JSON object)',
+    );
+  });
+
+  test('a result that breaks agent.outputSchema is reshaped from what it says and the run goes on', async ({ request }) => {
+    const overviewKey = `overview_${Date.now()}`;
+    const original = { mock: true, summary: 'Mock output for step grade-aes' };
+    await scriptOpenRouter(overviewKey, [{ content: JSON.stringify({ [overviewKey]: original.summary }) }]);
+    const runId = await startRun(request, agentStepWorkflow(`e2e-output-reshape-${Date.now()}`, {
+      autonomyLevel: 'L4',
+      agent: {
+        prompt: 'Grade each adverse event by CTCAE.',
+        outputSchema: { type: 'object', required: [overviewKey], properties: { [overviewKey]: { type: 'string' } } },
+      },
+    }));
+
+    const agentRun = await awaitFinishedAgentRun(request, runId);
+
+    expect(agentRun).toMatchObject({ status: 'completed', fallbackReason: null });
+    expect(agentRun.envelope?.result).toEqual({ [overviewKey]: original.summary });
+    expect(agentRun.envelope?.annotations.some((annotation) =>
+      annotation.content.includes('reshaped') && annotation.content.includes(JSON.stringify(original)))).toBe(true);
   });
 
   test('an agent run\'s trajectory is retrievable by its id, and scoped to the run\'s workspace', async ({ request }) => {

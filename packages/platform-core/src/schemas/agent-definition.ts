@@ -53,7 +53,7 @@ export const AgentDefinitionSchema = z.object({
   inputDescription: z.string(),
   outputDescription: z.string(),
   /** The JSON Schema the agent's `result` must satisfy, wherever it runs: shown
-   *  in its prompt and checked after the run (one retry, then escalation). A
+   *  in its prompt and checked after the run (one reshape, then escalation). A
    *  Step's own `agent.outputSchema` replaces it. */
   outputSchema: AgentOutputSchemaSchema.optional(),
   /** Canonical MCP server configuration for this agent. Map of server

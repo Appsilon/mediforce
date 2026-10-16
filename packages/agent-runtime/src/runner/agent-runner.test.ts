@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentRunner } from './agent-runner';
-import { PluginRunner } from './plugin-runner';
 import {
   InMemoryProcessInstanceRepository,
   InMemoryAuditRepository,
@@ -13,6 +12,7 @@ import { InMemoryAgentEventLog } from '../testing/index';
 import { NoopLlmClient } from '../testing/index';
 import type {
   AgentOutputGate,
+  LlmClient,
   StepExecutorPlugin,
   AgentContext,
   EmitFn,
@@ -777,13 +777,15 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
   }
 
   let instanceRepository: InMemoryProcessInstanceRepository;
+  let auditRepository: InMemoryAuditRepository;
   let eventLog: InMemoryAgentEventLog;
   let runner: AgentRunner;
 
   beforeEach(async () => {
     instanceRepository = new InMemoryProcessInstanceRepository();
+    auditRepository = new InMemoryAuditRepository();
     eventLog = new InMemoryAgentEventLog();
-    runner = new AgentRunner(instanceRepository, new InMemoryAuditRepository(), eventLog);
+    runner = new AgentRunner(instanceRepository, auditRepository, eventLog);
     await createTestInstance(instanceRepository);
   });
 
@@ -797,38 +799,93 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
     expect(seenContexts).toHaveLength(1);
   });
 
-  it('retries once with the validation error and accepts a corrected result', async () => {
-    const { plugin, seenContexts } = makeScriptedPlugin([
-      makeValidEnvelope({ result: { summary: 'no findings key' } }),
-      makeValidEnvelope({ result: { findings: ['AE grade 3'] } }),
-    ]);
-
-    const result = await runner.runWithWorkflowStep(plugin, makeSchemaStepContext());
-
-    expect(result.status).toBe('completed');
-    expect(result.envelope?.result).toEqual({ findings: ['AE grade 3'] });
-    expect(seenContexts).toHaveLength(2);
-    expect(seenContexts[0]!.outputSchemaViolation).toBeUndefined();
-    expect(seenContexts[1]!.outputSchemaViolation).toBe('missing required keys: findings');
-    const statuses = eventLog.getEvents('instance-1', 'step-1')
+  function statusEvents(): string[] {
+    return eventLog.getEvents('instance-1', 'step-1')
       .filter((event) => event.type === 'status')
       .map((event) => String(event.payload));
-    expect(statuses.some((payload) => payload.includes('missing required keys: findings'))).toBe(true);
+  }
+
+  it('reshapes a violating result with one LLM call instead of rerunning the agent', async () => {
+    const { plugin, seenContexts } = makeScriptedPlugin([
+      makeValidEnvelope({ result: { finding_list: ['AE grade 3'] } }),
+    ]);
+    const llm = vi.fn<LlmClient['complete']>().mockResolvedValue({
+      content: '```json\n{"findings": ["AE grade 3"]}\n```',
+      model: 'anthropic/claude-sonnet-4',
+      usage: { promptTokens: 10, completionTokens: 5 },
+    });
+    const context = { ...makeSchemaStepContext(), llm: { complete: llm } };
+
+    const result = await runner.runWithWorkflowStep(plugin, context);
+
+    expect(seenContexts).toHaveLength(1);
+    expect(result.status).toBe('completed');
+    expect(result.envelope?.result).toEqual({ findings: ['AE grade 3'] });
+    expect(llm).toHaveBeenCalledOnce();
+    const [messages, model] = llm.mock.calls[0]!;
+    expect(model).toBe('anthropic/claude-sonnet-4');
+    const sent = messages.map((message) => message.content).join('\n');
+    expect(sent).toContain('missing required keys: findings');
+    expect(sent).toContain('finding_list');
+    expect(sent).toContain('"required"');
+    expect(result.envelope?.annotations.some((annotation) =>
+      annotation.content.includes('finding_list') && annotation.content.includes('missing required keys: findings'))).toBe(true);
+    expect(statusEvents().some((payload) => payload.includes('missing required keys: findings'))).toBe(true);
+    expect(statusEvents().some((payload) => payload.includes('reshaped'))).toBe(true);
+    const [audit] = await auditRepository.getByProcess('instance-1');
+    expect(audit?.outputSnapshot).toMatchObject({
+      result: { findings: ['AE grade 3'] },
+      reshapedBy: 'anthropic/claude-sonnet-4',
+      originalResult: { finding_list: ['AE grade 3'] },
+    });
   });
 
-  it('escalates a second violation with reason output_schema', async () => {
+  it('escalates with reason output_schema, naming both problems, when the reshaped result still violates', async () => {
     const { plugin, seenContexts } = makeScriptedPlugin([
-      makeValidEnvelope({ result: { summary: 'still wrong' } }),
+      makeValidEnvelope({ result: { summary: 'no findings at all' } }),
     ]);
+    const llm = vi.fn<LlmClient['complete']>().mockResolvedValue({
+      content: '{"summary": "no findings at all"}',
+      model: 'anthropic/claude-sonnet-4',
+      usage: { promptTokens: 10, completionTokens: 5 },
+    });
 
-    const result = await runner.runWithWorkflowStep(plugin, makeSchemaStepContext());
+    const result = await runner.runWithWorkflowStep(plugin, { ...makeSchemaStepContext(), llm: { complete: llm } });
 
-    expect(seenContexts).toHaveLength(2);
+    expect(seenContexts).toHaveLength(1);
     expect(result.status).toBe('escalated');
     expect(result.fallbackReason).toBe('output_schema');
-    expect(result.errorMessage).toContain('missing required keys: findings');
+    expect(result.errorMessage).toBe(
+      'result does not match agent.outputSchema: missing required keys: findings '
+      + '(reshaping it did not fix it: missing required keys: findings)',
+    );
+    expect(result.envelope?.result).toEqual({ summary: 'no findings at all' });
     const instance = await instanceRepository.getById('instance-1');
     expect(instance?.pauseReason).toBe('agent_escalated');
+  });
+
+  it('escalates with the original violation when the repair answer is not a JSON object or the call fails', async () => {
+    const { plugin } = makeScriptedPlugin([makeValidEnvelope({ result: { summary: 'still wrong' } })]);
+    const prose = vi.fn<LlmClient['complete']>().mockResolvedValue({
+      content: 'I cannot produce findings from this.',
+      model: 'anthropic/claude-sonnet-4',
+      usage: { promptTokens: 10, completionTokens: 5 },
+    });
+    const broken = vi.fn<LlmClient['complete']>().mockRejectedValue(new Error('OpenRouter API error 502'));
+
+    const fromProse = await runner.runWithWorkflowStep(plugin, { ...makeSchemaStepContext(), llm: { complete: prose } });
+    const fromError = await runner.runWithWorkflowStep(plugin, { ...makeSchemaStepContext(), llm: { complete: broken } });
+
+    expect(fromProse.fallbackReason).toBe('output_schema');
+    expect(fromProse.errorMessage).toBe(
+      'result does not match agent.outputSchema: missing required keys: findings '
+      + '(reshaping it did not fix it: the answer was not a JSON object)',
+    );
+    expect(fromError.fallbackReason).toBe('output_schema');
+    expect(fromError.errorMessage).toBe(
+      'result does not match agent.outputSchema: missing required keys: findings '
+      + '(reshaping it did not fix it: OpenRouter API error 502)',
+    );
   });
 
   it('does not retry a non-schema failure', async () => {
@@ -850,12 +907,6 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
   describe('output gate — production Evaluators (D13)', () => {
     function gatedContext(gate: AgentOutputGate): WorkflowAgentContext {
       return { ...makeSchemaStepContext(), outputGate: gate };
-    }
-
-    function statuses(): string[] {
-      return eventLog.getEvents('instance-1', 'step-1')
-        .filter((event) => event.type === 'status')
-        .map((event) => String(event.payload));
     }
 
     it('hands a conforming result to the gate with its Agent Run and lets a pass through', async () => {
@@ -884,7 +935,7 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
       expect(result.fallbackReason).toBe('production_evaluator');
       expect(result.errorMessage).toContain('grade 4 on a fatal AE');
       expect((await instanceRepository.getById('instance-1'))?.pauseReason).toBe('agent_escalated');
-      expect(statuses().some((payload) => payload.includes('failed a production Evaluator'))).toBe(true);
+      expect(statusEvents().some((payload) => payload.includes('failed a production Evaluator'))).toBe(true);
       const [audit] = await auditRepository.getByProcess('instance-1');
       expect(audit?.outputSnapshot).toMatchObject({ error: expect.stringContaining('grade 4 on a fatal AE') });
     });
@@ -911,70 +962,61 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
 
       expect(withErrors.status).toBe('completed');
       expect(thrown.status).toBe('completed');
-      expect(statuses()).toEqual(expect.arrayContaining([
+      expect(statusEvents()).toEqual(expect.arrayContaining([
         expect.stringContaining('grade-5-flagged: script crashed'),
         expect.stringContaining('database unreachable'),
       ]));
     });
   });
 
-  describe('retry budget — both attempts fit inside one step timeout', () => {
-    const STEP_TIMEOUT_MS = 10 * 60_000;
-
-    function makeTimedSchemaStepContext(): WorkflowAgentContext {
+  it('escalates when the reshape does not answer within what is left of the step timeout', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
       const context = makeSchemaStepContext();
-      return {
-        ...context,
-        step: { ...context.step, agent: { ...context.step.agent, timeoutMinutes: STEP_TIMEOUT_MS / 60_000 } },
-      };
-    }
-
-    /** A plugin whose first attempt takes `firstAttemptMs` of wall-clock time and violates the schema. */
-    function makeSlowViolatingPlugin(firstAttemptMs: number) {
-      const scripted = makeScriptedPlugin([
-        makeValidEnvelope({ result: { summary: 'no findings key' } }),
-        makeValidEnvelope({ result: { findings: [] } }),
-      ]);
-      const run = scripted.plugin.run;
-      let attempts = 0;
-      scripted.plugin.run = async (emit: EmitFn) => {
-        if (attempts === 0) vi.setSystemTime(Date.now() + firstAttemptMs);
-        attempts += 1;
+      const timedContext = { ...context, step: { ...context.step, agent: { ...context.step.agent, timeoutMinutes: 10 } } };
+      const { plugin } = makeScriptedPlugin([makeValidEnvelope({ result: { summary: 'no findings key' } })]);
+      const run = plugin.run;
+      plugin.run = async (emit: EmitFn) => {
+        vi.setSystemTime(Date.now() + 10 * 60_000 - 20);
         await run(emit);
       };
-      return scripted;
-    }
+      const never = vi.fn<LlmClient['complete']>().mockReturnValue(new Promise(() => {}));
 
-    beforeEach(() => {
-      vi.useFakeTimers({ toFake: ['Date'] });
-    });
+      const result = await runner.runWithWorkflowStep(plugin, { ...timedContext, llm: { complete: never } });
 
-    afterEach(() => {
-      vi.useRealTimers();
-      vi.restoreAllMocks();
-    });
-
-    it('gives the retry only the budget the first attempt left', async () => {
-      const execute = vi.spyOn(PluginRunner.prototype, 'execute');
-      const { plugin, seenContexts } = makeSlowViolatingPlugin(4 * 60_000);
-
-      const result = await runner.runWithWorkflowStep(plugin, makeTimedSchemaStepContext());
-
-      expect(seenContexts).toHaveLength(2);
-      expect(result.status).toBe('completed');
-      expect(execute.mock.calls.map((call) => call[2])).toEqual([STEP_TIMEOUT_MS, 6 * 60_000]);
-    });
-
-    it('skips the retry and takes the output_schema fallback when the budget is spent', async () => {
-      const { plugin, seenContexts } = makeSlowViolatingPlugin(STEP_TIMEOUT_MS);
-
-      const result = await runner.runWithWorkflowStep(plugin, makeTimedSchemaStepContext());
-
-      expect(seenContexts).toHaveLength(1);
+      expect(never).toHaveBeenCalledOnce();
       expect(result.fallbackReason).toBe('output_schema');
-      expect(result.status).toBe('escalated');
-      expect(result.errorMessage).toContain('missing required keys: findings');
-    });
+      expect(result.errorMessage).toBe(
+        'result does not match agent.outputSchema: missing required keys: findings '
+        + '(reshaping it did not fix it: the step timeout ran out)',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('skips the repair and takes the output_schema fallback when the step timeout is spent', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const context = makeSchemaStepContext();
+      const timedContext = { ...context, step: { ...context.step, agent: { ...context.step.agent, timeoutMinutes: 10 } } };
+      const { plugin } = makeScriptedPlugin([makeValidEnvelope({ result: { summary: 'no findings key' } })]);
+      const run = plugin.run;
+      plugin.run = async (emit: EmitFn) => {
+        vi.setSystemTime(Date.now() + 10 * 60_000);
+        await run(emit);
+      };
+      const llm = vi.fn<LlmClient['complete']>();
+
+      const result = await runner.runWithWorkflowStep(plugin, { ...timedContext, llm: { complete: llm } });
+
+      expect(llm).not.toHaveBeenCalled();
+      expect(result.fallbackReason).toBe('output_schema');
+      expect(result.errorMessage).toBe('result does not match agent.outputSchema: missing required keys: findings');
+      expect(statusEvents().some((payload) => payload.includes('no time left in the step timeout'))).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
