@@ -32,7 +32,7 @@ const TRUNCATED_RESPONSE_NOTICE = 'Your last response was cut off at the output-
 /** Who the assistant is evaluating: a Step of a workflow version, or an Agent on its own (ADR-0029). */
 function subjectContext(step: EvaluationSubject, name: string, version: number): string {
   if (step.kind === 'step') {
-    return `You are evaluating ${subjectName(step, false)} ("${name}") of workflow '${step.workflowName}' v${version} in workspace '${step.namespace}'.`;
+    return `You are evaluating step '${step.stepId}' ("${name}") of workflow '${step.workflowName}' v${version} in workspace '${step.namespace}'.`;
   }
   return `You are evaluating ${subjectName(step, false)} ("${name}") on its own, outside any workflow, in workspace '${step.namespace}'. `
     + 'Each Eval Case\'s triggerPayload is its whole input. Its production runs are those of the steps that use it: write cases from what they were given, and a check is first tried in an Eval Run.';

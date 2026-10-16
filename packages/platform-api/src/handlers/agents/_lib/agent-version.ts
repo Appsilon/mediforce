@@ -41,7 +41,9 @@ export function agentConfigHash(config: AgentConfigSnapshot): string {
  * The Agent's version for the configuration it has now: its newest version
  * when that has the same hash, otherwise a new one, recorded as the caller.
  * Two callers recording the same new version race on its number; the loser
- * reads the winner's back.
+ * reads the winner's back. It runs after the save it follows, not in one
+ * transaction with it: a failure here leaves that configuration unrecorded
+ * until the next save or prepare, which records it before any trial runs.
  */
 export async function recordAgentVersion(scope: CallerScope, agent: AgentDefinition): Promise<AgentVersion> {
   const config = await agentConfigOf(scope, agent);
@@ -65,16 +67,22 @@ export async function recordAgentVersion(scope: CallerScope, agent: AgentDefinit
   }
 }
 
+/** The Agent's newest recorded version, and whether the Agent still has its configuration. */
+async function newestAgentVersion(scope: CallerScope, agent: AgentDefinition): Promise<{ newest: AgentVersion | undefined; unchanged: boolean }> {
+  const [newest] = await scope.agentDefinitions.listVersions(agent.id);
+  if (newest === undefined) return { newest, unchanged: false };
+  return { newest, unchanged: newest.hash === agentConfigHash(await agentConfigOf(scope, agent)) };
+}
+
 /** The version `recordAgentVersion` would return for the Agent's configuration now, without recording it. */
 export async function upcomingAgentVersion(scope: CallerScope, agent: AgentDefinition): Promise<number> {
-  const [newest] = await scope.agentDefinitions.listVersions(agent.id);
+  const { newest, unchanged } = await newestAgentVersion(scope, agent);
   if (newest === undefined) return 1;
-  return newest.hash === agentConfigHash(await agentConfigOf(scope, agent)) ? newest.version : newest.version + 1;
+  return unchanged ? newest.version : newest.version + 1;
 }
 
 /** The Agent's newest version when it still has that configuration; null when it changed since, or was never recorded. */
 export async function currentAgentVersion(scope: CallerScope, agent: AgentDefinition): Promise<AgentVersion | null> {
-  const [newest] = await scope.agentDefinitions.listVersions(agent.id);
-  if (newest === undefined) return null;
-  return newest.hash === agentConfigHash(await agentConfigOf(scope, agent)) ? newest : null;
+  const { newest, unchanged } = await newestAgentVersion(scope, agent);
+  return unchanged ? newest ?? null : null;
 }

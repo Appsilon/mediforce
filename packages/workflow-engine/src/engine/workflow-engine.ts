@@ -400,23 +400,25 @@ export class WorkflowEngine {
     /** An Agent's trial (ADR-0029): the single-step Definition it runs, carried on the run since no stored Workflow holds it. */
     | { definition: WorkflowDefinition }
   )): Promise<ProcessInstance> {
-    const carried = 'definition' in input ? input.definition : null;
-    const definitionName = 'definition' in input ? input.definition.name : input.definitionName;
-    const version = 'definition' in input ? input.definition.version : input.version;
-    const definition = carried
-      ?? await this.processRepository.getWorkflowDefinition(input.namespace, definitionName, version);
-    if (!definition) {
-      throw new Error(`Workflow definition '${definitionName}' version '${version}' not found`);
+    let definition: WorkflowDefinition;
+    if ('definition' in input) {
+      definition = input.definition;
+    } else {
+      const stored = await this.processRepository.getWorkflowDefinition(input.namespace, input.definitionName, input.version);
+      if (!stored) {
+        throw new Error(`Workflow definition '${input.definitionName}' version '${input.version}' not found`);
+      }
+      definition = stored;
     }
     if (!definition.steps.some((step) => step.id === input.stepId)) {
-      throw new Error(`Step '${input.stepId}' not found in '${definitionName}' v${version}`);
+      throw new Error(`Step '${input.stepId}' not found in '${definition.name}' v${definition.version}`);
     }
 
     const now = new Date().toISOString();
     const instance: ProcessInstance = {
       id: input.id,
-      definitionName,
-      definitionVersion: String(version),
+      definitionName: definition.name,
+      definitionVersion: String(definition.version),
       status: 'running',
       currentStepId: input.stepId,
       variables: input.variables,
@@ -434,7 +436,7 @@ export class WorkflowEngine {
       ...(input.previousRun === undefined ? {} : { previousRun: input.previousRun }),
       dryRun: false,
       evalRunId: input.evalRunId,
-      ...(carried === null ? {} : { evalDefinition: carried }),
+      ...('definition' in input ? { evalDefinition: input.definition } : {}),
       ...(input.workspaceStartCommit === null ? {} : { workspaceStartCommit: input.workspaceStartCommit }),
     };
     await this.instanceRepository.create(instance);
@@ -444,15 +446,15 @@ export class WorkflowEngine {
       actorType: 'user',
       actorRole: 'evaluator',
       action: 'instance.created',
-      description: `Created eval trial of '${definitionName}' v${version} at step '${input.stepId}'`,
+      description: `Created eval trial of '${definition.name}' v${definition.version} at step '${input.stepId}'`,
       timestamp: now,
-      inputSnapshot: { definitionName, version, stepId: input.stepId, evalRunId: input.evalRunId },
+      inputSnapshot: { definitionName: definition.name, version: definition.version, stepId: input.stepId, evalRunId: input.evalRunId },
       outputSnapshot: { instanceId: instance.id },
       basis: `Eval Run '${input.evalRunId}' trial (ADR-0023 D4)`,
       entityType: 'processInstance',
       entityId: instance.id,
       processInstanceId: instance.id,
-      processDefinitionVersion: String(version),
+      processDefinitionVersion: String(definition.version),
     });
     return instance;
   }

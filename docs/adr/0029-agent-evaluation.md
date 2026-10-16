@@ -46,7 +46,10 @@ point at.
    Agent is created or saved, its MCP bindings change, or an Eval Run of it is
    prepared, whenever the snapshot's hash differs from its newest version's.
    A Skill edited in the catalog therefore becomes a new Agent version at the
-   next save or Eval Run. `GET /api/agents/:id/versions` (`mediforce agent
+   next save or Eval Run. Saving the Agent and recording its version are two
+   writes with no transaction across them: a save whose version write fails
+   leaves that configuration unrecorded until the next save or prepare, never
+   an Eval Run naming a version it did not run. `GET /api/agents/:id/versions` (`mediforce agent
    versions`) lists them and says which one the Agent has now. _Amended
    2026-10-16: the snapshot also holds the Agent's `outputSchema` when it
    declares one (decision 7); an Agent without one keeps the hash it had._
@@ -68,7 +71,15 @@ point at.
    cost and audit stay the production path. The Eval Case's `triggerPayload`
    is the Agent's whole input — the trial's step is given it alone, and an
    Agent's case takes no `previousStepOutputs` or `previousRun`; its workspace
-   starts empty, so the case takes no workspace seed.
+   starts empty, so the case takes no workspace seed. _Amended 2026-10-16: the
+   one thing the trial's step may add is `env` — the step env a Workflow Step
+   would declare, as secret templates such as `{{OPENROUTER_API_KEY}}`, never
+   values — since no Step exists to declare it and the run pre-flight would
+   otherwise refuse a runtime that needs a key. It changes where the Agent
+   runs, not what it is, so it is not part of the Agent version. The Agent's
+   Evaluation holds it beside its MCP eval policy (`mcp_eval_policies.env`, set
+   from the Evaluation tab or `mediforce eval mcp-policy-set --env`), and each
+   Eval Run freezes a copy at prepare (`eval_runs.env`)._
 
 5. **Production-only features stay a Step's.** An Agent has no production runs
    of its own — its runs belong to the Steps that use it. Harvesting a case

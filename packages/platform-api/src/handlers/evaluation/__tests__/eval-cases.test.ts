@@ -114,7 +114,7 @@ describe('Eval Cases', () => {
 
   it('refuses a case that selects an Evaluator its step does not have', async () => {
     const elsewhere = '00000000-0000-4000-8000-0000000000ff';
-    await expect(write({ evaluatorIds: [elsewhere] })).rejects.toThrow(`Step 'grade-aes' has no live Evaluator '${elsewhere}'`);
+    await expect(write({ evaluatorIds: [elsewhere] })).rejects.toThrow(`Step 'grade-aes' of '${STEP.workflowName}' has no live Evaluator '${elsewhere}'`);
     const { evaluator: archived } = await createEvaluator(
       { ...STEP, name: 'retired', rule: 'r', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user', runInProduction: false },
       fixture.scope(),

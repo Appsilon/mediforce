@@ -3,9 +3,10 @@ import { AgentOutputSchemaSchema } from './workflow-definition';
 
 /**
  * The Evaluation domain of ADR-0023: everything is owned by one agent Workflow
- * Step, keyed by `(namespace, workflowName, stepId)` and kept outside the
- * immutable Workflow Definition, so adding a check never mints a Definition
- * version (D2) — or, since ADR-0029, by one Agent, evaluated on its own.
+ * Step, keyed by `(namespace, workflowName, stepId)`, or by one Agent evaluated
+ * on its own (ADR-0029), keyed by `(namespace, agentId)`. It is kept outside
+ * the immutable Workflow Definition, so adding a check never mints a
+ * Definition version (D2).
  */
 export const EvaluatedStepSchema = z.object({
   namespace: z.string().min(1),

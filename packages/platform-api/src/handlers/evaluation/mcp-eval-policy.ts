@@ -57,7 +57,7 @@ export async function setMcpEvalPolicy(input: SetMcpEvalPolicyInput, scope: Call
   for (const [name, serverPolicy] of Object.entries(input.servers ?? {})) {
     const binding = bindings[name];
     if (binding === undefined) {
-      throw new ValidationError(`'${name}' is not an MCP server of this step's agent (${known.join(', ') || 'it has none'})`);
+      throw new ValidationError(`'${name}' is not an MCP server ${step.kind === 'agent' ? 'of this agent' : 'of this step\'s agent'} (${known.join(', ') || 'it has none'})`);
     }
     if ((serverPolicy.denyTools?.length ?? 0) > 0 && binding.allowedTools === undefined) {
       throw new ValidationError(`'${name}' lists no allowedTools, so tools cannot be denied one by one — deny the server or list its tools on the agent`);

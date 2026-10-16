@@ -49,7 +49,8 @@ export async function updateAgent(
  * An Agent that owns Evaluation rows cannot move to another workspace
  * (ADR-0029): they live in its workspace, so the move would leave its suite
  * behind. Datasets, Qualifications and MCP recordings need a case or an Eval
- * Run, so these lists cover every row.
+ * Run, so these lists cover every row. Reading whole lists to test for one
+ * row is fine here: it runs only on a move, over one Agent's own suite.
  */
 async function assertMayLeaveWorkspace(scope: CallerScope, agent: AgentDefinition, namespace: string): Promise<void> {
   if (agent.namespace === undefined || agent.namespace === namespace) return;

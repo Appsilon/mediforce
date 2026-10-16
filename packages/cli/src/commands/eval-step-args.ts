@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { evaluationSubjectOf } from '@mediforce/platform-core';
 
 /** The agent Workflow Step every `mediforce eval` command is about. */
 export const STEP_ARGS = {
@@ -24,12 +25,12 @@ export const SUBJECT_ARGS = {
 } as const;
 
 export function subjectFrom(args: { namespace: string; workflow?: string; step?: string; agent?: string }) {
-  const step = args.workflow !== undefined && args.step !== undefined;
-  if (args.agent !== undefined && args.workflow === undefined && args.step === undefined) {
-    return { namespace: args.namespace, agentId: args.agent };
-  }
-  if (step && args.agent === undefined) return { namespace: args.namespace, workflowName: args.workflow, stepId: args.step };
-  throw new Error('Name a step with --workflow and --step, or an agent with --agent');
+  const subject = evaluationSubjectOf({ namespace: args.namespace, workflowName: args.workflow, stepId: args.step, agentId: args.agent });
+  const mixed = args.agent !== undefined && (args.workflow !== undefined || args.step !== undefined);
+  if (subject === null || mixed) throw new Error('Name a step with --workflow and --step, or an agent with --agent');
+  return subject.kind === 'agent'
+    ? { namespace: subject.namespace, agentId: subject.agentId }
+    : { namespace: subject.namespace, workflowName: subject.workflowName, stepId: subject.stepId };
 }
 
 export function readJsonFile(path: string): unknown {

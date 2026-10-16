@@ -1,6 +1,7 @@
 import {
   AGENT_EVAL_STEP_ID,
   agentEvalDefinition,
+  describeEvaluationSubject,
   evaluationSubjectOf,
   inlineMcpServerNames,
   resolveRunnableVersion,
@@ -149,10 +150,10 @@ export function subjectKey(subject: EvaluationSubject): string {
   return subject.kind === 'agent' ? `agent:${subject.agentId}` : `${subject.workflowName}/${subject.stepId}`;
 }
 
-/** A subject as messages name it: `Step 'extract'` or `Agent 'reviewer'`, lowercased mid-sentence. */
+/** A subject as messages name it, `describeEvaluationSubject` capitalised to open a sentence. */
 export function subjectName(subject: EvaluationSubject, capital = true): string {
-  const name = subject.kind === 'agent' ? `Agent '${subject.agentId}'` : `Step '${subject.stepId}'`;
-  return capital ? name : name.charAt(0).toLowerCase() + name.slice(1);
+  const described = describeEvaluationSubject(subject);
+  return capital ? described.charAt(0).toUpperCase() + described.slice(1) : described;
 }
 
 /** The version an Eval Run ran: the Definition version of a Step's, the Agent version of an Agent's. */

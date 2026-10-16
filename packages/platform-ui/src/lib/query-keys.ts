@@ -1,5 +1,12 @@
 import type { EvaluationSubject, HumanTaskStatus } from '@mediforce/platform-core';
 
+/** The key prefix of one Evaluation subject's cache: a Step's or an Agent's. */
+function evaluationSubjectKey(subject: EvaluationSubject) {
+  return subject.kind === 'agent'
+    ? ['evaluation', subject.namespace, 'agent', subject.agentId] as const
+    : ['evaluation', subject.namespace, 'step', subject.workflowName, subject.stepId] as const;
+}
+
 /**
  * Cache key factories per ADR-0006 §2.
  *
@@ -17,13 +24,6 @@ import type { EvaluationSubject, HumanTaskStatus } from '@mediforce/platform-cor
  * namespace (detail), agent-runs, monitoring. Future work extends with
  * `workflows`.
  */
-
-/** The key prefix of one Evaluation subject's cache: a Step's or an Agent's. */
-function evaluationSubjectKey(subject: EvaluationSubject) {
-  return subject.kind === 'agent'
-    ? ['evaluation', subject.namespace, 'agent', subject.agentId] as const
-    : ['evaluation', subject.namespace, 'step', subject.workflowName, subject.stepId] as const;
-}
 
 export const queryKeys = {
   tasks: {

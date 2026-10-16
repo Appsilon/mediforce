@@ -6,7 +6,7 @@ import {
   Shield, Code, Database, Globe, Sparkles, Settings, Info,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { AgentOutputSchemaSchema, type AgentOutputSchema } from '@mediforce/platform-core';
+import { AgentOutputSchemaSchema, CoworkAgentSchema, type AgentDefinition, type AgentOutputSchema } from '@mediforce/platform-core';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { usePlugins } from '@/hooks/use-plugins';
 import { humanizeToken } from '@/components/workflows/workflow-editor/step-editor-fields';
@@ -41,10 +41,9 @@ export function RecognitionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-const COWORK_RUNTIMES = ['chat', 'voice-realtime'] as const;
 const selectClass = 'w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring';
 
-export type AgentKind = 'plugin' | 'cowork';
+export type AgentKind = AgentDefinition['kind'];
 
 /** Runtime of an agent. Its kind is fixed at creation: a container agent runs on a registered plugin, a cowork agent on a chat or voice runtime. */
 export function AgentRuntimeField({ kind, runtimeId, onChange }: {
@@ -53,7 +52,7 @@ export function AgentRuntimeField({ kind, runtimeId, onChange }: {
   onChange: (runtimeId: string) => void;
 }) {
   const { plugins } = usePlugins();
-  const options: string[] = kind === 'cowork' ? [...COWORK_RUNTIMES] : plugins.map((plugin) => plugin.name);
+  const options: string[] = kind === 'cowork' ? [...CoworkAgentSchema.options] : plugins.map((plugin) => plugin.name);
   if (runtimeId !== undefined && !options.includes(runtimeId)) options.push(runtimeId);
 
   return (

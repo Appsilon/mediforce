@@ -60,7 +60,6 @@ export {
   evaluationSubjectOf,
   evaluationOwnerOf,
   isOwnedBy,
-  isSameOwner,
   describeEvaluationSubject,
   EvaluationOriginSchema,
   EvaluationBriefSchema,
@@ -680,7 +679,6 @@ export type {
 } from './schemas/agent-definition';
 export type { AgentDefinitionRepository } from './repositories/agent-definition-repository';
 export {
-  AgentConfigSnapshotSchema,
   AgentVersionSchema,
   AGENT_EVAL_STEP_ID,
   agentEvalDefinition,

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mcpReplayMissesOf, type AgentOutputSnapshot, type EvalCase, type EvalRun, type EvalTrial, type JudgeCall, type Score } from '@mediforce/platform-core';
+import { mcpReplayMissesOf, type AgentOutputSnapshot, type EvalCase, type EvalRun, type EvalTrial, type JudgeCall, type Score, type WorkflowDefinition } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { recordScore } from '../../scores/record-score';
 import { loadScoredRun } from './scored-run';
@@ -191,14 +191,20 @@ async function startTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
     return;
   }
   try {
-    // An Agent's trial runs the single-step Definition its run assessed, which no stored Workflow holds (ADR-0029).
-    const target = run.agentId === null ? null : await loadEvaluationSubject(scope, subjectRef(run), 'read', runVersionOf(run), run.env);
+    const subject = subjectRef(run);
+    let target: { definition: WorkflowDefinition } | { definitionName: string; version: number };
+    if (subject.kind === 'agent') {
+      // An Agent's trial runs the single-step Definition its run assessed, which no stored Workflow holds (ADR-0029).
+      target = { definition: (await loadEvaluationSubject(scope, subject, 'read', runVersionOf(run), run.env)).definition };
+    } else if (run.definitionVersion === null) {
+      throw new Error(`Eval Run '${run.id}' of a step froze no workflow version`);
+    } else {
+      target = { definitionName: subject.workflowName, version: run.definitionVersion };
+    }
     await scope.system.engine.createEvalTrial({
       id: processInstanceId,
       namespace: run.namespace,
-      ...(target === null
-        ? { definitionName: run.workflowName!, version: run.definitionVersion! }
-        : { definition: target.definition }),
+      ...target,
       stepId: trialStepId(run),
       evalRunId: run.id,
       triggerPayload: evalCase.input.triggerPayload,
