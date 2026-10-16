@@ -54,6 +54,20 @@ async function createAgent(request: APIRequestContext, name: string, visibility:
   return agent.id;
 }
 
+/** A summary-present Evaluator, one positive case, a 100% pass bar and a saved Dataset: enough to prepare an Eval Run. */
+async function seedSuite(request: APIRequestContext, subject: { namespace: string; agentId: string }, triggerPayload: Record<string, unknown>) {
+  await post(request, '/api/evaluation/evaluators', {
+    ...subject, name: 'summary-present', rule: 'The result carries a summary.',
+    check: { kind: 'schema', schema: { required: ['summary'] } },
+  }, 201);
+  await post(request, '/api/evaluation/cases', {
+    ...subject, name: 'Grade 4 neutropenia', expectation: 'positive',
+    input: { triggerPayload, previousStepOutputs: {} },
+  }, 201);
+  await post(request, '/api/evaluation/acceptance-criteria', { ...subject, criteria: { minPassRate: 1 } }, 201);
+  await post(request, '/api/evaluation/datasets', subject, 201);
+}
+
 test.describe('Agent Evaluation — API E2E', () => {
   test('an Agent owns a suite; its Eval Run assesses one Agent version and records its configuration', async ({ request }) => {
     test.setTimeout(120_000);
@@ -65,17 +79,8 @@ test.describe('Agent Evaluation — API E2E', () => {
     expect(created.versions.map((version) => version.version)).toEqual([1]);
     expect(created.current).toBe(1);
 
-    await post(request, '/api/evaluation/evaluators', {
-      ...subject, name: 'summary-present', rule: 'The result carries a summary.',
-      check: { kind: 'schema', schema: { required: ['summary'] } },
-    }, 201);
     const triggerPayload = { events: [{ term: 'Neutropenia', anc: 0.4 }] };
-    await post(request, '/api/evaluation/cases', {
-      ...subject, name: 'Grade 4 neutropenia', expectation: 'positive',
-      input: { triggerPayload, previousStepOutputs: {} },
-    }, 201);
-    await post(request, '/api/evaluation/acceptance-criteria', { ...subject, criteria: { minPassRate: 1 } }, 201);
-    await post(request, '/api/evaluation/datasets', subject, 201);
+    await seedSuite(request, subject, triggerPayload);
 
     // The suite is the Agent's own: it lists under the Agent, apart from any Step.
     const cases = await getJson(request, `/api/evaluation/cases?namespace=${TEST_ORG_HANDLE}&agentId=${agentId}`) as { cases: Array<{ agentId: string | null; workflowName: string | null }> };
@@ -109,6 +114,9 @@ test.describe('Agent Evaluation — API E2E', () => {
       // The case's trigger payload is the Agent's whole input: no outputs of earlier steps.
       const detail = await getJson(request, `/api/evaluation/runs/${prepared.evalRun.id}/trials/${trial.id}`) as { stepInput: unknown };
       expect(detail.stepInput).toEqual(triggerPayload);
+      // Its input/output pair reads through the Agent, not a workflow named after it.
+      const io = await getJson(request, `/api/evaluation/agent-runs/${trial.agentRunId}/io`) as { stepInput: unknown };
+      expect(io.stepInput).toEqual(triggerPayload);
     }
     expect(finished.report.evaluators[0]).toMatchObject({ name: 'summary-present', passes: 2, failures: 0 });
     expect(finished.evalRun.acceptance?.status).toBe('met');
@@ -153,16 +161,7 @@ test.describe('Agent Evaluation — API E2E', () => {
     const { member } = await setupMultiNamespaceCallers();
     const agentId = await createAgent(request, `AE grader ${randomUUID().slice(0, 8)}`);
     const subject = { namespace: TEST_ORG_HANDLE, agentId };
-    await post(request, '/api/evaluation/evaluators', {
-      ...subject, name: 'summary-present', rule: 'The result carries a summary.',
-      check: { kind: 'schema', schema: { required: ['summary'] } },
-    }, 201);
-    await post(request, '/api/evaluation/cases', {
-      ...subject, name: 'Grade 4 neutropenia', expectation: 'positive',
-      input: { triggerPayload: { events: [{ term: 'Neutropenia', anc: 0.4 }] }, previousStepOutputs: {} },
-    }, 201);
-    await post(request, '/api/evaluation/acceptance-criteria', { ...subject, criteria: { minPassRate: 1 } }, 201);
-    await post(request, '/api/evaluation/datasets', subject, 201);
+    await seedSuite(request, subject, { events: [{ term: 'Neutropenia', anc: 0.4 }] });
     const prepared = EvalRunOutputSchema.parse(await post(request, '/api/evaluation/runs', { ...subject, trialsPerCase: 1, budgetUsd: 1 }, 201));
     await post(request, `/api/evaluation/runs/${prepared.evalRun.id}/start`, { confirmedBudgetUsd: 1 });
     await pollUntil(
@@ -196,6 +195,43 @@ test.describe('Agent Evaluation — API E2E', () => {
       reason: expect.stringContaining('as it was validated'),
       inheritedFromAgent: { agentId, version: 1 },
     });
+  });
+
+  test('an MCP binding change is a new version; a moving model alias and a cowork agent are refused', async ({ request }) => {
+    const agentId = await createAgent(request, `AE grader ${randomUUID().slice(0, 8)}`);
+    const subject = { namespace: TEST_ORG_HANDLE, agentId };
+
+    const entryId = `e2e-agent-eval-${agentId.slice(0, 8)}`;
+    await post(request, `/api/admin/tool-catalog?namespace=${TEST_ORG_HANDLE}`, { id: entryId, type: 'http', url: 'https://mcp.example.com/mcp' }, 201);
+    const bound = await request.put(`/api/agents/${agentId}/mcp-servers/ctcae`, { headers: JSON_HEADERS, data: { type: 'http', catalogId: entryId } });
+    expect(bound.ok(), await bound.text()).toBe(true);
+    const afterBind = ListAgentVersionsOutputSchema.parse(await getJson(request, `/api/agents/${agentId}/versions`));
+    expect(afterBind.versions.map((version) => version.version)).toEqual([2, 1]);
+    expect(Object.keys(afterBind.versions[0]!.config.mcpServers)).toEqual(['ctcae']);
+    const unbound = await request.delete(`/api/agents/${agentId}/mcp-servers/ctcae`, { headers: AUTH_HEADERS });
+    expect(unbound.ok(), await unbound.text()).toBe(true);
+    expect(ListAgentVersionsOutputSchema.parse(await getJson(request, `/api/agents/${agentId}/versions`)).current).toBe(3);
+
+    // A Fingerprint must say which model ran, so an alias that moves cannot be evaluated.
+    await seedSuite(request, subject, { events: [{ term: 'Neutropenia', anc: 0.4 }] });
+    const aliased = await request.put(`/api/agents/${agentId}`, { headers: JSON_HEADERS, data: { foundationModel: '~anthropic/claude-sonnet-latest' } });
+    expect(aliased.status(), await aliased.text()).toBe(200);
+    const prepared = await request.post('/api/evaluation/runs', { headers: JSON_HEADERS, data: { ...subject, trialsPerCase: 1, budgetUsd: 1 } });
+    expect(prepared.status()).toBe(400);
+    expect(await prepared.text()).toContain('an alias whose model changes');
+
+    const cowork = await post(request, '/api/agents', {
+      name: `AE chat ${randomUUID().slice(0, 8)}`, iconName: 'Bot', description: 'Talks AEs through',
+      kind: 'cowork', runtimeId: 'chat', foundationModel: 'anthropic/claude-sonnet-4',
+      systemPrompt: 'You discuss adverse events.', inputDescription: 'A question', outputDescription: 'An answer',
+      namespace: TEST_ORG_HANDLE,
+    }, 201) as { agent: { id: string } };
+    const coworkCase = await request.post('/api/evaluation/cases', {
+      headers: JSON_HEADERS,
+      data: { namespace: TEST_ORG_HANDLE, agentId: cowork.agent.id, name: 'A question', expectation: 'positive', input: { triggerPayload: {}, previousStepOutputs: {} } },
+    });
+    expect(coworkCase.status()).toBe(400);
+    expect(await coworkCase.text()).toContain('only container agents are evaluated');
   });
 
   test('refuses what only a workflow step has: production Evaluators, workspace seeds, earlier step outputs, and naming both owners', async ({ request }) => {

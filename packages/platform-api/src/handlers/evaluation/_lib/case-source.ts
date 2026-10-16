@@ -2,7 +2,7 @@ import type { EvalCaseExpectation, EvalCaseInput, EvaluatedStep, ProcessInstance
 import type { CallerScope } from '../../../repositories/index';
 import { ValidationError } from '../../../errors';
 import { loadEvaluationSubject } from './evaluation-subject';
-import { loadScoredRun, type ScoredRun } from './scored-run';
+import { loadScoredRun, runSubjectRef, type ScoredRun } from './scored-run';
 import { parentCommit } from './workspace-seed';
 import { HUMAN_VERDICT_SCORE_NAME } from '../../scores/record-human-verdict';
 
@@ -41,16 +41,16 @@ export async function loadCaseSource(
   step: EvaluatedStep | undefined,
   verb: 'read' | 'edit',
 ): Promise<CaseSource> {
-  const subject = await loadScoredRun(scope, agentRunId, step);
+  const subject = await loadScoredRun(scope, agentRunId, step === undefined ? undefined : { ...step, kind: 'step' });
+  await loadEvaluationSubject(scope, runSubjectRef(subject.agentRun, subject.instance), verb);
+  if (subject.instance.evalRunId !== undefined) {
+    throw new ValidationError(`Agent Run '${agentRunId}' is an eval trial, not a production run`);
+  }
   const runStep = {
     namespace: subject.instance.namespace ?? '',
     workflowName: subject.instance.definitionName,
     stepId: subject.agentRun.stepId,
   };
-  await loadEvaluationSubject(scope, runStep, verb);
-  if (subject.instance.evalRunId !== undefined) {
-    throw new ValidationError(`Agent Run '${agentRunId}' is an eval trial, not a production run`);
-  }
 
   const git = subject.agentRun.envelope?.gitMetadata ?? null;
   return {

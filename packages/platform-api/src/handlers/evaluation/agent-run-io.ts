@@ -1,17 +1,17 @@
 import type { GetAgentRunIoInput, GetAgentRunIoOutput } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { loadEvaluationSubject } from './_lib/evaluation-subject';
-import { loadGatedAgentRun, loadStepInput } from './_lib/scored-run';
+import { loadGatedAgentRun, loadStepInput, runSubjectRef } from './_lib/scored-run';
 import { caseInputOf, loadVerdictExpectation } from './_lib/case-source';
 
 /**
  * One Agent Run as an input/output pair: what its step was given and what it
  * returned — what a person looks at before adding the run as an Eval Case or
- * labelling its output. Readable by whoever may read the step's Evaluation.
+ * labelling its output. Readable by whoever may read its subject's Evaluation.
  */
 export async function getAgentRunIo(input: GetAgentRunIoInput, scope: CallerScope): Promise<GetAgentRunIoOutput> {
   const { agentRun, instance } = await loadGatedAgentRun(scope, input.agentRunId);
-  await loadEvaluationSubject(scope, { namespace: instance.namespace ?? '', workflowName: instance.definitionName, stepId: agentRun.stepId }, 'read');
+  await loadEvaluationSubject(scope, runSubjectRef(agentRun, instance), 'read');
   const stepInput = await loadStepInput(scope, agentRun, instance);
   return {
     agentRunId: agentRun.id,
