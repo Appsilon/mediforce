@@ -14,18 +14,21 @@ function schemaText(schema: Record<string, unknown> | undefined): string {
  * Commits on blur: blank clears the field, text that is not JSON or does not
  * fit `schema` stays in the box with the error under it. With `inherited`,
  * an unset field shows the schema it falls back to, and committing that
- * schema unchanged keeps the field unset.
+ * schema unchanged keeps the field unset. `onEdit` runs on each keystroke,
+ * before anything commits.
  */
 export function OutputSchemaEditor<Schema extends Record<string, unknown>>({
   value,
   onChange,
   schema,
   inherited,
+  onEdit,
 }: {
   value: Schema | undefined;
   onChange: (schema: Schema | undefined) => void;
   schema: z.ZodType<Schema>;
   inherited?: { schema: Schema; from: string };
+  onEdit?: () => void;
 }) {
   const shownText = schemaText(value ?? inherited?.schema);
   const [draft, setDraft] = useState(shownText);
@@ -61,7 +64,7 @@ export function OutputSchemaEditor<Schema extends Record<string, unknown>>({
     <div className="w-full">
       <textarea
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => { setDraft(e.target.value); onEdit?.(); }}
         onBlur={handleBlur}
         rows={5}
         placeholder={'{\n  "type": "object",\n  "required": [],\n  "properties": {}\n}'}

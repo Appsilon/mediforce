@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
 import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, agentStepChanges, DEFAULT_STEP_TIMEOUT_MINUTES, defaultVerdictLabel, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
-import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
+import type { AgentDefinition, AgentStepChange, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo, ImageCatalogEntryView, StepValidation } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import { selectAgentPatch } from '../workflow-editor-utils';
@@ -448,19 +448,26 @@ export function StepEditor({
   const agentValidated = agentQualification.data?.validation.status === 'passed';
   const agentChanges = selectedAgent === undefined ? [] : agentStepChanges(step, selectedAgent, workflowPreamble);
   const hasOwnVerdict = savedValidation === 'failed' || savedValidation === 'awaiting_approval';
-  const [pendingAgentChange, setPendingAgentChange] = useState<Partial<WorkflowStep> | null>(null);
+  // A patch to apply once confirmed, or an edit to a field that commits on
+  // blur — asked about when the edit starts, while the step is still selected.
+  const [pendingAgentChange, setPendingAgentChange] = useState<
+    { patch: Partial<WorkflowStep> } | { edit: AgentStepChange } | null
+  >(null);
+  const [outputSchemaRevision, setOutputSchemaRevision] = useState(0);
   const acknowledgedStepIds = useRef(new Set<string>());
+  const asksBeforeModifyingAgent = agentValidated
+    && selectedAgent !== undefined
+    && agentChanges.length === 0
+    && acknowledgedStepIds.current.has(step.id) === false;
 
   function onChange(patch: Partial<WorkflowStep>) {
     const next = { ...step, ...patch };
-    const modifiesValidatedAgent = agentValidated
+    const modifiesValidatedAgent = asksBeforeModifyingAgent
       && selectedAgent !== undefined
       && next.agentId === step.agentId
-      && agentChanges.length === 0
-      && agentStepChanges(next, selectedAgent, workflowPreamble).length > 0
-      && acknowledgedStepIds.current.has(step.id) === false;
+      && agentStepChanges(next, selectedAgent, workflowPreamble).length > 0;
     if (modifiesValidatedAgent) {
-      setPendingAgentChange(patch);
+      setPendingAgentChange({ patch });
       return;
     }
     applyChange(patch);
@@ -709,13 +716,20 @@ export function StepEditor({
       {selectedAgent !== undefined && (
         <ModifyValidatedAgentDialog
           agentName={selectedAgent.name}
-          changes={pendingAgentChange === null ? [] : agentStepChanges({ ...step, ...pendingAgentChange }, selectedAgent, workflowPreamble)}
+          changes={
+            pendingAgentChange === null ? []
+              : 'edit' in pendingAgentChange ? [pendingAgentChange.edit]
+                : agentStepChanges({ ...step, ...pendingAgentChange.patch }, selectedAgent, workflowPreamble)
+          }
           open={pendingAgentChange !== null}
-          onCancel={() => setPendingAgentChange(null)}
+          onCancel={() => {
+            if (pendingAgentChange !== null && 'edit' in pendingAgentChange) setOutputSchemaRevision((revision) => revision + 1);
+            setPendingAgentChange(null);
+          }}
           onConfirm={() => {
             if (pendingAgentChange === null) return;
             acknowledgedStepIds.current.add(step.id);
-            applyChange(pendingAgentChange);
+            if ('patch' in pendingAgentChange) applyChange(pendingAgentChange.patch);
             setPendingAgentChange(null);
           }}
         />
@@ -968,9 +982,10 @@ export function StepEditor({
 
           <FieldRow label="agent.outputSchema" tooltip={TIP.agentOutputSchema} alignStart>
             <OutputSchemaEditor
-              key={`agent-output-schema-${step.id}`}
+              key={`agent-output-schema-${step.id}-${outputSchemaRevision}`}
               value={step.agent?.outputSchema}
               onChange={(outputSchema) => updateAgent({ outputSchema })}
+              onEdit={asksBeforeModifyingAgent ? () => setPendingAgentChange({ edit: 'output schema' }) : undefined}
               schema={AgentOutputSchemaSchema}
               inherited={selectedAgent?.outputSchema === undefined ? undefined : { schema: selectedAgent.outputSchema, from: selectedAgent.name }}
             />

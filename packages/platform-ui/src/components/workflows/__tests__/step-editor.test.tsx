@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
 import type { AgentDefinition, ImageCommandCheck, ModelRegistryEntry, SkillSummary, ToolCatalogEntry, WorkflowStep } from '@mediforce/platform-core';
 import type { DockerImageInfo, ImageCatalogEntryView } from '@mediforce/platform-api/contract';
@@ -796,6 +797,50 @@ describe('StepEditor', () => {
       fireEvent.change(screen.getByRole('textbox', { name: 'Step prompt' }), { target: { value: 'Gr' } });
       expect(onChange).toHaveBeenLastCalledWith({ agent: { prompt: 'Gr' } });
       expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    describe.each([
+      ['declares none', undefined],
+      ['declares one the step inherits', { type: 'object', required: ['grade'], properties: { grade: { type: 'number' } } }],
+    ] as const)('editing the output schema when the agent %s', (_case, agentSchema) => {
+      const stepSchema = { type: 'object', required: ['summary'], properties: { summary: { type: 'string' } } };
+      const schemaBox = () => screen.getByPlaceholderText(/"required": \[\]/) as HTMLTextAreaElement;
+
+      async function renderReusingStep(onChange: (patch: Partial<WorkflowStep>) => void) {
+        agentState.response = { agents: [{ ...validatedAgent, outputSchema: agentSchema }] };
+        render(<StepEditor step={reusingStep} allSteps={[]} workflowName="ae-grading" onChange={onChange} />);
+        expandCard('Prompt & model');
+        await screen.findByTestId('agent-validation');
+      }
+
+      it('[DATA] asks as soon as the schema is edited, and cancelling puts the box back', async () => {
+        const onChange = vi.fn();
+        await renderReusingStep(onChange);
+        const user = userEvent.setup();
+
+        await user.type(schemaBox(), 'x');
+        expect(await screen.findByRole('dialog')).toHaveTextContent('output schema');
+
+        await user.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(schemaBox().value).toBe(agentSchema === undefined ? '' : JSON.stringify(agentSchema, null, 2));
+        expect(onChange).not.toHaveBeenCalled();
+      });
+
+      it('[DATA] commits the schema once the change is confirmed, without asking again', async () => {
+        const onChange = vi.fn();
+        await renderReusingStep(onChange);
+        const user = userEvent.setup();
+
+        await user.type(schemaBox(), 'x');
+        await user.click(await screen.findByRole('button', { name: 'Change anyway' }));
+        await user.clear(schemaBox());
+        await user.paste(JSON.stringify(stepSchema));
+        await user.click(screen.getByRole('textbox', { name: 'Step prompt' }));
+
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(onChange).toHaveBeenLastCalledWith({ agent: { outputSchema: stepSchema } });
+      });
     });
 
     it('[DATA] leaves the step as it is when the change is cancelled', async () => {
