@@ -841,6 +841,7 @@ its first one awaiting approval, else its first not verified one; in the workflo
 carries its validation icon for the version being edited, linking to the
 Evaluation tab on that step and version. The icon speaks of the step as saved:
 a step added or edited since carries none until the version is saved and run.
+The **Agent** picker marks each Agent whose validation passed *✅ Verified*.
 Under the step's **Agent** field the editor says *Validated agent vN* while
 the step runs a validated Agent as it is, and asks before a change to its
 plugin, model, prompt, Skills, output schema or MCP restrictions that would

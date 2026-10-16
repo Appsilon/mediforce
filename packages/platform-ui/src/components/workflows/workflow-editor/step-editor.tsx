@@ -9,7 +9,7 @@ import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { useNamespaceMembers } from '@/hooks/use-namespace-members';
 import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
 import { useAuth } from '@/contexts/auth-context';
-import { useStepQualification } from '@/hooks/use-step-evaluation';
+import { useAgentValidationStatuses, useStepQualification } from '@/hooks/use-step-evaluation';
 import { mediforce } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
@@ -51,6 +51,11 @@ const NO_CATALOG_ENTRIES: ImageCatalogEntryView[] = [];
 
 function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+/** A saved agent with an Agent Version to validate: a plugin agent owned by a workspace. */
+function isEvaluableAgent(agent: AgentDefinition): agent is AgentDefinition & { namespace: string } {
+  return agent.kind === 'plugin' && agent.runtimeId !== undefined && agent.namespace !== undefined;
 }
 
 /** What a saved agent brings to every step that names it. */
@@ -433,9 +438,12 @@ export function StepEditor({
   // A step that runs a validated agent as it is shares its validation; one
   // that changes it needs a validation of its own (ADR-0029 D8).
   const agentQualification = useStepQualification(
-    selectedAgent?.kind === 'plugin' && selectedAgent.runtimeId !== undefined && selectedAgent.namespace !== undefined
+    selectedAgent !== undefined && isEvaluableAgent(selectedAgent)
       ? { kind: 'agent', namespace: selectedAgent.namespace, agentId: selectedAgent.id }
       : null,
+  );
+  const agentValidationStatuses = useAgentValidationStatuses(
+    agentDefinitions.filter(isEvaluableAgent).map((agent) => ({ namespace: agent.namespace, agentId: agent.id })),
   );
   const agentValidated = agentQualification.data?.validation.status === 'passed';
   const agentChanges = selectedAgent === undefined ? [] : agentStepChanges(step, selectedAgent, workflowPreamble);
@@ -837,7 +845,7 @@ export function StepEditor({
                 .sort((firstAgent, secondAgent) => firstAgent.name.localeCompare(secondAgent.name))
                 .map((agent) => (
                   <option key={agent.id} value={agent.id}>
-                    {agent.name} ({agent.id})
+                    {agent.name} ({agent.id}){agentValidationStatuses.get(agent.id) === 'passed' ? ' — ✅ Verified' : ''}
                   </option>
                 ))}
             </select>

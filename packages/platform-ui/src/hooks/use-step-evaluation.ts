@@ -1,6 +1,6 @@
 'use client';
 
-import { keepPreviousData, skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { keepPreviousData, skipToken, useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { EvaluationSubject } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
@@ -82,6 +82,27 @@ export function useStepQualification(step: EvaluationSubject | null, definitionV
     retry: stopRetryOn4xx,
     // The validation is read from the newest finished Eval Run; poll until a running one ends.
     refetchInterval: (query) => (query.state.data?.validation.runInProgress === true ? 5000 : false),
+  });
+}
+
+/**
+ * Each listed Agent's validation status, by agent id — read through the same
+ * cache as `useStepQualification`, so an agent picker and the selected agent's
+ * badge share one fetch. Agents still loading or unreadable are left out.
+ */
+export function useAgentValidationStatuses(agents: Array<{ namespace: string; agentId: string }>) {
+  return useQueries({
+    queries: agents.map((agent) => {
+      const subject: EvaluationSubject = { kind: 'agent', ...agent };
+      return {
+        queryKey: sectionKey(subject, 'qualification:runnable'),
+        queryFn: () => mediforce.evaluation.getQualification(subject),
+        retry: stopRetryOn4xx,
+      };
+    }),
+    combine: (results) => new Map(results.flatMap((result, index) => (
+      result.data === undefined ? [] : [[agents[index]!.agentId, result.data.validation.status] as const]
+    ))),
   });
 }
 
