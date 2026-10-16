@@ -83,7 +83,7 @@ describe('OpenRouterLlmClient endpoint', () => {
     vi.unstubAllEnvs();
   });
 
-  it('posts to OPENROUTER_BASE_URL at temperature 0, and reads a response without usage as zero tokens', async () => {
+  it('posts to OPENROUTER_BASE_URL at the default temperature, and reads a response without usage as zero tokens', async () => {
     vi.stubEnv('OPENROUTER_BASE_URL', 'http://127.0.0.1:9019/api/v1/');
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -96,11 +96,25 @@ describe('OpenRouterLlmClient endpoint', () => {
 
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('http://127.0.0.1:9019/api/v1/chat/completions');
-    expect(JSON.parse(init.body as string)).toMatchObject({ temperature: 0 });
+    expect(JSON.parse(init.body as string)).toMatchObject({ temperature: 0.7 });
     expect(response).toEqual({
       content: '{"findings": []}',
       model: 'anthropic/claude-sonnet-4',
       usage: { promptTokens: 0, completionTokens: 0 },
     });
+  });
+
+  it('posts the temperature a call asks for', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '{}' } }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new OpenRouterLlmClient('test-api-key')
+      .complete([{ role: 'user', content: 'Reshape this.' }], 'anthropic/claude-sonnet-4', { temperature: 0 });
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse(init.body as string)).toMatchObject({ temperature: 0 });
   });
 });

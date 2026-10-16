@@ -151,7 +151,7 @@ export async function repairOutput(
   let content: string;
   let answeredBy: string;
   try {
-    const response = await llm.complete(outputRepairMessages(result, schema, violation), model);
+    const response = await llm.complete(outputRepairMessages(result, schema, violation), model, { temperature: 0 });
     content = response.content;
     answeredBy = response.model;
   } catch (err) {

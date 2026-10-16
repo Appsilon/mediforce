@@ -24,8 +24,13 @@ export interface LlmResponse {
   usage: { promptTokens: number; completionTokens: number };
 }
 
+export interface LlmCallOptions {
+  /** Defaults to 0.7; a call that must not paraphrase, such as reshaping an output, asks for 0. */
+  temperature?: number;
+}
+
 export interface LlmClient {
-  complete(messages: LlmMessage[], model: string): Promise<LlmResponse>;
+  complete(messages: LlmMessage[], model: string, options?: LlmCallOptions): Promise<LlmResponse>;
 }
 
 /**

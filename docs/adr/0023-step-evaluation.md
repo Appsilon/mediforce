@@ -249,7 +249,7 @@ itself is always on the task and its `task.completed` audit event.
 `outputSchema` violations, after one retry with the first violation, follow
 the same fallback route; the retry shares the step's timeout. _Amended
 2026-10-16: the retry no longer reruns the agent — one LLM call on the step's
-model reshapes the rejected result to the schema, using only what the result
+model, at temperature 0 (other calls keep the client's 0.7), reshapes the rejected result to the schema, using only what the result
 already says (checked: a value the original does not contain rejects it), and
 the result is validated again. A reshaped result keeps the agent's original in
 an annotation and the audit event; a key it cannot fill stays missing and the

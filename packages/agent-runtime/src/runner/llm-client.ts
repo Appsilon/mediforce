@@ -1,4 +1,4 @@
-import type { LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
+import type { LlmCallOptions, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
 import {
   annotateOpenRouterLlmSpan,
   type OpenTelemetryTracingOptions,
@@ -6,7 +6,7 @@ import {
 } from './tracing';
 
 // Re-export the interface defined in interfaces/ for barrel convenience
-export type { LlmClient, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
+export type { LlmCallOptions, LlmClient, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
 
 // OpenRouterLlmClient: wraps the OpenRouter API for LLM access.
 // Platform provides this to agents — agents never call OpenRouter directly.
@@ -21,7 +21,7 @@ export class OpenRouterLlmClient {
     private readonly tracingOptions: OpenTelemetryTracingOptions = {},
   ) {}
 
-  async complete(messages: LlmMessage[], model: string): Promise<LlmResponse> {
+  async complete(messages: LlmMessage[], model: string, options: LlmCallOptions = {}): Promise<LlmResponse> {
     return withOpenRouterLlmSpan(
       {
         messages,
@@ -38,7 +38,7 @@ export class OpenRouterLlmClient {
           body: JSON.stringify({
             model,
             messages,
-            temperature: 0,
+            temperature: options.temperature ?? 0.7,
             max_tokens: 16_000,
           }),
         });

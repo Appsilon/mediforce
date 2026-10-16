@@ -102,11 +102,11 @@ describe('repairOutput', () => {
   it('accepts a reshape that only renames keys and converts types', async () => {
     const original = { ctcae_grade: '3', is_serious: 'true', ae_term: 'Neutropenia' };
 
-    const repair = await repairOutput(
-      answering('{"grade": 3, "serious": true, "term": "Neutropenia"}'), 'm', original, schema, 'missing required keys: grade, serious, term',
-    );
+    const llm = answering('{"grade": 3, "serious": true, "term": "Neutropenia"}');
+    const repair = await repairOutput(llm, 'm', original, schema, 'missing required keys: grade, serious, term');
 
     expect(repair).toEqual({ ok: true, result: { grade: 3, serious: true, term: 'Neutropenia' }, model: 'repair-model' });
+    expect(llm.complete).toHaveBeenCalledWith(expect.any(Array), 'm', { temperature: 0 });
   });
 
   it('pulls values out of a prose result', async () => {
