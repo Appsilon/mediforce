@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-10-15
+last_reviewed: 2026-10-16
 ---
 
 # ADR-0029: An Agent can own an Evaluation, and an Eval Run assesses one Agent version
@@ -103,6 +103,23 @@ point at.
    JSON, so a `schema` Evaluator fails every trial on its prose: the Evaluation
    Assistant does not propose one for an Agent that declares no output schema,
    and tells the person to declare it first.
+
+8. **A Workflow Step that runs a validated Agent as it is shares its
+   validation.** _Added 2026-10-16._ A Step runs its Agent as it was validated
+   when it adds nothing to the trial of decision 4: no other runtime or model,
+   no prompt, Skills, output schema or MCP servers of its own, no MCP
+   restriction that removes something, and no workflow preamble
+   (`agentStepChanges`). What the Step provides around the Agent — image,
+   params, env, timeout, autonomy, review — is not a change; an Agent names no
+   image. Such a Step with no verdict of its own, in the Agent's own workspace
+   (whose tool catalog its trials resolved MCP servers from), reads the
+   Agent's validation when the Agent's current version passed, so a workflow
+   whose agent steps all do is Verified without an Eval Run of its own; a
+   Step's own verdict, once read, stands. The workflow editor marks a
+   validated Agent the Step runs as it is, and asks before a change to the
+   Step that makes it stop doing so — from then on the Step needs its own
+   validation on the workflow's Evaluation tab. A preamble is edited in the
+   workflow's settings, which do not ask.
 
 ## Considered options
 

@@ -585,7 +585,8 @@ for one Step Fingerprint; it qualifies the step only when it leaves the verdict
 passed, and goes stale when the Workflow Step's current Fingerprint differs.
 The step's **validation** — passed, failed, waiting for human approval or not
 verified — is read from the newest finished Eval Run of the workflow version
-and that sign-off.
+and that sign-off — or, for a step with no verdict of its own that runs a
+validated Agent as it is, the Agent's (ADR-0029 D8).
 _Avoid_: "validated", "certified", "approved step".
 
 **Verified** *(Workflow Definition version)*:

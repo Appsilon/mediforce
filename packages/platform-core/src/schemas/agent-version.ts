@@ -3,7 +3,7 @@ import { AgentMcpBindingMapSchema } from './agent-mcp-binding';
 import { AgentOutputSchemaSchema } from './agent-output-schema';
 import type { AgentDefinition } from './agent-definition';
 import { OfferedSkillSchema } from './step-execution';
-import type { WorkflowDefinition } from './workflow-definition';
+import type { WorkflowDefinition, WorkflowStep } from './workflow-definition';
 
 /**
  * Everything about an Agent that shapes what it does (ADR-0029): its runtime,
@@ -75,4 +75,45 @@ export function agentEvalDefinition(
     }],
     transitions: [],
   };
+}
+
+/** A part of an Agent that a Workflow Step running it changes. */
+export type AgentStepChange =
+  | 'plugin'
+  | 'model'
+  | 'step prompt'
+  | 'skills'
+  | 'output schema'
+  | 'MCP servers'
+  | 'MCP restrictions'
+  | 'workflow preamble';
+
+/**
+ * What a Workflow Step changes about the Agent it runs, compared with the
+ * trial of `agentEvalDefinition` its validation was read from: another
+ * runtime or model, a prompt, Skills, output schema or MCP servers of its own,
+ * an MCP restriction that removes something, or a workflow preamble. Empty
+ * when the step runs the Agent as it was validated. What the step provides
+ * around the Agent — image, params, env, timeout, autonomy, review — is not
+ * a change: an Agent names no image.
+ */
+export function agentStepChanges(
+  step: Pick<WorkflowStep, 'plugin' | 'agent' | 'mcpRestrictions'>,
+  agent: Pick<AgentDefinition, 'runtimeId' | 'foundationModel'>,
+  preamble?: string,
+): AgentStepChange[] {
+  const config = step.agent ?? {};
+  const restricted = Object.values(step.mcpRestrictions ?? {})
+    .some((entry) => entry.disable === true || (entry.denyTools?.length ?? 0) > 0);
+  const changed: Record<AgentStepChange, boolean> = {
+    plugin: step.plugin !== undefined && step.plugin !== agent.runtimeId,
+    model: config.model !== undefined && config.model !== agent.foundationModel,
+    'step prompt': config.prompt !== undefined && config.prompt.trim() !== '',
+    skills: (config.skills?.length ?? 0) > 0,
+    'output schema': config.outputSchema !== undefined,
+    'MCP servers': (config.mcpServers?.length ?? 0) > 0,
+    'MCP restrictions': restricted,
+    'workflow preamble': preamble !== undefined && preamble.trim() !== '',
+  };
+  return (Object.keys(changed) as AgentStepChange[]).filter((change) => changed[change]);
 }

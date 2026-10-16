@@ -3,6 +3,7 @@ import type { APIRequestContext } from '@playwright/test';
 import {
   EvalRunOutputSchema,
   GetStepQualificationOutputSchema,
+  GetWorkflowValidationOutputSchema,
   ListAgentVersionsOutputSchema,
   ListEvalRunsOutputSchema,
   type EvalRunOutput,
@@ -10,7 +11,7 @@ import {
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { pollUntil } from '../helpers/poll-until';
-import { AUTH_HEADERS, JSON_HEADERS } from '../helpers/agent-step-runs';
+import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow } from '../helpers/agent-step-runs';
 import { OUTSIDER_NAMESPACE, sessionCookieHeaders, setupMultiNamespaceCallers } from '../helpers/multi-namespace';
 
 /**
@@ -145,6 +146,56 @@ test.describe('Agent Evaluation — API E2E', () => {
     expect(deleted.ok(), await deleted.text()).toBe(true);
     const afterDelete = EvalRunOutputSchema.parse(await getJson(request, `/api/evaluation/runs/${prepared.evalRun.id}`));
     expect(afterDelete.assessedAgentVersion).toMatchObject({ agentId, version: 1, config: { systemPrompt: 'You grade adverse events by CTCAE v5.' } });
+  });
+
+  test('a workflow step that runs a validated Agent as it is takes its validation; one that adds a prompt does not', async ({ request }) => {
+    test.setTimeout(120_000);
+    const { member } = await setupMultiNamespaceCallers();
+    const agentId = await createAgent(request, `AE grader ${randomUUID().slice(0, 8)}`);
+    const subject = { namespace: TEST_ORG_HANDLE, agentId };
+    await post(request, '/api/evaluation/evaluators', {
+      ...subject, name: 'summary-present', rule: 'The result carries a summary.',
+      check: { kind: 'schema', schema: { required: ['summary'] } },
+    }, 201);
+    await post(request, '/api/evaluation/cases', {
+      ...subject, name: 'Grade 4 neutropenia', expectation: 'positive',
+      input: { triggerPayload: { events: [{ term: 'Neutropenia', anc: 0.4 }] }, previousStepOutputs: {} },
+    }, 201);
+    await post(request, '/api/evaluation/acceptance-criteria', { ...subject, criteria: { minPassRate: 1 } }, 201);
+    await post(request, '/api/evaluation/datasets', subject, 201);
+    const prepared = EvalRunOutputSchema.parse(await post(request, '/api/evaluation/runs', { ...subject, trialsPerCase: 1, budgetUsd: 1 }, 201));
+    await post(request, `/api/evaluation/runs/${prepared.evalRun.id}/start`, { confirmedBudgetUsd: 1 });
+    await pollUntil(
+      async () => EvalRunOutputSchema.parse(await getJson(request, `/api/evaluation/runs/${prepared.evalRun.id}`)).evalRun.status === 'completed' || null,
+      { description: `Eval Run ${prepared.evalRun.id} to complete`, timeoutMs: 90_000 },
+    );
+    const signed = await request.post('/api/evaluation/qualification', {
+      headers: sessionCookieHeaders(member), data: { evalRunId: prepared.evalRun.id, decision: 'confirmed' },
+    });
+    expect(signed.status(), await signed.text()).toBe(201);
+
+    const workflowName = `e2e-validated-agent-${agentId.slice(0, 8)}`;
+    for (const step of [
+      { autonomyLevel: 'L4', agentId, plugin: 'claude-code-agent' },
+      { autonomyLevel: 'L4', agentId, plugin: 'claude-code-agent', agent: { prompt: 'Grade each AE.' } },
+    ]) {
+      const registered = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, { headers: JSON_HEADERS, data: agentStepWorkflow(workflowName, step) });
+      expect(registered.status(), await registered.text()).toBe(201);
+    }
+
+    const validation = GetWorkflowValidationOutputSchema.parse(
+      await getJson(request, `/api/evaluation/workflow-validation?${new URLSearchParams({ namespace: TEST_ORG_HANDLE, workflowName }).toString()}`),
+    );
+    expect(validation).toMatchObject({
+      versions: [
+        { definitionVersion: 2, status: 'not_verified' },
+        { definitionVersion: 1, status: 'passed', steps: [{ stepId: 'grade-aes', validation: { status: 'passed', evalRunId: prepared.evalRun.id } }] },
+      ],
+    });
+    expect(validation.versions[1]!.steps[0]!.validation).toMatchObject({
+      reason: expect.stringContaining('as it was validated'),
+      inheritedFromAgent: { agentId, version: 1 },
+    });
   });
 
   test('refuses what only a workflow step has: production Evaluators, workspace seeds, earlier step outputs, and naming both owners', async ({ request }) => {

@@ -2,16 +2,19 @@ import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import {
   DEFAULT_ACCEPTANCE_CRITERIA,
+  agentStepChanges,
   inlineMcpServerNames,
   qualificationOutcome,
   qualificationSignatureMeaning,
   type AcceptanceCriteria,
+  type AgentDefinition,
   type ElectronicSignature,
   type EvalRun,
   type EvaluationSubject,
   type EvalRunEvaluator,
   type StepFingerprint,
   type StepQualification,
+  type WorkflowDefinition,
   type WorkflowStep,
   describeEvaluationSubject,
   evaluationOwnerOf,
@@ -175,13 +178,64 @@ async function stepValidation(
   return { status: outcome, evalRunId: run.id, reason, runInProgress };
 }
 
+/** An Agent's Evaluation as it stands now, each Agent read at most once; null when the caller cannot see it or it cannot be evaluated. */
+type AgentValidations = (agentId: string) => Promise<{ agent: AgentDefinition; qualification: GetStepQualificationOutput } | null>;
+
+function agentValidations(scope: CallerScope): AgentValidations {
+  const reads = new Map<string, ReturnType<AgentValidations>>();
+  return (agentId) => {
+    if (reads.has(agentId) === false) {
+      reads.set(agentId, (async () => {
+        const agent = await scope.agentDefinitions.getById(agentId);
+        if (agent === null || agent.namespace === undefined) return null;
+        return getStepQualification({ namespace: agent.namespace, agentId }, scope).then(
+          (qualification) => ({ agent, qualification }),
+          (error: unknown) => {
+            if (error instanceof NotFoundError || error instanceof ForbiddenError || error instanceof ValidationError) return null;
+            throw error;
+          },
+        );
+      })());
+    }
+    return reads.get(agentId)!;
+  };
+}
+
+/**
+ * A step that has no verdict of its own takes the Agent's it runs (ADR-0029
+ * D8), when it runs that Agent as it was validated (`agentStepChanges`), in
+ * the Agent's own workspace — whose tool catalog its trials resolved MCP
+ * servers from — and the Agent's current version passed. Its own verdict,
+ * once read, stands.
+ */
+async function withAgentValidation(
+  validations: AgentValidations,
+  definition: WorkflowDefinition,
+  workflowStep: WorkflowStep,
+  own: StepValidation,
+): Promise<StepValidation> {
+  if (own.status !== 'not_verified' || workflowStep.agentId === undefined) return own;
+  const read = await validations(workflowStep.agentId);
+  if (read === null || read.agent.namespace !== definition.namespace || read.qualification.validation.status !== 'passed') return own;
+  if (agentStepChanges(workflowStep, read.agent, definition.preamble).length > 0) return own;
+  const { agent, qualification } = read;
+  if (qualification.agentVersion === null) return own;
+  return {
+    ...qualification.validation,
+    reason: `Runs agent '${agent.name}' v${qualification.agentVersion} as it was validated: ${qualification.validation.reason}`,
+    runInProgress: own.runInProgress,
+    inheritedFromAgent: { agentId: agent.id, name: agent.name, version: qualification.agentVersion },
+  };
+}
+
 /**
  * The Step's qualification badge (ADR-0023 D11): `qualified` when some signed
  * qualification that passed — confirmed met, or overwritten from missed — binds the Step's Fingerprint as it is now — in the runnable
  * version, or the version asked about — `stale` when qualifications exist but
  * none binds it, `not_qualified` when none passed. Evaluators changed
  * since the qualification shown are flagged beside it (D7). Beside it, the
- * step's validation in that version (`stepValidation`).
+ * step's validation in that version (`stepValidation`), or its Agent's
+ * (`withAgentValidation`).
  */
 export async function getStepQualification(
   input: z.output<typeof GetStepQualificationInputSchema>,
@@ -206,7 +260,8 @@ export async function getStepQualification(
   const approvals = history.filter((qualification) => qualificationOutcome(qualification) === 'passed');
   const matching = approvals.find((qualification) => qualification.fingerprint.hash === fingerprint.hash);
   const shown = matching ?? approvals[0] ?? history[0];
-  const validation = await stepValidation(scope, rows, workflowStep, version, async () => fingerprint);
+  const ownValidation = await stepValidation(scope, rows, workflowStep, version, async () => fingerprint);
+  const validation = agent === null ? await withAgentValidation(agentValidations(scope), definition, workflowStep, ownValidation) : ownValidation;
   if (shown === undefined || approvals.length === 0) {
     return { status: 'not_qualified', validation, qualification: shown ?? null, ...versions, fingerprint, changed: [], evaluatorsChanged: [], history };
   }
@@ -224,7 +279,8 @@ export async function getStepQualification(
 
 /**
  * Whether each live version of a workflow is verified: every agent step's
- * validation in that version (`stepValidation`), rolled up — `passed` when all
+ * validation in that version (`stepValidation`, or its Agent's through
+ * `withAgentValidation`), rolled up — `passed` when all
  * passed, `failed` when any failed, `awaiting_approval` when one waits for a
  * signature, else `not_verified`. Archived versions are
  * not evaluated, so they are left out.
@@ -235,6 +291,7 @@ export async function getWorkflowValidation(
 ): Promise<GetWorkflowValidationOutput> {
   const definitions = await scope.workflowDefinitions.listVersions(input.namespace, input.workflowName);
   if (definitions.length === 0) throw new NotFoundError(`Workflow '${input.workflowName}' not found`);
+  const validations = agentValidations(scope);
   const rowsByStep = new Map<string, SubjectRows>();
   const rowsOf = (stepId: string): SubjectRows => {
     if (rowsByStep.has(stepId) === false) rowsByStep.set(stepId, subjectRows(scope, { kind: 'step', namespace: input.namespace, workflowName: input.workflowName, stepId }));
@@ -246,7 +303,12 @@ export async function getWorkflowValidation(
     const steps = await Promise.all(definition.steps.filter((workflowStep) => workflowStep.executor === 'agent').map(async (workflowStep) => ({
       stepId: workflowStep.id,
       stepName: workflowStep.name,
-      validation: await stepValidation(scope, rowsOf(workflowStep.id), workflowStep, definitionVersionOf(definition.version), () => computeStepFingerprint(scope, definition, workflowStep)),
+      validation: await withAgentValidation(
+        validations,
+        definition,
+        workflowStep,
+        await stepValidation(scope, rowsOf(workflowStep.id), workflowStep, definitionVersionOf(definition.version), () => computeStepFingerprint(scope, definition, workflowStep)),
+      ),
     })));
     const statuses = steps.map((entry) => entry.validation.status);
     const status = statuses.includes('failed')

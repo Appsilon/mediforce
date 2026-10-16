@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { WorkflowEngine } from '@mediforce/workflow-engine';
+import { AGENT_EVAL_STEP_ID, type EvaluationSubject } from '@mediforce/platform-core';
 import {
   buildAgentOutputEnvelope,
   buildAgentRun,
@@ -9,6 +10,7 @@ import {
 import { ConflictError } from '../../../errors';
 import { noopRunKicker, type NoopRunKicker } from '../../../runtime/run-kicker';
 import type { CallerScope } from '../../../repositories/index';
+import { userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { setAcceptanceCriteria } from '../acceptance-criteria';
 import { addEvaluatorVersion, createEvaluator } from '../evaluators';
 import { createEvalCase } from '../eval-cases';
@@ -66,12 +68,13 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
   }
 
   /** Runs every trial of a fresh Eval Run to a scored result with findings — but the first `failing`, which end without an Agent Run. */
-  async function finishedRun(failing = 0, definitionVersion?: number): Promise<string> {
+  async function finishedRun(failing = 0, definitionVersion?: number, subject: EvaluationSubject = STEP): Promise<string> {
     // Each run is created a millisecond after the last, so "newest" is never a tie.
     await new Promise((resolve) => setTimeout(resolve, 2));
     const kicksBefore = kicker.kicks.length;
+    const stepId = subject.kind === 'agent' ? AGENT_EVAL_STEP_ID : STEP.stepId;
     const { evalRun } = await prepareEvalRun({
-      ...STEP, definitionVersion, trialsPerCase: 1, concurrency: 4, budgetUsd: 5,
+      ...subject, definitionVersion, trialsPerCase: 1, concurrency: 4, budgetUsd: 5,
     }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
     const kicked = kicker.kicks.slice(kicksBefore);
@@ -82,9 +85,9 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
         continue;
       }
       const startedAt = new Date().toISOString();
-      await fixture.instanceRepo.addStepExecution(instanceId, buildStepExecution({ instanceId, stepId: 'grade-aes', startedAt }));
+      await fixture.instanceRepo.addStepExecution(instanceId, buildStepExecution({ instanceId, stepId, startedAt }));
       await fixture.agentRunRepo.create(buildAgentRun({
-        processInstanceId: instanceId, stepId: 'grade-aes', startedAt, envelope: buildAgentOutputEnvelope({ result: { findings: ['sepsis: 5'] } }),
+        processInstanceId: instanceId, stepId, startedAt, envelope: buildAgentOutputEnvelope({ result: { findings: ['sepsis: 5'] } }),
       }));
       await fixture.instanceRepo.update(instanceId, { status: 'completed', currentStepId: null });
       await advanceEvalRunOfInstance(scope, instanceId);
@@ -365,6 +368,80 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
       const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
       await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
       expect((await getStepQualification(STEP, scope)).validation).toMatchObject({ status: 'not_verified', runInProgress: true });
+    });
+
+    describe('a step that runs a validated Agent as it is', () => {
+      const AGENT = { kind: 'agent', namespace: NAMESPACE, workflowName: null, stepId: null, agentId: 'ae-grader' } as const;
+      const workflow = { namespace: NAMESPACE, workflowName: WORKFLOW };
+
+      beforeEach(async () => {
+        const agent = await fixture.agentDefinitionRepo.getById('ae-grader');
+        await fixture.agentDefinitionRepo.upsert('ae-grader', { ...agent!, runtimeId: 'claude-code-agent' });
+        await setAcceptanceCriteria({ ...AGENT, criteria: lenient, origin: 'user' }, scope);
+        await createEvaluator({ ...AGENT, name: 'findings-present', rule: 'The result lists findings.', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);
+        await createEvalCase({
+          ...AGENT,
+          name: 'Grade 5 sepsis',
+          input: { triggerPayload: { events: [{ term: 'Sepsis' }] }, previousStepOutputs: {} },
+          workspaceSeedCommit: null,
+          expectation: 'positive',
+          expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null,
+          split: 'dev',
+          containsProductionData: false,
+          origin: 'user',
+        }, scope);
+        await saveEvalDataset(AGENT, scope);
+        await signStepQualification({ evalRunId: await finishedRun(0, undefined, AGENT), decision: 'confirmed' }, scope);
+        await fixture.processRepo.saveWorkflowDefinition(buildWorkflowDefinition({
+          name: WORKFLOW,
+          namespace: NAMESPACE,
+          version: 2,
+          steps: [
+            { id: 'extract-aes', name: 'Extract AEs', type: 'creation', executor: 'script', script: { runtime: 'python', inlineScript: 'print(1)' } },
+            { id: 'grade-aes', name: 'Grade AEs', type: 'creation', executor: 'agent', agentId: 'ae-grader', plugin: 'claude-code-agent', autonomyLevel: 'L4', agent: { timeoutMinutes: 30 } },
+            { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+          ],
+          transitions: [{ from: 'extract-aes', to: 'grade-aes' }, { from: 'grade-aes', to: 'done' }],
+        }));
+      });
+
+      it('passes on the Agent\'s validation, so a workflow of such steps is verified; a step that adds a prompt is not', async () => {
+        expect((await getStepQualification(STEP, scope)).validation).toMatchObject({
+          status: 'passed',
+          reason: expect.stringContaining('Runs agent \'AE grader\' v1 as it was validated'),
+          inheritedFromAgent: { agentId: 'ae-grader', name: 'AE grader', version: 1 },
+        });
+        expect(await getWorkflowValidation(workflow, scope)).toMatchObject({
+          versions: [
+            { definitionVersion: 2, status: 'passed', steps: [{ stepId: 'grade-aes', validation: { status: 'passed' } }] },
+            { definitionVersion: 1, status: 'not_verified', steps: [{ stepId: 'grade-aes', validation: { status: 'not_verified' } }] },
+          ],
+        });
+        expect((await getWorkflowValidation(workflow, scope)).versions[1]!.steps[0]!.validation).not.toHaveProperty('inheritedFromAgent');
+      });
+
+      it('stops passing once the Agent changes after its validation', async () => {
+        const agent = await fixture.agentDefinitionRepo.getById('ae-grader');
+        await fixture.agentDefinitionRepo.upsert('ae-grader', { ...agent!, systemPrompt: 'You grade adverse events by CTCAE v6.' });
+        expect((await getWorkflowValidation(workflow, scope)).versions[0]).toMatchObject({ definitionVersion: 2, status: 'not_verified' });
+      });
+
+      it('passes only in the Agent\'s own workspace, where its MCP servers resolve as its trials did', async () => {
+        const agent = await fixture.agentDefinitionRepo.getById('ae-grader');
+        await fixture.agentDefinitionRepo.upsert('ae-grader', { ...agent!, visibility: 'public' });
+        const definition = await fixture.processRepo.getWorkflowDefinition(NAMESPACE, WORKFLOW, 2);
+        await fixture.processRepo.saveWorkflowDefinition({ ...definition!, namespace: 'pharma-b', version: 1 });
+        const bothWorkspaces = withEngine(fixture.scope(userCaller('author-1', [NAMESPACE, 'pharma-b'])));
+
+        expect((await getWorkflowValidation({ namespace: 'pharma-b', workflowName: WORKFLOW }, bothWorkspaces)).versions[0]).toMatchObject({ status: 'not_verified' });
+        expect((await getWorkflowValidation(workflow, bothWorkspaces)).versions[0]).toMatchObject({ definitionVersion: 2, status: 'passed' });
+      });
+
+      it('keeps the step\'s own verdict when one was read', async () => {
+        await setAcceptanceCriteria({ ...STEP, criteria: strict, origin: 'user' }, scope);
+        await signStepQualification({ evalRunId: await finishedRun(), decision: 'confirmed' }, scope);
+        expect((await getStepQualification(STEP, scope)).validation.status).toBe('failed');
+      });
     });
   });
 });

@@ -807,6 +807,17 @@ person's sign-off on it:
   archived — compared with the cases the run ran), or the Acceptance Criteria.
   Run the step again to verify it. A step that declares MCP servers inline
   cannot be evaluated, so it stays not verified until they move onto its agent.
+- **Inherited from its agent** — a step with no verdict of its own that runs
+  a validated Agent of its workspace as it is takes the Agent's **passed**
+  (ADR-0029 D8): no other runtime or model, no prompt, Skills, output schema
+  or MCP servers of its own, no MCP restriction that removes something, and
+  no workflow preamble. Image, params, env, timeout, autonomy and review are
+  not changes. The reason starts *Runs agent '…' vN as it was validated*,
+  and `validation.inheritedFromAgent` names the Agent and version; a version
+  verified with any such step reads **Verified via agent**, and its tooltip
+  says which step leans on which Agent.
+  Once the Agent changes, the step is not verified until the Agent's new
+  version passes.
 
 It comes with `GET /api/evaluation/qualification` as `validation: { status,
 evalRunId, reason, runInProgress }`, as the first line of `mediforce eval
@@ -830,6 +841,13 @@ its first one awaiting approval, else its first not verified one; in the workflo
 carries its validation icon for the version being edited, linking to the
 Evaluation tab on that step and version. The icon speaks of the step as saved:
 a step added or edited since carries none until the version is saved and run.
+Under the step's **Agent** field the editor says *Validated agent vN* while
+the step runs a validated Agent as it is, and asks before a change to its
+plugin, model, prompt, Skills, output schema or MCP restrictions that would
+end that; once changed, it says the step needs a validation of its own and
+links to the Evaluation tab. A step with a verdict of its own (failed or
+awaiting approval) is told that verdict stands instead. A preamble edit in the
+workflow's settings is not asked about.
 
 ## Evaluating an Agent
 

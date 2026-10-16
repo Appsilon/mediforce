@@ -1,6 +1,6 @@
 'use client';
 
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { keepPreviousData, skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { EvaluationSubject } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
@@ -70,12 +70,15 @@ export function useStepDatasets(step: EvaluationSubject) {
 
 /**
  * The Step's qualification badge (ADR-0023 D11) — for its runnable version, or
- * for `definitionVersion`, what a run of that version ran.
+ * for `definitionVersion`, what a run of that version ran. Nothing is fetched
+ * while `step` is null.
  */
-export function useStepQualification(step: EvaluationSubject, definitionVersion?: number) {
+export function useStepQualification(step: EvaluationSubject | null, definitionVersion?: number) {
   return useQuery({
-    queryKey: sectionKey(step, `qualification:${definitionVersion ?? 'runnable'}`),
-    queryFn: () => mediforce.evaluation.getQualification({ ...step, ...(definitionVersion === undefined ? {} : { definitionVersion }) }),
+    queryKey: step === null ? ['qualification', 'none'] : sectionKey(step, `qualification:${definitionVersion ?? 'runnable'}`),
+    queryFn: step === null
+      ? skipToken
+      : () => mediforce.evaluation.getQualification({ ...step, ...(definitionVersion === undefined ? {} : { definitionVersion }) }),
     retry: stopRetryOn4xx,
     // The validation is read from the newest finished Eval Run; poll until a running one ends.
     refetchInterval: (query) => (query.state.data?.validation.runInProgress === true ? 5000 : false),

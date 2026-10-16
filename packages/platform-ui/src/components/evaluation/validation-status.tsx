@@ -51,11 +51,17 @@ export const VALIDATION_STATUS: Record<ValidationStatus, {
   },
 };
 
+/** Whose validation a step's is: its own, or that of the Agent it runs as it is (ADR-0029 D8). */
+function inheritedFrom(validation: StepValidation): string {
+  const agent = validation.inheritedFromAgent;
+  return agent === undefined ? '' : ` via agent '${agent.name}' v${agent.version}`;
+}
+
 /** What a version's status rests on: each agent step's validation in it. */
 function describeVersionValidation(version: WorkflowVersionValidation): string {
   if (version.steps.length === 0) return 'No agent steps to verify.';
   return version.steps
-    .map((step) => `${step.stepName}: ${VALIDATION_STATUS[step.validation.status].label.toLowerCase()}`)
+    .map((step) => `${step.stepName}: ${VALIDATION_STATUS[step.validation.status].label.toLowerCase()}${inheritedFrom(step.validation)}`)
     .join(' · ');
 }
 
@@ -82,6 +88,7 @@ export function VersionValidationBadge({ handle, workflowName, version }: { hand
     >
       <display.icon className="h-3 w-3" aria-hidden />
       {display.versionLabel}
+      {version.status === 'passed' && version.steps.some((step) => step.validation.inheritedFromAgent !== undefined) && ' via agent'}
     </Link>
   );
 }

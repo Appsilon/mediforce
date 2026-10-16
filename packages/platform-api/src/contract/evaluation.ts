@@ -531,6 +531,12 @@ export const StepValidationSchema = z.object({
   runVerdict: z.enum(['passed', 'missed', 'not_judged']).optional(),
   /** An Eval Run of the step is running; the status is read again once it ends. */
   runInProgress: z.boolean(),
+  /** The validated Agent a step without a verdict of its own runs as it is, whose validation it reads (ADR-0029 D8). */
+  inheritedFromAgent: z.object({
+    agentId: z.string(),
+    name: z.string(),
+    version: z.number().int().positive(),
+  }).optional(),
 });
 
 export const GetStepQualificationOutputSchema = z.object({

@@ -684,7 +684,9 @@ export {
   AgentVersionSchema,
   AGENT_EVAL_STEP_ID,
   agentEvalDefinition,
+  agentStepChanges,
   type AgentConfigSnapshot,
+  type AgentStepChange,
   type AgentVersion,
 } from './schemas/agent-version';
 
