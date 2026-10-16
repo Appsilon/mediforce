@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { evaluationSubjectOf } from '@mediforce/platform-core';
 
 /** The agent Workflow Step every `mediforce eval` command is about. */
 export const STEP_ARGS = {
@@ -9,6 +10,27 @@ export const STEP_ARGS = {
 
 export function stepFrom(args: { namespace: string; workflow: string; step: string }) {
   return { namespace: args.namespace, workflowName: args.workflow, stepId: args.step };
+}
+
+/**
+ * What a command that works on either is about: an agent Workflow Step by
+ * `--workflow` and `--step`, or an Agent evaluated on its own by `--agent`
+ * (ADR-0029).
+ */
+export const SUBJECT_ARGS = {
+  namespace: { type: 'string', required: true, description: 'Workspace handle' },
+  workflow: { type: 'string', description: 'Workflow name (with --step)' },
+  step: { type: 'string', description: 'Agent step id (with --workflow)' },
+  agent: { type: 'string', description: 'Agent id — evaluate the agent on its own, instead of --workflow and --step' },
+} as const;
+
+export function subjectFrom(args: { namespace: string; workflow?: string; step?: string; agent?: string }) {
+  const subject = evaluationSubjectOf({ namespace: args.namespace, workflowName: args.workflow, stepId: args.step, agentId: args.agent });
+  const mixed = args.agent !== undefined && (args.workflow !== undefined || args.step !== undefined);
+  if (subject === null || mixed) throw new Error('Name a step with --workflow and --step, or an agent with --agent');
+  return subject.kind === 'agent'
+    ? { namespace: subject.namespace, agentId: subject.agentId }
+    : { namespace: subject.namespace, workflowName: subject.workflowName, stepId: subject.stepId };
 }
 
 export function readJsonFile(path: string): unknown {

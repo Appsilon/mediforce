@@ -208,6 +208,52 @@ describe('POST /api/processes/[instanceId]/run', () => {
       );
     });
 
+    it('[DATA] an agent step re-entered from a revise loop takes its input from the step that just completed', async () => {
+      const loopDefinition = {
+        ...workflowDefinition,
+        steps: [
+          { id: 'draft', name: 'Draft', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
+          { id: 'review', name: 'Review', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
+          { id: 'revise', name: 'Revise', type: 'creation', executor: 'agent', autonomyLevel: 'L2' },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [
+          { from: 'draft', to: 'review' },
+          { from: 'review', to: 'revise' },
+          { from: 'revise', to: 'review' },
+          { from: 'review', to: 'done' },
+        ],
+      };
+      const variables = { draft: { text: 'first draft' }, review: { verdict: 'revise' }, revise: { text: 'revised draft' } };
+      let callCount = 0;
+      mockInstanceGetById.mockImplementation(() => {
+        callCount++;
+        return Promise.resolve({
+          id: 'inst-1', namespace: 'test-ns', definitionName: 'community-digest', definitionVersion: '1',
+          status: callCount <= 2 ? 'running' : 'paused',
+          currentStepId: callCount <= 2 ? 'review' : 'done',
+          configName: undefined, variables, triggerPayload: {},
+        });
+      });
+      mockGetStepExecutions.mockResolvedValue([
+        { id: 'e1', stepId: 'draft', status: 'completed', startedAt: '2026-01-01T10:00:00.000Z', completedAt: '2026-01-01T10:01:00.000Z' },
+        { id: 'e2', stepId: 'review', status: 'completed', startedAt: '2026-01-01T10:02:00.000Z', completedAt: '2026-01-01T10:03:00.000Z' },
+        { id: 'e3', stepId: 'revise', status: 'completed', startedAt: '2026-01-01T10:04:00.000Z', completedAt: '2026-01-01T10:05:00.000Z' },
+      ]);
+      mockGetWorkflowDefinition.mockResolvedValue(loopDefinition);
+      mockExecuteAgentStep.mockResolvedValue({
+        instanceId: 'inst-1', status: 'paused', currentStepId: 'done', agentRunStatus: 'completed',
+      });
+
+      await POST(makeRequest(), { params: makeParams('inst-1') });
+      await afterCallback!();
+
+      expect(mockInstanceAddStepExecution).toHaveBeenCalledWith(
+        'inst-1',
+        expect.objectContaining({ stepId: 'review', input: { text: 'revised draft', steps: variables } }),
+      );
+    });
+
     it('[DATA] reaps a stranded running step past its timeout instead of re-running it (issue #868)', async () => {
       let callCount = 0;
       mockInstanceGetById.mockImplementation(() => {

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
 import type { AgentDefinition, ImageCommandCheck, ModelRegistryEntry, SkillSummary, ToolCatalogEntry, WorkflowStep } from '@mediforce/platform-core';
 import type { DockerImageInfo, ImageCatalogEntryView } from '@mediforce/platform-api/contract';
@@ -20,6 +21,22 @@ const agentState = vi.hoisted(() => ({
 
 const modelState = vi.hoisted(() => ({
   models: [] as ModelRegistryEntry[],
+}));
+
+// The selected agent's validation; null leaves it unread.
+const qualificationState = vi.hoisted(() => ({
+  status: null as 'passed' | 'not_verified' | null,
+  // Each listed agent's validation, by agent id, as the picker reads it.
+  byAgent: {} as Record<string, 'passed' | 'not_verified'>,
+}));
+
+vi.mock('@/hooks/use-step-evaluation', () => ({
+  useStepQualification: (subject: unknown) => ({
+    data: subject === null || qualificationState.status === null
+      ? undefined
+      : { agentVersion: 3, validation: { status: qualificationState.status, reason: 'Eval Run 1a2b3c4d met its Acceptance Criteria', evalRunId: null, runInProgress: false } },
+  }),
+  useAgentValidationStatuses: () => new Map(Object.entries(qualificationState.byAgent)),
 }));
 
 vi.mock('@/hooks/use-model-registry', () => ({
@@ -197,6 +214,8 @@ describe('StepEditor', () => {
     agentState.response = { agents: [] };
     agentState.requests = [];
     agentState.error = false;
+    qualificationState.status = null;
+    qualificationState.byAgent = {};
     modelState.models = [];
     mcpState.catalog = [];
     mcpState.checks = {};
@@ -640,6 +659,54 @@ describe('StepEditor', () => {
     expect(screen.queryByText('Invalid JSON')).toBeNull();
   });
 
+  describe('an agent with an output schema', () => {
+    const agentSchema = { type: 'object', required: ['grade'], properties: { grade: { type: 'number' } } } as const;
+    const stepSchema = { type: 'object', required: ['summary'], properties: { summary: { type: 'string' } } } as const;
+    const schemaBox = () => screen.getByPlaceholderText(/"required": \[\]/) as HTMLTextAreaElement;
+
+    beforeEach(() => {
+      agentState.response = {
+        agents: [{ ...buildAgentDefinition('ae-grader', 'AE grader'), outputSchema: agentSchema }],
+      };
+    });
+
+    it('[RENDER] shows the agent\'s schema on a step that declares none', async () => {
+      render(<StepEditor step={buildStep({ executor: 'agent', agentId: 'ae-grader' })} allSteps={[]} onChange={noop} />);
+      expandCard('Prompt & model');
+
+      expect(await screen.findByText(/Inherited from AE grader/)).toBeInTheDocument();
+      expect(JSON.parse(schemaBox().value)).toEqual(agentSchema);
+    });
+
+    it('[DATA] leaving the inherited schema unchanged does not copy it onto the step', async () => {
+      const onChange = vi.fn();
+      render(<StepEditor step={buildStep({ executor: 'agent', agentId: 'ae-grader' })} allSteps={[]} onChange={onChange} />);
+      expandCard('Prompt & model');
+      await screen.findByText(/Inherited from AE grader/);
+
+      fireEvent.blur(schemaBox());
+
+      expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ agent: expect.objectContaining({ outputSchema: agentSchema }) }));
+    });
+
+    it('[DATA] a step schema of its own replaces the agent\'s and can be reset to it', async () => {
+      const onChange = vi.fn();
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'agent', agentId: 'ae-grader', agent: { outputSchema: stepSchema } })}
+          allSteps={[]}
+          onChange={onChange}
+        />,
+      );
+      expandCard('Prompt & model');
+
+      expect(JSON.parse(schemaBox().value)).toEqual(stepSchema);
+      fireEvent.click(await screen.findByRole('button', { name: 'Use AE grader\'s schema' }));
+
+      expect(onChange).toHaveBeenCalledWith({ agent: { outputSchema: undefined } });
+    });
+  });
+
   it('[DATA] agent ID selects a saved agent definition', async () => {
     agentState.response = {
       agents: [
@@ -669,6 +736,148 @@ describe('StepEditor', () => {
     fireEvent.change(agentSelect, { target: { value: 'clinical-reviewer' } });
 
     expect(onChange).toHaveBeenCalledWith({ agentId: 'clinical-reviewer', agent: undefined, plugin: 'claude-code-agent' });
+  });
+
+  it('[RENDER] marks the verified agents in the agent picker', async () => {
+    agentState.response = {
+      agents: [
+        { ...buildAgentDefinition('ae-grader', 'AE grader', 'claude-code-agent'), namespace: 'test' },
+        { ...buildAgentDefinition('safety-reviewer', 'Safety Reviewer', 'claude-code-agent'), namespace: 'test' },
+      ],
+    };
+    qualificationState.byAgent = { 'ae-grader': 'passed', 'safety-reviewer': 'not_verified' };
+    render(<StepEditor step={buildStep({ executor: 'agent' })} allSteps={[]} onChange={noop} />);
+    expandCard('Prompt & model');
+
+    expect(await screen.findByRole('option', { name: 'AE grader (ae-grader) — ✅ Verified' })).toHaveValue('ae-grader');
+    expect(screen.getByRole('option', { name: 'Safety Reviewer (safety-reviewer)' })).toBeInTheDocument();
+  });
+
+  describe('a step that reuses a validated agent', () => {
+    const validatedAgent = { ...buildAgentDefinition('ae-grader', 'AE grader', 'claude-code-agent'), namespace: 'test' };
+    const reusingStep = buildStep({ executor: 'agent', agentId: 'ae-grader', plugin: 'claude-code-agent' });
+
+    beforeEach(() => {
+      agentState.response = { agents: [validatedAgent] };
+      qualificationState.status = 'passed';
+    });
+
+    it('[RENDER] marks the agent validated while the step runs it as it is', async () => {
+      render(<StepEditor step={reusingStep} allSteps={[]} workflowName="ae-grading" onChange={noop} />);
+      expandCard('Prompt & model');
+
+      const badge = await screen.findByTestId('agent-validation');
+      expect(badge).toHaveAttribute('data-status', 'validated');
+      expect(badge).toHaveTextContent('Validated agent v3');
+    });
+
+    it('[RENDER] says a step that changes the agent needs a validation of its own', async () => {
+      render(<StepEditor step={{ ...reusingStep, agent: { prompt: 'Grade each AE.' } }} allSteps={[]} workflowName="ae-grading" onChange={noop} />);
+      expandCard('Prompt & model');
+
+      const badge = await screen.findByTestId('agent-validation');
+      expect(badge).toHaveAttribute('data-status', 'modified');
+      expect(badge).toHaveTextContent('step prompt');
+      expect(screen.getByRole('link', { name: 'Evaluation tab' })).toHaveAttribute('href', '/test/workflows/ae-grading?tab=evaluation&step=step-1');
+    });
+
+    it('[DATA] asks before a change modifies the validated agent, then applies it and stops asking for the step', async () => {
+      const onChange = vi.fn();
+      render(<StepEditor step={reusingStep} allSteps={[]} workflowName="ae-grading" onChange={onChange} />);
+      expandCard('Prompt & model');
+      await screen.findByTestId('agent-validation');
+
+      fireEvent.change(screen.getByRole('textbox', { name: 'Step prompt' }), { target: { value: 'G' } });
+      expect(onChange).not.toHaveBeenCalled();
+      expect(await screen.findByRole('dialog')).toHaveTextContent('no longer validated');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Change anyway' }));
+      expect(onChange).toHaveBeenCalledWith({ agent: { prompt: 'G' } });
+
+      fireEvent.change(screen.getByRole('textbox', { name: 'Step prompt' }), { target: { value: 'Gr' } });
+      expect(onChange).toHaveBeenLastCalledWith({ agent: { prompt: 'Gr' } });
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    describe.each([
+      ['declares none', undefined],
+      ['declares one the step inherits', { type: 'object', required: ['grade'], properties: { grade: { type: 'number' } } }],
+    ] as const)('editing the output schema when the agent %s', (_case, agentSchema) => {
+      const stepSchema = { type: 'object', required: ['summary'], properties: { summary: { type: 'string' } } };
+      const schemaBox = () => screen.getByPlaceholderText(/"required": \[\]/) as HTMLTextAreaElement;
+
+      async function renderReusingStep(onChange: (patch: Partial<WorkflowStep>) => void) {
+        agentState.response = { agents: [{ ...validatedAgent, outputSchema: agentSchema }] };
+        render(<StepEditor step={reusingStep} allSteps={[]} workflowName="ae-grading" onChange={onChange} />);
+        expandCard('Prompt & model');
+        await screen.findByTestId('agent-validation');
+      }
+
+      it('[DATA] asks as soon as the schema is edited, and cancelling puts the box back', async () => {
+        const onChange = vi.fn();
+        await renderReusingStep(onChange);
+        const user = userEvent.setup();
+
+        await user.type(schemaBox(), 'x');
+        expect(await screen.findByRole('dialog')).toHaveTextContent('output schema');
+
+        await user.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(schemaBox().value).toBe(agentSchema === undefined ? '' : JSON.stringify(agentSchema, null, 2));
+        expect(onChange).not.toHaveBeenCalled();
+      });
+
+      it('[DATA] commits the schema once the change is confirmed, without asking again', async () => {
+        const onChange = vi.fn();
+        await renderReusingStep(onChange);
+        const user = userEvent.setup();
+
+        await user.type(schemaBox(), 'x');
+        await user.click(await screen.findByRole('button', { name: 'Change anyway' }));
+        await user.clear(schemaBox());
+        await user.paste(JSON.stringify(stepSchema));
+        await user.click(screen.getByRole('textbox', { name: 'Step prompt' }));
+
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(onChange).toHaveBeenLastCalledWith({ agent: { outputSchema: stepSchema } });
+      });
+    });
+
+    it('[DATA] leaves the step as it is when the change is cancelled', async () => {
+      pluginState.plugins = [{ name: 'claude-code-agent' }, { name: 'opencode-agent' }];
+      const onChange = vi.fn();
+      render(<StepEditor step={reusingStep} allSteps={[]} workflowName="ae-grading" onChange={onChange} />);
+      expandCard('Prompt & model');
+      await screen.findByTestId('agent-validation');
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Plugin' }), { target: { value: 'opencode-agent' } });
+      fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+      expect(onChange).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('[RENDER] defers to a verdict the step has of its own', async () => {
+      render(<StepEditor step={reusingStep} allSteps={[]} workflowName="ae-grading" savedValidation="failed" onChange={noop} />);
+      expandCard('Prompt & model');
+
+      const badge = await screen.findByTestId('agent-validation');
+      expect(badge).toHaveAttribute('data-status', 'own-verdict');
+      expect(badge).not.toHaveTextContent('Validated agent');
+    });
+
+    it('[DATA] does not ask when the agent is not validated', async () => {
+      qualificationState.status = 'not_verified';
+      const onChange = vi.fn();
+      render(<StepEditor step={reusingStep} allSteps={[]} workflowName="ae-grading" onChange={onChange} />);
+      expandCard('Prompt & model');
+      await screen.findByRole('option', { name: 'AE grader (ae-grader)' });
+
+      fireEvent.change(screen.getByRole('textbox', { name: 'Step prompt' }), { target: { value: 'G' } });
+
+      expect(onChange).toHaveBeenCalledWith({ agent: { prompt: 'G' } });
+      expect(screen.queryByTestId('agent-validation')).toBeNull();
+    });
   });
 
   it('[DATA] the model picker offers the selected agent model as the blank default', async () => {

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { canonicalJson, type WorkflowDefinition, type WorkflowStep } from '@mediforce/platform-core';
 import { InMemorySkillRepository } from '@mediforce/platform-core/testing';
-import { loadEvaluatedStep } from '../evaluated-step';
+import { loadEvaluationSubject } from '../evaluation-subject';
 import { changedFingerprintComponents, computeStepFingerprint } from '../step-fingerprint';
 import { evaluationFixture, NAMESPACE, STEP } from '../../__tests__/fixture';
 
@@ -10,7 +10,7 @@ describe('computeStepFingerprint', () => {
   async function loaded() {
     const fixture = await evaluationFixture();
     const scope = fixture.scope();
-    const { definition, step } = await loadEvaluatedStep(scope, STEP, 'read');
+    const { definition, step } = await loadEvaluationSubject(scope, STEP, 'read');
     const fingerprint = (patch: { definition?: Partial<WorkflowDefinition>; step?: Partial<WorkflowStep> }) => {
       const patchedStep = { ...step, ...patch.step };
       return computeStepFingerprint(scope, { ...definition, ...patch.definition, steps: [patchedStep] }, patchedStep);
@@ -85,7 +85,7 @@ describe('computeStepFingerprint', () => {
     const fixture = await evaluationFixture();
     const skillRepo = new InMemorySkillRepository();
     const scope = fixture.scope(undefined, { skillRepo });
-    const { definition, step } = await loadEvaluatedStep(scope, STEP, 'read');
+    const { definition, step } = await loadEvaluationSubject(scope, STEP, 'read');
     const fingerprint = () => computeStepFingerprint(scope, definition, step);
     const skill = (contentHash: string) => ({
       namespace: NAMESPACE,
@@ -126,7 +126,7 @@ describe('computeStepFingerprint', () => {
     const fixture = await evaluationFixture();
     const skillRepo = new InMemorySkillRepository();
     const scope = fixture.scope(undefined, { skillRepo });
-    const { definition, step } = await loadEvaluatedStep(scope, STEP, 'read');
+    const { definition, step } = await loadEvaluationSubject(scope, STEP, 'read');
     const addingStep = { ...step, agent: { ...step.agent, skills: [{ namespace: NAMESPACE, id: 'recist-reading' }] } };
     const fingerprint = () => computeStepFingerprint(scope, { ...definition, steps: [addingStep] }, addingStep);
     const skill = (contentHash: string) => ({
@@ -151,7 +151,7 @@ describe('computeStepFingerprint', () => {
     const fixture = await evaluationFixture();
     const skillRepo = new InMemorySkillRepository();
     const scope = fixture.scope(undefined, { skillRepo });
-    const { definition, step } = await loadEvaluatedStep(scope, STEP, 'read');
+    const { definition, step } = await loadEvaluationSubject(scope, STEP, 'read');
     const { agentId: _agentId, ...agentless } = step;
     const withSkills = (skills: { namespace: string; id: string }[]) => ({ ...agentless, agent: { ...step.agent, skills } });
     const fingerprint = (bare: WorkflowStep) => computeStepFingerprint(scope, { ...definition, steps: [bare] }, bare);

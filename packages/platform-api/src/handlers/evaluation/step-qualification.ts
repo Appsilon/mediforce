@@ -2,17 +2,22 @@ import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import {
   DEFAULT_ACCEPTANCE_CRITERIA,
+  agentStepChanges,
   inlineMcpServerNames,
   qualificationOutcome,
   qualificationSignatureMeaning,
   type AcceptanceCriteria,
+  type AgentDefinition,
   type ElectronicSignature,
   type EvalRun,
-  type EvaluatedStep,
+  type EvaluationSubject,
   type EvalRunEvaluator,
   type StepFingerprint,
   type StepQualification,
+  type WorkflowDefinition,
   type WorkflowStep,
+  describeEvaluationSubject,
+  evaluationOwnerOf,
 } from '@mediforce/platform-core';
 import type {
   GetStepQualificationInputSchema,
@@ -26,8 +31,9 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, ForbiddenError, NotFoundError, PreconditionFailedError, ValidationError } from '../../errors';
-import { inlineMcpReason, loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
+import { inlineMcpReason, loadEvaluationSubject, subjectName, subjectRef, runVersionOf } from './_lib/evaluation-subject';
 import { appendEvaluationAudit } from './_lib/audit';
+import { currentAgentVersion } from '../agents/_lib/agent-version';
 import { buildEvalRunReport, rebuildEvalRunAcceptance } from './_lib/eval-run-report';
 import { changedFingerprintComponents, computeStepFingerprint } from './_lib/step-fingerprint';
 
@@ -42,7 +48,7 @@ interface StepEvaluator {
  * The Step's own Evaluation rows — the same in every Definition version — each
  * read at most once, however many versions' validations ask for it.
  */
-interface StepRows {
+interface SubjectRows {
   readonly runs: () => Promise<readonly EvalRun[]>;
   readonly evaluators: () => Promise<readonly StepEvaluator[]>;
   readonly liveCaseIds: () => Promise<readonly string[]>;
@@ -55,7 +61,7 @@ function once<Value>(read: () => Promise<Value>): () => Promise<Value> {
   return () => (pending ??= read());
 }
 
-function stepRows(scope: CallerScope, step: EvaluatedStep): StepRows {
+function subjectRows(scope: CallerScope, step: EvaluationSubject): SubjectRows {
   return {
     runs: once(() => scope.evaluation.listEvalRuns(step)),
     evaluators: once(async () => Promise.all((await scope.evaluation.listEvaluators(step)).map(async (evaluator) => ({
@@ -88,8 +94,23 @@ function evaluatorChanges(evaluators: readonly StepEvaluator[], frozen: readonly
 const FINISHED_RUN_STATUSES = new Set(['completed', 'budget_exceeded']);
 
 /**
- * The step's validation in one Definition version: the newest finished Eval Run
- * of that version, judged on the criteria frozen into it — reset to
+ * Which Eval Runs a validation reads: those of one Definition version of a
+ * Step, or of one Agent version (ADR-0029) — null when the Agent changed since
+ * its newest version, so no run assessed it as it is.
+ */
+interface ValidatedVersion {
+  readonly subject: 'step' | 'agent';
+  readonly label: string;
+  readonly ran: (run: EvalRun) => boolean;
+}
+
+function definitionVersionOf(definitionVersion: number): ValidatedVersion {
+  return { subject: 'step', label: `version ${definitionVersion}`, ran: (run) => run.definitionVersion === definitionVersion };
+}
+
+/**
+ * The step's validation in one Definition version — or an Agent's in its
+ * current version: the newest finished Eval Run of that version, judged on the criteria frozen into it — reset to
  * `not_verified` by any change to what that run rested on. Its verdict stands
  * once a person signed that run (`confirmed` or `overwritten`); until then the
  * step is `awaiting_approval`. A step that declares
@@ -98,9 +119,9 @@ const FINISHED_RUN_STATUSES = new Set(['completed', 'budget_exceeded']);
  */
 async function stepValidation(
   scope: CallerScope,
-  rows: StepRows,
+  rows: SubjectRows,
   workflowStep: WorkflowStep,
-  definitionVersion: number,
+  version: ValidatedVersion,
   stepFingerprint: () => Promise<StepFingerprint>,
 ): Promise<StepValidation> {
   const inlineServers = inlineMcpServerNames(workflowStep);
@@ -109,17 +130,18 @@ async function stepValidation(
   }
   const runs = await rows.runs();
   const runInProgress = runs.some((run) => run.status === 'running');
-  const run = runs.find((candidate) => candidate.definitionVersion === definitionVersion && FINISHED_RUN_STATUSES.has(candidate.status));
+  const run = runs.find((candidate) => version.ran(candidate) && FINISHED_RUN_STATUSES.has(candidate.status));
   if (run === undefined) {
-    return { status: 'not_verified', evalRunId: null, reason: `No Eval Run of version ${definitionVersion} has finished yet.`, runInProgress };
+    return { status: 'not_verified', evalRunId: null, reason: `No Eval Run of ${version.label} has finished yet.`, runInProgress };
   }
   const notVerified = (reason: string): StepValidation => ({ status: 'not_verified', evalRunId: run.id, reason, runInProgress });
   const since = `since Eval Run ${run.id.slice(0, 8)}`;
   const fingerprint = await stepFingerprint();
 
   if (run.fingerprint === null || run.fingerprint.hash !== fingerprint.hash) {
-    const changed = run.fingerprint === null ? [] : changedFingerprintComponents(run.fingerprint, fingerprint);
-    return notVerified(`The step changed ${since}${changed.length === 0 ? '' : `: ${changed.join(', ')}`}.`);
+    const changed = (run.fingerprint === null ? [] : changedFingerprintComponents(run.fingerprint, fingerprint))
+      .map((component) => (version.subject === 'agent' && component === 'step' ? 'trial env' : component));
+    return notVerified(`The ${version.subject} changed ${since}${changed.length === 0 ? '' : `: ${changed.join(', ')}`}.`);
   }
   const evaluatorsChanged = evaluatorChanges(await rows.evaluators(), run.evaluators, 'run with');
   if (evaluatorsChanged.length > 0) return notVerified(`Evaluators changed ${since}: ${evaluatorsChanged.join('; ')}.`);
@@ -156,35 +178,98 @@ async function stepValidation(
   return { status: outcome, evalRunId: run.id, reason, runInProgress };
 }
 
+/** An Agent's Evaluation as it stands now, each Agent read at most once; null when the caller cannot see it or it cannot be evaluated. */
+type AgentValidations = (agentId: string) => Promise<{ agent: AgentDefinition; qualification: GetStepQualificationOutput } | null>;
+
+function agentValidations(scope: CallerScope): AgentValidations {
+  const reads = new Map<string, ReturnType<AgentValidations>>();
+  return (agentId) => {
+    if (reads.has(agentId) === false) {
+      reads.set(agentId, (async () => {
+        const agent = await scope.agentDefinitions.getById(agentId);
+        if (agent === null || agent.namespace === undefined) return null;
+        return getStepQualification({ namespace: agent.namespace, agentId }, scope).then(
+          (qualification) => ({ agent, qualification }),
+          (error: unknown) => {
+            if (error instanceof NotFoundError || error instanceof ForbiddenError || error instanceof ValidationError) return null;
+            throw error;
+          },
+        );
+      })());
+    }
+    return reads.get(agentId)!;
+  };
+}
+
+/**
+ * A step that has no verdict of its own takes the Agent's it runs (ADR-0029
+ * D8), when it runs that Agent as it was validated (`agentStepChanges`), in
+ * the Agent's own workspace — whose tool catalog its trials resolved MCP
+ * servers from — and the Agent's current version passed. Its own verdict,
+ * once read, stands.
+ */
+async function withAgentValidation(
+  validations: AgentValidations,
+  definition: WorkflowDefinition,
+  workflowStep: WorkflowStep,
+  own: StepValidation,
+): Promise<StepValidation> {
+  if (own.status !== 'not_verified' || workflowStep.agentId === undefined) return own;
+  const read = await validations(workflowStep.agentId);
+  if (read === null || read.agent.namespace !== definition.namespace || read.qualification.validation.status !== 'passed') return own;
+  if (agentStepChanges(workflowStep, read.agent, definition.preamble).length > 0) return own;
+  const { agent, qualification } = read;
+  if (qualification.agentVersion === null) return own;
+  return {
+    ...qualification.validation,
+    reason: `Runs agent '${agent.name}' v${qualification.agentVersion} as it was validated: ${qualification.validation.reason}`,
+    runInProgress: own.runInProgress,
+    inheritedFromAgent: { agentId: agent.id, name: agent.name, version: qualification.agentVersion },
+  };
+}
+
 /**
  * The Step's qualification badge (ADR-0023 D11): `qualified` when some signed
  * qualification that passed — confirmed met, or overwritten from missed — binds the Step's Fingerprint as it is now — in the runnable
  * version, or the version asked about — `stale` when qualifications exist but
  * none binds it, `not_qualified` when none passed. Evaluators changed
  * since the qualification shown are flagged beside it (D7). Beside it, the
- * step's validation in that version (`stepValidation`).
+ * step's validation in that version (`stepValidation`), or its Agent's
+ * (`withAgentValidation`).
  */
 export async function getStepQualification(
   input: z.output<typeof GetStepQualificationInputSchema>,
   scope: CallerScope,
 ): Promise<GetStepQualificationOutput> {
-  const step = stepRef(input);
-  const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'read', input.definitionVersion);
+  const step = subjectRef(input);
+  if (step.kind === 'agent' && input.definitionVersion !== undefined) {
+    throw new ValidationError(`${subjectName(step)} is read as it is now; it has no workflow version to pick`);
+  }
+  const trialEnv = step.kind === 'agent' ? (await scope.evaluation.getMcpPolicy(step))?.env : undefined;
+  const { definition, step: workflowStep, agent } = await loadEvaluationSubject(scope, step, 'read', input.definitionVersion, trialEnv);
   const fingerprint = await computeStepFingerprint(scope, definition, workflowStep);
-  const rows = stepRows(scope, step);
+  const rows = subjectRows(scope, step);
+  const agentVersion = agent === null ? null : await currentAgentVersion(scope, agent);
+  const version: ValidatedVersion = agent === null
+    ? definitionVersionOf(definition.version)
+    : agentVersion === null
+      ? { subject: 'agent', label: `agent '${agent.id}' as it is now (it changed since its newest version)`, ran: () => false }
+      : { subject: 'agent', label: `agent version ${agentVersion.version}`, ran: (run) => run.agentVersion === agentVersion.version };
+  const versions = { definitionVersion: agent === null ? definition.version : null, agentVersion: agentVersion?.version ?? null };
   const history = [...await rows.qualifications()];
   const approvals = history.filter((qualification) => qualificationOutcome(qualification) === 'passed');
   const matching = approvals.find((qualification) => qualification.fingerprint.hash === fingerprint.hash);
   const shown = matching ?? approvals[0] ?? history[0];
-  const validation = await stepValidation(scope, rows, workflowStep, definition.version, async () => fingerprint);
+  const ownValidation = await stepValidation(scope, rows, workflowStep, version, async () => fingerprint);
+  const validation = agent === null ? await withAgentValidation(agentValidations(scope), definition, workflowStep, ownValidation) : ownValidation;
   if (shown === undefined || approvals.length === 0) {
-    return { status: 'not_qualified', validation, qualification: shown ?? null, definitionVersion: definition.version, fingerprint, changed: [], evaluatorsChanged: [], history };
+    return { status: 'not_qualified', validation, qualification: shown ?? null, ...versions, fingerprint, changed: [], evaluatorsChanged: [], history };
   }
   return {
     status: matching === undefined ? 'stale' : 'qualified',
     validation,
     qualification: shown,
-    definitionVersion: definition.version,
+    ...versions,
     fingerprint,
     changed: changedFingerprintComponents(shown.fingerprint, fingerprint),
     evaluatorsChanged: evaluatorChanges(await rows.evaluators(), shown.evaluators, 'qualified with'),
@@ -194,7 +279,8 @@ export async function getStepQualification(
 
 /**
  * Whether each live version of a workflow is verified: every agent step's
- * validation in that version (`stepValidation`), rolled up — `passed` when all
+ * validation in that version (`stepValidation`, or its Agent's through
+ * `withAgentValidation`), rolled up — `passed` when all
  * passed, `failed` when any failed, `awaiting_approval` when one waits for a
  * signature, else `not_verified`. Archived versions are
  * not evaluated, so they are left out.
@@ -205,9 +291,10 @@ export async function getWorkflowValidation(
 ): Promise<GetWorkflowValidationOutput> {
   const definitions = await scope.workflowDefinitions.listVersions(input.namespace, input.workflowName);
   if (definitions.length === 0) throw new NotFoundError(`Workflow '${input.workflowName}' not found`);
-  const rowsByStep = new Map<string, StepRows>();
-  const rowsOf = (stepId: string): StepRows => {
-    if (rowsByStep.has(stepId) === false) rowsByStep.set(stepId, stepRows(scope, { namespace: input.namespace, workflowName: input.workflowName, stepId }));
+  const validations = agentValidations(scope);
+  const rowsByStep = new Map<string, SubjectRows>();
+  const rowsOf = (stepId: string): SubjectRows => {
+    if (rowsByStep.has(stepId) === false) rowsByStep.set(stepId, subjectRows(scope, { kind: 'step', namespace: input.namespace, workflowName: input.workflowName, stepId }));
     return rowsByStep.get(stepId)!;
   };
 
@@ -216,7 +303,12 @@ export async function getWorkflowValidation(
     const steps = await Promise.all(definition.steps.filter((workflowStep) => workflowStep.executor === 'agent').map(async (workflowStep) => ({
       stepId: workflowStep.id,
       stepName: workflowStep.name,
-      validation: await stepValidation(scope, rowsOf(workflowStep.id), workflowStep, definition.version, () => computeStepFingerprint(scope, definition, workflowStep)),
+      validation: await withAgentValidation(
+        validations,
+        definition,
+        workflowStep,
+        await stepValidation(scope, rowsOf(workflowStep.id), workflowStep, definitionVersionOf(definition.version), () => computeStepFingerprint(scope, definition, workflowStep)),
+      ),
     })));
     const statuses = steps.map((entry) => entry.validation.status);
     const status = statuses.includes('failed')
@@ -247,8 +339,8 @@ export async function signStepQualification(
   const uid = scope.caller.uid;
   const run = await scope.evaluation.getEvalRun(input.evalRunId);
   if (run === null) throw new NotFoundError(`Eval Run '${input.evalRunId}' not found`);
-  const step = stepRef(run);
-  await loadEvaluatedStep(scope, step, 'edit', run.definitionVersion);
+  const step = subjectRef(run);
+  await loadEvaluationSubject(scope, step, 'edit', runVersionOf(run));
 
   const trials = await scope.evaluation.listTrials(run.id);
   const inFlight = trials.some((trial) => trial.status === 'pending' || trial.status === 'running' || trial.status === 'scoring');
@@ -283,10 +375,11 @@ export async function signStepQualification(
   const signedConcurrently = async (): Promise<boolean> =>
     (await scope.evaluation.listQualifications(step)).some((existing) => existing.evalRunId === run.id);
   const qualification = await scope.evaluation.createQualification({
-    ...step,
+    ...evaluationOwnerOf(step),
     id: randomUUID(),
     evalRunId: run.id,
     definitionVersion: run.definitionVersion,
+    agentVersion: run.agentVersion,
     fingerprint,
     evaluators: run.evaluators,
     mcpPolicy: run.mcpPolicy,
@@ -297,7 +390,7 @@ export async function signStepQualification(
     signature: {
       signerId: uid,
       signerName: metadata?.displayName ?? metadata?.email ?? uid,
-      meaning: qualificationSignatureMeaning(input.decision, outcome),
+      meaning: qualificationSignatureMeaning(input.decision, outcome, step.kind),
       signedAt: new Date().toISOString(),
       reauthentication: 'session',
     },
@@ -308,7 +401,7 @@ export async function signStepQualification(
   });
   await appendEvaluationAudit(scope, {
     action: 'step_qualification.signed',
-    description: `Step Qualification signed for step '${step.stepId}' of '${step.workflowName}' by ${qualification.signature.signerName}`
+    description: `Step Qualification signed for ${describeEvaluationSubject(step)} by ${qualification.signature.signerName}`
       + (deviations.length === 0 ? ` (${input.decision})` : ` (${input.decision}, with a deviation)`),
     namespace: step.namespace,
     entityType: 'step_qualification',

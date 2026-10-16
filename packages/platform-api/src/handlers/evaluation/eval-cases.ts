@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { z } from 'zod';
-import type { EvalCase, EvalCaseLabel, EvaluatedStep } from '@mediforce/platform-core';
+import { evaluationOwnerOf, type EvalCase, type EvalCaseLabel, type EvaluationSubject } from '@mediforce/platform-core';
 import type {
   ArchiveEvalCaseInputSchema,
   CreateEvalCaseFromAgentRunInputSchema,
@@ -14,7 +14,7 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError, ValidationError } from '../../errors';
-import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
+import { loadEvaluationSubject, stepOnly, subjectRef, subjectName } from './_lib/evaluation-subject';
 import { loadCaseSource, loadVerdictExpectation } from './_lib/case-source';
 import { perturbCase } from './_lib/perturb-case';
 import { commitWorkspaceChanges } from './_lib/workspace-seed';
@@ -24,17 +24,17 @@ export async function listEvalCases(
   input: z.output<typeof ListEvalCasesInputSchema>,
   scope: CallerScope,
 ): Promise<ListEvalCasesOutput> {
-  await loadEvaluatedStep(scope, input, 'read');
-  const cases = await scope.evaluation.listCases(stepRef(input));
+  await loadEvaluationSubject(scope, input, 'read');
+  const cases = await scope.evaluation.listCases(subjectRef(input));
   return { cases: input.includeArchived === true ? cases : cases.filter((evalCase) => !evalCase.archived) };
 }
 
 /** A case selects only live Evaluators of its own step: an archived one is in no Eval Run, so it would grade nothing. */
-async function checkSelectedEvaluators(scope: CallerScope, step: EvaluatedStep, evaluatorIds: readonly string[] | null): Promise<void> {
+async function checkSelectedEvaluators(scope: CallerScope, step: EvaluationSubject, evaluatorIds: readonly string[] | null): Promise<void> {
   if (evaluatorIds === null) return;
   const own = new Set((await scope.evaluation.listEvaluators(step)).filter((evaluator) => evaluator.archived === false).map((evaluator) => evaluator.id));
   const foreign = evaluatorIds.filter((evaluatorId) => own.has(evaluatorId) === false);
-  if (foreign.length > 0) throw new ValidationError(`Step '${step.stepId}' has no live Evaluator ${foreign.map((evaluatorId) => `'${evaluatorId}'`).join(', ')}`);
+  if (foreign.length > 0) throw new ValidationError(`${subjectName(step)} has no live Evaluator ${foreign.map((evaluatorId) => `'${evaluatorId}'`).join(', ')}`);
 }
 
 function labelOf(input: EvalCaseLabel): EvalCaseLabel {
@@ -48,17 +48,18 @@ function labelOf(input: EvalCaseLabel): EvalCaseLabel {
 }
 
 async function storeCase(scope: CallerScope, evalCase: EvalCase): Promise<EvalCaseOutput> {
-  await checkSelectedEvaluators(scope, stepRef(evalCase), evalCase.evaluatorIds);
+  await checkSelectedEvaluators(scope, subjectRef(evalCase), evalCase.evaluatorIds);
   const stored = await scope.evaluation.createCase(evalCase);
   await appendEvaluationAudit(scope, {
     action: 'eval_case.created',
-    description: `Eval Case '${stored.name}' (${stored.source}, ${stored.expectation}) added to step '${stored.stepId}'${stored.origin === 'assistant' ? ' from an Evaluation Assistant proposal' : ''}`,
+    description: `Eval Case '${stored.name}' (${stored.source}, ${stored.expectation}) added to ${subjectName(subjectRef(stored), false)}${stored.origin === 'assistant' ? ' from an Evaluation Assistant proposal' : ''}`,
     namespace: stored.namespace,
     entityType: 'eval_case',
     entityId: stored.id,
     inputSnapshot: {
       workflowName: stored.workflowName,
       stepId: stored.stepId,
+      ...(stored.agentId === null ? {} : { agentId: stored.agentId }),
       source: stored.source,
       sourceAgentRunId: stored.sourceAgentRunId,
       perturbation: stored.perturbation,
@@ -75,15 +76,31 @@ async function storeCase(scope: CallerScope, evalCase: EvalCase): Promise<EvalCa
   return { evalCase: stored };
 }
 
+/**
+ * An Agent's case gives it its trigger payload alone, from an empty workspace
+ * (ADR-0029 D4): earlier steps, a previous run and a workspace seed belong to a
+ * Step's case.
+ */
+function assertAgentCaseInput(subject: EvaluationSubject, evalCase: Pick<EvalCase, 'input' | 'workspaceSeedCommit'>): void {
+  if (subject.kind !== 'agent') return;
+  if (evalCase.workspaceSeedCommit !== null) {
+    throw new ValidationError(`An Eval Case of ${subjectName(subject, false)} starts from an empty workspace; it takes no workspace seed commit`);
+  }
+  if (Object.keys(evalCase.input.previousStepOutputs).length > 0 || evalCase.input.previousRun !== undefined) {
+    throw new ValidationError(`An Eval Case of ${subjectName(subject, false)} is given its trigger payload alone; it takes no previousStepOutputs or previousRun`);
+  }
+}
+
 /** A hand-written Eval Case. */
 export async function createEvalCase(
   input: z.output<typeof CreateEvalCaseInputSchema>,
   scope: CallerScope,
 ): Promise<EvalCaseOutput> {
-  const step = stepRef(input);
-  await loadEvaluatedStep(scope, step, 'edit');
+  const step = subjectRef(input);
+  await loadEvaluationSubject(scope, step, 'edit');
+  assertAgentCaseInput(step, input);
   return storeCase(scope, {
-    ...step,
+    ...evaluationOwnerOf(step),
     id: randomUUID(),
     name: input.name,
     input: input.input,
@@ -123,7 +140,7 @@ export async function createEvalCaseFromAgentRun(
   const expectedOutput = fromRun ? (verdictLabel === null ? null : agentRun.envelope?.result ?? null) : input.expectedOutput;
   const caseInput = input.input ?? source.input;
   return storeCase(scope, {
-    ...source.step,
+    ...evaluationOwnerOf({ kind: 'step', ...source.step }),
     id: randomUUID(),
     name: input.name ?? `From run ${instance.id.slice(0, 8)} (${agentRun.startedAt.slice(0, 10)})`,
     input: caseInput,
@@ -151,8 +168,8 @@ export async function createPerturbedEvalCase(
   input: z.output<typeof CreatePerturbedEvalCaseInputSchema>,
   scope: CallerScope,
 ): Promise<EvalCaseOutput> {
-  const step = stepRef(input);
-  await loadEvaluatedStep(scope, step, 'edit');
+  const step = stepOnly(subjectRef(input), 'A perturbed case');
+  await loadEvaluationSubject(scope, step, 'edit');
   const source = await loadCaseSource(scope, input.baseAgentRunId, step, 'edit');
   const perturbed = await perturbCase(source, input);
   const id = randomUUID();
@@ -165,7 +182,7 @@ export async function createPerturbedEvalCase(
     });
 
   return storeCase(scope, {
-    ...step,
+    ...evaluationOwnerOf(step),
     id,
     name: input.name,
     input: perturbed.input,
@@ -189,7 +206,7 @@ export async function archiveEvalCase(
 ): Promise<EvalCaseOutput> {
   const evalCase = await scope.evaluation.getCase(input.caseId);
   if (evalCase === null) throw new NotFoundError(`Eval Case '${input.caseId}' not found`);
-  await loadEvaluatedStep(scope, stepRef(evalCase), 'edit');
+  await loadEvaluationSubject(scope, subjectRef(evalCase), 'edit');
   await scope.evaluation.setCaseArchived(evalCase, input.archived);
   await appendEvaluationAudit(scope, {
     action: input.archived ? 'eval_case.archived' : 'eval_case.restored',
@@ -215,7 +232,7 @@ export async function updateEvalCase(
 ): Promise<EvalCaseOutput> {
   const evalCase = await scope.evaluation.getCase(input.caseId);
   if (evalCase === null) throw new NotFoundError(`Eval Case '${input.caseId}' not found`);
-  await loadEvaluatedStep(scope, stepRef(evalCase), 'edit');
+  await loadEvaluationSubject(scope, subjectRef(evalCase), 'edit');
   if (evalCase.archived) throw new ValidationError(`Eval Case '${evalCase.name}' is archived — restore it before editing it`);
 
   const { caseId: _caseId, ...changes } = input;
@@ -223,8 +240,9 @@ export async function updateEvalCase(
     .filter((field) => changes[field] !== undefined && JSON.stringify(changes[field]) !== JSON.stringify(evalCase[field]));
   if (changed.length === 0) throw new ValidationError(`The edit changes nothing in Eval Case '${evalCase.name}'`);
 
-  if (changed.includes('evaluatorIds')) await checkSelectedEvaluators(scope, stepRef(evalCase), changes.evaluatorIds ?? null);
+  if (changed.includes('evaluatorIds')) await checkSelectedEvaluators(scope, subjectRef(evalCase), changes.evaluatorIds ?? null);
   const inputEdited = changed.includes('input');
+  if (inputEdited && changes.input !== undefined) assertAgentCaseInput(subjectRef(evalCase), { ...evalCase, input: changes.input });
   const stored = await scope.evaluation.createCase({
     ...evalCase,
     ...Object.fromEntries(changed.map((field) => [field, changes[field]])),

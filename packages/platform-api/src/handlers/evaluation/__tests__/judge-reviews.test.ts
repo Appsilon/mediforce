@@ -23,7 +23,7 @@ describe('reviewJudgeVerdict', () => {
     fixture = await evaluationFixture();
     scope = fixture.scope();
     evalRun = {
-      ...STEP, id: randomUUID(), definitionVersion: 1, datasetVersionId: randomUUID(), caseIds: [CASE],
+      ...STEP, id: randomUUID(), definitionVersion: 1, agentVersion: null, datasetVersionId: randomUUID(), caseIds: [CASE],
       trialsPerCase: 1, concurrency: 1,
       evaluators: [
         { evaluatorId: JUDGE, name: 'grades-justified', version: 1, kind: 'llm_judge', counted: true },
@@ -31,7 +31,7 @@ describe('reviewJudgeVerdict', () => {
       ],
       fingerprint: null,
       acceptanceCriteria: { minPassRate: 1 },
-      mcpPolicy: {}, estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
+      mcpPolicy: {}, env: {}, estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
       budgetUsd: 5, spentUsd: 0, status: 'completed', createdBy: 'author-1', createdAt: '2026-10-01T08:00:00.000Z', startedAt: null, completedAt: null, acceptance: null,
     };
     trial = {

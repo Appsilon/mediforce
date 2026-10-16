@@ -5,6 +5,7 @@ import type {
   ProcessDefinition,
   ReviewVerdict,
 } from '@mediforce/platform-core';
+import { resolvePreviousStepId } from '@mediforce/platform-core';
 import {
   resolveTransitions,
   TransitionValidationError,
@@ -175,10 +176,11 @@ export class StepExecutor {
       });
     }
 
-    const incomingTransition = definition.transitions.find(
-      (t) => t.to === currentStepId,
+    const previousStepId = resolvePreviousStepId(
+      await this.instanceRepository.getStepExecutions(instance.id),
+      definition.transitions,
+      currentStepId,
     );
-    const previousStepId = incomingTransition?.from ?? null;
     const stepInput = previousStepId
       ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
       : {};

@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-14
+last_reviewed: 2026-10-16
 ---
 
 # Step Evaluation
@@ -15,7 +15,8 @@ variants, applying them, few-shot examples, fix variants and GEPA — is parked 
 pinned there for reuse.
 
 Everything below belongs to one agent Step, keyed by
-`(namespace, workflowName, stepId)`, and lives outside the Workflow
+`(namespace, workflowName, stepId)` — or to one Agent evaluated on its own (see
+[Evaluating an Agent](#evaluating-an-agent)) — and lives outside the Workflow
 Definition: adding a check never mints a definition version. Reading needs only
 access to the workflow; changing anything needs its `edit` verb, and
 previewing checks or preparing, starting and cancelling Eval Runs its `run`
@@ -266,8 +267,8 @@ an `expected_output` Evaluator stays one, and no other kind becomes one. In the
 tab, a case whose expected output no Expected output check grades says so.
 
 In the Evaluation tab, **Evaluators → Add** picks the kind from a dropdown and
-shows its fields — a JSON Schema (started from the step's `agent.outputSchema`
-when it declares one), a language and source, a judge model with the question
+shows its fields — a JSON Schema (started from the step's `agent.outputSchema`,
+or an Agent's `outputSchema`, when it declares one), a language and source, a judge model with the question
 it answers and its minimum confidence — never the check's JSON.
 Each Evaluator's **Details** show the whole check and its versions; **Edit**
 saves a new version with what changed (`POST
@@ -297,8 +298,10 @@ autonomy routing, `AgentRunner` hands it to the gate
 - `schema` and `code` run synchronously and each writes a Score marked
   `metadata.production: true` (no `evalRunId`). A failing one fails
   the run with reason `production_evaluator`: the run is escalated to a
-  person, and the failure message is the run's
-  `errorMessage`, an activity-log line and part of the `agent.run` audit event.
+  person, and the failure message is the Agent Run's
+  `errorMessage`, the step's and the paused run's `error` (`Agent step '<id>'
+  failed a production Evaluator: …`), an activity-log line and part of the
+  `agent.run` audit event. It is not retried or reshaped.
 - `llm_judge` runs asynchronously after the run has moved on and only writes a
   Score (`source: llm_judge`, its cost in `metadata.judgeCostUsd`, its
   confidence as in an Eval Run). Its errors
@@ -548,6 +551,11 @@ run go by the version it was prepared for.
    runs, or its model's registry price for a nominal turn when it has none,
    plus one call per `llm_judge`. The budget cap
    defaults to 1.5× the estimate; with no estimate it must be given.
+   An Agent's Evaluation holds the step env its trials run with, as secret
+   templates, set once for all its runs (`mcp-policy-set --env '<json>'`, the
+   tab's *Add secrets* dialog, one key and value per row); each run freezes a copy. Without it an Agent whose
+   runtime wants `ANTHROPIC_API_KEY` fails every trial on a workspace that only
+   has `OPENROUTER_API_KEY`.
    A run whose trials the auto-runner would pause on a model — one the
    registry does not list or has retired — is
    refused, at prepare and again at start, naming the model.
@@ -572,6 +580,9 @@ run go by the version it was prepared for.
    writes a Score (`source: deterministic` or `llm_judge`, `metadata.evalRunId`).
    A trial whose run pauses before its Step starts — a missing secret, an
    unknown or retired model — fails with the run's error, and the next trial starts.
+   So does a trial whose Agent Run errored before giving any result (a runtime
+   that could not start, a crashed container): there is no output to grade, so
+   no Evaluator scores it and it shows under **Problems**, not as a failed grade.
    Trials start `concurrency` at a time, round by round — each case's k-th
    trial; once spend reaches the budget the rest
    are skipped and the run ends `budget_exceeded`. A trial's cost is its Agent
@@ -796,6 +807,17 @@ person's sign-off on it:
   archived — compared with the cases the run ran), or the Acceptance Criteria.
   Run the step again to verify it. A step that declares MCP servers inline
   cannot be evaluated, so it stays not verified until they move onto its agent.
+- **Inherited from its agent** — a step with no verdict of its own that runs
+  a validated Agent of its workspace as it is takes the Agent's **passed**
+  (ADR-0029 D8): no other runtime or model, no prompt, Skills, output schema
+  or MCP servers of its own, no MCP restriction that removes something, and
+  no workflow preamble. Image, params, env, timeout, autonomy and review are
+  not changes. The reason starts *Runs agent '…' vN as it was validated*,
+  and `validation.inheritedFromAgent` names the Agent and version; a version
+  verified with any such step reads **Verified via agent**, and its tooltip
+  says which step leans on which Agent.
+  Once the Agent changes, the step is not verified until the Agent's new
+  version passes.
 
 It comes with `GET /api/evaluation/qualification` as `validation: { status,
 evalRunId, reason, runInProgress }`, as the first line of `mediforce eval
@@ -819,3 +841,55 @@ its first one awaiting approval, else its first not verified one; in the workflo
 carries its validation icon for the version being edited, linking to the
 Evaluation tab on that step and version. The icon speaks of the step as saved:
 a step added or edited since carries none until the version is saved and run.
+The **Agent** picker marks each Agent whose validation passed *✅ Verified*.
+Under the step's **Agent** field the editor says *Validated agent vN* while
+the step runs a validated Agent as it is, and asks before a change to its
+plugin, model, prompt, Skills, output schema or MCP restrictions that would
+end that; once changed, it says the step needs a validation of its own and
+links to the Evaluation tab. A step with a verdict of its own (failed or
+awaiting approval) is told that verdict stands instead. A preamble edit in the
+workflow's settings is not asked about.
+
+## Evaluating an Agent
+
+An Agent can own an Evaluation of its own, independent of any workflow step
+([ADR-0029](../adr/0029-agent-evaluation.md)): the **Evaluation** tab of the
+Agent's page, or any `mediforce eval` command that takes `--agent <id>` in place
+of `--workflow` and `--step` (and the API with `agentId` in place of
+`workflowName` + `stepId`). Its Evaluators, Eval Cases, Datasets, Acceptance
+Criteria, Eval Runs and Qualification work as above, with these differences:
+
+- **Each Eval Run assesses one Agent version.** An Agent version is a snapshot
+  of its runtime, model, system prompt, output schema, MCP bindings and Skills
+  (by content hash). Saving the Agent records a new version when one of those changed — a
+  rename does not; preparing an Eval Run records one when a Skill it holds was
+  edited since. The run names the version (`agentVersion`) and its output
+  carries that version's configuration (`assessedAgentVersion`), shown on the
+  run's page as *Configuration assessed*. `mediforce agent versions <id>` lists
+  them. Validation reads the newest finished run of the current version.
+- **A trial runs the Agent alone**: a single agent step with no prompt, model,
+  Skills or MCP restrictions of its own. It runs under the Agent's
+  `outputSchema`, when the Agent declares one; without one the agent is never
+  asked to answer as JSON, so the Evaluation Assistant does not propose a
+  `schema` Evaluator for it and asks for the Output schema to be set on the
+  Agent's page first. A case's `triggerPayload` is the whole
+  input — a case takes no `previousStepOutputs` or `previousRun` — and the
+  workspace starts empty, so it takes no workspace seed either.
+- **The suite follows the Agent.** Whoever can see the Agent can read its
+  Evaluation — every workspace, for a public Agent; only its own workspace can
+  change it or run it. An Agent that owns an Evaluation cannot move to another
+  workspace (409): its suite lives in the workspace it has now.
+- `mediforce eval qualification --agent <id>` reads the Agent as it is now and
+  prints its Agent version; `--version` is for a step.
+- **No production features.** An Agent has no production runs of its own, so
+  harvesting or perturbing cases, previewing a check, drift and production
+  Evaluators are refused. Write cases by hand.
+- **Its Evaluation Assistant reads the Steps that use it.** The assistant is the
+  Step's, with the Agent's toolset: it reads the Agent (`get_agent`) instead of a
+  step, and finds the Steps that use the Agent with their recent production runs
+  (`list_agent_production_runs`), reading one as for a step (`get_agent_run`,
+  `get_trajectory`). From what a run was given it proposes a *written* case — the
+  trigger payload carrying what the Agent used, flagged as containing production
+  data. It has no step reads, previews, synthesized cases or routing.
+- Only a container agent of the workspace, with a runtime, is evaluated.
+

@@ -20,7 +20,10 @@ import { createTestScope, userCaller, type TestScopeOverrides } from '../../../r
 
 export const NAMESPACE = 'pharma-a';
 export const WORKFLOW = 'ae-grading';
-export const STEP = { namespace: NAMESPACE, workflowName: WORKFLOW, stepId: 'grade-aes' } as const;
+/** The evaluated Step: a subject to query by, and the owner its rows carry. */
+export const STEP = { kind: 'step', namespace: NAMESPACE, workflowName: WORKFLOW, stepId: 'grade-aes', agentId: null } as const;
+/** What a row of the evaluated Step carries of it. */
+export const STEP_OWNER = { namespace: NAMESPACE, workflowName: WORKFLOW, stepId: 'grade-aes', agentId: null } as const;
 
 /** Findings with a grade for every event — passes `{ required: ['findings'] }`. */
 export const GRADED_RUN = 'agent-run-graded';

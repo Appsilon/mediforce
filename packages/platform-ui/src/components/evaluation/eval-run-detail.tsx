@@ -11,7 +11,7 @@ import {
   type EvalRunEvaluator,
   type EvalTrial,
   type EvalTrialResult,
-  type EvaluatedStep,
+  type EvaluationSubject,
   type EvaluatorVersion,
 } from '@mediforce/platform-core';
 import type { EvalRunOutput } from '@mediforce/platform-api/contract';
@@ -20,7 +20,8 @@ import { mediforce } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import { useEvalRun, useEvalRunMutation, useStepDatasets, useStepEvaluatorHistory } from '@/hooks/use-step-evaluation';
-import { useWorkflowEditGate, useWorkflowRunGate } from '@/hooks/use-workflow-access';
+import type { EvaluationGates } from '@/hooks/use-evaluation-gates';
+import { evalTrialHref, subjectOfRow } from '@/lib/evaluation-subject';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { AcceptanceBadge, EvalRunStatusBadge, OutcomeChip, TrialResultBadge, TrialStatusBadge } from './eval-run-badges';
 import { EvalRunSummary, percent } from './eval-run-report';
@@ -28,6 +29,7 @@ import { JudgeVerdicts } from './judge-verdicts';
 import { CHECK_KINDS, CheckDetails } from './evaluator-check-editor';
 import { StartEvalRunCard } from './step-evaluation-sections';
 import { buttonClass } from './evaluation-styles';
+import { AssessedAgentConfiguration } from './assessed-agent-configuration';
 import { EvaluatorOutageAlert, EvaluatorOutageSummary } from './evaluator-outages';
 
 const RUN_TABS = ['summary', 'trials', 'evaluators', 'verdicts', 'problems'] as const;
@@ -44,7 +46,7 @@ function dateTime(value: string | null): string {
 /** Everything the run's tabs link with: its step, and where one of its trials is shown. */
 interface RunContext {
   output: EvalRunOutput;
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   trialHref: (trialId: string) => string;
   mayEdit: boolean;
   editReason: string | undefined;
@@ -280,11 +282,17 @@ function ProblemsTab({ output, step, trialHref, mayEdit, editReason }: RunContex
   );
 }
 
-function RunHeader({ handle, workflowName, output, step, mayRun, runReason }: {
+/** Back to the Evaluation the run belongs to: its Step's in the workflow version it ran, or its Agent's. */
+function evaluationHref(handle: string, step: EvaluationSubject, definitionVersion: number | null): string {
+  return step.kind === 'agent'
+    ? `${routes.agentDefinition(handle, step.agentId)}?tab=evaluation`
+    : routes.workflowEvaluation(handle, step.workflowName, { version: definitionVersion ?? undefined, step: step.stepId });
+}
+
+function RunHeader({ handle, output, step, mayRun, runReason }: {
   handle: string;
-  workflowName: string;
   output: EvalRunOutput;
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   mayRun: boolean;
   runReason: string | undefined;
 }) {
@@ -296,10 +304,10 @@ function RunHeader({ handle, workflowName, output, step, mayRun, runReason }: {
   return (
     <div className="space-y-4">
       <Link
-        href={routes.workflowEvaluation(handle, workflowName, { version: evalRun.definitionVersion, step: evalRun.stepId })}
+        href={evaluationHref(handle, step, evalRun.definitionVersion)}
         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-3 w-3" /> Evaluation · {evalRun.stepId}
+        <ArrowLeft className="h-3 w-3" /> Evaluation · {step.kind === 'agent' ? `agent v${evalRun.agentVersion ?? '?'}` : step.stepId}
       </Link>
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-lg font-semibold">Eval Run <span className="font-mono">{evalRun.id.slice(0, 8)}</span></h1>
@@ -326,7 +334,9 @@ function RunHeader({ handle, workflowName, output, step, mayRun, runReason }: {
         />
       )}
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Meta label="Step">{evalRun.stepId} · v{evalRun.definitionVersion}</Meta>
+        {step.kind === 'agent'
+          ? <Meta label="Agent">{step.agentId} · v{evalRun.agentVersion}</Meta>
+          : <Meta label="Step">{evalRun.stepId} · v{evalRun.definitionVersion}</Meta>}
         <Meta label="Dataset">{dataset === undefined ? '—' : `v${dataset.version}`} · {evalRun.caseIds.length} case(s)</Meta>
         <Meta label="Trials">
           {report.trials.scored}/{report.trials.total} scored
@@ -357,13 +367,12 @@ const tabTriggerClass = 'border-b-2 border-transparent px-3 py-2 text-sm text-mu
  * verdict to review, and the trials that had problems. Each trial opens on its
  * own page with everything the step and its Evaluators read and gave.
  */
-export function EvalRunDetail({ handle, workflowName, evalRunId }: { handle: string; workflowName: string; evalRunId: string }) {
+export function EvalRunDetail({ handle, evalRunId, gates }: { handle: string; evalRunId: string; gates: EvaluationGates }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const run = useEvalRun(evalRunId);
-  const { mayEdit, reason: editReason } = useWorkflowEditGate(handle, workflowName);
-  const { mayRun, reason: runReason } = useWorkflowRunGate(handle, workflowName);
+  const { mayEdit, editReason, mayRun, runReason } = gates;
   const requested = searchParams.get('tab');
   const tab: RunTab = isRunTab(requested) ? requested : 'summary';
 
@@ -372,11 +381,11 @@ export function EvalRunDetail({ handle, workflowName, evalRunId }: { handle: str
 
   const output = run.data;
   const { evalRun, report } = output;
-  const step: EvaluatedStep = { namespace: evalRun.namespace, workflowName: evalRun.workflowName, stepId: evalRun.stepId };
+  const step = subjectOfRow(evalRun);
   const context: RunContext = {
     output,
     step,
-    trialHref: (trialId) => routes.workflowEvalTrial(handle, workflowName, evalRun.id, trialId),
+    trialHref: (trialId) => evalTrialHref(step, evalRun.id, trialId),
     mayEdit,
     editReason,
   };
@@ -397,7 +406,8 @@ export function EvalRunDetail({ handle, workflowName, evalRunId }: { handle: str
 
   return (
     <div className="space-y-6 p-6" data-testid="eval-run-detail">
-      <RunHeader handle={handle} workflowName={workflowName} output={output} step={step} mayRun={mayRun} runReason={runReason} />
+      <RunHeader handle={handle} output={output} step={step} mayRun={mayRun} runReason={runReason} />
+      {output.assessedAgentVersion !== null && <AssessedAgentConfiguration version={output.assessedAgentVersion} />}
       <Tabs.Root value={tab} onValueChange={select}>
         <Tabs.List className="flex flex-wrap gap-0 border-b">
           {RUN_TABS.map((value) => (

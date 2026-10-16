@@ -14,6 +14,15 @@ import type {
   StepExecutionResult,
 } from './step-executor';
 
+/** How a run's error names what stopped the step, after `Agent step '<id>'`. */
+const FALLBACK_LABELS: Record<AgentFallbackReason, string> = {
+  timeout: 'timed out',
+  error: 'failed',
+  output_schema: 'escalated',
+  production_evaluator: 'failed a production Evaluator',
+  low_confidence: 'escalated',
+};
+
 export class AgentStepExecutor implements StepExecutor {
   constructor(private readonly agentRunner: AgentRunner) {}
 
@@ -91,14 +100,16 @@ export class AgentStepExecutor implements StepExecutor {
 
     const costResult = envelope ? await estimateCostField(envelope, modelRegistryRepo, stepId) : {};
 
+    const isFailed = runResult.fallbackReason === 'error' || runResult.fallbackReason === 'timeout';
+    const isEscalatedToL3Review = autonomyLevel === 'L3' && runResult.status === 'escalated' && !isFailed;
+    const stepFailed = isFailed || (runResult.status !== 'completed' && runResult.status !== 'paused' && !isEscalatedToL3Review);
+
     if (stepExecutionId) {
-      const isFailed = runResult.fallbackReason === 'error' || runResult.fallbackReason === 'timeout';
-      const isEscalatedToL3Review = autonomyLevel === 'L3' && runResult.status === 'escalated' && !isFailed;
       await instanceRepo.updateStepExecution(instanceId, stepExecutionId, {
         output: envelope?.result ?? null,
-        status: !isFailed && (runResult.status === 'completed' || runResult.status === 'paused' || isEscalatedToL3Review) ? 'completed' : 'failed',
+        status: stepFailed ? 'failed' : 'completed',
         completedAt: new Date().toISOString(),
-        ...(isFailed && runResult.errorMessage ? { error: runResult.errorMessage } : {}),
+        ...(stepFailed && runResult.errorMessage ? { error: runResult.errorMessage } : {}),
         agentOutput: envelope
           ? {
               confidence: envelope.confidence ?? null,
@@ -117,13 +128,11 @@ export class AgentStepExecutor implements StepExecutor {
       });
     }
 
-    const isFailed = runResult.fallbackReason === 'error' || runResult.fallbackReason === 'timeout';
-    if (isFailed) {
-      const failLabel = runResult.fallbackReason === 'timeout' ? 'timed out' : 'failed';
+    if (stepFailed && runResult.fallbackReason !== null) {
       const errorDetail = runResult.errorMessage ?? (runResult.fallbackReason === 'timeout' ? 'agent execution timed out' : null);
       if (errorDetail !== null) {
         await instanceRepo.update(instanceId, {
-          error: `Agent step '${stepId}' ${failLabel}: ${errorDetail}`,
+          error: `Agent step '${stepId}' ${FALLBACK_LABELS[runResult.fallbackReason]}: ${errorDetail}`,
           updatedAt: new Date().toISOString(),
         });
       }

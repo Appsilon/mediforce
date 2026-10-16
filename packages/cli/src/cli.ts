@@ -81,6 +81,7 @@ import {
   skillImportCommand,
 } from './commands/skill';
 import { agentGetCommand } from './commands/agent-get';
+import { agentVersionsCommand } from './commands/agent-versions';
 import { agentDeleteCommand } from './commands/agent-delete';
 import { agentSetVisibilityCommand } from './commands/agent-set-visibility';
 import { agentSetSkillsCommand } from './commands/agent-set-skills';
@@ -266,10 +267,11 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   agent: {
-    description: 'Agent definitions (list, get, create, delete, visibility)',
+    description: 'Agent definitions (list, get, versions, create, delete, visibility)',
     leaves: {
       list: { description: 'List agent definitions', fn: agentListCommand },
       get: { description: 'Fetch an agent definition', fn: agentGetCommand },
+      versions: { description: 'List an agent\'s versions', fn: agentVersionsCommand },
       create: { description: 'Create an agent from a JSON file', fn: agentCreateCommand },
       delete: { description: 'Delete an agent definition', fn: agentDeleteCommand },
       'set-visibility': { description: 'Set agent visibility (public|private)', fn: agentSetVisibilityCommand },
@@ -310,7 +312,7 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   eval: {
-    description: 'Step Evaluation (ADR-0023) — Briefs, Evaluators, Eval Cases, Datasets, MCP eval policy, Acceptance Criteria, Eval Runs, Step Qualification',
+    description: 'Step and Agent Evaluation (ADR-0023, ADR-0029) — Briefs, Evaluators, Eval Cases, Datasets, MCP eval policy, Acceptance Criteria, Eval Runs, Qualification',
     leaves: {
       'brief-get': { description: 'Print a step\'s Evaluation Brief', fn: evalBriefGetCommand },
       'brief-set': { description: 'Write a new Evaluation Brief version', fn: evalBriefSetCommand },

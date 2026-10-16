@@ -4,6 +4,7 @@ import { ValidationError } from '../../errors';
 import { actorFromCaller } from '../_helpers';
 import { assertAgentMayHoldSkills } from '../skills/may-hold-skills';
 import { assertBindingsTargetCatalogEntries } from './mcp-bindings';
+import { recordAgentVersion } from './_lib/agent-version';
 
 export async function createAgent(
   input: CreateAgentInput,
@@ -20,6 +21,7 @@ export async function createAgent(
   await assertAgentMayHoldSkills(input, scope);
   await assertBindingsTargetCatalogEntries(scope, input.namespace, input.mcpServers);
   const agent = await scope.agentDefinitions.create(input);
+  await recordAgentVersion(scope, agent);
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
     ...actor,

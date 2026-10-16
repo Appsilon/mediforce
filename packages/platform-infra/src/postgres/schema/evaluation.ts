@@ -9,21 +9,33 @@ import {
   timestamp,
   index,
   primaryKey,
+  check,
   uniqueIndex,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { workspaces } from './workspace';
 
 /**
  * Storage for `EvaluationRepository` (platform-core), which owns the why.
  * Shape notes only:
  *
- * Every table is keyed by the Step it evaluates, `(workspace, workflow_name,
- * step_id)`, with no foreign key to a Workflow Definition — Evaluation lives
+ * Every table is keyed by what it evaluates, `(workspace, workflow_name,
+ * step_id, agent_id)`: a Step's rows leave `agent_id` `''`, an Agent's
+ * (ADR-0029) leave `workflow_name` and `step_id` `''` — empty, not null, so the
+ * owner stays in the primary keys; `<table>_owner_check` holds exactly one set.
+ * No foreign key reaches a Workflow Definition or an Agent — Evaluation lives
  * outside the immutable definition (ADR-0023 D2) and survives its versions.
  * Versioned tables are append-only; `evaluator_versions` takes in-place writes
  * only for `source_approval`, which describes a version without changing what
  * it checks.
  */
+const agentIdColumn = () => text('agent_id').notNull().default('');
+
+/** Exactly one owner: a Step (`workflow_name`, `step_id`) or an Agent (`agent_id`). */
+const ownerCheck = (name: string, table: { workflowName: AnyPgColumn; stepId: AnyPgColumn; agentId: AnyPgColumn }) =>
+  check(name, sql`(${table.agentId} <> '' AND ${table.workflowName} = '' AND ${table.stepId} = '') OR (${table.agentId} = '' AND ${table.workflowName} <> '' AND ${table.stepId} <> '')`);
+
 const workspaceColumn = () =>
   text('workspace')
     .notNull()
@@ -35,6 +47,7 @@ export const evaluationBriefs = pgTable(
     workspace: workspaceColumn(),
     workflowName: text('workflow_name').notNull(),
     stepId: text('step_id').notNull(),
+    agentId: agentIdColumn(),
     version: integer('version').notNull(),
     text: text('text').notNull(),
     origin: text('origin').notNull(),
@@ -42,7 +55,8 @@ export const evaluationBriefs = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    pk: primaryKey({ columns: [table.workspace, table.workflowName, table.stepId, table.version] }),
+    ownerCheck: ownerCheck('evaluation_briefs_owner_check', table),
+    pk: primaryKey({ columns: [table.workspace, table.workflowName, table.stepId, table.agentId, table.version] }),
   }),
 );
 
@@ -53,6 +67,7 @@ export const evaluators = pgTable(
     workspace: workspaceColumn(),
     workflowName: text('workflow_name').notNull(),
     stepId: text('step_id').notNull(),
+    agentId: agentIdColumn(),
     name: text('name').notNull(),
     archived: boolean('archived').notNull().default(false),
     runInProduction: boolean('run_in_production').notNull().default(false),
@@ -61,7 +76,8 @@ export const evaluators = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    stepNameIdx: uniqueIndex('evaluators_step_name_idx').on(table.workspace, table.workflowName, table.stepId, table.name),
+    ownerCheck: ownerCheck('evaluators_owner_check', table),
+    stepNameIdx: uniqueIndex('evaluators_step_name_idx').on(table.workspace, table.workflowName, table.stepId, table.agentId, table.name),
   }),
 );
 
@@ -91,6 +107,7 @@ export const evalCases = pgTable(
     workspace: workspaceColumn(),
     workflowName: text('workflow_name').notNull(),
     stepId: text('step_id').notNull(),
+    agentId: agentIdColumn(),
     name: text('name').notNull(),
     input: jsonb('input').notNull(),
     workspaceSeedCommit: text('workspace_seed_commit'),
@@ -110,7 +127,8 @@ export const evalCases = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    stepIdx: index('eval_cases_step_idx').on(table.workspace, table.workflowName, table.stepId, table.createdAt.desc()),
+    ownerCheck: ownerCheck('eval_cases_owner_check', table),
+    stepIdx: index('eval_cases_step_idx').on(table.workspace, table.workflowName, table.stepId, table.agentId, table.createdAt.desc()),
   }),
 );
 
@@ -121,6 +139,7 @@ export const evalDatasetVersions = pgTable(
     workspace: workspaceColumn(),
     workflowName: text('workflow_name').notNull(),
     stepId: text('step_id').notNull(),
+    agentId: agentIdColumn(),
     version: integer('version').notNull(),
     caseIds: jsonb('case_ids').notNull(),
     containsProductionData: boolean('contains_production_data').notNull(),
@@ -128,8 +147,9 @@ export const evalDatasetVersions = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
+    ownerCheck: ownerCheck('eval_dataset_versions_owner_check', table),
     stepVersionIdx: uniqueIndex('eval_dataset_versions_step_version_idx')
-      .on(table.workspace, table.workflowName, table.stepId, table.version),
+      .on(table.workspace, table.workflowName, table.stepId, table.agentId, table.version),
   }),
 );
 
@@ -139,12 +159,15 @@ export const mcpEvalPolicies = pgTable(
     workspace: workspaceColumn(),
     workflowName: text('workflow_name').notNull(),
     stepId: text('step_id').notNull(),
+    agentId: agentIdColumn(),
     servers: jsonb('servers').notNull(),
+    env: jsonb('env').notNull().default({}),
     updatedBy: text('updated_by').notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    pk: primaryKey({ columns: [table.workspace, table.workflowName, table.stepId] }),
+    ownerCheck: ownerCheck('mcp_eval_policies_owner_check', table),
+    pk: primaryKey({ columns: [table.workspace, table.workflowName, table.stepId, table.agentId] }),
   }),
 );
 
@@ -155,6 +178,7 @@ export const evalAcceptanceCriteria = pgTable(
     workspace: workspaceColumn(),
     workflowName: text('workflow_name').notNull(),
     stepId: text('step_id').notNull(),
+    agentId: agentIdColumn(),
     version: integer('version').notNull(),
     criteria: jsonb('criteria').notNull(),
     origin: text('origin').notNull(),
@@ -162,7 +186,8 @@ export const evalAcceptanceCriteria = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    pk: primaryKey({ columns: [table.workspace, table.workflowName, table.stepId, table.version] }),
+    ownerCheck: ownerCheck('eval_acceptance_criteria_owner_check', table),
+    pk: primaryKey({ columns: [table.workspace, table.workflowName, table.stepId, table.agentId, table.version] }),
   }),
 );
 
@@ -180,7 +205,9 @@ export const evalRuns = pgTable(
     workspace: workspaceColumn(),
     workflowName: text('workflow_name').notNull(),
     stepId: text('step_id').notNull(),
-    definitionVersion: integer('definition_version').notNull(),
+    agentId: agentIdColumn(),
+    definitionVersion: integer('definition_version'),
+    agentVersion: integer('agent_version'),
     datasetVersionId: uuid('dataset_version_id').notNull().references(() => evalDatasetVersions.id),
     caseIds: jsonb('case_ids').notNull(),
     trialsPerCase: integer('trials_per_case').notNull(),
@@ -189,6 +216,7 @@ export const evalRuns = pgTable(
     fingerprint: jsonb('fingerprint'),
     acceptanceCriteria: jsonb('acceptance_criteria'),
     mcpPolicy: jsonb('mcp_policy').notNull(),
+    env: jsonb('env').notNull().default({}),
     estimate: jsonb('estimate').notNull(),
     budgetUsd: doublePrecision('budget_usd').notNull(),
     spentUsd: doublePrecision('spent_usd').notNull().default(0),
@@ -200,7 +228,8 @@ export const evalRuns = pgTable(
     acceptance: jsonb('acceptance'),
   },
   (table) => ({
-    stepIdx: index('eval_runs_step_idx').on(table.workspace, table.workflowName, table.stepId, table.createdAt.desc()),
+    ownerCheck: ownerCheck('eval_runs_owner_check', table),
+    stepIdx: index('eval_runs_step_idx').on(table.workspace, table.workflowName, table.stepId, table.agentId, table.createdAt.desc()),
     statusIdx: index('eval_runs_status_idx').on(table.status),
   }),
 );
@@ -248,6 +277,7 @@ export const evalMcpRecordings = pgTable(
     workspace: workspaceColumn(),
     workflowName: text('workflow_name').notNull(),
     stepId: text('step_id').notNull(),
+    agentId: agentIdColumn(),
     caseId: uuid('case_id').notNull(),
     server: text('server').notNull(),
     tape: jsonb('tape').notNull(),
@@ -256,8 +286,9 @@ export const evalMcpRecordings = pgTable(
     recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
+    ownerCheck: ownerCheck('eval_mcp_recordings_owner_check', table),
     caseIdx: index('eval_mcp_recordings_case_idx')
-      .on(table.workspace, table.workflowName, table.stepId, table.caseId, table.server, table.recordedAt),
+      .on(table.workspace, table.workflowName, table.stepId, table.agentId, table.caseId, table.server, table.recordedAt),
   }),
 );
 
@@ -273,6 +304,7 @@ export const stepQualifications = pgTable(
     workspace: workspaceColumn(),
     workflowName: text('workflow_name').notNull(),
     stepId: text('step_id').notNull(),
+    agentId: agentIdColumn(),
     evalRunId: uuid('eval_run_id').notNull().references(() => evalRuns.id),
     fingerprint: text('fingerprint').notNull(),
     record: jsonb('record').notNull(),
@@ -280,7 +312,8 @@ export const stepQualifications = pgTable(
     signedAt: timestamp('signed_at', { withTimezone: true }).notNull(),
   },
   (table) => ({
-    stepIdx: index('step_qualifications_step_idx').on(table.workspace, table.workflowName, table.stepId, table.signedAt.desc()),
+    ownerCheck: ownerCheck('step_qualifications_owner_check', table),
+    stepIdx: index('step_qualifications_step_idx').on(table.workspace, table.workflowName, table.stepId, table.agentId, table.signedAt.desc()),
     runUnique: uniqueIndex('step_qualifications_eval_run_uniq').on(table.evalRunId),
   }),
 );

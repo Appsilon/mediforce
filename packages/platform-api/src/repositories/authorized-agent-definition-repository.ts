@@ -2,6 +2,7 @@ import type {
   AgentDefinition,
   AgentDefinitionRepository,
   AgentMcpBindingMap,
+  AgentVersion,
   CreateAgentDefinitionInput,
   UpdateAgentDefinitionInput,
 } from '@mediforce/platform-core';
@@ -115,6 +116,23 @@ export class AuthorizedAgentDefinitionRepository extends AuthorizedScope {
       { namespace, id },
       this.caller.isSystemActor ? null : [...this.caller.namespaces],
     );
+
+  /** The versions of an Agent the caller can see, newest first; `[]` when it is not visible (ADR-0029). */
+  listVersions = async (id: string): Promise<AgentVersion[]> =>
+    (await this.getById(id)) === null ? [] : this.raw.listVersions(id);
+
+  /**
+   * Records a version of the agent the caller just saved or is evaluating. The
+   * gate is the one its write passed, on the stored agent: workspace
+   * membership for a namespaced agent; none for a platform-global one, whose
+   * MCP bindings members manage (`updateMcpServers`).
+   */
+  appendVersion = async (version: AgentVersion): Promise<AgentVersion> => {
+    const agent = await this.raw.getById(version.agentId);
+    if (agent === null) throw new NotFoundError();
+    if (typeof agent.namespace === 'string') this.assertWriteOrThrowNotFound(agent.namespace);
+    return this.raw.appendVersion(version);
+  };
 
   delete = async (id: string): Promise<void> => {
     const existing = await this.raw.getById(id);

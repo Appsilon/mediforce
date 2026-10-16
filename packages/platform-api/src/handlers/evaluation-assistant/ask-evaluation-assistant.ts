@@ -2,7 +2,10 @@ import {
   DEFAULT_MODEL,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
+  EVALUATION_ASSISTANT_TOOLSETS,
+  pickTools,
   type EvaluationAssistantPlatformToolName,
+  type EvaluationSubject,
   type EvaluatorCheck,
 } from '@mediforce/platform-core';
 import {
@@ -16,15 +19,24 @@ import type { PreviewEvaluatorOutput } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { recordAssistantPrompt, runProposalToolLoop } from '../../assistant-core';
 import { requireOpenRouterApiKey } from '../../services/openrouter-key';
-import { loadEvaluatedStep, stepRef } from '../evaluation/_lib/evaluated-step';
-import { EVALUATION_ASSISTANT_SYSTEM_PROMPT, briefMessage, unattendedBudgetMessage } from './_lib/system-prompt';
+import { loadEvaluationSubject, subjectRef, subjectKey, subjectName } from '../evaluation/_lib/evaluation-subject';
+import { EVALUATION_ASSISTANT_SYSTEM_PROMPTS, briefMessage, unattendedBudgetMessage } from './_lib/system-prompt';
 import { executeEvaluationTool, type UnattendedGrant } from './_lib/run-evaluation-tool';
 import { reviewEvaluationProposal, type PreviewedCheck } from './_lib/review-proposal';
 
 // Leave room for paged trajectory reads and preview/repair cycles for several checks.
 const MAX_TOOL_LOOP_ITERATIONS = 32;
 const ASSISTANT_MAX_OUTPUT_TOKENS = 8000;
-const TRUNCATED_RESPONSE_NOTICE = 'Your last response was cut off at the output-token limit before it finished, and no tool call in it ran. Work one check at a time: a single tool call per response (preview_evaluator or propose_evaluator for one check) and short prose, then the next check once it is done. If you were writing your final answer, give it again more briefly.';
+const TRUNCATED_RESPONSE_NOTICE = 'Your last response was cut off at the output-token limit before it finished, and no tool call in it ran. Work one check at a time: a single tool call per response, for one check, and short prose, then the next check once it is done. If you were writing your final answer, give it again more briefly.';
+
+/** Who the assistant is evaluating: a Step of a workflow version, or an Agent on its own (ADR-0029). */
+function subjectContext(step: EvaluationSubject, name: string, version: number): string {
+  if (step.kind === 'step') {
+    return `You are evaluating step '${step.stepId}' ("${name}") of workflow '${step.workflowName}' v${version} in workspace '${step.namespace}'.`;
+  }
+  return `You are evaluating ${subjectName(step, false)} ("${name}") on its own, outside any workflow, in workspace '${step.namespace}'. `
+    + 'Each Eval Case\'s triggerPayload is its whole input. Its production runs are those of the steps that use it: write cases from what they were given, and a check is first tried in an Eval Run.';
+}
 
 function preparedRun(result: unknown): PreparedEvalRun | null {
   if (result === null || typeof result !== 'object' || !('prepared' in result)) return null;
@@ -51,8 +63,8 @@ export async function askEvaluationAssistant(
   scope: CallerScope,
   onProgress?: (event: EvaluationAssistantProgress) => void,
 ): Promise<AskEvaluationAssistantOutput> {
-  const step = stepRef(input);
-  const { definition, step: workflowStep } = await loadEvaluatedStep(scope, step, 'read', input.definitionVersion);
+  const step = subjectRef(input);
+  const { definition, step: workflowStep, agent } = await loadEvaluationSubject(scope, step, 'read', step.kind === 'step' ? input.definitionVersion : undefined);
   const apiKey = await requireOpenRouterApiKey(scope, step.namespace);
   const model = input.model ?? DEFAULT_MODEL;
 
@@ -62,20 +74,21 @@ export async function askEvaluationAssistant(
     messages: input.messages,
     ...(input.unattendedBudgetUsd === undefined ? {} : { extraInput: { unattendedBudgetUsd: input.unattendedBudgetUsd } }),
     action: 'evaluation_assistant.prompt',
-    description: `Evaluation Assistant prompt for step '${step.stepId}' (model: ${model})`,
+    description: `Evaluation Assistant prompt for ${subjectName(step, false)} (model: ${model})`,
     basis: 'Evaluation Assistant request (ADR-0023 D14)',
     entityType: 'evaluation_assistant',
-    entityId: `${step.workflowName}/${step.stepId}`,
+    entityId: subjectKey(step),
     logTag: 'evaluation-assistant',
   });
 
   const [brief] = await scope.evaluation.listBriefs(step);
+  const toolset = EVALUATION_ASSISTANT_TOOLSETS[step.kind];
   const unattended: UnattendedGrant | undefined = input.unattendedBudgetUsd === undefined
     ? undefined
     : { remainingUsd: input.unattendedBudgetUsd, started: [] };
   const previewed: PreviewedCheck[] = [];
   const executePlatformTool = async (toolName: EvaluationAssistantPlatformToolName, args: unknown) => {
-    const toolResult = await executeEvaluationTool(toolName, args, scope, { step, definition, workflowStep, ...(unattended === undefined ? {} : { unattended }) });
+    const toolResult = await executeEvaluationTool(toolName, args, scope, { step, definition, workflowStep, agent, ...(unattended === undefined ? {} : { unattended }) });
     if (toolName === 'preview_evaluator') {
       previewed.push({ check: (args as { check: EvaluatorCheck }).check, results: (toolResult as PreviewEvaluatorOutput).results });
     }
@@ -85,14 +98,14 @@ export async function askEvaluationAssistant(
     model,
     apiKey,
     messages: [
-      { role: 'system', content: EVALUATION_ASSISTANT_SYSTEM_PROMPT },
-      { role: 'system', content: `You are evaluating step '${step.stepId}' ("${workflowStep.name}") of workflow '${step.workflowName}' v${definition.version} in workspace '${step.namespace}'.` },
-      { role: 'system', content: briefMessage(brief ?? null) },
-      { role: 'system', content: unattendedBudgetMessage(input.unattendedBudgetUsd) },
+      { role: 'system', content: EVALUATION_ASSISTANT_SYSTEM_PROMPTS[step.kind] },
+      { role: 'system', content: subjectContext(step, workflowStep.name, definition.version) },
+      { role: 'system', content: briefMessage(brief ?? null, step.kind) },
+      { role: 'system', content: unattendedBudgetMessage(input.unattendedBudgetUsd, step.kind) },
       ...input.messages.map((message) => ({ role: message.role, content: message.content })),
     ],
-    proposalTools: EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
-    platformTools: EVALUATION_ASSISTANT_PLATFORM_TOOLS,
+    proposalTools: pickTools(EVALUATION_ASSISTANT_PROPOSAL_TOOLS, toolset.proposals),
+    platformTools: pickTools(EVALUATION_ASSISTANT_PLATFORM_TOOLS, toolset.platform),
     executePlatformTool,
     reviewProposal: (toolName, args) => reviewEvaluationProposal(toolName, args, scope, step, previewed),
     maxIterations: MAX_TOOL_LOOP_ITERATIONS,

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { AlertTriangle } from 'lucide-react';
-import type { EvaluatedStep, EvaluatorOnError } from '@mediforce/platform-core';
+import type { EvaluationSubject, EvaluatorOnError } from '@mediforce/platform-core';
 import type { EvalRunOutput, EvaluatorView } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
@@ -33,7 +33,7 @@ function productionEffect(evaluator: EvaluatorView | undefined): string {
 }
 
 /** The run's Evaluators that could not grade some trials, each with the Step's live Evaluator it is now. */
-function useOutages(output: EvalRunOutput, step: EvaluatedStep): Array<{ line: OutageLine; live: EvaluatorView | undefined }> {
+function useOutages(output: EvalRunOutput, step: EvaluationSubject): Array<{ line: OutageLine; live: EvaluatorView | undefined }> {
   const live = useStepEvaluators(step).data?.evaluators ?? [];
   return output.report.evaluators
     .filter((line) => line.errors > 0)
@@ -42,7 +42,7 @@ function useOutages(output: EvalRunOutput, step: EvaluatedStep): Array<{ line: O
 
 /** Ignore lets a live run its check cannot grade continue; Escalate sends it to a person, as a failure would. */
 export function OnErrorChoice({ step, evaluator, mayEdit, editReason }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   evaluator: EvaluatorView;
   mayEdit: boolean;
   editReason: string | undefined;
@@ -84,7 +84,7 @@ export function OnErrorChoice({ step, evaluator, mayEdit, editReason }: {
  */
 export function EvaluatorOutageAlert({ output, step, onOpenProblems }: {
   output: EvalRunOutput;
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   onOpenProblems: () => void;
 }) {
   const outages = useOutages(output, step);
@@ -113,7 +113,7 @@ export function EvaluatorOutageAlert({ output, step, onOpenProblems }: {
 /** The Problems tab's line per Evaluator that could not grade, with what a production run does when it cannot. */
 export function EvaluatorOutageSummary({ output, step, mayEdit, editReason }: {
   output: EvalRunOutput;
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   mayEdit: boolean;
   editReason: string | undefined;
 }) {

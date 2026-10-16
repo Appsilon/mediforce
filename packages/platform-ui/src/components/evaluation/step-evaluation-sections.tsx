@@ -24,7 +24,7 @@ import {
   type EvalCaseExpectation,
   type EvalCaseInput,
   type EvalDatasetVersion,
-  type EvaluatedStep,
+  type EvaluationSubject,
   type EvaluatorCheck,
   type StepFingerprintComponent,
 } from '@mediforce/platform-core';
@@ -41,10 +41,11 @@ import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { AgentRunLog } from '@/components/agents/agent-log-panel';
 import { useAgentRun } from '@/hooks/use-agent-runs';
-import { useAgentRunIo, useEvalRunEstimate, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
+import { useAgentEvalPolicy, useAgentRunIo, useEvalRunEstimate, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { formatCostUsd } from '@/lib/format';
 import { routes } from '@/lib/routes';
+import { evalRunHref } from '@/lib/evaluation-subject';
 import { AcceptanceBadge, EvalRunStatusBadge } from './eval-run-badges';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 import { OnErrorChoice, mayEscalate } from './evaluator-outages';
@@ -95,7 +96,7 @@ const OUTPUT_SCHEMA_NAME = 'output-schema';
 const OUTPUT_SCHEMA_RULE = 'The output matches the JSON Schema.';
 
 function EvaluatorRow({ step, evaluator, mayEdit, editReason, stepOutputSchema }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   evaluator: EvaluatorView;
   mayEdit: boolean;
   editReason: string | undefined;
@@ -141,7 +142,9 @@ function EvaluatorRow({ step, evaluator, mayEdit, editReason, stepOutputSchema }
             'mt-1 inline-block rounded px-1.5 py-0.5 text-[11px] font-medium',
             evaluator.trust.trusted ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
           )}>{evaluator.trust.trusted ? 'Counts' : `Not counted — ${evaluator.trust.reason}`}</span>
-          {check.kind === 'expected_output' ? (
+          {step.kind === 'agent' ? (
+            <p className="mt-1.5 text-xs text-muted-foreground">Checks this agent&apos;s Eval Runs; production runs belong to the workflow steps that use it.</p>
+          ) : check.kind === 'expected_output' ? (
             <p className="mt-1.5 text-xs text-muted-foreground">Only checks cases that have an expected output; never runs in production.</p>
           ) : <>
           <label className="mt-1.5 flex items-center gap-1.5 text-xs" data-testid="evaluator-production">
@@ -335,7 +338,7 @@ function EvaluatorForm({ initial, editing = false, schemaTaken = false, stepOutp
 
 /** The Step's Evaluators with whether each counts (D9); code source is approved here, by a person. */
 export function EvaluatorsSection({ step, data, mayEdit, editReason, stepOutputSchema }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   data: StepEvaluation['evaluators'];
   mayEdit: boolean;
   editReason?: string;
@@ -794,7 +797,7 @@ function CaseExpectationMark({ evalCase }: { evalCase: EvalCase }) {
 
 /** One Eval Case: what it expects, which Evaluators grade it, editing and removing it, and in its details what it gives the step and expects. */
 function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSelect }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   evalCase: EvalCase;
   evaluators: readonly EvaluatorView[];
   mayEdit: boolean;
@@ -935,7 +938,7 @@ export function caseFromFile(text: string): { values: Partial<CaseFormValues> } 
  * step is given, from a `.json` file, or from an empty input.
  */
 function AddCase({ step, evaluation, cases, evaluators, onClose }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   evaluation: StepEvaluation;
   cases: readonly EvalCase[];
   evaluators: readonly EvaluatorView[];
@@ -955,7 +958,7 @@ function AddCase({ step, evaluation, cases, evaluators, onClose }: {
   const template = fromFile === null ? cases.find((evalCase) => caseOption(evalCase.id) === startFrom) : undefined;
   const runIo = useAgentRunIo(run?.id ?? null);
   const createFromRun = useStepEvaluationMutation(step, ({ agentRunId, values }: { agentRunId: string; values: CaseFormResult }) =>
-    mediforce.evaluation.createCaseFromAgentRun({ agentRunId, step, ...values }));
+    mediforce.evaluation.createCaseFromAgentRun({ agentRunId, ...(step.kind === 'step' ? { step } : {}), ...values }));
   const create = useStepEvaluationMutation(step, (values: CaseFormResult) => mediforce.evaluation.createCase({
     ...step,
     ...values,
@@ -1152,7 +1155,7 @@ function DatasetStatus({ cases, datasets }: { cases: readonly EvalCase[]; datase
  * as any case edit does; a case that already has the selection is left alone.
  */
 function SetCaseEvaluators({ step, cases, evaluators, onDone }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   cases: readonly EvalCase[];
   evaluators: readonly EvaluatorView[];
   onDone: () => void;
@@ -1184,7 +1187,7 @@ function SetCaseEvaluators({ step, cases, evaluators, onDone }: {
 
 /** Eval Cases, added from production runs, by hand or by the assistant, and the Dataset versions Save snapshots them into. */
 export function CasesSection({ step, evaluation, mayEdit }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   evaluation: StepEvaluation;
   mayEdit: boolean;
 }) {
@@ -1440,7 +1443,7 @@ function ValidationReason({ validation }: { validation: StepValidation }) {
  * a dialog; the next Eval Run takes the one in force.
  */
 export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEdit }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   criteria: StepEvaluation['criteria'];
   qualification: StepEvaluation['qualification'];
   mayEdit: boolean;
@@ -1487,7 +1490,7 @@ export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEd
           <ValidationReason validation={status.validation} />{status.validation.runInProgress && ' An Eval Run is running; this updates when it ends.'}
           {status.validation.status === 'awaiting_approval' && status.validation.evalRunId !== null && (
             <Link
-              href={routes.workflowEvalRun(step.namespace, step.workflowName, status.validation.evalRunId)}
+              href={evalRunHref(step, status.validation.evalRunId)}
               className="ml-2 inline-flex items-center gap-0.5 font-medium text-primary hover:underline"
               data-testid="review-eval-run"
             >
@@ -1571,7 +1574,7 @@ function StartEvalRunDialog({ trials, estimatedUsd, budget, starting, error, onS
  * the CLI: the person starts it by confirming the budget shown (D15).
  */
 export function StartEvalRunCard({ step, prepared, otherVersion, mayRun, runReason }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   prepared: PreparedEvalRun;
   /** The workflow version the run was prepared for, when it is not the one shown. */
   otherVersion?: number;
@@ -1628,18 +1631,143 @@ function parseBudgetUsd(text: string): number | null {
   return text.trim() !== '' && Number.isFinite(budget) && budget > 0 ? budget : null;
 }
 
+const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+interface EnvRow { key: string; value: string }
+
+/** Why the rows cannot be saved as an env, or null when they can. */
+function envRowsProblem(rows: readonly EnvRow[]): string | null {
+  const keys = rows.map((row) => row.key.trim());
+  if (keys.some((key) => ENV_KEY_PATTERN.test(key) === false)) return 'Every key must be a name like OPENROUTER_API_KEY: letters, digits and underscores.';
+  if (new Set(keys).size !== keys.length) return 'A key is listed twice.';
+  return null;
+}
+
 /**
- * Start, confirm and read the Step's Eval Runs. Starting one is the workflow's
- * `run` verb; signing a qualification from a report is its `edit` verb.
+ * The env an Agent's trials run with, set once for all its Eval Runs: what a
+ * Workflow Step would declare, since an Agent evaluated on its own has no
+ * Workflow Step to declare it. A value is a literal or a `{{SECRET}}` template
+ * the workspace's secrets fill in when a trial runs. Each run freezes a copy.
+ */
+function AgentTrialEnvDialog({ env, onClose, onSave, saving, error }: {
+  env: Record<string, string>;
+  onClose: () => void;
+  onSave: (env: Record<string, string>) => void;
+  saving: boolean;
+  error: Error | null;
+}) {
+  const [rows, setRows] = React.useState<EnvRow[]>(() => {
+    const saved = Object.entries(env).map(([key, value]) => ({ key, value }));
+    return saved.length === 0 ? [{ key: '', value: '' }] : saved;
+  });
+  const filled = rows.filter((row) => row.key.trim() !== '' || row.value !== '');
+  const problem = envRowsProblem(filled);
+  const update = (index: number, patch: Partial<EnvRow>) => setRows(rows.map((row, at) => (at === index ? { ...row, ...patch } : row)));
+  return (
+    <Dialog.Root open onOpenChange={(open) => { if (open === false) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border bg-background p-6 shadow-lg" data-testid="agent-trial-env-dialog">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <Dialog.Title className="text-lg font-semibold">Secrets for trials</Dialog.Title>
+              <Dialog.Description className="mt-1 text-xs text-muted-foreground">
+                Env every trial of this agent runs with, as a workflow step declares it. Use <span className="font-mono">{'{{NAME}}'}</span> to take a value from the workspace secrets.
+              </Dialog.Description>
+            </div>
+            <Dialog.Close asChild>
+              <button type="button" aria-label="Close" className="rounded-sm p-1 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+            </Dialog.Close>
+          </div>
+          <div className="space-y-2">
+            {rows.map((row, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  aria-label="Key"
+                  className={cn(inputClass, 'w-56 font-mono')}
+                  placeholder="OPENROUTER_API_KEY"
+                  value={row.key}
+                  onChange={(event) => update(index, { key: event.target.value })}
+                />
+                <input
+                  type="text"
+                  aria-label="Value"
+                  className={cn(inputClass, 'min-w-0 flex-1 font-mono')}
+                  placeholder="{{OPENROUTER_API_KEY}}"
+                  value={row.value}
+                  onChange={(event) => update(index, { value: event.target.value })}
+                />
+                <button
+                  type="button"
+                  aria-label="Remove"
+                  className="rounded-sm p-1 text-muted-foreground hover:text-foreground"
+                  onClick={() => setRows(rows.length === 1 ? [{ key: '', value: '' }] : rows.filter((_row, at) => at !== index))}
+                ><X className="h-4 w-4" /></button>
+              </div>
+            ))}
+            <button type="button" className={buttonClass} onClick={() => setRows([...rows, { key: '', value: '' }])}>Add another</button>
+          </div>
+          {problem !== null && <p className="mt-3 text-xs text-destructive">{problem}</p>}
+          {error !== null && <p className="mt-3 text-xs text-destructive">{error.message}</p>}
+          <div className="mt-6 flex justify-end gap-2">
+            <Dialog.Close asChild>
+              <button type="button" className={buttonClass}>Cancel</button>
+            </Dialog.Close>
+            <button
+              type="button"
+              className={primaryButtonClass}
+              disabled={problem !== null || saving}
+              onClick={() => onSave(Object.fromEntries(filled.map((row) => [row.key.trim(), row.value])))}
+            >{saving ? 'Saving…' : 'Save'}</button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+function AgentTrialEnv({ step, mayEdit }: { step: Extract<EvaluationSubject, { kind: 'agent' }>; mayEdit: boolean }) {
+  const policy = useAgentEvalPolicy(step);
+  const env = policy.data?.policy?.env ?? {};
+  const keys = Object.keys(env);
+  const [open, setOpen] = React.useState(false);
+  const save = useStepEvaluationMutation(step, async (next: Record<string, string>) => {
+    await mediforce.evaluation.setMcpPolicy({ ...step, env: next });
+    setOpen(false);
+  });
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      {mayEdit && (
+        <button type="button" className={buttonClass} onClick={() => { save.reset(); setOpen(true); }} data-testid="agent-trial-env-open">
+          {keys.length === 0 ? 'Add secrets' : 'Edit secrets'}
+        </button>
+      )}
+      {keys.length === 0 && (
+        <span className="text-muted-foreground" data-testid="agent-trial-env-keys">
+          No env for this agent's trials.
+        </span>
+      )}
+      {open && <AgentTrialEnvDialog env={env} onClose={() => setOpen(false)} onSave={(next) => save.mutate(next)} saving={save.isPending} error={save.error instanceof Error ? save.error : null} />}
+    </div>
+  );
+}
+
+/**
+ * Start, confirm and read the Step's Eval Runs — or an Agent's, each of which
+ * assesses the Agent version it had when prepared (ADR-0029). Starting one is
+ * the workflow's `run` verb; signing a qualification from a report is its
+ * `edit` verb.
  */
 export function EvalRunsSection({ step, definitionVersion, data, datasets, cases, mayRun, runReason }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   /**
    * The workflow version whose step a new run runs. Its finished runs are
    * listed; a prepared or running run of any version stays listed, so it can
-   * be started or followed from here.
+   * be started or followed from here. Null for an Agent: every run of it is
+   * listed, with the Agent version it assessed.
    */
-  definitionVersion: number;
+  definitionVersion: number | null;
   data: StepEvaluation['runs'];
   /** The Step's saved Dataset versions, newest first: the one a new run takes, and the one each run ran. */
   datasets: StepEvaluation['datasets'];
@@ -1664,7 +1792,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
   const start = useStepEvaluationMutation(step, async () => {
     const prepared = await mediforce.evaluation.prepareRun({
       ...step,
-      definitionVersion,
+      ...(definitionVersion === null ? {} : { definitionVersion }),
       trialsPerCase: trials ?? undefined,
       ...(budgetUsd === null ? {} : { budgetUsd }),
     });
@@ -1676,8 +1804,13 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
       : estimate.data === undefined ? '(estimating…)'
         : estimate.data.estimate.totalUsd === null ? '(no estimate)'
           : `(estimated ${formatCostUsd(estimate.data.estimate.totalUsd)})`;
-  const runs = (data.data?.evalRuns ?? []).filter((run) => run.definitionVersion === definitionVersion || run.status === 'prepared' || run.status === 'running');
-  const otherVersion = (run: { definitionVersion: number }) => (run.definitionVersion === definitionVersion ? undefined : run.definitionVersion);
+  const runs = (data.data?.evalRuns ?? []).filter((run) =>
+    step.kind === 'agent' || run.definitionVersion === definitionVersion || run.status === 'prepared' || run.status === 'running');
+  const otherVersion = (run: { definitionVersion: number | null; agentVersion: number | null }) => (
+    step.kind === 'agent'
+      ? run.agentVersion ?? undefined
+      : run.definitionVersion === definitionVersion ? undefined : run.definitionVersion ?? undefined
+  );
   const datasetVersion = new Map(versions.map((dataset) => [dataset.id, dataset.version]));
   // Prepared by the assistant or from the CLI, or left when starting one failed: each waits for a person to confirm its budget.
   const waiting: { prepared: PreparedEvalRun; otherVersion: number | undefined }[] = runs.filter((run) => run.status === 'prepared').map((run) => ({
@@ -1692,6 +1825,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
 
   return (
     <Section title="Eval Runs" data-tour="eval-runs">
+      {step.kind === 'agent' && <AgentTrialEnv step={step} mayEdit={mayRun} />}
       {mayRun && (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <label className="flex items-center gap-1">Trials per case
@@ -1729,7 +1863,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
       )}
       {waiting.map((run) => <StartEvalRunCard key={run.prepared.evalRunId} step={step} prepared={run.prepared} otherVersion={run.otherVersion} mayRun={mayRun} runReason={runReason} />)}
       {data.isLoading ? <Loading /> : runs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No Eval Runs of v{definitionVersion} yet.</p>
+        <p className="text-sm text-muted-foreground">{step.kind === 'agent' ? 'No Eval Runs of this agent yet.' : `No Eval Runs of v${definitionVersion} yet.`}</p>
       ) : (
         <div className="overflow-x-auto rounded-md border">
           <table className="w-full text-sm" data-testid="eval-runs-table">
@@ -1753,7 +1887,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
                 <tr key={run.id} className="border-b last:border-0 hover:bg-muted/30" data-testid="eval-run-row">
                   <td className="px-3 py-2 font-mono text-xs">
                     {run.id.slice(0, 8)}
-                    {otherVersion(run) !== undefined && <span className="ml-1.5 text-muted-foreground">v{run.definitionVersion}</span>}
+                    {otherVersion(run) !== undefined && <span className="ml-1.5 text-muted-foreground">{step.kind === 'agent' ? 'agent ' : ''}v{otherVersion(run)}</span>}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground" title={run.createdAt}>
                     {formatDistanceToNow(new Date(run.createdAt), { addSuffix: true })}
@@ -1763,7 +1897,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
                   <td className="px-3 py-2 text-xs">{datasetVersion.has(run.datasetVersionId) ? `v${datasetVersion.get(run.datasetVersionId)}` : '—'}</td>
                   <td className="px-3 py-2"><AcceptanceBadge acceptance={run.acceptance} /></td>
                   <td className="px-3 py-2 text-right">
-                    <Link href={routes.workflowEvalRun(step.namespace, step.workflowName, run.id)} className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline">
+                    <Link href={evalRunHref(step, run.id)} className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline">
                       Details <ChevronRight className="h-3 w-3" />
                     </Link>
                   </td>

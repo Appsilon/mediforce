@@ -412,6 +412,36 @@ describe('AgentStepExecutor', () => {
     );
   });
 
+  it.each([
+    {
+      fallbackReason: 'production_evaluator',
+      errorMessage: "Evaluator 'output-matches-contract' v1 failed: missing required keys: verdict",
+      instanceError: "Agent step 'analyze-data' failed a production Evaluator: Evaluator 'output-matches-contract' v1 failed: missing required keys: verdict",
+    },
+    {
+      fallbackReason: 'output_schema',
+      errorMessage: 'result does not match agent.outputSchema: missing required keys: findings',
+      instanceError: "Agent step 'analyze-data' escalated: result does not match agent.outputSchema: missing required keys: findings",
+    },
+  ])('records why a $fallbackReason escalation stopped the step, on the step and the run', async ({ fallbackReason, errorMessage, instanceError }) => {
+    mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+      status: 'escalated',
+      envelope: defaultEnvelope,
+      appliedToWorkflow: false,
+      fallbackReason,
+      errorMessage,
+    });
+
+    await executor.execute(mockPlugin, makeContext(), services, meta);
+
+    expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
+      'inst-001',
+      'exec-001',
+      expect.objectContaining({ status: 'failed', error: errorMessage }),
+    );
+    expect(mockInstanceRepo.update).toHaveBeenCalledWith('inst-001', expect.objectContaining({ error: instanceError }));
+  });
+
   it('persists output to instance.variables', async () => {
     mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
       status: 'completed',

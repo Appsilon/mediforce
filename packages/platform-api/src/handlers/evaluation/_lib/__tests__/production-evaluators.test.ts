@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import type { Evaluator, EvaluatorCheck, EvaluatorVersion } from '@mediforce/platform-core';
 import { scoreProductionRun, hasProductionEvaluators } from '../production-evaluators';
-import { loadEvaluationSubject } from '../evaluation-subject';
+import { loadScoredRun } from '../scored-run';
 import { evaluationFixture, GRADED_RUN, STEP, UNGRADED_RUN, type EvaluationFixture } from '../../__tests__/fixture';
 
 const runCodeCheck = vi.hoisted(() => vi.fn());
@@ -50,7 +50,7 @@ describe('production Evaluators (ADR-0023 D13)', () => {
 
   async function score(agentRunId: string) {
     const scope = fixture.scope();
-    return scoreProductionRun(scope, STEP, await loadEvaluationSubject(scope, agentRunId, STEP));
+    return scoreProductionRun(scope, STEP, await loadScoredRun(scope, agentRunId, STEP));
   }
 
   it('fails the gate on a failing schema Evaluator and records a production Score', async () => {
@@ -118,7 +118,7 @@ describe('production Evaluators (ADR-0023 D13)', () => {
     const scope = fixture.scope();
     Object.assign(scope, { workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) } });
 
-    const { verdict, judges } = await scoreProductionRun(scope, STEP, await loadEvaluationSubject(scope, UNGRADED_RUN, STEP));
+    const { verdict, judges } = await scoreProductionRun(scope, STEP, await loadScoredRun(scope, UNGRADED_RUN, STEP));
 
     expect(verdict.failure).toBeNull();
     expect(judges).toHaveLength(1);

@@ -1,15 +1,18 @@
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import {
   AgentDefinitionSchema,
+  AgentVersionSchema,
+  mergeAgentUpdate,
   parseRow,
+  type AgentVersion,
   type AgentDefinition,
   type AgentDefinitionRepository,
   type CreateAgentDefinitionInput,
   type UpdateAgentDefinitionInput,
 } from '@mediforce/platform-core';
 import type { Database } from '../client';
-import { agents } from '../schema/agent-definition';
+import { agents, agentVersions } from '../schema/agent-definition';
 
 /**
  * Postgres-backed AgentDefinitionRepository (ADR-0001, PLAN §1.2 agents).
@@ -54,6 +57,7 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
           systemPrompt: values.systemPrompt,
           inputDescription: values.inputDescription,
           outputDescription: values.outputDescription,
+          outputSchema: values.outputSchema,
           mcpServers: values.mcpServers,
           skills: values.skills,
           namespace: values.namespace,
@@ -127,8 +131,7 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
       throw new Error(`Agent definition ${id} not found`);
     }
     const merged: AgentDefinition = AgentDefinitionSchema.parse({
-      ...current,
-      ...input,
+      ...mergeAgentUpdate(current, input),
       id,
     });
     const [row] = await this.db
@@ -143,6 +146,7 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
         systemPrompt: merged.systemPrompt,
         inputDescription: merged.inputDescription,
         outputDescription: merged.outputDescription,
+        outputSchema: merged.outputSchema ?? null,
         mcpServers: merged.mcpServers ?? null,
         skills: merged.skills ?? null,
         namespace: merged.namespace ?? null,
@@ -157,6 +161,43 @@ export class PostgresAgentDefinitionRepository implements AgentDefinitionReposit
   async delete(id: string): Promise<void> {
     await this.db.delete(agents).where(eq(agents.id, id));
   }
+
+  async appendVersion(version: AgentVersion): Promise<AgentVersion> {
+    const parsed = AgentVersionSchema.parse(version);
+    const [row] = await this.db.insert(agentVersions).values({
+      agentId: parsed.agentId,
+      version: parsed.version,
+      hash: parsed.hash,
+      config: parsed.config,
+      createdBy: parsed.createdBy,
+      createdAt: new Date(parsed.createdAt),
+    }).returning();
+    return toAgentVersion(row!);
+  }
+
+  async listVersions(agentId: string): Promise<AgentVersion[]> {
+    const rows = await this.db.select().from(agentVersions)
+      .where(eq(agentVersions.agentId, agentId))
+      .orderBy(desc(agentVersions.version));
+    return rows.map(toAgentVersion);
+  }
+
+  async getVersion(agentId: string, version: number): Promise<AgentVersion | null> {
+    const [row] = await this.db.select().from(agentVersions)
+      .where(and(eq(agentVersions.agentId, agentId), eq(agentVersions.version, version)));
+    return row === undefined ? null : toAgentVersion(row);
+  }
+}
+
+function toAgentVersion(row: typeof agentVersions.$inferSelect): AgentVersion {
+  return AgentVersionSchema.parse({
+    agentId: row.agentId,
+    version: row.version,
+    hash: row.hash,
+    config: row.config,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt.toISOString(),
+  });
 }
 
 function visibilityFilter(allowed: readonly string[]) {
@@ -194,6 +235,7 @@ function toRow(id: string, input: CreateAgentDefinitionInput) {
     systemPrompt: parsed.systemPrompt,
     inputDescription: parsed.inputDescription,
     outputDescription: parsed.outputDescription,
+    outputSchema: parsed.outputSchema ?? null,
     mcpServers: parsed.mcpServers ?? null,
     skills: parsed.skills ?? null,
     namespace: parsed.namespace ?? null,
@@ -216,6 +258,7 @@ function toAgent(row: typeof agents.$inferSelect): AgentDefinition {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     runtimeId: row.runtimeId ?? undefined,
+    outputSchema: row.outputSchema ?? undefined,
     mcpServers: row.mcpServers ?? undefined,
     skills: row.skills ?? undefined,
     namespace: row.namespace ?? undefined,

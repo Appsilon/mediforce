@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { validateOutputSchema } from '../output-schema';
+import { describe, it, expect, vi } from 'vitest';
+import type { LlmClient } from '../../interfaces/step-executor-plugin';
+import { repairOutput, validateOutputSchema } from '../output-schema';
 
 describe('validateOutputSchema', () => {
   const schema = {
@@ -84,5 +85,50 @@ describe('validateOutputSchema', () => {
   ])('accepts a %s property holding %j', (type, value) => {
     const typedSchema = { type: 'object', properties: { flag: { type } } };
     expect(validateOutputSchema({ flag: value }, typedSchema)).toBeNull();
+  });
+});
+
+describe('repairOutput', () => {
+  const schema = {
+    type: 'object',
+    required: ['grade', 'serious', 'term'],
+    properties: { grade: { type: 'integer' }, serious: { type: 'boolean' }, term: { type: 'string' } },
+  };
+
+  function answering(content: string): LlmClient {
+    return { complete: vi.fn<LlmClient['complete']>().mockResolvedValue({ content, model: 'repair-model', usage: { promptTokens: 1, completionTokens: 1 } }) };
+  }
+
+  it('accepts a reshape that only renames keys and converts types', async () => {
+    const original = { ctcae_grade: '3', is_serious: 'true', ae_term: 'Neutropenia' };
+
+    const llm = answering('{"grade": 3, "serious": true, "term": "Neutropenia"}');
+    const repair = await repairOutput(llm, 'm', original, schema, 'missing required keys: grade, serious, term');
+
+    expect(repair).toEqual({ ok: true, result: { grade: 3, serious: true, term: 'Neutropenia' }, model: 'repair-model' });
+    expect(llm.complete).toHaveBeenCalledWith(expect.any(Array), 'm', { temperature: 0 });
+  });
+
+  it('pulls values out of a prose result', async () => {
+    const original = { raw: 'Neutropenia, CTCAE grade 3, serious: true.' };
+
+    const repair = await repairOutput(
+      answering('{"grade": 3, "serious": true, "term": "Neutropenia"}'), 'm', original, schema, 'output is not valid JSON',
+    );
+
+    expect(repair.ok).toBe(true);
+  });
+
+  it('rejects a reshape that carries a value the result never stated', async () => {
+    const original = { ctcae_grade: 3, ae_term: 'Neutropenia' };
+
+    const repair = await repairOutput(
+      answering('{"grade": 3, "serious": false, "term": "Febrile neutropenia"}'), 'm', original, schema, 'missing required keys: serious, term',
+    );
+
+    expect(repair).toEqual({
+      ok: false,
+      reason: 'it introduced values the result does not contain: false, "Febrile neutropenia"',
+    });
   });
 });

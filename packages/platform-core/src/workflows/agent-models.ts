@@ -1,5 +1,5 @@
 import type { AgentDefinitionRepository } from '../repositories/agent-definition-repository';
-import type { WorkflowDefinition, WorkflowStep } from '../schemas/workflow-definition';
+import type { AgentOutputSchema, WorkflowDefinition, WorkflowStep } from '../schemas/workflow-definition';
 
 /**
  * Apply the agent's model to a step that names no model of its own.
@@ -11,6 +11,15 @@ import type { WorkflowDefinition, WorkflowStep } from '../schemas/workflow-defin
 export function applyAgentModel(step: WorkflowStep, agentModel: string | undefined): WorkflowStep {
   const inherits = step.executor === 'agent' && agentModel !== undefined && !step.agent?.model;
   return inherits ? { ...step, agent: { ...step.agent, model: agentModel } } : step;
+}
+
+/**
+ * Apply the agent's output schema to an agent step that declares none of its
+ * own, so the runtime shows it in the prompt and checks the result against it.
+ */
+export function applyAgentOutputSchema(step: WorkflowStep, agentOutputSchema: AgentOutputSchema | undefined): WorkflowStep {
+  const inherits = step.executor === 'agent' && agentOutputSchema !== undefined && step.agent?.outputSchema === undefined;
+  return inherits ? { ...step, agent: { ...step.agent, outputSchema: agentOutputSchema } } : step;
 }
 
 /**

@@ -138,6 +138,11 @@ describe('ClaudeCodeAgentPlugin', () => {
         .rejects.toThrow("No prompt configured in step.agent for step 'triage'");
     });
 
+    it('[DATA] runs a step with no prompt of its own when its Agent gives one (ADR-0029 agent eval trial)', async () => {
+      const context = { ...buildWorkflowContext({ prompt: undefined }), agentIdentityPrompt: 'You grade adverse events by CTCAE v5.' };
+      await expect(plugin.initialize(context)).resolves.toBeUndefined();
+    });
+
     it('[ERROR] refuses a step that still names a retired file skill, naming the step and the skill', async () => {
       const error = await plugin.initialize(buildWorkflowContext({ retiredFileSkill: 'trial-metadata-extractor' }))
         .catch((caught: unknown) => caught);
@@ -382,6 +387,41 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(warning?.payload).toContain('installed on the host');
       expect(String(warning?.payload)).not.toContain('undefined');
     });
+
+    it.each(['local', 'docker'] as const)(
+      '[DATA] reads result.json when the agent closes with prose (%s mode)',
+      async (mode) => {
+        process.env.ALLOW_LOCAL_AGENTS = 'true';
+        const context = buildMockContext({
+          config: {
+            processName: 'p', configName: 'c', configVersion: 'v1',
+            stepConfigs: [{
+              stepId: 'extract', executorType: 'agent', plugin: 'claude-code-agent',
+              agentConfig: { prompt: 'Extract trial metadata from the protocol', ...(mode === 'docker' ? { image: 'mediforce-agent:test' } : {}) },
+            }],
+          } as ProcessConfig,
+        });
+        await plugin.initialize(context);
+
+        const spawned = async (_prompt: string, options?: Record<string, unknown>) => {
+          const outputDir = options?.outputDir as string;
+          await writeFile(join(outputDir, 'result.json'), JSON.stringify({ classification: 'recovery', confidence: 0.8 }));
+          return {
+            cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: 'All done, result written.' }),
+            gitMetadata: null, presentation: null, outputDir, injectedEnvVars: [],
+          };
+        };
+        if (mode === 'local') mockSpawnLocal(plugin).mockImplementation(spawned);
+        else mockSpawn(plugin).mockImplementation(spawned);
+
+        const { emit, events } = buildEmitSpy();
+        await plugin.run(emit);
+
+        const resultEvent = events.find((e) => e.type === 'result');
+        expect(resultEvent?.payload).toMatchObject({ confidence: 0.8, result: { classification: 'recovery' } });
+        expect((resultEvent?.payload as { result: Record<string, unknown> }).result).not.toHaveProperty('raw');
+      },
+    );
 
     it('[DATA] parses an answer the agent wrapped in a ```json fence', async () => {
       const context = buildMockContext();
@@ -633,7 +673,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(promptArg).toContain('100 cases like this');
     });
 
-    it('[DATA] includes agent.outputSchema and the rejected attempt\'s error in the prompt', async () => {
+    it('[DATA] includes agent.outputSchema in the prompt', async () => {
       const outputSchema = { type: 'object' as const, required: ['findings'] };
       const context: WorkflowAgentContext = {
         stepId: 'extract',
@@ -659,7 +699,6 @@ describe('ClaudeCodeAgentPlugin', () => {
         },
         llm: { complete: vi.fn() },
         getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
-        outputSchemaViolation: 'missing required keys: findings',
       };
       await plugin.initialize(context);
 
@@ -672,8 +711,6 @@ describe('ClaudeCodeAgentPlugin', () => {
       const promptArg = spawnSpy.mock.calls[0][0] as string;
       expect(promptArg).toContain('## Output Schema');
       expect(promptArg).toContain('"required": [\n    "findings"\n  ]');
-      expect(promptArg).toContain('## Previous Attempt Rejected');
-      expect(promptArg).toContain('missing required keys: findings');
     });
 
     it('[DATA] accepts standalone Docker mode (image only, no repo/commit)', async () => {

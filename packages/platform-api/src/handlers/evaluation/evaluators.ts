@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
-import { isMovingModelAlias, type Evaluator, type EvaluatorCheck } from '@mediforce/platform-core';
+import { evaluationOwnerOf, isMovingModelAlias, type Evaluator, type EvaluatorCheck } from '@mediforce/platform-core';
 import type {
   AddEvaluatorVersionInputSchema,
   ArchiveEvaluatorInputSchema,
@@ -13,7 +13,7 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, ValidationError } from '../../errors';
-import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
+import { loadEvaluationSubject, subjectRef, subjectName } from './_lib/evaluation-subject';
 import { evaluatorView, loadEvaluator } from './_lib/evaluator-view';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
 
@@ -21,8 +21,8 @@ export async function listEvaluators(
   input: z.output<typeof ListEvaluatorsInputSchema>,
   scope: CallerScope,
 ): Promise<ListEvaluatorsOutput> {
-  await loadEvaluatedStep(scope, input, 'read');
-  const evaluators = await scope.evaluation.listEvaluators(stepRef(input));
+  await loadEvaluationSubject(scope, input, 'read');
+  const evaluators = await scope.evaluation.listEvaluators(subjectRef(input));
   const shown = input.includeArchived === true ? evaluators : evaluators.filter((evaluator) => !evaluator.archived);
   return { evaluators: await Promise.all(shown.map((evaluator) => evaluatorView(scope, evaluator))) };
 }
@@ -39,7 +39,7 @@ function assertPinnedJudgeModel(check: EvaluatorCheck): void {
 }
 
 /** A step has one output-schema check: the step's output either matches its JSON Schema or does not. */
-async function liveSchemaEvaluatorName(scope: CallerScope, step: ReturnType<typeof stepRef>, except?: string): Promise<string | null> {
+async function liveSchemaEvaluatorName(scope: CallerScope, step: ReturnType<typeof subjectRef>, except?: string): Promise<string | null> {
   const evaluators = await scope.evaluation.listEvaluators(step);
   for (const evaluator of evaluators) {
     if (evaluator.archived || evaluator.id === except) continue;
@@ -48,27 +48,28 @@ async function liveSchemaEvaluatorName(scope: CallerScope, step: ReturnType<type
   return null;
 }
 
-async function assertSingleSchemaEvaluator(scope: CallerScope, step: ReturnType<typeof stepRef>, except?: string): Promise<void> {
+async function assertSingleSchemaEvaluator(scope: CallerScope, step: ReturnType<typeof subjectRef>, except?: string): Promise<void> {
   const taken = await liveSchemaEvaluatorName(scope, step, except);
-  if (taken !== null) throw new ConflictError(`Step '${step.stepId}' already has an output schema check ('${taken}'); a step has one`);
+  if (taken !== null) throw new ConflictError(`${subjectName(step)} already has an output schema check ('${taken}'); a step has one`);
 }
 
 const NOT_IN_PRODUCTION = 'An expected-output check never runs in production: a production run has no expected output to compare with';
+const AGENT_NOT_IN_PRODUCTION = 'An agent\'s Evaluator never runs in production: production runs belong to the workflow steps that use the agent (ADR-0029)';
 
 /** An Evaluator starts at version 1. A `schema` check counts at once; the others wait for the trust gate (D9). */
 export async function createEvaluator(
   input: z.output<typeof CreateEvaluatorInputSchema>,
   scope: CallerScope,
 ): Promise<EvaluatorOutput> {
-  const step = stepRef(input);
-  await loadEvaluatedStep(scope, step, 'edit');
+  const step = subjectRef(input);
+  await loadEvaluationSubject(scope, step, 'edit');
   const existing = await scope.evaluation.listEvaluators(step);
   const sameName = existing.find((evaluator) => evaluator.name === input.name);
   if (input.check.kind === 'schema') await assertSingleSchemaEvaluator(scope, step);
   if (sameName !== undefined) {
     const archivedSchema = sameName.archived && (await evaluatorView(scope, sameName)).latest.check.kind === 'schema';
     if (input.check.kind !== 'schema' || !archivedSchema) {
-      throw new ConflictError(`Step '${step.stepId}' already has an Evaluator named '${input.name}'`);
+      throw new ConflictError(`${subjectName(step)} already has an Evaluator named '${input.name}'`);
     }
     await archiveEvaluator({ evaluatorId: sameName.id, archived: false }, scope);
     return addEvaluatorVersion({ evaluatorId: sameName.id, rule: input.rule, check: input.check, origin: input.origin }, scope);
@@ -78,9 +79,10 @@ export async function createEvaluator(
   const createdBy = authorId(scope);
   const runInProduction = input.runInProduction ?? false;
   if (runInProduction === true && input.check.kind === 'expected_output') throw new ValidationError(NOT_IN_PRODUCTION);
+  if (runInProduction === true && step.kind === 'agent') throw new ValidationError(AGENT_NOT_IN_PRODUCTION);
   assertPinnedJudgeModel(input.check);
   const evaluator = {
-    ...step,
+    ...evaluationOwnerOf(step),
     id: randomUUID(),
     name: input.name,
     archived: false,
@@ -101,12 +103,12 @@ export async function createEvaluator(
   });
   await appendEvaluationAudit(scope, {
     action: 'evaluator.created',
-    description: `Evaluator '${input.name}' (${input.check.kind}) created for step '${step.stepId}'`,
+    description: `Evaluator '${input.name}' (${input.check.kind}) created for ${subjectName(step, false)}`,
     namespace: step.namespace,
     entityType: 'evaluator',
     entityId: evaluator.id,
     inputSnapshot: {
-      ...step,
+      ...evaluationOwnerOf(step),
       name: input.name,
       rule: input.rule,
       check: input.check,
@@ -129,13 +131,13 @@ export async function addEvaluatorVersion(
   scope: CallerScope,
 ): Promise<EvaluatorOutput> {
   const evaluator = await loadEvaluator(scope, input.evaluatorId);
-  await loadEvaluatedStep(scope, stepRef(evaluator), 'edit');
+  await loadEvaluationSubject(scope, subjectRef(evaluator), 'edit');
   const { latest } = await evaluatorView(scope, evaluator);
   if (input.check !== undefined && (input.check.kind === 'expected_output') !== (latest.check.kind === 'expected_output')) {
     throw new ValidationError(`Evaluator '${evaluator.name}' is ${latest.check.kind === 'expected_output' ? 'an expected-output check and stays one' : `a ${latest.check.kind} check and cannot become an expected-output check`}`);
   }
   if (input.check !== undefined) assertPinnedJudgeModel(input.check);
-  if (input.check?.kind === 'schema' && latest.check.kind !== 'schema') await assertSingleSchemaEvaluator(scope, stepRef(evaluator), evaluator.id);
+  if (input.check?.kind === 'schema' && latest.check.kind !== 'schema') await assertSingleSchemaEvaluator(scope, subjectRef(evaluator), evaluator.id);
   const version = await scope.evaluation.appendEvaluatorVersion(evaluator, {
     evaluatorId: evaluator.id,
     version: latest.version + 1,
@@ -164,9 +166,9 @@ export async function archiveEvaluator(
   scope: CallerScope,
 ): Promise<EvaluatorOutput> {
   const evaluator = await loadEvaluator(scope, input.evaluatorId);
-  await loadEvaluatedStep(scope, stepRef(evaluator), 'edit');
+  await loadEvaluationSubject(scope, subjectRef(evaluator), 'edit');
   if (input.archived === false && (await evaluatorView(scope, evaluator)).latest.check.kind === 'schema') {
-    await assertSingleSchemaEvaluator(scope, stepRef(evaluator), evaluator.id);
+    await assertSingleSchemaEvaluator(scope, subjectRef(evaluator), evaluator.id);
   }
   await scope.evaluation.setEvaluatorArchived(evaluator, input.archived);
   await appendEvaluationAudit(scope, {
@@ -205,7 +207,8 @@ export async function setEvaluatorProduction(
   scope: CallerScope,
 ): Promise<EvaluatorOutput> {
   const evaluator = await loadEvaluator(scope, input.evaluatorId);
-  await loadEvaluatedStep(scope, stepRef(evaluator), 'edit');
+  await loadEvaluationSubject(scope, subjectRef(evaluator), 'edit');
+  if (input.runInProduction === true && evaluator.agentId !== null) throw new ValidationError(AGENT_NOT_IN_PRODUCTION);
   if (input.runInProduction === true && (await evaluatorView(scope, evaluator)).latest.check.kind === 'expected_output') {
     throw new ValidationError(NOT_IN_PRODUCTION);
   }

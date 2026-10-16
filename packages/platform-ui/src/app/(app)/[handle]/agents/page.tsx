@@ -8,6 +8,9 @@ import { getModelDisplayName } from '@/lib/agent-models';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { ConceptPopover } from '@/components/ui/concept-intro';
+import { VALIDATION_STATUS } from '@/components/evaluation/validation-status';
+import { useStepQualification } from '@/hooks/use-step-evaluation';
+import { routes } from '@/lib/routes';
 import type { LucideIcon } from 'lucide-react';
 import type { AgentDefinition } from '@mediforce/platform-core';
 
@@ -28,6 +31,8 @@ interface AgentEntry {
   metadata?: AgentMetadata;
   definitionId?: string;
   visibility?: 'public' | 'private';
+  /** A container agent of this workspace: the only kind an Eval Run assesses. */
+  evaluable?: boolean;
 }
 
 
@@ -39,6 +44,41 @@ function getAgentIcon(agentId: string): { Icon: LucideIcon; colorClass: string; 
   if (id.includes('script')) return { Icon: Terminal, colorClass: 'text-slate-500', bgClass: 'bg-slate-500/10' };
   if (id.includes('risk') || id.includes('driver') || id.includes('supply')) return { Icon: BarChart3, colorClass: 'text-emerald-500', bgClass: 'bg-emerald-500/10' };
   return { Icon: Bot, colorClass: 'text-primary', bgClass: 'bg-primary/10' };
+}
+
+/** The agent's current version and validation; the status links to its Evaluation tab. */
+function AgentValidationRows({ handle, definitionId }: { handle: string; definitionId: string }) {
+  const qualification = useStepQualification({ kind: 'agent', namespace: handle, agentId: definitionId });
+  const status = qualification.data?.validation.status;
+  const display = status === undefined ? undefined : VALIDATION_STATUS[status];
+  const agentVersion = qualification.data?.agentVersion ?? null;
+  return (
+    <>
+      <div className="grid grid-cols-[5rem_1fr] items-start px-4 py-2 gap-3">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground pt-0.5">Version</span>
+        <p className="text-xs text-foreground/80" data-testid="agent-card-version">
+          {qualification.isLoading ? '…' : agentVersion !== null ? `v${agentVersion}` : '—'}
+        </p>
+      </div>
+      <div className="grid grid-cols-[5rem_1fr] items-start px-4 py-2 gap-3">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground pt-0.5">Validation</span>
+        {display !== undefined && status !== undefined ? (
+          <Link
+            href={`${routes.agentDefinition(handle, definitionId)}?tab=evaluation`}
+            title={qualification.data?.validation.reason}
+            data-testid="agent-card-validation"
+            data-status={status}
+            className={cn('inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap', display.buttonClassName)}
+          >
+            <display.icon className="h-3 w-3" aria-hidden />
+            {display.versionLabel}
+          </Link>
+        ) : (
+          <p className="text-xs text-muted-foreground">{qualification.isLoading ? '…' : '—'}</p>
+        )}
+      </div>
+    </>
+  );
 }
 
 function AgentCard({ agent, handle }: { agent: AgentEntry; handle: string }) {
@@ -115,6 +155,9 @@ function AgentCard({ agent, handle }: { agent: AgentEntry; handle: string }) {
 
       {/* 5-row table: label | value */}
       <div className="border-t border-border/50 divide-y divide-border/50 flex-1">
+        {agent.definitionId !== undefined && agent.evaluable === true && (
+          <AgentValidationRows handle={handle} definitionId={agent.definitionId} />
+        )}
         <div className="grid grid-cols-[5rem_1fr] items-start px-4 py-2 gap-3">
           <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground pt-0.5">Model</span>
           <div>
@@ -211,11 +254,12 @@ function agentMatchesQuery(agent: AgentEntry, query: string): boolean {
   );
 }
 
-function agentDefinitionToEntry(def: AgentDefinition): AgentEntry {
+function agentDefinitionToEntry(def: AgentDefinition, namespace: string): AgentEntry {
   return {
     name: def.runtimeId ?? def.id,
     definitionId: def.id,
     visibility: def.visibility ?? 'private',
+    evaluable: def.kind === 'plugin' && def.runtimeId !== undefined && def.namespace === namespace,
     metadata: {
       name: def.name,
       description: def.description,
@@ -239,15 +283,7 @@ function AgentCatalog({ handle }: { handle: string }) {
     mediforce.agents
       .list({ namespace: handle })
       .then((definitionsData) => {
-        // Map from runtimeId → definition entry. Dedups definitions that share a
-        // runtimeId (e.g. an older seeded doc + the builtin-seeded doc).
-        const definitionByRuntimeId = new Map(
-          (definitionsData.agents ?? []).map((def) => {
-            const entry = agentDefinitionToEntry(def);
-            return [entry.name, entry] as const;
-          }),
-        );
-        setAgents([...definitionByRuntimeId.values()]);
+        setAgents((definitionsData.agents ?? []).map((def) => agentDefinitionToEntry(def, handle)));
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -307,7 +343,7 @@ function AgentCatalog({ handle }: { handle: string }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-tour="agents-grid">
           {filtered.map((agent) => (
-            <AgentCard key={agent.name} agent={agent} handle={handle} />
+            <AgentCard key={agent.definitionId ?? agent.name} agent={agent} handle={handle} />
           ))}
         </div>
       )}
@@ -328,7 +364,8 @@ export default function AgentsPage() {
               <p>
                 <strong>An agent is a reusable configuration a workflow step calls by id</strong> — a system prompt
                 plus the MCP servers that step is allowed to reach. One agent can power many steps, and agents are
-                not versioned, so editing one changes every step that already references it.
+                versioned: saving a change to its runtime, model, system prompt, output schema, MCP servers or Skills records a new
+                version, and a step that references the agent uses its current one.
               </p>
               <p>
                 A run uses the agent&apos;s foundation model unless the workflow step that calls it names its own.

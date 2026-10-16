@@ -1,13 +1,24 @@
+import { z } from 'zod';
 import { defineCommand, enumArg } from '../define-command';
 import { printJson } from '../output';
-import { readJsonFile, STEP_ARGS, stepFrom } from './eval-step-args';
+import { readJsonFile, STEP_ARGS, stepFrom, SUBJECT_ARGS, subjectFrom } from './eval-step-args';
+
+const EnvArgSchema = z.record(z.string(), z.string());
+
+function parseEnvArg(text: string): Record<string, string> | null {
+  try {
+    return EnvArgSchema.parse(JSON.parse(text));
+  } catch {
+    return null;
+  }
+}
 
 export const evalCaseListCommand = defineCommand({
   name: 'mediforce eval case-list',
   description: 'List a step\'s Eval Cases, newest first.',
-  args: { ...STEP_ARGS, 'include-archived': { type: 'boolean', description: 'Include archived cases' } },
+  args: { ...SUBJECT_ARGS, 'include-archived': { type: 'boolean', description: 'Include archived cases' } },
   async run({ args, output, mediforce, jsonMode }) {
-    const result = await mediforce.evaluation.listCases({ ...stepFrom(args), includeArchived: args['include-archived'] === true ? 'true' : undefined });
+    const result = await mediforce.evaluation.listCases({ ...subjectFrom(args), includeArchived: args['include-archived'] === true ? 'true' : undefined });
     if (jsonMode) {
       printJson(output, result);
       return 0;
@@ -42,10 +53,10 @@ export const evalCaseAddCommand = defineCommand({
   name: 'mediforce eval case-add',
   description: 'Add a hand-written Eval Case from a JSON file: { name, input, expectedOutput?, expectation?, comparison?, agreementInstructions?, evaluatorIds?, split? } '
     + '(expectation defaults to positive, comparison to exact, evaluatorIds to every Evaluator of the step).',
-  args: { ...STEP_ARGS, file: { type: 'string', required: true, description: 'JSON file with the case' } },
+  args: { ...SUBJECT_ARGS, file: { type: 'string', required: true, description: 'JSON file with the case' } },
   async run({ args, output, mediforce, jsonMode }) {
     const body = readJsonFile(args.file) as Record<string, unknown>;
-    const result = await mediforce.evaluation.createCase({ ...body, ...stepFrom(args) } as Parameters<typeof mediforce.evaluation.createCase>[0]);
+    const result = await mediforce.evaluation.createCase({ ...body, ...subjectFrom(args) } as Parameters<typeof mediforce.evaluation.createCase>[0]);
     if (jsonMode) printJson(output, result);
     else output.stdout(`Eval Case ${result.evalCase.id} added`);
     return 0;
@@ -127,9 +138,9 @@ export const evalCaseEditCommand = defineCommand({
 export const evalDatasetListCommand = defineCommand({
   name: 'mediforce eval dataset-list',
   description: 'List a step\'s saved Eval Dataset versions.',
-  args: { ...STEP_ARGS },
+  args: { ...SUBJECT_ARGS },
   async run({ args, output, mediforce, jsonMode }) {
-    const result = await mediforce.evaluation.listDatasets(stepFrom(args));
+    const result = await mediforce.evaluation.listDatasets(subjectFrom(args));
     if (jsonMode) {
       printJson(output, result);
       return 0;
@@ -145,10 +156,10 @@ export const evalDatasetListCommand = defineCommand({
 export const evalDatasetSaveCommand = defineCommand({
   name: 'mediforce eval dataset-save',
   description: 'Save the step\'s live Eval Cases (or --cases) as a new Dataset version.',
-  args: { ...STEP_ARGS, cases: { type: 'string', description: 'Comma-separated case ids (default: all live cases)' } },
+  args: { ...SUBJECT_ARGS, cases: { type: 'string', description: 'Comma-separated case ids (default: all live cases)' } },
   async run({ args, output, mediforce, jsonMode }) {
     const result = await mediforce.evaluation.saveDataset({
-      ...stepFrom(args),
+      ...subjectFrom(args),
       ...(args.cases !== undefined ? { caseIds: args.cases.split(',') } : {}),
     });
     if (jsonMode) printJson(output, result);
@@ -160,9 +171,9 @@ export const evalDatasetSaveCommand = defineCommand({
 export const evalMcpPolicyGetCommand = defineCommand({
   name: 'mediforce eval mcp-policy-get',
   description: 'Show what each of the step agent\'s MCP servers may do in an eval trial.',
-  args: { ...STEP_ARGS },
+  args: { ...SUBJECT_ARGS },
   async run({ args, output, mediforce, jsonMode }) {
-    const result = await mediforce.evaluation.getMcpPolicy(stepFrom(args));
+    const result = await mediforce.evaluation.getMcpPolicy(subjectFrom(args));
     if (jsonMode) {
       printJson(output, result);
       return 0;
@@ -179,13 +190,30 @@ export const evalMcpPolicyGetCommand = defineCommand({
 
 export const evalMcpPolicySetCommand = defineCommand({
   name: 'mediforce eval mcp-policy-set',
-  description: 'Replace the step\'s MCP eval policy from a JSON file: { "<server>": { "mode": "live"|"replay"|"deny", "denyTools"?: [] } }. A live trial records each server\'s responses per case; replay answers from them, and runs a case with no recording yet live to record it.',
-  args: { ...STEP_ARGS, file: { type: 'string', required: true, description: 'JSON file with the servers map' } },
+  description: 'Replace the step\'s MCP eval policy from a JSON file: { "<server>": { "mode": "live"|"replay"|"deny", "denyTools"?: [] } }. A live trial records each server\'s responses per case; replay answers from them, and runs a case with no recording yet live to record it. For an agent, --env replaces the step env its trials run with; what is left out is kept.',
+  args: {
+    ...SUBJECT_ARGS,
+    file: { type: 'string', description: 'JSON file with the servers map' },
+    env: { type: 'string', description: 'An agent\'s trial env as JSON of secret templates, e.g. \'{"OPENROUTER_API_KEY":"{{OPENROUTER_API_KEY}}"}\'' },
+  },
   async run({ args, output, mediforce, jsonMode }) {
-    const servers = readJsonFile(args.file) as Parameters<typeof mediforce.evaluation.setMcpPolicy>[0]['servers'];
-    const result = await mediforce.evaluation.setMcpPolicy({ ...stepFrom(args), servers });
+    if (args.file === undefined && args.env === undefined) {
+      output.stderr('Give --file (the servers map), --env, or both');
+      return 2;
+    }
+    const servers = args.file === undefined ? undefined : readJsonFile(args.file) as Parameters<typeof mediforce.evaluation.setMcpPolicy>[0]['servers'];
+    const env = args.env === undefined ? undefined : parseEnvArg(args.env);
+    if (env === null) {
+      output.stderr('--env must be a JSON object of string values');
+      return 2;
+    }
+    const result = await mediforce.evaluation.setMcpPolicy({
+      ...subjectFrom(args),
+      ...(servers === undefined ? {} : { servers }),
+      ...(env === undefined ? {} : { env }),
+    });
     if (jsonMode) printJson(output, result);
-    else output.stdout(`MCP eval policy set for ${Object.keys(result.policy.servers).length} server(s)`);
+    else output.stdout(`MCP eval policy set for ${Object.keys(result.policy.servers).length} server(s), ${Object.keys(result.policy.env).length} env var(s)`);
     return 0;
   },
 });

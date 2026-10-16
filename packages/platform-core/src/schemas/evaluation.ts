@@ -3,9 +3,10 @@ import { AgentOutputSchemaSchema } from './workflow-definition';
 
 /**
  * The Evaluation domain of ADR-0023: everything is owned by one agent Workflow
- * Step, keyed by `(namespace, workflowName, stepId)` and kept outside the
- * immutable Workflow Definition, so adding a check never mints a Definition
- * version (D2).
+ * Step, keyed by `(namespace, workflowName, stepId)`, or by one Agent evaluated
+ * on its own (ADR-0029), keyed by `(namespace, agentId)`. It is kept outside
+ * the immutable Workflow Definition, so adding a check never mints a
+ * Definition version (D2).
  */
 export const EvaluatedStepSchema = z.object({
   namespace: z.string().min(1),
@@ -13,11 +14,85 @@ export const EvaluatedStepSchema = z.object({
   stepId: z.string().min(1),
 });
 
+/**
+ * What an Evaluation call is about, as a request names it: a Step by
+ * `workflowName` and `stepId`, or an Agent by `agentId` — one of the two
+ * (ADR-0029). `evaluationSubjectOf` says which, or that it is neither.
+ */
+export const EvaluationSubjectRefSchema = z.object({
+  namespace: z.string().min(1),
+  workflowName: z.string().min(1).nullish(),
+  stepId: z.string().min(1).nullish(),
+  agentId: z.string().min(1).nullish(),
+});
+
+/**
+ * Who owns an Evaluation row: a Step (`workflowName` and `stepId`, no
+ * `agentId`) or an Agent (`agentId` alone), in the owner's namespace.
+ */
+export const EvaluationOwnerSchema = z.object({
+  namespace: z.string().min(1),
+  workflowName: z.string().min(1).nullable(),
+  stepId: z.string().min(1).nullable(),
+  /** Absent on records written before Agents could own an Evaluation. */
+  agentId: z.string().min(1).nullable().default(null),
+});
+
+export type EvaluationSubjectRef = z.infer<typeof EvaluationSubjectRefSchema>;
+export type EvaluationOwner = z.infer<typeof EvaluationOwnerSchema>;
+
+/** What an Evaluation is about: one agent Workflow Step, or one Agent on its own (ADR-0029). */
+export type EvaluationSubject =
+  | { kind: 'step'; namespace: string; workflowName: string; stepId: string }
+  | { kind: 'agent'; namespace: string; agentId: string };
+
+/** The subject a request or a row names; null when it names neither a Step nor an Agent, or both. */
+export function evaluationSubjectOf(ref: {
+  namespace: string;
+  workflowName?: string | null;
+  stepId?: string | null;
+  agentId?: string | null;
+}): EvaluationSubject | null {
+  const names = (value: string | null | undefined): value is string => typeof value === 'string' && value.length > 0;
+  const step = names(ref.workflowName) && names(ref.stepId);
+  const agent = names(ref.agentId);
+  if (step === agent) return null;
+  if (agent) return { kind: 'agent', namespace: ref.namespace, agentId: ref.agentId as string };
+  return { kind: 'step', namespace: ref.namespace, workflowName: ref.workflowName as string, stepId: ref.stepId as string };
+}
+
+/** The owner columns a row of `subject` carries. */
+export function evaluationOwnerOf(subject: EvaluationSubject): EvaluationOwner {
+  return subject.kind === 'agent'
+    ? { namespace: subject.namespace, workflowName: null, stepId: null, agentId: subject.agentId }
+    : { namespace: subject.namespace, workflowName: subject.workflowName, stepId: subject.stepId, agentId: null };
+}
+
+/** Whether two rows have the same owner. */
+export function isSameOwner(left: EvaluationOwner, right: EvaluationOwner): boolean {
+  return left.namespace === right.namespace
+    && left.workflowName === right.workflowName
+    && left.stepId === right.stepId
+    && left.agentId === right.agentId;
+}
+
+/** Whether a row belongs to `subject`. */
+export function isOwnedBy(row: EvaluationOwner, subject: EvaluationSubject): boolean {
+  return isSameOwner(row, evaluationOwnerOf(subject));
+}
+
+/** A subject in words: `step 'extract' of 'intake'`, or `agent 'reviewer'`. */
+export function describeEvaluationSubject(subject: EvaluationSubject): string {
+  return subject.kind === 'agent'
+    ? `agent '${subject.agentId}'`
+    : `step '${subject.stepId}' of '${subject.workflowName}'`;
+}
+
 /** Who put a thing there: a person, or the Evaluation Assistant's proposal a person accepted. */
 export const EvaluationOriginSchema = z.enum(['user', 'assistant']);
 
 /** A Step's context of use (D16). Every write is a new version. */
-export const EvaluationBriefSchema = EvaluatedStepSchema.extend({
+export const EvaluationBriefSchema = EvaluationOwnerSchema.extend({
   version: z.number().int().positive(),
   text: z.string().min(1).max(4000),
   origin: EvaluationOriginSchema,
@@ -106,7 +181,7 @@ export const SourceApprovalSchema = z.object({
 export const EvaluatorOnErrorSchema = z.enum(['ignore', 'escalate']);
 
 /** Evaluator identity. What it checks lives on its versions. */
-export const EvaluatorSchema = EvaluatedStepSchema.extend({
+export const EvaluatorSchema = EvaluationOwnerSchema.extend({
   id: z.uuid(),
   /** Stable handle, also the name of the Scores it writes. */
   name: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/, 'lowercase letters, digits and dashes'),
@@ -248,7 +323,7 @@ export function hasPerturbationChange(spec: { inputChanges?: readonly unknown[];
   return (spec.inputChanges?.length ?? 0) + (spec.fileChanges?.length ?? 0) > 0;
 }
 
-export const EvalCaseSchema = EvaluatedStepSchema.extend(EvalCaseLabelSchema.shape).extend({
+export const EvalCaseSchema = EvaluationOwnerSchema.extend(EvalCaseLabelSchema.shape).extend({
   id: z.uuid(),
   name: z.string().min(1).max(200),
   input: EvalCaseInputSchema,
@@ -267,7 +342,7 @@ export const EvalCaseSchema = EvaluatedStepSchema.extend(EvalCaseLabelSchema.sha
 });
 
 /** A saved set of a Step's Eval Cases; an Eval Run runs one of these. */
-export const EvalDatasetVersionSchema = EvaluatedStepSchema.extend({
+export const EvalDatasetVersionSchema = EvaluationOwnerSchema.extend({
   id: z.uuid(),
   version: z.number().int().positive(),
   caseIds: z.array(z.uuid()).min(1),
@@ -304,7 +379,7 @@ export const McpTapeSchema = z.object({
  * One live trial's recording of one MCP server for one Eval Case (D6).
  * Append-only; a replay merges every recording of the case, newest last.
  */
-export const McpRecordingSchema = EvaluatedStepSchema.extend({
+export const McpRecordingSchema = EvaluationOwnerSchema.extend({
   id: z.uuid(),
   caseId: z.uuid(),
   server: z.string().min(1),
@@ -321,8 +396,10 @@ export const McpReplayMissSchema = z.object({
   arguments: z.record(z.string(), z.unknown()),
 });
 
-export const McpEvalPolicySchema = EvaluatedStepSchema.extend({
+export const McpEvalPolicySchema = EvaluationOwnerSchema.extend({
   servers: z.record(z.string().min(1), McpEvalServerPolicySchema),
+  /** An Agent's Evaluation only: the step env its trials run with, as a Workflow Step declares it — secret templates, never values. */
+  env: z.record(z.string(), z.string()).default({}),
   updatedBy: z.string().min(1),
   updatedAt: z.iso.datetime(),
 });
@@ -370,7 +447,7 @@ export const StoredAcceptanceCriteriaSchema = z.union([
 ]);
 
 /** A Step's Acceptance Criteria, set before an Eval Run and frozen into it. Every write is a new version. */
-export const AcceptanceCriteriaVersionSchema = EvaluatedStepSchema.extend({
+export const AcceptanceCriteriaVersionSchema = EvaluationOwnerSchema.extend({
   version: z.number().int().positive(),
   criteria: StoredAcceptanceCriteriaSchema,
   origin: EvaluationOriginSchema,

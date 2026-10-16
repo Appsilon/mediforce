@@ -16,8 +16,9 @@ import {
   CreatePerturbedEvalCaseInputSchema,
 } from '../../../contract/evaluation';
 import { listCommitFiles, readCommitFile } from '@mediforce/agent-runtime';
-import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, type EvaluationFixture } from './fixture';
+import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, type EvaluationFixture, STEP_OWNER } from './fixture';
 import { gitWorkspace } from './git-workspace';
+import { userCaller } from '../../../repositories/__tests__/create-test-scope';
 
 async function reviewVerdict(fixture: EvaluationFixture, agentRunId: string, value: number, comment: string | null) {
   await recordScore({
@@ -54,7 +55,7 @@ describe('Eval Cases', () => {
     const { evalCase } = await harvest({ agentRunId: UNGRADED_RUN });
 
     expect(evalCase).toMatchObject({
-      ...STEP,
+      ...STEP_OWNER,
       source: 'production',
       sourceAgentRunId: UNGRADED_RUN,
       expectation: 'negative',
@@ -113,7 +114,7 @@ describe('Eval Cases', () => {
 
   it('refuses a case that selects an Evaluator its step does not have', async () => {
     const elsewhere = '00000000-0000-4000-8000-0000000000ff';
-    await expect(write({ evaluatorIds: [elsewhere] })).rejects.toThrow(`Step 'grade-aes' has no live Evaluator '${elsewhere}'`);
+    await expect(write({ evaluatorIds: [elsewhere] })).rejects.toThrow(`Step 'grade-aes' of '${STEP.workflowName}' has no live Evaluator '${elsewhere}'`);
     const { evaluator: archived } = await createEvaluator(
       { ...STEP, name: 'retired', rule: 'r', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user', runInProduction: false },
       fixture.scope(),
@@ -253,5 +254,51 @@ describe('Eval Cases', () => {
     await expect(synthesize({ ...base, inputChanges: [{ op: 'remove', part: 'triggerPayload', path: ['armCode'] }] }))
       .rejects.toThrow('there is nothing there to remove');
     expect((await listEvalCases(STEP, fixture.scope())).cases).toEqual([]);
+  });
+});
+
+describe('Eval Cases of an Agent (ADR-0029)', () => {
+  let fixture: EvaluationFixture;
+  const AGENT = { namespace: NAMESPACE, agentId: 'ae-grader-public' } as const;
+  const outsider = userCaller('outsider-1', ['pharma-b']);
+
+  async function addAgent(id: string, visibility: 'public' | 'private') {
+    await fixture.agentDefinitionRepo.upsert(id, {
+      kind: 'plugin', name: id, iconName: 'bot', description: 'Grades AEs', runtimeId: 'claude-code-agent',
+      foundationModel: 'anthropic/claude-sonnet-4', systemPrompt: 'You grade AEs.', inputDescription: 'AEs', outputDescription: 'Grades',
+      namespace: NAMESPACE, visibility,
+    });
+  }
+
+  function caseOf(agentId: string, input: Record<string, unknown>) {
+    return CreateEvalCaseInputSchema.parse({ namespace: NAMESPACE, agentId, name: 'Neutropenia', input });
+  }
+
+  beforeEach(async () => {
+    fixture = await evaluationFixture();
+    await addAgent(AGENT.agentId, 'public');
+    await addAgent('ae-grader-private', 'private');
+  });
+
+  it('lets anyone who can see a public Agent read its suite, but only its workspace change it', async () => {
+    await createEvalCase(caseOf(AGENT.agentId, { triggerPayload: { events: [] }, previousStepOutputs: {} }), fixture.scope());
+
+    const { cases } = await listEvalCases({ ...AGENT }, fixture.scope(outsider));
+    expect(cases.map((evalCase) => evalCase.name)).toEqual(['Neutropenia']);
+    await expect(createEvalCase(caseOf(AGENT.agentId, { triggerPayload: {}, previousStepOutputs: {} }), fixture.scope(outsider)))
+      .rejects.toMatchObject({ code: 'not_found' });
+    await expect(listEvalCases({ namespace: NAMESPACE, agentId: 'ae-grader-private' }, fixture.scope(outsider)))
+      .rejects.toMatchObject({ code: 'not_found' });
+  });
+
+  it('refuses the outputs of earlier steps and a previous run: the trigger payload is the Agent\'s whole input', async () => {
+    await expect(createEvalCase(caseOf(AGENT.agentId, { triggerPayload: {}, previousStepOutputs: { extract: { events: [] } } }), fixture.scope()))
+      .rejects.toMatchObject({ code: 'validation' });
+    await expect(createEvalCase(caseOf(AGENT.agentId, { triggerPayload: {}, previousStepOutputs: {}, previousRun: { verdict: 'revise' } }), fixture.scope()))
+      .rejects.toMatchObject({ code: 'validation' });
+
+    const { evalCase } = await createEvalCase(caseOf(AGENT.agentId, { triggerPayload: { events: [] }, previousStepOutputs: {} }), fixture.scope());
+    await expect(updateEvalCase({ caseId: evalCase.id, input: { triggerPayload: { events: [] }, previousStepOutputs: { extract: {} } } }, fixture.scope()))
+      .rejects.toMatchObject({ code: 'validation' });
   });
 });

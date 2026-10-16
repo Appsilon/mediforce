@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import type { AgentDefinition } from '../../schemas/agent-definition';
 import type { AgentDefinitionRepository } from '../../repositories/agent-definition-repository';
 import type { WorkflowDefinition, WorkflowStep } from '../../schemas/workflow-definition';
-import { applyAgentModel, resolveDefinitionModels } from '../agent-models';
+import { applyAgentModel, applyAgentOutputSchema, resolveDefinitionModels } from '../agent-models';
 
 function makeAgent(overrides: Partial<AgentDefinition> = {}): AgentDefinition {
   return {
@@ -25,6 +25,30 @@ function makeAgent(overrides: Partial<AgentDefinition> = {}): AgentDefinition {
 function makeRepo(agent: AgentDefinition | null): Pick<AgentDefinitionRepository, 'getById'> {
   return { getById: vi.fn().mockResolvedValue(agent) };
 }
+
+describe('applyAgentOutputSchema', () => {
+  const agentStep: WorkflowStep = { id: 's1', name: 'S1', type: 'creation', executor: 'agent', agentId: 'a1' };
+  const agentSchema = { type: 'object' as const, required: ['classification'] };
+
+  it('fills in the agent output schema when the step declares none', () => {
+    expect(applyAgentOutputSchema(agentStep, agentSchema).agent?.outputSchema).toEqual(agentSchema);
+  });
+
+  it('leaves a step that declares its own output schema alone', () => {
+    const stepSchema = { type: 'object' as const, required: ['verdict'] };
+    const step = { ...agentStep, agent: { outputSchema: stepSchema } };
+    expect(applyAgentOutputSchema(step, agentSchema).agent?.outputSchema).toEqual(stepSchema);
+  });
+
+  it('leaves the step unchanged when the agent declares no output schema', () => {
+    expect(applyAgentOutputSchema(agentStep, undefined)).toBe(agentStep);
+  });
+
+  it('never gives a script step an output schema', () => {
+    const scriptStep: WorkflowStep = { ...agentStep, executor: 'script' };
+    expect(applyAgentOutputSchema(scriptStep, agentSchema)).toBe(scriptStep);
+  });
+});
 
 describe('applyAgentModel', () => {
   const agentStep: WorkflowStep = { id: 's1', name: 'S1', type: 'creation', executor: 'agent', agentId: 'a1' };

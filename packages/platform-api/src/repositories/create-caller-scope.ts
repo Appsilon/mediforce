@@ -154,7 +154,7 @@ export function createCallerScope(
     agentEvents: new AuthorizedAgentEventRepository(caller, services.agentEventRepo),
     agentTrajectories: new AuthorizedAgentTrajectoryRepository(caller, services.agentTrajectoryRepo),
     scores: new AuthorizedScoreRepository(caller, services.scoreRepo),
-    evaluation: new AuthorizedEvaluationRepository(caller, services.evaluationRepo),
+    evaluation: new AuthorizedEvaluationRepository(caller, services.evaluationRepo, services.agentDefinitionRepo),
     auditEvents: new AuthorizedAuditEventRepository(caller, services.auditRepo),
     handoffs: new AuthorizedHandoffRepository(caller, services.handoffRepo),
     toolCatalog: new AuthorizedToolCatalogRepository(caller, services.toolCatalogRepo),

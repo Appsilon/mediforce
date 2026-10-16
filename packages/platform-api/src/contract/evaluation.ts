@@ -3,6 +3,7 @@ import {
   AcceptanceCriteriaSchema,
   AcceptanceCriteriaVersionSchema,
   AgentRunSchema,
+  AgentVersionSchema,
   EvalCaseComparisonSchema,
   EvalCaseExpectationSchema,
   EvalCaseInputSchema,
@@ -20,6 +21,7 @@ import {
   JudgeVerdictSchema,
   StoredAgentTrajectoryEntrySchema,
   EvaluatedStepSchema,
+  EvaluationSubjectRefSchema,
   EvaluationBriefSchema,
   EvaluationOriginSchema,
   EvaluatorCheckSchema,
@@ -44,14 +46,16 @@ import {
  * Contracts for the Evaluation domain (ADR-0023): Evaluation Briefs,
  * Evaluators, Eval Cases, Eval Datasets, MCP eval policies, Acceptance
  * Criteria, Eval Runs and Step Qualifications. Every read and write names the
- * agent Workflow Step it belongs to by `(namespace, workflowName, stepId)`;
- * writes need the workflow's `edit` verb.
+ * agent Workflow Step it belongs to by `(namespace, workflowName, stepId)`,
+ * or the Agent by `(namespace, agentId)` (ADR-0029); writes need the
+ * workflow's `edit` verb, or the right to change the Agent. Harvesting cases
+ * from production runs, drift and previews stay a Step's.
  */
 
 /** A query-string boolean. */
 const QueryBooleanSchema = z.enum(['true', 'false']).transform((value) => value === 'true');
 
-export const GetEvaluationBriefInputSchema = EvaluatedStepSchema;
+export const GetEvaluationBriefInputSchema = EvaluationSubjectRefSchema;
 export const GetEvaluationBriefOutputSchema = z.object({
   /** The current Brief; null until one is written. */
   brief: EvaluationBriefSchema.nullable(),
@@ -59,7 +63,7 @@ export const GetEvaluationBriefOutputSchema = z.object({
   versions: z.array(EvaluationBriefSchema),
 });
 
-export const SetEvaluationBriefInputSchema = EvaluatedStepSchema.extend({
+export const SetEvaluationBriefInputSchema = EvaluationSubjectRefSchema.extend({
   text: z.string().trim().min(1).max(4000),
   origin: EvaluationOriginSchema.default('user'),
 });
@@ -87,7 +91,7 @@ export const EvaluatorViewSchema = EvaluatorSchema.extend({
   production: EvaluatorProductionSchema,
 });
 
-export const ListEvaluatorsInputSchema = EvaluatedStepSchema.extend({
+export const ListEvaluatorsInputSchema = EvaluationSubjectRefSchema.extend({
   includeArchived: QueryBooleanSchema.optional(),
 });
 export const ListEvaluatorsOutputSchema = z.object({ evaluators: z.array(EvaluatorViewSchema) });
@@ -95,7 +99,7 @@ export const ListEvaluatorsOutputSchema = z.object({ evaluators: z.array(Evaluat
 export const GetEvaluatorInputSchema = z.object({ evaluatorId: z.uuid() });
 export const EvaluatorOutputSchema = z.object({ evaluator: EvaluatorViewSchema });
 
-export const CreateEvaluatorInputSchema = EvaluatedStepSchema.extend({
+export const CreateEvaluatorInputSchema = EvaluationSubjectRefSchema.extend({
   name: EvaluatorSchema.shape.name,
   rule: z.string().trim().min(1).max(2000),
   check: EvaluatorCheckSchema,
@@ -189,12 +193,12 @@ export const GetAgentRunIoOutputSchema = z.object({
   verdictExpectation: EvalCaseExpectationSchema.nullable(),
 });
 
-export const ListEvalCasesInputSchema = EvaluatedStepSchema.extend({
+export const ListEvalCasesInputSchema = EvaluationSubjectRefSchema.extend({
   includeArchived: QueryBooleanSchema.optional(),
 });
 export const ListEvalCasesOutputSchema = z.object({ cases: z.array(EvalCaseSchema) });
 
-export const CreateEvalCaseInputSchema = EvaluatedStepSchema.extend({
+export const CreateEvalCaseInputSchema = EvaluationSubjectRefSchema.extend({
   name: z.string().trim().min(1).max(200),
   input: EvalCaseInputSchema,
   workspaceSeedCommit: EvalCaseSchema.shape.workspaceSeedCommit.default(null),
@@ -274,11 +278,11 @@ export const UpdateEvalCaseInputSchema = z.object({
   split: EvalCaseSplitSchema.optional(),
 });
 
-export const ListEvalDatasetsInputSchema = EvaluatedStepSchema;
+export const ListEvalDatasetsInputSchema = EvaluationSubjectRefSchema;
 export const ListEvalDatasetsOutputSchema = z.object({ datasets: z.array(EvalDatasetVersionSchema) });
 
 /** Saves the Step's live cases (or the named ones) as a new Dataset version. */
-export const SaveEvalDatasetInputSchema = EvaluatedStepSchema.extend({
+export const SaveEvalDatasetInputSchema = EvaluationSubjectRefSchema.extend({
   caseIds: z.array(z.uuid()).min(1).optional(),
 });
 export const SaveEvalDatasetOutputSchema = z.object({ dataset: EvalDatasetVersionSchema });
@@ -292,19 +296,22 @@ export const EffectiveMcpEvalServerSchema = McpEvalServerPolicySchema.extend({
   recordedCaseIds: z.array(z.uuid()),
 });
 
-export const GetMcpEvalPolicyInputSchema = EvaluatedStepSchema;
+export const GetMcpEvalPolicyInputSchema = EvaluationSubjectRefSchema;
 export const GetMcpEvalPolicyOutputSchema = z.object({
   policy: McpEvalPolicySchema.nullable(),
   /** Every server the Step's agent binds, as a trial would see it. */
   servers: z.array(EffectiveMcpEvalServerSchema),
 });
 
-export const SetMcpEvalPolicyInputSchema = EvaluatedStepSchema.extend({
-  servers: z.record(z.string().min(1), McpEvalServerPolicySchema),
+/** Each part left out keeps what the policy has now. */
+export const SetMcpEvalPolicyInputSchema = EvaluationSubjectRefSchema.extend({
+  servers: z.record(z.string().min(1), McpEvalServerPolicySchema).optional(),
+  /** An Agent's only: the step env its trials run with, e.g. `{ OPENROUTER_API_KEY: '{{OPENROUTER_API_KEY}}' }`. */
+  env: z.record(z.string(), z.string()).optional(),
 });
 export const SetMcpEvalPolicyOutputSchema = z.object({ policy: McpEvalPolicySchema });
 
-export const GetAcceptanceCriteriaInputSchema = EvaluatedStepSchema;
+export const GetAcceptanceCriteriaInputSchema = EvaluationSubjectRefSchema;
 export const GetAcceptanceCriteriaOutputSchema = z.object({
   /** The current Acceptance Criteria; null until some are set. */
   criteria: AcceptanceCriteriaVersionSchema.nullable(),
@@ -313,7 +320,7 @@ export const GetAcceptanceCriteriaOutputSchema = z.object({
 });
 
 /** Sets the Step's Acceptance Criteria as a new version; the next Eval Run prepared freezes them (D10). */
-export const SetAcceptanceCriteriaInputSchema = EvaluatedStepSchema.extend({
+export const SetAcceptanceCriteriaInputSchema = EvaluationSubjectRefSchema.extend({
   criteria: AcceptanceCriteriaSchema,
   origin: EvaluationOriginSchema.default('user'),
 });
@@ -325,7 +332,7 @@ export const SetAcceptanceCriteriaOutputSchema = z.object({ criteria: Acceptance
  * policy, its Acceptance Criteria, and the Step with its Step Fingerprint —
  * and estimates the cost. Nothing runs until `start`.
  */
-export const PrepareEvalRunInputSchema = EvaluatedStepSchema.extend({
+export const PrepareEvalRunInputSchema = EvaluationSubjectRefSchema.extend({
   /** The Workflow Definition version whose step runs; its runnable version when absent. */
   definitionVersion: z.number().int().positive().optional(),
   datasetVersionId: z.uuid().optional(),
@@ -364,9 +371,11 @@ export const EvalRunOutputSchema = z.object({
   evalRun: EvalRunSchema,
   trials: z.array(EvalTrialSchema),
   report: EvalRunReportSchema,
+  /** The Agent version an Agent's run assessed, with its configuration (ADR-0029); null on a Step's run. */
+  assessedAgentVersion: AgentVersionSchema.nullable().default(null),
 });
 
-export const ListEvalRunsInputSchema = EvaluatedStepSchema;
+export const ListEvalRunsInputSchema = EvaluationSubjectRefSchema;
 
 export const ListEvalRunsOutputSchema = z.object({
   evalRuns: z.array(EvalRunSchema),
@@ -501,7 +510,7 @@ export const GetEvalRunFailuresOutputSchema = z.object({
  * runnable version has it; with `definitionVersion`, as that version has it —
  * what a run of that version ran.
  */
-export const GetStepQualificationInputSchema = EvaluatedStepSchema.extend({
+export const GetStepQualificationInputSchema = EvaluationSubjectRefSchema.extend({
   definitionVersion: z.coerce.number().int().positive().optional(),
 });
 /**
@@ -522,6 +531,12 @@ export const StepValidationSchema = z.object({
   runVerdict: z.enum(['passed', 'missed', 'not_judged']).optional(),
   /** An Eval Run of the step is running; the status is read again once it ends. */
   runInProgress: z.boolean(),
+  /** The validated Agent a step without a verdict of its own runs as it is, whose validation it reads (ADR-0029 D8). */
+  inheritedFromAgent: z.object({
+    agentId: z.string(),
+    name: z.string(),
+    version: z.number().int().positive(),
+  }).optional(),
 });
 
 export const GetStepQualificationOutputSchema = z.object({
@@ -529,7 +544,10 @@ export const GetStepQualificationOutputSchema = z.object({
   validation: StepValidationSchema,
   /** A signed qualification that binds this Fingerprint, else the newest one; null when there is none. */
   qualification: StepQualificationSchema.nullable(),
-  definitionVersion: z.number().int().positive(),
+  /** The workflow version a Step's badge is for; null on an Agent's. */
+  definitionVersion: z.number().int().positive().nullable(),
+  /** An Agent's version as it stands now (ADR-0029); null on a Step's, or when the Agent changed since its newest version was recorded. */
+  agentVersion: z.number().int().positive().nullable().default(null),
   /** The Step's Fingerprint in that version. */
   fingerprint: StepFingerprintSchema,
   /** What differs from the qualified Fingerprint; empty unless stale. */

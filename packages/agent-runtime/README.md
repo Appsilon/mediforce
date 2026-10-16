@@ -36,10 +36,17 @@ calibrated.
 Timeouts and errors are envelope outcomes too: `FallbackHandler` escalates
 them to a person, never an exception a plugin swallows.
 
-`agent.outputSchema` is the runner's check too: it validates `result`, reruns
-the plugin once with the violation in `context.outputSchemaViolation` — within
-what is left of the one step timeout — then escalates with reason
-`output_schema` (ADR-0023 D13).
+`agent.outputSchema` is the runner's check too: it validates `result`, and a
+violating one is reshaped by one `context.llm` call on the step's model
+(`repairOutput` in `output-schema.ts`) — not by rerunning the plugin — within
+what is left of the one step timeout. The repair may only rearrange what the
+result already says, and that is checked: a reshaped result carrying a value
+the original does not contain is rejected. It is validated again, keeps the
+agent's original in an annotation and in the `agent.run` audit event
+(`reshapedBy`, `originalResult`), and one that still violates escalates with
+reason `output_schema` (ADR-0023 D13). A repair call the timeout cuts short is
+not aborted; its late answer is dropped. `AgentStepExecutor` writes the reason of every
+escalation that fails the step to the step execution's and the run's `error`.
 
 **An optional `context.outputGate` checks a result that passed `outputSchema`.**
 It runs before the autonomy routing, receives the Agent Run id, context and

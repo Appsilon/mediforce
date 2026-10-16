@@ -1,6 +1,6 @@
 'use client';
 
-import type { EvaluatedStep, StepQualificationStatus } from '@mediforce/platform-core';
+import type { EvaluationSubject, StepQualificationStatus } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { useStepQualification } from '@/hooks/use-step-evaluation';
 
@@ -25,7 +25,7 @@ function QualificationStatusChip({ status, title }: { status: StepQualificationS
  * what a run of that version ran. Renders nothing while loading or when the
  * step cannot be evaluated.
  */
-export function StepQualificationBadge({ step, definitionVersion }: { step: EvaluatedStep; definitionVersion?: number }) {
+export function StepQualificationBadge({ step, definitionVersion }: { step: EvaluationSubject; definitionVersion?: number }) {
   const { data } = useStepQualification(step, definitionVersion);
   if (data === undefined) return null;
   const title = data.status === 'stale'

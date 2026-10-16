@@ -3,6 +3,7 @@ import {
   AgentDefinitionSchema,
   AgentMcpBindingMapSchema,
   AgentMcpBindingSchema,
+  AgentVersionSchema,
   CreateAgentDefinitionInputSchema,
   PublicAgentOAuthTokenSchema,
   UpdateAgentDefinitionInputSchema,
@@ -91,6 +92,16 @@ export const ListAgentMcpBindingsOutputSchema = z.object({
 });
 export type ListAgentMcpBindingsInput = z.infer<typeof ListAgentMcpBindingsInputSchema>;
 export type ListAgentMcpBindingsOutput = z.infer<typeof ListAgentMcpBindingsOutputSchema>;
+
+/** An Agent's versions (ADR-0029), newest first, and which of them it has now. */
+export const ListAgentVersionsInputSchema = z.object({ id: z.string().min(1) });
+export const ListAgentVersionsOutputSchema = z.object({
+  versions: z.array(AgentVersionSchema),
+  /** The version whose configuration the Agent has now; null when it changed since its newest version was recorded. */
+  current: z.number().int().positive().nullable(),
+});
+export type ListAgentVersionsInput = z.infer<typeof ListAgentVersionsInputSchema>;
+export type ListAgentVersionsOutput = z.infer<typeof ListAgentVersionsOutputSchema>;
 
 // Returns sanitized tokens (no access/refresh tokens) for the agent UI.
 export const ListAgentOAuthTokensInputSchema = z.object({

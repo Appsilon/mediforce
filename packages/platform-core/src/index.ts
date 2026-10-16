@@ -55,6 +55,12 @@ export {
   ScoreSourceSchema,
   ScoreSchema,
   EvaluatedStepSchema,
+  EvaluationSubjectRefSchema,
+  EvaluationOwnerSchema,
+  evaluationSubjectOf,
+  evaluationOwnerOf,
+  isOwnedBy,
+  describeEvaluationSubject,
   EvaluationOriginSchema,
   EvaluationBriefSchema,
   EvaluatorKindSchema,
@@ -288,6 +294,9 @@ export {
 export type { Handle } from './schemas/handle';
 export type {
   EvaluatedStep,
+  EvaluationSubject,
+  EvaluationSubjectRef,
+  EvaluationOwner,
   EvaluationOrigin,
   EvaluationBrief,
   EvaluatorKind,
@@ -358,6 +367,8 @@ export {
   FixKindSchema,
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
+  EVALUATION_ASSISTANT_TOOLSETS,
+  pickTools,
   EvaluationAssistantProposalSchema,
   type EvaluationAssistantProposalToolName,
   type EvaluationAssistantPlatformToolName,
@@ -655,6 +666,7 @@ export {
   AgentVisibilitySchema,
   CreateAgentDefinitionInputSchema,
   UpdateAgentDefinitionInputSchema,
+  mergeAgentUpdate,
   mayHoldSkill,
   type SkillHolder,
 } from './schemas/agent-definition';
@@ -666,6 +678,15 @@ export type {
   UpdateAgentDefinitionInput,
 } from './schemas/agent-definition';
 export type { AgentDefinitionRepository } from './repositories/agent-definition-repository';
+export {
+  AgentVersionSchema,
+  AGENT_EVAL_STEP_ID,
+  agentEvalDefinition,
+  agentStepChanges,
+  type AgentConfigSnapshot,
+  type AgentStepChange,
+  type AgentVersion,
+} from './schemas/agent-version';
 
 // Skill (ADR-0025)
 export {
@@ -794,7 +815,8 @@ export type {
 } from './workflows/resolve-runnable-version';
 export { carriedDockerfile, stepHasBuildSource } from './workflows/build-source';
 export { resolveStepAssignee, resolveInstanceAssignee, type ResolvedStepAssignee } from './workflows/step-assignee';
-export { applyAgentModel, resolveDefinitionModels } from './workflows/agent-models';
+export { resolvePreviousStepId } from './workflows/previous-step';
+export { applyAgentModel, applyAgentOutputSchema, resolveDefinitionModels } from './workflows/agent-models';
 export {
   stepContainerConfig,
   allowedRepoHosts,

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import type { AgentOutputSchema, EvaluatedStep } from '@mediforce/platform-core';
+import type { AgentOutputSchema, EvaluationSubject } from '@mediforce/platform-core';
 import { useStepEvaluation, useWorkflowValidation } from '@/hooks/use-step-evaluation';
 import { useWorkflowRunGate } from '@/hooks/use-workflow-access';
 import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
@@ -97,9 +97,13 @@ function AssistantResizeHandle({ width, resize, persist, commit }: ReturnType<ty
   );
 }
 
-function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit, editReason, mayRun, runReason }: {
-  step: EvaluatedStep;
-  definitionVersion: number;
+/**
+ * One subject's Evaluation beside its assistant: an agent Step in one workflow
+ * version, or an Agent on its own (ADR-0029), with no version to pick.
+ */
+export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit, editReason, mayRun, runReason }: {
+  step: EvaluationSubject;
+  definitionVersion: number | null;
   outputSchema: AgentOutputSchema | undefined;
   mayEdit: boolean;
   editReason: string | undefined;
@@ -239,7 +243,7 @@ export function EvaluationTab({ handle, workflowName, runnableVersion, mayEdit, 
       ) : (
         <StepEvaluation
           key={`${selectedVersion}:${selected.id}`}
-          step={{ namespace: handle, workflowName, stepId: selected.id }}
+          step={{ kind: 'step', namespace: handle, workflowName, stepId: selected.id }}
           definitionVersion={selectedVersion}
           outputSchema={selected.agent?.outputSchema}
           mayEdit={mayEdit}

@@ -2,6 +2,7 @@ import type {
   EvalRunEstimate,
   EvalRunEvaluator,
   EvaluatedStep,
+  EvaluationSubject,
   EvaluatorVersion,
   WorkflowStep,
 } from '@mediforce/platform-core';
@@ -38,7 +39,7 @@ async function historicalCosts(scope: CallerScope, step: EvaluatedStep): Promise
 }
 
 /**
- * The pre-run estimate (ADR-0023 Consequences). Per trial, the Step's mean
+ * The pre-run estimate (ADR-0023 Consequences). Per trial, a Step's mean
  * historical cost, or its model's registry price for a nominal turn when it
  * has no history, plus one judge call per `llm_judge` Evaluator and
  * `expected_output` check — for the latter an upper bound, since an exact
@@ -46,12 +47,13 @@ async function historicalCosts(scope: CallerScope, step: EvaluatedStep): Promise
  */
 export async function estimateEvalRun(
   scope: CallerScope,
-  step: EvaluatedStep,
+  subject: EvaluationSubject,
   workflowStep: WorkflowStep,
   evaluators: ReadonlyArray<{ frozen: EvalRunEvaluator; version: EvaluatorVersion }>,
   trialCount: number,
 ): Promise<EvalRunEstimate> {
-  const costs = await historicalCosts(scope, step);
+  // An Agent evaluated on its own has no production history (ADR-0029).
+  const costs = subject.kind === 'step' ? await historicalCosts(scope, subject) : [];
   const priceOf = await loadModelPrices(scope);
   const agent = workflowStep.agentId === undefined ? null : await scope.agentDefinitions.getById(workflowStep.agentId);
   const model = workflowStep.agent?.model ?? agent?.foundationModel;

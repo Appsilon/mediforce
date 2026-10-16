@@ -5,7 +5,7 @@ import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { advanceEvalRunOfInstance, checkRetiredModels, checkUnknownModels } from '@mediforce/platform-api/handlers';
 import { defaultBuildScope } from '@/lib/route-adapter';
-import { DEFAULT_MODEL, resolveCoworkOutputSchema, resolveDefinitionModels, resolveStepTimeoutMs, buildTaskVerdicts, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
+import { DEFAULT_MODEL, resolveCoworkOutputSchema, resolveDefinitionModels, resolvePreviousStepId, resolveStepTimeoutMs, buildTaskVerdicts, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -130,9 +130,10 @@ export async function POST(
     // Load WorkflowDefinition — try exact version, fall back to latest
     const versionNum = parseInt(initialInstance.definitionVersion, 10);
     const runNamespace = initialInstance.namespace ?? '';
-    let workflowDefinition = !isNaN(versionNum)
+    // An Agent's eval trial carries its single-step Definition; no stored Workflow holds it (ADR-0029).
+    let workflowDefinition = initialInstance.evalDefinition ?? (!isNaN(versionNum)
       ? await processRepo.getWorkflowDefinition(runNamespace, initialInstance.definitionName, versionNum)
-      : null;
+      : null);
     if (!workflowDefinition) {
       const latestVersion = await processRepo.getLatestWorkflowVersion(runNamespace, initialInstance.definitionName);
       if (latestVersion > 0) {
@@ -458,9 +459,11 @@ export async function POST(
             const taskId = crypto.randomUUID();
 
             // For selection review steps, pass options from the previous step's output
-            const previousStepId = workflowDefinition.transitions.find(
-              (t) => t.to === instance.currentStepId,
-            )?.from ?? null;
+            const previousStepId = resolvePreviousStepId(
+              await instanceRepo.getStepExecutions(instanceId),
+              workflowDefinition.transitions,
+              instance.currentStepId,
+            );
             const previousOutput = previousStepId
               ? (instance.variables?.[previousStepId] ?? null)
               : null;
@@ -611,9 +614,12 @@ export async function POST(
 
             console.log(`[auto-runner] Executing action step '${instance.currentStepId}' (kind: ${currentStep.action.kind}) on instance '${instanceId}'`);
 
-            const previousStepId = workflowDefinition.transitions.find(
-              (t) => t.to === instance.currentStepId,
-            )?.from ?? null;
+            const actionStepExecutions = await instanceRepo.getStepExecutions(instanceId);
+            const previousStepId = resolvePreviousStepId(
+              actionStepExecutions,
+              workflowDefinition.transitions,
+              instance.currentStepId,
+            );
             const previousStepOutput = previousStepId
               ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
               : {};
@@ -624,7 +630,7 @@ export async function POST(
             // Iteration count = number of prior executions of this same step on
             // this instance. Lets revise loops surface as iter 1, 2, 3 in audit
             // and UI rather than every execution showing as iter 0.
-            const priorExecutionsForStep = (await instanceRepo.getStepExecutions(instanceId))
+            const priorExecutionsForStep = actionStepExecutions
               .filter((e) => e.stepId === instance.currentStepId).length;
 
             if (await failRunIfStepAttemptsExceeded(instanceRepo, instanceId, currentStep.id, currentStep, priorExecutionsForStep)) {
@@ -845,13 +851,17 @@ export async function POST(
               await agentRunner.markStepRunsInterrupted(instanceId, instance.currentStepId);
             }
 
-            const previousStepId = workflowDefinition.transitions.find(
-              (t) => t.to === instance.currentStepId,
-            )?.from ?? null;
+            const previousStepId = resolvePreviousStepId(
+              stepExecutions,
+              workflowDefinition.transitions,
+              instance.currentStepId,
+            );
             const previousStepOutput = previousStepId
               ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
               : {};
-            const stepInput = { ...previousStepOutput, steps: instance.variables };
+            // An Agent's eval trial is given its case's trigger payload and nothing else (ADR-0029 D4).
+            const agentTrialInput = instance.evalDefinition === undefined ? null : instance.triggerPayload;
+            const stepInput = agentTrialInput ?? { ...previousStepOutput, steps: instance.variables };
 
             const executionId = crypto.randomUUID();
             // Iteration count = number of prior executions of this same step on
@@ -896,7 +906,7 @@ export async function POST(
               processDefinitionVersion: initialInstance.definitionVersion,
             });
 
-            const mergedAppContext = { ...appContext, ...stepInput };
+            const mergedAppContext = agentTrialInput ?? { ...appContext, ...stepInput };
             // Register this execution as in-flight for the shutdown hook
             // (ADR-0010 §4): if a deploy SIGTERMs this process while the plugin
             // is running, the hook marks `executionId` interrupted so the next

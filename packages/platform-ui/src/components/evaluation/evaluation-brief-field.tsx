@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { FileText, Loader2 } from 'lucide-react';
-import type { EvaluatedStep } from '@mediforce/platform-core';
+import type { EvaluationSubject } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
@@ -40,7 +40,7 @@ export function EvaluationBriefToggle({ brief, open, onToggle }: { brief: BriefQ
  * assistant on every turn. It belongs to the Step, not to whoever opens the
  * panel, so every save is a new version everyone evaluating the Step shares.
  */
-export function EvaluationBriefField({ step, brief: query, mayEdit }: { step: EvaluatedStep; brief: BriefQuery; mayEdit: boolean }) {
+export function EvaluationBriefField({ step, brief: query, mayEdit }: { step: EvaluationSubject; brief: BriefQuery; mayEdit: boolean }) {
   const [draft, setDraft] = React.useState<string | null>(null);
   const save = useStepEvaluationMutation(step, (text: string) => mediforce.evaluation.setBrief({ ...step, text }));
   const brief = query.data?.brief ?? null;

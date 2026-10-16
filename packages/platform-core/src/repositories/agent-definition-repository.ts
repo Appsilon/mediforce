@@ -6,6 +6,7 @@ import type {
   CreateAgentDefinitionInput,
   UpdateAgentDefinitionInput,
 } from '../schemas/agent-definition';
+import type { AgentVersion } from '../schemas/agent-version';
 
 export type { CreateAgentDefinitionInput, UpdateAgentDefinitionInput };
 
@@ -31,4 +32,10 @@ export interface AgentDefinitionRepository {
   ): Promise<{ visible: AgentDefinition[]; hiddenCount: number }>;
   update(id: string, input: UpdateAgentDefinitionInput): Promise<AgentDefinition>;
   delete(id: string): Promise<void>;
+  /** Appends the Agent's next version (ADR-0029); refuses a version number it already has. */
+  appendVersion(version: AgentVersion): Promise<AgentVersion>;
+  /** The Agent's versions, newest first. */
+  listVersions(agentId: string): Promise<AgentVersion[]>;
+  /** One version of the Agent; it outlives the Agent, since Eval Runs name it. */
+  getVersion(agentId: string, version: number): Promise<AgentVersion | null>;
 }

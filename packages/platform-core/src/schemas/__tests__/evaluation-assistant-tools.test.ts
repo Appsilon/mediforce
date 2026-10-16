@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
+  EVALUATION_ASSISTANT_TOOLSETS,
   EvaluationAssistantProposalSchema,
   FailureRootCauseSchema,
   FixKindSchema,
@@ -10,7 +11,32 @@ import {
   ProposeEvalCaseToolSchema,
   ProposeEvaluatorToolSchema,
   ProposePerturbedCaseToolSchema,
+  pickTools,
 } from '../evaluation-assistant-tools';
+
+describe('Evaluation Assistant toolsets', () => {
+  const toolsets = Object.values(EVALUATION_ASSISTANT_TOOLSETS);
+
+  it('offers every catalog tool to at least one subject, and names only catalog tools', () => {
+    expect(new Set(toolsets.flatMap((toolset) => toolset.platform))).toEqual(new Set(Object.keys(EVALUATION_ASSISTANT_PLATFORM_TOOLS)));
+    expect(new Set(toolsets.flatMap((toolset) => toolset.proposals))).toEqual(new Set(Object.keys(EVALUATION_ASSISTANT_PROPOSAL_TOOLS)));
+  });
+
+  it('gives an Agent its own reads and none that need a Step\'s production runs', () => {
+    const { platform, proposals } = EVALUATION_ASSISTANT_TOOLSETS.agent;
+    expect(platform).toEqual(expect.arrayContaining(['get_agent', 'list_agent_production_runs', 'get_agent_run', 'get_trajectory']));
+    for (const stepOnly of ['get_step', 'list_step_runs', 'list_workspace_files', 'read_workspace_file', 'preview_evaluator']) {
+      expect(platform).not.toContain(stepOnly);
+    }
+    expect(proposals).not.toContain('propose_perturbed_case');
+    expect(proposals).not.toContain('propose_control_settings');
+    expect(EVALUATION_ASSISTANT_TOOLSETS.step.platform).not.toContain('get_agent');
+  });
+
+  it('picks the selected schemas out of a catalog', () => {
+    expect(pickTools(EVALUATION_ASSISTANT_PLATFORM_TOOLS, ['get_failures'])).toEqual({ get_failures: EVALUATION_ASSISTANT_PLATFORM_TOOLS.get_failures });
+  });
+});
 
 const RUN = '0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
 const TRIAL = '1e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';

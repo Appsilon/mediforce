@@ -1,18 +1,19 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { z } from 'zod';
-import type {
-  EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
-  EvaluatedStep,
-  EvaluationAssistantProposalToolName,
-  EvaluatorCheck,
+import {
+  isOwnedBy,
+  type EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
+  type EvaluationSubject,
+  type EvaluationAssistantProposalToolName,
+  type EvaluatorCheck,
 } from '@mediforce/platform-core';
 import type { ProposalReview } from '../../../assistant-core';
 import type { EvaluatorOutcome } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { HandlerError } from '../../../errors';
-import { EXPECTED_OUTPUT_NOT_PREVIEWED, previewEvaluator } from '../../evaluation/preview-evaluator';
+import { AGENT_NOT_PREVIEWED, EXPECTED_OUTPUT_NOT_PREVIEWED, previewEvaluator } from '../../evaluation/preview-evaluator';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
-import { isSameStep } from '../../evaluation/_lib/evaluated-step';
+import { stepOnly } from '../../evaluation/_lib/evaluation-subject';
 import { perturbCase } from '../../evaluation/_lib/perturb-case';
 import { loadStepEvaluator } from './run-evaluation-tool';
 
@@ -33,12 +34,15 @@ export interface PreviewedCheck {
  */
 async function selfTest(
   scope: CallerScope,
-  step: EvaluatedStep,
+  step: EvaluationSubject,
   check: EvaluatorCheck,
   previewed: readonly PreviewedCheck[],
 ): Promise<ProposalReview> {
   if (check.kind === 'expected_output') {
     return { ok: true, evidence: { selfTest: { unavailable: EXPECTED_OUTPUT_NOT_PREVIEWED } } };
+  }
+  if (step.kind === 'agent') {
+    return { ok: true, evidence: { selfTest: { unavailable: AGENT_NOT_PREVIEWED } } };
   }
   let results = previewed.find((preview) => isDeepStrictEqual(preview.check, check))?.results;
   if (results === undefined) {
@@ -61,6 +65,45 @@ async function selfTest(
 }
 
 /**
+ * A schema check on an Agent that declares no output schema grades text the
+ * agent was never asked to write as JSON, so it fails every trial.
+ */
+async function reviewAgentSchemaCheck(
+  scope: CallerScope,
+  step: EvaluationSubject,
+  check: EvaluatorCheck | undefined,
+): Promise<ProposalReview> {
+  if (step.kind !== 'agent' || check?.kind !== 'schema') return { ok: true };
+  const agent = await scope.agentDefinitions.getById(step.agentId);
+  if (agent?.outputSchema !== undefined) return { ok: true };
+  return {
+    ok: false,
+    error: 'This agent declares no Output schema, so it is never asked to answer as JSON and a schema check fails every trial. Do not propose one: tell the person to set the agent\'s Output schema on its page first, or check the rule with code or a judge.',
+  };
+}
+
+/**
+ * An Agent's case is written, never harvested (ADR-0029 D5), and is given its
+ * trigger payload alone (D4) — what accepting it would refuse goes back to the
+ * model with how to write it from a production run instead.
+ */
+function reviewAgentCase(agentRunId: string | undefined, input: Args<'propose_eval_case'>['input']): ProposalReview {
+  if (agentRunId !== undefined) {
+    return {
+      ok: false,
+      error: 'An agent\'s case is not harvested from a run: write its input from what get_agent_run shows the run was given — the trigger payload, with what the agent used from earlier steps folded into it — and set containsProductionData to true.',
+    };
+  }
+  if (input !== undefined && (Object.keys(input.previousStepOutputs).length > 0 || input.previousRun !== undefined)) {
+    return {
+      ok: false,
+      error: 'An agent\'s case is given its trigger payload alone: put what the agent needs into triggerPayload, and leave previousStepOutputs empty and previousRun out.',
+    };
+  }
+  return { ok: true };
+}
+
+/**
  * Checks one Evaluation Assistant proposal against the platform before the
  * person sees it, so a card never offers what accepting would refuse: a name
  * already taken, an Evaluator of another step, an output that is not one of
@@ -71,7 +114,7 @@ export async function reviewEvaluationProposal(
   toolName: string,
   args: unknown,
   scope: CallerScope,
-  step: EvaluatedStep,
+  step: EvaluationSubject,
   previewed: readonly PreviewedCheck[],
 ): Promise<ProposalReview> {
   switch (toolName as EvaluationAssistantProposalToolName) {
@@ -84,23 +127,27 @@ export async function reviewEvaluationProposal(
           error: `This step has an Evaluator named '${name}' already (${taken.id}${taken.archived ? ', archived' : ''}) — propose a new version of it with propose_evaluator_version, or choose another name.`,
         };
       }
+      const schemaReview = await reviewAgentSchemaCheck(scope, step, check);
+      if (schemaReview.ok === false) return schemaReview;
       return selfTest(scope, step, check, previewed);
     }
     case 'propose_evaluator_version': {
       const { evaluatorId, check } = args as Args<'propose_evaluator_version'>;
       const evaluator = await loadStepEvaluator(scope, step, evaluatorId);
       if (evaluator.archived) return { ok: false, error: `Evaluator '${evaluator.name}' is archived` };
+      const schemaReview = await reviewAgentSchemaCheck(scope, step, check);
+      if (schemaReview.ok === false) return schemaReview;
       return check === undefined ? { ok: true } : selfTest(scope, step, check, previewed);
     }
     case 'propose_perturbed_case': {
       const proposal = args as Args<'propose_perturbed_case'>;
-      await perturbCase(await loadCaseSource(scope, proposal.baseAgentRunId, step, 'read'), proposal);
+      await perturbCase(await loadCaseSource(scope, proposal.baseAgentRunId, stepOnly(step, 'A perturbed case'), 'read'), proposal);
       return { ok: true };
     }
     case 'propose_control_settings': {
       const { evalRunId } = args as Args<'propose_control_settings'>;
       const run = await scope.evaluation.getEvalRun(evalRunId);
-      if (run === null || isSameStep(run, step) === false) {
+      if (run === null || isOwnedBy(run, step) === false) {
         return { ok: false, error: `Eval Run '${evalRunId}' is not a run of this step` };
       }
       return { ok: true };
@@ -108,7 +155,7 @@ export async function reviewEvaluationProposal(
     case 'propose_diagnosis': {
       const { evalRunId, clusters } = args as Args<'propose_diagnosis'>;
       const run = await scope.evaluation.getEvalRun(evalRunId);
-      if (run === null || isSameStep(run, step) === false) {
+      if (run === null || isOwnedBy(run, step) === false) {
         return { ok: false, error: `Eval Run '${evalRunId}' is not a run of this step` };
       }
       const known = new Set((await scope.evaluation.listTrials(evalRunId)).map((trial) => trial.id));
@@ -118,7 +165,8 @@ export async function reviewEvaluationProposal(
         : { ok: false, error: `Not trials of Eval Run '${evalRunId}': ${[...new Set(unknown)].join(', ')} — take trial ids from get_failures` };
     }
     case 'propose_eval_case': {
-      const { agentRunId } = args as Args<'propose_eval_case'>;
+      const { agentRunId, input } = args as Args<'propose_eval_case'>;
+      if (step.kind === 'agent') return reviewAgentCase(agentRunId, input);
       if (agentRunId !== undefined) await loadCaseSource(scope, agentRunId, step, 'read');
       return { ok: true };
     }

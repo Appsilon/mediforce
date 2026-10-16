@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { InMemoryAgentTrajectoryRepository, buildAgentRun } from '@mediforce/platform-core/testing';
 import { OPENROUTER_KEY_MISSING_MESSAGE } from '../../../../services/openrouter-key';
 import { runEvaluatorCheck } from '../run-evaluator-check';
-import { loadEvaluationSubject } from '../evaluation-subject';
+import { loadScoredRun } from '../scored-run';
 import { createEvalCase } from '../../eval-cases';
 import { CreateEvalCaseInputSchema } from '../../../../contract/evaluation';
 import { evaluationFixture, GRADED_RUN, STEP, type EvaluationFixture } from '../../__tests__/fixture';
@@ -54,7 +54,7 @@ describe('runEvaluatorCheck', () => {
     await fixture.agentRunRepo.create(buildAgentRun({
       id: 'errored', processInstanceId: 'run-graded', stepId: 'grade-aes', status: 'error', envelope: null,
     }));
-    const subject = await loadEvaluationSubject(fixture.scope(), 'errored', STEP);
+    const subject = await loadScoredRun(fixture.scope(), 'errored', STEP);
     const outcome = await runEvaluatorCheck(fixture.scope(), judge, subject, null);
     expect(outcome).toEqual({
       agentRunId: 'errored', passed: false, value: 0, label: 'fail', confidence: null, agreement: null,
@@ -75,7 +75,7 @@ describe('runEvaluatorCheck', () => {
     const scope = fixture.scope(undefined, { agentTrajectoryRepo });
     Object.assign(scope, { workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) } });
 
-    const outcome = await runEvaluatorCheck(scope, judge, await loadEvaluationSubject(scope, GRADED_RUN, STEP), null);
+    const outcome = await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, GRADED_RUN, STEP), null);
 
     expect(outcome).toEqual({
       agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', confidence: 0.85, agreement: null,
@@ -92,7 +92,7 @@ describe('runEvaluatorCheck', () => {
     const scope = withOpenRouterKey(fixture);
     const evalCase = await caseExpecting(fixture, { expectedOutput: { marker: 'EXPECTED-OUTPUT-MARKER' }, expectation: 'negative' });
 
-    await runEvaluatorCheck(scope, judge, await loadEvaluationSubject(scope, GRADED_RUN, STEP), evalCase);
+    await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, GRADED_RUN, STEP), evalCase);
 
     const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as { messages: Array<{ content: string }> };
     const prompt = body.messages.map((message) => message.content).join('\n');
@@ -103,7 +103,7 @@ describe('runEvaluatorCheck', () => {
   describe('expected_output, exact', () => {
     it('passes a positive case only on an output that matches its expected output exactly', async () => {
       const fixture = await evaluationFixture();
-      const subject = await loadEvaluationSubject(fixture.scope(), GRADED_RUN, STEP);
+      const subject = await loadScoredRun(fixture.scope(), GRADED_RUN, STEP);
 
       const matching = await caseExpecting(fixture, { expectedOutput: { findings: [{ grade: 5, term: 'Sepsis' }] } });
       expect(await runEvaluatorCheck(fixture.scope(), expected, subject, matching)).toMatchObject({ passed: true, value: 1, agreement: null });
@@ -116,7 +116,7 @@ describe('runEvaluatorCheck', () => {
 
     it('passes a negative case only on an output that differs from its expected output', async () => {
       const fixture = await evaluationFixture();
-      const subject = await loadEvaluationSubject(fixture.scope(), GRADED_RUN, STEP);
+      const subject = await loadScoredRun(fixture.scope(), GRADED_RUN, STEP);
 
       const avoided = await caseExpecting(fixture, { expectedOutput: { findings: [{ term: 'Sepsis', grade: 5 }] }, expectation: 'negative' });
       expect(await runEvaluatorCheck(fixture.scope(), expected, subject, avoided)).toMatchObject({ passed: false, comment: expect.stringContaining('must not get') });
@@ -127,7 +127,7 @@ describe('runEvaluatorCheck', () => {
 
     it('is an error, not a failure, on a case without an expected output', async () => {
       const fixture = await evaluationFixture();
-      const subject = await loadEvaluationSubject(fixture.scope(), GRADED_RUN, STEP);
+      const subject = await loadScoredRun(fixture.scope(), GRADED_RUN, STEP);
       expect(await runEvaluatorCheck(fixture.scope(), expected, subject, await caseExpecting(fixture, {}))).toMatchObject({
         passed: null, error: expect.stringContaining('has an expected output'),
       });
@@ -145,7 +145,7 @@ describe('runEvaluatorCheck', () => {
       });
       const calls: unknown[] = [];
 
-      const outcome = await runEvaluatorCheck(scope, expected, await loadEvaluationSubject(scope, GRADED_RUN, STEP), evalCase, (call) => calls.push(call));
+      const outcome = await runEvaluatorCheck(scope, expected, await loadScoredRun(scope, GRADED_RUN, STEP), evalCase, (call) => calls.push(call));
 
       expect(outcome).toMatchObject({ passed: true, value: 1, agreement: 0.9, comment: expect.stringContaining('Same term and grade.') });
       expect(calls).toHaveLength(1);
@@ -159,7 +159,7 @@ describe('runEvaluatorCheck', () => {
     it('fails a positive case below minAgreement, and a negative case above maxAgreement', async () => {
       const fixture = await evaluationFixture();
       const scope = withOpenRouterKey(fixture);
-      const subject = await loadEvaluationSubject(scope, GRADED_RUN, STEP);
+      const subject = await loadScoredRun(scope, GRADED_RUN, STEP);
       const label = { expectedOutput: { findings: [{ term: 'Sepsis', grade: 5 }] }, comparison: 'agreement' };
 
       answeringOpenRouter('{"rationale": "The grade differs.", "agreement": 0.3}');
@@ -184,7 +184,7 @@ describe('runEvaluatorCheck', () => {
     Object.assign(scope, { workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) } });
     const calls: unknown[] = [];
 
-    const outcome = await runEvaluatorCheck(scope, judge, await loadEvaluationSubject(scope, GRADED_RUN, STEP), null, (call) => calls.push(call));
+    const outcome = await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, GRADED_RUN, STEP), null, (call) => calls.push(call));
 
     expect(outcome).toMatchObject({ passed: null, value: null });
     expect(calls.length).toBeGreaterThan(0);
@@ -195,7 +195,7 @@ describe('runEvaluatorCheck', () => {
 
   it('reports a check that cannot run as an error, not a failure', async () => {
     const fixture = await evaluationFixture();
-    const outcome = await runEvaluatorCheck(fixture.scope(), judge, await loadEvaluationSubject(fixture.scope(), GRADED_RUN, STEP), null);
+    const outcome = await runEvaluatorCheck(fixture.scope(), judge, await loadScoredRun(fixture.scope(), GRADED_RUN, STEP), null);
     expect(outcome).toMatchObject({ passed: null, value: null, error: OPENROUTER_KEY_MISSING_MESSAGE });
   });
 });

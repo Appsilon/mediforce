@@ -22,6 +22,9 @@ import {
 } from '@mediforce/agent-runtime';
 import {
   applyAgentModel,
+  applyAgentOutputSchema,
+  evaluationOwnerOf,
+  evaluationSubjectOf,
   inlineMcpServerNames,
   mcpEvalRestrictions,
   mergeMcpTapes,
@@ -100,7 +103,8 @@ export async function executeAgentStep(
   }
 
   // Load the full WorkflowDefinition for WorkflowAgentContext
-  const workflowDefinition: WorkflowDefinition | null = await processRepo.getWorkflowDefinition(
+  // An Agent's eval trial carries its single-step Definition; no stored Workflow holds it (ADR-0029).
+  const workflowDefinition: WorkflowDefinition | null = instance.evalDefinition ?? await processRepo.getWorkflowDefinition(
     instance.namespace ?? '',
     instance.definitionName,
     Number(instance.definitionVersion),
@@ -202,7 +206,8 @@ export async function executeAgentStep(
     : undefined;
 
   // Resolve what the step inherits from its AgentDefinition: the identity
-  // prompt (systemPrompt) and the model. Empty when the step has no agentId.
+  // prompt (systemPrompt), the model and the output schema. Empty when the
+  // step has no agentId.
   const agentDefaults = !reapTimedOut && workflowStep.agentId !== undefined
     ? await resolveAgentDefaults(workflowStep.agentId, agentDefinitionRepo)
     : {};
@@ -216,8 +221,8 @@ export async function executeAgentStep(
     ? undefined
     : (await resolveSkillsForStep(workflowStep, { agentDefinitionRepo, skillRepo: runtimeSkillRepo }, workflowDefinition)) ?? undefined;
 
-  // Picking an agent picks its model unless the step deliberately overrides it.
-  const resolvedStep = applyAgentModel(workflowStep, agentDefaults.model);
+  // Picking an agent picks its model and output schema unless the step deliberately overrides them.
+  const resolvedStep = applyAgentOutputSchema(applyAgentModel(workflowStep, agentDefaults.model), agentDefaults.outputSchema);
 
   const workflowAgentContext: WorkflowAgentContext = {
     stepId,
@@ -379,10 +384,11 @@ async function evalTrialConfig(
   const replayed = servers.filter((server) => evalRun.mcpPolicy[server]?.mode === 'replay');
   if (record.length === 0 && replayed.length === 0) return { mcpStep };
 
-  const evaluatedStep = { namespace: evalRun.namespace, workflowName: evalRun.workflowName, stepId: evalRun.stepId };
+  const evaluated = evaluationSubjectOf(evalRun);
+  if (evaluated === null) throw new Error(`Eval Run '${evalRunId}' names neither a step nor an agent`);
   const replay: McpTapeContext['replay'] = {};
   for (const server of replayed) {
-    const recordings = await evaluationRepo.listMcpRecordings(evaluatedStep, { caseId: trial.caseId, server, limit: MCP_REPLAY_RECORDINGS });
+    const recordings = await evaluationRepo.listMcpRecordings(evaluated, { caseId: trial.caseId, server, limit: MCP_REPLAY_RECORDINGS });
     if (recordings.length === 0) record.push(server);
     else replay[server] = mergeMcpTapes(recordings.map((recording) => recording.tape));
   }
@@ -392,7 +398,7 @@ async function evalTrialConfig(
       replay,
       record,
       onRecorded: (server, tape) => evaluationRepo.appendMcpRecording({
-        ...evaluatedStep,
+        ...evaluationOwnerOf(evaluated),
         id: randomUUID(),
         caseId: trial.caseId,
         server,

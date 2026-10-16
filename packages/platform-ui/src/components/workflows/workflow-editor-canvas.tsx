@@ -1066,6 +1066,8 @@ export function WorkflowEditorCanvas({
               dockerImages={dockerImages}
               workflowArtifacts={settingsDraft?.artifacts}
               workflowVisibility={settingsDraft?.visibility}
+              workflowPreamble={settingsDraft?.preamble}
+              savedValidation={savedStepEvaluation?.get(selectedStep.id)?.status}
               catalogEntries={catalogEntries}
             />
           </div>

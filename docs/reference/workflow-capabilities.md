@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-12
+last_reviewed: 2026-10-16
 ---
 
 # Workflow capabilities
@@ -157,7 +157,9 @@ empty `/output`, so a step reading `/output/<file>` from an earlier step fails
 with `FileNotFoundError`. A file handed from one step to the next is written to
 `/output` (so it is kept and downloadable) and read from
 `/workspace/.mediforce/output/<producing-step-id>/<file>`, which every container
-mounts. Small values need no file at all: `result.json` is the step's output and
+mounts. An agent step is told where they are: its prompt lists every file each
+earlier step left in `/workspace`, including its `.mediforce/output/<stepId>/`.
+Small values need no file at all: `result.json` is the step's output and
 later steps read it as `${steps.<id>.<field>}`. A third mode is
 `plugin: databricks-job`, which requires step-level `databricks`
 (`DatabricksJobConfigSchema`) instead of `script`.
@@ -228,7 +230,7 @@ that *enforces* each one — the behaviour is not visible from the schema.
 |-----------|-------|-------------------------------|
 | Autonomy L0–L4 — silent / shadow / annotate / human-review / autopilot | `autonomyLevel` | [`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts) decides `appliedToWorkflow` + pause/escalate per level |
 | What happens on failure | none — a timeout, error, `outputSchema` violation or failing production Evaluator always escalates the run to a person (the instance pauses) | [`fallback-handler.ts`](../../packages/agent-runtime/src/runner/fallback-handler.ts) |
-| Typed output | `agent.outputSchema` (inline JSON Schema; top-level `type: object`, `required` and per-property `type` — `string`, `number`, `integer`, `boolean`, `null`, `array`, `object` — are checked) — `executor: agent` steps only, rejected elsewhere | shown to the agent in its prompt; [`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts) validates `result`, retries once with the error inside the same step timeout, then escalates with reason `output_schema` ([ADR-0023](../adr/0023-step-evaluation.md) D13) |
+| Typed output | `agent.outputSchema`, or the Agent's `outputSchema` when the step sets none (inline JSON Schema; top-level `type: object`, `required` and per-property `type` — `string`, `number`, `integer`, `boolean`, `null`, `array`, `object` — are checked) — `executor: agent` steps only, rejected elsewhere | shown to the agent in its prompt; [`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts) validates `result`, reshapes a violating one with one LLM call on the step's model (the agent is not rerun; only what the result already says is used) inside the same step timeout, then escalates with reason `output_schema` ([ADR-0023](../adr/0023-step-evaluation.md) D13) |
 | Built-in approve/revise loop | `review` (`type`: `human`/`agent`/`none`, `maxIterations`, `timeBoxDays`) + L3 | iteration cap enforced by [`review-tracker.ts`](../../packages/workflow-engine/src/review/review-tracker.ts) + [`workflow-engine.ts`](../../packages/workflow-engine/src/engine/workflow-engine.ts); L3 task creation in [`agent-step-executor.ts`](../../packages/agent-runtime/src/runner/agent-step-executor.ts) |
 | Skills | `agent.skills` — catalog `(namespace, id)` references, added to the step's agent's Skills; a step Skill replaces the agent's Skill of the same id | resolved by [`resolve-skills-for-step.ts`](../../packages/agent-runtime/src/skills/resolve-skills-for-step.ts), offered through the `/plugin` folder ([ADR-0027](../adr/0027-step-adds-catalog-skills.md)) |
 | Step time limit | `agent.timeoutMinutes` (default 30) | [`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts) races the run against it, then escalates with reason `timeout` |

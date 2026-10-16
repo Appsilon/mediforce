@@ -10,6 +10,7 @@ import type {
 import type { CallerScope } from '../../repositories/index';
 import { HandlerError, PreconditionFailedError } from '../../errors';
 import { actorFromCaller, loadOr404, resolvePersonalNamespace } from '../_helpers';
+import { recordAgentVersion } from './_lib/agent-version';
 
 /**
  * The FK-valid `workspace` an MCP-binding audit event belongs to. A
@@ -86,6 +87,7 @@ export async function upsertAgentMcpBinding(
   await assertBindingsTargetCatalogEntries(scope, agent.namespace, { [input.name]: input.binding });
   const nextMcpServers = { ...(agent.mcpServers ?? {}), [input.name]: input.binding };
   const updated = await scope.agentDefinitions.updateMcpServers(input.id, nextMcpServers);
+  await recordAgentVersion(scope, updated);
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
     ...actor,
@@ -110,6 +112,7 @@ export async function deleteAgentMcpBinding(
   const next = { ...(agent.mcpServers ?? {}) };
   delete next[input.name];
   const updated = await scope.agentDefinitions.updateMcpServers(input.id, next);
+  await recordAgentVersion(scope, updated);
   const actor = actorFromCaller(scope);
   await scope.system.audit.append({
     ...actor,

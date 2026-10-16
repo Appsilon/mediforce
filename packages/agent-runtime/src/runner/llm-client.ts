@@ -1,4 +1,4 @@
-import type { LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
+import type { LlmCallOptions, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
 import {
   annotateOpenRouterLlmSpan,
   type OpenTelemetryTracingOptions,
@@ -6,17 +6,22 @@ import {
 } from './tracing';
 
 // Re-export the interface defined in interfaces/ for barrel convenience
-export type { LlmClient, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
+export type { LlmCallOptions, LlmClient, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
 
 // OpenRouterLlmClient: wraps the OpenRouter API for LLM access.
 // Platform provides this to agents — agents never call OpenRouter directly.
+// OPENROUTER_BASE_URL points it at a mock or a proxy, as it does
+// platform-api's OpenRouter seam; unset, it is OpenRouter itself.
 export class OpenRouterLlmClient {
+  private readonly chatCompletionsUrl =
+    `${(process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1').replace(/\/$/, '')}/chat/completions`;
+
   constructor(
     private readonly apiKey: string,
     private readonly tracingOptions: OpenTelemetryTracingOptions = {},
   ) {}
 
-  async complete(messages: LlmMessage[], model: string): Promise<LlmResponse> {
+  async complete(messages: LlmMessage[], model: string, options: LlmCallOptions = {}): Promise<LlmResponse> {
     return withOpenRouterLlmSpan(
       {
         messages,
@@ -24,7 +29,7 @@ export class OpenRouterLlmClient {
         captureContent: this.tracingOptions.captureContent === true,
       },
       async (span) => {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        const response = await fetch(this.chatCompletionsUrl, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${this.apiKey}`,
@@ -33,7 +38,7 @@ export class OpenRouterLlmClient {
           body: JSON.stringify({
             model,
             messages,
-            temperature: 0.7,
+            temperature: options.temperature ?? 0.7,
             max_tokens: 16_000,
           }),
         });
@@ -44,17 +49,20 @@ export class OpenRouterLlmClient {
         }
 
         const data = await response.json() as {
-          model: string;
+          model?: string;
           choices: Array<{ message: { content: string } }>;
-          usage: { prompt_tokens: number; completion_tokens: number };
+          usage?: { prompt_tokens: number; completion_tokens: number };
         };
+        const answeredBy = data.model ?? model;
+        const promptTokens = data.usage?.prompt_tokens ?? 0;
+        const completionTokens = data.usage?.completion_tokens ?? 0;
 
         annotateOpenRouterLlmSpan(
           span,
           {
-            model: data.model,
-            promptTokens: data.usage.prompt_tokens,
-            completionTokens: data.usage.completion_tokens,
+            model: answeredBy,
+            promptTokens,
+            completionTokens,
             content: data.choices[0].message.content,
           },
           this.tracingOptions.captureContent === true,
@@ -62,11 +70,8 @@ export class OpenRouterLlmClient {
 
         return {
           content: data.choices[0].message.content,
-          model: data.model,
-          usage: {
-            promptTokens: data.usage.prompt_tokens,
-            completionTokens: data.usage.completion_tokens,
-          },
+          model: answeredBy,
+          usage: { promptTokens, completionTokens },
         };
       },
     );

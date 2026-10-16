@@ -27,6 +27,14 @@ export class AuthorizedSkillRepository extends AuthorizedScope {
   list = async (namespace: string): Promise<SkillSummary[]> =>
     this.raw.list(namespace, { publicOnly: this.canSeeNamespace(namespace) === false });
 
+  /**
+   * The content hash of a Skill an Agent holds, whatever the caller may see of
+   * it: an Agent's version (ADR-0029) must not depend on who asks. Only the
+   * hash leaves, never the Skill. Null when it no longer resolves.
+   */
+  heldContentHash = async (namespace: string, id: string): Promise<string | null> =>
+    (await this.raw.getById(namespace, id, { publicOnly: false }))?.contentHash ?? null;
+
   /** Every `public` Skill in the deployment; readable by any caller. */
   listPublic = async (): Promise<SkillSummary[]> => this.raw.listPublic();
 

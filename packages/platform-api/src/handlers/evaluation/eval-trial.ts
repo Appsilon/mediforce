@@ -8,8 +8,8 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
-import { loadEvaluatedStep, stepRef } from './_lib/evaluated-step';
-import { loadEvaluationSubject, type EvaluationSubject } from './_lib/evaluation-subject';
+import { loadEvaluationSubject, subjectRef, runVersionOf } from './_lib/evaluation-subject';
+import { loadScoredRun, type ScoredRun } from './_lib/scored-run';
 import {
   checkOutcome,
   evaluatorError,
@@ -25,7 +25,7 @@ import {
  * `llm_judge`'s messages, or an agreement comparison's. Null for a check no
  * model runs, and for a run with no output — no check ran on it.
  */
-function judgePromptOf(check: EvaluatorCheck | null, subject: EvaluationSubject | null, evalCase: EvalCase | null): JudgeMessage[] | null {
+function judgePromptOf(check: EvaluatorCheck | null, subject: ScoredRun | null, evalCase: EvalCase | null): JudgeMessage[] | null {
   const envelope = subject?.agentRun.envelope ?? null;
   const result = envelope?.result;
   if (check === null || subject === null || envelope === null || result === null || result === undefined) return null;
@@ -53,12 +53,12 @@ function judgePromptOf(check: EvaluatorCheck | null, subject: EvaluationSubject 
 export async function getEvalTrial(input: GetEvalTrialInput, scope: CallerScope): Promise<GetEvalTrialOutput> {
   const run = await scope.evaluation.getEvalRun(input.evalRunId);
   if (run === null) throw new NotFoundError(`Eval Run '${input.evalRunId}' not found`);
-  await loadEvaluatedStep(scope, stepRef(run), 'read', run.definitionVersion);
+  await loadEvaluationSubject(scope, subjectRef(run), 'read', runVersionOf(run));
   const trial = (await scope.evaluation.listTrials(run.id)).find((candidate) => candidate.id === input.trialId);
   if (trial === undefined) throw new NotFoundError(`Eval Run '${run.id}' has no trial '${input.trialId}'`);
 
   const evalCase = await scope.evaluation.getCase(trial.caseId);
-  const subject = trial.agentRunId === null ? null : await loadEvaluationSubject(scope, trial.agentRunId);
+  const subject = trial.agentRunId === null ? null : await loadScoredRun(scope, trial.agentRunId);
   const { checks, reviews } = await trialScores(scope, run, trial);
   const scored = trial.status === 'scored';
 

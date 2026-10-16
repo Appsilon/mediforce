@@ -151,6 +151,24 @@ export interface CommitStepResult {
   isEmpty: boolean;
 }
 
+export interface StepFiles {
+  stepId: string;
+  /** Worktree-relative paths, sorted. */
+  files: string[];
+}
+
+/** Opens each commit in `listStepFiles`' log output; no path contains it. */
+const STEP_COMMIT_MARKER = '\x1e';
+/** Bounds `listStepFiles`' walk back from HEAD — far more step commits than a
+ *  run makes, and it keeps a long workspace history from being read in full. */
+const MAX_RUN_COMMITS_LISTED = 1000;
+/** Separates the Run-Id and Step-Id trailers on a commit's header line. */
+const TRAILER_SEPARATOR = '\x1f';
+
+function runIdOf(branch: string): string {
+  return branch.startsWith('run/') ? branch.slice(4) : branch;
+}
+
 const STATUS_PREFIX: Record<string, string> = { A: '+', M: '~', D: '-', R: '+', C: '+', T: '~' };
 
 /**
@@ -236,7 +254,7 @@ export function formatStepCommitMessage(
   }
 
   // Trailers
-  const runId = ws.branch.startsWith('run/') ? ws.branch.slice(4) : ws.branch;
+  const runId = runIdOf(ws.branch);
   const trailers: string[] = [
     `Step-Id: ${opts.stepId}`,
     `Run-Id: ${runId}`,
@@ -692,6 +710,49 @@ export class WorkspaceManager {
 
     runGit(['clean', '-fdX'], { cwd: ws.path });
     return { commitSha, changedFiles, isEmpty };
+  }
+
+  /**
+   * The files each step of the run has left in the worktree, read back from
+   * the trailers of the run's step commits: walking back from HEAD while
+   * commits carry this run's `Run-Id`, so neither a re-attached handle (whose
+   * `startCommit` is the current HEAD) nor the commits of a run this branch
+   * was seeded from shift the range. Steps come in the order they first
+   * committed; a file a later commit deleted is gone, and a file several
+   * steps wrote is listed under each. Steps that left no file are omitted.
+   */
+  async listStepFiles(ws: RunWorkspaceHandle): Promise<StepFiles[]> {
+    const log = runGit(
+      [
+        '-c', 'core.quotePath=false',
+        'log', '--name-only', `--max-count=${MAX_RUN_COMMITS_LISTED}`,
+        `--format=${STEP_COMMIT_MARKER}%(trailers:key=Run-Id,valueonly,separator=)${TRAILER_SEPARATOR}%(trailers:key=Step-Id,valueonly,separator=)`,
+        'HEAD',
+      ],
+      { cwd: ws.path },
+    );
+    const tracked = new Set(
+      runGit(['-c', 'core.quotePath=false', 'ls-files'], { cwd: ws.path }).split('\n').filter(Boolean),
+    );
+
+    const runId = runIdOf(ws.branch);
+    const commitsNewestFirst: Array<{ stepId: string; files: string[] }> = [];
+    for (const chunk of log.split(STEP_COMMIT_MARKER).slice(1)) {
+      const [header, ...files] = chunk.split('\n');
+      const [commitRunId, stepId] = header.split(TRAILER_SEPARATOR).map((value) => value.trim());
+      if (commitRunId !== runId) break;
+      commitsNewestFirst.push({ stepId, files: files.filter((file) => tracked.has(file)) });
+    }
+
+    const filesByStep = new Map<string, Set<string>>();
+    for (const { stepId, files } of commitsNewestFirst.reverse()) {
+      if (stepId === '' || files.length === 0) continue;
+      const stepFiles = filesByStep.get(stepId) ?? new Set<string>();
+      for (const file of files) stepFiles.add(file);
+      filesByStep.set(stepId, stepFiles);
+    }
+
+    return [...filesByStep].map(([stepId, files]) => ({ stepId, files: [...files].sort() }));
   }
 
   /**

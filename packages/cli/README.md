@@ -52,6 +52,13 @@ entry is `<namespace>/<id>`, or a bare `<id>` for a Skill in the agent's own
 workspace; an empty list removes them all. The API refuses a Skill the agent may
 not hold (ADR-0025 decision 3), naming it.
 
+`mediforce eval` commands name a workflow step with `--workflow` and `--step`,
+or an agent evaluated on its own with `--agent`
+([ADR-0029](../../docs/adr/0029-agent-evaluation.md)); production-only ones
+(`case-from-run`, `case-perturb`, `evaluator-preview`, `drift`) take a step
+only. `agent versions <id>` lists the versions an agent was saved or evaluated
+with.
+
 `mediforce images` and `mediforce system images` are different things and the
 names are close enough to be worth stating: `images` is the per-namespace
 **Image Catalog** — the images a workspace offers for steps, one row per source

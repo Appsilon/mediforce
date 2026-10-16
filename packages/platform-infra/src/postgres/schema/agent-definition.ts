@@ -1,4 +1,4 @@
-import { pgTable, text, jsonb, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, jsonb, timestamp, index, integer, primaryKey } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { workspaces } from './workspace';
 
@@ -26,6 +26,7 @@ import { workspaces } from './workspace';
  * `jsonb` (variable-size map of bindings, never queried by element).
  * `skills` is a `jsonb` array of `{ namespace, id }` Skill references
  * (ADR-0025), GIN-indexed for the "which agents hold this skill" lookup.
+ * `output_schema` is the `jsonb` JSON Schema the agent's result must satisfy.
  */
 export const agents = pgTable(
   'agents',
@@ -43,6 +44,7 @@ export const agents = pgTable(
     systemPrompt: text('system_prompt').notNull(),
     inputDescription: text('input_description').notNull(),
     outputDescription: text('output_description').notNull(),
+    outputSchema: jsonb('output_schema'),
     mcpServers: jsonb('mcp_servers'),
     skills: jsonb('skills'),
     namespace: text('namespace'),
@@ -62,5 +64,26 @@ export const agents = pgTable(
     namespaceIdx: index('agents_namespace_idx')
       .on(table.namespace)
       .where(sql`${table.namespace} is not null`),
+  }),
+);
+
+/**
+ * Agent versions (ADR-0029): insert-only, one row per configuration an Agent
+ * was saved or evaluated with. `hash` is the SHA-256 of `config`. No foreign
+ * key to `agents`: an Eval Run outlives its Agent and still shows the
+ * configuration it assessed.
+ */
+export const agentVersions = pgTable(
+  'agent_versions',
+  {
+    agentId: text('agent_id').notNull(),
+    version: integer('version').notNull(),
+    hash: text('hash').notNull(),
+    config: jsonb('config').notNull(),
+    createdBy: text('created_by').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.agentId, table.version] }),
   }),
 );

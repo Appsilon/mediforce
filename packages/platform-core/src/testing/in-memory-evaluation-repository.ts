@@ -21,7 +21,9 @@ import {
   McpRecordingSchema,
   type EvalCase,
   type EvalDatasetVersion,
-  type EvaluatedStep,
+  type EvaluationSubject,
+  isOwnedBy,
+  isSameOwner,
   type EvaluationBrief,
   type Evaluator,
   type EvaluatorVersion,
@@ -29,12 +31,6 @@ import {
   type McpRecording,
   type SourceApproval,
 } from '../schemas/evaluation';
-
-function sameStep(left: EvaluatedStep, right: EvaluatedStep): boolean {
-  return left.namespace === right.namespace
-    && left.workflowName === right.workflowName
-    && left.stepId === right.stepId;
-}
 
 function newestFirst<T extends { createdAt: string }>(rows: T[]): T[] {
   return [...rows].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
@@ -55,21 +51,21 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
 
   async appendBrief(brief: EvaluationBrief): Promise<EvaluationBrief> {
     const parsed = EvaluationBriefSchema.parse(brief);
-    if (this.briefs.some((row) => sameStep(row, parsed) && row.version === parsed.version)) {
+    if (this.briefs.some((row) => isSameOwner(row, parsed) && row.version === parsed.version)) {
       throw new Error(`Evaluation Brief version ${parsed.version} already exists`);
     }
     this.briefs.push(parsed);
     return parsed;
   }
 
-  async listBriefs(step: EvaluatedStep): Promise<EvaluationBrief[]> {
-    return this.briefs.filter((row) => sameStep(row, step)).sort((left, right) => right.version - left.version);
+  async listBriefs(subject: EvaluationSubject): Promise<EvaluationBrief[]> {
+    return this.briefs.filter((row) => isOwnedBy(row, subject)).sort((left, right) => right.version - left.version);
   }
 
   async createEvaluator(evaluator: Evaluator, firstVersion: EvaluatorVersion): Promise<void> {
     const parsed = EvaluatorSchema.parse(evaluator);
-    const clash = [...this.evaluators.values()].some((row) => sameStep(row, parsed) && row.name === parsed.name);
-    if (clash) throw new Error(`Evaluator '${parsed.name}' already exists on this step`);
+    const clash = [...this.evaluators.values()].some((row) => isSameOwner(row, parsed) && row.name === parsed.name);
+    if (clash) throw new Error(`Evaluator '${parsed.name}' already exists on this subject`);
     this.evaluators.set(parsed.id, parsed);
     this.versions.push(EvaluatorVersionSchema.parse(firstVersion));
   }
@@ -78,9 +74,9 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     return this.evaluators.get(id) ?? null;
   }
 
-  async listEvaluators(step: EvaluatedStep): Promise<Evaluator[]> {
+  async listEvaluators(subject: EvaluationSubject): Promise<Evaluator[]> {
     return [...this.evaluators.values()]
-      .filter((row) => sameStep(row, step))
+      .filter((row) => isOwnedBy(row, subject))
       .sort((left, right) => left.name.localeCompare(right.name));
   }
 
@@ -123,8 +119,8 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     return this.cases.get(id) ?? null;
   }
 
-  async listCases(step: EvaluatedStep): Promise<EvalCase[]> {
-    return newestFirst([...this.cases.values()].filter((row) => sameStep(row, step)));
+  async listCases(subject: EvaluationSubject): Promise<EvalCase[]> {
+    return newestFirst([...this.cases.values()].filter((row) => isOwnedBy(row, subject)));
   }
 
   async setCaseArchived(id: string, archived: boolean): Promise<void> {
@@ -134,7 +130,7 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
 
   async appendDatasetVersion(dataset: EvalDatasetVersion): Promise<EvalDatasetVersion> {
     const parsed = EvalDatasetVersionSchema.parse(dataset);
-    if (this.datasets.some((row) => sameStep(row, parsed) && row.version === parsed.version)) {
+    if (this.datasets.some((row) => isSameOwner(row, parsed) && row.version === parsed.version)) {
       throw new Error(`Eval Dataset version ${parsed.version} already exists`);
     }
     this.datasets.push(parsed);
@@ -145,17 +141,17 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     return this.datasets.find((row) => row.id === id) ?? null;
   }
 
-  async listDatasetVersions(step: EvaluatedStep): Promise<EvalDatasetVersion[]> {
-    return this.datasets.filter((row) => sameStep(row, step)).sort((left, right) => right.version - left.version);
+  async listDatasetVersions(subject: EvaluationSubject): Promise<EvalDatasetVersion[]> {
+    return this.datasets.filter((row) => isOwnedBy(row, subject)).sort((left, right) => right.version - left.version);
   }
 
-  async getMcpPolicy(step: EvaluatedStep): Promise<McpEvalPolicy | null> {
-    return this.policies.find((row) => sameStep(row, step)) ?? null;
+  async getMcpPolicy(subject: EvaluationSubject): Promise<McpEvalPolicy | null> {
+    return this.policies.find((row) => isOwnedBy(row, subject)) ?? null;
   }
 
   async putMcpPolicy(policy: McpEvalPolicy): Promise<McpEvalPolicy> {
     const parsed = McpEvalPolicySchema.parse(policy);
-    const index = this.policies.findIndex((row) => sameStep(row, parsed));
+    const index = this.policies.findIndex((row) => isSameOwner(row, parsed));
     if (index === -1) this.policies.push(parsed);
     else this.policies[index] = parsed;
     return parsed;
@@ -165,34 +161,34 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     this.recordings.push(McpRecordingSchema.parse(recording));
   }
 
-  async listMcpRecordings(step: EvaluatedStep, filter: McpRecordingFilter = {}): Promise<McpRecording[]> {
+  async listMcpRecordings(subject: EvaluationSubject, filter: McpRecordingFilter = {}): Promise<McpRecording[]> {
     const rows = this.recordings
-      .filter((row) => sameStep(row, step)
+      .filter((row) => isOwnedBy(row, subject)
         && (filter.caseId === undefined || row.caseId === filter.caseId)
         && (filter.server === undefined || row.server === filter.server))
       .sort((left, right) => left.recordedAt.localeCompare(right.recordedAt));
     return filter.limit === undefined ? rows : rows.slice(-filter.limit);
   }
 
-  async listMcpRecordedCases(step: EvaluatedStep, filter: McpRecordedCaseFilter = {}): Promise<McpRecordedCase[]> {
+  async listMcpRecordedCases(subject: EvaluationSubject, filter: McpRecordedCaseFilter = {}): Promise<McpRecordedCase[]> {
     const seen = new Map<string, McpRecordedCase>();
     for (const row of this.recordings) {
-      if (sameStep(row, step) && (filter.evalRunId === undefined || row.evalRunId === filter.evalRunId)) seen.set(`${row.server}\u0000${row.caseId}`, { server: row.server, caseId: row.caseId });
+      if (isOwnedBy(row, subject) && (filter.evalRunId === undefined || row.evalRunId === filter.evalRunId)) seen.set(`${row.server}\u0000${row.caseId}`, { server: row.server, caseId: row.caseId });
     }
     return [...seen.values()];
   }
 
   async appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> {
     const parsed = AcceptanceCriteriaVersionSchema.parse(criteria);
-    if (this.criteria.some((row) => sameStep(row, parsed) && row.version === parsed.version)) {
+    if (this.criteria.some((row) => isSameOwner(row, parsed) && row.version === parsed.version)) {
       throw new Error(`Acceptance Criteria version ${parsed.version} already exists`);
     }
     this.criteria.push(parsed);
     return parsed;
   }
 
-  async listAcceptanceCriteria(step: EvaluatedStep): Promise<AcceptanceCriteriaVersion[]> {
-    return this.criteria.filter((row) => sameStep(row, step)).sort((left, right) => right.version - left.version);
+  async listAcceptanceCriteria(subject: EvaluationSubject): Promise<AcceptanceCriteriaVersion[]> {
+    return this.criteria.filter((row) => isOwnedBy(row, subject)).sort((left, right) => right.version - left.version);
   }
 
   async createQualification(qualification: StepQualification): Promise<StepQualification> {
@@ -204,9 +200,9 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     return parsed;
   }
 
-  async listQualifications(step: EvaluatedStep): Promise<StepQualification[]> {
+  async listQualifications(subject: EvaluationSubject): Promise<StepQualification[]> {
     return this.qualifications
-      .filter((row) => sameStep(row, step))
+      .filter((row) => isOwnedBy(row, subject))
       .sort((left, right) => right.signature.signedAt.localeCompare(left.signature.signedAt));
   }
 
@@ -219,8 +215,8 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
     return this.runs.get(id) ?? null;
   }
 
-  async listEvalRuns(step: EvaluatedStep): Promise<EvalRun[]> {
-    return newestFirst([...this.runs.values()].filter((run) => sameStep(run, step)));
+  async listEvalRuns(subject: EvaluationSubject): Promise<EvalRun[]> {
+    return newestFirst([...this.runs.values()].filter((run) => isOwnedBy(run, subject)));
   }
 
   async listEvalRunIdsToDrive(): Promise<string[]> {

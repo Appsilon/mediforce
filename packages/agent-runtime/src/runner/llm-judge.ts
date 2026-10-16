@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { AgentOutputEnvelope, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import type { ReviewPlugin, ReviewPluginContext, ReviewPluginResult } from '../interfaces/review-plugin';
 import type { LlmClient, LlmMessage } from '../interfaces/step-executor-plugin';
+import { parseAnswer } from './llm-answer';
 
 export interface LlmJudgeConfig {
   readonly model: string;
@@ -73,18 +74,6 @@ function formatTrajectory(entries: readonly StoredAgentTrajectoryEntry[]): strin
     }
   }
   return [...head, `… ${lines.length - head.length - tail.length} entries omitted …`, ...tail].join('\n');
-}
-
-function parseAnswer<Answer>(content: string, schema: z.ZodType<Answer>): Answer | null {
-  const start = content.indexOf('{');
-  const end = content.lastIndexOf('}');
-  if (start === -1 || end <= start) return null;
-  try {
-    const parsed = schema.safeParse(JSON.parse(content.slice(start, end + 1)));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
 }
 
 /**

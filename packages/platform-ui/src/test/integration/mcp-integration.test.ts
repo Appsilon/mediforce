@@ -70,6 +70,8 @@ const fake = vi.hoisted(() => {
         state.agents.set(id, updated);
         return updated;
       },
+      listVersions: async () => [],
+      appendVersion: async (version: unknown) => version,
     },
     // Headless handler now writes an audit event on every binding mutation;
     // the route adapter wires `auditRepo` straight into `scope.system.audit`,

@@ -575,6 +575,27 @@
       "when": 1789641802900,
       "tag": "0081_evaluator_on_error",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1789641803000,
+      "tag": "0082_agent_evaluation",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1789641803100,
+      "tag": "0083_eval_run_env",
+      "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1789641803200,
+      "tag": "0084_agent_output_schema",
+      "breakpoints": true
     }
   ]
 }

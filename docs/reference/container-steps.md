@@ -1,7 +1,7 @@
 ---
 status: living
 audience: engineers
-last_reviewed: 2026-09-23
+last_reviewed: 2026-10-16
 ---
 
 # Container step execution
@@ -49,6 +49,12 @@ for a channel that carries inputs — is argued in the header comment of
 [`container-plugin.ts`](../../packages/agent-runtime/src/plugins/container-plugin.ts).
 Deliverables written to `/output` are copied into `.mediforce/output/<stepId>/`
 in the worktree before the commit, so the commit captures them.
+Previous-step and previous-run values too large to inline in an agent's prompt
+are written to `/output/.previous-outputs/`; that directory is dotted, so they
+never become the step's Output Files. An agent's prompt also lists, per earlier
+step, every file that step left in the worktree (`## Files From Previous
+Steps`), read back from the `Step-Id` trailers on the run branch
+(`WorkspaceManager.listStepFiles`).
 
 A dry run builds the image and mocks the step. Execution is swapped for
 `MockAgentPlugin` — no agent runs, no container starts, nothing external is
@@ -171,7 +177,8 @@ Code in its `system/init` event, OpenCode in its log under
 ## Result and Agent Trajectory
 
 An agent step's `result.json` becomes the envelope's `result`. When the step
-sets `agent.outputSchema`, the schema is added to the prompt and `AgentRunner`
+sets `agent.outputSchema` — or inherits its Agent's `outputSchema` by setting
+none — the schema is added to the prompt and `AgentRunner`
 checks `result` against it after the run: a violation records a `status` event
 and runs the plugin once more with the error in the prompt; a second violation
 escalates the run to a person with `fallbackReason: output_schema`

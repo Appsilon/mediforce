@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EvaluatedStepSchema, EvaluationAssistantProposalSchema } from '@mediforce/platform-core';
+import { EvaluationAssistantProposalSchema, EvaluationSubjectRefSchema } from '@mediforce/platform-core';
 import { PreviewEvaluatorOutputSchema } from './evaluation';
 
 /**
@@ -8,7 +8,7 @@ import { PreviewEvaluatorOutputSchema } from './evaluation';
  * to accept or reject; a prepared Eval Run comes back for them to start
  * by confirming its budget.
  */
-export const AskEvaluationAssistantInputSchema = EvaluatedStepSchema.extend({
+export const AskEvaluationAssistantInputSchema = EvaluationSubjectRefSchema.extend({
   /** The Workflow Definition version whose step the assistant reads and runs; its runnable version when absent. */
   definitionVersion: z.number().int().positive().optional(),
   messages: z.array(z.object({

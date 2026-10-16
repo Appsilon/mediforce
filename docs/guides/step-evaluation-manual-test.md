@@ -1,7 +1,7 @@
 ---
 status: living
 audience: engineers
-last_reviewed: 2026-10-14
+last_reviewed: 2026-10-16
 ---
 
 # Step Evaluation — manual test guide
@@ -489,7 +489,7 @@ Scores are exported to Phoenix / Langfuse.
 
 | Feature | Where | Test | 🧪 |
 |---|---|---|---|
-| **Output schema** — the step declares its result shape; a violation retries once, then escalates to a person | Step editor | Require a field the agent never produces → ✅ retry, then fallback with an output-schema reason | Add `"meddraCode"` to `required`, run 02 → escalation; remove it again |
+| **Output schema** — the step declares its result shape; a violation is reshaped once from what the result says, then escalates to a person | Step editor | Require a field the agent never produces → ✅ one reshape attempt (no rerun), then fallback; the run's error names the violation and why reshaping did not fix it | Add `"meddraCode"` to `required`, run 02 → escalation; remove it again |
 | **Agent log** — every tool call stored durably | Run view → agent step; Agents page | ✅ tool names and sizes; survives reload/restart. Arguments hidden unless `MEDIFORCE_OTEL_CAPTURE_CONTENT=true`. Old runs have no log | `lookup_ctcae_term` / `get_reference_range`; `file_safety_report` on 03/05 |
 | **Human-verdict Scores** — review decisions become Scores | CLI `mediforce score list` | ✅ Approve = 1, Request changes = 0.5 | Request changes on a run → agent re-runs with your comment |
 | **Qualification badge** | Run view → agent step | ✅ Same status as the tab | — |

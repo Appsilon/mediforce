@@ -4,7 +4,8 @@ import type {
   CreateAgentDefinitionInput,
   UpdateAgentDefinitionInput,
 } from '../index';
-import { AgentDefinitionSchema } from '../schemas/agent-definition';
+import { AgentDefinitionSchema, mergeAgentUpdate } from '../schemas/agent-definition';
+import { AgentVersionSchema, type AgentVersion } from '../schemas/agent-version';
 
 /**
  * In-memory `AgentDefinitionRepository` for tests. Implements the full
@@ -17,6 +18,7 @@ import { AgentDefinitionSchema } from '../schemas/agent-definition';
  */
 export class InMemoryAgentDefinitionRepository implements AgentDefinitionRepository {
   private readonly byId = new Map<string, AgentDefinition>();
+  private readonly versions: AgentVersion[] = [];
   private counter = 0;
   private now: () => string;
 
@@ -107,8 +109,7 @@ export class InMemoryAgentDefinitionRepository implements AgentDefinitionReposit
       throw new Error(`Agent definition ${id} not found`);
     }
     const merged = AgentDefinitionSchema.parse({
-      ...existing,
-      ...input,
+      ...mergeAgentUpdate(existing, input),
       id,
       updatedAt: this.now(),
     });
@@ -118,5 +119,22 @@ export class InMemoryAgentDefinitionRepository implements AgentDefinitionReposit
 
   async delete(id: string): Promise<void> {
     this.byId.delete(id);
+  }
+
+  async appendVersion(version: AgentVersion): Promise<AgentVersion> {
+    const parsed = AgentVersionSchema.parse(version);
+    if (this.versions.some((row) => row.agentId === parsed.agentId && row.version === parsed.version)) {
+      throw new Error(`Agent '${parsed.agentId}' already has version ${parsed.version}`);
+    }
+    this.versions.push(parsed);
+    return parsed;
+  }
+
+  async listVersions(agentId: string): Promise<AgentVersion[]> {
+    return this.versions.filter((row) => row.agentId === agentId).sort((left, right) => right.version - left.version);
+  }
+
+  async getVersion(agentId: string, version: number): Promise<AgentVersion | null> {
+    return this.versions.find((row) => row.agentId === agentId && row.version === version) ?? null;
   }
 }

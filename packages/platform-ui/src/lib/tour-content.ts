@@ -57,9 +57,9 @@ export const GUIDE_CHAPTERS: readonly TourChapter[] = [
         target: 'agents-header',
       },
       {
-        id: 'unversioned',
-        title: 'Agents are not versioned',
-        body: 'Editing one changes every step already referencing it, immediately and everywhere. That is the trade for having a single definition instead of a copy per step.',
+        id: 'versions',
+        title: 'Agents are versioned',
+        body: 'Saving a change to an agent records a new version, shown on its card beside its validation status. Steps that call it use the current version, everywhere, immediately.',
         target: 'agents-header',
       },
       {
@@ -304,6 +304,43 @@ export const GUIDE_CHAPTERS: readonly TourChapter[] = [
         title: 'Tools come after it exists',
         body: 'Saving takes you straight to Configure, because a binding needs something to bind to. A new agent can reach nothing until you add one there.',
         target: 'agent-new-save',
+      },
+    ],
+  },
+  {
+    id: 'agent-evaluation',
+    title: 'Evaluating an agent',
+    match: '/:handle/agents/definitions/:id?tab=evaluation',
+    steps: [
+      {
+        id: 'own',
+        title: 'This suite belongs to the agent, not to a workflow',
+        body: 'Its Evaluators, Eval Cases and threshold stay with the agent through every edit. Only a container agent of this workspace that names a runtime can be evaluated.',
+        target: 'agent-tabs',
+      },
+      {
+        id: 'version',
+        title: 'Each Eval Run assesses one agent version',
+        body: 'This line says which. A change to the runtime, model, system prompt, output schema, MCP servers or Skills makes a new version, which reads Not verified until it is run; a rename does not.',
+        target: 'agent-version',
+      },
+      {
+        id: 'cases',
+        title: 'A case\u2019s trigger payload is the agent\u2019s whole input',
+        body: 'It is given nothing else: no earlier step outputs, and an empty workspace. Write cases by hand or with the assistant, from what the steps that use the agent were given.',
+        target: 'eval-cases',
+      },
+      {
+        id: 'run',
+        title: 'An Eval Run runs the agent as a one-step workflow',
+        body: 'Each trial is a real run on the production path, so its cost, trajectory and audit read like any other. Open a run to see the exact configuration it assessed.',
+        target: 'eval-runs',
+      },
+      {
+        id: 'steps',
+        title: 'A step that runs it as it is shares this verdict',
+        body: 'A workflow step that adds no prompt, model, Skills, output schema or MCP servers of its own reads this validation. One that changes the agent needs its own, on the workflow\u2019s Evaluation tab.',
+        target: 'eval-status',
       },
     ],
   },

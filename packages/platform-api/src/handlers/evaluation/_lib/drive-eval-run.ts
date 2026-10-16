@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { mcpReplayMissesOf, type AgentOutputSnapshot, type EvalCase, type EvalRun, type EvalTrial, type JudgeCall, type Score } from '@mediforce/platform-core';
+import { mcpReplayMissesOf, type AgentOutputSnapshot, type EvalCase, type EvalRun, type EvalTrial, type JudgeCall, type Score, type WorkflowDefinition } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { recordScore } from '../../scores/record-score';
-import { loadEvaluationSubject } from './evaluation-subject';
+import { loadScoredRun } from './scored-run';
 import { storeEvalRunAcceptance } from './eval-run-report';
 import { loadModelPrices } from './model-prices';
 import { runEvaluatorCheck } from './run-evaluator-check';
 import { evaluatorsOfCase, judgeConfidenceMetadata, scoresOfTrial } from './trial-scores';
+import { loadEvaluationSubject, runVersionOf, subjectRef, trialStepId } from './evaluation-subject';
 
 /**
  * How long a driver may hold a trial — between claiming it and creating its
@@ -34,7 +35,7 @@ function schedulingOrder(trials: readonly EvalTrial[]): EvalTrial[] {
 /** What the trial's step execution recorded of its Agent Run: cost, tokens, duration. */
 async function trialAgentOutput(scope: CallerScope, run: EvalRun, instanceId: string): Promise<AgentOutputSnapshot | null> {
   const execution = (await scope.runs.getStepExecutions(instanceId))
-    .filter((candidate) => candidate.stepId === run.stepId)
+    .filter((candidate) => candidate.stepId === trialStepId(run))
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt))[0];
   return execution?.agentOutput ?? null;
 }
@@ -70,7 +71,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
   const instanceId = trial.processInstanceId!;
   const instance = await scope.runs.getById(instanceId);
   const agentRun = (await scope.agentRuns.getByInstanceId(instanceId))
-    .filter((candidate) => candidate.stepId === run.stepId && candidate.status !== 'running')
+    .filter((candidate) => candidate.stepId === trialStepId(run) && candidate.status !== 'running')
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt))[0];
 
   if (agentRun === undefined) {
@@ -82,8 +83,19 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
     return;
   }
 
+  // An Agent Run that errored before giving a result never produced an output to grade: the trial failed to run.
+  if (agentRun.envelope === null && agentRun.fallbackReason === 'error') {
+    await scope.evaluation.transitionTrial(trial, 'scoring', {
+      status: 'failed',
+      agentRunId: agentRun.id,
+      error: instance?.error ?? 'The trial\'s Agent Run errored before giving a result',
+      completedAt: new Date().toISOString(),
+    });
+    return;
+  }
+
   const agentOutput = await trialAgentOutput(scope, run, instanceId);
-  const subject = await loadEvaluationSubject(scope, agentRun.id);
+  const subject = await loadScoredRun(scope, agentRun.id);
   const priceOf = await loadModelPrices(scope);
   const earlier = await scoresOfTrial(scope, run, trial);
   const alreadyScored = new Set(earlier.map((score) => score.evaluatorId));
@@ -138,7 +150,7 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
       },
       namespace: run.namespace,
       processInstanceId: instanceId,
-      stepId: run.stepId,
+      stepId: trialStepId(run),
       evaluatorId: frozen.evaluatorId,
       supersedes: null,
       basis: `Evaluator '${frozen.name}' v${frozen.version} on Eval Run '${run.id}' (ADR-0023)`,
@@ -179,12 +191,21 @@ async function startTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
     return;
   }
   try {
+    const subject = subjectRef(run);
+    let target: { definition: WorkflowDefinition } | { definitionName: string; version: number };
+    if (subject.kind === 'agent') {
+      // An Agent's trial runs the single-step Definition its run assessed, which no stored Workflow holds (ADR-0029).
+      target = { definition: (await loadEvaluationSubject(scope, subject, 'read', runVersionOf(run), run.env)).definition };
+    } else if (run.definitionVersion === null) {
+      throw new Error(`Eval Run '${run.id}' of a step froze no workflow version`);
+    } else {
+      target = { definitionName: subject.workflowName, version: run.definitionVersion };
+    }
     await scope.system.engine.createEvalTrial({
       id: processInstanceId,
       namespace: run.namespace,
-      definitionName: run.workflowName,
-      version: run.definitionVersion,
-      stepId: run.stepId,
+      ...target,
+      stepId: trialStepId(run),
       evalRunId: run.id,
       triggerPayload: evalCase.input.triggerPayload,
       variables: evalCase.input.previousStepOutputs,

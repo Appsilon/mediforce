@@ -21,7 +21,9 @@ import {
   McpRecordingSchema,
   type EvalCase,
   type EvalDatasetVersion,
-  type EvaluatedStep,
+  type EvaluationOwner,
+  type EvaluationSubject,
+  evaluationOwnerOf,
   type EvaluationBrief,
   type EvaluationRepository,
   type Evaluator,
@@ -49,27 +51,48 @@ import {
   stepQualifications,
 } from '../schema/evaluation';
 
-type StepColumns = {
+type OwnerColumns = {
   workspace: PgColumn;
   workflowName: PgColumn;
   stepId: PgColumn;
+  agentId: PgColumn;
 };
 
-function onStep(table: StepColumns, step: EvaluatedStep) {
+/**
+ * The owner as stored: the columns a row does not use hold `''`, never null,
+ * so they stay in the primary keys (see the schema).
+ */
+function ownerColumns(owner: EvaluationOwner): { workspace: string; workflowName: string; stepId: string; agentId: string } {
+  return {
+    workspace: owner.namespace,
+    workflowName: owner.workflowName ?? '',
+    stepId: owner.stepId ?? '',
+    agentId: owner.agentId ?? '',
+  };
+}
+
+function ownedBy(table: OwnerColumns, subject: EvaluationSubject) {
+  const owner = ownerColumns(evaluationOwnerOf(subject));
   return and(
-    eq(table.workspace, step.namespace),
-    eq(table.workflowName, step.workflowName),
-    eq(table.stepId, step.stepId),
+    eq(table.workspace, owner.workspace),
+    eq(table.workflowName, owner.workflowName),
+    eq(table.stepId, owner.stepId),
+    eq(table.agentId, owner.agentId),
   );
 }
 
-function stepFields(row: { workspace: string; workflowName: string; stepId: string }): EvaluatedStep {
-  return { namespace: row.workspace, workflowName: row.workflowName, stepId: row.stepId };
+function ownerFields(row: { workspace: string; workflowName: string; stepId: string; agentId: string }): EvaluationOwner {
+  return {
+    namespace: row.workspace,
+    workflowName: row.workflowName === '' ? null : row.workflowName,
+    stepId: row.stepId === '' ? null : row.stepId,
+    agentId: row.agentId === '' ? null : row.agentId,
+  };
 }
 
 function toBrief(row: typeof evaluationBriefs.$inferSelect): EvaluationBrief {
   return EvaluationBriefSchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     version: row.version,
     text: row.text,
     origin: row.origin,
@@ -80,7 +103,7 @@ function toBrief(row: typeof evaluationBriefs.$inferSelect): EvaluationBrief {
 
 function toEvaluator(row: typeof evaluators.$inferSelect): Evaluator {
   return EvaluatorSchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     id: row.id,
     name: row.name,
     archived: row.archived,
@@ -106,7 +129,7 @@ function toVersion(row: typeof evaluatorVersions.$inferSelect): EvaluatorVersion
 
 function toCase(row: typeof evalCases.$inferSelect): EvalCase {
   return EvalCaseSchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     id: row.id,
     name: row.name,
     input: row.input,
@@ -130,7 +153,7 @@ function toCase(row: typeof evalCases.$inferSelect): EvalCase {
 
 function toDataset(row: typeof evalDatasetVersions.$inferSelect): EvalDatasetVersion {
   return EvalDatasetVersionSchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     id: row.id,
     version: row.version,
     caseIds: row.caseIds,
@@ -142,8 +165,9 @@ function toDataset(row: typeof evalDatasetVersions.$inferSelect): EvalDatasetVer
 
 function toPolicy(row: typeof mcpEvalPolicies.$inferSelect): McpEvalPolicy {
   return McpEvalPolicySchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     servers: row.servers,
+    env: row.env,
     updatedBy: row.updatedBy,
     updatedAt: row.updatedAt.toISOString(),
   });
@@ -151,7 +175,7 @@ function toPolicy(row: typeof mcpEvalPolicies.$inferSelect): McpEvalPolicy {
 
 function toRecording(row: typeof evalMcpRecordings.$inferSelect): McpRecording {
   return McpRecordingSchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     id: row.id,
     caseId: row.caseId,
     server: row.server,
@@ -164,9 +188,10 @@ function toRecording(row: typeof evalMcpRecordings.$inferSelect): McpRecording {
 
 function toEvalRun(row: typeof evalRuns.$inferSelect): EvalRun {
   return EvalRunSchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     id: row.id,
     definitionVersion: row.definitionVersion,
+    agentVersion: row.agentVersion,
     datasetVersionId: row.datasetVersionId,
     caseIds: row.caseIds,
     trialsPerCase: row.trialsPerCase,
@@ -175,6 +200,7 @@ function toEvalRun(row: typeof evalRuns.$inferSelect): EvalRun {
     fingerprint: row.fingerprint,
     acceptanceCriteria: row.acceptanceCriteria,
     mcpPolicy: row.mcpPolicy,
+    env: row.env,
     estimate: row.estimate,
     budgetUsd: row.budgetUsd,
     spentUsd: row.spentUsd,
@@ -189,7 +215,7 @@ function toEvalRun(row: typeof evalRuns.$inferSelect): EvalRun {
 
 function toCriteria(row: typeof evalAcceptanceCriteria.$inferSelect): AcceptanceCriteriaVersion {
   return AcceptanceCriteriaVersionSchema.parse({
-    ...stepFields(row),
+    ...ownerFields(row),
     version: row.version,
     criteria: row.criteria,
     origin: row.origin,
@@ -228,9 +254,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
   async appendBrief(brief: EvaluationBrief): Promise<EvaluationBrief> {
     const parsed = EvaluationBriefSchema.parse(brief);
     const [row] = await this.db.insert(evaluationBriefs).values({
-      workspace: parsed.namespace,
-      workflowName: parsed.workflowName,
-      stepId: parsed.stepId,
+      ...ownerColumns(parsed),
       version: parsed.version,
       text: parsed.text,
       origin: parsed.origin,
@@ -240,9 +264,9 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     return toBrief(row!);
   }
 
-  async listBriefs(step: EvaluatedStep): Promise<EvaluationBrief[]> {
+  async listBriefs(subject: EvaluationSubject): Promise<EvaluationBrief[]> {
     const rows = await this.db.select().from(evaluationBriefs)
-      .where(onStep(evaluationBriefs, step))
+      .where(ownedBy(evaluationBriefs, subject))
       .orderBy(desc(evaluationBriefs.version));
     return rows.map(toBrief);
   }
@@ -253,9 +277,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     await this.db.transaction(async (tx) => {
       await tx.insert(evaluators).values({
         id: parsed.id,
-        workspace: parsed.namespace,
-        workflowName: parsed.workflowName,
-        stepId: parsed.stepId,
+        ...ownerColumns(parsed),
         name: parsed.name,
         archived: parsed.archived,
         runInProduction: parsed.runInProduction,
@@ -272,9 +294,9 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     return row === undefined ? null : toEvaluator(row);
   }
 
-  async listEvaluators(step: EvaluatedStep): Promise<Evaluator[]> {
+  async listEvaluators(subject: EvaluationSubject): Promise<Evaluator[]> {
     const rows = await this.db.select().from(evaluators)
-      .where(onStep(evaluators, step))
+      .where(ownedBy(evaluators, subject))
       .orderBy(asc(evaluators.name));
     return rows.map(toEvaluator);
   }
@@ -310,9 +332,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     const parsed = EvalCaseSchema.parse(evalCase);
     const [row] = await this.db.insert(evalCases).values({
       id: parsed.id,
-      workspace: parsed.namespace,
-      workflowName: parsed.workflowName,
-      stepId: parsed.stepId,
+      ...ownerColumns(parsed),
       name: parsed.name,
       input: parsed.input,
       workspaceSeedCommit: parsed.workspaceSeedCommit,
@@ -339,9 +359,9 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     return row === undefined ? null : toCase(row);
   }
 
-  async listCases(step: EvaluatedStep): Promise<EvalCase[]> {
+  async listCases(subject: EvaluationSubject): Promise<EvalCase[]> {
     const rows = await this.db.select().from(evalCases)
-      .where(onStep(evalCases, step))
+      .where(ownedBy(evalCases, subject))
       .orderBy(desc(evalCases.createdAt), desc(evalCases.id));
     return rows.map(toCase);
   }
@@ -354,9 +374,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     const parsed = EvalDatasetVersionSchema.parse(dataset);
     const [row] = await this.db.insert(evalDatasetVersions).values({
       id: parsed.id,
-      workspace: parsed.namespace,
-      workflowName: parsed.workflowName,
-      stepId: parsed.stepId,
+      ...ownerColumns(parsed),
       version: parsed.version,
       caseIds: parsed.caseIds,
       containsProductionData: parsed.containsProductionData,
@@ -371,32 +389,31 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     return row === undefined ? null : toDataset(row);
   }
 
-  async listDatasetVersions(step: EvaluatedStep): Promise<EvalDatasetVersion[]> {
+  async listDatasetVersions(subject: EvaluationSubject): Promise<EvalDatasetVersion[]> {
     const rows = await this.db.select().from(evalDatasetVersions)
-      .where(onStep(evalDatasetVersions, step))
+      .where(ownedBy(evalDatasetVersions, subject))
       .orderBy(desc(evalDatasetVersions.version));
     return rows.map(toDataset);
   }
 
-  async getMcpPolicy(step: EvaluatedStep): Promise<McpEvalPolicy | null> {
-    const [row] = await this.db.select().from(mcpEvalPolicies).where(onStep(mcpEvalPolicies, step)).limit(1);
+  async getMcpPolicy(subject: EvaluationSubject): Promise<McpEvalPolicy | null> {
+    const [row] = await this.db.select().from(mcpEvalPolicies).where(ownedBy(mcpEvalPolicies, subject)).limit(1);
     return row === undefined ? null : toPolicy(row);
   }
 
   async putMcpPolicy(policy: McpEvalPolicy): Promise<McpEvalPolicy> {
     const parsed = McpEvalPolicySchema.parse(policy);
     const values = {
-      workspace: parsed.namespace,
-      workflowName: parsed.workflowName,
-      stepId: parsed.stepId,
+      ...ownerColumns(parsed),
       servers: parsed.servers,
+      env: parsed.env,
       updatedBy: parsed.updatedBy,
       updatedAt: new Date(parsed.updatedAt),
     };
     const [row] = await this.db.insert(mcpEvalPolicies).values(values)
       .onConflictDoUpdate({
-        target: [mcpEvalPolicies.workspace, mcpEvalPolicies.workflowName, mcpEvalPolicies.stepId],
-        set: { servers: values.servers, updatedBy: values.updatedBy, updatedAt: values.updatedAt },
+        target: [mcpEvalPolicies.workspace, mcpEvalPolicies.workflowName, mcpEvalPolicies.stepId, mcpEvalPolicies.agentId],
+        set: { servers: values.servers, env: values.env, updatedBy: values.updatedBy, updatedAt: values.updatedAt },
       })
       .returning();
     return toPolicy(row!);
@@ -406,9 +423,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     const parsed = McpRecordingSchema.parse(recording);
     await this.db.insert(evalMcpRecordings).values({
       id: parsed.id,
-      workspace: parsed.namespace,
-      workflowName: parsed.workflowName,
-      stepId: parsed.stepId,
+      ...ownerColumns(parsed),
       caseId: parsed.caseId,
       server: parsed.server,
       tape: parsed.tape,
@@ -418,10 +433,10 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     });
   }
 
-  async listMcpRecordings(step: EvaluatedStep, filter: McpRecordingFilter = {}): Promise<McpRecording[]> {
+  async listMcpRecordings(subject: EvaluationSubject, filter: McpRecordingFilter = {}): Promise<McpRecording[]> {
     const query = this.db.select().from(evalMcpRecordings)
       .where(and(
-        onStep(evalMcpRecordings, step),
+        ownedBy(evalMcpRecordings, subject),
         filter.caseId === undefined ? undefined : eq(evalMcpRecordings.caseId, filter.caseId),
         filter.server === undefined ? undefined : eq(evalMcpRecordings.server, filter.server),
       ))
@@ -430,20 +445,18 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     return rows.reverse().map(toRecording);
   }
 
-  async listMcpRecordedCases(step: EvaluatedStep, filter: McpRecordedCaseFilter = {}): Promise<McpRecordedCase[]> {
+  async listMcpRecordedCases(subject: EvaluationSubject, filter: McpRecordedCaseFilter = {}): Promise<McpRecordedCase[]> {
     return this.db.selectDistinct({ server: evalMcpRecordings.server, caseId: evalMcpRecordings.caseId })
       .from(evalMcpRecordings)
       .where(and(
-        onStep(evalMcpRecordings, step),
+        ownedBy(evalMcpRecordings, subject),
         filter.evalRunId === undefined ? undefined : eq(evalMcpRecordings.evalRunId, filter.evalRunId),
       ));
   }
   async appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion> {
     const parsed = AcceptanceCriteriaVersionSchema.parse(criteria);
     const [row] = await this.db.insert(evalAcceptanceCriteria).values({
-      workspace: parsed.namespace,
-      workflowName: parsed.workflowName,
-      stepId: parsed.stepId,
+      ...ownerColumns(parsed),
       version: parsed.version,
       criteria: parsed.criteria,
       origin: parsed.origin,
@@ -453,9 +466,9 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     return toCriteria(row!);
   }
 
-  async listAcceptanceCriteria(step: EvaluatedStep): Promise<AcceptanceCriteriaVersion[]> {
+  async listAcceptanceCriteria(subject: EvaluationSubject): Promise<AcceptanceCriteriaVersion[]> {
     const rows = await this.db.select().from(evalAcceptanceCriteria)
-      .where(onStep(evalAcceptanceCriteria, step))
+      .where(ownedBy(evalAcceptanceCriteria, subject))
       .orderBy(desc(evalAcceptanceCriteria.version));
     return rows.map(toCriteria);
   }
@@ -464,9 +477,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     const parsed = StepQualificationSchema.parse(qualification);
     await this.db.insert(stepQualifications).values({
       id: parsed.id,
-      workspace: parsed.namespace,
-      workflowName: parsed.workflowName,
-      stepId: parsed.stepId,
+      ...ownerColumns(parsed),
       evalRunId: parsed.evalRunId,
       fingerprint: parsed.fingerprint.hash,
       record: parsed,
@@ -476,9 +487,9 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     return parsed;
   }
 
-  async listQualifications(step: EvaluatedStep): Promise<StepQualification[]> {
+  async listQualifications(subject: EvaluationSubject): Promise<StepQualification[]> {
     const rows = await this.db.select().from(stepQualifications)
-      .where(onStep(stepQualifications, step))
+      .where(ownedBy(stepQualifications, subject))
       .orderBy(desc(stepQualifications.signedAt), desc(stepQualifications.id));
     return rows.map((row) => StepQualificationSchema.parse(row.record));
   }
@@ -488,10 +499,9 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     await this.db.transaction(async (tx) => {
       await tx.insert(evalRuns).values({
         id: parsed.id,
-        workspace: parsed.namespace,
-        workflowName: parsed.workflowName,
-        stepId: parsed.stepId,
+        ...ownerColumns(parsed),
         definitionVersion: parsed.definitionVersion,
+        agentVersion: parsed.agentVersion,
         datasetVersionId: parsed.datasetVersionId,
         caseIds: parsed.caseIds,
         trialsPerCase: parsed.trialsPerCase,
@@ -500,6 +510,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
         fingerprint: parsed.fingerprint,
         acceptanceCriteria: parsed.acceptanceCriteria,
         mcpPolicy: parsed.mcpPolicy,
+        env: parsed.env,
         estimate: parsed.estimate,
         budgetUsd: parsed.budgetUsd,
         spentUsd: parsed.spentUsd,
@@ -524,9 +535,9 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     return row === undefined ? null : toEvalRun(row);
   }
 
-  async listEvalRuns(step: EvaluatedStep): Promise<EvalRun[]> {
+  async listEvalRuns(subject: EvaluationSubject): Promise<EvalRun[]> {
     const rows = await this.db.select().from(evalRuns)
-      .where(onStep(evalRuns, step))
+      .where(ownedBy(evalRuns, subject))
       .orderBy(desc(evalRuns.createdAt), desc(evalRuns.id));
     return rows.map(toEvalRun);
   }

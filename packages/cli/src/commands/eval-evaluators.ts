@@ -1,7 +1,7 @@
 import { EvaluatorOnErrorSchema } from '@mediforce/platform-core';
 import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson } from '../output';
-import { readJsonFile, STEP_ARGS, stepFrom } from './eval-step-args';
+import { readJsonFile, STEP_ARGS, stepFrom, SUBJECT_ARGS, subjectFrom } from './eval-step-args';
 import type { EvaluatorView } from '@mediforce/platform-api/contract';
 
 function describeProduction(evaluator: EvaluatorView): string {
@@ -21,9 +21,9 @@ function describeEvaluator(evaluator: EvaluatorView): string {
 export const evalEvaluatorListCommand = defineCommand({
   name: 'mediforce eval evaluator-list',
   description: 'List a step\'s Evaluators with their latest version and whether they count.',
-  args: { ...STEP_ARGS, 'include-archived': { type: 'boolean', description: 'Include archived Evaluators' } },
+  args: { ...SUBJECT_ARGS, 'include-archived': { type: 'boolean', description: 'Include archived Evaluators' } },
   async run({ args, output, mediforce, jsonMode }) {
-    const result = await mediforce.evaluation.listEvaluators({ ...stepFrom(args), includeArchived: args['include-archived'] === true ? 'true' : undefined });
+    const result = await mediforce.evaluation.listEvaluators({ ...subjectFrom(args), includeArchived: args['include-archived'] === true ? 'true' : undefined });
     if (jsonMode) {
       printJson(output, result);
       return 0;
@@ -37,10 +37,10 @@ export const evalEvaluatorListCommand = defineCommand({
 export const evalEvaluatorCreateCommand = defineCommand({
   name: 'mediforce eval evaluator-create',
   description: 'Create an Evaluator from a JSON file: { name, rule, check }.',
-  args: { ...STEP_ARGS, file: { type: 'string', required: true, description: 'JSON file with name, rule and check' } },
+  args: { ...SUBJECT_ARGS, file: { type: 'string', required: true, description: 'JSON file with name, rule and check' } },
   async run({ args, output, mediforce, jsonMode }) {
     const body = readJsonFile(args.file) as Record<string, unknown>;
-    const result = await mediforce.evaluation.createEvaluator({ ...body, ...stepFrom(args) } as Parameters<typeof mediforce.evaluation.createEvaluator>[0]);
+    const result = await mediforce.evaluation.createEvaluator({ ...body, ...subjectFrom(args) } as Parameters<typeof mediforce.evaluation.createEvaluator>[0]);
     if (jsonMode) printJson(output, result);
     else output.stdout(describeEvaluator(result.evaluator));
     return 0;

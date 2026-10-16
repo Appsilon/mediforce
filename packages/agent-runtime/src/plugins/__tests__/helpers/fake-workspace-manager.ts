@@ -1,9 +1,10 @@
 import type { WorkspaceManagerLike } from '../../container-plugin';
-import type { RunWorkspaceHandle } from '../../../workspace/workspace-manager';
+import type { RunWorkspaceHandle, StepFiles } from '../../../workspace/workspace-manager';
 import { vi } from 'vitest';
 
 export interface FakeWorkspaceManagerOptions {
   handle?: Partial<RunWorkspaceHandle>;
+  stepFiles?: StepFiles[];
 }
 
 export function createFakeWorkspaceManager(
@@ -28,5 +29,6 @@ export function createFakeWorkspaceManager(
       changedFiles: [],
       isEmpty: true,
     })),
+    listStepFiles: vi.fn(async () => options.stepFiles ?? []),
   };
 }

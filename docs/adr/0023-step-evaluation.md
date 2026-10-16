@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-10-07
+last_reviewed: 2026-10-16
 ---
 
 # 0023 — Step Evaluation: Evaluation Assistant, Evaluators, single-step Eval Runs, Step Qualification
@@ -34,6 +34,10 @@ last_reviewed: 2026-10-07
   deleted, not only out of the UI; ADR-0024 pins the commit that has it.
   From 2026-10-05 an Eval Run carries the Step Fingerprint itself, with no
   variants (D5).
+- **Partially superseded 2026-10-15 by [ADR-0029](./0029-agent-evaluation.md):**
+  D2 — an Evaluation is owned by a Step or by an Agent, and an Agent's Eval Run
+  assesses one Agent version. Everything else here holds for an Agent's
+  Evaluation except where ADR-0029 names it.
 - **Vocabulary:** Evaluation, Evaluation Assistant, Evaluation Brief, Evaluator, Eval Case, Eval Dataset, Eval Run,
   Agent Trajectory, Step Fingerprint, Acceptance Criteria, Step Qualification
   — all in [`CONTEXT.md`](../../CONTEXT.md) § Evaluation domain.
@@ -57,6 +61,8 @@ names schema-shape checking of a Definition. The activity is Evaluation, a rule
 is an Evaluator, the signed outcome is a Step Qualification.
 
 **D2 — Evaluators and Eval Datasets are platform entities owned by one Step.**
+_Superseded in part by [ADR-0029](./0029-agent-evaluation.md): they are owned
+by one Step or by one Agent._
 Keyed by `(namespace, workflow name, stepId)`, outside the immutable Workflow
 Definition, so adding a check never mints a Definition version. Exportable to
 an `evals/` folder of the workflow package (ADR-0013). Reuse is by copy —
@@ -241,7 +247,15 @@ only writes Scores. Human verdicts on CM3 reviews become Scores automatically,
 best-effort until handlers get a cross-repository transaction (#516): the verdict
 itself is always on the task and its `task.completed` audit event.
 `outputSchema` violations, after one retry with the first violation, follow
-the same fallback route; the retry shares the step's timeout.
+the same fallback route; the retry shares the step's timeout. _Amended
+2026-10-16: the retry no longer reruns the agent — one LLM call on the step's
+model, at temperature 0 (other calls keep the client's 0.7), reshapes the rejected result to the schema, using only what the result
+already says (checked: a value the original does not contain rejects it), and
+the result is validated again. A reshaped result keeps the agent's original in
+an annotation and the audit event; a key it cannot fill stays missing and the
+run escalates. Production Evaluators get no retry. Every escalation that
+fails the step writes its reason to the step and the run, so the paused run
+says why._
 
 **D14 — One Evaluation Assistant, built on the workflow assistant's
 blocks.** A single assistant per Step covers the whole Evaluation: suggest a

@@ -9,7 +9,7 @@ import type { AgentOutputGate, AgentOutputGateVerdict } from '@mediforce/agent-r
 import type { CallerScope } from '../../../repositories/index';
 import { recordScore } from '../../scores/record-score';
 import { evaluatorProduction } from './evaluator-view';
-import type { EvaluationSubject } from './evaluation-subject';
+import type { ScoredRun } from './scored-run';
 import { loadModelPrices } from './model-prices';
 import { judgeConfidenceMetadata } from './trial-scores';
 import { runEvaluatorCheck } from './run-evaluator-check';
@@ -21,7 +21,7 @@ interface ProductionEvaluator {
 
 /** The step's Evaluators that score live runs now: flagged, not archived, latest version counted (D9, D13). */
 export async function listProductionEvaluators(scope: CallerScope, step: EvaluatedStep): Promise<ProductionEvaluator[]> {
-  const flagged = (await scope.evaluation.listEvaluators(step))
+  const flagged = (await scope.evaluation.listEvaluators({ kind: 'step', ...step }))
     .filter((evaluator) => evaluator.runInProduction === true && evaluator.archived === false);
   const active: ProductionEvaluator[] = [];
   for (const evaluator of flagged) {
@@ -35,7 +35,7 @@ export async function listProductionEvaluators(scope: CallerScope, step: Evaluat
 
 /** Whether the step has any Evaluator marked for production, counted or not — one cheap query for the runner to skip the gate. */
 export async function hasProductionEvaluators(scope: CallerScope, step: EvaluatedStep): Promise<boolean> {
-  return (await scope.evaluation.listEvaluators(step))
+  return (await scope.evaluation.listEvaluators({ kind: 'step', ...step }))
     .some((evaluator) => evaluator.runInProduction === true && evaluator.archived === false);
 }
 
@@ -47,7 +47,7 @@ export interface ProductionScoring {
 
 async function scoreProduction(
   scope: CallerScope,
-  subject: EvaluationSubject,
+  subject: ScoredRun,
   { evaluator, version }: ProductionEvaluator,
   judgeCalls: readonly JudgeCall[],
   priceOf: Awaited<ReturnType<typeof loadModelPrices>>,
@@ -91,7 +91,7 @@ async function scoreProduction(
 export async function scoreProductionRun(
   scope: CallerScope,
   step: EvaluatedStep,
-  subject: EvaluationSubject,
+  subject: ScoredRun,
 ): Promise<ProductionScoring> {
   const evaluators = await listProductionEvaluators(scope, step);
   if (evaluators.length === 0) return { verdict: { failure: null, errors: [] }, judges: [] };
@@ -135,7 +135,7 @@ export function productionEvaluatorGate(scope: CallerScope): AgentOutputGate {
     const agentRun = await scope.agentRuns.getById(agentRunId);
     const instance = await scope.runs.getById(context.processInstanceId);
     if (agentRun === null || instance === null) return { failure: null, errors: ['the Agent Run is not visible to the gate'] };
-    const subject: EvaluationSubject = {
+    const subject: ScoredRun = {
       agentRun: { ...agentRun, envelope },
       instance,
       stepInput: context.stepInput,

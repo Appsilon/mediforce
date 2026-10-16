@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   InMemoryAgentDefinitionRepository,
   InMemoryAuditRepository,
+  InMemoryEvaluationRepository,
   InMemoryProcessInstanceRepository,
   InMemoryToolCatalogRepository,
   resetFactorySequence,
@@ -11,7 +12,7 @@ import {
   createTestScope,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope';
-import { NotFoundError } from '../../../errors';
+import { ConflictError, NotFoundError } from '../../../errors';
 
 describe('updateAgent handler', () => {
   let agentDefinitionRepo: InMemoryAgentDefinitionRepository;
@@ -99,5 +100,34 @@ describe('updateAgent handler', () => {
       scope,
     ).catch((e) => e);
     expect(err).toBeInstanceOf(NotFoundError);
+  });
+
+  it('refuses to move an Agent to another workspace while it owns an Evaluation, and moves one that does not', async () => {
+    const evaluationRepo = new InMemoryEvaluationRepository();
+    const agentFields = {
+      kind: 'plugin',
+      iconName: 'Bot',
+      description: 'd',
+      foundationModel: 'm',
+      systemPrompt: 'p',
+      inputDescription: 'i',
+      outputDescription: 'o',
+      namespace: 'team-alpha',
+      visibility: 'private',
+    } as const;
+    const evaluated = await agentDefinitionRepo.create({ ...agentFields, name: 'Evaluated' });
+    const unevaluated = await agentDefinitionRepo.create({ ...agentFields, name: 'Unevaluated' });
+    await evaluationRepo.appendBrief({
+      namespace: 'team-alpha', workflowName: null, stepId: null, agentId: evaluated.id,
+      version: 1, text: 'Grades AEs by CTCAE v5.', origin: 'user', createdBy: 'u-1', createdAt: '2026-10-15T09:00:00.000Z',
+    });
+    const scope = createTestScope({ agentDefinitionRepo, auditRepo, evaluationRepo, caller: userCaller('u-1', ['team-alpha', 'team-beta']) });
+
+    await expect(updateAgent({ id: evaluated.id, body: { namespace: 'team-beta' } }, scope)).rejects.toBeInstanceOf(ConflictError);
+    expect((await agentDefinitionRepo.getById(evaluated.id))?.namespace).toBe('team-alpha');
+
+    await updateAgent({ id: evaluated.id, body: { namespace: 'team-alpha', description: 'same workspace' } }, scope);
+    const moved = await updateAgent({ id: unevaluated.id, body: { namespace: 'team-beta' } }, scope);
+    expect(moved.agent.namespace).toBe('team-beta');
   });
 });

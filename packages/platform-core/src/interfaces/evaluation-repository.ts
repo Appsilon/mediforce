@@ -4,7 +4,7 @@ import type {
   AcceptanceCriteriaVersion,
   EvalCase,
   EvalDatasetVersion,
-  EvaluatedStep,
+  EvaluationSubject,
   EvaluationBrief,
   Evaluator,
   EvaluatorVersion,
@@ -42,11 +42,11 @@ export interface McpRecordedCase {
 export interface EvaluationRepository {
   appendBrief(brief: EvaluationBrief): Promise<EvaluationBrief>;
   /** Newest first. */
-  listBriefs(step: EvaluatedStep): Promise<EvaluationBrief[]>;
+  listBriefs(subject: EvaluationSubject): Promise<EvaluationBrief[]>;
 
   createEvaluator(evaluator: Evaluator, firstVersion: EvaluatorVersion): Promise<void>;
   getEvaluator(id: string): Promise<Evaluator | null>;
-  listEvaluators(step: EvaluatedStep): Promise<Evaluator[]>;
+  listEvaluators(subject: EvaluationSubject): Promise<Evaluator[]>;
   setEvaluatorArchived(id: string, archived: boolean): Promise<void>;
   setEvaluatorProduction(id: string, settings: Pick<Evaluator, 'runInProduction' | 'onError'>): Promise<void>;
   appendEvaluatorVersion(version: EvaluatorVersion): Promise<EvaluatorVersion>;
@@ -57,35 +57,35 @@ export interface EvaluationRepository {
   createCase(evalCase: EvalCase): Promise<EvalCase>;
   getCase(id: string): Promise<EvalCase | null>;
   /** Newest first, archived cases included. */
-  listCases(step: EvaluatedStep): Promise<EvalCase[]>;
+  listCases(subject: EvaluationSubject): Promise<EvalCase[]>;
   setCaseArchived(id: string, archived: boolean): Promise<void>;
 
   appendDatasetVersion(dataset: EvalDatasetVersion): Promise<EvalDatasetVersion>;
   getDatasetVersion(id: string): Promise<EvalDatasetVersion | null>;
   /** Newest first. */
-  listDatasetVersions(step: EvaluatedStep): Promise<EvalDatasetVersion[]>;
+  listDatasetVersions(subject: EvaluationSubject): Promise<EvalDatasetVersion[]>;
 
-  getMcpPolicy(step: EvaluatedStep): Promise<McpEvalPolicy | null>;
+  getMcpPolicy(subject: EvaluationSubject): Promise<McpEvalPolicy | null>;
   putMcpPolicy(policy: McpEvalPolicy): Promise<McpEvalPolicy>;
 
   appendMcpRecording(recording: McpRecording): Promise<void>;
   /** Oldest first; narrowed to one case and one server when `filter` names them, and to the newest `limit`. */
-  listMcpRecordings(step: EvaluatedStep, filter?: McpRecordingFilter): Promise<McpRecording[]>;
+  listMcpRecordings(subject: EvaluationSubject, filter?: McpRecordingFilter): Promise<McpRecording[]>;
   /** Each server and Eval Case the Step has a recording for, once — without the tapes; only one Eval Run's when `filter` names it. */
-  listMcpRecordedCases(step: EvaluatedStep, filter?: McpRecordedCaseFilter): Promise<McpRecordedCase[]>;
+  listMcpRecordedCases(subject: EvaluationSubject, filter?: McpRecordedCaseFilter): Promise<McpRecordedCase[]>;
 
   appendAcceptanceCriteria(criteria: AcceptanceCriteriaVersion): Promise<AcceptanceCriteriaVersion>;
   /** Newest first. */
-  listAcceptanceCriteria(step: EvaluatedStep): Promise<AcceptanceCriteriaVersion[]>;
+  listAcceptanceCriteria(subject: EvaluationSubject): Promise<AcceptanceCriteriaVersion[]>;
 
   createQualification(qualification: StepQualification): Promise<StepQualification>;
   /** Newest first. */
-  listQualifications(step: EvaluatedStep): Promise<StepQualification[]>;
+  listQualifications(subject: EvaluationSubject): Promise<StepQualification[]>;
 
   createEvalRun(run: EvalRun, trials: readonly EvalTrial[]): Promise<void>;
   getEvalRun(id: string): Promise<EvalRun | null>;
   /** Newest first. */
-  listEvalRuns(step: EvaluatedStep): Promise<EvalRun[]>;
+  listEvalRuns(subject: EvaluationSubject): Promise<EvalRun[]>;
   /**
    * Every Eval Run the heartbeat must move on, across workspaces: the running
    * ones, and any other — a cancelled one — with a trial still running or scoring.

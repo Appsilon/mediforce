@@ -10,7 +10,7 @@ import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-stra
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { RetiredFileSkillError } from '../skills/resolve-skills-for-step';
-import { INTERNAL_OUTPUT_FILE_NAMES, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
+import { INTERNAL_OUTPUT_FILE_NAMES, OUTPUT_FILES_REPO_ROOT, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
 import { DEFAULT_STEP_TIMEOUT_MINUTES, agentLogEntries, createLineStreamReader, offeredSkill, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes, unfence } from '@mediforce/platform-core';
 import { MCP_TAPE_DIR, MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from '../mcp/mcp-tape';
@@ -812,7 +812,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         throw new RetiredFileSkillError(context.stepId, stepAgent.retiredFileSkill);
       }
 
-      if (stepAgent.prompt === undefined || stepAgent.prompt === '') {
+      const instructedByAgent = context.agentIdentityPrompt !== undefined && context.agentIdentityPrompt !== '';
+      if ((stepAgent.prompt === undefined || stepAgent.prompt === '') && instructedByAgent === false) {
         throw new Error(
           `No prompt configured in step.agent for step '${context.stepId}'. ` +
           `${this.agentName} plugin requires step.agent.prompt.`,
@@ -1099,8 +1100,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
       const duration_ms = Date.now() - startTime;
 
+      // Local mode: the agent saw the real host path, so the mapping is the identity.
       const outputDirMapping = isLocalMode
-        ? undefined  // Local mode: paths in prompt are already real host paths
+        ? { containerPath: dockerOutputDir + '/', hostPath: dockerOutputDir + '/' }
         : spawnResult.outputDir
           ? { containerPath: '/output/', hostPath: spawnResult.outputDir + '/' }
           : undefined;
@@ -1392,9 +1394,11 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       );
       parts.push(
         `## Result Contract Directory\n` +
-        `Write ONLY the output result contract JSON to: ${outputDir}/result.json\n` +
-        `Do NOT write deliverable files to ${outputDir} — they will not be committed.\n` +
-        `The ${outputDir} directory is for the result contract and temporary/intermediate files only.`,
+        `Write the output result contract JSON to: ${outputDir}/result.json\n` +
+        `Any other file you leave in ${outputDir} is published as an Output File of this step: ` +
+        `it is offered for download and committed to ${workingDir}/${OUTPUT_FILES_REPO_ROOT}/${this.context.stepId}/, ` +
+        `where later steps find it. ${outputDir} itself is discarded when the step ends, ` +
+        `so keep scratch files out of it.`,
       );
     }
 
@@ -1406,22 +1410,20 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         `a non-conforming result is rejected.\n` +
         '```json\n' + JSON.stringify(this.context.step.agent.outputSchema, null, 2) + '\n```',
       );
-      if (this.context.outputSchemaViolation !== undefined) {
-        parts.push(
-          `## Previous Attempt Rejected\n` +
-          `Your previous result did not match the Output Schema: ${this.context.outputSchemaViolation}\n` +
-          `Produce a result that conforms to the schema.`,
-        );
-      }
     }
 
     // 5. Input context
-    const previousOutputs = await this.context.getPreviousStepOutputs();
+    // The run's `steps` in the input hold each step's latest output; the step
+    // execution history can lag behind it for a step that ran more than once.
+    const { steps: inputSteps, ...inputWithoutSteps } = input;
+    const previousOutputs = isRecord(inputSteps) ? inputSteps : await this.context.getPreviousStepOutputs();
     const hasPreviousOutputs = Object.keys(previousOutputs).length > 0;
     const INLINE_THRESHOLD = 5_000; // characters — shared by both previous-run and previous-step spill logic
 
+    // `steps` is rendered once, in its own section below, where large values
+    // are spilled to files instead of inlined.
     parts.push('## Input Data');
-    parts.push(JSON.stringify(input, null, 2));
+    parts.push(JSON.stringify(hasPreviousOutputs ? inputWithoutSteps : input, null, 2));
 
     // 5b. Previous run outputs — carry-over snapshot from the last successful
     // run of this workflow (see WD.inputForNextRun). Distinct from "previous
@@ -1446,12 +1448,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         for (const [key, value] of Object.entries(previousRun)) {
           const serialized = typeof value === 'string' ? value : JSON.stringify(value);
           if (serialized.length > INLINE_THRESHOLD) {
-            const writeDir = hostOutputDir ?? outputDir;
             const ext = typeof value === 'string' && !value.trimStart().startsWith('{') ? '.md' : '.json';
-            const filename = `prevrun-${key}${ext}`;
-            const hostPath = join(writeDir, filename);
-            await writeFile(hostPath, typeof value === 'string' ? value : JSON.stringify(value, null, 2), 'utf-8');
-            const agentFilePath = `${outputDir}/${filename}`;
+            const agentFilePath = await spillPreviousOutput(outputDir, hostOutputDir, `prevrun-${key}${ext}`, value);
             previousRunFileRefs.push({ field: key, containerPath: agentFilePath });
             inlinePreviousRun[key] = `[FILE: ${agentFilePath}]`;
           } else {
@@ -1465,7 +1463,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           parts.push(
             '## Large Previous Run Files\n' +
             'Some previous run values were too large to include inline. ' +
-            `They have been written to files in ${outputDir}/. Read them with \`cat\` or your preferred tool:\n` +
+            `They have been written to files in ${outputDir}/${PREVIOUS_OUTPUTS_DIR}/. Read them with \`cat\` or your preferred tool:\n` +
             previousRunFileRefs.map((r) => `- **${r.field}**: \`${r.containerPath}\``).join('\n'),
           );
         }
@@ -1491,14 +1489,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         for (const [key, value] of Object.entries(record)) {
           const serialized = typeof value === 'string' ? value : JSON.stringify(value);
           if (serialized.length > INLINE_THRESHOLD) {
-            // Write to file — use hostOutputDir (real disk path) when available,
-            // fall back to outputDir (which may be a container path like /output)
-            const writeDir = hostOutputDir ?? outputDir;
             const ext = typeof value === 'string' && !value.trimStart().startsWith('{') ? '.md' : '.json';
-            const filename = `prev-${stepId}-${key}${ext}`;
-            const hostPath = join(writeDir, filename);
-            await writeFile(hostPath, typeof value === 'string' ? value : JSON.stringify(value, null, 2), 'utf-8');
-            const agentFilePath = `${outputDir}/${filename}`;
+            const agentFilePath = await spillPreviousOutput(outputDir, hostOutputDir, `prev-${stepId}-${key}${ext}`, value);
             fileRefs.push({ stepId, field: key, containerPath: agentFilePath });
             compactOutput[key] = `[FILE: ${agentFilePath}]`;
           } else {
@@ -1515,13 +1507,32 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         parts.push(
           '## Large Output Files\n' +
           'Some previous step outputs were too large to include inline. ' +
-          `They have been written to files in ${outputDir}/. Read them with \`cat\` or your preferred tool:\n` +
+          `They have been written to files in ${outputDir}/${PREVIOUS_OUTPUTS_DIR}/. Read them with \`cat\` or your preferred tool:\n` +
           fileRefs.map((r) => `- **${r.stepId}.${r.field}**: \`${r.containerPath}\``).join('\n'),
         );
       }
     } else if (hasPreviousOutputs) {
       parts.push('## Previous Step Outputs');
       parts.push(JSON.stringify(previousOutputs, null, 2));
+    }
+
+    // 7. Files earlier steps left in the workspace — they are on disk either
+    // way, but an agent that is not told about them does not look.
+    if (workingDir && this.runWorkspaceHandle && this.workspaceManager) {
+      const stepFiles = await this.workspaceManager.listStepFiles(this.runWorkspaceHandle).catch((error: unknown) => {
+        agentLog('run.buildPrompt', 'could not list files of previous steps; prompt omits them', {
+          stepId: this.context.stepId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return [];
+      });
+      if (stepFiles.length > 0) {
+        parts.push(
+          '## Files From Previous Steps\n' +
+          'Files earlier steps of this run left in the workspace, by step:\n\n' +
+          stepFiles.map(({ stepId, files }) => formatStepFileList(stepId, files, workingDir)).join('\n\n'),
+        );
+      }
     }
 
     return parts.join('\n\n');
@@ -1834,6 +1845,41 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
     return { cliOutput, failedMcpServers: mcpStatus.failed, pendingMcpServers: mcpStatus.pending, gitMetadata, presentation, outputDir, injectedEnvVars };
   }
+}
+
+/** Where large previous-step and previous-run values are spilled inside the
+ *  output dir. Dotted, so they never become this step's Output Files. */
+const PREVIOUS_OUTPUTS_DIR = '.previous-outputs';
+
+/** Most files listed per step under "Files From Previous Steps". */
+const MAX_LISTED_FILES_PER_STEP = 100;
+
+/** Write a value too large to inline into the prompt to a file and return the
+ *  path the agent reads it at. `hostOutputDir` is the real directory on disk;
+ *  `outputDir` is the agent's view of it (`/output` in a container). */
+async function spillPreviousOutput(
+  outputDir: string,
+  hostOutputDir: string | undefined,
+  filename: string,
+  value: unknown,
+): Promise<string> {
+  const hostDir = join(hostOutputDir ?? outputDir, PREVIOUS_OUTPUTS_DIR);
+  await mkdir(hostDir, { recursive: true });
+  await writeFile(join(hostDir, filename), typeof value === 'string' ? value : JSON.stringify(value, null, 2), 'utf-8');
+  return `${outputDir}/${PREVIOUS_OUTPUTS_DIR}/${filename}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && Array.isArray(value) === false;
+}
+
+function formatStepFileList(stepId: string, files: string[], workingDir: string): string {
+  const listed = files.slice(0, MAX_LISTED_FILES_PER_STEP).map((file) => `- ${workingDir}/${file}`);
+  const unlisted = files.length - listed.length;
+  if (unlisted > 0) {
+    listed.push(`- … and ${unlisted} more (\`git log --name-only\` in ${workingDir} lists them)`);
+  }
+  return [`### ${stepId}`, ...listed].join('\n');
 }
 
 /** Read presentation.md (preferred) or presentation.html from the agent's

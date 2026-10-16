@@ -4,12 +4,12 @@ import * as React from 'react';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { mediforce } from '@/lib/mediforce';
-import type { AgentMcpBindingMap, AgentSkillRef } from '@mediforce/platform-core';
+import type { AgentMcpBindingMap, AgentOutputSchema, AgentSkillRef } from '@mediforce/platform-core';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 import { AgentSkillsSection } from '@/components/agents/agent-skills-section';
-import { AGENT_ICON_OPTIONS, RecognitionLabel } from '@/components/agents/agent-form-parts';
+import { AGENT_ICON_OPTIONS, AgentOutputSchemaField, AgentRuntimeField, RecognitionLabel } from '@/components/agents/agent-form-parts';
 import { cn } from '@/lib/utils';
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -23,10 +23,12 @@ export default function NewAgentPage() {
   const [description, setDescription] = useState('');
   const [inputDescription, setInputDescription] = useState('');
   const [outputDescription, setOutputDescription] = useState('');
+  const [outputSchema, setOutputSchema] = useState<AgentOutputSchema | undefined>(undefined);
   const pinnedDefaultModel = usePinnedDefaultModel();
   const [chosenModelId, setChosenModelId] = useState<string | null>(null);
   const selectedModelId = chosenModelId ?? pinnedDefaultModel;
   const [prompt, setPrompt] = useState('');
+  const [runtimeId, setRuntimeId] = useState<string | undefined>(undefined);
   const [mcpServers, setMcpServers] = useState<AgentMcpBindingMap>({});
   const [skills, setSkills] = useState<AgentSkillRef[]>([]);
   const [saving, setSaving] = useState(false);
@@ -41,11 +43,13 @@ export default function NewAgentPage() {
     try {
       const { agent } = await mediforce.agents.create({
         kind: 'plugin',
+        ...(runtimeId === undefined ? {} : { runtimeId }),
         name: name.trim(),
         iconName: selectedIcon,
         description,
         inputDescription,
         outputDescription,
+        ...(outputSchema === undefined ? {} : { outputSchema }),
         foundationModel: selectedModelId,
         systemPrompt: prompt,
         mcpServers,
@@ -158,6 +162,8 @@ export default function NewAgentPage() {
           </p>
         </div>
 
+        <AgentRuntimeField kind="plugin" runtimeId={runtimeId} onChange={setRuntimeId} />
+
         {/* 6. System prompt */}
         <div className="space-y-1.5">
           <label className="text-sm font-medium">System prompt (optional)</label>
@@ -169,6 +175,8 @@ export default function NewAgentPage() {
             className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none font-mono"
           />
         </div>
+
+        <AgentOutputSchemaField value={outputSchema} onChange={setOutputSchema} />
 
         {/* 7. MCP servers */}
         <AgentMcpSection

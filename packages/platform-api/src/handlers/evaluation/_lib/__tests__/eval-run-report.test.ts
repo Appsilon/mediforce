@@ -14,12 +14,12 @@ const CASE_B = '5e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c';
 
 function run(overrides: Partial<EvalRun> = {}): EvalRun {
   return {
-    ...STEP, id: randomUUID(), definitionVersion: 1, datasetVersionId: randomUUID(), caseIds: [CASE_A, CASE_B],
+    ...STEP, id: randomUUID(), definitionVersion: 1, agentVersion: null, datasetVersionId: randomUUID(), caseIds: [CASE_A, CASE_B],
     trialsPerCase: 2, concurrency: 2,
     evaluators: [{ evaluatorId: EVALUATOR, name: 'findings-present', version: 1, kind: 'schema', counted: true }],
     fingerprint: null,
     acceptanceCriteria: null,
-    mcpPolicy: {}, estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
+    mcpPolicy: {}, env: {}, estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
     budgetUsd: 5, spentUsd: 0, status: 'completed', createdBy: 'a', createdAt: '2026-09-23T08:00:00.000Z', startedAt: null, completedAt: null, acceptance: null,
     ...overrides,
   };

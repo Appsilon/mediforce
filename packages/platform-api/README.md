@@ -98,11 +98,23 @@ Langfuse. It only writes, runs in the background, and never fails the Score
 write. Drift alerts (`handlers/evaluation/drift.ts`) are computed from
 production Scores when read, never stored.
 
-**Evaluation belongs to a Step, not a definition.** `handlers/evaluation/`
-([ADR-0023](../../docs/adr/0023-step-evaluation.md)) keys every Brief, Evaluator,
-Eval Case, Dataset version, MCP eval policy and MCP recording by `(namespace, workflowName,
-stepId)` and reaches it through the one `scope.evaluation` wrapper. Reads need
-only to see the workflow; writes need its `edit` verb (`_lib/evaluated-step.ts`).
+**Evaluation belongs to a Step or an Agent, not a definition.** `handlers/evaluation/`
+([ADR-0023](../../docs/adr/0023-step-evaluation.md), [ADR-0029](../../docs/adr/0029-agent-evaluation.md))
+keys every Brief, Evaluator, Eval Case, Dataset version, MCP eval policy and MCP
+recording by its owner — `(namespace, workflowName, stepId)` or `(namespace,
+agentId)` — and reaches it through the one `scope.evaluation` wrapper.
+`_lib/evaluation-subject.ts` resolves a request to its subject and checks the
+caller: a Step's reads need only to see the workflow and its writes the `edit`
+verb; an Agent's need to see it, or to be allowed to change it. An Agent comes
+back as the single-step Definition its trials run, carried on each trial's run
+(`evalDefinition`); its one step has no env of its own unless the Agent's
+Evaluation holds one (`mcp_eval_policies.env`, set once with
+`setMcpEvalPolicy`; secret templates such as `{{OPENROUTER_API_KEY}}`), which
+each Eval Run freezes at prepare and the auto-runner's pre-flight and executor
+resolve like a Workflow Step's. Production-only features — harvesting, previews, drift,
+production Evaluators — refuse an Agent (`stepOnly`). Agent versions are
+recorded by `handlers/agents/_lib/agent-version.ts` on every agent save and
+every Eval Run prepare.
 An Evaluator check that cannot run comes back as `error`, never as a failed
 output (`_lib/run-evaluator-check.ts`). Evaluators flagged `runInProduction`
 (`setEvaluatorProduction`) score live runs through `_lib/production-evaluators.ts`,
@@ -168,6 +180,17 @@ Assistant's self-test of a proposed check) travels with the proposal. The workfl
 interleaved with its graph-completeness gates and truncation salvage. The
 cowork chat (`handlers/cowork/`) is a separate OpenRouter loop and does not use
 the core.
+
+The Evaluation Assistant is one assistant for a Step and for an Agent
+evaluated on its own ([ADR-0029](../../docs/adr/0029-agent-evaluation.md)): one
+catalog of tool schemas (`EVALUATION_ASSISTANT_PLATFORM_TOOLS` /
+`…_PROPOSAL_TOOLS`), one executor (`_lib/run-evaluation-tool.ts`) and one
+system prompt with a shared core (`_lib/system-prompt.ts`). What each subject
+is offered is a selection from the catalog, `EVALUATION_ASSISTANT_TOOLSETS`:
+an Agent reads itself (`get_agent`) and the production runs of the Steps that
+use it (`list_agent_production_runs`, from `evaluation/_lib/agent-production-runs.ts`)
+in place of a Step's own reads, previews, synthesized cases and routing. A
+tool added for both lands in both toolsets; one for a single subject, in its own.
 
 A request may grant the Evaluation Assistant an unattended budget
 (`unattendedBudgetUsd`): `start_eval_run` then starts prepared runs of the step

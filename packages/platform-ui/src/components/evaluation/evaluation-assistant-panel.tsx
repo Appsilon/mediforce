@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Bot, Check, Loader2, Send, Settings, Sparkles, User, X } from 'lucide-react';
 import { DEFAULT_MODEL } from '@mediforce/platform-core';
 import type {
-  EvaluatedStep,
+  EvaluationSubject,
   EvaluationAssistantPlatformToolName,
   EvaluationAssistantProposalToolName,
 } from '@mediforce/platform-core';
@@ -59,6 +59,8 @@ const FOLLOW_LATEST_THRESHOLD = 48;
 
 const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssistantProposalToolName, string> = {
   get_step: 'Reading the step',
+  get_agent: 'Reading the agent',
+  list_agent_production_runs: 'Finding production runs of steps using the agent',
   list_step_runs: 'Listing recent runs',
   get_agent_run: 'Reading an agent run',
   get_trajectory: 'Reading a run trajectory',
@@ -71,7 +73,7 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   preview_evaluator: 'Previewing a check on real runs',
   prepare_eval_run: 'Preparing an eval run',
   start_eval_run: 'Starting an eval run',
-  get_qualification: 'Reading the step\'s qualification',
+  get_qualification: 'Reading the qualification',
   propose_evaluation_plan: 'Drafting an evaluation plan',
   propose_evaluator: 'Drafting an evaluator',
   propose_evaluator_version: 'Drafting a new evaluator version',
@@ -135,9 +137,10 @@ function StepsSummary({ steps }: { steps: ActivityStep[] }) {
  * every turn, opens from the header.
  */
 export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEdit, editReason, mayRun, runReason }: {
-  step: EvaluatedStep;
+  step: EvaluationSubject;
   /** The workflow version whose step the assistant reads and runs. */
-  definitionVersion: number;
+  /** Null for an Agent evaluated on its own (ADR-0029), which runs as it is now. */
+  definitionVersion: number | null;
   brief: BriefQuery;
   mayEdit: boolean;
   editReason: string | undefined;
@@ -187,7 +190,7 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
     try {
       const result = await mediforce.evaluation.askAssistant({
         ...step,
-        definitionVersion,
+        ...(definitionVersion === null ? {} : { definitionVersion }),
         messages: thread.map((message) => ({
           role: message.role,
           content: [message.content, ...(message.proposals ?? []).map(({ proposal }) => `[proposal: ${JSON.stringify(proposal)}]`)].join('\n'),
@@ -201,7 +204,7 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
         },
       });
       if (result.preparedEvalRuns.length > 0 || result.startedEvalRuns.length > 0) {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.evaluation.step(step.namespace, step.workflowName, step.stepId) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.evaluation.subject(step) });
       }
       setMessages([...thread, {
         role: 'assistant',

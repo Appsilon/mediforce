@@ -50,8 +50,8 @@ export const routes = {
   workflowRunReport: (handle: string, name: string, runId: string) =>
     `/${handle}/workflows/${encode(name)}/runs/${runId}/report`,
   /** The Evaluation tab on one agent step of one workflow version. */
-  workflowEvaluation: (handle: string, name: string, params: { version: number; step: string }) =>
-    `/${handle}/workflows/${encode(name)}?tab=evaluation&version=${params.version}&step=${encode(params.step)}`,
+  workflowEvaluation: (handle: string, name: string, params: { version?: number; step: string }) =>
+    `/${handle}/workflows/${encode(name)}?tab=evaluation${params.version === undefined ? '' : `&version=${params.version}`}&step=${encode(params.step)}`,
   workflowEvalRun: (handle: string, name: string, evalRunId: string) =>
     `/${handle}/workflows/${encode(name)}/eval-runs/${evalRunId}`,
   workflowEvalTrial: (handle: string, name: string, evalRunId: string, trialId: string) =>
@@ -78,6 +78,10 @@ export const routes = {
   agentDefinition: (handle: string, definitionId: string) =>
     `/${handle}/agents/definitions/${definitionId}`,
   agentNew: (handle: string) => `/${handle}/agents/new`,
+  agentEvalRun: (handle: string, agentId: string, evalRunId: string) =>
+    `/${handle}/agents/definitions/${agentId}/eval-runs/${evalRunId}`,
+  agentEvalTrial: (handle: string, agentId: string, evalRunId: string, trialId: string) =>
+    `/${handle}/agents/definitions/${agentId}/eval-runs/${evalRunId}/trials/${trialId}`,
 
   // ── Configs ────────────────────────────────────────────────────
   configs: (handle: string) => `/${handle}/configs`,

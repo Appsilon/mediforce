@@ -1,6 +1,8 @@
 import {
   AgentOutputEnvelopeSchema,
+  DEFAULT_MODEL,
   DEFAULT_STEP_TIMEOUT_MINUTES,
+  normaliseModelId,
   resolveStepTimeoutMinutes,
   type AgentFallbackReason,
   type AgentOutputEnvelope,
@@ -24,7 +26,7 @@ import type {
 import type { AgentEventLog } from './agent-event-log';
 import { FallbackHandler } from './fallback-handler';
 import { PluginRunner } from './plugin-runner';
-import { validateOutputSchema } from './output-schema';
+import { repairOutput, validateOutputSchema, type OutputRepair } from './output-schema';
 import { TrajectoryRecorder } from './trajectory-recorder';
 import {
   annotateAgentRunSpan,
@@ -50,6 +52,14 @@ interface AttemptOutcome {
   errorMessage: string | null;
   /** The `validateOutputSchema` message when `fallbackReason` is `output_schema`. */
   outputSchemaViolation: string | null;
+  /** Set when an LLM call reshaped `result` to match `outputSchema`. */
+  reshape: OutputReshape | null;
+}
+
+/** Who reshaped a result to match `outputSchema`, and what the agent had returned. */
+interface OutputReshape {
+  by: string;
+  originalResult: Record<string, unknown> | null;
 }
 
 export class AgentRunner {
@@ -148,34 +158,10 @@ export class AgentRunner {
         : new TrajectoryRecorder(this.agentTrajectoryRepository, runId);
       const runContext: WorkflowAgentContext = trajectory === undefined ? context : { ...context, trajectory };
       const outputSchema = context.step.agent?.outputSchema;
-      let attempt = await this.runAttempt(plugin, runContext, timeoutMs, outputSchema);
+      let attempt: AttemptOutcome = await this.runAttempt(plugin, runContext, timeoutMs, outputSchema);
 
-      if (attempt.outputSchemaViolation !== null) {
-        // Both attempts share one step timeout: the run route's reap guard
-        // measures a step execution from its start against a single timeout.
-        const retryBudgetMs = timeoutMs - (Date.now() - startedAt);
-        if (retryBudgetMs > 0) {
-          await this.eventLog.write(processInstanceId, stepId, {
-            type: 'status',
-            payload: `result does not match agent.outputSchema (${attempt.outputSchemaViolation}) — retrying once with the validation error`,
-            timestamp: new Date().toISOString(),
-          });
-          // A retry is fresh activity: keep the heartbeat's stranded sweep from
-          // reading the longer step as a dead driver.
-          await this.instanceRepository.update(processInstanceId, { updatedAt: new Date().toISOString() });
-          attempt = await this.runAttempt(
-            plugin,
-            { ...runContext, outputSchemaViolation: attempt.outputSchemaViolation },
-            retryBudgetMs,
-            outputSchema,
-          );
-        } else {
-          await this.eventLog.write(processInstanceId, stepId, {
-            type: 'status',
-            payload: `result does not match agent.outputSchema (${attempt.outputSchemaViolation}) — no time left in the step timeout to retry`,
-            timestamp: new Date().toISOString(),
-          });
-        }
+      if (attempt.outputSchemaViolation !== null && attempt.envelope !== null && outputSchema !== undefined) {
+        attempt = await this.repairAttempt(runContext, attempt, attempt.envelope, outputSchema, attempt.outputSchemaViolation, timeoutMs - (Date.now() - startedAt));
       }
       await trajectory?.flush();
 
@@ -190,12 +176,12 @@ export class AgentRunner {
         }
       }
 
-      const { envelope, fallbackReason, errorMessage } = attempt;
+      const { envelope, fallbackReason, errorMessage, reshape } = attempt;
 
       if (fallbackReason) {
         const fallbackResult = await this.fallbackHandler.escalate(fallbackReason, processInstanceId, envelope);
         const duration_ms = Date.now() - startedAt;
-        await this.appendAuditEventFromWorkflowStep(context, envelope, fallbackResult.status, duration_ms, errorMessage);
+        await this.appendAuditEventFromWorkflowStep(context, envelope, fallbackResult.status, duration_ms, errorMessage, reshape);
         await this.recordTerminalRun(
           span, runId, context, startedAt, { ...fallbackResult, errorMessage },
           fallbackResult.envelope?.model ?? envelope?.model ?? null,
@@ -205,7 +191,7 @@ export class AgentRunner {
 
       const result = await this.applyAutonomyBehaviorForWorkflowStep(autonomyLevel, envelope!, context);
       const duration_ms = Date.now() - startedAt;
-      await this.appendAuditEventFromWorkflowStep(context, envelope!, result.status, duration_ms);
+      await this.appendAuditEventFromWorkflowStep(context, envelope!, result.status, duration_ms, null, reshape);
       await this.recordTerminalRun(
         span, runId, context, startedAt, result,
         result.envelope?.model ?? envelope!.model,
@@ -242,6 +228,63 @@ export class AgentRunner {
     }
   }
 
+  /**
+   * Reshapes a result that broke `outputSchema` with one LLM call on the
+   * step's model, inside what is left of the step timeout (ADR-0023 D13).
+   * The agent is not rerun. A reshaped result keeps the original in an
+   * annotation; one that still breaks the schema escalates naming both.
+   */
+  private async repairAttempt(
+    context: WorkflowAgentContext,
+    attempt: AttemptOutcome,
+    envelope: AgentOutputEnvelope,
+    outputSchema: OutputSchemaShape,
+    violation: string,
+    budgetMs: number,
+  ): Promise<AttemptOutcome> {
+    const { processInstanceId, stepId } = context;
+    const status = (payload: string) => this.eventLog.write(processInstanceId, stepId, {
+      type: 'status',
+      payload,
+      timestamp: new Date().toISOString(),
+    });
+    const rejected = attempt.errorMessage;
+
+    if (budgetMs <= 0) {
+      await status(`${rejected} — no time left in the step timeout to reshape it`);
+      return attempt;
+    }
+    await status(`${rejected} — reshaping the result to match it`);
+    const model = normaliseModelId(context.step.agent?.model ?? DEFAULT_MODEL);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const outOfTime = new Promise<OutputRepair>((resolve) => {
+      timer = setTimeout(() => resolve({ ok: false, reason: 'the step timeout ran out' }), budgetMs);
+    });
+    const repair = await Promise.race([
+      repairOutput(context.llm, model, envelope.result ?? {}, outputSchema, violation),
+      outOfTime,
+    ]).finally(() => clearTimeout(timer));
+
+    if (repair.ok === false) {
+      await status(`reshaping the result did not fix it: ${repair.reason}`);
+      return { ...attempt, errorMessage: `${rejected} (reshaping it did not fix it: ${repair.reason})` };
+    }
+    await status(`result reshaped by ${repair.model} to match agent.outputSchema`);
+    const annotation = {
+      id: randomUUID(),
+      content: `Result reshaped by ${repair.model} to match agent.outputSchema (${violation}). `
+        + `The agent's original result: ${JSON.stringify(envelope.result)}`,
+      timestamp: new Date().toISOString(),
+    };
+    return {
+      envelope: { ...envelope, result: repair.result, annotations: [...envelope.annotations, annotation] },
+      fallbackReason: null,
+      errorMessage: null,
+      outputSchemaViolation: null,
+      reshape: { by: repair.model, originalResult: envelope.result },
+    };
+  }
+
   /** Execute the plugin once and classify the outcome. */
   private async runAttempt(
     plugin: StepExecutorPlugin,
@@ -253,7 +296,7 @@ export class AgentRunner {
       plugin, context, timeoutMs,
     );
     const failed = (reason: AgentFallbackReason): AttemptOutcome => ({
-      envelope: null, fallbackReason: reason, errorMessage, outputSchemaViolation: null,
+      envelope: null, fallbackReason: reason, errorMessage, outputSchemaViolation: null, reshape: null,
     });
 
     if (timedOut) return failed('timeout');
@@ -271,10 +314,11 @@ export class AgentRunner {
         fallbackReason: 'output_schema',
         errorMessage: `result does not match agent.outputSchema: ${violation}`,
         outputSchemaViolation: violation,
+        reshape: null,
       };
     }
 
-    return { envelope, fallbackReason: null, errorMessage: null, outputSchemaViolation: null };
+    return { envelope, fallbackReason: null, errorMessage: null, outputSchemaViolation: null, reshape: null };
   }
 
   /**
@@ -468,6 +512,7 @@ export class AgentRunner {
     runStatus: AgentRunStatus,
     duration_ms: number,
     errorMessage: string | null = null,
+    reshape: OutputReshape | null = null,
   ): Promise<void> {
     const pluginId = context.step.plugin ?? context.stepId;
     const isScript = context.step.executor === 'script';
@@ -499,6 +544,7 @@ export class AgentRunner {
         reasoning_summary: envelope?.reasoning_summary ?? null,
         result: envelope?.result ?? null,
         ...(errorMessage !== null ? { error: errorMessage } : {}),
+        ...(reshape !== null ? { reshapedBy: reshape.by, originalResult: reshape.originalResult } : {}),
       },
       basis: isScript
         ? 'Deterministic script execution'

@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { evalCaseFromRunCommand, evalCasePerturbCommand, evalMcpPolicySetCommand } from '../commands/eval-cases';
+import { evalCaseFromRunCommand, evalCaseListCommand, evalCasePerturbCommand, evalMcpPolicySetCommand } from '../commands/eval-cases';
+import { agentVersionsCommand } from '../commands/agent-versions';
 import { evalDriftCommand, evalEvaluatorProductionCommand } from '../commands/eval-evaluators';
 import { evalCriteriaSetCommand, evalQualificationCommand, evalValidationCommand } from '../commands/eval-qualification';
 import { evalJudgeReviewCommand } from '../commands/eval-runs';
@@ -17,6 +18,45 @@ beforeEach(() => {
 });
 
 describe('mediforce eval', () => {
+  it('names an agent evaluated on its own with --agent instead of --workflow and --step (ADR-0029)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ cases: [] }));
+    const output = captureOutput();
+    const code = await evalCaseListCommand({ argv: ['--namespace', 'pharma-a', '--agent', 'ae-grader', ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    expect(fetchSpy.mock.calls[0]![0]).toBe('http://localhost:5555/api/evaluation/cases?namespace=pharma-a&agentId=ae-grader');
+  });
+
+  it('refuses naming both a step and an agent, and neither', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    for (const argv of [[...STEP, '--agent', 'ae-grader'], ['--namespace', 'pharma-a']]) {
+      const output = captureOutput();
+      expect(await evalCaseListCommand({ argv: [...argv, ...BASE], env: ENV, output })).not.toBe(0);
+      expect(output.stderrLines.join('\n')).toContain('--workflow and --step, or an agent with --agent');
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('agent versions lists each version, newest first, and marks the current one', async () => {
+    const config = { kind: 'plugin', runtimeId: 'claude-code-agent', foundationModel: 'anthropic/claude-sonnet-4', systemPrompt: 'Grade AEs.', mcpServers: {}, skills: [] };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      versions: [
+        { agentId: 'ae-grader', version: 2, hash: 'b'.repeat(64), config, createdBy: 'u-1', createdAt: '2026-10-02T08:00:00.000Z' },
+        { agentId: 'ae-grader', version: 1, hash: 'a'.repeat(64), config, createdBy: 'u-1', createdAt: '2026-10-01T08:00:00.000Z' },
+      ],
+      current: 2,
+    }));
+    const output = captureOutput();
+    const code = await agentVersionsCommand({ argv: ['ae-grader', ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    expect(fetchSpy.mock.calls[0]![0]).toBe('http://localhost:5555/api/agents/ae-grader/versions');
+    expect(output.stdoutLines).toEqual([
+      `v2  2026-10-02T08:00:00.000Z  ${'b'.repeat(12)}  anthropic/claude-sonnet-4  (current)`,
+      `v1  2026-10-01T08:00:00.000Z  ${'a'.repeat(12)}  anthropic/claude-sonnet-4`,
+    ]);
+  });
+
   it('case-from-run posts the Agent Run with the chosen expectation', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
       evalCase: {
@@ -245,6 +285,20 @@ describe('mediforce eval', () => {
     expect(code).toBe(0);
     expect(fetchSpy.mock.calls[0]![0]).toBe('http://localhost:5555/api/evaluation/qualification?namespace=pharma-a&workflowName=ae-grading&stepId=grade-aes&definitionVersion=3');
     expect(output.stdoutLines).toEqual(['validation not verified: No Eval Run of version 3 has finished yet.', `not qualified  (v3, fingerprint ${'a'.repeat(12)})`]);
+  });
+
+  it('qualification of an agent prints the agent version it is about', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      status: 'not_qualified', qualification: null, definitionVersion: null, agentVersion: 2,
+      validation: { status: 'not_verified', evalRunId: null, reason: 'No Eval Run of agent version 2 has finished yet.', runInProgress: false },
+      fingerprint: { hash: 'a'.repeat(64), components: Object.fromEntries(['step', 'model', 'systemPrompt', 'skill', 'image', 'mcpServers', 'preamble'].map((component) => [component, 'b'.repeat(64)])) },
+      changed: [], evaluatorsChanged: [], history: [],
+    }));
+    const output = captureOutput();
+    const code = await evalQualificationCommand({ argv: ['--namespace', 'pharma-a', '--agent', 'ae-grader', ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    expect(output.stdoutLines).toEqual(['validation not verified: No Eval Run of agent version 2 has finished yet.', `not qualified  (agent v2, fingerprint ${'a'.repeat(12)})`]);
   });
 
   it('validation prints each workflow version and its agent steps', async () => {

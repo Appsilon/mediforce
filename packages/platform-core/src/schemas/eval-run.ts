@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import {
   AcceptanceCriteriaSchema,
-  EvaluatedStepSchema,
+  EvaluationOwnerSchema,
   EvaluatorKindSchema,
   McpEvalServerPolicySchema,
   McpReplayMissSchema,
@@ -10,9 +10,9 @@ import {
 
 /**
  * An Eval Run (ADR-0023 D4, D5, D10): a Step, as its pinned Definition version
- * has it, run over a saved Eval Dataset version, `trialsPerCase` times per
- * case. Each trial is a real single-step Workflow Run flagged with the
- * Eval Run's id.
+ * has it — or an Agent version on its own (ADR-0029) — run over a saved Eval
+ * Dataset version, `trialsPerCase` times per case. Each trial is a real
+ * single-step Workflow Run flagged with the Eval Run's id.
  */
 export const EvalRunStatusSchema = z.enum([
   /** Created with its estimate; waits for a person to confirm the budget. */
@@ -84,9 +84,12 @@ export const EvalRunAcceptanceSchema = z.object({
   reason: z.string(),
 });
 
-export const EvalRunSchema = EvaluatedStepSchema.extend({
+export const EvalRunSchema = EvaluationOwnerSchema.extend({
   id: z.uuid(),
-  definitionVersion: z.number().int().positive(),
+  /** The Workflow Definition version a Step's run ran; null on an Agent's. */
+  definitionVersion: z.number().int().positive().nullable(),
+  /** The Agent version an Agent's run assessed (ADR-0029); null on a Step's. */
+  agentVersion: z.number().int().positive().nullable().default(null),
   datasetVersionId: z.uuid(),
   caseIds: z.array(z.uuid()).min(1),
   trialsPerCase: z.number().int().min(1).max(10),
@@ -98,6 +101,8 @@ export const EvalRunSchema = EvaluatedStepSchema.extend({
   acceptanceCriteria: StoredAcceptanceCriteriaSchema.nullable(),
   /** The MCP eval policy the trials ran under, one entry per server of the Step's agent (D6). */
   mcpPolicy: z.record(z.string(), McpEvalServerPolicySchema),
+  /** An Agent's run: the step env its trials run with, as a Workflow Step declares it — secret templates, never values. */
+  env: z.record(z.string(), z.string()).default({}),
   estimate: EvalRunEstimateSchema,
   /** Spend cap: no trial starts once `spentUsd` reaches it. */
   budgetUsd: z.number().positive(),

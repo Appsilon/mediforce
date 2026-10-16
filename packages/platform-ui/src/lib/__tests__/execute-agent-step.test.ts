@@ -594,6 +594,19 @@ describe('executeAgentStep', () => {
       }
     });
 
+    it('[DATA] gives the step the agent output schema when it declares none, and keeps its own otherwise', async () => {
+      const agentSchema = { type: 'object' as const, required: ['classification'] };
+      const stepSchema = { type: 'object' as const, required: ['verdict'] };
+      vi.mocked(resolveAgentDefaults).mockResolvedValue({ model: 'anthropic/claude-opus-4', outputSchema: agentSchema });
+
+      await executeAgentStep('inst-wf-001', 'gather-data', agentStep, {}, 'user-1');
+      await executeAgentStep('inst-wf-001', 'gather-data', { ...agentStep, agent: { outputSchema: stepSchema } }, {}, 'user-1');
+
+      expect(mockAgentRunner.runWithWorkflowStep.mock.calls[0][1].step.agent).toMatchObject({ model: 'anthropic/claude-opus-4', outputSchema: agentSchema });
+      expect(mockAgentRunner.runWithWorkflowStep.mock.calls[1][1].step.agent.outputSchema).toEqual(stepSchema);
+      vi.mocked(resolveAgentDefaults).mockResolvedValue({});
+    });
+
     it('[DATA] does not consult the agent definition when the step has no agentId', async () => {
       const stepNoAgentId: WorkflowStep = { ...agentStep, agentId: undefined };
 

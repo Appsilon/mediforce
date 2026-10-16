@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, X } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, CircleCheck, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
@@ -9,14 +9,15 @@ import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { useNamespaceMembers } from '@/hooks/use-namespace-members';
 import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
 import { useAuth } from '@/contexts/auth-context';
+import { useAgentValidationStatuses, useStepQualification } from '@/hooks/use-step-evaluation';
 import { mediforce } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
-import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, DEFAULT_STEP_TIMEOUT_MINUTES, defaultVerdictLabel, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
-import type { AgentDefinition, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
-import type { DockerImageInfo, ImageCatalogEntryView } from '@mediforce/platform-api/contract';
+import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, agentStepChanges, DEFAULT_STEP_TIMEOUT_MINUTES, defaultVerdictLabel, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
+import type { AgentDefinition, AgentStepChange, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
+import type { DockerImageInfo, ImageCatalogEntryView, StepValidation } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import { selectAgentPatch } from '../workflow-editor-utils';
 import {
@@ -37,6 +38,7 @@ import { stdioServerCommands } from '@/components/agents/mcp-command-warnings';
 import { useToolCatalogEntries } from '@/hooks/use-tool-catalog';
 import { AllowedRolesField, AssignedToField } from './step-editor-roles';
 import { CollapsibleCard } from './collapsible-card';
+import { ModifyValidatedAgentDialog } from './modify-validated-agent-dialog';
 import {
   buildImagePicker,
   requiredRuntimeFor,
@@ -49,6 +51,11 @@ const NO_CATALOG_ENTRIES: ImageCatalogEntryView[] = [];
 
 function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+/** A saved agent with an Agent Version to validate: a plugin agent owned by a workspace. */
+function isEvaluableAgent(agent: AgentDefinition): agent is AgentDefinition & { namespace: string } {
+  return agent.kind === 'plugin' && agent.runtimeId !== undefined && agent.namespace !== undefined;
 }
 
 /** What a saved agent brings to every step that names it. */
@@ -142,7 +149,7 @@ const TIP = {
   agentModel:              'Leave on the default to run the agent\'s own model. Picking a model here replaces it for this step only; the agent itself is unchanged.',
   agentSkills:             'Skills offered to the agent in this step, on top of its own. The agent loads one when its description fits the task. A step skill replaces the agent\'s skill of the same name.',
   stepTimeoutMinutes:      `How long the step may run before it is stopped as timed out. Blank means ${DEFAULT_STEP_TIMEOUT_MINUTES} minutes.`,
-  agentOutputSchema:       'JSON Schema the agent\'s result must match. Shown to the agent; a result that breaks it gets one retry with the error, then the run is escalated to a person.',
+  agentOutputSchema:       'JSON Schema the agent\'s result must match. Shown to the agent; a result that breaks it is reshaped once from what it already says (the agent is not rerun), and if that cannot fix it the run is escalated to a person with the reason.',
   agentPrompt:             'Instructions for this step, added after the agent\'s system prompt. The agent\'s own prompt still applies.',
 
   scriptRuntime:           'Language runtime for the inline script: javascript, python, r, or bash.',
@@ -260,7 +267,7 @@ export function StepEditor({
   step,
   allSteps,
   workflowName,
-  onChange,
+  onChange: applyChange,
   onClose,
   errors,
   imageWarning,
@@ -268,6 +275,8 @@ export function StepEditor({
   catalogEntries = NO_CATALOG_ENTRIES,
   workflowArtifacts,
   workflowVisibility = 'private',
+  workflowPreamble,
+  savedValidation,
 }: {
   step: WorkflowStep;
   allSteps: WorkflowStep[];
@@ -283,6 +292,10 @@ export function StepEditor({
   workflowArtifacts?: WorkflowDefinition['artifacts'];
   /** Decides which catalog Skills the step may add (ADR-0027). */
   workflowVisibility?: WorkflowDefinition['visibility'];
+  /** A preamble changes every agent the workflow runs (ADR-0029 D8). */
+  workflowPreamble?: string;
+  /** The step's validation as saved; a verdict of its own outranks its agent's. */
+  savedValidation?: StepValidation['status'];
 }) {
   const isNewStep = step.id.startsWith('new-step-');
   const { plugins } = usePlugins();
@@ -422,6 +435,43 @@ export function StepEditor({
   // nothing to ask about; one that names none runs in the default image.
   const toolCatalog = useToolCatalogEntries(isAgent ? handle : undefined);
   const selectedAgent = agentDefinitions.find((agent) => agent.id === step.agentId);
+  // A step that runs a validated agent as it is shares its validation; one
+  // that changes it needs a validation of its own (ADR-0029 D8).
+  const agentQualification = useStepQualification(
+    selectedAgent !== undefined && isEvaluableAgent(selectedAgent)
+      ? { kind: 'agent', namespace: selectedAgent.namespace, agentId: selectedAgent.id }
+      : null,
+  );
+  const agentValidationStatuses = useAgentValidationStatuses(
+    agentDefinitions.filter(isEvaluableAgent).map((agent) => ({ namespace: agent.namespace, agentId: agent.id })),
+  );
+  const agentValidated = agentQualification.data?.validation.status === 'passed';
+  const agentChanges = selectedAgent === undefined ? [] : agentStepChanges(step, selectedAgent, workflowPreamble);
+  const hasOwnVerdict = savedValidation === 'failed' || savedValidation === 'awaiting_approval';
+  // A patch to apply once confirmed, or an edit to a field that commits on
+  // blur — asked about when the edit starts, while the step is still selected.
+  const [pendingAgentChange, setPendingAgentChange] = useState<
+    { patch: Partial<WorkflowStep> } | { edit: AgentStepChange } | null
+  >(null);
+  const [outputSchemaRevision, setOutputSchemaRevision] = useState(0);
+  const acknowledgedStepIds = useRef(new Set<string>());
+  const asksBeforeModifyingAgent = agentValidated
+    && selectedAgent !== undefined
+    && agentChanges.length === 0
+    && acknowledgedStepIds.current.has(step.id) === false;
+
+  function onChange(patch: Partial<WorkflowStep>) {
+    const next = { ...step, ...patch };
+    const modifiesValidatedAgent = asksBeforeModifyingAgent
+      && selectedAgent !== undefined
+      && next.agentId === step.agentId
+      && agentStepChanges(next, selectedAgent, workflowPreamble).length > 0;
+    if (modifiesValidatedAgent) {
+      setPendingAgentChange({ patch });
+      return;
+    }
+    applyChange(patch);
+  }
   const mcpServerCommands = useMemo(
     () => stdioServerCommands(selectedAgent?.mcpServers ?? {}, toolCatalog, step.mcpRestrictions),
     [selectedAgent, toolCatalog, step.mcpRestrictions],
@@ -663,6 +713,27 @@ export function StepEditor({
 
   return (
     <div className="flex flex-col gap-3 h-full min-h-0" data-testid="step-editor" data-tour="step-editor">
+      {selectedAgent !== undefined && (
+        <ModifyValidatedAgentDialog
+          agentName={selectedAgent.name}
+          changes={
+            pendingAgentChange === null ? []
+              : 'edit' in pendingAgentChange ? [pendingAgentChange.edit]
+                : agentStepChanges({ ...step, ...pendingAgentChange.patch }, selectedAgent, workflowPreamble)
+          }
+          open={pendingAgentChange !== null}
+          onCancel={() => {
+            if (pendingAgentChange !== null && 'edit' in pendingAgentChange) setOutputSchemaRevision((revision) => revision + 1);
+            setPendingAgentChange(null);
+          }}
+          onConfirm={() => {
+            if (pendingAgentChange === null) return;
+            acknowledgedStepIds.current.add(step.id);
+            if ('patch' in pendingAgentChange) applyChange(pendingAgentChange.patch);
+            setPendingAgentChange(null);
+          }}
+        />
+      )}
 
       {/* ── Basics (carries the step identity header) ────────────── */}
       <CollapsibleCard
@@ -788,7 +859,7 @@ export function StepEditor({
                 .sort((firstAgent, secondAgent) => firstAgent.name.localeCompare(secondAgent.name))
                 .map((agent) => (
                   <option key={agent.id} value={agent.id}>
-                    {agent.name} ({agent.id})
+                    {agent.name} ({agent.id}){agentValidationStatuses.get(agent.id) === 'passed' ? ' — ✅ Verified' : ''}
                   </option>
                 ))}
             </select>
@@ -799,6 +870,32 @@ export function StepEditor({
                 <Link href={routes.agentDefinition(handle, selectedAgent.id)} className="underline">Edit agent</Link>
               </p>
             )}
+            {selectedAgent !== undefined && agentValidated && (hasOwnVerdict ? (
+              <p data-testid="agent-validation" data-status="own-verdict" className="text-xs text-muted-foreground">
+                {selectedAgent.name} is validated, but this step has an Eval Run verdict of its own, which stands
+                {workflowName === undefined ? '.' : (
+                  <> — see the <Link href={routes.workflowEvaluation(handle, workflowName, { step: step.id })} className="underline">Evaluation tab</Link>.</>
+                )}
+              </p>
+            ) : agentChanges.length === 0 ? (
+              <p
+                data-testid="agent-validation"
+                data-status="validated"
+                title={agentQualification.data?.validation.reason}
+                className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400"
+              >
+                <CircleCheck className="h-3.5 w-3.5" aria-hidden />
+                Validated agent v{agentQualification.data?.agentVersion} — this step runs it as it was validated
+              </p>
+            ) : (
+              <p data-testid="agent-validation" data-status="modified" className="text-xs text-amber-700 dark:text-amber-300">
+                {selectedAgent.name} is validated, but this step changes its {agentChanges.join(', ')}, so the step needs a
+                validation of its own
+                {workflowName === undefined ? '.' : (
+                  <> on the <Link href={routes.workflowEvaluation(handle, workflowName, { step: step.id })} className="underline">Evaluation tab</Link>.</>
+                )}
+              </p>
+            ))}
             {agentsError && <p className="text-xs text-amber-600">Agent list unavailable: {agentsError}</p>}
           </FieldRow>
 
@@ -885,10 +982,12 @@ export function StepEditor({
 
           <FieldRow label="agent.outputSchema" tooltip={TIP.agentOutputSchema} alignStart>
             <OutputSchemaEditor
-              key={`agent-output-schema-${step.id}`}
+              key={`agent-output-schema-${step.id}-${outputSchemaRevision}`}
               value={step.agent?.outputSchema}
               onChange={(outputSchema) => updateAgent({ outputSchema })}
+              onEdit={asksBeforeModifyingAgent ? () => setPendingAgentChange({ edit: 'output schema' }) : undefined}
               schema={AgentOutputSchemaSchema}
+              inherited={selectedAgent?.outputSchema === undefined ? undefined : { schema: selectedAgent.outputSchema, from: selectedAgent.name }}
             />
           </FieldRow>
 

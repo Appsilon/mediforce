@@ -1,17 +1,19 @@
 'use client';
 
 import * as React from 'react';
+import * as Tabs from '@radix-ui/react-tabs';
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { cn } from '@/lib/utils';
-import type { AgentSkillRef } from '@mediforce/platform-core';
+import type { AgentOutputSchema, AgentSkillRef } from '@mediforce/platform-core';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 import { AgentSkillsSection } from '@/components/agents/agent-skills-section';
-import { AGENT_ICON_OPTIONS, RecognitionLabel } from '@/components/agents/agent-form-parts';
+import { AGENT_ICON_OPTIONS, AgentOutputSchemaField, AgentRuntimeField, RecognitionLabel } from '@/components/agents/agent-form-parts';
+import { AgentEvaluation } from '@/components/evaluation/agent-evaluation';
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 
@@ -33,7 +35,17 @@ function FormSkeleton() {
 export default function EditAgentPage({ params }: { params: Promise<{ id: string }> }) {
   const { handle } = useParams<{ handle: string }>();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { id } = React.use(params);
+  // The Agent's own Evaluation (ADR-0029) sits beside its configuration.
+  const tab = searchParams.get('tab') === 'evaluation' ? 'evaluation' : 'configuration';
+  const selectTab = (next: 'configuration' | 'evaluation') => {
+    const query = new URLSearchParams(searchParams.toString());
+    if (next === 'evaluation') query.set('tab', 'evaluation');
+    else query.delete('tab');
+    router.replace(query.size === 0 ? pathname : `${pathname}?${query}`, { scroll: false });
+  };
 
   const [loadingDef, setLoadingDef] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -43,10 +55,12 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const [description, setDescription] = useState('');
   const [inputDescription, setInputDescription] = useState('');
   const [outputDescription, setOutputDescription] = useState('');
+  const [outputSchema, setOutputSchema] = useState<AgentOutputSchema | undefined>(undefined);
   const [selectedModelId, setSelectedModelId] = useState('');
   const [prompt, setPrompt] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
   const [skills, setSkills] = useState<AgentSkillRef[]>([]);
+  const [kind, setKind] = useState<'plugin' | 'cowork'>('plugin');
   const [runtimeId, setRuntimeId] = useState<string | undefined>(undefined);
   const [agentNamespace, setAgentNamespace] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
@@ -61,10 +75,12 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         setDescription(def.description);
         setInputDescription(def.inputDescription);
         setOutputDescription(def.outputDescription);
+        setOutputSchema(def.outputSchema);
         setSelectedModelId(def.foundationModel);
         setPrompt(def.systemPrompt);
         setVisibility(def.visibility ?? 'private');
         setSkills(def.skills ?? []);
+        setKind(def.kind);
         setRuntimeId(def.runtimeId);
         setAgentNamespace(def.namespace);
       })
@@ -90,10 +106,12 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         description,
         inputDescription,
         outputDescription,
+        outputSchema: outputSchema ?? null,
         foundationModel: selectedModelId,
         systemPrompt: prompt,
         visibility,
         skills,
+        ...(runtimeId === undefined ? {} : { runtimeId }),
       });
       router.push(`/${handle}/agents`);
     } catch (err) {
@@ -108,13 +126,35 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6 max-w-2xl">
+    <div className={cn('flex flex-1 flex-col gap-6 p-6', tab === 'configuration' && 'max-w-2xl')}>
+      {notFound === false && (
+        <Tabs.Root value={tab} onValueChange={(next) => selectTab(next === 'evaluation' ? 'evaluation' : 'configuration')}>
+          <Tabs.List className="flex gap-0 border-b" data-tour="agent-tabs">
+            {(['configuration', 'evaluation'] as const).map((value) => (
+              <Tabs.Trigger
+                key={value}
+                value={value}
+                data-testid={`agent-tab-${value}`}
+                className={cn(
+                  'border-b-2 px-3 py-2 text-sm transition-colors',
+                  'border-transparent text-muted-foreground hover:text-foreground',
+                  'data-[state=active]:border-primary data-[state=active]:font-medium data-[state=active]:text-foreground',
+                )}
+              >
+                {value === 'configuration' ? 'Configuration' : 'Evaluation'}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        </Tabs.Root>
+      )}
       {loadingDef ? (
         <FormSkeleton />
       ) : notFound ? (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
           Agent definition not found.
         </div>
+      ) : tab === 'evaluation' ? (
+        <AgentEvaluation handle={handle} agentId={id} />
       ) : (
         <div className="space-y-6">
 
@@ -232,6 +272,8 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
             </p>
           </div>
 
+          <AgentRuntimeField kind={kind} runtimeId={runtimeId} onChange={setRuntimeId} />
+
           {/* 7. System prompt */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">System prompt (optional)</label>
@@ -243,6 +285,8 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
               className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none font-mono"
             />
           </div>
+
+          <AgentOutputSchemaField value={outputSchema} onChange={setOutputSchema} />
 
           {/* MCP Servers — bindings persisted separately via /mcp-servers endpoints */}
           <AgentMcpSection agentId={id} handle={handle} />

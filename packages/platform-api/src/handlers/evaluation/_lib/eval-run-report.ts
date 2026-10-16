@@ -33,6 +33,7 @@ import {
   trialScores,
   type TrialScores,
 } from './trial-scores';
+import { subjectRef } from './evaluation-subject';
 
 type RunCases = ReadonlyMap<string, EvalCase | null>;
 
@@ -155,7 +156,7 @@ async function mcpReport(scope: CallerScope, run: EvalRun, trials: readonly Eval
   const modes = mcpServersByMode(run.mcpPolicy);
   const recordedByThisRun = modes.replayed.length === 0
     ? []
-    : await scope.evaluation.listMcpRecordedCases(run, { evalRunId: run.id });
+    : await scope.evaluation.listMcpRecordedCases(subjectRef(run), { evalRunId: run.id });
   const recordedFirst = modes.replayed
     .map((server) => ({ server, cases: recordedByThisRun.filter((recorded) => recorded.server === server).length }))
     .filter((recorded) => recorded.cases > 0);
