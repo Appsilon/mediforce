@@ -551,7 +551,7 @@ run go by the version it was prepared for.
    defaults to 1.5× the estimate; with no estimate it must be given.
    An Agent's Evaluation holds the step env its trials run with, as secret
    templates, set once for all its runs (`mcp-policy-set --env '<json>'`, the
-   tab's *Trial env* field); each run freezes a copy. Without it an Agent whose
+   tab's *Add secrets* dialog, one key and value per row); each run freezes a copy. Without it an Agent whose
    runtime wants `ANTHROPIC_API_KEY` fails every trial on a workspace that only
    has `OPENROUTER_API_KEY`.
    A run whose trials the auto-runner would pause on a model — one the

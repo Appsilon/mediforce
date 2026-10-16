@@ -58,8 +58,8 @@ export const GUIDE_CHAPTERS: readonly TourChapter[] = [
       },
       {
         id: 'unversioned',
-        title: 'Agents are not versioned',
-        body: 'Editing one changes every step already referencing it, immediately and everywhere. That is the trade for having a single definition instead of a copy per step.',
+        title: 'Agents are versioned',
+        body: 'Saving a change to an agent records a new version, shown on its card beside its validation status. Steps that call it use the current version, everywhere, immediately.',
         target: 'agents-header',
       },
       {

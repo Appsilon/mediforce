@@ -1,3 +1,5 @@
+'use client';
+
 import * as React from 'react';
 import {
   Bot, Cpu, Terminal, BarChart3, Brain, Zap,
@@ -5,6 +7,8 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
+import { usePlugins } from '@/hooks/use-plugins';
+import { humanizeToken } from '@/components/workflows/workflow-editor/step-editor-fields';
 
 export const AGENT_ICON_OPTIONS: Array<{ icon: LucideIcon; label: string }> = [
   { icon: Bot,      label: 'Bot'      },
@@ -32,5 +36,41 @@ export function RecognitionLabel({ children }: { children: React.ReactNode }) {
         <Info className="h-3.5 w-3.5 text-muted-foreground" aria-label={RECOGNITION_ONLY_HINT} />
       </InstantTooltip>
     </label>
+  );
+}
+
+const COWORK_RUNTIMES = ['chat', 'voice-realtime'] as const;
+const selectClass = 'w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring';
+
+export type AgentKind = 'plugin' | 'cowork';
+
+/** Runtime of an agent. Its kind is fixed at creation: a container agent runs on a registered plugin, a cowork agent on a chat or voice runtime. */
+export function AgentRuntimeField({ kind, runtimeId, onChange }: {
+  kind: AgentKind;
+  runtimeId: string | undefined;
+  onChange: (runtimeId: string) => void;
+}) {
+  const { plugins } = usePlugins();
+  const options: string[] = kind === 'cowork' ? [...COWORK_RUNTIMES] : plugins.map((plugin) => plugin.name);
+  if (runtimeId !== undefined && !options.includes(runtimeId)) options.push(runtimeId);
+
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor="agent-runtime" className="text-sm font-medium">Runtime</label>
+      <select
+        id="agent-runtime"
+        value={runtimeId ?? ''}
+        onChange={(event) => onChange(event.target.value)}
+        className={selectClass}
+      >
+        {runtimeId === undefined && <option value="" disabled>Select a runtime</option>}
+        {options.map((option) => <option key={option} value={option}>{humanizeToken(option)}</option>)}
+      </select>
+      <p className="text-xs text-muted-foreground">
+        {kind === 'plugin'
+          ? 'What executes this agent. Required before the agent can be evaluated.'
+          : 'The chat or voice runtime of this cowork agent.'}
+      </p>
+    </div>
   );
 }

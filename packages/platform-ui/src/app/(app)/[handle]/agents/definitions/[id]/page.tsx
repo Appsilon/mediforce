@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import type { AgentSkillRef } from '@mediforce/platform-core';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 import { AgentSkillsSection } from '@/components/agents/agent-skills-section';
-import { AGENT_ICON_OPTIONS, RecognitionLabel } from '@/components/agents/agent-form-parts';
+import { AGENT_ICON_OPTIONS, AgentRuntimeField, RecognitionLabel } from '@/components/agents/agent-form-parts';
 import { AgentEvaluation } from '@/components/evaluation/agent-evaluation';
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
@@ -58,6 +58,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const [prompt, setPrompt] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
   const [skills, setSkills] = useState<AgentSkillRef[]>([]);
+  const [kind, setKind] = useState<'plugin' | 'cowork'>('plugin');
   const [runtimeId, setRuntimeId] = useState<string | undefined>(undefined);
   const [agentNamespace, setAgentNamespace] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
@@ -76,6 +77,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         setPrompt(def.systemPrompt);
         setVisibility(def.visibility ?? 'private');
         setSkills(def.skills ?? []);
+        setKind(def.kind);
         setRuntimeId(def.runtimeId);
         setAgentNamespace(def.namespace);
       })
@@ -105,6 +107,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         systemPrompt: prompt,
         visibility,
         skills,
+        ...(runtimeId === undefined ? {} : { runtimeId }),
       });
       router.push(`/${handle}/agents`);
     } catch (err) {
@@ -264,6 +267,8 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
               Used by every workflow step that calls this agent, unless the step sets its own model.
             </p>
           </div>
+
+          <AgentRuntimeField kind={kind} runtimeId={runtimeId} onChange={setRuntimeId} />
 
           {/* 7. System prompt */}
           <div className="space-y-1.5">

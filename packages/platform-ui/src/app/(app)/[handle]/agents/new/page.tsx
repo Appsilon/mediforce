@@ -9,7 +9,7 @@ import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker
 import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 import { AgentSkillsSection } from '@/components/agents/agent-skills-section';
-import { AGENT_ICON_OPTIONS, RecognitionLabel } from '@/components/agents/agent-form-parts';
+import { AGENT_ICON_OPTIONS, AgentRuntimeField, RecognitionLabel } from '@/components/agents/agent-form-parts';
 import { cn } from '@/lib/utils';
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -27,6 +27,7 @@ export default function NewAgentPage() {
   const [chosenModelId, setChosenModelId] = useState<string | null>(null);
   const selectedModelId = chosenModelId ?? pinnedDefaultModel;
   const [prompt, setPrompt] = useState('');
+  const [runtimeId, setRuntimeId] = useState<string | undefined>(undefined);
   const [mcpServers, setMcpServers] = useState<AgentMcpBindingMap>({});
   const [skills, setSkills] = useState<AgentSkillRef[]>([]);
   const [saving, setSaving] = useState(false);
@@ -41,6 +42,7 @@ export default function NewAgentPage() {
     try {
       const { agent } = await mediforce.agents.create({
         kind: 'plugin',
+        ...(runtimeId === undefined ? {} : { runtimeId }),
         name: name.trim(),
         iconName: selectedIcon,
         description,
@@ -157,6 +159,8 @@ export default function NewAgentPage() {
             Used by every workflow step that calls this agent, unless the step sets its own model.
           </p>
         </div>
+
+        <AgentRuntimeField kind="plugin" runtimeId={runtimeId} onChange={setRuntimeId} />
 
         {/* 6. System prompt */}
         <div className="space-y-1.5">

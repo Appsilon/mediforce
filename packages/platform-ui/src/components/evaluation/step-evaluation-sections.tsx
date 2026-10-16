@@ -1631,53 +1631,124 @@ function parseBudgetUsd(text: string): number | null {
   return text.trim() !== '' && Number.isFinite(budget) && budget > 0 ? budget : null;
 }
 
-/** The step env typed for an Agent's trials: empty for none, null when it is not a JSON object of strings. */
-function parseStepEnv(text: string): Record<string, string> | null {
-  if (text.trim() === '') return {};
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
-    const entries = Object.entries(parsed);
-    return entries.every(([, value]) => typeof value === 'string') ? Object.fromEntries(entries) as Record<string, string> : null;
-  } catch {
-    return null;
-  }
+const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+interface EnvRow { key: string; value: string }
+
+/** Why the rows cannot be saved as an env, or null when they can. */
+function envRowsProblem(rows: readonly EnvRow[]): string | null {
+  const keys = rows.map((row) => row.key.trim());
+  if (keys.some((key) => ENV_KEY_PATTERN.test(key) === false)) return 'Every key must be a name like OPENROUTER_API_KEY: letters, digits and underscores.';
+  if (new Set(keys).size !== keys.length) return 'A key is listed twice.';
+  return null;
 }
 
 /**
- * The step env an Agent's trials run with, set once for all its Eval Runs: the
- * secret templates a Workflow Step would declare, since an Agent evaluated on
- * its own has no Workflow Step to declare them. Each run freezes a copy.
+ * The env an Agent's trials run with, set once for all its Eval Runs: what a
+ * Workflow Step would declare, since an Agent evaluated on its own has no
+ * Workflow Step to declare it. A value is a literal or a `{{SECRET}}` template
+ * the workspace's secrets fill in when a trial runs. Each run freezes a copy.
  */
+function AgentTrialEnvDialog({ env, onClose, onSave, saving, error }: {
+  env: Record<string, string>;
+  onClose: () => void;
+  onSave: (env: Record<string, string>) => void;
+  saving: boolean;
+  error: Error | null;
+}) {
+  const [rows, setRows] = React.useState<EnvRow[]>(() => {
+    const saved = Object.entries(env).map(([key, value]) => ({ key, value }));
+    return saved.length === 0 ? [{ key: '', value: '' }] : saved;
+  });
+  const filled = rows.filter((row) => row.key.trim() !== '' || row.value !== '');
+  const problem = envRowsProblem(filled);
+  const update = (index: number, patch: Partial<EnvRow>) => setRows(rows.map((row, at) => (at === index ? { ...row, ...patch } : row)));
+  return (
+    <Dialog.Root open onOpenChange={(open) => { if (open === false) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border bg-background p-6 shadow-lg" data-testid="agent-trial-env-dialog">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <Dialog.Title className="text-lg font-semibold">Secrets for trials</Dialog.Title>
+              <Dialog.Description className="mt-1 text-xs text-muted-foreground">
+                Env every trial of this agent runs with, as a workflow step declares it. Use <span className="font-mono">{'{{NAME}}'}</span> to take a value from the workspace secrets.
+              </Dialog.Description>
+            </div>
+            <Dialog.Close asChild>
+              <button type="button" aria-label="Close" className="rounded-sm p-1 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+            </Dialog.Close>
+          </div>
+          <div className="space-y-2">
+            {rows.map((row, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  aria-label="Key"
+                  className={cn(inputClass, 'w-56 font-mono')}
+                  placeholder="OPENROUTER_API_KEY"
+                  value={row.key}
+                  onChange={(event) => update(index, { key: event.target.value })}
+                />
+                <input
+                  type="text"
+                  aria-label="Value"
+                  className={cn(inputClass, 'min-w-0 flex-1 font-mono')}
+                  placeholder="{{OPENROUTER_API_KEY}}"
+                  value={row.value}
+                  onChange={(event) => update(index, { value: event.target.value })}
+                />
+                <button
+                  type="button"
+                  aria-label="Remove"
+                  className="rounded-sm p-1 text-muted-foreground hover:text-foreground"
+                  onClick={() => setRows(rows.length === 1 ? [{ key: '', value: '' }] : rows.filter((_row, at) => at !== index))}
+                ><X className="h-4 w-4" /></button>
+              </div>
+            ))}
+            <button type="button" className={buttonClass} onClick={() => setRows([...rows, { key: '', value: '' }])}>Add another</button>
+          </div>
+          {problem !== null && <p className="mt-3 text-xs text-destructive">{problem}</p>}
+          {error !== null && <p className="mt-3 text-xs text-destructive">{error.message}</p>}
+          <div className="mt-6 flex justify-end gap-2">
+            <Dialog.Close asChild>
+              <button type="button" className={buttonClass}>Cancel</button>
+            </Dialog.Close>
+            <button
+              type="button"
+              className={primaryButtonClass}
+              disabled={problem !== null || saving}
+              onClick={() => onSave(Object.fromEntries(filled.map((row) => [row.key.trim(), row.value])))}
+            >{saving ? 'Saving…' : 'Save'}</button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
 function AgentTrialEnv({ step, mayEdit }: { step: Extract<EvaluationSubject, { kind: 'agent' }>; mayEdit: boolean }) {
   const policy = useAgentEvalPolicy(step);
-  const saved = JSON.stringify(policy.data?.policy?.env ?? {});
-  const [text, setText] = React.useState<string | null>(null);
-  const shown = text ?? (saved === '{}' ? '' : saved);
-  const env = parseStepEnv(shown);
-  const save = useStepEvaluationMutation(step, async () => {
-    await mediforce.evaluation.setMcpPolicy({ ...step, env: env ?? {} });
-    setText(null);
+  const env = policy.data?.policy?.env ?? {};
+  const keys = Object.keys(env);
+  const [open, setOpen] = React.useState(false);
+  const save = useStepEvaluationMutation(step, async (next: Record<string, string>) => {
+    await mediforce.evaluation.setMcpPolicy({ ...step, env: next });
+    setOpen(false);
   });
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
-      <label className="flex items-center gap-1">Trial env
-        <input
-          type="text"
-          className={cn(inputClass, 'w-96')}
-          placeholder='{"OPENROUTER_API_KEY":"{{OPENROUTER_API_KEY}}"}'
-          value={shown}
-          disabled={mayEdit === false}
-          onChange={(event) => setText(event.target.value)}
-          data-testid="agent-trial-env"
-        />
-      </label>
       {mayEdit && (
-        <button type="button" className={primaryButtonClass} disabled={env === null || text === null || save.isPending} onClick={() => save.mutate(undefined)}>Save env</button>
+        <button type="button" className={buttonClass} onClick={() => { save.reset(); setOpen(true); }} data-testid="agent-trial-env-open">
+          {keys.length === 0 ? 'Add secrets' : 'Edit secrets'}
+        </button>
       )}
-      <span className="text-muted-foreground">Env every trial of this agent runs with, as a workflow step declares it.</span>
-      {env === null && <span className="text-destructive">Trial env must be a JSON object of string values.</span>}
-      {save.error instanceof Error && <span className="text-destructive">{save.error.message}</span>}
+      {keys.length === 0 && (
+        <span className="text-muted-foreground" data-testid="agent-trial-env-keys">
+          No env for this agent's trials.
+        </span>
+      )}
+      {open && <AgentTrialEnvDialog env={env} onClose={() => setOpen(false)} onSave={(next) => save.mutate(next)} saving={save.isPending} error={save.error instanceof Error ? save.error : null} />}
     </div>
   );
 }
