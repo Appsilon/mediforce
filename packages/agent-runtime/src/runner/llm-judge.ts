@@ -78,12 +78,12 @@ function formatTrajectory(entries: readonly StoredAgentTrajectoryEntry[]): strin
 
 /**
  * What an `llm_judge` is sent: the rubric and how to answer, then the step's
- * input, the agent's log, its output and its own summary. The judge and
+ * input, the agent's log, its output, its own summary and its closing message. The judge and
  * anyone checking its verdict read the same messages.
  */
 export function llmJudgeMessages(
   config: Omit<LlmJudgeConfig, 'model'>,
-  output: Pick<AgentOutputEnvelope, 'result' | 'reasoning_summary'>,
+  output: Pick<AgentOutputEnvelope, 'result' | 'reasoning_summary' | 'agentSummary'>,
 ): LlmMessage[] {
   return [
     {
@@ -108,6 +108,7 @@ export function llmJudgeMessages(
         ...(config.trajectory.length === 0 ? [] : [`Agent log:\n${formatTrajectory(config.trajectory)}`]),
         `Step output:\n${section(output.result ?? null)}`,
         ...(output.reasoning_summary.length > 0 ? [`The agent's own summary:\n${output.reasoning_summary}`] : []),
+        ...(output.agentSummary ? [`The agent's closing message (its agent_summary.json — not part of the step output):\n${output.agentSummary.text}`] : []),
       ].join('\n\n'),
     },
   ];

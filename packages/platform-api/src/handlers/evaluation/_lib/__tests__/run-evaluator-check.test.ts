@@ -1,11 +1,17 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { InMemoryAgentTrajectoryRepository, buildAgentRun } from '@mediforce/platform-core/testing';
+import { InMemoryAgentTrajectoryRepository, buildAgentOutputEnvelope, buildAgentRun } from '@mediforce/platform-core/testing';
 import { OPENROUTER_KEY_MISSING_MESSAGE } from '../../../../services/openrouter-key';
 import { runEvaluatorCheck } from '../run-evaluator-check';
 import { loadScoredRun } from '../scored-run';
 import { createEvalCase } from '../../eval-cases';
 import { CreateEvalCaseInputSchema } from '../../../../contract/evaluation';
 import { evaluationFixture, GRADED_RUN, STEP, type EvaluationFixture } from '../../__tests__/fixture';
+
+const runCodeCheck = vi.hoisted(() => vi.fn());
+vi.mock('@mediforce/agent-runtime', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@mediforce/agent-runtime')>()),
+  runCodeCheck,
+}));
 
 const judge = {
   kind: 'llm_judge' as const,
@@ -191,6 +197,21 @@ describe('runEvaluatorCheck', () => {
     expect(calls[0]).toEqual({
       model: 'anthropic/claude-haiku-4.5', promptTokens: 4000, completionTokens: 500, durationMs: expect.any(Number), response: 'I would rather not choose.',
     });
+  });
+
+  it('gives a code check the agent\'s closing message beside its result (#1551)', async () => {
+    const fixture = await evaluationFixture();
+    await fixture.agentRunRepo.create(buildAgentRun({
+      id: 'summarised', processInstanceId: 'run-graded', stepId: 'grade-aes',
+      envelope: buildAgentOutputEnvelope({ result: { grade: 5 }, agentSummary: { text: 'AKUKU' } }),
+    }));
+    runCodeCheck.mockResolvedValue({ passed: true, comment: null });
+
+    await runEvaluatorCheck(fixture.scope(), { kind: 'code', runtime: 'python', source: 'print(1)' }, await loadScoredRun(fixture.scope(), 'summarised', STEP), null);
+
+    expect(runCodeCheck).toHaveBeenCalledWith(expect.objectContaining({
+      input: expect.objectContaining({ result: { grade: 5 }, agentSummary: { text: 'AKUKU' } }),
+    }));
   });
 
   it('reports a check that cannot run as an error, not a failure', async () => {

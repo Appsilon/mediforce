@@ -75,6 +75,22 @@ describe('LlmJudgeReviewPlugin', () => {
     expect(userMessage).toContain('Graded 3 AEs by CTCAE v5.');
   });
 
+  it('shows the judge the agent\'s closing message apart from the step output (#1551)', async () => {
+    const llm = answering('{"rationale": "r", "passed": true, "confidence": 0.9}');
+    const plugin = new LlmJudgeReviewPlugin({ model: 'anthropic/claude-haiku-4.5', rubric: 'Say AKUKU.', stepInput: null, trajectory: [] });
+    await plugin.review({
+      stepId: 'grade-aes',
+      processInstanceId: 'run-1',
+      executorOutput: { ...envelope, agentSummary: { text: 'AKUKU — the MCP server answered.' } },
+      iterationNumber: 0,
+      llm,
+    });
+
+    const userMessage = vi.mocked(llm.complete).mock.calls[0]![0][1]!.content;
+    expect(userMessage).toContain('agent_summary.json');
+    expect(userMessage).toContain('AKUKU — the MCP server answered.');
+  });
+
   it('keeps the start and end of a log too long for the prompt', async () => {
     const long = Array.from({ length: 400 }, (_unused, seq): StoredAgentTrajectoryEntry => ({
       seq, ts: '2026-10-01T10:00:00.000Z', type: 'assistant', text: `step ${seq} ${'x'.repeat(300)}`,

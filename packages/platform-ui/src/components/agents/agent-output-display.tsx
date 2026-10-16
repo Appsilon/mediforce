@@ -12,11 +12,13 @@ import {
   FileText,
   Gauge,
   Loader2,
+  MessageSquareText,
   MonitorPlay,
 } from 'lucide-react';
 import type { AgentOutputData } from '@/components/tasks/task-utils';
 import { SandboxedHtmlIframe } from '@/components/tasks/sandboxed-html-iframe';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
+import { AgentSummaryView, resultLabel } from '@/components/agents/agent-output-switch';
 import { apiFetch } from '@/lib/api-fetch';
 import { formatCostUsd, formatDuration } from '@/lib/format';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
@@ -136,6 +138,7 @@ export function AgentOutputDisplay({
             ...(hasFileTab ? [{ value: 'content', label: 'Output File', icon: FileText }] : []),
             { value: 'summary', label: 'Extracted Data', icon: FileText },
             { value: 'full', label: 'Raw JSON', icon: Code },
+            ...(agentOutput.agentSummary ? [{ value: 'agent-summary', label: 'agent_summary.json', icon: MessageSquareText }] : []),
           ].map(({ value, label, icon: Icon }) => (
             <Tabs.Trigger
               key={value}
@@ -193,10 +196,24 @@ export function AgentOutputDisplay({
         </Tabs.Content>
 
         <Tabs.Content value="full" className="p-4">
+          {agentOutput.resultSource !== null && (
+            <p className="mb-2 text-xs text-muted-foreground" data-testid="result-source">
+              Source: <span className="font-mono">{resultLabel(agentOutput.resultSource)}</span>
+            </p>
+          )}
           <pre className="rounded-md bg-muted p-4 text-xs overflow-auto max-h-[600px] whitespace-pre-wrap break-words">
             {JSON.stringify(result, null, 2)}
           </pre>
         </Tabs.Content>
+
+        {agentOutput.agentSummary && (
+          <Tabs.Content value="agent-summary" className="p-4">
+            <p className="mb-2 text-xs text-muted-foreground">
+              The agent&apos;s closing message, kept apart from its result.
+            </p>
+            <AgentSummaryView summary={agentOutput.agentSummary} />
+          </Tabs.Content>
+        )}
       </Tabs.Root>
     </div>
   );

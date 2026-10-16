@@ -88,12 +88,16 @@ export {
   GitMetadataSchema,
   StepOutputEnvelopeSchema,
   AgentOutputEnvelopeSchema,
+  AgentSummarySchema,
+  AgentResultSourceSchema,
   TokenUsageSchema,
   type Annotation,
   type GitMetadata,
   type TokenUsage,
   type StepOutputEnvelope,
   type AgentOutputEnvelope,
+  type AgentSummary,
+  type AgentResultSource,
 } from './agent-output-envelope';
 
 export {

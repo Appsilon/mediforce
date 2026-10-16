@@ -49,6 +49,8 @@ export type {
   Presentation,
   StepOutputEnvelope,
   AgentOutputEnvelope,
+  AgentSummary,
+  AgentResultSource,
 } from '../schemas/agent-output-envelope';
 
 export type { AgentEvent } from '../schemas/agent-event';

@@ -17,6 +17,7 @@ import { OutcomeChip, TrialResultBadge, TrialStatusBadge } from './eval-run-badg
 import { JudgeVerdictRow } from './judge-verdicts';
 import { CHECK_KINDS, CheckDetails } from './evaluator-check-editor';
 import { citationParts, citedEntries } from './judge-citations';
+import { AgentOutputSwitch } from '@/components/agents/agent-output-switch';
 
 const preClass = 'max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md border bg-muted/40 p-3 font-mono text-xs';
 
@@ -310,7 +311,12 @@ export function EvalTrialDetail({ handle, evalRunId, trialId, gates }: {
             )}
           </Panel>
           <Panel title="Output">
-            <pre className={preClass} data-testid="trial-output">{json(output.result)}</pre>
+            <AgentOutputSwitch
+              resultSource={output.resultSource}
+              agentSummary={output.agentSummary}
+              summaryClassName={preClass}
+              result={<pre className={preClass} data-testid="trial-output">{json(output.result)}</pre>}
+            />
           </Panel>
         </div>
       </Section>

@@ -423,6 +423,83 @@ describe('ClaudeCodeAgentPlugin', () => {
       },
     );
 
+    describe('result.json and the closing message are two outputs (#1551)', () => {
+      async function runWith(finalMessage: string, resultJson: Record<string, unknown> | null): Promise<Record<string, unknown>> {
+        await plugin.initialize(buildMockContext());
+        mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
+          const outputDir = options?.outputDir as string;
+          if (resultJson !== null) await writeFile(join(outputDir, 'result.json'), JSON.stringify(resultJson));
+          return {
+            cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: finalMessage }),
+            gitMetadata: null, presentation: null, outputDir, injectedEnvVars: [],
+          };
+        });
+        const { emit, events } = buildEmitSpy();
+        await plugin.run(emit);
+        return events.find((e) => e.type === 'result')!.payload as Record<string, unknown>;
+      }
+
+      it('[REGRESSION] keeps result.json as the result when the agent closes with JSON of its own', async () => {
+        const payload = await runWith('{"status":"done"}', { summary: 'AKUKU — MCP worked', grade: 3 });
+
+        expect(payload.result).toEqual({ summary: 'AKUKU — MCP worked', grade: 3 });
+        expect(payload.resultSource).toBe('result_json');
+        expect(payload.agentSummary).toEqual({ text: '{"status":"done"}', json: { status: 'done' } });
+      });
+
+      it('[REGRESSION] keeps a prose closing message as the agent summary beside result.json', async () => {
+        const payload = await runWith('AKUKU. The MCP server answered every call.', { grade: 3 });
+
+        expect(payload.result).toEqual({ grade: 3 });
+        expect(payload.agentSummary).toEqual({ text: 'AKUKU. The MCP server answered every call.' });
+      });
+
+      it('[DATA] takes the result from a JSON closing message when the agent wrote no result.json, and says so', async () => {
+        const payload = await runWith('{"grade": 2, "confidence": 0.9}', null);
+
+        expect(payload.result).toEqual({ grade: 2 });
+        expect(payload.confidence).toBe(0.9);
+        expect(payload.resultSource).toBe('final_message');
+        expect(payload.agentSummary).toEqual({ text: '{"grade": 2, "confidence": 0.9}', json: { grade: 2, confidence: 0.9 } });
+      });
+
+      it('[DATA] reads confidence from the closing message when result.json carries none', async () => {
+        const payload = await runWith('{"confidence": 0.65, "confidence_rationale": "One field guessed."}', { grade: 1 });
+
+        expect(payload.result).toEqual({ grade: 1 });
+        expect(payload.confidence).toBe(0.65);
+        expect(payload.confidence_rationale).toBe('One field guessed.');
+      });
+
+      it('[DATA] tells the agent result.json is what later steps get and its closing message is kept apart', async () => {
+        const context = buildMockContext();
+        await plugin.initialize(context);
+        const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] });
+
+        await plugin.run(buildEmitSpy().emit);
+
+        const prompt = spawnSpy.mock.calls[0]![0];
+        expect(prompt).toContain('/output/result.json is this step\'s result');
+        expect(prompt).toContain('agent_summary.json');
+      });
+
+      it('[DATA] gives a later step the closing messages of the steps before it, apart from their results', async () => {
+        const context: WorkflowAgentContext = {
+          ...buildWorkflowContext({}),
+          getPreviousStepOutputs: vi.fn().mockResolvedValue({ grade: { grade: 3 } }),
+          getPreviousAgentSummaries: vi.fn().mockResolvedValue({ grade: { text: 'AKUKU — MCP worked.' } }),
+        };
+        await plugin.initialize(context);
+        const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] });
+
+        await plugin.run(buildEmitSpy().emit);
+
+        const prompt = spawnSpy.mock.calls[0]![0];
+        expect(prompt).toContain('## Previous Step Agent Summaries');
+        expect(prompt).toContain('AKUKU — MCP worked.');
+      });
+    });
+
     it('[DATA] parses an answer the agent wrapped in a ```json fence', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);

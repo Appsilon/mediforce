@@ -8,6 +8,7 @@ import { ArrowLeft, ChevronDown } from 'lucide-react';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import type { AgentRun, ProcessInstance } from '@mediforce/platform-core';
 import { ConfidenceBadge } from './confidence-badge';
+import { AgentOutputSwitch } from './agent-output-switch';
 import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { cn } from '@/lib/utils';
 import { formatStepName } from '@/lib/format';
@@ -235,13 +236,17 @@ export function AgentRunDetail({
 
         {/* Output section */}
         <CollapsibleSection title="Output" defaultOpen={true}>
-          {envelope?.result ? (
-            <LightFormattedData data={envelope.result} />
-          ) : (
-            <p className="text-xs text-muted-foreground italic">
-              {'No output produced'}
-            </p>
-          )}
+          <AgentOutputSwitch
+            resultSource={envelope?.resultSource}
+            agentSummary={envelope?.agentSummary}
+            result={envelope?.result ? (
+              <LightFormattedData data={envelope.result} />
+            ) : (
+              <p className="text-xs text-muted-foreground italic">
+                {'No output produced'}
+              </p>
+            )}
+          />
         </CollapsibleSection>
       </div>
     </div>

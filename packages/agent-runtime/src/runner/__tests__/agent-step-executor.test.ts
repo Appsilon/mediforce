@@ -391,6 +391,21 @@ describe('AgentStepExecutor', () => {
     expect(update.agentOutput).not.toHaveProperty('skills');
   });
 
+  it('keeps the agent\'s closing message beside its result on the step execution (#1551)', async () => {
+    mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+      status: 'completed',
+      envelope: { ...defaultEnvelope, agentSummary: { text: 'AKUKU' }, resultSource: 'result_json' },
+      appliedToWorkflow: false,
+      fallbackReason: null,
+    });
+
+    await executor.execute(mockPlugin, makeContext(), services, meta);
+
+    const update = mockInstanceRepo.updateStepExecution.mock.calls[0]?.[2] as { output: unknown; agentOutput: Record<string, unknown> };
+    expect(update.output).toEqual(defaultEnvelope.result);
+    expect(update.agentOutput).toMatchObject({ agentSummary: { text: 'AKUKU' }, resultSource: 'result_json' });
+  });
+
   it('marks step execution as failed on error fallback', async () => {
     mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
       status: 'escalated',

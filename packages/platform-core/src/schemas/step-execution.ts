@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PresentationSchema, TokenUsageSchema } from './agent-output-envelope';
+import { AgentResultSourceSchema, AgentSummarySchema, PresentationSchema, TokenUsageSchema } from './agent-output-envelope';
 import type { Skill } from './skill';
 
 export const StepExecutionStatusSchema = z.enum([
@@ -67,6 +67,8 @@ export const AgentOutputSnapshotSchema = z.object({
     .optional(),
   /** Absent when the step's agent holds no Skills. */
   skills: z.array(OfferedSkillSchema).optional(),
+  agentSummary: AgentSummarySchema.nullable().optional(),
+  resultSource: AgentResultSourceSchema.optional(),
 });
 
 export const StepExecutionSchema = z.object({
