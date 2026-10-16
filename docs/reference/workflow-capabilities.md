@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-12
+last_reviewed: 2026-10-16
 ---
 
 # Workflow capabilities
@@ -157,7 +157,9 @@ empty `/output`, so a step reading `/output/<file>` from an earlier step fails
 with `FileNotFoundError`. A file handed from one step to the next is written to
 `/output` (so it is kept and downloadable) and read from
 `/workspace/.mediforce/output/<producing-step-id>/<file>`, which every container
-mounts. Small values need no file at all: `result.json` is the step's output and
+mounts. An agent step is told where they are: its prompt lists every file each
+earlier step left in `/workspace`, including its `.mediforce/output/<stepId>/`.
+Small values need no file at all: `result.json` is the step's output and
 later steps read it as `${steps.<id>.<field>}`. A third mode is
 `plugin: databricks-job`, which requires step-level `databricks`
 (`DatabricksJobConfigSchema`) instead of `script`.

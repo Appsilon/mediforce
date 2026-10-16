@@ -103,6 +103,36 @@ describe('StepExecutor', () => {
     expect(stepExec!.status).toBe('completed');
   });
 
+  it('records as a merge step\'s input the output of the branch that actually ran', async () => {
+    const mergeDef: ProcessDefinition = {
+      name: 'merge-process',
+      version: '1.0',
+      steps: [
+        { id: 'start', name: 'Start', type: 'creation' },
+        { id: 'path-a', name: 'Path A', type: 'creation' },
+        { id: 'path-b', name: 'Path B', type: 'creation' },
+        { id: 'merge', name: 'Merge', type: 'creation' },
+        { id: 'done', name: 'Done', type: 'terminal' },
+      ],
+      transitions: [
+        { from: 'start', to: 'path-a', when: 'output.route == "a"' },
+        { from: 'start', to: 'path-b', when: 'output.route == "b"' },
+        { from: 'path-a', to: 'merge' },
+        { from: 'path-b', to: 'merge' },
+        { from: 'merge', to: 'done' },
+      ],
+    };
+    await instanceRepo.create(makeRunningInstance('start', { definitionName: 'merge-process' }));
+
+    for (const output of [{ route: 'b' }, { found: 'via path b' }, { merged: true }]) {
+      const current = await instanceRepo.getById('instance-1');
+      await executor.executeStep(current!, output, actor, mergeDef);
+    }
+
+    const executions = await instanceRepo.getStepExecutions('instance-1');
+    expect(executions.find((e) => e.stepId === 'merge')!.input).toEqual({ found: 'via path b' });
+  });
+
   it('records verdict from stepOutput when present', async () => {
     const instance = makeRunningInstance('start');
     await instanceRepo.create(instance);

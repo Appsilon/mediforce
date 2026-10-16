@@ -195,6 +195,62 @@ describe('WorkspaceManager', () => {
     });
   });
 
+  describe('listStepFiles', () => {
+    it('lists the files each step left in the worktree, by Step-Id, in step order', async () => {
+      const wd = { name: 'wd-step-files', workspace: {} as WorkflowWorkspace };
+      const ws = await manager.createRunWorkspace(wd, 'run-step-files');
+
+      await mkdir(join(ws.path, '.mediforce', 'output', 'extract'), { recursive: true });
+      await writeFile(join(ws.path, '.mediforce', 'output', 'extract', 'report.html'), '<p/>');
+      await writeFile(join(ws.path, 'data.csv'), 'a,b');
+      await writeFile(join(ws.path, 'scratch.txt'), 'tmp');
+      await manager.commitStep(ws, { stepId: 'extract' });
+
+      await manager.commitStep(ws, { stepId: 'noop' });
+
+      await rm(join(ws.path, 'scratch.txt'));
+      await writeFile(join(ws.path, 'data.csv'), 'a,b,c');
+      await writeFile(join(ws.path, 'summary.md'), '# done');
+      await manager.commitStep(ws, { stepId: 'review' });
+
+      expect(await manager.listStepFiles(ws)).toEqual([
+        { stepId: 'extract', files: ['.mediforce/output/extract/report.html', 'data.csv'] },
+        { stepId: 'review', files: ['data.csv', 'summary.md'] },
+      ]);
+    });
+
+    it('sees earlier steps through a handle re-attached by a later step', async () => {
+      const wd = { name: 'wd-step-files-reattach', workspace: {} as WorkflowWorkspace };
+      const first = await manager.createRunWorkspace(wd, 'run-reattach');
+      await writeFile(join(first.path, 'data.csv'), 'a,b');
+      await manager.commitStep(first, { stepId: 'extract' });
+
+      const second = await manager.createRunWorkspace(wd, 'run-reattach');
+
+      expect(await manager.listStepFiles(second)).toEqual([{ stepId: 'extract', files: ['data.csv'] }]);
+    });
+
+    it('stops at commits of another run the branch was started from', async () => {
+      const wd = { name: 'wd-step-files-seed', workspace: {} as WorkflowWorkspace };
+      const seed = await manager.createRunWorkspace(wd, 'run-seed');
+      await writeFile(join(seed.path, 'seed.csv'), 'x');
+      const seeded = await manager.commitStep(seed, { stepId: 'seed-step' });
+
+      const trial = await manager.createRunWorkspace(wd, 'run-trial', { startCommit: seeded.commitSha });
+      await writeFile(join(trial.path, 'trial.md'), '# t');
+      await manager.commitStep(trial, { stepId: 'trial-step' });
+
+      expect(await manager.listStepFiles(trial)).toEqual([{ stepId: 'trial-step', files: ['trial.md'] }]);
+    });
+
+    it('returns nothing before any step has committed', async () => {
+      const wd = { name: 'wd-step-files-empty', workspace: {} as WorkflowWorkspace };
+      const ws = await manager.createRunWorkspace(wd, 'run-step-files-empty');
+
+      expect(await manager.listStepFiles(ws)).toEqual([]);
+    });
+  });
+
   describe('listRunWorktrees', () => {
     it('enumerates worktrees across namespaces and workflows', async () => {
       const wd1 = { name: 'wd-a', workspace: {} as WorkflowWorkspace };

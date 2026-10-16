@@ -387,6 +387,8 @@ describe('OpenCodeAgentPlugin', () => {
       expect(prompt).toContain('/workspace');
       expect(prompt).toContain('Result Contract Directory');
       expect(prompt).toContain('/output/result.json');
+      expect(prompt).toContain('/workspace/.mediforce/output/extract/');
+      expect(prompt).not.toContain('will not be committed');
     });
 
     it('[DATA] emits result with valid AgentOutputEnvelope', async () => {
@@ -496,7 +498,7 @@ describe('OpenCodeAgentPlugin', () => {
         const spawnSpy = mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
           // At spawn time, the large file should already exist in the output dir
           const outputDir = (options as Record<string, unknown>).outputDir as string;
-          const fileContent = await readFile(join(outputDir, 'prev-generate-tlg-shells-raw.md'), 'utf-8');
+          const fileContent = await readFile(join(outputDir, '.previous-outputs', 'prev-generate-tlg-shells-raw.md'), 'utf-8');
           expect(fileContent).toBe(largeOutput);
 
           return {
@@ -514,7 +516,7 @@ describe('OpenCodeAgentPlugin', () => {
         const promptEvent = events.find((e) => e.type === 'prompt');
         expect(promptEvent).toBeDefined();
         const promptText = promptEvent!.payload as string;
-        expect(promptText).toContain('[FILE: /output/prev-generate-tlg-shells-raw.md]');
+        expect(promptText).toContain('[FILE: /output/.previous-outputs/prev-generate-tlg-shells-raw.md]');
         expect(promptText).not.toContain(hostDir); // Must NOT leak host path
 
         expect(spawnSpy).toHaveBeenCalledOnce();
@@ -564,9 +566,9 @@ describe('OpenCodeAgentPlugin', () => {
       mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
         const outputDir = (options as Record<string, unknown>).outputDir as string;
         // Both files should exist
-        const fileA = await readFile(join(outputDir, 'prev-step-a-raw.md'), 'utf-8');
+        const fileA = await readFile(join(outputDir, '.previous-outputs', 'prev-step-a-raw.md'), 'utf-8');
         expect(fileA).toBe(largeA);
-        const fileB = await readFile(join(outputDir, 'prev-step-b-payload.json'), 'utf-8');
+        const fileB = await readFile(join(outputDir, '.previous-outputs', 'prev-step-b-payload.json'), 'utf-8');
         expect(JSON.parse(fileB)).toEqual(JSON.parse(largeB));
 
         return {
@@ -582,8 +584,118 @@ describe('OpenCodeAgentPlugin', () => {
 
       const promptEvent = events.find((e) => e.type === 'prompt');
       const promptText = promptEvent!.payload as string;
-      expect(promptText).toContain('[FILE: /output/prev-step-a-raw.md]');
-      expect(promptText).toContain('[FILE: /output/prev-step-b-payload.json]');
+      expect(promptText).toContain('[FILE: /output/.previous-outputs/prev-step-a-raw.md]');
+      expect(promptText).toContain('[FILE: /output/.previous-outputs/prev-step-b-payload.json]');
+    });
+
+    it('[DATA] previous step outputs appear once, not again under `steps` in Input Data', async () => {
+      const previousOutputs = { 'extract-metadata': { studyId: 'STUDY-UNIQUE-42' } };
+      const context = buildMockContext({
+        stepInput: { studyId: 'STUDY-UNIQUE-42', steps: previousOutputs },
+        getPreviousStepOutputs: vi.fn().mockResolvedValue(previousOutputs),
+      });
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      mockSpawn(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ result: '"done"' }),
+        gitMetadata: null,
+        presentation: null,
+        outputDir: '/tmp/mock', injectedEnvVars: [],
+      });
+
+      await plugin.run(emit);
+
+      const promptText = events.find((e) => e.type === 'prompt')!.payload as string;
+      expect(promptText.split('STUDY-UNIQUE-42')).toHaveLength(3);
+    });
+
+    it('[DATA] previous step outputs come from `steps` in the input, the latest value of each step', async () => {
+      const context = buildMockContext({
+        stepInput: { steps: { review: { comments: 'second-round comments' } } },
+        getPreviousStepOutputs: vi.fn().mockResolvedValue({ review: { comments: 'first-round comments' } }),
+      });
+      await plugin.initialize(context);
+
+      const { emit, events } = buildEmitSpy();
+      mockSpawn(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ result: '"done"' }),
+        gitMetadata: null,
+        presentation: null,
+        outputDir: '/tmp/mock', injectedEnvVars: [],
+      });
+
+      await plugin.run(emit);
+
+      const promptText = events.find((e) => e.type === 'prompt')!.payload as string;
+      expect(promptText).toContain('second-round comments');
+      expect(promptText).not.toContain('first-round comments');
+    });
+
+    it('[DATA] a workspace that cannot list earlier steps\' files still runs the step, without the section', async () => {
+      const workspaceManager = createFakeWorkspaceManager();
+      vi.mocked(workspaceManager.listStepFiles).mockRejectedValue(new Error('fatal: bad revision'));
+      plugin = new OpenCodeAgentPlugin({ workspaceManager });
+      await plugin.initialize(buildMockContext());
+
+      const { emit, events } = buildEmitSpy();
+      mockSpawn(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ result: '"done"' }),
+        gitMetadata: null,
+        presentation: null,
+        outputDir: '/tmp/mock', injectedEnvVars: [],
+      });
+
+      await plugin.run(emit);
+
+      const promptText = events.find((e) => e.type === 'prompt')!.payload as string;
+      expect(promptText).not.toContain('Files From Previous Steps');
+      expect(events.some((e) => e.type === 'result')).toBe(true);
+    });
+
+    it('[DATA] lists the files earlier steps committed, at the paths the agent sees them', async () => {
+      plugin = new OpenCodeAgentPlugin({
+        workspaceManager: createFakeWorkspaceManager({
+          stepFiles: [
+            { stepId: 'generate-samples', files: ['.mediforce/output/generate-samples/samples.csv', 'code/generate.py'] },
+            { stepId: 'review', files: ['notes.md'] },
+          ],
+        }),
+      });
+      await plugin.initialize(buildMockContext());
+
+      const { emit, events } = buildEmitSpy();
+      mockSpawn(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ result: '"done"' }),
+        gitMetadata: null,
+        presentation: null,
+        outputDir: '/tmp/mock', injectedEnvVars: [],
+      });
+
+      await plugin.run(emit);
+
+      const promptText = events.find((e) => e.type === 'prompt')!.payload as string;
+      expect(promptText).toContain('## Files From Previous Steps');
+      expect(promptText).toContain('- /workspace/.mediforce/output/generate-samples/samples.csv');
+      expect(promptText).toContain('- /workspace/code/generate.py');
+      expect(promptText).toContain('- /workspace/notes.md');
+    });
+
+    it('[DATA] omits the previous-step files section when no step has committed a file', async () => {
+      await plugin.initialize(buildMockContext());
+
+      const { emit, events } = buildEmitSpy();
+      mockSpawn(plugin).mockResolvedValue({
+        cliOutput: JSON.stringify({ result: '"done"' }),
+        gitMetadata: null,
+        presentation: null,
+        outputDir: '/tmp/mock', injectedEnvVars: [],
+      });
+
+      await plugin.run(emit);
+
+      const promptText = events.find((e) => e.type === 'prompt')!.payload as string;
+      expect(promptText).not.toContain('Files From Previous Steps');
     });
   });
 

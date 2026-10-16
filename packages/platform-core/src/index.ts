@@ -815,6 +815,7 @@ export type {
 } from './workflows/resolve-runnable-version';
 export { carriedDockerfile, stepHasBuildSource } from './workflows/build-source';
 export { resolveStepAssignee, resolveInstanceAssignee, type ResolvedStepAssignee } from './workflows/step-assignee';
+export { resolvePreviousStepId } from './workflows/previous-step';
 export { applyAgentModel, applyAgentOutputSchema, resolveDefinitionModels } from './workflows/agent-models';
 export {
   stepContainerConfig,

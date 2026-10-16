@@ -298,6 +298,7 @@ export interface CommitRunWorkspaceOptions {
 export interface WorkspaceManagerLike {
   createRunWorkspace: WorkspaceManager['createRunWorkspace'];
   commitStep: WorkspaceManager['commitStep'];
+  listStepFiles: WorkspaceManager['listStepFiles'];
 }
 
 export interface ContainerPluginInit {
