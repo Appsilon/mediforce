@@ -283,15 +283,7 @@ function AgentCatalog({ handle }: { handle: string }) {
     mediforce.agents
       .list({ namespace: handle })
       .then((definitionsData) => {
-        // Map from runtimeId → definition entry. Dedups definitions that share a
-        // runtimeId (e.g. an older seeded doc + the builtin-seeded doc).
-        const definitionByRuntimeId = new Map(
-          (definitionsData.agents ?? []).map((def) => {
-            const entry = agentDefinitionToEntry(def, handle);
-            return [entry.name, entry] as const;
-          }),
-        );
-        setAgents([...definitionByRuntimeId.values()]);
+        setAgents((definitionsData.agents ?? []).map((def) => agentDefinitionToEntry(def, handle)));
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -351,7 +343,7 @@ function AgentCatalog({ handle }: { handle: string }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-tour="agents-grid">
           {filtered.map((agent) => (
-            <AgentCard key={agent.name} agent={agent} handle={handle} />
+            <AgentCard key={agent.definitionId ?? agent.name} agent={agent} handle={handle} />
           ))}
         </div>
       )}
