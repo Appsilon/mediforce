@@ -57,6 +57,23 @@ describe('driveEvalRun', () => {
     expect((await fixture.evaluationRepo.getEvalRun(evalRun.id))?.status).toBe('completed');
   });
 
+  it('fails a trial whose Agent Run errored before giving any result, with the run\'s error, and records no Score', async () => {
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
+    const instanceId = kicker.kicks[0]!.instanceId;
+    await fixture.agentRunRepo.create(buildAgentRun({
+      id: 'crashed-agent-run', processInstanceId: instanceId, stepId: STEP.stepId, status: 'escalated', envelope: null, fallbackReason: 'error',
+    }));
+    await fixture.instanceRepo.update(instanceId, { status: 'failed', error: 'No prompt configured in step.agent for step \'agent\'' });
+
+    await driveEvalRun(scope, evalRun.id);
+
+    expect((await fixture.evaluationRepo.listTrials(evalRun.id))[0]).toMatchObject({
+      status: 'failed', agentRunId: 'crashed-agent-run', error: 'No prompt configured in step.agent for step \'agent\'',
+    });
+    expect(await fixture.scoreRepo.list({ processInstanceId: instanceId, limit: 50 })).toHaveLength(0);
+  });
+
   it('creates each trial\'s run under the id it claimed the trial with', async () => {
     const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
     await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);

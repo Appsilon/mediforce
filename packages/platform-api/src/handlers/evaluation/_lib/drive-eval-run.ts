@@ -83,6 +83,17 @@ async function scoreTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
     return;
   }
 
+  // An Agent Run that errored before giving a result never produced an output to grade: the trial failed to run.
+  if (agentRun.envelope === null && agentRun.fallbackReason === 'error') {
+    await scope.evaluation.transitionTrial(trial, 'scoring', {
+      status: 'failed',
+      agentRunId: agentRun.id,
+      error: instance?.error ?? 'The trial\'s Agent Run errored before giving a result',
+      completedAt: new Date().toISOString(),
+    });
+    return;
+  }
+
   const agentOutput = await trialAgentOutput(scope, run, instanceId);
   const subject = await loadScoredRun(scope, agentRun.id);
   const priceOf = await loadModelPrices(scope);

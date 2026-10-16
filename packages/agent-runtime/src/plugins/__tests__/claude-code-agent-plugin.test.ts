@@ -138,6 +138,11 @@ describe('ClaudeCodeAgentPlugin', () => {
         .rejects.toThrow("No prompt configured in step.agent for step 'triage'");
     });
 
+    it('[DATA] runs a step with no prompt of its own when its Agent gives one (ADR-0029 agent eval trial)', async () => {
+      const context = { ...buildWorkflowContext({ prompt: undefined }), agentIdentityPrompt: 'You grade adverse events by CTCAE v5.' };
+      await expect(plugin.initialize(context)).resolves.toBeUndefined();
+    });
+
     it('[ERROR] refuses a step that still names a retired file skill, naming the step and the skill', async () => {
       const error = await plugin.initialize(buildWorkflowContext({ retiredFileSkill: 'trial-metadata-extractor' }))
         .catch((caught: unknown) => caught);

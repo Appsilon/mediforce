@@ -812,7 +812,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         throw new RetiredFileSkillError(context.stepId, stepAgent.retiredFileSkill);
       }
 
-      if (stepAgent.prompt === undefined || stepAgent.prompt === '') {
+      const instructedByAgent = context.agentIdentityPrompt !== undefined && context.agentIdentityPrompt !== '';
+      if ((stepAgent.prompt === undefined || stepAgent.prompt === '') && instructedByAgent === false) {
         throw new Error(
           `No prompt configured in step.agent for step '${context.stepId}'. ` +
           `${this.agentName} plugin requires step.agent.prompt.`,

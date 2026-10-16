@@ -578,6 +578,9 @@ run go by the version it was prepared for.
    writes a Score (`source: deterministic` or `llm_judge`, `metadata.evalRunId`).
    A trial whose run pauses before its Step starts — a missing secret, an
    unknown or retired model — fails with the run's error, and the next trial starts.
+   So does a trial whose Agent Run errored before giving any result (a runtime
+   that could not start, a crashed container): there is no output to grade, so
+   no Evaluator scores it and it shows under **Problems**, not as a failed grade.
    Trials start `concurrency` at a time, round by round — each case's k-th
    trial; once spend reaches the budget the rest
    are skipped and the run ends `budget_exceeded`. A trial's cost is its Agent
