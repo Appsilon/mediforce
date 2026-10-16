@@ -96,12 +96,13 @@ const FINISHED_RUN_STATUSES = new Set(['completed', 'budget_exceeded']);
  * its newest version, so no run assessed it as it is.
  */
 interface ValidatedVersion {
+  readonly subject: 'step' | 'agent';
   readonly label: string;
   readonly ran: (run: EvalRun) => boolean;
 }
 
 function definitionVersionOf(definitionVersion: number): ValidatedVersion {
-  return { label: `version ${definitionVersion}`, ran: (run) => run.definitionVersion === definitionVersion };
+  return { subject: 'step', label: `version ${definitionVersion}`, ran: (run) => run.definitionVersion === definitionVersion };
 }
 
 /**
@@ -135,8 +136,9 @@ async function stepValidation(
   const fingerprint = await stepFingerprint();
 
   if (run.fingerprint === null || run.fingerprint.hash !== fingerprint.hash) {
-    const changed = run.fingerprint === null ? [] : changedFingerprintComponents(run.fingerprint, fingerprint);
-    return notVerified(`The step changed ${since}${changed.length === 0 ? '' : `: ${changed.join(', ')}`}.`);
+    const changed = (run.fingerprint === null ? [] : changedFingerprintComponents(run.fingerprint, fingerprint))
+      .map((component) => (version.subject === 'agent' && component === 'step' ? 'trial env' : component));
+    return notVerified(`The ${version.subject} changed ${since}${changed.length === 0 ? '' : `: ${changed.join(', ')}`}.`);
   }
   const evaluatorsChanged = evaluatorChanges(await rows.evaluators(), run.evaluators, 'run with');
   if (evaluatorsChanged.length > 0) return notVerified(`Evaluators changed ${since}: ${evaluatorsChanged.join('; ')}.`);
@@ -189,15 +191,16 @@ export async function getStepQualification(
   if (step.kind === 'agent' && input.definitionVersion !== undefined) {
     throw new ValidationError(`${subjectName(step)} is read as it is now; it has no workflow version to pick`);
   }
-  const { definition, step: workflowStep, agent } = await loadEvaluationSubject(scope, step, 'read', input.definitionVersion);
+  const trialEnv = step.kind === 'agent' ? (await scope.evaluation.getMcpPolicy(step))?.env : undefined;
+  const { definition, step: workflowStep, agent } = await loadEvaluationSubject(scope, step, 'read', input.definitionVersion, trialEnv);
   const fingerprint = await computeStepFingerprint(scope, definition, workflowStep);
   const rows = subjectRows(scope, step);
   const agentVersion = agent === null ? null : await currentAgentVersion(scope, agent);
   const version: ValidatedVersion = agent === null
     ? definitionVersionOf(definition.version)
     : agentVersion === null
-      ? { label: `agent '${agent.id}' as it is now (it changed since its newest version)`, ran: () => false }
-      : { label: `agent version ${agentVersion.version}`, ran: (run) => run.agentVersion === agentVersion.version };
+      ? { subject: 'agent', label: `agent '${agent.id}' as it is now (it changed since its newest version)`, ran: () => false }
+      : { subject: 'agent', label: `agent version ${agentVersion.version}`, ran: (run) => run.agentVersion === agentVersion.version };
   const versions = { definitionVersion: agent === null ? definition.version : null, agentVersion: agentVersion?.version ?? null };
   const history = [...await rows.qualifications()];
   const approvals = history.filter((qualification) => qualificationOutcome(qualification) === 'passed');
