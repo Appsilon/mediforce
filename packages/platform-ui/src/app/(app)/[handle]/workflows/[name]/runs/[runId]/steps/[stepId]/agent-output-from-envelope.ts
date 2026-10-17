@@ -26,5 +26,7 @@ export function agentOutputFromEnvelope(
     escalationReason: null,
     estimatedCostUsd: null,
     tokenUsage: envelope.tokenUsage ?? null,
+    agentSummary: envelope.agentSummary ?? null,
+    resultSource: envelope.resultSource ?? null,
   };
 }

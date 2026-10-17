@@ -4,7 +4,7 @@ import { join, dirname, isAbsolute, resolve, posix, basename } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, AgentTrajectoryEntry } from '@mediforce/platform-core';
+import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, AgentTrajectoryEntry, AgentResultSource, AgentSummary } from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
@@ -138,10 +138,20 @@ export interface SpawnDockerResult {
   injectedEnvVars: string[];
 }
 
-export interface AgentOutputContract {
+export interface AgentOutputContract extends Record<string, unknown> {
   output_file?: string;
   summary?: string;
 }
+
+/** What an agent step ended with: its result and, kept apart, its closing message (#1551). */
+export interface ExtractedAgentOutput {
+  result: Record<string, unknown>;
+  resultSource: AgentResultSource;
+  agentSummary: AgentSummary | null;
+}
+
+/** Marks a stream event `recoverOutputFromDirectory` assembled from the files in /output. */
+const RECOVERED_OUTPUT_FILES = 'recoveredOutputFiles';
 
 /** Spec returned by subclass to define how the agent CLI is invoked inside the container. */
 export interface AgentCommandSpec {
@@ -414,24 +424,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
   /**
    * Recover agent output when no result event was emitted (e.g. model stopped
-   * after tool calls). Tries result.json first, then scans for any files the
-   * agent wrote to /output/.
+   * after tool calls). `extractResult` reads result.json itself; without one,
+   * the files the agent wrote to /output/ stand in for its result.
    */
   protected async recoverOutputFromDirectory(outputDir: string): Promise<string> {
-    // 1. Try result.json (the expected contract location)
-    try {
-      const contents = await readFile(join(outputDir, 'result.json'), 'utf-8');
-      try {
-        const parsed = JSON.parse(contents) as Record<string, unknown>;
-        return JSON.stringify({ result: JSON.stringify(parsed) });
-      } catch {
-        return JSON.stringify({ result: contents });
-      }
-    } catch {
-      // result.json not found — continue to directory scan
-    }
+    // No closing message: a stream event without a string `result`.
+    if (await readResultJson(outputDir) !== null) return JSON.stringify({});
 
-    // 2. Scan output directory for any files the agent wrote
     const entries = await readdir(outputDir, { withFileTypes: true });
     const files = entries.filter((entry) => entry.isFile() && entry.name !== 'prompt.txt');
 
@@ -455,7 +454,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       ? collected[files[0].name]
       : collected;
 
-    return JSON.stringify({ result: JSON.stringify(resultPayload) });
+    return JSON.stringify({ [RECOVERED_OUTPUT_FILES]: resultPayload });
   }
 
   /** Hook called after the output directory is created and prompt.txt is written,
@@ -1106,24 +1105,26 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         : spawnResult.outputDir
           ? { containerPath: '/output/', hostPath: spawnResult.outputDir + '/' }
           : undefined;
-      const parsedResult = await this.extractResult(spawnResult.cliOutput, outputDirMapping);
+      const { result: parsedResult, resultSource, agentSummary } = await this.extractResult(spawnResult.cliOutput, outputDirMapping);
+      // Envelope fields come from the result, else from a JSON closing message beside it.
+      const envelopeFields: Record<string, unknown> = { ...agentSummary?.json, ...parsedResult };
 
-      const confidence = typeof parsedResult.confidence === 'number'
-        ? parsedResult.confidence
+      const confidence = typeof envelopeFields.confidence === 'number'
+        ? envelopeFields.confidence
         : 0.7;
 
-      const confidence_rationale = typeof parsedResult.confidence_rationale === 'string'
-        ? parsedResult.confidence_rationale
+      const confidence_rationale = typeof envelopeFields.confidence_rationale === 'string'
+        ? envelopeFields.confidence_rationale
         : undefined;
 
       let tokenUsage: { inputTokens: number; outputTokens: number; cachedInputTokens?: number; peakInputTokens?: number } | undefined;
 
       // First: check if agent reported tokenUsage in its result
-      if (parsedResult.tokenUsage !== null
-        && typeof parsedResult.tokenUsage === 'object'
-        && typeof (parsedResult.tokenUsage as Record<string, unknown>).inputTokens === 'number'
-        && typeof (parsedResult.tokenUsage as Record<string, unknown>).outputTokens === 'number') {
-        tokenUsage = parsedResult.tokenUsage as { inputTokens: number; outputTokens: number; cachedInputTokens?: number; peakInputTokens?: number };
+      if (envelopeFields.tokenUsage !== null
+        && typeof envelopeFields.tokenUsage === 'object'
+        && typeof (envelopeFields.tokenUsage as Record<string, unknown>).inputTokens === 'number'
+        && typeof (envelopeFields.tokenUsage as Record<string, unknown>).outputTokens === 'number') {
+        tokenUsage = envelopeFields.tokenUsage as { inputTokens: number; outputTokens: number; cachedInputTokens?: number; peakInputTokens?: number };
       }
 
       // Second: check stream event for CLI-reported usage (e.g. Claude Code stream-json result event)
@@ -1198,6 +1199,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           ...(spawnResult.presentation ? { presentation: spawnResult.presentation } : {}),
           ...(deliverableFile ? { deliverableFile } : {}),
           ...(tokenUsage ? { tokenUsage } : {}),
+          agentSummary,
+          resultSource,
         },
         timestamp: new Date().toISOString(),
       });
@@ -1263,61 +1266,85 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     }
   }
 
+  /**
+   * What the agent step produced (#1551): `result.json` when the agent wrote
+   * one, whatever its closing message says; and, kept apart, that closing
+   * message as its `agent_summary.json`. Without a `result.json` the result
+   * falls back to the closing message, or to the files recovered from /output.
+   */
   protected async extractResult(
     cliOutput: string,
     outputDirMapping?: { containerPath: string; hostPath: string },
-  ): Promise<Record<string, unknown>> {
-    let streamEvent: Record<string, unknown>;
+  ): Promise<ExtractedAgentOutput> {
+    let streamEvent: Record<string, unknown> | null = null;
     try {
-      streamEvent = JSON.parse(cliOutput) as Record<string, unknown>;
+      const parsed: unknown = JSON.parse(cliOutput);
+      if (isRecord(parsed)) streamEvent = parsed;
     } catch {
-      return { raw: cliOutput };
+      // The CLI printed plain text — that text is the closing message.
     }
 
-    const agentText = typeof streamEvent.result === 'string' ? streamEvent.result : null;
-    if (!agentText) {
-      return streamEvent;
+    const closingMessage = streamEvent === null
+      ? cliOutput
+      : typeof streamEvent.result === 'string' && streamEvent.result.length > 0 ? streamEvent.result : null;
+    const closingJson = closingMessage === null ? null : parseAgentContract(closingMessage);
+    const agentSummary: AgentSummary | null = closingMessage === null
+      ? null
+      : { text: closingMessage, ...(closingJson === null ? {} : { json: closingJson }) };
+
+    const resultJson = outputDirMapping === undefined ? null : await readResultJson(outputDirMapping.hostPath);
+    if (resultJson !== null) {
+      // A closing message naming result.json as its output_file still adds its summary to it.
+      const namesResultJson = outputDirMapping !== undefined
+        && closingJson?.output_file !== undefined
+        && hostPathOf(closingJson.output_file, outputDirMapping) === join(outputDirMapping.hostPath, 'result.json');
+      const result = namesResultJson && closingJson?.summary !== undefined ? { ...resultJson, summary: closingJson.summary } : resultJson;
+      return { result, resultSource: 'result_json', agentSummary };
     }
 
-    const contract = parseAgentContract(agentText);
-    if (contract === null) {
-      // Agent text isn't JSON — try reading /output/result.json as fallback
-      if (outputDirMapping) {
-        try {
-          const fallbackPath = join(outputDirMapping.hostPath, 'result.json');
-          const fallbackContents = await readFile(fallbackPath, 'utf-8');
-          const parsed = JSON.parse(fallbackContents) as Record<string, unknown>;
-          return parsed;
-        } catch {
-          // No result.json either — return raw text
-        }
-      }
-      return { raw: agentText };
+    if (streamEvent !== null && RECOVERED_OUTPUT_FILES in streamEvent) {
+      const recovered = streamEvent[RECOVERED_OUTPUT_FILES];
+      return { result: isRecord(recovered) ? recovered : { raw: recovered }, resultSource: 'output_files', agentSummary: null };
     }
 
-    if (contract.output_file) {
+    if (closingMessage === null) {
+      return { result: streamEvent ?? {}, resultSource: 'final_message', agentSummary: null };
+    }
+    if (closingJson === null) {
+      return { result: { raw: closingMessage }, resultSource: 'final_message', agentSummary };
+    }
+    return {
+      result: await this.readOutputFile(closingJson, closingMessage, outputDirMapping),
+      resultSource: 'final_message',
+      agentSummary,
+    };
+  }
+
+  /** A closing message naming an `output_file` (the mock agents' contract) stands for that file's contents. */
+  private async readOutputFile(
+    contract: AgentOutputContract,
+    closingMessage: string,
+    outputDirMapping?: { containerPath: string; hostPath: string },
+  ): Promise<Record<string, unknown>> {
+    if (!contract.output_file) {
+      return contract;
+    }
+    try {
+      const filePath = outputDirMapping === undefined ? contract.output_file : hostPathOf(contract.output_file, outputDirMapping);
+      const fileContents = await readFile(filePath, 'utf-8');
+      // Try JSON parse; if file is not JSON (e.g. Markdown), return as raw content
       try {
-        let filePath = contract.output_file;
-        if (outputDirMapping && filePath.startsWith(outputDirMapping.containerPath)) {
-          filePath = filePath.replace(outputDirMapping.containerPath, outputDirMapping.hostPath);
+        const parsed = JSON.parse(fileContents) as Record<string, unknown>;
+        if (contract.summary) {
+          parsed.summary = contract.summary;
         }
-        const fileContents = await readFile(filePath, 'utf-8');
-        // Try JSON parse; if file is not JSON (e.g. Markdown), return as raw content
-        try {
-          const parsed = JSON.parse(fileContents) as Record<string, unknown>;
-          if (contract.summary) {
-            parsed.summary = contract.summary;
-          }
-          return parsed;
-        } catch {
-          return { raw: fileContents, output_file: filePath, summary: contract.summary };
-        }
+        return parsed;
       } catch {
-        return { raw: agentText, summary: contract.summary };
+        return { raw: fileContents, output_file: filePath, summary: contract.summary };
       }
+    } catch {
+      return { raw: closingMessage, summary: contract.summary };
     }
-
-    return contract as unknown as Record<string, unknown>;
   }
 
   protected async buildPrompt(
@@ -1394,7 +1421,10 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       );
       parts.push(
         `## Result Contract Directory\n` +
-        `Write the output result contract JSON to: ${outputDir}/result.json\n` +
+        `Write this step's result as JSON to: ${outputDir}/result.json\n` +
+        `${outputDir}/result.json is this step's result: later steps, the output schema and Evaluators read it. ` +
+        `Your closing message is kept apart from it, as this step's agent_summary.json, and never replaces it — ` +
+        `put everything the result must carry in result.json.\n` +
         `Any other file you leave in ${outputDir} is published as an Output File of this step: ` +
         `it is offered for download and committed to ${workingDir}/${OUTPUT_FILES_REPO_ROOT}/${this.context.stepId}/, ` +
         `where later steps find it. ${outputDir} itself is discarded when the step ends, ` +
@@ -1500,7 +1530,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         inlineOutputs[stepId] = compactOutput;
       }
 
-      parts.push('## Previous Step Outputs');
+      parts.push(PREVIOUS_STEP_OUTPUTS_HEADING);
       parts.push(JSON.stringify(inlineOutputs, null, 2));
 
       if (fileRefs.length > 0) {
@@ -1512,8 +1542,27 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         );
       }
     } else if (hasPreviousOutputs) {
-      parts.push('## Previous Step Outputs');
+      parts.push(PREVIOUS_STEP_OUTPUTS_HEADING);
       parts.push(JSON.stringify(previousOutputs, null, 2));
+    }
+
+    // 6b. Previous agent summaries — each earlier agent step's closing message, apart from its result (#1551)
+    const previousSummaries = isWorkflowAgentContext(this.context) && this.context.getPreviousAgentSummaries !== undefined
+      ? await this.context.getPreviousAgentSummaries()
+      : {};
+    if (Object.keys(previousSummaries).length > 0) {
+      const inlineSummaries: Record<string, string> = {};
+      for (const [stepId, summary] of Object.entries(previousSummaries)) {
+        inlineSummaries[stepId] = summary.text.length > INLINE_THRESHOLD && outputDir
+          ? `[FILE: ${await spillPreviousOutput(outputDir, hostOutputDir, `summary-${stepId}.md`, summary.text)}]`
+          : summary.text;
+      }
+      parts.push(
+        '## Previous Step Agent Summaries\n' +
+        'The closing message each earlier agent step ended with (its agent_summary.json), by step id. ' +
+        'It is not that step\'s result — the result is under Previous Step Outputs.',
+      );
+      parts.push(JSON.stringify(inlineSummaries, null, 2));
     }
 
     // 7. Files earlier steps left in the workspace — they are on disk either
@@ -1847,6 +1896,10 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
   }
 }
 
+const PREVIOUS_STEP_OUTPUTS_HEADING =
+  '## Previous Step Outputs\n' +
+  'Each earlier step\'s result (for an agent step, its result.json), by step id.';
+
 /** Where large previous-step and previous-run values are spilled inside the
  *  output dir. Dotted, so they never become this step's Output Files. */
 const PREVIOUS_OUTPUTS_DIR = '.previous-outputs';
@@ -1907,10 +1960,28 @@ async function readPresentation(outputDir: string): Promise<Presentation | null>
 function parseAgentContract(agentText: string): AgentOutputContract | null {
   for (const candidate of [agentText, unfence(agentText)]) {
     try {
-      return JSON.parse(candidate) as AgentOutputContract;
+      const parsed: unknown = JSON.parse(candidate);
+      return isRecord(parsed) ? parsed as AgentOutputContract : null;
     } catch {
       continue;
     }
   }
   return null;
+}
+
+/** A path the agent named inside the container, as the host sees it. */
+function hostPathOf(path: string, outputDirMapping: { containerPath: string; hostPath: string }): string {
+  return path.startsWith(outputDirMapping.containerPath)
+    ? path.replace(outputDirMapping.containerPath, outputDirMapping.hostPath)
+    : path;
+}
+
+/** The agent's `result.json` in `outputDir`, or null when it wrote none that holds a JSON object. */
+async function readResultJson(outputDir: string): Promise<Record<string, unknown> | null> {
+  try {
+    const parsed: unknown = JSON.parse(await readFile(join(outputDir, 'result.json'), 'utf-8'));
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
 }

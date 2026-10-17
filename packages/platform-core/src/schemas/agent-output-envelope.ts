@@ -54,6 +54,18 @@ export const StepOutputEnvelopeSchema = z.object({
   deliverableFile: z.string().nullable().optional(),
 });
 
+/** An agent's closing message, kept beside its result as `agent_summary.json`
+ *  (#1551): the text verbatim, and the JSON it holds when it parses as JSON. */
+export const AgentSummarySchema = z.object({
+  text: z.string(),
+  json: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** Where an agent step's `result` came from: the `result.json` it wrote, or —
+ *  when it wrote none — its closing message or the other files it left in
+ *  `/output`. Absent on envelopes from before #1551. */
+export const AgentResultSourceSchema = z.enum(['result_json', 'final_message', 'output_files']);
+
 export const AgentOutputEnvelopeSchema = StepOutputEnvelopeSchema.extend({
   confidence: z.number().min(0).max(1),
   confidence_rationale: z.string().optional(),
@@ -61,6 +73,8 @@ export const AgentOutputEnvelopeSchema = StepOutputEnvelopeSchema.extend({
   reasoning_chain: z.array(z.string()),
   model: z.string().nullable(),
   tokenUsage: TokenUsageSchema.optional(),
+  agentSummary: AgentSummarySchema.nullable().optional(),
+  resultSource: AgentResultSourceSchema.optional(),
 });
 
 export type Annotation = z.infer<typeof AnnotationSchema>;
@@ -68,4 +82,6 @@ export type GitMetadata = z.infer<typeof GitMetadataSchema>;
 export type TokenUsage = z.infer<typeof TokenUsageSchema>;
 export type Presentation = z.infer<typeof PresentationSchema>;
 export type StepOutputEnvelope = z.infer<typeof StepOutputEnvelopeSchema>;
+export type AgentSummary = z.infer<typeof AgentSummarySchema>;
+export type AgentResultSource = z.infer<typeof AgentResultSourceSchema>;
 export type AgentOutputEnvelope = z.infer<typeof AgentOutputEnvelopeSchema>;

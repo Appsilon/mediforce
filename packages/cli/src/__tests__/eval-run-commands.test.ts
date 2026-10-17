@@ -189,6 +189,8 @@ describe('mediforce eval trial', () => {
     evalCase: null,
     stepInput: { events: [{ term: 'Sepsis' }] },
     result: { findings: [{ term: 'Sepsis', grade: 4 }] },
+    resultSource: 'result_json',
+    agentSummary: { text: 'Graded Sepsis 4. MCP worked.' },
     reasoningSummary: 'Graded by CTCAE v5.',
     trajectory: [],
     evaluators: [{
@@ -212,6 +214,7 @@ describe('mediforce eval trial', () => {
     expect(fetchSpy.mock.calls[0]![0]).toBe(`http://localhost:5555/api/evaluation/runs/${RUN_ID}/trials/${TRIAL_ID}`);
     const printed = output.stdoutLines.join('\n');
     expect(printed).toContain('output: {"findings":[{"term":"Sepsis","grade":4}]}');
+    expect(printed).toContain('agent summary: Graded Sepsis 4. MCP worked.');
     expect(printed).toContain('fail  death-graded-5 v2 (llm_judge, confidence 0.9)');
     expect(printed).toContain('Grade 4 given for a fatal AE.');
     expect(printed).not.toContain('Rubric:');

@@ -31,6 +31,7 @@ import {
   MCP_REPLAY_RECORDINGS,
   type AgentDefinitionRepository,
   type AgentOAuthTokenRepository,
+  type AgentSummary,
   type EvaluationRepository,
   type OAuthProviderRepository,
   type ResolvedMcpConfig,
@@ -256,6 +257,17 @@ export async function executeAgentStep(
         }
       }
       return result;
+    },
+    getPreviousAgentSummaries: async () => {
+      const executions = await instanceRepo.getStepExecutions(instanceId);
+      const summaries: Record<string, AgentSummary> = {};
+      for (const exec of executions) {
+        const summary = exec.agentOutput?.agentSummary;
+        if (summary !== null && summary !== undefined) {
+          summaries[exec.stepId] = summary;
+        }
+      }
+      return summaries;
     },
   };
 

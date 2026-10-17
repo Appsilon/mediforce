@@ -95,6 +95,8 @@ export async function getEvalTrial(input: GetEvalTrialInput, scope: CallerScope)
     evalCase,
     stepInput: subject?.stepInput ?? null,
     result: subject?.agentRun.envelope?.result ?? null,
+    resultSource: subject?.agentRun.envelope?.resultSource ?? null,
+    agentSummary: subject?.agentRun.envelope?.agentSummary ?? null,
     reasoningSummary: subject?.agentRun.envelope?.reasoning_summary ?? null,
     trajectory: subject?.trajectory ?? [],
     evaluators,

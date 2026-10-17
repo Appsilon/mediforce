@@ -1,5 +1,5 @@
-import type { AgentFallbackReason, HumanTask, ProcessInstance, Presentation } from '@mediforce/platform-core';
-import { AgentFallbackReasonSchema } from '@mediforce/platform-core';
+import type { AgentFallbackReason, AgentResultSource, AgentSummary, HumanTask, ProcessInstance, Presentation } from '@mediforce/platform-core';
+import { AgentFallbackReasonSchema, AgentResultSourceSchema, AgentSummarySchema } from '@mediforce/platform-core';
 import { formatStepName } from '@/lib/format';
 
 /** Check if a task is an agent output review (L3 approval).
@@ -87,6 +87,8 @@ export function getAgentOutput(task: HumanTask): AgentOutputData | null {
     gitMetadata,
     presentation: normalizePresentation(agentOutput.presentation),
     escalationReason: normalizedEscalation,
+    agentSummary: AgentSummarySchema.safeParse(agentOutput.agentSummary).data ?? null,
+    resultSource: AgentResultSourceSchema.safeParse(agentOutput.resultSource).data ?? null,
   };
 }
 
@@ -137,4 +139,7 @@ export interface AgentOutputData {
   gitMetadata: GitMetadataData | null;
   presentation: Presentation | null;
   escalationReason: EscalationReason;
+  /** The agent's closing message, kept apart from `result` (#1551). */
+  agentSummary: AgentSummary | null;
+  resultSource: AgentResultSource | null;
 }

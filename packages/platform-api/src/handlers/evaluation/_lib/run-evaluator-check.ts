@@ -144,6 +144,7 @@ export async function runEvaluatorCheck(
           source: check.source,
           input: {
             result,
+            agentSummary: envelope.agentSummary ?? null,
             stepInput: subject.stepInput,
             trajectory: subject.trajectory,
             case: evalCase,

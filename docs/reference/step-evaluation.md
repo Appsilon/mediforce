@@ -189,11 +189,12 @@ One rule in plain language plus the check behind it. Four kinds:
 |---|---|---|
 | `schema` | `result` against the JSON Schema subset `agent.outputSchema` uses | at once |
 | `code` | a `python` or `javascript` script in the `script-container` sandbox (no network) | after a person approves that version's source |
-| `llm_judge` | a model reads the step's input, the agent's Trajectory and its output, explains its judgment, then answers pass or fail with a confidence 0–1 | at once; each verdict below its `minConfidence` is left out unless a person accepts it |
+| `llm_judge` | a model reads the step's input, the agent's Trajectory, its output and its closing message, explains its judgment, then answers pass or fail with a confidence 0–1 | at once; each verdict below its `minConfidence` is left out unless a person accepts it |
 | `expected_output` | `result` against the Eval Case's expected output — an exact match, or an agreement score 0–1 from its model; see [Expected outputs](#expected-outputs) | at once |
 
-A `code` check reads `/output/input.json` — `{ result, stepInput, trajectory,
-case }` — and the step's workspace commit read-only at `/workspace`, and writes
+A `code` check reads `/output/input.json` — `{ result, agentSummary,
+stepInput, trajectory, case }`, where `agentSummary` is the agent's closing
+message kept apart from `result` (`{ text, json? }`, or null) — and the step's workspace commit read-only at `/workspace`, and writes
 `/output/result.json` as `{ "passed": boolean, "comment"?: string }`. A check
 that crashes, or a judge that gives no usable verdict, is an *error*, never a
 failed output.

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { AgentOutputReviewPanel } from '../agent-output-review-panel';
 import type { AgentOutputData } from '../task-utils';
 
@@ -16,6 +17,8 @@ function buildAgentOutput(overrides: Partial<AgentOutputData> = {}): AgentOutput
     gitMetadata: null,
     presentation: null,
     escalationReason: null,
+    agentSummary: null,
+    resultSource: null,
     ...overrides,
   };
 }
@@ -309,5 +312,26 @@ describe('AgentOutputReviewPanel', () => {
     const srcdoc = document.querySelector('iframe')!.getAttribute('srcdoc')!;
     expect(srcdoc).not.toContain('</script><script>alert');
     expect(srcdoc).toContain('<\\/script>');
+  });
+
+  it('switches between the result and the agent\'s closing message, naming where the result came from (#1551)', async () => {
+    const agentOutput = buildAgentOutput({
+      result: { grade: 3 },
+      resultSource: 'result_json',
+      agentSummary: { text: 'AKUKU — the MCP server answered.' },
+    });
+
+    render(<AgentOutputReviewPanel agentOutput={agentOutput} />);
+
+    await userEvent.setup().click(screen.getByRole('tab', { name: /Raw JSON/ }));
+    expect(screen.getByTestId('result-source')).toHaveTextContent('result.json');
+    await userEvent.setup().click(screen.getByRole('tab', { name: /agent_summary\.json/ }));
+    expect(screen.getByTestId('agent-summary')).toHaveTextContent('AKUKU — the MCP server answered.');
+  });
+
+  it('offers no closing-message tab for a run that ended without one', () => {
+    render(<AgentOutputReviewPanel agentOutput={buildAgentOutput({ result: { grade: 3 } })} />);
+
+    expect(screen.queryByRole('tab', { name: /agent_summary\.json/ })).toBeNull();
   });
 });

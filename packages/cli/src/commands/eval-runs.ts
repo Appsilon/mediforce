@@ -222,7 +222,8 @@ export const evalTrialCommand = defineCommand({
     if (trial.error !== null) output.stdout(`error: ${trial.error}`);
     output.stdout(`input: ${JSON.stringify(result.stepInput)}`);
     if (evalCase?.expectedOutput != null) output.stdout(`expected output (${evalCase.expectation === 'negative' ? 'to avoid' : 'to match'}): ${JSON.stringify(evalCase.expectedOutput)}`);
-    output.stdout(`output: ${JSON.stringify(result.result)}`);
+    output.stdout(`output${result.resultSource === 'result_json' || result.resultSource === null ? '' : ` (${result.resultSource})`}: ${JSON.stringify(result.result)}`);
+    if (result.agentSummary !== null) output.stdout(`agent summary: ${result.agentSummary.text}`);
     for (const entry of result.evaluators) {
       const { evaluator, score } = entry;
       const confidence = score?.confidence == null ? '' : `, confidence ${score.confidence}`;

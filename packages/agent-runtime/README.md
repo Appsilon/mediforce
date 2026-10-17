@@ -33,6 +33,13 @@ workflow definition, where it is auditable, and buried it in code. Nothing
 routes on `confidence`: it is recorded, and Eval Runs report how well it is
 calibrated.
 
+An agent step's `result` is its `/output/result.json` whenever it wrote one;
+its closing message is kept beside it as `agentSummary` (`agent_summary.json`)
+and never replaces it, and `resultSource` says when `result` is a fallback
+instead — the closing message or the `/output` files. Later steps, code checks
+and judges get both, apart
+([container steps](../../docs/reference/container-steps.md#result-and-agent-trajectory), #1551).
+
 Timeouts and errors are envelope outcomes too: `FallbackHandler` escalates
 them to a person, never an exception a plugin swallows.
 

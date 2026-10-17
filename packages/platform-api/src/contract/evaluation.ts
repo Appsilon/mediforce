@@ -2,7 +2,9 @@ import { z } from 'zod';
 import {
   AcceptanceCriteriaSchema,
   AcceptanceCriteriaVersionSchema,
+  AgentResultSourceSchema,
   AgentRunSchema,
+  AgentSummarySchema,
   AgentVersionSchema,
   EvalCaseComparisonSchema,
   EvalCaseExpectationSchema,
@@ -434,6 +436,10 @@ export const GetEvalTrialOutputSchema = z.object({
   /** What the step was given; null before the trial has an Agent Run. */
   stepInput: z.record(z.string(), z.unknown()).nullable(),
   result: z.unknown(),
+  /** Where `result` came from; null when the run predates recording it (#1551). */
+  resultSource: AgentResultSourceSchema.nullable().default(null),
+  /** The agent's closing message, kept apart from `result` as its agent_summary.json (#1551). */
+  agentSummary: AgentSummarySchema.nullable().default(null),
   /** The agent's own summary of what it did. */
   reasoningSummary: z.string().nullable(),
   /** The Agent Run's log, as judges and code checks read it. */

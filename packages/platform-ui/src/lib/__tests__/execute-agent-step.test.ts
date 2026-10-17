@@ -400,6 +400,24 @@ describe('executeAgentStep', () => {
     });
   });
 
+  it('[DATA] hands a step each earlier agent step\'s latest closing message, apart from its result (#1551)', async () => {
+    const execution = (stepId: string, startedAt: string, text: string | null) => ({
+      id: `exec-${startedAt}`, instanceId: 'inst-wf-001', stepId, status: 'completed', input: {}, output: { grade: 3 },
+      verdict: null, executedBy: 'agent', startedAt, completedAt: startedAt, iterationNumber: 0, gateResult: null, error: null,
+      agentOutput: text === null ? null : { confidence: 0.9, confidence_rationale: null, reasoning: null, model: null, duration_ms: 1, gitMetadata: null, agentSummary: { text } },
+    });
+    mockInstanceRepo.getStepExecutions.mockResolvedValue([
+      execution('grade', '2026-10-16T08:00:00.000Z', 'first attempt'),
+      execution('grade', '2026-10-16T09:00:00.000Z', 'AKUKU — MCP worked.'),
+      execution('review', '2026-10-16T10:00:00.000Z', null),
+    ]);
+
+    await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1');
+
+    const context = mockAgentRunner.runWithWorkflowStep.mock.calls[0]![1] as WorkflowAgentContext;
+    expect(await context.getPreviousAgentSummaries!()).toEqual({ grade: { text: 'AKUKU — MCP worked.' } });
+  });
+
   // ---- Plugin resolution ----
 
   it('[DATA] uses workflowStep.plugin for plugin lookup when set', async () => {

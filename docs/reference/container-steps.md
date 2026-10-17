@@ -176,19 +176,39 @@ Code in its `system/init` event, OpenCode in its log under
 
 ## Result and Agent Trajectory
 
-An agent step's `result.json` becomes the envelope's `result`. When the step
-sets `agent.outputSchema` — or inherits its Agent's `outputSchema` by setting
-none — the schema is added to the prompt and `AgentRunner`
-checks `result` against it after the run: a violation records a `status` event
-and runs the plugin once more with the error in the prompt; a second violation
+An agent step ends with two outputs, and the platform keeps both (#1551):
+
+- **`result.json`** — the step's result. When the agent wrote one that holds a
+  JSON object, it becomes the envelope's `result`, whatever the closing message
+  says. Later steps get it under `steps.<id>`; `outputSchema`, Evaluators and
+  transitions read it. `confidence`, `confidence_rationale` and `tokenUsage`
+  are moved out of it onto the envelope. A closing message naming it as its
+  `output_file` still adds its `summary` to it.
+- **The closing message** — kept as the envelope's `agentSummary`, shown as
+  `agent_summary.json`: `{ text }`, plus `json` when the message parses as
+  JSON (bare or in a fenced block). It never replaces the result. Later agent
+  steps get every earlier step's summary in their prompt under *Previous Step
+  Agent Summaries*, apart from the results; `code` checks get it as
+  `agentSummary` in `input.json` and `llm_judge` Evaluators see it.
+
+With no `result.json`, the result falls back as before: to a JSON closing
+message (its `output_file` contract resolved), else `{ raw: <message> }`, else —
+when the agent emitted no closing message — the files it left in `/output`.
+The envelope's `resultSource` (`result_json`, `final_message`, `output_files`)
+says which, so the UI never labels a fallback `result.json`. Envelope fields
+the result lacks are read from a JSON closing message
+([`base-container-agent-plugin.ts`](../../packages/agent-runtime/src/plugins/base-container-agent-plugin.ts)).
+
+When the step sets `agent.outputSchema` — or inherits its Agent's
+`outputSchema` by setting none — the schema is added to the prompt and
+`AgentRunner` checks `result` against it after the run: a violating result is
+reshaped by one call to the step's model, which may only rearrange what the
+result already says, and validated again; a result that still violates
 escalates the run to a person with `fallbackReason: output_schema`
 ([`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts),
-ADR-0023 D13). Both attempts share the one step timeout — the retry gets what the
-first attempt left, and with nothing left the violation escalates straight
-away — so the run route's reap guard never reads a live retry as
-stranded. The retry refreshes the run's `updatedAt` for the heartbeat's
-stranded sweep. `agent.outputSchema` is valid on `executor: agent` steps only;
-definition validation rejects it anywhere else.
+ADR-0023 D13). The repair shares the one step timeout, so the run route's reap
+guard never reads a live repair as stranded. `agent.outputSchema` is valid on
+`executor: agent` steps only; definition validation rejects it anywhere else.
 
 A result that passes `outputSchema` is then checked by the step's production
 Evaluators, when it has any: a failing critical `schema` or `code` one

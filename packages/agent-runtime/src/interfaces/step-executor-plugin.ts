@@ -1,6 +1,7 @@
 import type {
   AgentEvent,
   AgentOutputEnvelope,
+  AgentSummary,
   AgentTrajectoryEntry,
   McpTape,
   ProcessConfig,
@@ -99,6 +100,9 @@ export interface WorkflowAgentContext {
   step: WorkflowStep;
   llm: LlmClient;
   getPreviousStepOutputs: () => Promise<Record<string, unknown>>;
+  /** The closing message of each earlier agent step of the run, by step id —
+   *  kept apart from its result (#1551). Absent where no run backs the step. */
+  getPreviousAgentSummaries?: () => Promise<Record<string, AgentSummary>>;
   /** Pre-fetched workflow secrets for {{TEMPLATE}} resolution */
   workflowSecrets?: Record<string, string>;
   /** Keys that came from namespace-level secrets (vs workflow-level).
