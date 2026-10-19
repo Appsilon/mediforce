@@ -13,16 +13,7 @@ Evaluate each change for **community interest** — how relevant and interesting
 
 ## Output Format
 
-Write a JSON file to `/output/result.json` with this structure:
-
-```json
-{
-  "output_file": "/output/result.json",
-  "summary": "Ranked N changes from REPO"
-}
-```
-
-The result.json should contain:
+Write your result as one JSON object to `/output/result.json`:
 
 ```json
 {

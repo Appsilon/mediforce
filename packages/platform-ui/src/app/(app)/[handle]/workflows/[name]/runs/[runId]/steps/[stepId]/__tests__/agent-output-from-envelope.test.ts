@@ -36,32 +36,18 @@ describe('agentOutputFromEnvelope', () => {
     expect(out.result).toEqual({ foo: 'bar' });
   });
 
-  it('passes git metadata and presentation through', () => {
+  it('passes git metadata through', () => {
     const git = {
       commitSha: 'deadbeef',
       branch: 'feat/x',
       changedFiles: ['a.ts', 'b.ts'],
       repoUrl: 'https://github.com/org/repo',
     };
-    const envelope = buildEnvelope({
-      gitMetadata: git,
-      presentation: { kind: 'html', content: '<div>html</div>' },
-    });
+    const envelope = buildEnvelope({ gitMetadata: git });
 
     const out = agentOutputFromEnvelope(envelope);
 
     expect(out.gitMetadata).toEqual(git);
-    expect(out.presentation).toEqual({ kind: 'html', content: '<div>html</div>' });
-  });
-
-  it('forwards a markdown presentation untouched', () => {
-    const envelope = buildEnvelope({
-      presentation: { kind: 'markdown', content: '## Status\n\n- done' },
-    });
-
-    const out = agentOutputFromEnvelope(envelope);
-
-    expect(out.presentation).toEqual({ kind: 'markdown', content: '## Status\n\n- done' });
   });
 
   it('passes tokenUsage through', () => {
@@ -96,6 +82,5 @@ describe('agentOutputFromEnvelope', () => {
 
     expect(out.confidence_rationale).toBeNull();
     expect(out.gitMetadata).toBeNull();
-    expect(out.presentation).toBeNull();
   });
 });

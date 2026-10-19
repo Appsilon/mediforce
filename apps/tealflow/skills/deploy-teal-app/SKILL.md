@@ -32,8 +32,12 @@ Write the `dataCode` content to `/output/app/data.R`.
 
 ### 2. Push to GitHub
 
+Push from a copy outside `/output` — a git repository inside the step's output
+folder would not be committed with it.
+
 ```bash
-cd /output/app
+rm -rf /tmp/teal-app && cp -r /output/app /tmp/teal-app
+cd /tmp/teal-app
 git init
 git checkout -b main
 git add app.R data.R
@@ -44,12 +48,18 @@ git push -u origin main --force
 
 Replace REPO with the value from `define-requirements.githubRepo`.
 
-### 3. Return result
+### 3. Write the result
 
-Return the GitHub repo URL as your result.
+Write `/output/result.json`:
+
+```json
+{ "repoUrl": "https://github.com/REPO", "pushed": true }
+```
+
+Set `pushed: false` and add `reason` when the push was skipped.
 
 ## Rules
 
 - Do NOT download datasets. Do NOT set up renv. Do NOT validate the app. Just write files and push.
 - Do NOT modify the code from the artifact.
-- If GITHUB_TOKEN is missing, write the files and report that push was skipped.
+- If GITHUB_TOKEN is missing, write the files and record in `result.json` that the push was skipped.

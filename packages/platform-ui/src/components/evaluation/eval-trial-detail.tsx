@@ -4,13 +4,15 @@ import * as React from 'react';
 import { flushSync } from 'react-dom';
 import Link from 'next/link';
 import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
-import type { EvalCase, EvaluationSubject, EvaluatorCheck, JudgeVerdict, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
+import { AGENT_EVAL_STEP_ID, isRecord, type EvalCase, type EvaluationSubject, type EvaluatorCheck, type JudgeVerdict, type StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import type { EvalTrialEvaluator, GetEvalTrialOutput } from '@mediforce/platform-api/contract';
 import { routes } from '@/lib/routes';
 import { formatCostUsd, formatDuration } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { secondaryButtonClass } from '@/components/ui/button-styles';
 import { useEvalRun, useEvalTrial } from '@/hooks/use-step-evaluation';
+import { useProcessInstance } from '@/hooks/use-process-instances';
+import { StepOutputViewer } from '@/components/agents/step-output-viewer';
 import type { EvaluationGates } from '@/hooks/use-evaluation-gates';
 import { evalRunHref, subjectOfRow } from '@/lib/evaluation-subject';
 import { OutcomeChip, TrialResultBadge, TrialStatusBadge } from './eval-run-badges';
@@ -241,6 +243,7 @@ export function EvalTrialDetail({ handle, evalRunId, trialId, gates }: {
 }) {
   const trial = useEvalTrial(evalRunId, trialId);
   const run = useEvalRun(evalRunId);
+  const { data: trialRun } = useProcessInstance(trial.data?.trial.processInstanceId ?? null);
   const { mayEdit, editReason } = gates;
   const [logOpen, setLogOpen] = React.useState(false);
 
@@ -310,7 +313,18 @@ export function EvalTrialDetail({ handle, evalRunId, trialId, gates }: {
             )}
           </Panel>
           <Panel title="Output">
-            <pre className={preClass} data-testid="trial-output">{json(output.result)}</pre>
+            {isRecord(output.result) ? (
+              <div className="rounded-md border" data-testid="trial-output">
+                <StepOutputViewer
+                  result={output.result}
+                  runId={instanceId}
+                  stepId={step.kind === 'step' ? step.stepId : AGENT_EVAL_STEP_ID}
+                  runStatus={trialRun?.status}
+                />
+              </div>
+            ) : (
+              <pre className={preClass} data-testid="trial-output">{json(output.result)}</pre>
+            )}
           </Panel>
         </div>
       </Section>

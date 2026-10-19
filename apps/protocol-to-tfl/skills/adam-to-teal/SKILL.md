@@ -267,7 +267,7 @@ The script should be runnable with `shiny::runApp("app.R")` or `Rscript -e 'shin
 If the app is complex (many modules), split into:
 
 ```
-{output_dir}/
+/output/
 ├── app.R                    # Main app entry point
 ├── R/
 │   ├── data_loading.R       # Data reading helpers
@@ -298,7 +298,7 @@ After completion, present:
 - List of teal modules included (with labels)
 - Which ADaM datasets are loaded
 - Default filter configuration
-- How to launch the app (`shiny::runApp("{output_dir}")`)
+- How to launch the app (`shiny::runApp("/output")`)
 - How to customize (add/remove modules, change defaults)
 
 ## Module selection logic

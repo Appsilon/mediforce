@@ -4,15 +4,15 @@ import { type AgentLogFormat, type PluginCapabilityMetadata, DEFAULT_MODEL, norm
 export { normaliseModelId };
 import {
   BaseContainerAgentPlugin,
+  CONTAINER_ENGINE_MOUNT,
   DEFAULT_STDIO_MCP_TIMEOUT_MS,
+  mockAgentDockerArgs,
   type McpConfigEntry,
   type McpServerStatus,
   type SpawnCliOptions,
   type AgentCommandSpec,
 } from './base-container-agent-plugin';
 import { isWorkflowAgentContext } from './container-plugin';
-
-const OPENCODE_ERROR_PREFIX = '[OpenCode error] ';
 
 /** An `mcp` entry in opencode.json (https://opencode.ai/docs/mcp-servers/). */
 type OpenCodeMcpEntry =
@@ -112,8 +112,10 @@ export function failedMcpServersInLog(openCodeLog: string): string[] {
  * OpenCode supports multiple LLM providers including local models via Ollama,
  * making it suitable for cost-effective UAT runs and privacy-sensitive workloads.
  *
- * CLI invocation: `opencode run "$(cat /output/prompt.txt)" --format json`
- * JSON output:    JSONL stream with type "text" events containing the response.
+ * CLI invocation: `opencode run "$(cat /engine/prompt.txt)" --format json`
+ * JSON output:    JSONL stream; the plugin reads `step_finish` token counts
+ *                 and `error` events from it. The step's result is
+ *                 `/output/result.json` (ADR-0030).
  */
 export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
   readonly agentName = 'OpenCode';
@@ -138,9 +140,9 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
   protected override getInternalEnvVars(): Record<string, string> {
     return {
       // OpenCode reads config from OPENCODE_CONFIG env var.
-      OPENCODE_CONFIG: '/output/opencode.json',
+      OPENCODE_CONFIG: `${CONTAINER_ENGINE_MOUNT}/opencode.json`,
       // XDG override so OpenCode writes auth.json where we mount it
-      XDG_DATA_HOME: '/output/.local/share',
+      XDG_DATA_HOME: `${CONTAINER_ENGINE_MOUNT}/.local/share`,
     };
   }
 
@@ -152,9 +154,9 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     return ' OpenCode waits at most 60s for a server to start, so a slower one has to be installed in the image.';
   }
 
-  protected override async mcpServerStatus(_rawStdout: string, outputDir: string): Promise<McpServerStatus> {
-    // XDG_DATA_HOME points into the output dir (getInternalEnvVars), so the log lands there.
-    const logDir = join(outputDir, '.local', 'share', 'opencode', 'log');
+  protected override async mcpServerStatus(_rawStdout: string, engineDir: string): Promise<McpServerStatus> {
+    // XDG_DATA_HOME points into the engine dir (getInternalEnvVars), so the log lands there.
+    const logDir = join(engineDir, '.local', 'share', 'opencode', 'log');
     let logFiles: string[];
     try {
       logFiles = (await readdir(logDir)).filter((name) => name.endsWith('.log'));
@@ -168,12 +170,9 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
   protected override extractErrorFromResult(resultLine: string): string | null {
     if (!resultLine) return null;
     try {
-      const { result, errors } = JSON.parse(resultLine) as { result?: unknown; errors?: unknown };
+      const { errors } = JSON.parse(resultLine) as { errors?: unknown };
       if (Array.isArray(errors) && errors.length > 0) {
         return errors.join('\n').slice(0, 500);
-      }
-      if (typeof result === 'string' && result.startsWith(OPENCODE_ERROR_PREFIX)) {
-        return result.replaceAll(OPENCODE_ERROR_PREFIX, '').slice(0, 500);
       }
     } catch {
       // not valid JSON
@@ -181,11 +180,11 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     return null;
   }
 
-  protected override getLocalInternalEnvVars(outputDir: string): Record<string, string> {
-    const absOutputDir = resolve(outputDir);
+  protected override getLocalInternalEnvVars(engineDir: string): Record<string, string> {
+    const absEngineDir = resolve(engineDir);
     return {
-      OPENCODE_CONFIG: join(absOutputDir, 'opencode.json'),
-      XDG_DATA_HOME: join(absOutputDir, '.local', 'share'),
+      OPENCODE_CONFIG: join(absEngineDir, 'opencode.json'),
+      XDG_DATA_HOME: join(absEngineDir, '.local', 'share'),
     };
   }
 
@@ -233,48 +232,17 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
   }
 
   getMockDockerArgs(stepId: string): string[] {
-    const copyOutputCmd =
-      `cp -r /mock-data/* /output/ 2>/dev/null; ` +
-      `if [ -f "/mock-fixtures/${stepId}.json" ]; then ` +
-        `cp /mock-fixtures/${stepId}.json /output/mock-result.json && ` +
-        `echo "[mock-opencode] step=${stepId}: copied data + fixture" >&2; ` +
-      `else ` +
-        `echo '{"mock":true,"summary":"Mock OpenCode output for step ${stepId}"}' > /output/mock-result.json && ` +
-        `echo "[mock-opencode] step=${stepId}: no fixture, generic mock" >&2; ` +
-      `fi`;
-
-    const copyWorkspaceCmd =
-      `WSDIR=$(grep -o '"_workspaceDir"[[:space:]]*:[[:space:]]*"[^"]*"' /mock-fixtures/${stepId}.json 2>/dev/null | sed 's/.*"\\([^"]*\\)"$/\\1/'); ` +
-      `if [ -n "$WSDIR" ] && [ -d "/mock-data/$WSDIR" ]; then ` +
-        `cp -r /mock-data/$WSDIR/* /workspace/ && ` +
-        `echo "[mock-opencode] step=${stepId}: copied $WSDIR/ into /workspace/" >&2; ` +
-      `fi`;
-
-    const mockAgentResponse = JSON.stringify({
-      output_file: '/output/mock-result.json',
-      summary: `Mock OpenCode output for step ${stepId}`,
-    });
-    const mockOpenCodeJson = JSON.stringify({ type: 'text', part: { type: 'text', text: mockAgentResponse } });
-
-    return [
-      'bash', '-c',
-      `${copyOutputCmd} && ${copyWorkspaceCmd}; ` +
-      `echo '${mockOpenCodeJson.replace(/'/g, "'\\''")}'`,
-    ];
+    return mockAgentDockerArgs(stepId, 'mock-opencode', JSON.stringify({ type: 'text', part: { type: 'text', text: `Mock OpenCode output for step ${stepId}` } }));
   }
 
   protected override readonly logFormat: AgentLogFormat = 'opencode-jsonl';
   protected override readonly loadsAgentSkills = true;
 
   parseAgentOutput(rawStdout: string): string {
-    // OpenCode with --format json outputs JSONL events.
-    // Text events: { "type": "text", "part": { "text": "..." } }
-    //
-    // The model emits many text events (narration at each step) but only the
-    // LAST one contains the contract JSON ({"output_file":...,"summary":...}).
-    // We scan text parts in reverse to find it.
+    // OpenCode with --format json outputs JSONL events. Only token counts
+    // (`step_finish`) and errors (`error`) matter here: the model's text is
+    // never the step's result.
     const lines = rawStdout.trim().split('\n');
-    const textParts: string[] = [];
     const errors: string[] = [];
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
@@ -292,16 +260,10 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
           type?: string;
           part?: {
             type?: string;
-            text?: string;
-            cost?: number;
             tokens?: { input?: number; output?: number; cache?: { read?: number; write?: number } };
           };
           error?: { name?: string; data?: { message?: string } };
         };
-
-        if (event.type === 'text' && typeof event.part?.text === 'string') {
-          textParts.push(event.part.text);
-        }
 
         if (event.type === 'step_finish' && event.part?.tokens) {
           const turnTokens = event.part.tokens;
@@ -323,45 +285,28 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       }
     }
 
-    if (textParts.length === 0 && errors.length === 0) {
+    const hasUsage = totalInputTokens > 0 || totalOutputTokens > 0;
+    if (hasUsage === false && errors.length === 0) {
       return '';
     }
 
-    // Errors travel beside the result so a mid-run failure survives later text events.
-    const errorsField = errors.length > 0 ? { errors } : {};
-    const usage = (totalInputTokens > 0 || totalOutputTokens > 0)
-      ? {
-          input_tokens: totalInputTokens,
-          output_tokens: totalOutputTokens,
-          ...(peakInputTokens > 0 ? { peak_input_tokens: peakInputTokens } : {}),
+    return JSON.stringify({
+      ...(errors.length > 0 ? { errors } : {}),
+      ...(hasUsage
+        ? {
+          usage: {
+            input_tokens: totalInputTokens,
+            output_tokens: totalOutputTokens,
+            ...(peakInputTokens > 0 ? { peak_input_tokens: peakInputTokens } : {}),
+          },
         }
-      : undefined;
-
-    // Find the contract JSON in text parts (scan from last to first).
-    // The contract is: {"output_file": "...", "summary": "..."}
-    // The model may wrap it in narration text, so extract just the JSON object.
-    for (let index = textParts.length - 1; index >= 0; index--) {
-      const part = textParts[index].trim();
-      if (part.includes('"output_file"') || part.includes('"summary"')) {
-        // Extract the JSON object from the text (model may add preamble/postamble)
-        const jsonMatch = part.match(/\{[^{}]*"output_file"[^{}]*\}/);
-        const contractJson = jsonMatch ? jsonMatch[0] : part;
-        return JSON.stringify({ result: contractJson, ...errorsField, ...(usage ? { usage } : {}) });
-      }
-    }
-
-    // Fallback: use the last text part (most likely the final response)
-    if (textParts.length > 0) {
-      return JSON.stringify({ result: textParts[textParts.length - 1], ...errorsField, ...(usage ? { usage } : {}) });
-    }
-
-    // Only errors
-    return JSON.stringify({ result: errors.map((e) => `${OPENCODE_ERROR_PREFIX}${e}`).join('\n'), ...errorsField, ...(usage ? { usage } : {}) });
+        : {}),
+    });
   }
 
-  protected override async writeAgentConfig(outputDir: string, agentOptions?: SpawnCliOptions): Promise<void> {
+  protected override async writeAgentConfig(engineDir: string, agentOptions?: SpawnCliOptions): Promise<void> {
     const model = normaliseModelId(this.agentConfig.model ?? DEFAULT_MODEL);
-    const mcpServers = await this.buildMcpServers(outputDir);
+    const mcpServers = await this.buildMcpServers(engineDir);
     const config: Record<string, unknown> = {
       $schema: 'https://opencode.ai/config.json',
       permission: toolPermissions(mcpServers),
@@ -387,7 +332,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
       config.provider = { deepseek: { models: { [model]: {} } } };
     }
 
-    const configPath = join(outputDir, 'opencode.json');
+    const configPath = join(engineDir, 'opencode.json');
     await writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
 
     // Write auth.json so OpenCode can authenticate with the provider.
@@ -401,7 +346,7 @@ export class OpenCodeAgentPlugin extends BaseContainerAgentPlugin {
     }
 
     if (Object.keys(auth).length > 0) {
-      const authDir = join(outputDir, '.local', 'share', 'opencode');
+      const authDir = join(engineDir, '.local', 'share', 'opencode');
       await mkdir(authDir, { recursive: true });
       const authPath = join(authDir, 'auth.json');
       await writeFile(authPath, JSON.stringify(auth), 'utf-8');

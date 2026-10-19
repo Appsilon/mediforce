@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest';
-import { resolve } from 'node:path';
-import { readFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { copyFile } from 'node:fs/promises';
 import { execSync } from 'node:child_process';
 import type { AgentContext, EmitFn, EmitPayload } from '../../interfaces/step-executor-plugin';
 import type { ProcessConfig } from '@mediforce/platform-core';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
+import type { SpawnCliOptions, SpawnDockerResult } from '../base-container-agent-plugin';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 
 const PROJECT_ROOT = resolve(import.meta.dirname, '../../../../..');
@@ -52,12 +53,13 @@ class StubClaudeCodeAgentPlugin extends ClaudeCodeAgentPlugin {
     super({ workspaceManager: createFakeWorkspaceManager() });
   }
 
+  /** The agent writes the reference output as its result.json. */
   protected override async spawnDockerContainer(
     _prompt: string,
-    _options?: { model?: string },
-  ): Promise<{ cliOutput: string; gitMetadata: null; presentation: null; outputDir: string; injectedEnvVars: string[] }> {
-    const cliOutput = await readFile(this.stubOutputPath, 'utf-8');
-    return { cliOutput, gitMetadata: null, presentation: null, outputDir: '/tmp/stub-output', injectedEnvVars: [] };
+    options?: SpawnCliOptions,
+  ): Promise<SpawnDockerResult> {
+    await copyFile(this.stubOutputPath, join(options!.stepOutputDir!, 'result.json'));
+    return { cliOutput: '', injectedEnvVars: [] };
   }
 }
 
@@ -174,8 +176,8 @@ describe('ClaudeCodeAgentPlugin E2E', () => {
   });
 
   describe('Docker output file resolution (MOCK_AGENT)', () => {
-    // Tests the full Docker pipeline: container writes output file to /output/ volume →
-    // plugin reads it back via host path mapping → extractResult resolves the actual JSON.
+    // Tests the full Docker pipeline: container writes /output/result.json into
+    // the step's output folder → plugin reads it back as the step's result.
     // Uses MOCK_AGENT=true so no Claude API call is needed.
 
     function dockerImageExists(): boolean {
@@ -249,8 +251,7 @@ describe('ClaudeCodeAgentPlugin E2E', () => {
         const payload = resultEvent!.payload as ResultPayload;
 
         // The mock copies a step-specific fixture from /mock-fixtures/extract-metadata.json
-        // into /output/mock-result.json inside the Docker container.
-        // extractResult should resolve it via the Docker output dir mapping.
+        // into /output/result.json inside the Docker container.
         expect(payload.result).toHaveProperty('study_identification');
         const studyId = (payload.result.study_identification as Record<string, unknown>).study_id;
         expect(studyId).toBe('CDISCPILOT01');

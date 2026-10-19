@@ -56,6 +56,13 @@ interface AttemptOutcome {
   reshape: OutputReshape | null;
 }
 
+/** A result that broke `outputSchema`, and what reshaping it gave — null when no time was left to try. */
+interface ReshapeTry {
+  violation: string;
+  originalResult: Record<string, unknown>;
+  repair: OutputRepair | null;
+}
+
 /** Who reshaped a result to match `outputSchema`, and what the agent had returned. */
 interface OutputReshape {
   by: string;
@@ -156,12 +163,33 @@ export class AgentRunner {
       const trajectory = this.agentTrajectoryRepository === undefined
         ? undefined
         : new TrajectoryRecorder(this.agentTrajectoryRepository, runId);
-      const runContext: WorkflowAgentContext = trajectory === undefined ? context : { ...context, trajectory };
       const outputSchema = context.step.agent?.outputSchema;
+      const budgetLeftMs = () => timeoutMs - (Date.now() - startedAt);
+      // A plugin that commits its result reshapes it first through conformResult;
+      // a result one emits without doing so is reshaped after the run.
+      let reshapeBeforeCommit = null as ReshapeTry | null;
+      const runContext: WorkflowAgentContext = {
+        ...context,
+        ...(trajectory === undefined ? {} : { trajectory }),
+        ...(outputSchema === undefined ? {} : {
+          conformResult: async (result: Record<string, unknown>) => {
+            const violation = validateOutputSchema(result, outputSchema);
+            if (violation === null) return result;
+            const repair = await this.reshapeResult(context, result, outputSchema, violation, budgetLeftMs());
+            reshapeBeforeCommit = { violation, originalResult: result, repair };
+            return repair?.ok === true ? repair.result : result;
+          },
+        }),
+      };
       let attempt: AttemptOutcome = await this.runAttempt(plugin, runContext, timeoutMs, outputSchema);
 
-      if (attempt.outputSchemaViolation !== null && attempt.envelope !== null && outputSchema !== undefined) {
-        attempt = await this.repairAttempt(runContext, attempt, attempt.envelope, outputSchema, attempt.outputSchemaViolation, timeoutMs - (Date.now() - startedAt));
+      if (reshapeBeforeCommit !== null && attempt.envelope !== null) {
+        attempt = this.applyReshape(attempt, attempt.envelope, reshapeBeforeCommit);
+      } else if (attempt.outputSchemaViolation !== null && attempt.envelope !== null && outputSchema !== undefined) {
+        const violation = attempt.outputSchemaViolation;
+        const originalResult = attempt.envelope.result ?? {};
+        const repair = await this.reshapeResult(context, originalResult, outputSchema, violation, budgetLeftMs());
+        attempt = this.applyReshape(attempt, attempt.envelope, { violation, originalResult, repair });
       }
       await trajectory?.flush();
 
@@ -231,28 +259,26 @@ export class AgentRunner {
   /**
    * Reshapes a result that broke `outputSchema` with one LLM call on the
    * step's model, inside what is left of the step timeout (ADR-0023 D13).
-   * The agent is not rerun. A reshaped result keeps the original in an
-   * annotation; one that still breaks the schema escalates naming both.
+   * The agent is not rerun. Null when no time was left to try.
    */
-  private async repairAttempt(
+  private async reshapeResult(
     context: WorkflowAgentContext,
-    attempt: AttemptOutcome,
-    envelope: AgentOutputEnvelope,
+    result: Record<string, unknown>,
     outputSchema: OutputSchemaShape,
     violation: string,
     budgetMs: number,
-  ): Promise<AttemptOutcome> {
+  ): Promise<OutputRepair | null> {
     const { processInstanceId, stepId } = context;
     const status = (payload: string) => this.eventLog.write(processInstanceId, stepId, {
       type: 'status',
       payload,
       timestamp: new Date().toISOString(),
     });
-    const rejected = attempt.errorMessage;
+    const rejected = outputSchemaRejection(violation);
 
     if (budgetMs <= 0) {
       await status(`${rejected} — no time left in the step timeout to reshape it`);
-      return attempt;
+      return null;
     }
     await status(`${rejected} — reshaping the result to match it`);
     const model = normaliseModelId(context.step.agent?.model ?? DEFAULT_MODEL);
@@ -261,19 +287,33 @@ export class AgentRunner {
       timer = setTimeout(() => resolve({ ok: false, reason: 'the step timeout ran out' }), budgetMs);
     });
     const repair = await Promise.race([
-      repairOutput(context.llm, model, envelope.result ?? {}, outputSchema, violation),
+      repairOutput(context.llm, model, result, outputSchema, violation),
       outOfTime,
     ]).finally(() => clearTimeout(timer));
 
+    await status(repair.ok
+      ? `result reshaped by ${repair.model} to match agent.outputSchema`
+      : `reshaping the result did not fix it: ${repair.reason}`);
+    return repair;
+  }
+
+  /**
+   * Folds a reshape into the attempt. A reshaped result keeps the original in
+   * an annotation; one that still breaks the schema escalates naming both.
+   */
+  private applyReshape(
+    attempt: AttemptOutcome,
+    envelope: AgentOutputEnvelope,
+    { violation, originalResult, repair }: ReshapeTry,
+  ): AttemptOutcome {
+    if (repair === null) return attempt;
     if (repair.ok === false) {
-      await status(`reshaping the result did not fix it: ${repair.reason}`);
-      return { ...attempt, errorMessage: `${rejected} (reshaping it did not fix it: ${repair.reason})` };
+      return { ...attempt, errorMessage: `${attempt.errorMessage} (reshaping it did not fix it: ${repair.reason})` };
     }
-    await status(`result reshaped by ${repair.model} to match agent.outputSchema`);
     const annotation = {
       id: randomUUID(),
       content: `Result reshaped by ${repair.model} to match agent.outputSchema (${violation}). `
-        + `The agent's original result: ${JSON.stringify(envelope.result)}`,
+        + `The agent's original result: ${JSON.stringify(originalResult)}`,
       timestamp: new Date().toISOString(),
     };
     return {
@@ -281,7 +321,7 @@ export class AgentRunner {
       fallbackReason: null,
       errorMessage: null,
       outputSchemaViolation: null,
-      reshape: { by: repair.model, originalResult: envelope.result },
+      reshape: { by: repair.model, originalResult },
     };
   }
 
@@ -312,7 +352,7 @@ export class AgentRunner {
       return {
         envelope,
         fallbackReason: 'output_schema',
-        errorMessage: `result does not match agent.outputSchema: ${violation}`,
+        errorMessage: outputSchemaRejection(violation),
         outputSchemaViolation: violation,
         reshape: null,
       };
@@ -688,4 +728,8 @@ export class AgentRunner {
     };
     return descriptions[level] ?? 'Unknown autonomy level';
   }
+}
+
+function outputSchemaRejection(violation: string): string {
+  return `result does not match agent.outputSchema: ${violation}`;
 }

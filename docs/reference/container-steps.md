@@ -38,23 +38,29 @@ path and branch conventions live in `workspace-paths.ts` so the read-only
 
 | Path | Mode | Lifetime | Carries |
 |---|---|---|---|
-| `/workspace` | rw | the run | The git worktree. Deliverables go here; it is the working directory. |
-| `/output` | rw | the step | Engine ↔ step channel. Host seeds `input.json`, `prompt.txt`, `previous_run.json`, the agent CLI's config (`mcp-config.json` for Claude Code, `opencode.json` for OpenCode), `script.<ext>`; the step writes `result.json` and optional `presentation.md`. |
+| `/workspace` | rw | the run | The git worktree; it is the working directory. Edits here are repository changes. |
+| `/output` | rw | the step | The step's output folder, `<worktree>/.mediforce/output/<stepId>/` ([ADR-0030](../adr/0030-agent-step-output-contract.md)). The step writes `result.json` (required for an agent step) and its Output Files, optional `presentation.md` among them. Host seeds `input.json` and `previous_run.json` here and removes both before the commit. |
+| `/engine` | rw (agent), ro (script) | the step | The engine's own files, never committed: `prompt.txt`, the agent CLI's config (`mcp-config.json` for Claude Code, `opencode.json` and `auth.json` for OpenCode), an eval trial's MCP tapes, spilled previous-step values, `script.<ext>`. A host tempdir, deleted when the step ends; it is what the queued strategy ships to the worker. |
 | `/data` | ro | the step | Uploaded attachments the host downloaded for this step (agent and script steps). Each `files[].localPath` in the agent's prompt and `input.json` points here. |
 | `/artifacts` | ro | the definition | The files the workflow carries (`artifacts` on the definition): scripts, a Dockerfile, skills. Materialized to a content-addressed host directory per file set, so every step of every run of an unchanged workflow shares one write. Absent when the workflow carries none. |
 | `/plugin` | ro | the step | The plugin root (`skills/<id>/SKILL.md`), when an agent step is offered catalog Skills (its agent's or its own `agent.skills`; `claude-code-agent` via `--plugin-dir`, `opencode-agent` via `skills.paths` in `opencode.json`; [ADR-0025](../adr/0025-skill-catalog.md), [ADR-0028](../adr/0028-retire-file-skills.md)): a content-hashed folder under `mediforce-agent-skills/` holding them under `skills/<id>/`. |
 
-Why `/workspace` and `/output` stay separate — and why `/output` is a bad name
-for a channel that carries inputs — is argued in the header comment of
+The mounts are described in the header comment of
 [`container-plugin.ts`](../../packages/agent-runtime/src/plugins/container-plugin.ts).
-Deliverables written to `/output` are copied into `.mediforce/output/<stepId>/`
-in the worktree before the commit, so the commit captures them.
+`/output` is a bind mount of the step's own folder in the worktree: nothing is
+copied and nothing is deleted after the step. It is emptied when the step
+starts, so a step that runs again (a loop, a retry) never inherits its earlier
+files — those stay in git history. Before the commit, top-level dotfiles (tool
+state such as `.Rhistory`) and every Output File over
+`MEDIFORCE_OUTPUT_FILE_MAX_BYTES` are removed from it, the oversized ones
+logged. `result.json` is never removed by the cap.
 Previous-step and previous-run values too large to inline in an agent's prompt
-are written to `/output/.previous-outputs/`; that directory is dotted, so they
-never become the step's Output Files. An agent's prompt also lists, per earlier
-step, every file that step left in the worktree (`## Files From Previous
-Steps`), read back from the `Step-Id` trailers on the run branch
-(`WorkspaceManager.listStepFiles`).
+are written to `/engine/previous-outputs/`. An agent's prompt has one entry per
+earlier step (`## Previous Steps`): its result plus the paths of its Output
+Files, read from the run branch's tree (`WorkspaceManager.listOutputFiles`).
+Repository changes earlier steps made are listed apart (`## Repository Changes
+From Previous Steps`), read back from the `Step-Id` trailers on the run branch
+(`WorkspaceManager.listStepFiles`), with `.mediforce/output/` left out.
 
 A dry run builds the image and mocks the step. Execution is swapped for
 `MockAgentPlugin` — no agent runs, no container starts, nothing external is
@@ -172,22 +178,29 @@ builds its own image is not checked — there is nothing to probe until it is
 built); and the run
 records a `status` event naming each server the CLI reported `failed` — Claude
 Code in its `system/init` event, OpenCode in its log under
-`/output/.local/share/opencode/log/`, the only place it reports MCP status.
+`/engine/.local/share/opencode/log/`, the only place it reports MCP status.
 
 ## Result and Agent Trajectory
 
-An agent step's `result.json` becomes the envelope's `result`. When the step
+An agent step's `/output/result.json` becomes the envelope's `result`
+([ADR-0030](../adr/0030-agent-step-output-contract.md)). It must hold one JSON
+object; a missing file, invalid JSON or a non-object fails the step (`agent
+wrote no result.json`, `result.json is not a JSON object`). Its reserved keys
+`confidence` (0.7 when absent) and `confidence_rationale` move onto the
+envelope and out of `result`. The agent's final message is ignored, and token
+usage comes from the CLI's own stream only. When the step
 sets `agent.outputSchema` — or inherits its Agent's `outputSchema` by setting
 none — the schema is added to the prompt and `AgentRunner`
-checks `result` against it after the run: a violation records a `status` event
-and runs the plugin once more with the error in the prompt; a second violation
-escalates the run to a person with `fallbackReason: output_schema`
+checks `result` against it: a violation records a `status` event and is
+reshaped by one LLM call on the step's model — the agent is not rerun — and a
+result the reshape cannot fix escalates the run to a person with
+`fallbackReason: output_schema`
 ([`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts),
-ADR-0023 D13). Both attempts share the one step timeout — the retry gets what the
-first attempt left, and with nothing left the violation escalates straight
-away — so the run route's reap guard never reads a live retry as
-stranded. The retry refreshes the run's `updatedAt` for the heartbeat's
-stranded sweep. `agent.outputSchema` is valid on `executor: agent` steps only;
+ADR-0023 D13). The container plugin reshapes through `context.conformResult`
+before the step commit and writes the reshaped result back to `result.json`, so
+the run branch holds the result later steps get. The reshape gets what is left
+of the one step timeout; with nothing left the violation escalates straight
+away. `agent.outputSchema` is valid on `executor: agent` steps only;
 definition validation rejects it anywhere else.
 
 A result that passes `outputSchema` is then checked by the step's production
@@ -233,7 +246,7 @@ filenames.
 **Run branches are never pushed.** They are local to the host, which is why
 `GitMetadata.repoUrl` is the bare repo path rather than a remote URL — a GitHub
 URL there would render `/commit/<sha>` links that 404. The step page shows the
-metadata as plain text (`GitSection`); the review panel has no git view.
+metadata as plain text (`GitSection`); the review panel lists the changed files without links.
 
 ## Config
 

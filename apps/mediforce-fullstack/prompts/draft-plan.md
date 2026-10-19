@@ -9,7 +9,7 @@ Most questions that look like they need a human do not. They need someone to rea
 `AGENTS.md`, `CONTEXT.md`, `docs/`, the existing tests, and `git log`. That is
 what this step is for.
 
-### Inputs (under `## Previous Step Outputs`)
+### Inputs (under `## Previous Steps`)
 - `select` — the chosen issue: `issueNumber`, `title`, `body`, `url`, `author`.
 - `select.blockers` — triage's open questions, each `{ question, kind }`. This is
   your worklist. It may be empty or absent (an issue triaged before blockers were
@@ -105,4 +105,3 @@ the human gate**, so the eager path only happens when you say `false` explicitly
 `confidence` (0–1) is how often a plan researched like this would be right; it is
 recorded for observability and does **not** route the run.
 
-Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "planned #<n> (needsHuman: <bool>)"}`.

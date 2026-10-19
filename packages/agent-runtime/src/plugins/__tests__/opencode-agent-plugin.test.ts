@@ -17,11 +17,20 @@ afterAll(() => {
   }
 });
 
-type DockerResult = { cliOutput: string; gitMetadata: { commitSha: string; branch: string; changedFiles: string[]; repoUrl: string } | null; presentation: null; outputDir: string; injectedEnvVars: string[] };
+type DockerResult = { cliOutput: string; injectedEnvVars: string[] };
 type SpawnDockerTarget = { spawnDockerContainer: (prompt: string, options?: Record<string, unknown>) => Promise<DockerResult> };
 
 function mockSpawn(plugin: OpenCodeAgentPlugin) {
   return vi.spyOn(plugin as unknown as SpawnDockerTarget, 'spawnDockerContainer');
+}
+
+/** A spawn that leaves `result` in the step's output folder as result.json —
+ *  what the agent does (ADR-0030) — and returns what the CLI printed. */
+function finishesWith(result: unknown, spawnResult: Partial<DockerResult> = {}) {
+  return async (_prompt: string, options?: Record<string, unknown>): Promise<DockerResult> => {
+    await writeFile(join(options!.stepOutputDir as string, 'result.json'), JSON.stringify(result));
+    return { cliOutput: '', injectedEnvVars: [], ...spawnResult };
+  };
 }
 
 function buildMockContext(overrides: Partial<AgentContext> = {}): AgentContext {
@@ -162,11 +171,11 @@ describe('OpenCodeAgentPlugin', () => {
       const context = buildMockContext();
       await plugin.initialize(context);
 
-      const spec = plugin.getAgentCommand('/output/prompt.txt');
+      const spec = plugin.getAgentCommand('/engine/prompt.txt');
       expect(spec.args[0]).toBe('bash');
       expect(spec.args[1]).toBe('-c');
       expect(spec.args[2]).toContain('opencode run');
-      expect(spec.args[2]).toContain('$(cat /output/prompt.txt)');
+      expect(spec.args[2]).toContain('$(cat /engine/prompt.txt)');
       expect(spec.args[2]).toContain('--format json');
       expect(spec.promptDelivery).toBe('file');
     });
@@ -179,34 +188,32 @@ describe('OpenCodeAgentPlugin', () => {
 
       // getInternalEnvVars is protected; access via type assertion
       const vars = (plugin as unknown as { getInternalEnvVars(): Record<string, string> }).getInternalEnvVars();
-      expect(vars.OPENCODE_CONFIG).toBe('/output/opencode.json');
-      expect(vars.XDG_DATA_HOME).toBe('/output/.local/share');
+      expect(vars.OPENCODE_CONFIG).toBe('/engine/opencode.json');
+      expect(vars.XDG_DATA_HOME).toBe('/engine/.local/share');
     });
   });
 
   describe('parseAgentOutput', () => {
-    it('[DATA] transforms OpenCode JSON response to extractResult format', () => {
-      const agentResponse = JSON.stringify({ output_file: '/output/result.json', summary: 'Done' });
-      const stdout = openCodeJsonOutput(agentResponse);
+    it('[DATA] keeps none of the model\'s text — its final message is not the step result', () => {
+      const stdout = [
+        JSON.stringify({ type: 'step_finish', part: { tokens: { input: 1000, output: 500 } } }),
+        openCodeJsonOutput(JSON.stringify({ confidence: 0.9, summary: 'OK' })),
+      ].join('\n');
 
-      const result = plugin.parseAgentOutput(stdout);
-      const parsed = JSON.parse(result);
+      const parsed = JSON.parse(plugin.parseAgentOutput(stdout));
 
-      expect(parsed.result).toBe(agentResponse);
+      expect(parsed).toEqual({ usage: { input_tokens: 1000, output_tokens: 500, peak_input_tokens: 1000 } });
     });
 
     it('[DATA] handles multi-line stdout with Docker/entrypoint noise', () => {
-      const agentResponse = JSON.stringify({ confidence: 0.9, summary: 'OK' });
       const stdout = [
         'Cloning repository...',
         'Switched to branch run/pi-001',
         '[entrypoint] Running command...',
-        openCodeJsonOutput(agentResponse),
+        JSON.stringify({ type: 'step_finish', part: { tokens: { input: 10, output: 5 } } }),
       ].join('\n');
 
-      const result = plugin.parseAgentOutput(stdout);
-      const parsed = JSON.parse(result);
-      expect(parsed.result).toBe(agentResponse);
+      expect(JSON.parse(plugin.parseAgentOutput(stdout)).usage).toMatchObject({ input_tokens: 10, output_tokens: 5 });
     });
 
     it('[DATA] returns empty string when no JSON found in stdout', () => {
@@ -220,11 +227,9 @@ describe('OpenCodeAgentPlugin', () => {
     });
 
     it('[DATA] accumulates token usage from step_finish events', () => {
-      const agentResponse = JSON.stringify({ output_file: '/output/result.json', summary: 'Done' });
       const stdout = [
         JSON.stringify({ type: 'step_finish', part: { tokens: { input: 1000, output: 500 }, cost: 0.01 } }),
         JSON.stringify({ type: 'step_finish', part: { tokens: { input: 2000, output: 800 }, cost: 0.02 } }),
-        openCodeJsonOutput(agentResponse),
       ].join('\n');
 
       const result = plugin.parseAgentOutput(stdout);
@@ -233,12 +238,10 @@ describe('OpenCodeAgentPlugin', () => {
     });
 
     it('[DATA] reports peak_input_tokens as the max single-turn prompt, not the sum', () => {
-      const agentResponse = JSON.stringify({ output_file: '/output/result.json', summary: 'Done' });
       const stdout = [
         JSON.stringify({ type: 'step_finish', part: { tokens: { input: 5000, output: 100 }, cost: 0.01 } }),
         JSON.stringify({ type: 'step_finish', part: { tokens: { input: 42000, output: 300 }, cost: 0.02 } }),
         JSON.stringify({ type: 'step_finish', part: { tokens: { input: 18000, output: 200 }, cost: 0.02 } }),
-        openCodeJsonOutput(agentResponse),
       ].join('\n');
 
       const result = plugin.parseAgentOutput(stdout);
@@ -250,11 +253,9 @@ describe('OpenCodeAgentPlugin', () => {
     it('[DATA] peak_input_tokens counts cached prompt tokens, not just uncached input', () => {
       // With prompt caching on, `input` is only the uncached delta; the real
       // context occupancy is input + cache.read + cache.write.
-      const agentResponse = JSON.stringify({ output_file: '/output/result.json', summary: 'Done' });
       const stdout = [
         JSON.stringify({ type: 'step_finish', part: { tokens: { input: 26, output: 100, cache: { read: 8158, write: 0 } }, cost: 0.01 } }),
         JSON.stringify({ type: 'step_finish', part: { tokens: { input: 40, output: 200, cache: { read: 60000, write: 1200 } }, cost: 0.02 } }),
-        openCodeJsonOutput(agentResponse),
       ].join('\n');
 
       const result = plugin.parseAgentOutput(stdout);
@@ -262,17 +263,12 @@ describe('OpenCodeAgentPlugin', () => {
       expect(parsed.usage.peak_input_tokens).toBe(61240); // 40 + 60000 + 1200
     });
 
-    it('[DATA] omits usage when no step_finish events have tokens', () => {
-      const agentResponse = JSON.stringify({ output_file: '/output/result.json', summary: 'Done' });
-      const stdout = openCodeJsonOutput(agentResponse);
-
-      const result = plugin.parseAgentOutput(stdout);
-      const parsed = JSON.parse(result);
-      expect(parsed.usage).toBeUndefined();
+    it('[DATA] returns empty string when no step_finish event has tokens and nothing failed', () => {
+      expect(plugin.parseAgentOutput(openCodeJsonOutput('Done.'))).toBe('');
     });
   });
 
-  describe('prepareOutputDir', () => {
+  describe('writeAgentConfig', () => {
     it('[DATA] writes OpenCode config with model when model is set', async () => {
       const context = buildMockContext({
         config: {
@@ -297,8 +293,7 @@ describe('OpenCodeAgentPlugin', () => {
 
       const tempDir = await mkdtemp(join(tmpdir(), 'test-opencode-'));
       try {
-        // Call prepareOutputDir directly (protected, but accessible for testing)
-        await (plugin as unknown as { prepareOutputDir: (dir: string) => Promise<void> }).prepareOutputDir(tempDir);
+        await (plugin as unknown as { writeAgentConfig: (dir: string) => Promise<void> }).writeAgentConfig(tempDir);
 
         const configPath = join(tempDir, 'opencode.json');
         const configContent = JSON.parse(await readFile(configPath, 'utf-8'));
@@ -314,7 +309,7 @@ describe('OpenCodeAgentPlugin', () => {
 
       const tempDir = await mkdtemp(join(tmpdir(), 'test-opencode-'));
       try {
-        await (plugin as unknown as { prepareOutputDir: (dir: string) => Promise<void> }).prepareOutputDir(tempDir);
+        await (plugin as unknown as { writeAgentConfig: (dir: string) => Promise<void> }).writeAgentConfig(tempDir);
 
         // Config file is always written now (for provider setup)
         const configPath = join(tempDir, 'opencode.json');
@@ -334,12 +329,9 @@ describe('OpenCodeAgentPlugin', () => {
       const { emit, events } = buildEmitSpy();
 
       const agentResponse = JSON.stringify({ confidence: 0.85, summary: 'Extracted' });
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: agentResponse }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output', injectedEnvVars: [],
-      });
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
+        cliOutput: JSON.stringify({ result: agentResponse }), injectedEnvVars: [],
+      }));
 
       await plugin.run(emit);
 
@@ -353,12 +345,9 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit } = buildEmitSpy();
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: 'ok' }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output', injectedEnvVars: [],
-      });
+      const spawnSpy = mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
+        cliOutput: JSON.stringify({ result: 'ok' }), injectedEnvVars: [],
+      }));
 
       await plugin.run(emit);
 
@@ -368,27 +357,22 @@ describe('OpenCodeAgentPlugin', () => {
       expect(prompt).toContain('/data/protocol.pdf');
     });
 
-    it('[DATA] prompt has workspace + result-contract split instructions (every run has a workspace now)', async () => {
+    it('[DATA] prompt has one Output section naming the workspace and /output/result.json', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);
 
       const { emit } = buildEmitSpy();
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: 'ok' }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output', injectedEnvVars: [],
-      });
+      const spawnSpy = mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
+        cliOutput: JSON.stringify({ result: 'ok' }), injectedEnvVars: [],
+      }));
 
       await plugin.run(emit);
 
       const [prompt] = spawnSpy.mock.calls[0];
-      expect(prompt).toContain('Workspace Directory (Git Worktree)');
-      expect(prompt).toContain('/workspace');
-      expect(prompt).toContain('Result Contract Directory');
-      expect(prompt).toContain('/output/result.json');
-      expect(prompt).toContain('/workspace/.mediforce/output/extract/');
-      expect(prompt).not.toContain('will not be committed');
+      expect(prompt).toContain('## Output');
+      expect(prompt).toContain('Your workspace is the git repository at /workspace');
+      expect(prompt).toContain('/output/result.json — required');
+      expect(prompt).not.toContain('Result Contract Directory');
     });
 
     it('[DATA] emits result with valid AgentOutputEnvelope', async () => {
@@ -396,12 +380,9 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: 'extracted data', confidence: 0.9 }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output', injectedEnvVars: [],
-      });
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
+        cliOutput: JSON.stringify({ result: 'extracted data', confidence: 0.9 }), injectedEnvVars: [],
+      }));
 
       await plugin.run(emit);
 
@@ -413,48 +394,6 @@ describe('OpenCodeAgentPlugin', () => {
       expect(payload.reasoning_summary).toContain('OpenCode');
       expect(payload.reasoning_chain).toBeInstanceOf(Array);
       expect(payload.duration_ms).toBeTypeOf('number');
-    });
-
-    it('[DATA] resolves output_file from Docker /output mount to host path', async () => {
-      const hostOutputDir = await mkdtemp(join(tmpdir(), 'test-docker-output-'));
-      const metadata = {
-        study_id: 'OPENCODE-STUDY-001',
-        phase: 'Phase II',
-        confidence: 0.88,
-      };
-      await writeFile(join(hostOutputDir, 'result.json'), JSON.stringify(metadata));
-
-      const agentResponse = JSON.stringify({
-        output_file: '/output/result.json',
-        summary: 'Extracted via OpenCode',
-      });
-      const cliOutput = JSON.stringify({
-        type: 'result',
-        subtype: 'success',
-        result: agentResponse,
-      });
-
-      const context = buildMockContext();
-      await plugin.initialize(context);
-
-      const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput,
-        gitMetadata: null,
-        presentation: null,
-        outputDir: hostOutputDir, injectedEnvVars: [],
-      });
-
-      await plugin.run(emit);
-
-      const resultEvent = events.find((e) => e.type === 'result');
-      const payload = resultEvent!.payload as Record<string, unknown>;
-      const result = payload.result as Record<string, unknown>;
-
-      expect(result.study_id).toBe('OPENCODE-STUDY-001');
-      expect(result.summary).toBe('Extracted via OpenCode');
-
-      await rm(hostOutputDir, { recursive: true, force: true });
     });
 
     it('[ERROR] re-throws errors and emits error event (not fake result)', async () => {
@@ -478,10 +417,10 @@ describe('OpenCodeAgentPlugin', () => {
 
   describe('Docker I/O: previous step outputs → container', () => {
     // Verifies that large previous step outputs are written as files to the
-    // host output directory (which gets mounted as /output in Docker), and
-    // that the prompt references them via container paths (/output/...).
+    // host engine directory (which gets mounted as /engine in Docker), and
+    // that the prompt references them via container paths (/engine/...).
 
-    it('[DATA] large previous step output is written to hostOutputDir, not container path', async () => {
+    it('[DATA] large previous step output is written to the host engine dir, not container path', async () => {
       const largeOutput = 'x'.repeat(6_000); // > 5KB threshold
       const context = buildMockContext({
         getPreviousStepOutputs: vi.fn().mockResolvedValue({
@@ -496,27 +435,21 @@ describe('OpenCodeAgentPlugin', () => {
 
         // Capture the prompt and verify the file was written to hostDir
         const spawnSpy = mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
-          // At spawn time, the large file should already exist in the output dir
-          const outputDir = (options as Record<string, unknown>).outputDir as string;
-          const fileContent = await readFile(join(outputDir, '.previous-outputs', 'prev-generate-tlg-shells-raw.md'), 'utf-8');
+          // At spawn time, the large file should already exist in the engine dir
+          const engineDir = (options as Record<string, unknown>).engineDir as string;
+          const fileContent = await readFile(join(engineDir, 'previous-outputs', 'prev-generate-tlg-shells-raw.md'), 'utf-8');
           expect(fileContent).toBe(largeOutput);
 
-          return {
-            cliOutput: JSON.stringify({ result: '"done"' }),
-            gitMetadata: null,
-            presentation: null,
-            outputDir,
-            injectedEnvVars: [],
-          };
+          return finishesWith({ ok: true })(_prompt, options);
         });
 
         await plugin.run(emit);
 
-        // Prompt should reference /output/ container path, not the host path
+        // Prompt should reference the /engine/ container path, not the host path
         const promptEvent = events.find((e) => e.type === 'prompt');
         expect(promptEvent).toBeDefined();
         const promptText = promptEvent!.payload as string;
-        expect(promptText).toContain('[FILE: /output/.previous-outputs/prev-generate-tlg-shells-raw.md]');
+        expect(promptText).toContain('[FILE: /engine/previous-outputs/prev-generate-tlg-shells-raw.md]');
         expect(promptText).not.toContain(hostDir); // Must NOT leak host path
 
         expect(spawnSpy).toHaveBeenCalledOnce();
@@ -535,12 +468,9 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: '"done"' }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock', injectedEnvVars: [],
-      });
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
+        cliOutput: JSON.stringify({ result: '"done"' }), injectedEnvVars: [],
+      }));
 
       await plugin.run(emit);
 
@@ -564,28 +494,22 @@ describe('OpenCodeAgentPlugin', () => {
       const { emit, events } = buildEmitSpy();
 
       mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
-        const outputDir = (options as Record<string, unknown>).outputDir as string;
+        const engineDir = (options as Record<string, unknown>).engineDir as string;
         // Both files should exist
-        const fileA = await readFile(join(outputDir, '.previous-outputs', 'prev-step-a-raw.md'), 'utf-8');
+        const fileA = await readFile(join(engineDir, 'previous-outputs', 'prev-step-a-raw.md'), 'utf-8');
         expect(fileA).toBe(largeA);
-        const fileB = await readFile(join(outputDir, '.previous-outputs', 'prev-step-b-payload.json'), 'utf-8');
+        const fileB = await readFile(join(engineDir, 'previous-outputs', 'prev-step-b-payload.json'), 'utf-8');
         expect(JSON.parse(fileB)).toEqual(JSON.parse(largeB));
 
-        return {
-          cliOutput: JSON.stringify({ result: '"done"' }),
-          gitMetadata: null,
-          presentation: null,
-          outputDir,
-          injectedEnvVars: [],
-        };
+        return finishesWith({ ok: true })(_prompt, options);
       });
 
       await plugin.run(emit);
 
       const promptEvent = events.find((e) => e.type === 'prompt');
       const promptText = promptEvent!.payload as string;
-      expect(promptText).toContain('[FILE: /output/.previous-outputs/prev-step-a-raw.md]');
-      expect(promptText).toContain('[FILE: /output/.previous-outputs/prev-step-b-payload.json]');
+      expect(promptText).toContain('[FILE: /engine/previous-outputs/prev-step-a-raw.md]');
+      expect(promptText).toContain('[FILE: /engine/previous-outputs/prev-step-b-payload.json]');
     });
 
     it('[DATA] previous step outputs appear once, not again under `steps` in Input Data', async () => {
@@ -597,12 +521,9 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: '"done"' }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock', injectedEnvVars: [],
-      });
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
+        cliOutput: JSON.stringify({ result: '"done"' }), injectedEnvVars: [],
+      }));
 
       await plugin.run(emit);
 
@@ -618,12 +539,9 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: '"done"' }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock', injectedEnvVars: [],
-      });
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
+        cliOutput: JSON.stringify({ result: '"done"' }), injectedEnvVars: [],
+      }));
 
       await plugin.run(emit);
 
@@ -639,25 +557,25 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(buildMockContext());
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: '"done"' }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock', injectedEnvVars: [],
-      });
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
+        cliOutput: JSON.stringify({ result: '"done"' }), injectedEnvVars: [],
+      }));
 
       await plugin.run(emit);
 
       const promptText = events.find((e) => e.type === 'prompt')!.payload as string;
-      expect(promptText).not.toContain('Files From Previous Steps');
+      expect(promptText).not.toContain('Repository Changes From Previous Steps');
       expect(events.some((e) => e.type === 'result')).toBe(true);
     });
 
     it('[DATA] lists the files earlier steps committed, at the paths the agent sees them', async () => {
       plugin = new OpenCodeAgentPlugin({
         workspaceManager: createFakeWorkspaceManager({
+          outputFiles: [
+            { stepId: 'generate-samples', name: 'samples.csv', path: '.mediforce/output/generate-samples/samples.csv', size: 10 },
+          ],
           stepFiles: [
-            { stepId: 'generate-samples', files: ['.mediforce/output/generate-samples/samples.csv', 'code/generate.py'] },
+            { stepId: 'generate-samples', files: ['code/generate.py'] },
             { stepId: 'review', files: ['notes.md'] },
           ],
         }),
@@ -665,17 +583,15 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(buildMockContext());
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: '"done"' }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock', injectedEnvVars: [],
-      });
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
+        cliOutput: JSON.stringify({ result: '"done"' }), injectedEnvVars: [],
+      }));
 
       await plugin.run(emit);
 
       const promptText = events.find((e) => e.type === 'prompt')!.payload as string;
-      expect(promptText).toContain('## Files From Previous Steps');
+      expect(promptText).toContain('## Previous Steps');
+      expect(promptText).toContain('## Repository Changes From Previous Steps');
       expect(promptText).toContain('- /workspace/.mediforce/output/generate-samples/samples.csv');
       expect(promptText).toContain('- /workspace/code/generate.py');
       expect(promptText).toContain('- /workspace/notes.md');
@@ -685,147 +601,60 @@ describe('OpenCodeAgentPlugin', () => {
       await plugin.initialize(buildMockContext());
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: '"done"' }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock', injectedEnvVars: [],
-      });
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
+        cliOutput: JSON.stringify({ result: '"done"' }), injectedEnvVars: [],
+      }));
 
       await plugin.run(emit);
 
       const promptText = events.find((e) => e.type === 'prompt')!.payload as string;
-      expect(promptText).not.toContain('Files From Previous Steps');
+      expect(promptText).not.toContain('Repository Changes From Previous Steps');
     });
   });
 
   describe('Docker I/O: container outputs → system', () => {
-    // Verifies that files written by the agent inside the container (to /output/)
-    // are correctly resolved and collected by the system via host path mapping.
-
-    it('[DATA] output_file contract resolves /output/ path to host path', async () => {
-      const hostOutputDir = await mkdtemp(join(tmpdir(), 'test-docker-output-'));
+    it('[DATA] the result is /output/result.json, whatever the model said last', async () => {
       const resultData = { tables: [{ id: 'T-1', title: 'Demographics' }], count: 1 };
-      await writeFile(join(hostOutputDir, 'result.json'), JSON.stringify(resultData));
-
-      const agentResponse = JSON.stringify({
-        output_file: '/output/result.json',
-        summary: 'Generated 1 table',
-      });
-
-      const context = buildMockContext();
-      await plugin.initialize(context);
+      await plugin.initialize(buildMockContext());
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: agentResponse }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: hostOutputDir, injectedEnvVars: [],
-      });
+      mockSpawn(plugin).mockImplementation(finishesWith(resultData, {
+        cliOutput: JSON.stringify({ result: JSON.stringify({ output_file: '/output/tlg-shells.md', summary: 'Generated 1 table' }) }),
+      }));
 
       await plugin.run(emit);
 
-      const resultEvent = events.find((e) => e.type === 'result');
-      const payload = resultEvent!.payload as Record<string, unknown>;
-      const result = payload.result as Record<string, unknown>;
-
-      expect(result.tables).toEqual(resultData.tables);
-      expect(result.count).toBe(1);
-      expect(result.summary).toBe('Generated 1 table');
-
-      await rm(hostOutputDir, { recursive: true, force: true });
+      const payload = events.find((e) => e.type === 'result')!.payload as Record<string, unknown>;
+      expect(payload.result).toEqual(resultData);
     });
 
-    it('[DATA] fallback to /output/result.json when agent output is not valid JSON', async () => {
-      const hostOutputDir = await mkdtemp(join(tmpdir(), 'test-docker-fallback-'));
-      const resultData = { status: 'completed', items: ['a', 'b'] };
-      await writeFile(join(hostOutputDir, 'result.json'), JSON.stringify(resultData));
-
-      const context = buildMockContext();
-      await plugin.initialize(context);
-
-      const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        // result is text, not JSON — should fall back to reading result.json
-        cliOutput: JSON.stringify({ result: 'I completed the task successfully.' }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: hostOutputDir, injectedEnvVars: [],
+    it.each([
+      ['missing', null, 'agent wrote no result.json'],
+      ['not JSON', 'All done.', 'result.json is not valid JSON'],
+      ['a JSON array', '[{"count":1}]', 'result.json is not a JSON object'],
+    ] as const)('[ERROR] fails the step when result.json is %s, even when the model\'s last message is JSON', async (_label, contents, message) => {
+      await plugin.initialize(buildMockContext());
+      mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
+        if (contents !== null) await writeFile(join(options!.stepOutputDir as string, 'result.json'), contents);
+        return { cliOutput: openCodeJsonOutput('{"count":1,"confidence":0.9}'), injectedEnvVars: [] };
       });
 
-      await plugin.run(emit);
+      const { emit, events } = buildEmitSpy();
+      await expect(plugin.run(emit)).rejects.toThrow(message);
 
-      const resultEvent = events.find((e) => e.type === 'result');
-      const payload = resultEvent!.payload as Record<string, unknown>;
-      const result = payload.result as Record<string, unknown>;
-
-      expect(result.status).toBe('completed');
-      expect(result.items).toEqual(['a', 'b']);
-
-      await rm(hostOutputDir, { recursive: true, force: true });
+      expect(events.find((e) => e.type === 'result')).toBeUndefined();
     });
 
-    it('[DATA] markdown output_file is returned as raw content', async () => {
-      const hostOutputDir = await mkdtemp(join(tmpdir(), 'test-docker-md-'));
-      const mdContent = '# TLG Shells\n\n## Table 14.1\nDemographics summary\n';
-      await writeFile(join(hostOutputDir, 'tlg-shells.md'), mdContent);
-
-      const agentResponse = JSON.stringify({
-        output_file: '/output/tlg-shells.md',
-        summary: 'Generated TLG shells',
-      });
-
-      const context = buildMockContext();
-      await plugin.initialize(context);
+    it('[DATA] git metadata comes from the step commit', async () => {
+      await plugin.initialize(buildMockContext());
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: agentResponse }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: hostOutputDir, injectedEnvVars: [],
-      });
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }));
 
       await plugin.run(emit);
 
-      const resultEvent = events.find((e) => e.type === 'result');
-      const payload = resultEvent!.payload as Record<string, unknown>;
-      const result = payload.result as Record<string, unknown>;
-
-      expect(result.raw).toBe(mdContent);
-      expect(result.output_file).toContain('tlg-shells.md');
-      expect(result.summary).toBe('Generated TLG shells');
-
-      await rm(hostOutputDir, { recursive: true, force: true });
-    });
-
-    it('[DATA] git metadata is collected from /output/git-result.json', async () => {
-      const context = buildMockContext();
-      await plugin.initialize(context);
-
-      const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: '"done"' }),
-        gitMetadata: {
-          commitSha: 'abc123',
-          branch: 'run/pi-001',
-          changedFiles: ['src/adam.R', 'src/utils.R'],
-          repoUrl: 'https://github.com/Appsilon/mediforce-clinical-workspace',
-        },
-        presentation: null,
-        outputDir: '/tmp/mock', injectedEnvVars: [],
-      });
-
-      await plugin.run(emit);
-
-      const resultEvent = events.find((e) => e.type === 'result');
-      const payload = resultEvent!.payload as Record<string, unknown>;
-      const gitMeta = payload.gitMetadata as Record<string, unknown>;
-
-      expect(gitMeta.commitSha).toBe('abc123');
-      expect(gitMeta.branch).toBe('run/pi-001');
-      expect(gitMeta.changedFiles).toEqual(['src/adam.R', 'src/utils.R']);
+      const payload = events.find((e) => e.type === 'result')!.payload as Record<string, unknown>;
+      expect(payload.gitMetadata).toMatchObject({ commitSha: 'fake-commit-sha', branch: 'run/pi-001' });
     });
   });
 
@@ -839,17 +668,7 @@ describe('OpenCodeAgentPlugin', () => {
       const bashCommand = args[2];
       expect(bashCommand).toContain('mock-opencode');
       expect(bashCommand).toContain('text');
-      expect(bashCommand).toContain('mock-result.json');
-    });
-
-    it('[DATA] copies fixture workspace files into /workspace/ when _workspaceDir is set', async () => {
-      const context = buildMockContext();
-      await plugin.initialize(context);
-
-      const args = plugin.getMockDockerArgs('generate-tlg');
-      const bashCommand = args[2];
-      expect(bashCommand).toContain('_workspaceDir');
-      expect(bashCommand).toContain('/workspace/');
+      expect(bashCommand).toContain('/output/result.json');
     });
   });
 });

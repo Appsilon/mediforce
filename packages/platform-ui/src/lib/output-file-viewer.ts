@@ -4,7 +4,7 @@
  * download). No I/O, no React: the switch that the OutputFilePreview modal
  * drives its render off.
  *
- * Text-family viewers (markdown, html, csv, text) parse the whole file in the
+ * Text-family viewers (markdown, html, csv, text, json) parse the whole file in the
  * browser, so they are size-guarded. Binary viewers (image, svg-as-image,
  * pdf) hand a blob straight to the browser and stream natively — no cap.
  */
@@ -18,6 +18,7 @@ export type ViewerKind =
   | 'svg'
   | 'csv'
   | 'text'
+  | 'json'
   | 'pdf'
   | 'download';
 
@@ -45,7 +46,7 @@ export const TEXT_PREVIEW_MAX_BYTES = 5 * 1024 * 1024;
 export const CSV_PREVIEW_ROW_LIMIT = 100;
 
 /** Text-family viewers parse the file in JS — size-guarded by TEXT_PREVIEW_MAX_BYTES. */
-const TEXT_FAMILY_VIEWERS: ReadonlySet<ViewerKind> = new Set(['markdown', 'html', 'csv', 'text']);
+const TEXT_FAMILY_VIEWERS: ReadonlySet<ViewerKind> = new Set(['markdown', 'html', 'csv', 'text', 'json']);
 
 const EXTENSION_VIEWERS: Readonly<Record<string, ViewerKind>> = {
   md: 'markdown',
@@ -63,7 +64,7 @@ const EXTENSION_VIEWERS: Readonly<Record<string, ViewerKind>> = {
   txt: 'text',
   text: 'text',
   log: 'text',
-  json: 'text',
+  json: 'json',
   pdf: 'pdf',
 };
 

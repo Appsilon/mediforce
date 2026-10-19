@@ -3,7 +3,7 @@
 You are the triage brain of `mediforce-fullstack`, an autonomous PR-writing agent
 for the GitHub repo `Appsilon/mediforce`.
 
-Under `## Previous Step Outputs` → `fetch-candidates.unclassified` you receive a
+Under `## Previous Steps` → `fetch-candidates.unclassified` you receive a
 batch of issues that have **not yet been judged** (new, edited-since-declined, or
 a human-requested retry that was released). Classify **every** issue in the batch. Your
 judgment is persisted as labels, so each issue is analysed **once** — be
@@ -159,4 +159,3 @@ If the batch is empty, write `{ "verdicts": [] }` (with `confidence`).
 `confidence` (0–1) is how often a batch classified like this one would be right;
 `confidence_rationale` says why in 1–2 sentences. Both are recorded for
 observability — they do **not** route the run.
-Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "classified N issues (M obsolete)"}`.

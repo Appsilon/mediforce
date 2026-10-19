@@ -10,7 +10,7 @@ import { saveBlobToDevice } from '@/lib/save-blob';
 import { selectViewer } from '@/lib/output-file-viewer';
 import { extensionOf } from '@/lib/file-extension';
 import { cn } from '@/lib/utils';
-import { OutputFilePreview } from './output-file-preview';
+import { OutputFilePreview, downloadOutputFile } from './output-file-preview';
 
 export interface OutputFileGroup {
   stepId: string;
@@ -67,17 +67,15 @@ function fileTypeIcon(fileName: string): LucideIcon {
   return File;
 }
 
-async function downloadOutputFile(runId: string, file: RunOutputFileEntry): Promise<void> {
-  const downloaded = await mediforce.runs.downloadOutputFile({ runId, path: file.path });
-  // `.slice()` re-types the view as Uint8Array<ArrayBuffer> (BlobPart
-  // rejects the wider ArrayBufferLike the client returns).
-  saveBlobToDevice(
-    new Blob([downloaded.bytes.slice()], { type: downloaded.contentType }),
-    downloaded.fileName,
-  );
-}
-
-export function OutputFileRow({ runId, file }: { runId: string; file: RunOutputFileEntry }) {
+export function OutputFileRow({
+  runId,
+  file,
+  result = null,
+}: {
+  runId: string;
+  file: RunOutputFileEntry;
+  result?: Record<string, unknown> | null;
+}) {
   const [downloading, setDownloading] = React.useState(false);
   const [downloadError, setDownloadError] = React.useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = React.useState(false);
@@ -125,7 +123,7 @@ export function OutputFileRow({ runId, file }: { runId: string; file: RunOutputF
         {downloading ? 'Downloading...' : 'Download'}
       </button>
       {canPreview && (
-        <OutputFilePreview runId={runId} file={file} open={previewOpen} onOpenChange={setPreviewOpen} />
+        <OutputFilePreview runId={runId} file={file} open={previewOpen} onOpenChange={setPreviewOpen} result={result} />
       )}
     </li>
   );

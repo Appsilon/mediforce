@@ -22,7 +22,6 @@ export function agentOutputFromEnvelope(
     model: envelope.model,
     duration_ms: envelope.duration_ms,
     gitMetadata: envelope.gitMetadata ?? null,
-    presentation: envelope.presentation ?? null,
     escalationReason: null,
     estimatedCostUsd: null,
     tokenUsage: envelope.tokenUsage ?? null,

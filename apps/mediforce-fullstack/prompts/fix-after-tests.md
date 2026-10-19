@@ -6,7 +6,7 @@ NOT reproduce anything locally (you cannot `pnpm install` in this container).
 You fix **statically from the actual CI error text**, push, and CI re-runs to
 tell us if you got it. This is a bounded loop; make each round count.
 
-### Inputs (under `## Previous Step Outputs`)
+### Inputs (under `## Previous Steps`)
 - `publish` — `prNumber`, `branch`, `issueNumber`, `baseBranch`.
 - `check-ci` — `failing[]`: one entry per red check, each with `name`, `url`,
   `title`, `summary`, and `annotations[]` (`path`, `startLine`, `message`) — the
@@ -74,4 +74,4 @@ Write ONLY this JSON to `/output/result.json`:
 ```
 
 If you could not push a fix (nothing actionable), set `pushed: false` and explain
-in `ciFixLog`. Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "ci-fix round <n>"}`.
+in `ciFixLog`.

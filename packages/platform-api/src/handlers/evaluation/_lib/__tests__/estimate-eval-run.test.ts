@@ -31,7 +31,7 @@ describe('estimateEvalRun', () => {
       await fixture.instanceRepo.updateStepExecution(instanceId, execution!.id, {
         agentOutput: {
           confidence: 0.9, confidence_rationale: null, reasoning: null, model: 'anthropic/claude-sonnet-4',
-          duration_ms: 1000, gitMetadata: null, deliverableFile: null, presentation: null, estimatedCostUsd: cost,
+          duration_ms: 1000, gitMetadata: null, estimatedCostUsd: cost,
         },
       });
     }

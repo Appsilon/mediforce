@@ -1,7 +1,7 @@
 /**
  * Content-Type + Content-Disposition helpers for file-serving routes.
  * Single source for the extension → MIME map and the RFC 6266 attachment
- * header, shared by `/api/agent-output-file` and `/api/runs/[runId]/files/[...path]`.
+ * header, shared by the file-serving routes.
  */
 import { extensionOf } from './file-extension';
 

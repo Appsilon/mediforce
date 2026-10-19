@@ -18,7 +18,7 @@ import { processInstances } from './process-instance';
  * Hybrid storage: query-worthy envelope fields (confidence, model,
  * duration_ms, token counts, cost) are extracted as columns; the rest of
  * the envelope (reasoning_summary, reasoning_chain, annotations,
- * gitMetadata, presentation, deliverableFile, result, confidence_rationale)
+ * gitMetadata, result, confidence_rationale)
  * lives in `envelope_payload` jsonb. Lifting cost + model out enables the
  * `model + cost_usd` partial index for spend rollups.
  *

@@ -35,8 +35,8 @@ import {
   computeActiveProcessingTime,
 } from '@/lib/format';
 import { cn, isBrowsableRepoUrl } from '@/lib/utils';
-import { saveBlobToDevice } from '@/lib/save-blob';
-import { apiFetch } from '@/lib/api-fetch';
+import { useRunOutputFiles } from '@/hooks/use-run-output-files';
+import { OutputFileRow } from '@/components/processes/run-output-files-panel';
 
 type DetailLevel = 'brief' | 'full';
 
@@ -209,7 +209,7 @@ export function RunReport({
       </section>
 
       {/* Deliverables */}
-      <DeliverablesSection finalOutput={finalOutput} instanceId={instance.id} />
+      <DeliverablesSection finalOutput={finalOutput} instance={instance} />
 
       {/* Footer */}
       <ReportFooter />
@@ -448,51 +448,41 @@ function JsonPreview({ label, value }: { label: string; value: unknown }) {
 
 function DeliverablesSection({
   finalOutput,
-  instanceId,
+  instance,
 }: {
   finalOutput: ReturnType<typeof findFinalAgentOutput>;
-  instanceId: string;
+  instance: ProcessInstance;
 }) {
+  const { data: runFiles } = useRunOutputFiles(instance.id, instance.status);
   if (!finalOutput) return null;
 
   const { stepId, output, result } = finalOutput;
   const git = output.gitMetadata;
-  const deliverableFile = output.deliverableFile ?? null;
-  const resultOutputFile = typeof result?.output_file === 'string' ? result.output_file : null;
-  const effectiveDeliverableFile = deliverableFile ?? resultOutputFile;
-
-  async function handleDownload() {
-    if (!effectiveDeliverableFile) return;
-    // The NextAuth session cookie rides `apiFetch` same-origin (ADR-0002 §6).
-    const response = await apiFetch(
-      `/api/agent-output-file?path=${encodeURIComponent(effectiveDeliverableFile)}&instanceId=${encodeURIComponent(instanceId)}`,
-    );
-    if (!response.ok) return;
-    saveBlobToDevice(
-      await response.blob(),
-      effectiveDeliverableFile.split('/').pop() ?? 'download',
-    );
-  }
+  const stepFiles = runFiles
+    .filter((file) => file.stepId === stepId)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <section>
       <h2 className="text-base print:text-lg font-headline font-semibold mb-3">Deliverables</h2>
       <div className="rounded-lg border bg-card p-4 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-            <span>From {formatStepName(stepId)}</span>
-          </div>
-          {effectiveDeliverableFile && (
-            <button
-              onClick={handleDownload}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              <FileText className="h-4 w-4" />
-              Download Report
-            </button>
-          )}
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <span>From {formatStepName(stepId)}</span>
         </div>
+
+        {stepFiles.length > 0 && (
+          <div>
+            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+              Output Files ({stepFiles.length})
+            </h4>
+            <ul className="space-y-1">
+              {stepFiles.map((file) => (
+                <OutputFileRow key={file.path} runId={instance.id} file={file} result={result} />
+              ))}
+            </ul>
+          </div>
+        )}
 
         {git && (
           <div className="space-y-3">

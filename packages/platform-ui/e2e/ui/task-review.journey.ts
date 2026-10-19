@@ -33,9 +33,8 @@ test.describe('Task Review Journey', () => {
     await expect(page.getByText(/Human Review/).first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/pending/i)).toBeVisible();
 
-    // Previous Step Output panel is open by default; both Report and Extracted
-    // Data tabs are visible. Assert the always-present Extracted Data tab.
-    await expect(page.getByRole('tab', { name: /extracted data/i })).toBeVisible();
+    // Previous Step Output panel is open by default, on that step's result.json.
+    await expect(page.getByRole('combobox', { name: 'Step output file' })).toHaveValue('result.json');
 
     // Lock the single-click invariant before clicking: no Submit button
     // exists in the form. If a future regression reinstated a two-step

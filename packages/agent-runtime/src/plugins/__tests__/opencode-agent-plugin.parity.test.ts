@@ -12,8 +12,8 @@ import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 // their tool allowlists, Skills, and a warning when a server never connected.
 
 type PluginInternals = {
-  prepareOutputDir(dir: string, agentOptions?: SpawnCliOptions): Promise<void>;
-  mcpServerStatus(rawStdout: string, outputDir: string): Promise<{ failed: string[]; pending: string[] }>;
+  writeAgentConfig(dir: string, agentOptions?: SpawnCliOptions): Promise<void>;
+  mcpServerStatus(rawStdout: string, engineDir: string): Promise<{ failed: string[]; pending: string[] }>;
   extractErrorFromResult(resultLine: string): string | null;
   resolvedEnv: { vars: Record<string, string> };
 };
@@ -53,15 +53,15 @@ function buildContext(overrides: Partial<WorkflowAgentContext> = {}): WorkflowAg
 
 describe('OpenCodeAgentPlugin — Claude Code parity (#1477)', () => {
   let plugin: OpenCodeAgentPlugin;
-  let outputDir: string;
+  let engineDir: string;
 
   function internals(): PluginInternals {
     return plugin as unknown as PluginInternals;
   }
 
   async function writtenConfig(agentOptions?: SpawnCliOptions): Promise<OpenCodeConfig> {
-    await internals().prepareOutputDir(outputDir, agentOptions);
-    return JSON.parse(await readFile(join(outputDir, 'opencode.json'), 'utf-8')) as OpenCodeConfig;
+    await internals().writeAgentConfig(engineDir, agentOptions);
+    return JSON.parse(await readFile(join(engineDir, 'opencode.json'), 'utf-8')) as OpenCodeConfig;
   }
 
   async function initializeWithServers(servers: ResolvedMcpConfig['servers'], overrides: Partial<WorkflowAgentContext> = {}): Promise<void> {
@@ -70,11 +70,11 @@ describe('OpenCodeAgentPlugin — Claude Code parity (#1477)', () => {
 
   beforeEach(async () => {
     plugin = new OpenCodeAgentPlugin({ workspaceManager: createFakeWorkspaceManager() });
-    outputDir = await mkdtemp(join(tmpdir(), 'opencode-parity-'));
+    engineDir = await mkdtemp(join(tmpdir(), 'opencode-parity-'));
   });
 
   afterEach(async () => {
-    await rm(outputDir, { recursive: true, force: true });
+    await rm(engineDir, { recursive: true, force: true });
   });
 
   describe('MCP servers in opencode.json', () => {
@@ -131,7 +131,7 @@ describe('OpenCodeAgentPlugin — Claude Code parity (#1477)', () => {
       const config = await writtenConfig();
 
       expect(config.mcp?.edc.command).toEqual([
-        'node', '/output/mcp-tape/mcp-tape.mjs', 'replay', '/output/mcp-tape/edc.replay.json', '/output/mcp-tape/edc.misses.jsonl',
+        'node', '/engine/mcp-tape/mcp-tape.mjs', 'replay', '/engine/mcp-tape/edc.replay.json', '/engine/mcp-tape/edc.misses.jsonl',
       ]);
     });
 
@@ -219,7 +219,7 @@ describe('OpenCodeAgentPlugin — Claude Code parity (#1477)', () => {
 
   describe('MCP startup status', () => {
     async function writeOpenCodeLog(lines: string[]): Promise<void> {
-      const logDir = join(outputDir, '.local', 'share', 'opencode', 'log');
+      const logDir = join(engineDir, '.local', 'share', 'opencode', 'log');
       await mkdir(logDir, { recursive: true });
       await writeFile(join(logDir, '2026-10-07T091741.log'), `${lines.join('\n')}\n`);
     }
@@ -238,7 +238,7 @@ describe('OpenCodeAgentPlugin — Claude Code parity (#1477)', () => {
         'INFO  2026-10-07T09:18:19 +43ms service=mcp key=everything toolCount=13 create() successfully created client',
       ]);
 
-      const status = await internals().mcpServerStatus('', outputDir);
+      const status = await internals().mcpServerStatus('', engineDir);
 
       expect(status).toEqual({ failed: ['broken', 'remote'], pending: [] });
     });
@@ -255,7 +255,7 @@ describe('OpenCodeAgentPlugin — Claude Code parity (#1477)', () => {
         'timestamp=2026-10-07T09:31:43.985Z level=INFO run=a20f5489 message=init count=2',
       ]);
 
-      const status = await internals().mcpServerStatus('', outputDir);
+      const status = await internals().mcpServerStatus('', engineDir);
 
       expect(status).toEqual({ failed: ['broken', 'biomcp'], pending: [] });
     });
@@ -263,7 +263,7 @@ describe('OpenCodeAgentPlugin — Claude Code parity (#1477)', () => {
     it('[DATA] reports nothing when OpenCode left no log to read', async () => {
       await initializeWithServers({ biomcp: { type: 'stdio', command: 'uvx' } });
 
-      const status = await internals().mcpServerStatus('', outputDir);
+      const status = await internals().mcpServerStatus('', engineDir);
 
       expect(status).toEqual({ failed: [], pending: [] });
     });
@@ -271,14 +271,11 @@ describe('OpenCodeAgentPlugin — Claude Code parity (#1477)', () => {
     it('[DATA] warns on the run, with the image hint, when a stdio server failed to start', async () => {
       await initializeWithServers({ biomcp: { type: 'stdio', command: 'uvx' } });
       const events: EmitPayload[] = [];
-      vi.spyOn(plugin as unknown as { spawnDockerContainer: () => Promise<unknown> }, 'spawnDockerContainer').mockResolvedValue({
-        cliOutput: JSON.stringify({ result: JSON.stringify({ confidence: 0.9 }) }),
-        failedMcpServers: ['biomcp'],
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output',
-        injectedEnvVars: [],
-      });
+      vi.spyOn(plugin as unknown as { spawnDockerContainer: (prompt: string, options: SpawnCliOptions) => Promise<unknown> }, 'spawnDockerContainer')
+        .mockImplementation(async (_prompt, options) => {
+          await writeFile(join(options.stepOutputDir!, 'result.json'), JSON.stringify({ confidence: 0.9 }));
+          return { cliOutput: '', failedMcpServers: ['biomcp'], injectedEnvVars: [] };
+        });
 
       await plugin.run(async (event) => { events.push(event); });
 

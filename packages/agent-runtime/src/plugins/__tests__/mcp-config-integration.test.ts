@@ -728,17 +728,17 @@ describe('writeMcpConfig integration', () => {
       };
       expect(parsed.mcpServers.edc).toEqual({
         type: 'stdio', command: 'node',
-        args: ['/output/mcp-tape/mcp-tape.mjs', 'replay', '/output/mcp-tape/edc.replay.json', '/output/mcp-tape/edc.misses.jsonl'],
+        args: ['/engine/mcp-tape/mcp-tape.mjs', 'replay', '/engine/mcp-tape/edc.replay.json', '/engine/mcp-tape/edc.misses.jsonl'],
         allowedTools: ['read_record'],
       });
       expect(parsed.mcpServers.meddra).toEqual({
         type: 'stdio', command: 'node',
-        args: ['/output/mcp-tape/mcp-tape.mjs', 'record', '/output/mcp-tape/meddra.tape.jsonl', 'meddra-mcp'],
+        args: ['/engine/mcp-tape/mcp-tape.mjs', 'record', '/engine/mcp-tape/meddra.tape.jsonl', 'meddra-mcp'],
         env: { MEDDRA_VERSION: '27.0' },
       });
       expect(parsed.mcpServers.email).toEqual({
         type: 'stdio', command: 'node',
-        args: ['/output/mcp-tape/mcp-tape.mjs', 'record-http', '/output/mcp-tape/email.tape.jsonl', 'https://mcp.example.com/email'],
+        args: ['/engine/mcp-tape/mcp-tape.mjs', 'record-http', '/engine/mcp-tape/email.tape.jsonl', 'https://mcp.example.com/email'],
         env: { MCP_TAPE_HEADERS: JSON.stringify({ 'X-Key': 'k-1' }) },
       });
       expect(parsed.mcpServers.untouched).toEqual({ type: 'http', url: 'https://mcp.example.com/other' });
@@ -804,8 +804,8 @@ describe('writeMcpConfig integration', () => {
       const parsed = JSON.parse(await readFile(join(tmpDir, 'mcp-config.json'), 'utf-8')) as {
         mcpServers: Record<string, { args: string[] }>;
       };
-      expect(parsed.mcpServers['edc.v2']!.args[2]).toBe('/output/mcp-tape/edc_2e_v2.tape.jsonl');
-      expect(parsed.mcpServers.edc_v2!.args[2]).toBe('/output/mcp-tape/edc_5f_v2.tape.jsonl');
+      expect(parsed.mcpServers['edc.v2']!.args[2]).toBe('/engine/mcp-tape/edc_2e_v2.tape.jsonl');
+      expect(parsed.mcpServers.edc_v2!.args[2]).toBe('/engine/mcp-tape/edc_5f_v2.tape.jsonl');
 
       await cleanup();
     });

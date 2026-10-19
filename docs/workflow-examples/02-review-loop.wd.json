@@ -43,7 +43,7 @@
       "agent": {
         "model": "anthropic/claude-sonnet-4",
         "image": "mediforce-golden-image",
-        "prompt": "You are a professional writer. Draft a document based on the user's topic and instructions.\n\nRead /output/input.json for context:\n- steps['describe-task'].topic — the subject\n- steps['describe-task'].instructions — detailed guidance\n- steps['review-draft'] (if present) — previous reviewer feedback to address\n\n## OUTPUT CONTRACT (MANDATORY)\nYou MUST: 1) Write result JSON to {output_directory}/result.json using bash. 2) Your FINAL message must be ONLY: {\"output_file\": \"{output_directory}/result.json\", \"summary\": \"...\"}\n\nResult JSON shape: { \"draft\": \"<the full document text>\", \"wordCount\": <number> }"
+        "prompt": "You are a professional writer. Draft a document based on the user's topic and instructions.\n\nRead /output/input.json for context:\n- steps['describe-task'].topic — the subject\n- steps['describe-task'].instructions — detailed guidance\n- steps['review-draft'] (if present) — previous reviewer feedback to address\n\n## OUTPUT CONTRACT (MANDATORY)\nWrite the result JSON to /output/result.json — it is the only output this step keeps.\n\nResult JSON shape: { \"draft\": \"<the full document text>\", \"wordCount\": <number> }"
       }
     },
     {

@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { Readable, Writable } from 'node:stream';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ChildProcess } from 'node:child_process';
@@ -50,16 +50,19 @@ function mockCliSuccess(resultLine: string): void {
       killed: false,
       kill: vi.fn(),
     });
-    const mount = (args ?? []).find((arg) => arg.endsWith(':/output'));
-    const hostDir = mount?.slice(0, -':/output'.length) ?? '';
+    const hostDirOf = (mountPoint: string): string =>
+      (args ?? []).find((arg) => arg.endsWith(`:${mountPoint}`))?.slice(0, -`:${mountPoint}`.length) ?? '';
+    const outputDir = hostDirOf('/output');
+    const engineDir = hostDirOf('/engine');
     dockerArgs = args ?? [];
     setTimeout(() => {
-      void readFile(join(hostDir, 'input.json'), 'utf-8')
+      void readFile(join(outputDir, 'input.json'), 'utf-8')
         .then((raw) => { seeded = JSON.parse(raw) as Record<string, unknown>; })
         .catch(() => { seeded = null; })
-        .then(() => readFile(join(hostDir, 'prompt.txt'), 'utf-8'))
+        .then(() => readFile(join(engineDir, 'prompt.txt'), 'utf-8'))
         .then((prompt) => { seededPrompt = prompt; })
         .catch(() => { seededPrompt = null; })
+        .then(() => writeFile(join(outputDir, 'result.json'), JSON.stringify({ summary: 'done' })))
         .finally(() => {
           (child.stdout as Readable).push(`${resultLine}\n`);
           (child.stdout as Readable).push(null);

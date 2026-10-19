@@ -37,7 +37,7 @@
         "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
       },
       "agent": {
-        "prompt": "Use the `trial-metadata-extractor` skill: it holds this step's instructions. Load it first and follow it.",
+        "prompt": "Use the `trial-metadata-extractor` skill: it holds this step's instructions. Load it first and follow it.\n\nThis step's result is the extracted metadata JSON: write it to `/output/result.json`. Write the summary the skill asks you to present as `/output/summary.md`.",
         "skills": [{ "namespace": "appsilon", "id": "trial-metadata-extractor" }],
         "model": "sonnet",
         "image": "mediforce-agent:protocol-to-tfl",
@@ -58,7 +58,7 @@
         "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
       },
       "agent": {
-        "prompt": "Use the `mock-tlg-generator` skill: it holds this step's instructions. Load it first and follow it.",
+        "prompt": "Use the `mock-tlg-generator` skill: it holds this step's instructions. Load it first and follow it.\n\nWrite the TLG shells document to `/output/`. This step's result, in `/output/result.json`, is `{ study_id, generation_date, total_outputs, tables, figures, listings, summary }` — `tables`/`figures`/`listings` list each shell's id and title.",
         "skills": [{ "namespace": "appsilon", "id": "mock-tlg-generator" }],
         "model": "sonnet",
         "image": "mediforce-agent:protocol-to-tfl",
@@ -94,7 +94,7 @@
         "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
       },
       "agent": {
-        "prompt": "Use the `sdtm-to-adam` skill: it holds this step's instructions. Load it first and follow it.",
+        "prompt": "Use the `sdtm-to-adam` skill: it holds this step's instructions. Load it first and follow it.\n\nThis step's result, in `/output/result.json`, is `{ study_id, generation_date, datasets, r_scripts, total_datasets, total_records, summary }` — `datasets` names each ADaM dataset with its record and subject counts.",
         "skills": [{ "namespace": "appsilon", "id": "sdtm-to-adam" }],
         "model": "sonnet",
         "image": "mediforce-agent:protocol-to-tfl",
@@ -115,7 +115,7 @@
         "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
       },
       "agent": {
-        "prompt": "Use the `adam-to-tlg` skill: it holds this step's instructions. Load it first and follow it.",
+        "prompt": "Use the `adam-to-tlg` skill: it holds this step's instructions. Load it first and follow it.\n\nThis step's result, in `/output/result.json`, is `{ study_id, generation_date, tables, figures, r_scripts, total_outputs, statistical_methods, r_packages, issues, summary }`.",
         "skills": [{ "namespace": "appsilon", "id": "adam-to-tlg" }],
         "model": "sonnet",
         "image": "mediforce-agent:protocol-to-tfl",

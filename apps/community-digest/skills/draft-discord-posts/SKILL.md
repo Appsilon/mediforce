@@ -18,16 +18,7 @@ Both should stand on their own.
 
 ## Output Format
 
-Write a JSON file to `/output/result.json` with this structure:
-
-```json
-{
-  "output_file": "/output/result.json",
-  "summary": "Drafted 2 Discord post versions covering N changes"
-}
-```
-
-The result.json should contain:
+Write your result as one JSON object to `/output/result.json`:
 
 ```json
 {
@@ -55,15 +46,3 @@ Follow the tone and style rules provided in the prompt's community tone section.
 - Group related changes when natural
 - Skip score 1-3 items unless nothing else is available
 - Include links to PRs/commits when referencing specific changes
-
-## Critical: Output Contract
-
-You MUST follow this exact sequence to complete the task:
-
-1. Write `/output/result.json` with the JSON structure defined above
-2. After writing the file, you MUST produce a final text response (not just tool calls) that includes:
-   ```
-   {"output_file": "/output/result.json", "summary": "Drafted 2 Discord post versions covering N changes"}
-   ```
-
-**Do NOT stop after writing files.** You must always end with a text response containing the output JSON. If you stop after tool calls without a final text message, the pipeline cannot collect your results.

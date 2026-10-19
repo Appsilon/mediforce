@@ -97,7 +97,7 @@ Population N (the denominator used in column headers and percentage calculations
 ### Step 3: Create the output directory structure
 
 ```
-{output_dir}/
+/output/
 ├── code/
 │   ├── 00_setup.R           # Shared config, helpers, theme
 │   ├── t_01_pop.R           # Table T-1

@@ -120,9 +120,14 @@ describe('buildWorkflowAssistantSystemPrompt', () => {
     expect(prompt).toMatch(/venv/);
   });
 
-  it('says how a file crosses from one step to the next, since /output does not survive', () => {
+  it('says how a file crosses from one step to the next, since each step has its own /output', () => {
     expect(prompt).toMatch(/\/workspace\/\.mediforce\/output\//);
-    expect(prompt).toMatch(/wiped|deleted|does not survive/i);
+    expect(prompt).toMatch(/Each step gets its own `\/output`/);
+  });
+
+  it('teaches the result.json contract, never the retired closing-message envelope (ADR-0030)', () => {
+    expect(prompt).not.toMatch(/output_file/);
+    expect(prompt).toMatch(/final message is discarded/);
   });
 
   it('names the tool that removes an edge, and says a stale defect is not yours to hide', () => {

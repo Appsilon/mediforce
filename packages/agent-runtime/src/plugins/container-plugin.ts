@@ -5,55 +5,30 @@
  * workspace lifecycle. Subclasses: BaseContainerAgentPlugin (LLM agents),
  * ScriptContainerPlugin (deterministic scripts).
  *
- * ## Container mounts — the `/workspace` vs `/output` split
- *
- * Every step container gets two bind mounts with distinct lifecycles and purposes.
- * Keeping them separate is deliberate — merging them would blur several concerns
- * that deserve to stay apart.
+ * ## Container mounts — `/workspace`, `/output` and `/engine`
  *
  *   /workspace (host path = run worktree)
  *     - Git worktree for the run, shared across all its steps.
  *     - rw, persistent for the life of the run, tracked in git.
  *     - Commit happens at step boundaries; ignored files are wiped between steps.
- *     - This is where the agent / script writes *deliverables* — code, data,
- *       reports — whatever the workflow produces for its user.
+ *     - Edits here are repository changes — code, data the workflow maintains.
  *
- *   /output (host path = per-step tempdir)
- *     - Ephemeral I/O channel between the engine and the step. Born on step
- *       start, deleted on step end. Never touched by git.
- *     - Host seeds inputs here before the container starts: `input.json`
- *       (stepInput), `previous_run.json` (carry-over), `prompt.txt` (agent
- *       plugins), `script.<ext>` (inline script mode), `mcp-config.json`.
- *     - The container writes the result contract: `result.json`.
- *     - Host reads `result.json` + optional `presentation.md` (preferred)
- *       or `presentation.html` + `git-result.json` (written by the host
- *       itself post-commit) after the container exits.
+ *   /output (host path = `<worktree>/.mediforce/output/<stepId>/`, ADR-0030)
+ *     - The step's output folder: `result.json` (the step's result) and every
+ *       other file it produces (its Output Files). Emptied when the step
+ *       starts, committed with the step, never copied or deleted afterwards.
+ *     - The engine seeds `input.json` (stepInput) and `previous_run.json`
+ *       (carry-over) here, where scripts and skills read them, and removes
+ *       both before the commit, with top-level dotfiles and oversized files.
  *
- * ### Why separate
- *
- * - **Commit history stays about user work.** Inputs / prompts / previous-run
- *   payloads are engine plumbing. Committing them on every step would flood
- *   the run branch with housekeeping noise.
- * - **No naming conflicts.** A step that wants to write its own `input.json`
- *   or `result.json` as a deliverable can do so in `/workspace/...` without
- *   colliding with engine-owned files.
- * - **Control-plane vs data-plane.** `/output` is how the engine talks to the
- *   step; `/workspace` is what the step produces. Mixing them makes both
- *   harder to reason about.
- * - **Replay reproducibility is not weakened.** stepInput lives in Firestore
- *   (`processInstances/<id>/stepExecutions`). `/output/input.json` is a
- *   derivative — writing it to git would be duplication, not extra truth.
- *
- * ### Naming caveat
- *
- * The `/output` name is imperfect — it carries both inputs and outputs. If we
- * renamed it today we'd pick `/io` or `/step-io`. The current name is kept
- * because every existing `SKILL.md`, workflow definition, and prompt hardcodes
- * `/output/result.json`. A rename is a breaking change across all those and
- * belongs in its own PR.
+ *   /engine (host path = per-step tempdir)
+ *     - Engine plumbing the step never publishes: `prompt.txt`, the agent
+ *       CLI's config (`mcp-config.json`, `opencode.json`, `auth.json`), MCP
+ *       tapes, spilled previous-step values, `script.<ext>`. Deleted when the
+ *       step ends; never committed. Read-only for script steps.
+ *     - It is the directory the queued spawn strategy ships to the worker.
  */
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
 import type { StepExecutorPlugin, AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
 import type { AgentConfig, ContainerConfig, PluginCapabilityMetadata, WorkflowArtifact } from '@mediforce/platform-core';
 import {
@@ -66,12 +41,11 @@ import {
   DOCKER_IMAGE_SETUP_URL,
 } from '@mediforce/platform-core';
 import { artifactsBuildHash, artifactsBuildTag, artifactsDir } from './workflow-artifacts';
-import { writeFile } from 'node:fs/promises';
 import type { GitMetadata } from '@mediforce/platform-core';
 import { resolveStepEnv, type ResolvedEnv } from './resolve-env';
 import type { ImageBuildMeta } from './docker-spawn-strategy';
 import { WorkspaceManager, type RunWorkspaceHandle } from '../workspace/workspace-manager';
-import { copyOutputFilesIntoWorkspace } from '../workspace/output-files';
+import { prepareStepOutputDirForCommit, resetStepOutputDir } from '../workspace/output-files';
 import { materializeAgentSkillsPlugin } from '../skills/agent-skills-plugin';
 
 export function isWorkflowAgentContext(ctx: AgentContext | WorkflowAgentContext): ctx is WorkflowAgentContext {
@@ -299,6 +273,7 @@ export interface WorkspaceManagerLike {
   createRunWorkspace: WorkspaceManager['createRunWorkspace'];
   commitStep: WorkspaceManager['commitStep'];
   listStepFiles: WorkspaceManager['listStepFiles'];
+  listOutputFiles: WorkspaceManager['listOutputFiles'];
 }
 
 export interface ContainerPluginInit {
@@ -313,6 +288,8 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
   protected imageBuild: ImageBuildMeta | undefined;
   /** Run-scoped git worktree — populated by `resolveRunWorkspace` at run start. */
   protected runWorkspaceHandle: RunWorkspaceHandle | null = null;
+  /** Host path of the step's output folder — set by `resetStepOutputDir`. */
+  protected stepOutputDir: string | null = null;
   protected workspaceManager: WorkspaceManagerLike | null = null;
   /** Whether the agent CLI loads an agent's Skills from the plugin dir:
    *  Claude Code through `--plugin-dir`, OpenCode through `skills.paths`. */
@@ -368,6 +345,18 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
   }
 
   /**
+   * Empty the step's output folder in the run worktree and return its host
+   * path — what the step sees as `/output` (ADR-0030).
+   */
+  protected async resetStepOutputDir(): Promise<string> {
+    if (!this.runWorkspaceHandle) {
+      throw new Error('runWorkspaceHandle is not set — resolveRunWorkspace() must run before resetStepOutputDir()');
+    }
+    this.stepOutputDir = await resetStepOutputDir(this.runWorkspaceHandle.path, this.context.stepId);
+    return this.stepOutputDir;
+  }
+
+  /**
    * Commit the step's workspace changes — ALWAYS, even on failure and even
    * when nothing changed. The run branch is meant to be a complete audit
    * trail of what the engine dispatched; `--allow-empty` keeps it isomorphic
@@ -378,20 +367,15 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
    *   ✓ last agent step of the run (no more agents will touch the workspace)
    *   ✗ failed — commits whatever the step produced before the error
    *
-   * Before committing, copies the step's `/output` deliverables into
-   * `.mediforce/output/<stepId>/` in the worktree (best-effort) so the same
-   * commit captures them — see `copyOutputFilesIntoWorkspace`.
+   * The step's output folder is committed with it, minus the seeded inputs
+   * and files over the size cap — see `prepareStepOutputDirForCommit`.
    *
-   * Writes `git-result.json` into `outputDir` for downstream consumers.
    * Never pushes — run branches stay local for now.
    */
-  protected async commitRunWorkspace(
-    outputDir: string,
-    opts: CommitRunWorkspaceOptions = {},
-  ): Promise<GitMetadata | null> {
+  protected async commitRunWorkspace(opts: CommitRunWorkspaceOptions = {}): Promise<GitMetadata | null> {
     if (!this.runWorkspaceHandle || !this.workspaceManager) return null;
 
-    await copyOutputFilesIntoWorkspace(outputDir, this.runWorkspaceHandle.path, this.context.stepId);
+    if (this.stepOutputDir !== null) await prepareStepOutputDirForCommit(this.stepOutputDir);
 
     const commit = await this.workspaceManager.commitStep(this.runWorkspaceHandle, {
       stepId: this.context.stepId,
@@ -418,7 +402,6 @@ export abstract class ContainerPlugin implements StepExecutorPlugin {
       repoUrl: this.runWorkspaceHandle.bareRepoPath,
     };
 
-    await writeFile(join(outputDir, 'git-result.json'), JSON.stringify(metadata, null, 2), 'utf-8');
     return metadata;
   }
 

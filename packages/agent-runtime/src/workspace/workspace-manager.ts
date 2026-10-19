@@ -28,6 +28,8 @@ import { createHash } from 'node:crypto';
 import type { WorkflowWorkspace } from '@mediforce/platform-core';
 import { normalizeRepoUrls, toHttpsWithToken } from '@mediforce/platform-core';
 import { bareRepoPathFor, defaultDataDir, runBranchName, worktreePathFor, type WorkflowIdentity } from './workspace-paths';
+import { OUTPUT_FILES_REPO_ROOT, RESULT_FILE_NAME, parseOutputFilePath } from './output-files';
+import { listRevisionOutputFiles, type OutputFileEntry } from './workspace-reader';
 
 export type { WorkflowIdentity } from './workspace-paths';
 
@@ -195,6 +197,11 @@ function truncate(value: string, max: number): string {
   return `${value.slice(0, max - 1).trimEnd()}…`;
 }
 
+/** `.mediforce/output/<stepId>/result.json` — a step's result (ADR-0030). */
+function isStepResultPath(path: string): boolean {
+  return parseOutputFilePath(path)?.name === RESULT_FILE_NAME;
+}
+
 /**
  * Build the full commit message for a step:
  *
@@ -217,7 +224,9 @@ export function formatStepCommitMessage(
 ): string {
   const status = opts.status ?? 'success';
   const stepName = opts.stepName ?? opts.stepId;
-  const delta = formatFileDelta(stagedEntries);
+  // Every agent step writes its result.json; naming it in the subject says nothing.
+  const subjectEntries = stagedEntries.filter((entry) => isStepResultPath(entry.path) === false);
+  const delta = formatFileDelta(subjectEntries.length > 0 ? subjectEntries : stagedEntries);
   const summary = opts.reasoningSummary?.split('\n')[0].trim();
 
   // Subject
@@ -720,6 +729,8 @@ export class WorkspaceManager {
    * was seeded from shift the range. Steps come in the order they first
    * committed; a file a later commit deleted is gone, and a file several
    * steps wrote is listed under each. Steps that left no file are omitted.
+   * Output Files (`.mediforce/output/`) are not repository changes and are
+   * left out — `listOutputFiles` lists them.
    */
   async listStepFiles(ws: RunWorkspaceHandle): Promise<StepFiles[]> {
     const log = runGit(
@@ -741,7 +752,10 @@ export class WorkspaceManager {
       const [header, ...files] = chunk.split('\n');
       const [commitRunId, stepId] = header.split(TRAILER_SEPARATOR).map((value) => value.trim());
       if (commitRunId !== runId) break;
-      commitsNewestFirst.push({ stepId, files: files.filter((file) => tracked.has(file)) });
+      commitsNewestFirst.push({
+        stepId,
+        files: files.filter((file) => tracked.has(file) && file.startsWith(`${OUTPUT_FILES_REPO_ROOT}/`) === false),
+      });
     }
 
     const filesByStep = new Map<string, Set<string>>();
@@ -753,6 +767,11 @@ export class WorkspaceManager {
     }
 
     return [...filesByStep].map(([stepId, files]) => ({ stepId, files: [...files].sort() }));
+  }
+
+  /** Every step's Output Files on the run branch, read from git (ADR-0030). */
+  async listOutputFiles(ws: RunWorkspaceHandle): Promise<OutputFileEntry[]> {
+    return listRevisionOutputFiles(ws.bareRepoPath, ws.branch);
   }
 
   /**

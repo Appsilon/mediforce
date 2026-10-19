@@ -116,11 +116,13 @@ Host capacity, the probe that watches it, and recovery are in
 **Host paths in a job must resolve on the worker too, so the worker shares the
 platform's `/tmp`.** The platform writes some of what a step mounts to a
 host directory under the system temp dir and passes only its path in the job:
-`/output`, the carried artifacts (`mediforce-artifacts/`), the git skills cache
+`/engine`, the carried artifacts (`mediforce-artifacts/`), the git skills cache
 (`mediforce-skills-cache/`) and an agent's Skills (`mediforce-agent-skills/`,
 ADR-0025), mounted at `/plugin`. Both compose files bind-mount `/tmp:/tmp` into
-the platform and the worker for this reason. A worker on another host would see
-none of those paths; shipping them over Redis is not built.
+the platform and the worker for this reason. `/workspace` and `/output` (the
+step's folder in the run worktree, ADR-0030) live under `MEDIFORCE_DATA_DIR`,
+mounted at the same path on the host for the same reason. A worker on another
+host would see none of those paths; shipping them over Redis is not built.
 
 **Nothing in a job payload can be a function.** The job crosses Redis as JSON.
 Behaviour the worker needs travels as a name it can resolve against a shared

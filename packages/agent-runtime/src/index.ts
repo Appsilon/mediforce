@@ -124,12 +124,7 @@ export type {
 } from './workspace/workspace-manager';
 export { WorkspaceReader, listCommitFiles, readCommitFile } from './workspace/workspace-reader';
 export type { CommitFileEntry, OutputFileEntry, WorkspaceReaderInit } from './workspace/workspace-reader';
-export {
-  copyOutputFilesIntoWorkspace,
-  INTERNAL_OUTPUT_FILE_NAMES,
-  PRESENTATION_FILE_NAMES,
-  OUTPUT_FILES_REPO_ROOT,
-} from './workspace/output-files';
+export { OUTPUT_FILES_REPO_ROOT } from './workspace/output-files';
 
 // Testing utilities
 export {

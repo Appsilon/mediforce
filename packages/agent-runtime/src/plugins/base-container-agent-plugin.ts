@@ -1,18 +1,19 @@
 import { spawn } from 'node:child_process';
-import { readFile, readdir, mkdtemp, writeFile, rm, mkdir, appendFile, realpath, cp } from 'node:fs/promises';
+import { readFile, mkdtemp, writeFile, rm, mkdir, appendFile, realpath } from 'node:fs/promises';
 import { join, dirname, isAbsolute, resolve, posix, basename } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata, GitMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, AgentTrajectoryEntry } from '@mediforce/platform-core';
+import type { AgentConfig, StepConfig, PluginCapabilityMetadata, McpServerConfig, ResolvedMcpConfig, AgentTrajectoryEntry } from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { RetiredFileSkillError } from '../skills/resolve-skills-for-step';
-import { INTERNAL_OUTPUT_FILE_NAMES, OUTPUT_FILES_REPO_ROOT, PRESENTATION_FILE_NAMES } from '../workspace/output-files';
+import { RESULT_FILE_NAME, readStepResult, writeStepResult } from '../workspace/output-files';
+import type { OutputFileEntry } from '../workspace/workspace-reader';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
-import { DEFAULT_STEP_TIMEOUT_MINUTES, agentLogEntries, createLineStreamReader, offeredSkill, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes, unfence } from '@mediforce/platform-core';
+import { DEFAULT_STEP_TIMEOUT_MINUTES, isRecord, agentLogEntries, createLineStreamReader, offeredSkill, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 import { MCP_TAPE_DIR, MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from '../mcp/mcp-tape';
 import type { AgentLogFormat } from '@mediforce/platform-core';
 
@@ -71,6 +72,13 @@ export const CONTAINER_DATA_MOUNT = '/data';
 /** Container-side path for bind-mounted Claude Code plugin roots. */
 export const CONTAINER_PLUGIN_MOUNT = '/plugin';
 
+/** Container-side path of the step's output folder (ADR-0030). */
+export const CONTAINER_OUTPUT_MOUNT = '/output';
+
+/** Container-side path of the engine's own per-step files (prompt, CLI config,
+ *  MCP tapes, spilled values) — never committed. */
+export const CONTAINER_ENGINE_MOUNT = '/engine';
+
 // Monorepo root: this file lives at packages/agent-runtime/src/plugins/
 const MONOREPO_ROOT = process.env.MEDIFORCE_ROOT ?? resolve(__dirname_base, '../../../..');
 
@@ -112,7 +120,10 @@ export interface SpawnCliOptions {
   addDirs?: string[];
   logFile?: string;
   timeoutMs?: number;
-  outputDir?: string;
+  /** Host path of the engine's per-step directory (mounted at `/engine`). */
+  engineDir?: string;
+  /** Host path of the step's output folder (mounted at `/output`). */
+  stepOutputDir?: string;
   /**
    * Host path to the Claude Code plugin root — the directory containing
    * `.claude-plugin/plugin.json` and `skills/`. When set, the runtime
@@ -131,16 +142,33 @@ export interface SpawnDockerResult {
   failedMcpServers?: string[];
   /** MCP servers still connecting when the agent started, from the same event. */
   pendingMcpServers?: string[];
-  gitMetadata: GitMetadata | null;
-  presentation: Presentation | null;
-  outputDir: string;
   /** Env var names injected into the process (for audit logging) */
   injectedEnvVars: string[];
 }
 
-export interface AgentOutputContract {
-  output_file?: string;
-  summary?: string;
+/**
+ * The `MOCK_AGENT` container command: copy the real output files from
+ * `/mock-data/` into `/output/`, and the step's canned result from
+ * `/mock-fixtures/<stepId>.json` as `/output/result.json` (a generic one when
+ * there is none). Ends by printing `finalStdoutLine`, the CLI's last event,
+ * for `parseAgentOutput`.
+ */
+export function mockAgentDockerArgs(stepId: string, logLabel: string, finalStdoutLine: string): string[] {
+  const copyOutputCmd =
+    `cp -r /mock-data/* /output/ 2>/dev/null; ` +
+    `if [ -f "/mock-fixtures/${stepId}.json" ]; then ` +
+      `cp /mock-fixtures/${stepId}.json /output/result.json && ` +
+      `echo "[${logLabel}] step=${stepId}: copied data + fixture" >&2; ` +
+    `else ` +
+      `echo '{"mock":true,"summary":"Mock output for step ${stepId}"}' > /output/result.json && ` +
+      `echo "[${logLabel}] step=${stepId}: no fixture, generic mock" >&2; ` +
+    `fi`;
+
+  return [
+    'bash', '-c',
+    `${copyOutputCmd}; ` +
+    `echo '${finalStdoutLine.replace(/'/g, "'\\''")}'`,
+  ];
 }
 
 /** Spec returned by subclass to define how the agent CLI is invoked inside the container. */
@@ -149,7 +177,7 @@ export interface AgentCommandSpec {
   args: string[];
   /** How to deliver the prompt to the agent CLI.
    *  'stdin' — pipe prompt to child.stdin (Claude Code)
-   *  'file'  — prompt is referenced in args via /output/prompt.txt (OpenCode) */
+   *  'file'  — prompt is referenced in args via /engine/prompt.txt (OpenCode) */
   promptDelivery: 'stdin' | 'file';
 }
 
@@ -309,9 +337,6 @@ function buildHttpHeaders(
  */
 export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
   protected agentConfig!: AgentConfig;
-  /** Step input as the agent sees it (file paths valid inside its container). Seeds `/output/input.json`. */
-  private agentVisibleInput: Record<string, unknown> | null = null;
-
   constructor(init: ContainerPluginInit = {}) {
     super(init);
   }
@@ -338,8 +363,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
   /** MCP servers that failed or were still connecting when the agent started,
    *  read from whatever the CLI left behind: its stdout, or files in the
-   *  output dir. Default: none reported. */
-  protected async mcpServerStatus(_rawStdout: string, _outputDir: string): Promise<McpServerStatus> {
+   *  engine dir. Default: none reported. */
+  protected async mcpServerStatus(_rawStdout: string, _engineDir: string): Promise<McpServerStatus> {
     return { failed: [], pending: [] };
   }
 
@@ -374,23 +399,25 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
   }
 
   /** Return plugin-internal env vars for local (non-Docker) execution.
-   *  Override when container paths differ from host paths (e.g. /output/ vs actual outputDir).
+   *  Override when container paths differ from host paths (e.g. /engine/ vs the actual engine dir).
    *  Default: delegates to getInternalEnvVars(). */
-  protected getLocalInternalEnvVars(_outputDir: string): Record<string, string> {
+  protected getLocalInternalEnvVars(_engineDir: string): Record<string, string> {
     return this.getInternalEnvVars();
   }
 
   /** Return the CLI command spec to run the agent inside the container.
-   *  @param promptFilePath — container path to the prompt file (/output/prompt.txt) */
+   *  @param promptFilePath — container path to the prompt file (/engine/prompt.txt) */
   abstract getAgentCommand(promptFilePath: string, options?: SpawnCliOptions): AgentCommandSpec;
 
-  /** Return docker command args for mock mode (MOCK_AGENT=true).
-   *  Must produce stdout that parseAgentOutput() can handle. */
+  /** Return docker command args for mock mode (MOCK_AGENT=true). The
+   *  command must write `/output/result.json`, as a real agent does. */
   abstract getMockDockerArgs(stepId: string): string[];
 
-  /** Extract the final result string from raw stdout (all lines joined).
-   *  Must return a JSON string parseable by extractResult().
-   *  Expected format: JSON object with a `result` field containing the agent's output string. */
+  /** Reduce raw stdout (all lines joined) to one JSON object carrying the
+   *  CLI's token `usage` (`input_tokens`, `output_tokens`, optional cache and
+   *  `peak_input_tokens` counts) and whatever `extractErrorFromResult` reads.
+   *  Empty when the CLI reported neither. The agent's final message is never
+   *  the step's result — `/output/result.json` is (ADR-0030). */
   abstract parseAgentOutput(rawStdout: string): string;
 
   /** Shape of this agent's stdout, so whichever process is watching the
@@ -412,79 +439,22 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     return null;
   }
 
-  /**
-   * Recover agent output when no result event was emitted (e.g. model stopped
-   * after tool calls). Tries result.json first, then scans for any files the
-   * agent wrote to /output/.
-   */
-  protected async recoverOutputFromDirectory(outputDir: string): Promise<string> {
-    // 1. Try result.json (the expected contract location)
-    try {
-      const contents = await readFile(join(outputDir, 'result.json'), 'utf-8');
-      try {
-        const parsed = JSON.parse(contents) as Record<string, unknown>;
-        return JSON.stringify({ result: JSON.stringify(parsed) });
-      } catch {
-        return JSON.stringify({ result: contents });
-      }
-    } catch {
-      // result.json not found — continue to directory scan
-    }
-
-    // 2. Scan output directory for any files the agent wrote
-    const entries = await readdir(outputDir, { withFileTypes: true });
-    const files = entries.filter((entry) => entry.isFile() && entry.name !== 'prompt.txt');
-
-    if (files.length === 0) {
-      throw new Error('No output files found');
-    }
-
-    // Read all output files and assemble a result
-    const collected: Record<string, unknown> = {};
-    for (const file of files) {
-      const content = await readFile(join(outputDir, file.name), 'utf-8');
-      try {
-        collected[file.name] = JSON.parse(content);
-      } catch {
-        collected[file.name] = content;
-      }
-    }
-
-    // If there's exactly one file, use its content as the result directly
-    const resultPayload = files.length === 1
-      ? collected[files[0].name]
-      : collected;
-
-    return JSON.stringify({ result: JSON.stringify(resultPayload) });
-  }
-
-  /** Hook called after the output directory is created and prompt.txt is written,
-   *  but before the Docker container is spawned. Writes `input.json` and the
-   *  agent CLI's own config into the output dir that will be mounted at /output.
+  /** Write the agent CLI's config into the engine dir, before the agent is
+   *  spawned. Default: the `mcp-config.json` Claude Code reads through
+   *  `--mcp-config`.
    *  @param agentOptions — the spawn options with paths as the agent sees them
    *    (`pluginDir` is the container mount in Docker mode). */
-  protected async prepareOutputDir(outputDir: string, agentOptions?: SpawnCliOptions): Promise<void> {
-    await writeFile(
-      join(outputDir, 'input.json'),
-      JSON.stringify(this.agentVisibleInput ?? this.context.stepInput, null, 2),
-      'utf-8',
-    );
-    await this.writeAgentConfig(outputDir, agentOptions);
-  }
-
-  /** Write the agent CLI's config into the output dir. Default: the
-   *  `mcp-config.json` Claude Code reads through `--mcp-config`. */
-  protected async writeAgentConfig(outputDir: string, _agentOptions?: SpawnCliOptions): Promise<void> {
-    await this.writeMcpConfig(outputDir);
+  protected async writeAgentConfig(engineDir: string, _agentOptions?: SpawnCliOptions): Promise<void> {
+    await this.writeMcpConfig(engineDir);
   }
 
   /** Generate mcp-config.json for Claude CLI --mcp-config flag. Writes nothing
    *  when the step binds no MCP server. */
-  protected async writeMcpConfig(outputDir: string): Promise<void> {
-    const servers = await this.buildMcpServers(outputDir);
+  protected async writeMcpConfig(engineDir: string): Promise<void> {
+    const servers = await this.buildMcpServers(engineDir);
     if (Object.keys(servers).length === 0) return;
     await writeFile(
-      join(outputDir, 'mcp-config.json'),
+      join(engineDir, 'mcp-config.json'),
       JSON.stringify({ mcpServers: servers }, null, 2),
       'utf-8',
     );
@@ -501,13 +471,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *   2. Legacy inline config on agentConfig.mcpServers (array of
    *      McpServerConfig). Still used by process-mode steps and
    *      by workflow steps that predate the migration to agentId. */
-  protected async buildMcpServers(outputDir: string): Promise<Record<string, McpConfigEntry>> {
+  protected async buildMcpServers(engineDir: string): Promise<Record<string, McpConfigEntry>> {
     const resolved = isWorkflowAgentContext(this.context)
       ? this.context.resolvedMcpConfig
       : undefined;
 
     if (resolved !== undefined) {
-      return this.buildResolvedMcpServers(outputDir, resolved);
+      return this.buildResolvedMcpServers(engineDir, resolved);
     }
 
     return this.buildLegacyMcpServers();
@@ -519,9 +489,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *  values at write time. For `auth.type === 'oauth'`, the access token
    *  comes from `context.oauthTokens[name]` (pre-loaded + pre-refreshed
    *  by the caller) and is stamped into `headerValueTemplate`. In an eval
-   *  trial it writes the record/replay tape files into the output dir. */
+   *  trial it writes the record/replay tape files into the engine dir. */
   private async buildResolvedMcpServers(
-    outputDir: string,
+    engineDir: string,
     resolved: ResolvedMcpConfig,
   ): Promise<Record<string, McpConfigEntry>> {
     const entries = Object.entries(resolved.servers);
@@ -538,13 +508,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
     const tapes = isWorkflowAgentContext(this.context) ? this.context.mcpTapes : undefined;
     const taped = entries.some(([name]) => tapes !== undefined && (name in tapes.replay || tapes.record.includes(name)));
-    // The path the agent sees the tape directory at: /output in a container.
+    // The path the agent sees the tape directory at: /engine in a container.
     const inContainer = this.agentConfig.image !== undefined && this.agentConfig.image !== '';
-    const tapeDir = inContainer ? `/output/${MCP_TAPE_DIR}` : join(outputDir, MCP_TAPE_DIR);
+    const tapeDir = inContainer ? `${CONTAINER_ENGINE_MOUNT}/${MCP_TAPE_DIR}` : join(engineDir, MCP_TAPE_DIR);
     const tapeScript = `${tapeDir}/mcp-tape.mjs`;
     if (taped) {
-      await mkdir(join(outputDir, MCP_TAPE_DIR), { recursive: true });
-      await writeFile(join(outputDir, MCP_TAPE_DIR, 'mcp-tape.mjs'), MCP_TAPE_SCRIPT, 'utf-8');
+      await mkdir(join(engineDir, MCP_TAPE_DIR), { recursive: true });
+      await writeFile(join(engineDir, MCP_TAPE_DIR, 'mcp-tape.mjs'), MCP_TAPE_SCRIPT, 'utf-8');
     }
 
     for (const [name, server] of entries) {
@@ -556,7 +526,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       const stem = tapeFileStem(name);
 
       if (replayTape !== undefined) {
-        await writeFile(join(outputDir, MCP_TAPE_DIR, `${stem}.replay.json`), JSON.stringify(replayTape), 'utf-8');
+        await writeFile(join(engineDir, MCP_TAPE_DIR, `${stem}.replay.json`), JSON.stringify(replayTape), 'utf-8');
         mcpConfig[name] = {
           type: 'stdio',
           command: 'node',
@@ -611,12 +581,12 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *  recorded server's tape to the caller. Never throws — a tape that cannot
    *  be read or stored is logged; recording is evidence for a later trial,
    *  never a reason to fail this one. */
-  protected async storeMcpRecordings(outputDir: string): Promise<void> {
+  protected async storeMcpRecordings(engineDir: string): Promise<void> {
     if (!isWorkflowAgentContext(this.context) || this.context.mcpTapes === undefined) return;
     const tapes = this.context.mcpTapes;
     for (const server of tapes.record) {
       try {
-        const tape = await readRecordedTape(join(outputDir, MCP_TAPE_DIR, `${tapeFileStem(server)}.tape.jsonl`));
+        const tape = await readRecordedTape(join(engineDir, MCP_TAPE_DIR, `${tapeFileStem(server)}.tape.jsonl`));
         if (tape !== null) await tapes.onRecorded(server, tape);
       } catch (error) {
         console.warn(
@@ -631,13 +601,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
    *  answer into the Agent Trajectory, where the Eval Run report counts them.
    *  Throws when they cannot all be read or recorded — the trial then fails
    *  rather than report fewer unanswered calls than it made. */
-  protected async recordMcpReplayMisses(outputDir: string): Promise<void> {
+  protected async recordMcpReplayMisses(engineDir: string): Promise<void> {
     if (!isWorkflowAgentContext(this.context) || this.context.mcpTapes === undefined) return;
     const { mcpTapes: tapes, trajectory } = this.context;
     for (const server of Object.keys(tapes.replay)) {
       let misses: Awaited<ReturnType<typeof readReplayMisses>>;
       try {
-        misses = await readReplayMisses(join(outputDir, MCP_TAPE_DIR, `${tapeFileStem(server)}.misses.jsonl`), server);
+        misses = await readReplayMisses(join(engineDir, MCP_TAPE_DIR, `${tapeFileStem(server)}.misses.jsonl`), server);
       } catch (error) {
         throw new Error(
           `Could not read the calls replayed MCP server '${server}' had no recording for: `
@@ -701,71 +671,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       servers: servers.map((s) => s.name),
     });
     return mcpConfig;
-  }
-
-  /**
-   * Scan outputDir for deliverable files (HTML, PDF, CSV, etc.) — excluding
-   * internal agent files. Copy the first match to a stable temp location so
-   * it survives output-dir cleanup, and return the absolute copied path.
-   * Returns null if nothing found.
-   *
-   * Two-phase logic:
-   * 1. Loop over known deliverable extensions, skipping INTERNAL_NAMES.
-   *    `presentation.{md,html}` are in INTERNAL_NAMES so they're skipped here.
-   * 2. Fallback: try `presentation.md` then `presentation.html` separately.
-   *    They are excluded from the loop because they're already read into
-   *    spawnResult.presentation, but we still need a persisted path so the
-   *    Download Report button can serve them.
-   */
-  protected async persistDeliverableFile(
-    outputDir: string,
-    instanceId: string,
-    stepId: string,
-  ): Promise<string | null> {
-    const INTERNAL_NAMES = new Set([...INTERNAL_OUTPUT_FILE_NAMES, ...PRESENTATION_FILE_NAMES]);
-    const DELIVERABLE_EXTS = new Set(['.html', '.htm', '.pdf', '.csv', '.xlsx', '.md']);
-
-    let entries: string[];
-    try {
-      entries = await readdir(outputDir);
-    } catch {
-      return null;
-    }
-
-    for (const name of entries) {
-      if (INTERNAL_NAMES.has(name)) continue;
-      if (name.startsWith('.')) continue;
-      const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
-      if (!DELIVERABLE_EXTS.has(ext)) continue;
-
-      const srcPath = join(outputDir, name);
-      const destDir = join(tmpdir(), 'mediforce-deliverables', instanceId);
-      await mkdir(destDir, { recursive: true });
-      const destPath = join(destDir, name);
-      try {
-        await cp(srcPath, destPath);
-        return destPath;
-      } catch {
-        continue;
-      }
-    }
-
-    // Also handle presentation.{md,html} — already read into
-    // spawnResult.presentation but a persisted path is needed for the
-    // Download Report button. Markdown wins on tie.
-    for (const filename of PRESENTATION_FILE_NAMES) {
-      const presentationPath = join(outputDir, filename);
-      try {
-        const destDir = join(tmpdir(), 'mediforce-deliverables', instanceId);
-        await mkdir(destDir, { recursive: true });
-        const destPath = join(destDir, `${stepId}-${filename}`);
-        await cp(presentationPath, destPath);
-        return destPath;
-      } catch {
-        continue;
-      }
-    }
-    return null;
   }
 
   /** Host path of the canned step results a `MOCK_AGENT` container copies
@@ -927,7 +832,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     });
 
     let tempDir: string | null = null;
-    let dockerOutputDir: string | null = null;
+    let engineDir: string | null = null;
     let succeeded = false;
     let replayMissesRecorded = false;
 
@@ -958,23 +863,25 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
       const isLocalMode = !this.agentConfig.image;
       const agentInput = isLocalMode ? updatedInput : toContainerFilePaths(updatedInput);
-      this.agentVisibleInput = agentInput;
       agentLog('run.mode', `execution mode: ${isLocalMode ? 'local' : 'docker'}`, { stepId });
 
-      // Create output dir early so buildPrompt can write large files into it.
-      const rawOutputDir = await mkdtemp(join(tmpdir(), `mediforce-${isLocalMode ? 'local' : 'docker'}-output-`));
-      dockerOutputDir = await realpath(rawOutputDir);
-
-      // In Docker mode, the agent sees /output; in local mode, the agent sees the real host path.
-      const outputDirForPrompt = isLocalMode ? dockerOutputDir : '/output';
+      // Create the engine dir early so buildPrompt can spill large values into it.
+      const rawEngineDir = await mkdtemp(join(tmpdir(), `mediforce-${isLocalMode ? 'local' : 'docker'}-engine-`));
+      engineDir = await realpath(rawEngineDir);
 
       // Every run gets a shared git worktree via WorkspaceManager — one model, no branches.
       await this.resolveRunWorkspace();
-      const workingDirForPrompt = isLocalMode ? this.runWorkspaceHandle!.path : '/workspace';
+      const stepOutputDir = await this.resetStepOutputDir();
+      await writeFile(join(stepOutputDir, 'input.json'), JSON.stringify(agentInput, null, 2), 'utf-8');
+
+      // In Docker mode the agent sees the mounts; in local mode, the real host paths.
+      const paths: PromptPaths = isLocalMode
+        ? { workingDir: this.runWorkspaceHandle!.path, outputDir: stepOutputDir, engineDir, hostEngineDir: engineDir }
+        : { workingDir: '/workspace', outputDir: CONTAINER_OUTPUT_MOUNT, engineDir: CONTAINER_ENGINE_MOUNT, hostEngineDir: engineDir };
 
       agentLog('run.buildPrompt', 'building prompt', { stepId });
 
-      const prompt = await this.buildPrompt(agentInput, timeoutMs, outputDirForPrompt, dockerOutputDir, workingDirForPrompt);
+      const prompt = await this.buildPrompt(agentInput, timeoutMs, paths);
 
       await emit({
         type: 'prompt',
@@ -982,7 +889,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         timestamp: new Date().toISOString(),
       });
 
-      const options: SpawnCliOptions = { timeoutMs, outputDir: dockerOutputDir };
+      const options: SpawnCliOptions = { timeoutMs, engineDir, stepOutputDir };
       if (this.agentConfig.model) options.model = this.agentConfig.model;
       if (tempDir) {
         options.addDirs = [tempDir];
@@ -1027,8 +934,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         });
 
         try {
-          spawnResult = await this.spawnLocalProcess(prompt, options, workingDirForPrompt!);
-          console.log(`[${this.agentName}] Local process finished: step=${this.context.stepId}, hasGitMetadata=${!!spawnResult.gitMetadata}, outputLength=${spawnResult.cliOutput.length}`);
+          spawnResult = await this.spawnLocalProcess(prompt, options, paths.workingDir);
+          console.log(`[${this.agentName}] Local process finished: step=${this.context.stepId}, outputLength=${spawnResult.cliOutput.length}`);
         } catch (localErr) {
           console.error(`[${this.agentName}] Local process FAILED: step=${this.context.stepId}`, localErr);
           throw localErr;
@@ -1044,7 +951,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
         try {
           spawnResult = await this.spawnDockerContainer(prompt, options);
-          console.log(`[${this.agentName}] Docker container finished: step=${this.context.stepId}, hasGitMetadata=${!!spawnResult.gitMetadata}, outputLength=${spawnResult.cliOutput.length}`);
+          console.log(`[${this.agentName}] Docker container finished: step=${this.context.stepId}, outputLength=${spawnResult.cliOutput.length}`);
         } catch (dockerErr) {
           console.error(`[${this.agentName}] Docker container FAILED: step=${this.context.stepId}`, dockerErr);
           throw dockerErr;
@@ -1098,15 +1005,26 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         });
       }
 
-      const duration_ms = Date.now() - startTime;
+      // The step's result is /output/result.json — never the agent's final message (ADR-0030).
+      const parsedResult = await readStepResult(stepOutputDir);
+      // The reserved keys move onto the envelope; the rest is the result.
+      const { confidence: reportedConfidence, confidence_rationale: reportedRationale, ...agentResult } = parsedResult;
+      // Reshape before the commit, so the run branch holds the result later steps get.
+      const cleanResult = isWorkflowAgentContext(this.context) && this.context.conformResult !== undefined
+        ? await this.context.conformResult(agentResult)
+        : agentResult;
+      if (cleanResult !== agentResult) {
+        await writeStepResult(stepOutputDir, {
+          ...cleanResult, confidence: reportedConfidence, confidence_rationale: reportedRationale,
+        });
+      }
 
-      // Local mode: the agent saw the real host path, so the mapping is the identity.
-      const outputDirMapping = isLocalMode
-        ? { containerPath: dockerOutputDir + '/', hostPath: dockerOutputDir + '/' }
-        : spawnResult.outputDir
-          ? { containerPath: '/output/', hostPath: spawnResult.outputDir + '/' }
-          : undefined;
-      const parsedResult = await this.extractResult(spawnResult.cliOutput, outputDirMapping);
+      const gitMetadata = await this.commitRunWorkspace({
+        status: 'success',
+        agentPlugin: this.agentName,
+        agentImage: this.agentConfig.image,
+      });
+      const duration_ms = Date.now() - startTime;
 
       const confidence = typeof parsedResult.confidence === 'number'
         ? parsedResult.confidence
@@ -1116,41 +1034,30 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         ? parsedResult.confidence_rationale
         : undefined;
 
-      let tokenUsage: { inputTokens: number; outputTokens: number; cachedInputTokens?: number; peakInputTokens?: number } | undefined;
-
-      // First: check if agent reported tokenUsage in its result
-      if (parsedResult.tokenUsage !== null
-        && typeof parsedResult.tokenUsage === 'object'
-        && typeof (parsedResult.tokenUsage as Record<string, unknown>).inputTokens === 'number'
-        && typeof (parsedResult.tokenUsage as Record<string, unknown>).outputTokens === 'number') {
-        tokenUsage = parsedResult.tokenUsage as { inputTokens: number; outputTokens: number; cachedInputTokens?: number; peakInputTokens?: number };
-      }
-
-      // Second: check stream event for CLI-reported usage (e.g. Claude Code stream-json result event)
-      // parseAgentOutput() returns a single JSON object for the final result event.
+      // Token usage comes from the CLI's own stream event (e.g. Claude Code's stream-json
+      // result event); parseAgentOutput() returns it as a single JSON object.
       // Cache-creation tokens are billed at (roughly) the input rate, so they fold into
       // inputTokens; cache-read tokens are billed at the cheaper cacheRead rate, so they are
       // tracked separately. Dropping either — as the previous version did — under-reports cost.
-      if (!tokenUsage) {
-        try {
-          const rawEvent = JSON.parse(spawnResult.cliOutput) as Record<string, unknown>;
-          const usage = rawEvent.usage as Record<string, number> | undefined;
-          if (usage && typeof usage.input_tokens === 'number' && typeof usage.output_tokens === 'number') {
-            const cacheCreationTokens = typeof usage.cache_creation_input_tokens === 'number' ? usage.cache_creation_input_tokens : 0;
-            const cacheReadTokens = typeof usage.cache_read_input_tokens === 'number' ? usage.cache_read_input_tokens : 0;
-            const peakInputTokens = typeof usage.peak_input_tokens === 'number' ? usage.peak_input_tokens : 0;
-            tokenUsage = {
-              inputTokens: usage.input_tokens + cacheCreationTokens,
-              outputTokens: usage.output_tokens,
-              ...(cacheReadTokens > 0 ? { cachedInputTokens: cacheReadTokens } : {}),
-              ...(peakInputTokens > 0 ? { peakInputTokens } : {}),
-            };
-          }
-        } catch {
-          agentLog('cost.tokenExtraction', 'could not extract token usage from CLI output', {
-            stepId, instanceId, cliOutputLength: spawnResult.cliOutput.length,
-          });
+      let tokenUsage: { inputTokens: number; outputTokens: number; cachedInputTokens?: number; peakInputTokens?: number } | undefined;
+      try {
+        const rawEvent = JSON.parse(spawnResult.cliOutput) as Record<string, unknown>;
+        const usage = rawEvent.usage as Record<string, number> | undefined;
+        if (usage && typeof usage.input_tokens === 'number' && typeof usage.output_tokens === 'number') {
+          const cacheCreationTokens = typeof usage.cache_creation_input_tokens === 'number' ? usage.cache_creation_input_tokens : 0;
+          const cacheReadTokens = typeof usage.cache_read_input_tokens === 'number' ? usage.cache_read_input_tokens : 0;
+          const peakInputTokens = typeof usage.peak_input_tokens === 'number' ? usage.peak_input_tokens : 0;
+          tokenUsage = {
+            inputTokens: usage.input_tokens + cacheCreationTokens,
+            outputTokens: usage.output_tokens,
+            ...(cacheReadTokens > 0 ? { cachedInputTokens: cacheReadTokens } : {}),
+            ...(peakInputTokens > 0 ? { peakInputTokens } : {}),
+          };
         }
+      } catch {
+        agentLog('cost.tokenExtraction', 'could not extract token usage from CLI output', {
+          stepId, instanceId, cliOutputLength: spawnResult.cliOutput.length,
+        });
       }
 
       if (tokenUsage) {
@@ -1159,20 +1066,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         });
       }
 
-      // Strip envelope-level fields from result to avoid duplication in UI
-      const { confidence: _c, confidence_rationale: _cr, tokenUsage: _tu, ...cleanResult } = parsedResult;
-
-      if (dockerOutputDir !== null) {
-        replayMissesRecorded = true;
-        await this.recordMcpReplayMisses(dockerOutputDir);
-      }
-
-      // Persist any deliverable file from the output dir before it gets cleaned up
-      const deliverableFile = await this.persistDeliverableFile(
-        dockerOutputDir ?? spawnResult.outputDir ?? '',
-        instanceId,
-        this.context.stepId,
-      );
+      replayMissesRecorded = true;
+      await this.recordMcpReplayMisses(engineDir);
 
       await emit({
         type: 'result',
@@ -1194,9 +1089,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           model: this.agentConfig.model ?? this.metadata?.foundationModel ?? `${this.agentName}-cli`,
           duration_ms,
           result: cleanResult,
-          ...(spawnResult.gitMetadata ? { gitMetadata: spawnResult.gitMetadata } : {}),
-          ...(spawnResult.presentation ? { presentation: spawnResult.presentation } : {}),
-          ...(deliverableFile ? { deliverableFile } : {}),
+          ...(gitMetadata ? { gitMetadata } : {}),
           ...(tokenUsage ? { tokenUsage } : {}),
         },
         timestamp: new Date().toISOString(),
@@ -1222,13 +1115,13 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         timestamp: new Date().toISOString(),
       });
 
-      // Commit whatever the agent wrote into /workspace before the error —
-      // ✗ marker on the run branch so failures are auditable. Best-effort:
-      // if this commit itself fails (e.g. worktree corrupt), we swallow that
-      // and rethrow the original error.
-      if (dockerOutputDir) {
+      // Commit whatever the agent wrote into /workspace and /output before the
+      // error — ✗ marker on the run branch so failures are auditable.
+      // Best-effort: if this commit itself fails (e.g. worktree corrupt), we
+      // swallow that and rethrow the original error.
+      if (this.stepOutputDir !== null) {
         try {
-          await this.commitRunWorkspace(dockerOutputDir, {
+          await this.commitRunWorkspace({
             status: 'failed',
             error: errorMessage,
             durationMs: duration_ms,
@@ -1243,89 +1136,28 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       // Re-throw so the agent runner's fallback handler deals with the error
       throw error;
     } finally {
-      if (dockerOutputDir !== null) {
+      if (engineDir !== null) {
         // A failed trial is never scored, but its trajectory still shows what replay could not answer.
         if (replayMissesRecorded === false) {
-          await this.recordMcpReplayMisses(dockerOutputDir).catch((error: unknown) => {
+          await this.recordMcpReplayMisses(engineDir).catch((error: unknown) => {
             console.warn(`[mcp-tape] ${error instanceof Error ? error.message : String(error)}`);
           });
         }
-        await this.storeMcpRecordings(dockerOutputDir);
+        await this.storeMcpRecordings(engineDir);
+        await rm(engineDir, { recursive: true, force: true }).catch(() => {});
       }
       if (succeeded) {
         await cleanupTempDir(tempDir);
-      }
-      if (dockerOutputDir) {
-        await rm(dockerOutputDir, { recursive: true, force: true }).catch(() => {});
       }
       // Worktree is NOT disposed here — steps of the same run re-attach to it.
       // A separate sweeper handles cleanup of worktrees from completed runs (out of v1 scope).
     }
   }
 
-  protected async extractResult(
-    cliOutput: string,
-    outputDirMapping?: { containerPath: string; hostPath: string },
-  ): Promise<Record<string, unknown>> {
-    let streamEvent: Record<string, unknown>;
-    try {
-      streamEvent = JSON.parse(cliOutput) as Record<string, unknown>;
-    } catch {
-      return { raw: cliOutput };
-    }
-
-    const agentText = typeof streamEvent.result === 'string' ? streamEvent.result : null;
-    if (!agentText) {
-      return streamEvent;
-    }
-
-    const contract = parseAgentContract(agentText);
-    if (contract === null) {
-      // Agent text isn't JSON — try reading /output/result.json as fallback
-      if (outputDirMapping) {
-        try {
-          const fallbackPath = join(outputDirMapping.hostPath, 'result.json');
-          const fallbackContents = await readFile(fallbackPath, 'utf-8');
-          const parsed = JSON.parse(fallbackContents) as Record<string, unknown>;
-          return parsed;
-        } catch {
-          // No result.json either — return raw text
-        }
-      }
-      return { raw: agentText };
-    }
-
-    if (contract.output_file) {
-      try {
-        let filePath = contract.output_file;
-        if (outputDirMapping && filePath.startsWith(outputDirMapping.containerPath)) {
-          filePath = filePath.replace(outputDirMapping.containerPath, outputDirMapping.hostPath);
-        }
-        const fileContents = await readFile(filePath, 'utf-8');
-        // Try JSON parse; if file is not JSON (e.g. Markdown), return as raw content
-        try {
-          const parsed = JSON.parse(fileContents) as Record<string, unknown>;
-          if (contract.summary) {
-            parsed.summary = contract.summary;
-          }
-          return parsed;
-        } catch {
-          return { raw: fileContents, output_file: filePath, summary: contract.summary };
-        }
-      } catch {
-        return { raw: agentText, summary: contract.summary };
-      }
-    }
-
-    return contract as unknown as Record<string, unknown>;
-  }
-
   protected async buildPrompt(
     stepInput?: Record<string, unknown>,
     timeoutMs?: number,
-    outputDir?: string,
-    hostOutputDir?: string,
-    workingDir?: string,
+    paths?: PromptPaths,
   ): Promise<string> {
     const parts: string[] = [];
     const input = stepInput ?? this.context.stepInput;
@@ -1357,14 +1189,32 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     parts.push(
       `## Time Budget\n` +
       `You have approximately ${budgetMinutes} minutes to complete this task. ` +
-      `Budget your time accordingly — prioritize core extraction over validation if time is tight. ` +
-      `Do not offer conversational summaries or next steps.`,
+      `Budget your time accordingly — prioritize core extraction over validation if time is tight.`,
     );
 
-    // 3b. Confidence self-assessment instructions
+    // 4. Output contract (ADR-0030) — one folder, result.json required.
+    if (paths !== undefined) {
+      const { workingDir, outputDir } = paths;
+      parts.push(
+        `## Output\n` +
+        `Your workspace is the git repository at ${workingDir}. Change files there only when the task asks you ` +
+        `to change the repository; those changes are committed when the step ends.\n\n` +
+        `Everything this step produces goes in ${outputDir}:\n` +
+        `- ${outputDir}/${RESULT_FILE_NAME} — required. One JSON object: this step's result. Later steps, the ` +
+        `output schema and Evaluators read it. It must include \`confidence\` (0.0–1.0) and ` +
+        `\`confidence_rationale\` (1–2 sentences). The step fails without a valid ${RESULT_FILE_NAME}.\n` +
+        `- Every other file you write to ${outputDir} (reports, tables, data) is an output file of this step. ` +
+        `It is kept, shown to the user, and listed for later steps.\n` +
+        `Nothing else is kept. Your final message is discarded.\n\n` +
+        `This step's input is also in ${outputDir}/input.json. ` +
+        `You MUST use full absolute paths when calling Write. Relative paths will be rejected.`,
+      );
+    }
+
+    // 4a. Confidence calibration — for the reserved keys of result.json.
     parts.push(
-      `## Confidence Self-Assessment\n` +
-      `After completing the task, you MUST include a \`confidence\` field (0.0–1.0) and a \`confidence_rationale\` field (1–2 sentences) in your output JSON.\n\n` +
+      `## Confidence\n` +
+      `Set \`confidence\` and \`confidence_rationale\` in ${RESULT_FILE_NAME}.\n\n` +
       `To calibrate your confidence, consider:\n` +
       `- **Input completeness**: Did you receive all necessary data, or were there gaps you had to work around?\n` +
       `- **Output completeness**: Did you address every part of the task, or did you skip/simplify anything?\n` +
@@ -1381,33 +1231,12 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       `- "0.40 — Source document was a low-quality scan with multiple illegible sections. Significant guesswork on 3 out of 8 fields."`,
     );
 
-    // 4. Workspace + result contract directories (unified — every run has a git worktree).
-    if (workingDir && outputDir) {
-      parts.push(
-        `## Workspace Directory (Git Worktree)\n` +
-        `Your workspace is at: ${workingDir}\n` +
-        `Write ALL deliverable files here — R scripts, data files, specs, reports, etc.\n` +
-        `Use subdirectories like ${workingDir}/code/ and ${workingDir}/data/ as appropriate.\n` +
-        `Everything in this directory will be committed on step completion.\n` +
-        `Whenever the skill instructions reference {output_dir}, use ${workingDir} instead.\n` +
-        `You MUST use full absolute paths when calling Write. Relative paths will be rejected.`,
-      );
-      parts.push(
-        `## Result Contract Directory\n` +
-        `Write the output result contract JSON to: ${outputDir}/result.json\n` +
-        `Any other file you leave in ${outputDir} is published as an Output File of this step: ` +
-        `it is offered for download and committed to ${workingDir}/${OUTPUT_FILES_REPO_ROOT}/${this.context.stepId}/, ` +
-        `where later steps find it. ${outputDir} itself is discarded when the step ends, ` +
-        `so keep scratch files out of it.`,
-      );
-    }
-
     // 4b. Output schema (ADR-0023 D13) — checked by AgentRunner after the run.
     if (isWorkflowAgentContext(this.context) && this.context.step.agent?.outputSchema) {
       parts.push(
         `## Output Schema\n` +
-        `The result JSON must conform to this JSON Schema. It is validated after you finish; ` +
-        `a non-conforming result is rejected.\n` +
+        `${RESULT_FILE_NAME}, without \`confidence\` and \`confidence_rationale\`, must conform to this JSON Schema. ` +
+        `It is validated after you finish; a non-conforming result is rejected.\n` +
         '```json\n' + JSON.stringify(this.context.step.agent.outputSchema, null, 2) + '\n```',
       );
     }
@@ -1427,7 +1256,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
     // 5b. Previous run outputs — carry-over snapshot from the last successful
     // run of this workflow (see WD.inputForNextRun). Distinct from "previous
-    // step outputs" (same run). Reuse the same inline-or-spill pattern as
+    // steps" (same run). Reuse the same inline-or-spill pattern as
     // below so a workflow that inadvertently carries a large payload doesn't
     // balloon the prompt and token cost silently.
     if (isWorkflowAgentContext(this.context) && this.context.previousRun !== undefined) {
@@ -1441,7 +1270,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       );
 
       const previousRun = this.context.previousRun;
-      if (outputDir) {
+      if (paths !== undefined) {
         const inlinePreviousRun: Record<string, unknown> = {};
         const previousRunFileRefs: { field: string; containerPath: string }[] = [];
 
@@ -1449,7 +1278,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           const serialized = typeof value === 'string' ? value : JSON.stringify(value);
           if (serialized.length > INLINE_THRESHOLD) {
             const ext = typeof value === 'string' && !value.trimStart().startsWith('{') ? '.md' : '.json';
-            const agentFilePath = await spillPreviousOutput(outputDir, hostOutputDir, `prevrun-${key}${ext}`, value);
+            const agentFilePath = await spillPreviousOutput(paths, `prevrun-${key}${ext}`, value);
             previousRunFileRefs.push({ field: key, containerPath: agentFilePath });
             inlinePreviousRun[key] = `[FILE: ${agentFilePath}]`;
           } else {
@@ -1463,62 +1292,47 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           parts.push(
             '## Large Previous Run Files\n' +
             'Some previous run values were too large to include inline. ' +
-            `They have been written to files in ${outputDir}/${PREVIOUS_OUTPUTS_DIR}/. Read them with \`cat\` or your preferred tool:\n` +
+            `They have been written to files in ${paths.engineDir}/${PREVIOUS_OUTPUTS_DIR}/. Read them with \`cat\` or your preferred tool:\n` +
             previousRunFileRefs.map((r) => `- **${r.field}**: \`${r.containerPath}\``).join('\n'),
           );
         }
       } else {
-        // No outputDir available (e.g. local-mode without disk) — inline verbatim.
+        // No engine dir available — inline verbatim.
         parts.push(JSON.stringify(previousRun, null, 2));
       }
     }
 
-    // 6. Previous step outputs — write large values to files instead of inlining
-    if (hasPreviousOutputs && outputDir) {
-      const inlineOutputs: Record<string, unknown> = {};
-      const fileRefs: { stepId: string; field: string; containerPath: string }[] = [];
-
-      for (const [stepId, stepOutput] of Object.entries(previousOutputs)) {
-        if (typeof stepOutput !== 'object' || stepOutput === null) {
-          inlineOutputs[stepId] = stepOutput;
-          continue;
+    // 6. Previous steps — one entry per earlier step: its result (large values
+    // spilled to files) plus the paths of its output files, read from git.
+    const outputFiles = await this.listPreviousOutputFiles();
+    const stepIds = [...new Set([...Object.keys(previousOutputs), ...outputFiles.map((file) => file.stepId)])];
+    if (stepIds.length > 0) {
+      const entries: string[] = [];
+      for (const previousStepId of stepIds) {
+        const entry = [`### ${previousStepId}`];
+        if (previousStepId in previousOutputs) {
+          const result = await this.compactPreviousResult(previousStepId, previousOutputs[previousStepId], paths, INLINE_THRESHOLD);
+          entry.push('Result:', '```json', JSON.stringify(result, null, 2), '```');
         }
-        const record = stepOutput as Record<string, unknown>;
-        const compactOutput: Record<string, unknown> = {};
-
-        for (const [key, value] of Object.entries(record)) {
-          const serialized = typeof value === 'string' ? value : JSON.stringify(value);
-          if (serialized.length > INLINE_THRESHOLD) {
-            const ext = typeof value === 'string' && !value.trimStart().startsWith('{') ? '.md' : '.json';
-            const agentFilePath = await spillPreviousOutput(outputDir, hostOutputDir, `prev-${stepId}-${key}${ext}`, value);
-            fileRefs.push({ stepId, field: key, containerPath: agentFilePath });
-            compactOutput[key] = `[FILE: ${agentFilePath}]`;
-          } else {
-            compactOutput[key] = value;
-          }
+        const files = outputFiles.filter((file) => file.stepId === previousStepId);
+        if (files.length > 0 && paths !== undefined) {
+          entry.push('Output files:', formatFileList(files.map((file) => file.path), paths.workingDir));
         }
-        inlineOutputs[stepId] = compactOutput;
+        entries.push(entry.join('\n'));
       }
-
-      parts.push('## Previous Step Outputs');
-      parts.push(JSON.stringify(inlineOutputs, null, 2));
-
-      if (fileRefs.length > 0) {
-        parts.push(
-          '## Large Output Files\n' +
-          'Some previous step outputs were too large to include inline. ' +
-          `They have been written to files in ${outputDir}/${PREVIOUS_OUTPUTS_DIR}/. Read them with \`cat\` or your preferred tool:\n` +
-          fileRefs.map((r) => `- **${r.stepId}.${r.field}**: \`${r.containerPath}\``).join('\n'),
-        );
-      }
-    } else if (hasPreviousOutputs) {
-      parts.push('## Previous Step Outputs');
-      parts.push(JSON.stringify(previousOutputs, null, 2));
+      const spilled = entries.some((entry) => entry.includes('"[FILE: '));
+      parts.push(
+        '## Previous Steps\n' +
+        'What earlier steps of this run produced, by step.' +
+        (spilled ? ' A value too large to include inline was written to the file its `[FILE: ...]` marker names; read it from there.' : '') +
+        '\n\n' +
+        entries.join('\n\n'),
+      );
     }
 
-    // 7. Files earlier steps left in the workspace — they are on disk either
-    // way, but an agent that is not told about them does not look.
-    if (workingDir && this.runWorkspaceHandle && this.workspaceManager) {
+    // 7. Repository changes earlier steps made — on disk either way, but an
+    // agent that is not told about them does not look.
+    if (paths !== undefined && this.runWorkspaceHandle && this.workspaceManager) {
       const stepFiles = await this.workspaceManager.listStepFiles(this.runWorkspaceHandle).catch((error: unknown) => {
         agentLog('run.buildPrompt', 'could not list files of previous steps; prompt omits them', {
           stepId: this.context.stepId,
@@ -1528,9 +1342,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       });
       if (stepFiles.length > 0) {
         parts.push(
-          '## Files From Previous Steps\n' +
-          'Files earlier steps of this run left in the workspace, by step:\n\n' +
-          stepFiles.map(({ stepId, files }) => formatStepFileList(stepId, files, workingDir)).join('\n\n'),
+          '## Repository Changes From Previous Steps\n' +
+          'Files earlier steps of this run changed in the workspace, by step:\n\n' +
+          stepFiles.map(({ stepId, files }) => [`### ${stepId}`, formatFileList(files, paths.workingDir)].join('\n')).join('\n\n'),
         );
       }
     }
@@ -1538,20 +1352,56 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     return parts.join('\n\n');
   }
 
+  /** Earlier steps' Output Files on the run branch — never this step's own,
+   *  whose folder was just emptied. Empty when they cannot be listed. */
+  private async listPreviousOutputFiles(): Promise<OutputFileEntry[]> {
+    if (!this.runWorkspaceHandle || !this.workspaceManager) return [];
+    const files = await this.workspaceManager.listOutputFiles(this.runWorkspaceHandle).catch((error: unknown) => {
+      agentLog('run.buildPrompt', 'could not list output files of previous steps; prompt omits them', {
+        stepId: this.context.stepId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    });
+    return files.filter((file) => file.stepId !== this.context.stepId);
+  }
+
+  /** A previous step's result with each value too large to inline spilled to
+   *  a file in the engine dir and replaced by `[FILE: <path>]`. */
+  private async compactPreviousResult(
+    previousStepId: string,
+    stepOutput: unknown,
+    paths: PromptPaths | undefined,
+    inlineThreshold: number,
+  ): Promise<unknown> {
+    if (paths === undefined || isRecord(stepOutput) === false) return stepOutput;
+    const compactOutput: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(stepOutput)) {
+      const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+      if (serialized.length > inlineThreshold) {
+        const ext = typeof value === 'string' && !value.trimStart().startsWith('{') ? '.md' : '.json';
+        compactOutput[key] = `[FILE: ${await spillPreviousOutput(paths, `prev-${previousStepId}-${key}${ext}`, value)}]`;
+      } else {
+        compactOutput[key] = value;
+      }
+    }
+    return compactOutput;
+  }
+
   protected async spawnLocalProcess(
     prompt: string,
     options: SpawnCliOptions,
     workingDir: string,
   ): Promise<SpawnDockerResult> {
-    const outputDir = options.outputDir!;
+    const engineDir = options.engineDir!;
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const logFile = options.logFile ?? null;
 
     // Write prompt to file for debugging and 'file' delivery mode
-    const promptFilePath = join(outputDir, 'prompt.txt');
+    const promptFilePath = join(engineDir, 'prompt.txt');
     await writeFile(promptFilePath, prompt, 'utf-8');
 
-    await this.prepareOutputDir(outputDir, options);
+    await this.writeAgentConfig(engineDir, options);
     // Workspace (git worktree) is already set up by run() → resolveRunWorkspace; nothing to do here.
 
     // --- Spawn the agent CLI ---
@@ -1565,7 +1415,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         env: {
           ...process.env,
           ...this.resolvedEnv.vars,
-          ...this.getLocalInternalEnvVars(outputDir),
+          ...this.getLocalInternalEnvVars(engineDir),
         },
       });
 
@@ -1629,15 +1479,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           return;
         }
 
-        if (!finalResult) {
-          this.recoverOutputFromDirectory(outputDir)
-            .then((recovered) => resolve(recovered))
-            .catch(() => {
-              reject(new Error('Local process produced no result event and no files found in output directory'));
-            });
-          return;
-        }
-
         resolve(finalResult);
       });
 
@@ -1648,16 +1489,9 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       child.stdin.end();
     });
 
-    const gitMetadata = await this.commitRunWorkspace(outputDir, {
-      status: 'success',
-      agentPlugin: this.agentName,
-      agentImage: this.agentConfig.image,
-    });
+    const mcpStatus = await this.mcpServerStatus(rawStdout, engineDir);
 
-    const localPresentation = await readPresentation(outputDir);
-    const mcpStatus = await this.mcpServerStatus(rawStdout, outputDir);
-
-    return { cliOutput, failedMcpServers: mcpStatus.failed, pendingMcpServers: mcpStatus.pending, gitMetadata, presentation: localPresentation, outputDir, injectedEnvVars: [] };
+    return { cliOutput, failedMcpServers: mcpStatus.failed, pendingMcpServers: mcpStatus.pending, injectedEnvVars: [] };
   }
 
   protected async spawnDockerContainer(
@@ -1671,6 +1505,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     if (!this.runWorkspaceHandle) {
       throw new Error('runWorkspaceHandle is not set — resolveRunWorkspace() must run before spawnDockerContainer()');
     }
+    const stepOutputDir = options?.stepOutputDir ?? await this.resetStepOutputDir();
 
     const imageBuild = resolveImageBuild(this.agentConfig.image, this.agentConfig, this.context, this.resolvedEnv.vars);
     const image = imageBuild?.image ?? this.agentConfig.image;
@@ -1687,18 +1522,17 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const envVars = { ...this.resolvedEnv.vars, ...internalVars };
     const injectedEnvVars = this.resolvedEnv.injectedKeys;
 
-    // Use pre-created output dir from options, or create one
-    let outputDir: string;
-    if (options?.outputDir) {
-      outputDir = options.outputDir;
+    // Use pre-created engine dir from options, or create one
+    let engineDir: string;
+    if (options?.engineDir) {
+      engineDir = options.engineDir;
     } else {
-      const rawOutputDir = await mkdtemp(join(tmpdir(), 'mediforce-docker-output-'));
-      outputDir = await realpath(rawOutputDir);
+      const rawEngineDir = await mkdtemp(join(tmpdir(), 'mediforce-docker-engine-'));
+      engineDir = await realpath(rawEngineDir);
     }
 
     // Write prompt to file — used for 'file' delivery mode and as debugging aid
-    const promptFilePath = join(outputDir, 'prompt.txt');
-    await writeFile(promptFilePath, prompt, 'utf-8');
+    await writeFile(join(engineDir, 'prompt.txt'), prompt, 'utf-8');
 
     // The host `options.pluginDir` is mounted at `${CONTAINER_PLUGIN_MOUNT}` inside the
     // container; the agent's config and command get the path it will actually see
@@ -1706,8 +1540,8 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     const containerOptions: SpawnCliOptions = { ...options };
     if (options?.pluginDir) containerOptions.pluginDir = CONTAINER_PLUGIN_MOUNT;
 
-    // Let subclass write additional files (e.g. agent config) to the output dir
-    await this.prepareOutputDir(outputDir, containerOptions);
+    // Let subclass write the agent CLI's config into the engine dir
+    await this.writeAgentConfig(engineDir, containerOptions);
 
     const isMockAgent = process.env.MOCK_AGENT === 'true';
 
@@ -1723,7 +1557,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       '--name', containerName,
       '--memory', '8g',
       '--cpus', '2',
-      '-v', `${outputDir}:/output`,
+      '-v', `${engineDir}:${CONTAINER_ENGINE_MOUNT}`,
     ];
 
     // Inject agent-specific env vars
@@ -1731,9 +1565,11 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       dockerArgs.push('-e', `${key}=${value}`);
     }
 
-    // /workspace: bind-mount the host run worktree (read-write)
+    // /workspace: bind-mount the host run worktree (read-write); /output: the
+    // step's output folder inside it (ADR-0030).
     dockerArgs.push(
       '-v', `${this.runWorkspaceHandle.path}:/workspace`,
+      '-v', `${stepOutputDir}:${CONTAINER_OUTPUT_MOUNT}`,
       '-w', '/workspace',
     );
 
@@ -1777,7 +1613,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     if (isMockAgent) {
       dockerArgs.push(...this.getMockDockerArgs(stepId));
     } else {
-      const commandSpec = this.getAgentCommand('/output/prompt.txt', containerOptions);
+      const commandSpec = this.getAgentCommand(`${CONTAINER_ENGINE_MOUNT}/prompt.txt`, containerOptions);
       dockerArgs.push(...commandSpec.args);
       promptViaStdin = commandSpec.promptDelivery === 'stdin';
     }
@@ -1793,7 +1629,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       containerName,
       processInstanceId,
       stepId,
-      outputDir,
+      outputDir: engineDir,
       logFile,
       imageBuild,
       lineFormat: this.logFormat,
@@ -1811,12 +1647,12 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     }
 
     const rawStdout = rawLines.join('\n');
-    const finalResult = this.parseAgentOutput(rawStdout);
+    const cliOutput = this.parseAgentOutput(rawStdout);
     const timeoutMinutes = Math.round(timeoutMs / 60_000);
 
     if (spawnResult.exitCode !== 0) {
       const exitInfo = formatExitInfo(spawnResult, timeoutMinutes);
-      const detail = this.extractErrorFromResult(finalResult) || spawnResult.stderr.trim() || 'no stderr output';
+      const detail = this.extractErrorFromResult(cliOutput) || spawnResult.stderr.trim() || 'no stderr output';
       const authHint = /not logged in|please run \/login/i.test(detail)
         ? ' — Hint: set ANTHROPIC_API_KEY (or OPENROUTER_API_KEY + ANTHROPIC_BASE_URL) in workflow env or secrets'
         : '';
@@ -1824,93 +1660,46 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       throw new Error(`Docker container failed (${exitInfo}): ${detail}${authHint}${imageHint}`);
     }
 
-    let cliOutput: string;
-    if (finalResult) {
-      cliOutput = finalResult;
-    } else {
-      // Agent wrote files but never emitted a text response with the contract
-      // (common with some models like Gemini Flash Lite that stop after tool calls).
-      // Fallback: try result.json first, then scan /output/ for any written files.
-      cliOutput = await this.recoverOutputFromDirectory(outputDir);
-    }
+    const mcpStatus = await this.mcpServerStatus(rawStdout, engineDir);
 
-    const gitMetadata = await this.commitRunWorkspace(outputDir, {
-      status: 'success',
-      agentPlugin: this.agentName,
-      agentImage: this.agentConfig.image,
-    });
-
-    const presentation = await readPresentation(outputDir);
-    const mcpStatus = await this.mcpServerStatus(rawStdout, outputDir);
-
-    return { cliOutput, failedMcpServers: mcpStatus.failed, pendingMcpServers: mcpStatus.pending, gitMetadata, presentation, outputDir, injectedEnvVars };
+    return { cliOutput, failedMcpServers: mcpStatus.failed, pendingMcpServers: mcpStatus.pending, injectedEnvVars };
   }
 }
 
-/** Where large previous-step and previous-run values are spilled inside the
- *  output dir. Dotted, so they never become this step's Output Files. */
-const PREVIOUS_OUTPUTS_DIR = '.previous-outputs';
+/** Where the agent finds the run's folders: the container mounts in Docker
+ *  mode, the real host paths in local mode. */
+interface PromptPaths {
+  /** The run's git worktree. */
+  workingDir: string;
+  /** The step's output folder. */
+  outputDir: string;
+  /** The engine's per-step directory, as the agent sees it. */
+  engineDir: string;
+  /** The engine's per-step directory on the host. */
+  hostEngineDir: string;
+}
 
-/** Most files listed per step under "Files From Previous Steps". */
+/** Where large previous-step and previous-run values are spilled inside the
+ *  engine dir. */
+const PREVIOUS_OUTPUTS_DIR = 'previous-outputs';
+
+/** Most files listed per step under "Previous Steps" and "Repository Changes". */
 const MAX_LISTED_FILES_PER_STEP = 100;
 
-/** Write a value too large to inline into the prompt to a file and return the
- *  path the agent reads it at. `hostOutputDir` is the real directory on disk;
- *  `outputDir` is the agent's view of it (`/output` in a container). */
-async function spillPreviousOutput(
-  outputDir: string,
-  hostOutputDir: string | undefined,
-  filename: string,
-  value: unknown,
-): Promise<string> {
-  const hostDir = join(hostOutputDir ?? outputDir, PREVIOUS_OUTPUTS_DIR);
+/** Write a value too large to inline into the prompt to a file in the engine
+ *  dir and return the path the agent reads it at. */
+async function spillPreviousOutput(paths: PromptPaths, filename: string, value: unknown): Promise<string> {
+  const hostDir = join(paths.hostEngineDir, PREVIOUS_OUTPUTS_DIR);
   await mkdir(hostDir, { recursive: true });
   await writeFile(join(hostDir, filename), typeof value === 'string' ? value : JSON.stringify(value, null, 2), 'utf-8');
-  return `${outputDir}/${PREVIOUS_OUTPUTS_DIR}/${filename}`;
+  return `${paths.engineDir}/${PREVIOUS_OUTPUTS_DIR}/${filename}`;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && Array.isArray(value) === false;
-}
-
-function formatStepFileList(stepId: string, files: string[], workingDir: string): string {
+function formatFileList(files: string[], workingDir: string): string {
   const listed = files.slice(0, MAX_LISTED_FILES_PER_STEP).map((file) => `- ${workingDir}/${file}`);
   const unlisted = files.length - listed.length;
   if (unlisted > 0) {
     listed.push(`- … and ${unlisted} more (\`git log --name-only\` in ${workingDir} lists them)`);
   }
-  return [`### ${stepId}`, ...listed].join('\n');
-}
-
-/** Read presentation.md (preferred) or presentation.html from the agent's
- *  output directory. Returns null when neither file exists. Markdown wins
- *  on tie — agents that want the iframe path must omit the .md file. */
-async function readPresentation(outputDir: string): Promise<Presentation | null> {
-  try {
-    return {
-      kind: 'markdown',
-      content: await readFile(join(outputDir, 'presentation.md'), 'utf-8'),
-    };
-  } catch {
-    try {
-      return {
-        kind: 'html',
-        content: await readFile(join(outputDir, 'presentation.html'), 'utf-8'),
-      };
-    } catch {
-      return null;
-    }
-  }
-}
-
-/** The agent's answer as JSON — as sent, or out of the markdown fence a model wraps it in. */
-function parseAgentContract(agentText: string): AgentOutputContract | null {
-  for (const candidate of [agentText, unfence(agentText)]) {
-    try {
-      return JSON.parse(candidate) as AgentOutputContract;
-    } catch {
-      continue;
-    }
-  }
-  return null;
+  return listed.join('\n');
 }

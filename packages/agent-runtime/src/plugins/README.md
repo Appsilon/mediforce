@@ -24,16 +24,19 @@ All four are registered in
 ## Writing one
 
 Subclass `BaseContainerAgentPlugin` and implement `getAgentCommand()`,
-`getMockDockerArgs()`, and `parseAgentOutput()`; set `logFormat` to name the
+`getMockDockerArgs()` (usually `mockAgentDockerArgs`, which writes the
+fixture as `/output/result.json`), and `parseAgentOutput()`, which only
+extracts token usage and errors — the step's result is always
+`/output/result.json` (ADR-0030); set `logFormat` to name the
 CLI's stream format, which feeds both the activity log and the Agent Trajectory.
 An agent CLI with its own config file overrides `writeAgentConfig()` and
 serialises `buildMcpServers()` into it, and `mcpServerStatus()` to report MCP
 servers that never connected, so a step's MCP bindings mean the same thing on
 every runtime.
 The base class already handles
-spawning, mounts, git clone, MCP config assembly, environment resolution, and
-output extraction — roughly everything that is hard to get right and identical
-across plugins.
+spawning, mounts (`/workspace`, `/output`, `/engine`), git clone, MCP config
+assembly, environment resolution, and reading `result.json` — roughly
+everything that is hard to get right and identical across plugins.
 
 `packages/example-agent/` is a minimal reference implementation.
 

@@ -3,7 +3,7 @@
 `self-review` returned `revise` — apply its fixable concerns to the pushed branch
 and re-push. This is a bounded loop (max 2 passes); make the concerns count.
 
-### Inputs (under `## Previous Step Outputs`)
+### Inputs (under `## Previous Steps`)
 - `implement` — `branch`, `issueNumber`, `baseBranch`.
 - `self-review` — `concerns[]` (the findings to address).
 - `revise` — your OWN previous output, if this is the 2nd pass:
@@ -49,4 +49,3 @@ Write ONLY this JSON to `/output/result.json`:
 }
 ```
 
-Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "revise pass <n>"}`.

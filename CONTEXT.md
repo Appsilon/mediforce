@@ -160,10 +160,15 @@ finalized artifact is promoted to Output only when the cowork step completes.
 **Output Files** (per Step Execution):
 Files a Step Execution leaves behind alongside its Output (reports, exports,
 generated documents) — preserved per Workflow Run on success and failure
-alike, listable and downloadable by Run members (UI + CLI).
+alike, listable and downloadable by Run members (UI + CLI). An agent step
+writes them into its output folder, `.mediforce/output/<stepId>/` in the run
+worktree (`/output` to the agent), next to the required `result.json` that
+holds its Output; the list is read from git, never reported by the agent
+(ADR-0030). Code the agent edits elsewhere in the worktree is not an Output
+File.
 _Avoid_: Artifact (= Cowork Session deliverable), "deliverable"/`deliverableFile`
-(legacy single-file mechanism), conflating with Output (= the structured result;
-Output Files are its file siblings).
+(removed single-file mechanism, ADR-0030), conflating with Output (= the structured result
+in `result.json`; Output Files are its file siblings).
 
 ### Agent + human work
 

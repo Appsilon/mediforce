@@ -263,7 +263,8 @@ function AgentOutputSection({
     <AgentOutputReviewPanel
       agentOutput={agentOutput}
       stepId={task.stepId}
-      instanceId={task.processInstanceId}
+      runId={task.processInstanceId}
+      runStatus={processInstance?.status}
     />
   );
 }

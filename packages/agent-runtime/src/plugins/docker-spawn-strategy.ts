@@ -66,6 +66,8 @@ export interface DockerSpawnRequest {
   containerName: string;
   processInstanceId: string;
   stepId: string;
+  /** Host path of the engine directory (mounted at /engine). The queued path
+   *  carries its files to the worker and back. */
   outputDir: string;
   logFile: string | null;
   /**

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PresentationSchema, TokenUsageSchema } from './agent-output-envelope';
+import { TokenUsageSchema } from './agent-output-envelope';
 import type { Skill } from './skill';
 
 export const StepExecutionStatusSchema = z.enum([
@@ -56,15 +56,8 @@ export const AgentOutputSnapshotSchema = z.object({
     changedFiles: z.array(z.string()),
     repoUrl: z.string(),
   }).nullable(),
-  deliverableFile: z.string().nullable().optional(),
   tokenUsage: TokenUsageSchema.optional(),
   estimatedCostUsd: z.number().optional(),
-  presentation: z.union([z.string(), PresentationSchema])
-    .transform((value) =>
-      typeof value === 'string' ? { kind: 'html' as const, content: value } : value,
-    )
-    .nullable()
-    .optional(),
   /** Absent when the step's agent holds no Skills. */
   skills: z.array(OfferedSkillSchema).optional(),
 });

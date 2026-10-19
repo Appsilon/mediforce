@@ -5,7 +5,7 @@ using the project's own `/code-review` methodology. You have fresh eyes and clea
 context — that is the point.
 
 ### Get the diff
-The pushed branch is under `## Previous Step Outputs` → `implement`
+The pushed branch is under `## Previous Steps` → `implement`
 (`implement.branch`, `implement.issueNumber`). Clone it and diff against `main`:
 
 ```
@@ -70,4 +70,4 @@ Write ONLY this JSON to `/output/result.json`:
 observability and do **not** route the run.
 
 `concerns` may be empty for `ship`. Each concern is one line, prefixed with its
-axis. Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "..."}`.
+axis.

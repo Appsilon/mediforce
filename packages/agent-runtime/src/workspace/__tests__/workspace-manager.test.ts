@@ -196,7 +196,7 @@ describe('WorkspaceManager', () => {
   });
 
   describe('listStepFiles', () => {
-    it('lists the files each step left in the worktree, by Step-Id, in step order', async () => {
+    it('lists the repository files each step changed, by Step-Id, in step order — Output Files apart', async () => {
       const wd = { name: 'wd-step-files', workspace: {} as WorkflowWorkspace };
       const ws = await manager.createRunWorkspace(wd, 'run-step-files');
 
@@ -214,8 +214,11 @@ describe('WorkspaceManager', () => {
       await manager.commitStep(ws, { stepId: 'review' });
 
       expect(await manager.listStepFiles(ws)).toEqual([
-        { stepId: 'extract', files: ['.mediforce/output/extract/report.html', 'data.csv'] },
+        { stepId: 'extract', files: ['data.csv'] },
         { stepId: 'review', files: ['data.csv', 'summary.md'] },
+      ]);
+      expect(await manager.listOutputFiles(ws)).toEqual([
+        { stepId: 'extract', name: 'report.html', path: '.mediforce/output/extract/report.html', size: 4 },
       ]);
     });
 
@@ -485,6 +488,16 @@ describe('formatStepCommitMessage (pure function)', () => {
       stepId: 'gen', stepName: 'Generate',
     }, [{ status: 'A', path: 'out.txt' }]);
     expect(msg.split('\n')[0]).toBe('◆ Generate → +out.txt');
+  });
+
+  it('leaves the step\'s result.json out of the subject, unless it is all the step changed', () => {
+    const result = { status: 'A', path: '.mediforce/output/grade/result.json' };
+    const listing = { status: 'A', path: '.mediforce/output/grade/ae-listing.csv' };
+
+    expect(formatStepCommitMessage(ws, { stepId: 'grade' }, [listing, result]).split('\n')[0])
+      .toBe('◆ grade → +.mediforce/output/grade/ae-listing.csv');
+    expect(formatStepCommitMessage(ws, { stepId: 'grade' }, [result]).split('\n')[0])
+      .toBe('◆ grade → +.mediforce/output/grade/result.json');
   });
 
   it('◆ marker with "no changes" when nothing staged and no summary', () => {
