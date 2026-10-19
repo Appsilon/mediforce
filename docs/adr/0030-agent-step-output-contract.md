@@ -121,8 +121,16 @@ step should rely on. `main` never carried it, so there is nothing to revert.
 ## Consequences
 
 - The output folder is cleared when a step starts, so a step that runs again
-  (loops, retries) never inherits files from its earlier execution. The earlier
-  files stay in git history.
+  (loops, retries) never inherits files from its earlier execution. Listing and
+  downloads keep reading the run-branch tip, so they show only the latest
+  execution's Output Files. An earlier execution's files stay in git at the
+  commit recorded on its Step Execution (`commitSha`), as ADR-0015's
+  "versioned per step, immutable" requires, but the UI and CLI no longer list
+  them. Today a re-run already overwrites same-named files at the tip and
+  leaves stale differently-named ones behind, wrongly shown as the latest
+  execution's. Hiding earlier executions' files from the listing is an
+  **accepted regression**; reading a chosen execution's files at its
+  `commitSha` is not part of this ADR.
 - Files over the size cap are removed before the commit and logged — the same
   outcome as today's skip.
 - Agents and scripts keep writing to `/output/result.json`, so existing scripts
