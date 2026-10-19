@@ -57,8 +57,11 @@ result already says, and that is checked: a reshaped result carrying a value
 the original does not contain is rejected. It is validated again, keeps the
 agent's original in an annotation and in the `agent.run` audit event
 (`reshapedBy`, `originalResult`), and one that still violates escalates with
-reason `output_schema` (ADR-0023 D13). A repair call the timeout cuts short is
-not aborted; its late answer is dropped. `AgentStepExecutor` writes the reason of every
+reason `output_schema` (ADR-0023 D13). A plugin that commits `result.json`
+reshapes it through `context.conformResult` before the commit and writes the
+reshaped result back, so the run branch holds the result later steps get; the
+runner reshapes only a result a plugin emits without doing so. A repair call
+the timeout cuts short is not aborted; its late answer is dropped. `AgentStepExecutor` writes the reason of every
 escalation that fails the step to the step execution's and the run's `error`.
 
 **An optional `context.outputGate` checks a result that passed `outputSchema`.**

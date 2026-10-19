@@ -840,6 +840,63 @@ describe('AgentRunner outputSchema (ADR-0023 D13)', () => {
     });
   });
 
+  /** A plugin that commits its result: reshapes it through conformResult first, then emits what it got. */
+  function makeConformingPlugin(agentResult: Record<string, unknown>) {
+    const conformed: Record<string, unknown>[] = [];
+    let context: WorkflowAgentContext | undefined;
+    const plugin: StepExecutorPlugin = {
+      initialize: async (received) => {
+        context = received as WorkflowAgentContext;
+      },
+      run: async (emit: EmitFn) => {
+        const result = await context!.conformResult!(agentResult);
+        conformed.push(result);
+        await emit({ type: 'result', payload: makeValidEnvelope({ result }), timestamp: new Date().toISOString() });
+      },
+    };
+    return { plugin, conformed };
+  }
+
+  it('hands a committing plugin the reshaped result before it commits, reshaping only once', async () => {
+    const { plugin, conformed } = makeConformingPlugin({ finding_list: ['AE grade 3'] });
+    const llm = vi.fn<LlmClient['complete']>().mockResolvedValue({
+      content: '{"findings": ["AE grade 3"]}',
+      model: 'anthropic/claude-sonnet-4',
+      usage: { promptTokens: 10, completionTokens: 5 },
+    });
+
+    const result = await runner.runWithWorkflowStep(plugin, { ...makeSchemaStepContext(), llm: { complete: llm } });
+
+    expect(conformed).toEqual([{ findings: ['AE grade 3'] }]);
+    expect(llm).toHaveBeenCalledOnce();
+    expect(result.status).toBe('completed');
+    expect(result.envelope?.annotations.some((annotation) => annotation.content.includes('finding_list'))).toBe(true);
+    const [audit] = await auditRepository.getByProcess('instance-1');
+    expect(audit?.outputSnapshot).toMatchObject({
+      reshapedBy: 'anthropic/claude-sonnet-4',
+      originalResult: { finding_list: ['AE grade 3'] },
+    });
+  });
+
+  it('escalates a committing plugin\'s result the reshape could not fix, without reshaping it again', async () => {
+    const { plugin, conformed } = makeConformingPlugin({ summary: 'no findings at all' });
+    const llm = vi.fn<LlmClient['complete']>().mockResolvedValue({
+      content: '{"summary": "no findings at all"}',
+      model: 'anthropic/claude-sonnet-4',
+      usage: { promptTokens: 10, completionTokens: 5 },
+    });
+
+    const result = await runner.runWithWorkflowStep(plugin, { ...makeSchemaStepContext(), llm: { complete: llm } });
+
+    expect(conformed).toEqual([{ summary: 'no findings at all' }]);
+    expect(llm).toHaveBeenCalledOnce();
+    expect(result.fallbackReason).toBe('output_schema');
+    expect(result.errorMessage).toBe(
+      'result does not match agent.outputSchema: missing required keys: findings '
+      + '(reshaping it did not fix it: missing required keys: findings)',
+    );
+  });
+
   it('escalates with reason output_schema, naming both problems, when the reshaped result still violates', async () => {
     const { plugin, seenContexts } = makeScriptedPlugin([
       makeValidEnvelope({ result: { summary: 'no findings at all' } }),

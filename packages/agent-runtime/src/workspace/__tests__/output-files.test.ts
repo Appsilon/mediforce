@@ -71,6 +71,17 @@ describe('step output folder', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('nested/big.bin'));
   });
 
+  it('keeps result.json over the size cap — it is the step result, not an Output File', async () => {
+    process.env[MAX_BYTES_ENV] = '10';
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const dir = await resetStepOutputDir(worktreeDir, 'extract');
+    await writeFile(join(dir, 'result.json'), JSON.stringify({ summary: 'x'.repeat(50) }));
+
+    await prepareStepOutputDirForCommit(dir);
+
+    await expect(stat(join(dir, 'result.json'))).resolves.toBeDefined();
+  });
+
   it('does nothing when the folder does not exist', async () => {
     await expect(prepareStepOutputDirForCommit(join(worktreeDir, 'missing'))).resolves.toBeUndefined();
   });

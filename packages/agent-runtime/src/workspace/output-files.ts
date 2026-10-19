@@ -4,7 +4,7 @@
  * `result.json` and its Output Files straight into it, and the step commit
  * captures them: nothing is copied and nothing is deleted after the step.
  */
-import { mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { isRecord, type Presentation } from '@mediforce/platform-core';
 
@@ -71,6 +71,7 @@ async function removeOversizedFiles(dir: string, relativePrefix: string, maxByte
       continue;
     }
     if (entry.isFile() === false) continue;
+    if (relativePath === RESULT_FILE_NAME) continue;
     const { size } = await stat(path);
     if (size <= maxBytes) continue;
     console.warn(
@@ -84,8 +85,9 @@ async function removeOversizedFiles(dir: string, relativePrefix: string, maxByte
 /**
  * Make the step's output folder ready for the step commit: remove the inputs
  * the engine seeded, top-level dotfiles (tool state such as `.Rhistory` or
- * `.cache/`, never an Output File), and every file over the per-file size cap
- * (`MEDIFORCE_OUTPUT_FILE_MAX_BYTES`, default 100 MiB), logging each.
+ * `.cache/`, never an Output File), and every Output File over the per-file
+ * size cap (`MEDIFORCE_OUTPUT_FILE_MAX_BYTES`, default 100 MiB), logging each.
+ * `result.json` is the step result, not an Output File, so the cap never removes it.
  * Best-effort: never throws — a cleanup failure must not fail the step commit.
  */
 export async function prepareStepOutputDirForCommit(stepOutputDir: string): Promise<void> {
@@ -120,6 +122,11 @@ export async function readStepResult(stepOutputDir: string): Promise<Record<stri
   }
   if (isRecord(parsed) === false) throw new Error(`${RESULT_FILE_NAME} is not a JSON object`);
   return parsed;
+}
+
+/** Overwrite the step's `result.json` — with the result reshaped to match `agent.outputSchema`. */
+export async function writeStepResult(stepOutputDir: string, result: Record<string, unknown>): Promise<void> {
+  await writeFile(join(stepOutputDir, RESULT_FILE_NAME), `${JSON.stringify(result, null, 2)}\n`, 'utf-8');
 }
 
 /** Read presentation.md (preferred) or presentation.html from the step's

@@ -10,7 +10,7 @@ import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-stra
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { RetiredFileSkillError } from '../skills/resolve-skills-for-step';
-import { PRESENTATION_FILE_NAMES, RESULT_FILE_NAME, readPresentation, readStepResult } from '../workspace/output-files';
+import { PRESENTATION_FILE_NAMES, RESULT_FILE_NAME, readPresentation, readStepResult, writeStepResult } from '../workspace/output-files';
 import type { OutputFileEntry } from '../workspace/workspace-reader';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
 import { DEFAULT_STEP_TIMEOUT_MINUTES, isRecord, agentLogEntries, createLineStreamReader, offeredSkill, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
@@ -1070,6 +1070,17 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
       // The step's result is /output/result.json — never the agent's final message (ADR-0030).
       const parsedResult = await readStepResult(stepOutputDir);
+      // The reserved keys move onto the envelope; the rest is the result.
+      const { confidence: reportedConfidence, confidence_rationale: reportedRationale, ...agentResult } = parsedResult;
+      // Reshape before the commit, so the run branch holds the result later steps get.
+      const cleanResult = isWorkflowAgentContext(this.context) && this.context.conformResult !== undefined
+        ? await this.context.conformResult(agentResult)
+        : agentResult;
+      if (cleanResult !== agentResult) {
+        await writeStepResult(stepOutputDir, {
+          ...cleanResult, confidence: reportedConfidence, confidence_rationale: reportedRationale,
+        });
+      }
 
       // Persist any deliverable file for the Download Report button — before
       // the commit, which removes files over the size cap from the folder.
@@ -1127,9 +1138,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           stepId, instanceId, inputTokens: tokenUsage.inputTokens, outputTokens: tokenUsage.outputTokens,
         });
       }
-
-      // The reserved keys move onto the envelope; the rest is the result.
-      const { confidence: _c, confidence_rationale: _cr, ...cleanResult } = parsedResult;
 
       replayMissesRecorded = true;
       await this.recordMcpReplayMisses(engineDir);

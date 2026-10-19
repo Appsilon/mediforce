@@ -157,6 +157,27 @@ describe('ClaudeCodeAgentPlugin ↔ WorkspaceManager integration', () => {
     expect(execFileSync('git', ['log', '-1', '--format=%s'], { cwd: wtDir, encoding: 'utf-8' })).toContain('✗');
   });
 
+  it('commits the result conformResult reshaped, not the one the agent wrote, keeping its confidence', async () => {
+    const conformResult = vi.fn(async () => ({ status: 'done' }));
+    const context = buildWorkflowContext({ conformResult });
+    const plugin = new ClaudeCodeAgentPlugin();
+    await plugin.initialize(context);
+    vi.spyOn(plugin as unknown as GetAgentCommandTarget, 'getAgentCommand').mockReturnValue(mockAgentShellCommand(
+      `echo '{"ok":true,"confidence":0.9}' > .mediforce/output/extract/result.json`, 'extract', false,
+    ));
+    const { emit, events } = buildEmitSpy();
+
+    await plugin.run(emit);
+
+    expect(conformResult).toHaveBeenCalledWith({ ok: true });
+    const committed = execFileSync('git', ['show', 'HEAD:.mediforce/output/extract/result.json'], {
+      cwd: worktreeOf(context), encoding: 'utf-8',
+    });
+    expect(JSON.parse(committed)).toEqual({ status: 'done', confidence: 0.9 });
+    const resultEvent = events.find((event) => event.type === 'result');
+    expect(resultEvent?.payload).toMatchObject({ result: { status: 'done' }, confidence: 0.9 });
+  });
+
   it('never commits an Output File over the size cap', async () => {
     process.env.MEDIFORCE_OUTPUT_FILE_MAX_BYTES = '64';
     vi.spyOn(console, 'warn').mockImplementation(() => {});

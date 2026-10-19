@@ -141,8 +141,8 @@ step should rely on. `main` never carried it, so there is nothing to revert.
   execution's. Hiding earlier executions' files from the listing is an
   **accepted regression**; reading a chosen execution's files at its
   `commitSha` is not part of this ADR.
-- Files over the size cap are removed before the commit and logged — the same
-  outcome as today's skip.
+- Output Files over the size cap are removed before the commit and logged — the
+  same outcome as today's skip. `result.json` is exempt: it is the step result.
 - Agents and scripts keep writing to `/output/result.json`, so existing scripts
   keep working.
 - Every agent-step workflow must write `result.json`. Workflows that rely on a

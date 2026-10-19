@@ -51,8 +51,9 @@ The mounts are described in the header comment of
 copied and nothing is deleted after the step. It is emptied when the step
 starts, so a step that runs again (a loop, a retry) never inherits its earlier
 files — those stay in git history. Before the commit, top-level dotfiles (tool
-state such as `.Rhistory`) and every file over `MEDIFORCE_OUTPUT_FILE_MAX_BYTES`
-are removed from it, the oversized ones logged.
+state such as `.Rhistory`) and every Output File over
+`MEDIFORCE_OUTPUT_FILE_MAX_BYTES` are removed from it, the oversized ones
+logged. `result.json` is never removed by the cap.
 Previous-step and previous-run values too large to inline in an agent's prompt
 are written to `/engine/previous-outputs/`. An agent's prompt has one entry per
 earlier step (`## Previous Steps`): its result plus the paths of its Output
@@ -190,15 +191,16 @@ envelope and out of `result`. The agent's final message is ignored, and token
 usage comes from the CLI's own stream only. When the step
 sets `agent.outputSchema` — or inherits its Agent's `outputSchema` by setting
 none — the schema is added to the prompt and `AgentRunner`
-checks `result` against it after the run: a violation records a `status` event
-and runs the plugin once more with the error in the prompt; a second violation
-escalates the run to a person with `fallbackReason: output_schema`
+checks `result` against it: a violation records a `status` event and is
+reshaped by one LLM call on the step's model — the agent is not rerun — and a
+result the reshape cannot fix escalates the run to a person with
+`fallbackReason: output_schema`
 ([`agent-runner.ts`](../../packages/agent-runtime/src/runner/agent-runner.ts),
-ADR-0023 D13). Both attempts share the one step timeout — the retry gets what the
-first attempt left, and with nothing left the violation escalates straight
-away — so the run route's reap guard never reads a live retry as
-stranded. The retry refreshes the run's `updatedAt` for the heartbeat's
-stranded sweep. `agent.outputSchema` is valid on `executor: agent` steps only;
+ADR-0023 D13). The container plugin reshapes through `context.conformResult`
+before the step commit and writes the reshaped result back to `result.json`, so
+the run branch holds the result later steps get. The reshape gets what is left
+of the one step timeout; with nothing left the violation escalates straight
+away. `agent.outputSchema` is valid on `executor: agent` steps only;
 definition validation rejects it anywhere else.
 
 A result that passes `outputSchema` is then checked by the step's production

@@ -141,6 +141,12 @@ export interface WorkflowAgentContext {
    *  applies — production Evaluators (ADR-0023 D13). Set by platform-ui's
    *  executeAgentStep only for a production run of a step that has them. */
   outputGate?: AgentOutputGate;
+  /** Reshapes a result that breaks `step.agent.outputSchema` before the plugin
+   *  commits it, so the run branch holds the result later steps get
+   *  (ADR-0030). Returns the result to commit and emit — the original when it
+   *  conforms or cannot be reshaped. Set by AgentRunner when the step has an
+   *  outputSchema. */
+  conformResult?: (result: Record<string, unknown>) => Promise<Record<string, unknown>>;
   /** Set by platform-ui's executeAgentStep for an eval trial only. */
   mcpTapes?: McpTapeContext;
 }
