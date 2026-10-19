@@ -77,6 +77,18 @@ test.describe('Step Output Viewer Journey', () => {
     await expect(page.getByTestId('step-result-json')).toBeVisible();
   });
 
+  test('a script step shows its result in the viewer, above its still-expanded Step IO', async ({ page }) => {
+    trackPageErrors(page);
+
+    await page.goto(
+      `/${TEST_ORG_HANDLE}/workflows/Entry%20Trigger%20Input/runs/proc-entry-trigger-input/steps/process?executionId=exec-entry-trigger-input`,
+    );
+
+    await expect(stepOutputFile(page)).toHaveValue('result.json', { timeout: 10_000 });
+    await expect(page.getByTestId('step-result-json').getByText('Accepted')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Input' })).toBeVisible();
+  });
+
   test('L3 reviewer sees the step output viewer on the review task', async ({ page, request }) => {
     trackPageErrors(page);
 

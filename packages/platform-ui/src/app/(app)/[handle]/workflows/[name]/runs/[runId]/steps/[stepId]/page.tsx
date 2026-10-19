@@ -17,6 +17,7 @@ import { getAgentOutput, type AgentOutputData } from '@/components/tasks/task-ut
 import { resolveStepView } from '@/components/tasks/resolve-step-view';
 import { HumanStepView } from '@/components/tasks/human-step-view';
 import { AgentOutputDisplay } from '@/components/agents/agent-output-display';
+import { StepOutputViewer } from '@/components/agents/step-output-viewer';
 import { StepQualificationBadge } from '@/components/evaluation/step-qualification-badge';
 import { agentOutputFromEnvelope } from './agent-output-from-envelope';
 import { isEntryStep } from './step-input';
@@ -160,6 +161,14 @@ export default function StepDetailPage() {
 
   const stepName = definitionStep?.name ?? formatStepName(decodedStepId);
   const hasAgentBadge = agentOutput !== null || execution?.agentOutput !== undefined;
+  // Script steps record no Agent Run: their result lives on the Step Execution.
+  const scriptExecution = agentOutput === null
+    && executorType === 'script'
+    && execution !== null
+    && execution.status !== 'pending'
+    && execution.status !== 'running'
+    ? execution
+    : null;
 
   if (stepView.kind === 'human-step') {
     const executionPanel = execution !== null && stepView.access.kind === 'completed' ? (
@@ -232,6 +241,11 @@ export default function StepDetailPage() {
       {agentOutput && runId && (
         <div className="rounded-lg border bg-card">
           <AgentOutputDisplay agentOutput={agentOutput} runId={runId} stepId={decodedStepId} runStatus={instance.status} />
+        </div>
+      )}
+      {scriptExecution !== null && runId !== undefined && (
+        <div className="rounded-lg border bg-card">
+          <StepOutputViewer result={scriptExecution.output} runId={runId} stepId={decodedStepId} runStatus={instance.status} />
         </div>
       )}
 

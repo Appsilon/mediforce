@@ -27,7 +27,8 @@ interface StepOutputViewerProps {
  * One viewer per step (ADR-0030 decision 7): a dropdown that opens on
  * `result.json`, followed by every Output File the step committed to the run
  * branch. `result.json` renders from the envelope, so runs that predate the
- * committed file still show it. Every entry can be downloaded.
+ * committed file still show it. A step that wrote no `result.json` (a failed
+ * run) still lists its committed Output Files. Every entry can be downloaded.
  */
 export function StepOutputViewer({ result, runId, stepId, runStatus }: StepOutputViewerProps) {
   const { data: runFiles } = useRunOutputFiles(stepId === null ? null : runId, runStatus);
@@ -52,7 +53,7 @@ export function StepOutputViewer({ result, runId, stepId, runStatus }: StepOutpu
         await downloadOutputFile(runId, selectedFile);
       } else {
         saveBlobToDevice(
-          new Blob([`${JSON.stringify(result ?? {}, null, 2)}\n`], { type: 'application/json' }),
+          new Blob([`${JSON.stringify(result, null, 2)}\n`], { type: 'application/json' }),
           RESULT_FILE_NAME,
         );
       }
@@ -86,14 +87,16 @@ export function StepOutputViewer({ result, runId, stepId, runStatus }: StepOutpu
           {downloadError !== null && (
             <span className="truncate text-xs text-destructive">{downloadError}</span>
           )}
-          <button
-            onClick={handleDownload}
-            disabled={downloading}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-primary hover:bg-muted disabled:opacity-50"
-          >
-            <Download className="h-3.5 w-3.5" />
-            {downloading ? 'Downloading…' : 'Download'}
-          </button>
+          {(selectedFile !== null || result !== null) && (
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-primary hover:bg-muted disabled:opacity-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {downloading ? 'Downloading…' : 'Download'}
+            </button>
+          )}
           {selectedFile !== null && runId !== null && isPreviewable(selectedFile) && (
             <button
               onClick={() => setPreviewOpen(true)}
@@ -110,7 +113,11 @@ export function StepOutputViewer({ result, runId, stepId, runStatus }: StepOutpu
       <div className="max-h-[600px] overflow-auto p-4">
         {selectedFile === null || runId === null ? (
           <div data-testid="step-result-json">
-            <JsonDataView value={result ?? {}} />
+            {result === null ? (
+              <p className="text-xs italic text-muted-foreground">No result.json produced</p>
+            ) : (
+              <JsonDataView value={result} />
+            )}
           </div>
         ) : (
           <OutputFileContent key={selectedFile.path} runId={runId} file={selectedFile} result={result} />

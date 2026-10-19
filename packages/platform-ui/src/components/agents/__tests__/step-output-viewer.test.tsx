@@ -170,6 +170,17 @@ describe('StepOutputViewer', () => {
     expect(screen.getByTestId('step-result-json')).toBeInTheDocument();
   });
 
+  it('still lists the committed Output Files of a step that wrote no result.json', () => {
+    mockRunOutputFiles.mockReturnValue({ data: [outputFile('grade', 'listing.csv')], loading: false, error: null });
+
+    render(<StepOutputViewer result={null} runId="run-1" stepId="grade" runStatus="failed" />);
+
+    const options = within(screen.getByRole('combobox', { name: 'Step output file' })).getAllByRole('option');
+    expect(options.map((option) => option.textContent)).toEqual(['result.json', 'listing.csv (64 B)']);
+    expect(screen.getByTestId('step-result-json')).toHaveTextContent('No result.json produced');
+    expect(screen.queryByRole('button', { name: /download/i })).not.toBeInTheDocument();
+  });
+
   it('downloads result.json from the step result', async () => {
     mockRunOutputFiles.mockReturnValue({ data: [], loading: false, error: null });
 

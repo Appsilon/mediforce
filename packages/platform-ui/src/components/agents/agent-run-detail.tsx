@@ -236,10 +236,10 @@ export function AgentRunDetail({
 
         {/* Output section */}
         <CollapsibleSection title="Output" defaultOpen={true}>
-          {envelope?.result ? (
+          {(envelope?.result ?? null) !== null || (run.status !== 'running' && run.status !== 'paused') ? (
             <div className="-m-4">
               <StepOutputViewer
-                result={envelope.result}
+                result={envelope?.result ?? null}
                 runId={run.processInstanceId}
                 stepId={run.stepId}
                 runStatus={processInstance?.status}
@@ -247,7 +247,7 @@ export function AgentRunDetail({
             </div>
           ) : (
             <p className="text-xs text-muted-foreground italic">
-              {'No output produced'}
+              Output not produced yet
             </p>
           )}
         </CollapsibleSection>
