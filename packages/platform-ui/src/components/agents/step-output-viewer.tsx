@@ -84,7 +84,7 @@ export function StepOutputViewer({ result, runId, stepId, runStatus }: StepOutpu
         </select>
         {files.length > 0 && (
           <span className="text-xs text-muted-foreground">
-            {files.length} output file{files.length === 1 ? '' : 's'}
+            {RESULT_FILE_NAME} and {files.length} output file{files.length === 1 ? '' : 's'}
           </span>
         )}
         <div className="ml-auto flex items-center gap-1">
