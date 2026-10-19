@@ -53,7 +53,7 @@ describe('AgentOutputReviewPanel', () => {
     expect(picker).toHaveValue('result.json');
     expect(within(picker).getAllByRole('option').map((option) => option.textContent))
       .toEqual(['result.json', 'presentation.md (120 B)']);
-    expect(screen.getByTestId('step-result-json').textContent).toBe(JSON.stringify(result, null, 2));
+    expect(within(screen.getByTestId('step-result-json')).getByText('Keytruda')).toBeInTheDocument();
     expect(mockRunOutputFiles).toHaveBeenCalledWith('run-1', 'paused');
   });
 

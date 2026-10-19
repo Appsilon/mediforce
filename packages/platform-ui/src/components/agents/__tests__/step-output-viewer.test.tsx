@@ -45,14 +45,19 @@ describe('StepOutputViewer', () => {
     mockSaveBlobToDevice.mockReset();
   });
 
-  it('opens on result.json, rendering the step result as JSON', () => {
+  it('opens on result.json, rendering the step result formatted with the raw JSON one click away', async () => {
     mockRunOutputFiles.mockReturnValue({ data: [outputFile('grade', 'listing.csv')], loading: false, error: null });
 
     render(<StepOutputViewer result={RESULT} runId="run-1" stepId="grade" runStatus="completed" />);
 
     expect(screen.getByRole('combobox', { name: 'Step output file' })).toHaveValue('result.json');
-    expect(screen.getByTestId('step-result-json').textContent).toBe(JSON.stringify(RESULT, null, 2));
+    const resultView = within(screen.getByTestId('step-result-json'));
+    expect(resultView.getByText('Ctcae Grade')).toBeInTheDocument();
+    expect(resultView.getByText('checked')).toBeInTheDocument();
     expect(mockDownloadOutputFile).not.toHaveBeenCalled();
+
+    await userEvent.setup().click(resultView.getByRole('button', { name: 'Raw' }));
+    expect(resultView.getByTestId('json-raw').textContent).toBe(JSON.stringify(RESULT, null, 2));
   });
 
   it('lists only this step\'s Output Files after result.json, never result.json twice', () => {
@@ -102,6 +107,33 @@ describe('StepOutputViewer', () => {
 
     expect(await screen.findByRole('columnheader', { name: 'subject' })).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: 'S-001' })).toBeInTheDocument();
+  });
+
+  it('renders a picked JSON file formatted, like result.json', async () => {
+    mockRunOutputFiles.mockReturnValue({ data: [outputFile('grade', 'grades.json')], loading: false, error: null });
+    serveFile('{"subject_count": 12, "notes": "## Grades\\n\\nNo **grade 5** events."}', 'application/json');
+
+    render(<StepOutputViewer result={RESULT} runId="run-1" stepId="grade" runStatus="completed" />);
+    await userEvent.setup().selectOptions(
+      screen.getByRole('combobox', { name: 'Step output file' }),
+      '.mediforce/output/grade/grades.json',
+    );
+
+    expect(await screen.findByText('Subject Count')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Grades' })).toBeInTheDocument();
+  });
+
+  it('shows a JSON file that does not parse as plain text', async () => {
+    mockRunOutputFiles.mockReturnValue({ data: [outputFile('grade', 'broken.json')], loading: false, error: null });
+    serveFile('{"subject_count": 12,', 'application/json');
+
+    render(<StepOutputViewer result={RESULT} runId="run-1" stepId="grade" runStatus="completed" />);
+    await userEvent.setup().selectOptions(
+      screen.getByRole('combobox', { name: 'Step output file' }),
+      '.mediforce/output/grade/broken.json',
+    );
+
+    expect(await screen.findByText('{"subject_count": 12,')).toBeInTheDocument();
   });
 
   it('exposes the step result to a picked HTML file as window.__data__', async () => {

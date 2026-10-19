@@ -6,6 +6,7 @@ import type { InstanceStatus } from '@mediforce/platform-core';
 import type { RunOutputFileEntry } from '@mediforce/platform-api/contract';
 import { useRunOutputFiles } from '@/hooks/use-run-output-files';
 import { OutputFileContent, OutputFilePreview, downloadOutputFile } from '@/components/processes/output-file-preview';
+import { JsonDataView } from '@/components/processes/json-data-view';
 import { selectViewer } from '@/lib/output-file-viewer';
 import { formatBytes } from '@/lib/format';
 import { saveBlobToDevice } from '@/lib/save-blob';
@@ -113,12 +114,9 @@ export function StepOutputViewer({ result, runId, stepId, runStatus }: StepOutpu
 
       <div className="max-h-[600px] overflow-auto p-4">
         {selectedFile === null || runId === null ? (
-          <pre
-            className="whitespace-pre-wrap break-words rounded-md bg-muted p-4 text-xs"
-            data-testid="step-result-json"
-          >
-            {JSON.stringify(result ?? {}, null, 2)}
-          </pre>
+          <div data-testid="step-result-json">
+            <JsonDataView value={result ?? {}} />
+          </div>
         ) : (
           <OutputFileContent key={selectedFile.path} runId={runId} file={selectedFile} result={result} />
         )}

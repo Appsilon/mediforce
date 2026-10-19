@@ -30,9 +30,13 @@ describe('selectViewer — viewer per extension', () => {
   });
 
   it('maps plain-text families to the text viewer', () => {
-    for (const name of ['notes.txt', 'notes.text', 'run.log', 'data.json']) {
+    for (const name of ['notes.txt', 'notes.text', 'run.log']) {
       expect(selectViewer(name, SMALL).viewer).toBe('text');
     }
+  });
+
+  it('maps json to the json viewer', () => {
+    expect(selectViewer('grades.json', SMALL).viewer).toBe('json');
   });
 
   it('maps pdf to the pdf viewer', () => {

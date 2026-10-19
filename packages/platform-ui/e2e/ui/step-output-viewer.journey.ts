@@ -53,7 +53,7 @@ test.describe('Step Output Viewer Journey', () => {
       /^summary\.md/,
     ], { timeout: 15_000 });
 
-    // Markdown renders as a document, CSV as a table, JSON as text.
+    // Markdown renders as a document, CSV as a table, JSON formatted like result.json.
     await picker.selectOption(`.mediforce/output/${STEP_ID}/summary.md`);
     await expect(page.getByRole('heading', { name: SUMMARY_HEADING })).toBeVisible({ timeout: 10_000 });
 
@@ -62,7 +62,9 @@ test.describe('Step Output Viewer Journey', () => {
     await expect(page.getByRole('cell', { name: 'Neutropenia' })).toBeVisible();
 
     await picker.selectOption(`.mediforce/output/${STEP_ID}/grades.json`);
-    await expect(page.getByText('{"S-001": 3}')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('json-formatted').getByText('S-001')).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'Raw' }).click();
+    await expect(page.getByTestId('json-raw')).toContainText('"S-001": 3');
 
     // Download the picked file.
     const downloadPromise = page.waitForEvent('download');

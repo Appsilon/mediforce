@@ -68,7 +68,7 @@ describe('TaskContextPanel', () => {
     expect(picker).toHaveValue('result.json');
     expect(within(picker).getAllByRole('option').map((option) => option.textContent))
       .toEqual(['result.json', 'presentation.html (2.0 KB)']);
-    expect(screen.getByTestId('step-result-json').textContent).toBe(JSON.stringify({ findings: 2 }, null, 2));
+    expect(within(screen.getByTestId('step-result-json')).getByText('Findings')).toBeInTheDocument();
     expect(mockRunOutputFiles).toHaveBeenCalledWith('inst-1', 'running');
   });
 
@@ -82,7 +82,7 @@ describe('TaskContextPanel', () => {
     render(<TaskContextPanel processInstanceId="inst-1" stepId="human-review" />);
 
     expect(screen.getByText('(interpret-validation)')).toBeInTheDocument();
-    expect(screen.getByTestId('step-result-json').textContent).toContain('"second": true');
+    expect(within(screen.getByTestId('step-result-json')).getByText('Second')).toBeInTheDocument();
   });
 
   it('renders nothing when there is no previous step output to show', () => {

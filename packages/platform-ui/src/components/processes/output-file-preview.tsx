@@ -17,6 +17,7 @@ import {
 } from '@/lib/output-file-viewer';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { SandboxedHtmlIframe } from '@/components/tasks/sandboxed-html-iframe';
+import { JsonDataView } from './json-data-view';
 
 interface OutputFilePreviewProps {
   runId: string;
@@ -269,6 +270,8 @@ function RenderedFile({
           {text}
         </pre>
       );
+    case 'json':
+      return <JsonFile text={text} />;
     case 'csv':
       return <CsvTable text={text} />;
     case 'image':
@@ -280,6 +283,26 @@ function RenderedFile({
         <iframe src={blobUrl} title={`Preview of ${fileName}`} className="h-[70vh] w-full border-0" />
       ) : null;
   }
+}
+
+/** A `.json` file that does not parse still shows, as plain text. */
+function JsonFile({ text }: { text: string }) {
+  const parsed = React.useMemo<{ ok: true; value: unknown } | { ok: false }>(() => {
+    try {
+      return { ok: true, value: JSON.parse(text) };
+    } catch {
+      return { ok: false };
+    }
+  }, [text]);
+
+  if (parsed.ok === false) {
+    return (
+      <pre className="whitespace-pre-wrap break-words rounded-md bg-muted p-3 text-xs leading-relaxed">
+        {text}
+      </pre>
+    );
+  }
+  return <JsonDataView value={parsed.value} />;
 }
 
 function CsvTable({ text }: { text: string }) {
