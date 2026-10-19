@@ -90,4 +90,3 @@ observability and do **not** route the run.
 
 When `changed` is false, omit branch/prTitle/prBody and give `reason` (+ `evidence`
 for already-fixed).
-Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "..."}`.

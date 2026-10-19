@@ -105,4 +105,3 @@ the human gate**, so the eager path only happens when you say `false` explicitly
 `confidence` (0–1) is how often a plan researched like this would be right; it is
 recorded for observability and does **not** route the run.
 
-Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "planned #<n> (needsHuman: <bool>)"}`.

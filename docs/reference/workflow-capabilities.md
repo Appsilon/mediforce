@@ -149,16 +149,16 @@ each is downloaded to `/data/<index>/<name>` (read-only) and its path set in
 never in `/workspace/.mediforce/output/` — that holds only what container steps
 wrote to `/output`.
 
-**`/output` does not survive the step.** It is an ephemeral host-container
-channel, deleted when the step ends: what a step leaves there becomes a
-downloadable Output File and is copied into the run worktree at
-`/workspace/.mediforce/output/<stepId>/<file>`. The next step starts with an
-empty `/output`, so a step reading `/output/<file>` from an earlier step fails
-with `FileNotFoundError`. A file handed from one step to the next is written to
-`/output` (so it is kept and downloadable) and read from
-`/workspace/.mediforce/output/<producing-step-id>/<file>`, which every container
-mounts. An agent step is told where they are: its prompt lists every file each
-earlier step left in `/workspace`, including its `.mediforce/output/<stepId>/`.
+**Each step gets its own `/output`.** It is the step's folder in the run
+worktree, `/workspace/.mediforce/output/<stepId>/`, emptied when the step
+starts ([ADR-0030](../adr/0030-agent-step-output-contract.md)): what a step
+leaves there becomes a downloadable Output File and stays at that path. The
+next step's `/output` is a different folder, so a step reading `/output/<file>`
+from an earlier step fails with `FileNotFoundError`. A file handed from one
+step to the next is written to `/output` (so it is kept and downloadable) and
+read from `/workspace/.mediforce/output/<producing-step-id>/<file>`, which
+every container mounts. An agent step is told where they are: its prompt lists,
+per earlier step, its result and the paths of its Output Files.
 Small values need no file at all: `result.json` is the step's output and
 later steps read it as `${steps.<id>.<field>}`. A third mode is
 `plugin: databricks-job`, which requires step-level `databricks`

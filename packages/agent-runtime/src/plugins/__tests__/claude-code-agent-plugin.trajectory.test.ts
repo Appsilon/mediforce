@@ -2,15 +2,13 @@
  * The Agent Trajectory (ADR-0023 D8) is recorded from the same entries the
  * step's activity log gets, as the container's stdout arrives.
  */
-import { EventEmitter } from 'node:events';
-import { Readable, Writable } from 'node:stream';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ChildProcess } from 'node:child_process';
 import type { AgentTrajectoryEntry } from '@mediforce/platform-core';
 import type { WorkflowAgentContext, EmitFn, EmitPayload } from '../../interfaces/step-executor-plugin';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
+import { fakeAgentContainer } from './helpers/fake-agent-container';
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
@@ -36,24 +34,7 @@ const RESULT_LINE = JSON.stringify({
 });
 
 function mockCliStdout(lines: string[]): void {
-  spawnMock.mockImplementation(() => {
-    const child = new EventEmitter() as ChildProcess;
-    Object.assign(child, {
-      stdout: new Readable({ read() {} }),
-      stderr: new Readable({ read() {} }),
-      stdin: new Writable({ write(_chunk, _enc, cb) { cb(); } }),
-      pid: 4242,
-      killed: false,
-      kill: vi.fn(),
-    });
-    setTimeout(() => {
-      for (const line of lines) (child.stdout as Readable).push(`${line}\n`);
-      (child.stdout as Readable).push(null);
-      (child.stderr as Readable).push(null);
-      child.emit('close', 0, null);
-    }, 10);
-    return child;
-  });
+  spawnMock.mockImplementation((_command, args) => fakeAgentContainer(args, lines));
 }
 
 function buildContext(record: (entries: readonly AgentTrajectoryEntry[]) => void): WorkflowAgentContext {

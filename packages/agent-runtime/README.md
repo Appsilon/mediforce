@@ -17,7 +17,7 @@ actually executes and whether its result is trustworthy enough to continue.
 | `src/mcp/` | Per-step MCP resolution (`resolveMcpForStep`); the record/replay proxy an eval trial runs in an MCP server's place (`mcp-tape.ts`, ADR-0023 D6) |
 | `src/skills/` | Per-step agent Skill resolution (`resolveSkillsForStep`) and the content-hashed plugin folder they are delivered in (`materializeAgentSkillsPlugin`, ADR-0025) |
 | `src/oauth/` | MCP OAuth — discovery, dynamic client registration, token resolution |
-| `src/workspace/` | Run workspace paths, output-file collection, workspace reads |
+| `src/workspace/` | Run workspace paths, the step output folder (`.mediforce/output/<stepId>/`, ADR-0030), workspace reads |
 | `src/testing/` | `InMemoryAgentEventLog`, `NoopLlmClient`, recording tracer |
 
 ## The contract
@@ -25,6 +25,17 @@ actually executes and whether its result is trustworthy enough to continue.
 A plugin implements `initialize(context)` then `run(emit)`, and emits **exactly
 one `result` event** conforming to `AgentOutputEnvelopeSchema`. The envelope
 carries `confidence` (0.0–1.0) and `confidence_rationale`.
+
+**An agent step's result is `/output/result.json`, and nothing else counts**
+([ADR-0030](../../docs/adr/0030-agent-step-output-contract.md)). `/output` is
+the step's folder in the run worktree, `.mediforce/output/<stepId>/`, emptied
+when the step starts and committed with the step; every other file there is an
+Output File. A missing or non-object `result.json` fails the step. Its reserved
+keys `confidence` and `confidence_rationale` move onto the envelope, so
+`outputSchema` sees the result without them. The agent's final message is
+ignored; token usage comes from the CLI's stream. The engine's own files —
+prompt, CLI config, MCP tapes, spilled values — live in a separate per-step
+directory mounted at `/engine` and are never committed.
 
 **Plugins do not implement autonomy.** `AgentRunner` applies it *after* `run`
 returns, from the step's `autonomyLevel`. A plugin that decides for itself
@@ -92,7 +103,7 @@ Code honours it; OpenCode's MCP SDK caps the handshake at 60s whatever it says,
 so its warning points at the image instead. In local mode that also overrides one
 exported in the host shell, and the host's own `claude` decides whether it
 waits at all. A server the CLI reports `failed` or still `pending` at start (OpenCode reports
-this only in its log, which the plugin reads from the output dir)
+this only in its log, which the plugin reads from the engine dir)
 becomes a status warning on the run, never a step failure; for a stdio server
 the warning says to raise `MCP_TIMEOUT` in the step's `env` (Claude Code) or to
 install the server in the image (OpenCode).

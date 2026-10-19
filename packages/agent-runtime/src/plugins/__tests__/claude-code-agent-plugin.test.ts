@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
@@ -8,7 +8,7 @@ import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
 import { RetiredFileSkillError } from '../../skills/resolve-skills-for-step';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
 
-type DockerResult = { cliOutput: string; failedMcpServers?: string[]; pendingMcpServers?: string[]; gitMetadata: null; presentation: string | null; outputDir: string; injectedEnvVars: string[] };
+type DockerResult = { cliOutput: string; failedMcpServers?: string[]; pendingMcpServers?: string[]; injectedEnvVars: string[] };
 type SpawnDockerTarget = { spawnDockerContainer: (prompt: string, options?: Record<string, unknown>) => Promise<DockerResult> };
 type SpawnLocalTarget = {
   spawnLocalProcess: (prompt: string, options: Record<string, unknown>, workingDir: string) => Promise<DockerResult>;
@@ -31,6 +31,15 @@ function mockSpawn(plugin: ClaudeCodeAgentPlugin) {
 
 function mockSpawnLocal(plugin: ClaudeCodeAgentPlugin) {
   return vi.spyOn(plugin as unknown as SpawnLocalTarget, 'spawnLocalProcess');
+}
+
+/** A spawn that leaves `result` in the step's output folder as result.json —
+ *  what the agent does (ADR-0030) — and returns what the CLI printed. */
+function finishesWith(result: unknown, spawnResult: Partial<DockerResult> = {}) {
+  return async (_prompt: string, options?: Record<string, unknown>): Promise<DockerResult> => {
+    await writeFile(join(options!.stepOutputDir as string, 'result.json'), JSON.stringify(result));
+    return { cliOutput: '', injectedEnvVars: [], ...spawnResult };
+  };
 }
 
 function buildMockContext(overrides: Partial<AgentContext> = {}): AgentContext {
@@ -281,9 +290,9 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue(
-        { cliOutput: JSON.stringify({ result: 'extracted metadata', confidence: 0.85 }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
-      );
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, 
+        { cliOutput: JSON.stringify({ result: 'extracted metadata', confidence: 0.85 }), injectedEnvVars: [] },
+      ));
 
       await plugin.run(emit);
 
@@ -297,14 +306,11 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
         cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
         failedMcpServers: ['biomcp'],
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output',
         injectedEnvVars: [],
-      });
+      }));
 
       await plugin.run(emit);
 
@@ -321,14 +327,11 @@ describe('ClaudeCodeAgentPlugin', () => {
       } as WorkflowAgentContext);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
         cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
         pendingMcpServers: ['biomcp'],
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output',
         injectedEnvVars: [],
-      });
+      }));
 
       await expect(plugin.run(emit)).resolves.toBeUndefined();
 
@@ -345,15 +348,12 @@ describe('ClaudeCodeAgentPlugin', () => {
       } as WorkflowAgentContext);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
         cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
         failedMcpServers: ['remote'],
         pendingMcpServers: ['remote'],
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output',
         injectedEnvVars: [],
-      });
+      }));
 
       await plugin.run(emit);
 
@@ -375,11 +375,10 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawnLocal(plugin).mockResolvedValue({
+      mockSpawnLocal(plugin).mockImplementation(finishesWith({ ok: true }, {
         cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify({ confidence: 0.9 }) }),
-        failedMcpServers: ['biomcp'],
-        gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [],
-      });
+        failedMcpServers: ['biomcp'], injectedEnvVars: [],
+      }));
 
       await plugin.run(emit);
 
@@ -389,7 +388,7 @@ describe('ClaudeCodeAgentPlugin', () => {
     });
 
     it.each(['local', 'docker'] as const)(
-      '[DATA] reads result.json when the agent closes with prose (%s mode)',
+      '[DATA] takes the result from result.json and ignores the closing message (%s mode)',
       async (mode) => {
         process.env.ALLOW_LOCAL_AGENTS = 'true';
         const context = buildMockContext({
@@ -403,14 +402,10 @@ describe('ClaudeCodeAgentPlugin', () => {
         });
         await plugin.initialize(context);
 
-        const spawned = async (_prompt: string, options?: Record<string, unknown>) => {
-          const outputDir = options?.outputDir as string;
-          await writeFile(join(outputDir, 'result.json'), JSON.stringify({ classification: 'recovery', confidence: 0.8 }));
-          return {
-            cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: 'All done, result written.' }),
-            gitMetadata: null, presentation: null, outputDir, injectedEnvVars: [],
-          };
-        };
+        const spawned = finishesWith(
+          { classification: 'recovery', confidence: 0.8 },
+          { cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: '{"classification":"fatal","confidence":0.99}' }) },
+        );
         if (mode === 'local') mockSpawnLocal(plugin).mockImplementation(spawned);
         else mockSpawn(plugin).mockImplementation(spawned);
 
@@ -423,27 +418,46 @@ describe('ClaudeCodeAgentPlugin', () => {
       },
     );
 
-    it('[DATA] parses an answer the agent wrapped in a ```json fence', async () => {
-      const context = buildMockContext();
-      await plugin.initialize(context);
-
-      const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({
-          type: 'result',
-          subtype: 'success',
-          result: '```json\n{\n  "ctcaeGrade": 3,\n  "confidence": 0.85\n}\n```',
-        }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output',
-        injectedEnvVars: [],
+    it.each([
+      ['missing', null, 'agent wrote no result.json'],
+      ['not JSON', 'All done.', 'result.json is not a JSON object'],
+      ['a JSON array', '[{"grade":3}]', 'result.json is not a JSON object'],
+    ] as const)('[ERROR] fails the step when result.json is %s, even when the closing message is JSON', async (_label, contents, message) => {
+      await plugin.initialize(buildMockContext());
+      mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
+        if (contents !== null) await writeFile(join(options!.stepOutputDir as string, 'result.json'), contents);
+        return { cliOutput: JSON.stringify({ type: 'result', subtype: 'success', result: '{"grade":3,"confidence":0.9}' }), injectedEnvVars: [] };
       });
 
+      const { emit, events } = buildEmitSpy();
+      await expect(plugin.run(emit)).rejects.toThrow(message);
+
+      expect(events.find((e) => e.type === 'result')).toBeUndefined();
+    });
+
+    it('[DATA] moves the reserved confidence keys onto the envelope, leaving the result as the output schema sees it', async () => {
+      await plugin.initialize(buildMockContext());
+      mockSpawn(plugin).mockImplementation(finishesWith({ ctcaeGrade: 3, confidence: 0.85, confidence_rationale: 'Lab values complete.' }));
+
+      const { emit, events } = buildEmitSpy();
       await plugin.run(emit);
 
-      const resultEvent = events.find((e) => e.type === 'result');
-      expect(resultEvent?.payload).toMatchObject({ confidence: 0.85, result: { ctcaeGrade: 3 } });
+      const payload = events.find((e) => e.type === 'result')!.payload as Record<string, unknown>;
+      expect(payload).toMatchObject({ confidence: 0.85, confidence_rationale: 'Lab values complete.' });
+      expect(payload.result).toEqual({ ctcaeGrade: 3 });
+    });
+
+    it('[DATA] seeds the step input as input.json in the output folder', async () => {
+      await plugin.initialize(buildMockContext());
+      let seeded: unknown;
+      mockSpawn(plugin).mockImplementation(async (prompt, options) => {
+        seeded = JSON.parse(await readFile(join(options!.stepOutputDir as string, 'input.json'), 'utf-8'));
+        return finishesWith({ ok: true })(prompt, options);
+      });
+
+      await plugin.run(buildEmitSpy().emit);
+
+      expect(seeded).toEqual({ filePaths: ['/data/protocol.pdf', '/data/sap.pdf'] });
     });
 
     it('[DATA] folds cache_creation into input tokens and captures cache_read for cost', async () => {
@@ -451,7 +465,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
         cliOutput: JSON.stringify({
           type: 'result',
           subtype: 'success',
@@ -463,11 +477,8 @@ describe('ClaudeCodeAgentPlugin', () => {
             cache_read_input_tokens: 30,
           },
         }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output',
         injectedEnvVars: [],
-      });
+      }));
 
       await plugin.run(emit);
 
@@ -511,20 +522,14 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      const dockerSpy = mockSpawn(plugin).mockResolvedValue({
+      const dockerSpy = mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
         cliOutput: JSON.stringify({ result: 'ok' }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output',
         injectedEnvVars: [],
-      });
-      const localSpy = mockSpawnLocal(plugin).mockResolvedValue({
+      }));
+      const localSpy = mockSpawnLocal(plugin).mockImplementation(finishesWith({ ok: true }, {
         cliOutput: JSON.stringify({ result: 'local' }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output',
         injectedEnvVars: [],
-      });
+      }));
 
       await plugin.run(emit);
 
@@ -560,7 +565,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit } = buildEmitSpy();
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] });
+      const spawnSpy = mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, { cliOutput: JSON.stringify({ result: 'ok' }), injectedEnvVars: [] }));
 
       await plugin.run(emit);
 
@@ -593,7 +598,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit } = buildEmitSpy();
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] });
+      const spawnSpy = mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, { cliOutput: JSON.stringify({ result: 'ok' }), injectedEnvVars: [] }));
 
       await plugin.run(emit);
 
@@ -606,9 +611,9 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue(
-        { cliOutput: JSON.stringify({ result: 'extracted data', confidence: 0.9 }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
-      );
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, 
+        { cliOutput: JSON.stringify({ result: 'extracted data', confidence: 0.9 }), injectedEnvVars: [] },
+      ));
 
       await plugin.run(emit);
 
@@ -629,9 +634,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue(
-        { cliOutput: JSON.stringify({ result: { ok: true }, confidence: 0.72, confidence_rationale: 'Missing supplier X data — interpolated from similar category.' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
-      );
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true, confidence: 0.72, confidence_rationale: 'Missing supplier X data — interpolated from similar category.' }));
 
       await plugin.run(emit);
 
@@ -645,9 +648,9 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue(
-        { cliOutput: JSON.stringify({ result: { ok: true }, confidence: 0.9 }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
-      );
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, 
+        { cliOutput: JSON.stringify({ result: { ok: true }, confidence: 0.9 }), injectedEnvVars: [] },
+      ));
 
       await plugin.run(emit);
 
@@ -661,16 +664,17 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit } = buildEmitSpy();
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue(
-        { cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
-      );
+      const spawnSpy = mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, 
+        { cliOutput: JSON.stringify({ result: 'ok' }), injectedEnvVars: [] },
+      ));
 
       await plugin.run(emit);
 
       const promptArg = spawnSpy.mock.calls[0][0] as string;
-      expect(promptArg).toContain('Confidence Self-Assessment');
-      expect(promptArg).toContain('confidence_rationale');
+      expect(promptArg).toContain('## Confidence');
+      expect(promptArg).toContain('Set `confidence` and `confidence_rationale` in result.json');
       expect(promptArg).toContain('100 cases like this');
+      expect(promptArg).not.toContain('your output JSON');
     });
 
     it('[DATA] includes agent.outputSchema in the prompt', async () => {
@@ -702,9 +706,9 @@ describe('ClaudeCodeAgentPlugin', () => {
       };
       await plugin.initialize(context);
 
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue(
-        { cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
-      );
+      const spawnSpy = mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, 
+        { cliOutput: JSON.stringify({ result: 'ok' }), injectedEnvVars: [] },
+      ));
 
       await plugin.run(buildEmitSpy().emit);
 
@@ -736,9 +740,9 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue(
-        { cliOutput: JSON.stringify({ result: 'standalone output', confidence: 0.85 }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] },
-      );
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, 
+        { cliOutput: JSON.stringify({ result: 'standalone output', confidence: 0.85 }), injectedEnvVars: [] },
+      ));
 
       await plugin.run(emit);
 
@@ -750,95 +754,21 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(payload.confidence).toBeGreaterThan(0);
     });
 
-    it('[DATA] resolves output_file from Docker /output mount to host path', async () => {
-      // Simulate: agent writes JSON to /output/result.json inside Docker,
-      // which maps to a host temp dir via the volume mount.
-      const hostOutputDir = await mkdtemp(join(tmpdir(), 'test-docker-output-'));
-      const metadata = {
-        study_id: 'CDISCPILOT01',
-        phase: 'Phase II',
-        endpoints: ['ADAS-Cog 11', 'CIBIC+'],
-        confidence: 0.92,
-      };
-      await writeFile(join(hostOutputDir, 'trial-metadata.json'), JSON.stringify(metadata));
+    it('[DATA] tells the agent, in one Output section, that result.json and the files in /output are all that is kept', async () => {
+      await plugin.initialize(buildMockContext());
+      const spawnSpy = mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }));
 
-      const agentResponse = JSON.stringify({
-        output_file: '/output/trial-metadata.json',
-        summary: 'Extracted trial metadata for CDISCPILOT01',
-      });
-      const streamJson = JSON.stringify({
-        type: 'result',
-        subtype: 'success',
-        result: agentResponse,
-      });
+      await plugin.run(buildEmitSpy().emit);
 
-      const context = buildMockContext();
-      await plugin.initialize(context);
-
-      const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput: streamJson,
-        gitMetadata: null,
-        presentation: null,
-        outputDir: hostOutputDir,
-        injectedEnvVars: [],
-      });
-
-      await plugin.run(emit);
-
-      const resultEvent = events.find((e) => e.type === 'result');
-      expect(resultEvent).toBeDefined();
-
-      const payload = resultEvent!.payload as Record<string, unknown>;
-      const result = payload.result as Record<string, unknown>;
-
-      // The actual metadata should be resolved, not { raw: "..." }
-      expect(result.study_id).toBe('CDISCPILOT01');
-      expect(result.phase).toBe('Phase II');
-      expect(result.endpoints).toEqual(['ADAS-Cog 11', 'CIBIC+']);
-      expect(result.summary).toBe('Extracted trial metadata for CDISCPILOT01');
-      expect(result).not.toHaveProperty('raw');
-
-      await rm(hostOutputDir, { recursive: true, force: true });
-    });
-
-    it('[DATA] falls back to raw when output_file is missing from host', async () => {
-      // Agent references a file that doesn't exist on the host
-      const hostOutputDir = await mkdtemp(join(tmpdir(), 'test-docker-output-'));
-
-      const agentResponse = JSON.stringify({
-        output_file: '/output/nonexistent.json',
-        summary: 'Some summary',
-      });
-      const streamJson = JSON.stringify({
-        type: 'result',
-        subtype: 'success',
-        result: agentResponse,
-      });
-
-      const context = buildMockContext();
-      await plugin.initialize(context);
-
-      const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput: streamJson,
-        gitMetadata: null,
-        presentation: null,
-        outputDir: hostOutputDir,
-        injectedEnvVars: [],
-      });
-
-      await plugin.run(emit);
-
-      const resultEvent = events.find((e) => e.type === 'result');
-      const payload = resultEvent!.payload as Record<string, unknown>;
-      const result = payload.result as Record<string, unknown>;
-
-      // Should fall back to raw + summary
-      expect(result.raw).toBe(agentResponse);
-      expect(result.summary).toBe('Some summary');
-
-      await rm(hostOutputDir, { recursive: true, force: true });
+      const prompt = spawnSpy.mock.calls[0][0] as string;
+      expect(prompt.match(/^## Output$/gm)).toHaveLength(1);
+      expect(prompt).toContain('/output/result.json — required');
+      expect(prompt).toContain('Your final message is discarded.');
+      expect(prompt).toContain('Your workspace is the git repository at /workspace');
+      expect(prompt).not.toContain('Result Contract Directory');
+      expect(prompt).not.toContain('Write ALL deliverable files');
+      expect(prompt).not.toContain('Do not offer conversational summaries');
+      expect(prompt).not.toContain('discarded when the step ends');
     });
 
     it('[DATA] prompt uses /output as output dir in Docker mode', async () => {
@@ -846,13 +776,10 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit } = buildEmitSpy();
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue({
+      const spawnSpy = mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
         cliOutput: JSON.stringify({ result: 'ok' }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output',
         injectedEnvVars: [],
-      });
+      }));
 
       await plugin.run(emit);
 
@@ -891,7 +818,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit } = buildEmitSpy();
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue({ cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [] });
+      const spawnSpy = mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, { cliOutput: JSON.stringify({ result: 'ok' }), injectedEnvVars: [] }));
 
       await plugin.run(emit);
 
@@ -900,17 +827,40 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(prompt).toContain('file2.pdf');
     });
 
-    it('[DATA] includes presentation in emitted result when spawn provides it', async () => {
+    it('[DATA] gives each earlier step one entry — its result and its output files from git — apart from repository changes', async () => {
+      plugin = new ClaudeCodeAgentPlugin({
+        workspaceManager: createFakeWorkspaceManager({
+          outputFiles: [
+            { stepId: 'grade', name: 'ae-listing.csv', path: '.mediforce/output/grade/ae-listing.csv', size: 120 },
+            { stepId: 'extract', name: 'stale.md', path: '.mediforce/output/extract/stale.md', size: 9 },
+          ],
+          stepFiles: [{ stepId: 'grade', files: ['code/derive.R'] }],
+        }),
+      });
+      await plugin.initialize(buildMockContext({
+        getPreviousStepOutputs: vi.fn().mockResolvedValue({ grade: { ctcaeGrade: 5, term: 'Death NOS' } }),
+      }));
+      const spawnSpy = mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }));
+
+      await plugin.run(buildEmitSpy().emit);
+
+      const prompt = spawnSpy.mock.calls[0][0] as string;
+      const previousSteps = prompt.slice(prompt.indexOf('## Previous Steps'), prompt.indexOf('## Repository Changes From Previous Steps'));
+      expect(previousSteps).toContain('### grade');
+      expect(previousSteps).toContain('"ctcaeGrade": 5');
+      expect(previousSteps).toContain('- /workspace/.mediforce/output/grade/ae-listing.csv');
+      expect(previousSteps).not.toContain('### extract');
+      expect(prompt).toContain('- /workspace/code/derive.R');
+    });
+
+    it('[DATA] includes presentation in emitted result when the agent writes presentation.html', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: 'ok', confidence: 0.9 }),
-        gitMetadata: null,
-        presentation: '<h1>My Report</h1>',
-        outputDir: '/tmp/mock-output',
-        injectedEnvVars: [],
+      mockSpawn(plugin).mockImplementation(async (prompt, options) => {
+        await writeFile(join(options!.stepOutputDir as string, 'presentation.html'), '<h1>My Report</h1>');
+        return finishesWith({ ok: true })(prompt, options);
       });
 
       await plugin.run(emit);
@@ -918,21 +868,18 @@ describe('ClaudeCodeAgentPlugin', () => {
       const resultEvent = events.find((e) => e.type === 'result');
       expect(resultEvent).toBeDefined();
       const payload = resultEvent!.payload as Record<string, unknown>;
-      expect(payload.presentation).toBe('<h1>My Report</h1>');
+      expect(payload.presentation).toEqual({ kind: 'html', content: '<h1>My Report</h1>' });
     });
 
-    it('[DATA] omits presentation from result when spawn returns null', async () => {
+    it('[DATA] omits presentation from result when the agent writes none', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
         cliOutput: JSON.stringify({ result: 'ok', confidence: 0.9 }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output',
         injectedEnvVars: [],
-      });
+      }));
 
       await plugin.run(emit);
 
@@ -968,13 +915,10 @@ describe('ClaudeCodeAgentPlugin', () => {
       await plugin.initialize(context);
 
       const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockResolvedValue({
+      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
         cliOutput: JSON.stringify({ result: 'ok' }),
-        gitMetadata: null,
-        presentation: null,
-        outputDir: '/tmp/mock-output',
         injectedEnvVars: [],
-      });
+      }));
 
       await plugin.run(emit);
 
@@ -1012,16 +956,16 @@ describe('ClaudeCodeAgentPlugin', () => {
       });
       await plugin.initialize(context);
 
-      const spec = plugin.getAgentCommand('/output/prompt.txt');
+      const spec = plugin.getAgentCommand('/engine/prompt.txt');
       expect(spec.args).toContain('--mcp-config');
-      expect(spec.args).toContain('/output/mcp-config.json');
+      expect(spec.args).toContain('/engine/mcp-config.json');
     });
 
     it('[DATA] omits --mcp-config flag when no mcpServers configured', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);
 
-      const spec = plugin.getAgentCommand('/output/prompt.txt');
+      const spec = plugin.getAgentCommand('/engine/prompt.txt');
       expect(spec.args).not.toContain('--mcp-config');
     });
 
@@ -1037,7 +981,7 @@ describe('ClaudeCodeAgentPlugin', () => {
         await plugin.initialize(buildMockContext());
         withEnv(plugin, { OPENROUTER_API_KEY: 'sk-or-x', ANTHROPIC_BASE_URL: 'https://openrouter.ai/api/v1' });
 
-        const spec = plugin.getAgentCommand('/output/prompt.txt', { model: 'anthropic/claude-sonnet-4' });
+        const spec = plugin.getAgentCommand('/engine/prompt.txt', { model: 'anthropic/claude-sonnet-4' });
 
         expect(spec.args[spec.args.indexOf('--model') + 1]).toBe('anthropic/claude-sonnet-4');
       });
@@ -1046,7 +990,7 @@ describe('ClaudeCodeAgentPlugin', () => {
         await plugin.initialize(buildMockContext());
         withEnv(plugin, { ANTHROPIC_API_KEY: 'sk-ant-x' });
 
-        const spec = plugin.getAgentCommand('/output/prompt.txt', { model: 'anthropic/claude-sonnet-4' });
+        const spec = plugin.getAgentCommand('/engine/prompt.txt', { model: 'anthropic/claude-sonnet-4' });
 
         expect(spec.args[spec.args.indexOf('--model') + 1]).toBe('claude-sonnet-4');
       });
@@ -1055,7 +999,7 @@ describe('ClaudeCodeAgentPlugin', () => {
         await plugin.initialize(buildMockContext());
         withEnv(plugin, { ANTHROPIC_API_KEY: 'sk-ant-x' });
 
-        const spec = plugin.getAgentCommand('/output/prompt.txt', { model: '~anthropic/claude-sonnet-latest' });
+        const spec = plugin.getAgentCommand('/engine/prompt.txt', { model: '~anthropic/claude-sonnet-latest' });
 
         expect(spec.args[spec.args.indexOf('--model') + 1]).toBe('sonnet');
       });
@@ -1065,7 +1009,7 @@ describe('ClaudeCodeAgentPlugin', () => {
         withEnv(plugin, { ANTHROPIC_API_KEY: 'sk-ant-x' });
 
         for (const model of ['claude-sonnet-4-6', 'sonnet', 'haiku']) {
-          const spec = plugin.getAgentCommand('/output/prompt.txt', { model });
+          const spec = plugin.getAgentCommand('/engine/prompt.txt', { model });
           expect(spec.args[spec.args.indexOf('--model') + 1]).toBe(model);
         }
       });
@@ -1074,7 +1018,7 @@ describe('ClaudeCodeAgentPlugin', () => {
         await plugin.initialize(buildMockContext());
         withEnv(plugin, { ANTHROPIC_API_KEY: 'sk-ant-x' });
 
-        expect(() => plugin.getAgentCommand('/output/prompt.txt', { model: 'openai/gpt-4o' }))
+        expect(() => plugin.getAgentCommand('/engine/prompt.txt', { model: 'openai/gpt-4o' }))
           .toThrow(/openai\/gpt-4o/);
       });
 
@@ -1082,7 +1026,7 @@ describe('ClaudeCodeAgentPlugin', () => {
         await plugin.initialize(buildMockContext());
         withEnv(plugin, { ANTHROPIC_API_KEY: 'sk-ant-x' });
 
-        const spec = plugin.getAgentCommand('/output/prompt.txt');
+        const spec = plugin.getAgentCommand('/engine/prompt.txt');
 
         expect(spec.args).not.toContain('--model');
       });
@@ -1098,9 +1042,9 @@ describe('ClaudeCodeAgentPlugin', () => {
     async function captureBudgetMinutes(agentOverrides: Record<string, unknown>): Promise<string> {
       const context = buildWorkflowContext(agentOverrides);
       await plugin.initialize(context);
-      const spawnSpy = mockSpawn(plugin).mockResolvedValue({
-        cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [],
-      });
+      const spawnSpy = mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
+        cliOutput: JSON.stringify({ result: 'ok' }), injectedEnvVars: [],
+      }));
       const { emit } = buildEmitSpy();
       await plugin.run(emit);
       const [prompt] = spawnSpy.mock.calls[0];
@@ -1170,9 +1114,9 @@ describe('ClaudeCodeAgentPlugin', () => {
     describe('MCP startup instruction', () => {
       async function promptFor(resolvedMcpConfig?: WorkflowAgentContext['resolvedMcpConfig']): Promise<string> {
         await plugin.initialize({ ...buildWorkflowContext({}), resolvedMcpConfig } as WorkflowAgentContext);
-        const spawnSpy = mockSpawn(plugin).mockResolvedValue({
-          cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: '/tmp/mock-output', injectedEnvVars: [],
-        });
+        const spawnSpy = mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
+          cliOutput: JSON.stringify({ result: 'ok' }), injectedEnvVars: [],
+        }));
         await plugin.run(buildEmitSpy().emit);
         return spawnSpy.mock.calls[0][0] as string;
       }
@@ -1207,7 +1151,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       } as WorkflowAgentContext;
       await plugin.initialize(context);
       mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
-        const tapeDir = join(options!.outputDir as string, 'mcp-tape');
+        const tapeDir = join(options!.engineDir as string, 'mcp-tape');
         await mkdir(tapeDir, { recursive: true });
         await writeFile(join(tapeDir, 'meddra.tape.jsonl'), `${JSON.stringify({ kind: 'call', tool: 'lookup', arguments: { term: 'Sepsis' }, result: { content: [] } })}\n`);
         await writeFile(join(tapeDir, 'edc.misses.jsonl'), `${JSON.stringify({ ts: '2026-09-28T10:00:00.000Z', tool: 'read_record', arguments: { subject: '1001' } })}\n`);
@@ -1231,10 +1175,10 @@ describe('ClaudeCodeAgentPlugin', () => {
       } as WorkflowAgentContext;
       await plugin.initialize(context);
       mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
-        const tapeDir = join(options!.outputDir as string, 'mcp-tape');
+        const tapeDir = join(options!.engineDir as string, 'mcp-tape');
         await mkdir(tapeDir, { recursive: true });
         await writeFile(join(tapeDir, 'edc.misses.jsonl'), '{"ts":"2026-09-28T10:00:00');
-        return { cliOutput: JSON.stringify({ result: 'ok' }), gitMetadata: null, presentation: null, outputDir: options!.outputDir as string, injectedEnvVars: [] };
+        return finishesWith({ ok: true })(_prompt, options);
       });
 
       await expect(plugin.run(buildEmitSpy().emit)).rejects.toThrow(/Could not read the calls replayed MCP server 'edc' had no recording for/);

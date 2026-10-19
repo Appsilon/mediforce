@@ -3,18 +3,16 @@
  * materialized plugin folder is mounted read-only at `/plugin` and handed to
  * the CLI as `--plugin-dir`, with no skills on the step itself.
  */
-import { EventEmitter } from 'node:events';
-import { Readable, Writable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ChildProcess } from 'node:child_process';
 import type { Skill } from '@mediforce/platform-core';
 import type { WorkflowAgentContext, EmitFn, EmitPayload } from '../../interfaces/step-executor-plugin';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { ClaudeCodeAgentPlugin } from '../claude-code-agent-plugin';
 import { createFakeWorkspaceManager } from './helpers/fake-workspace-manager';
+import { fakeAgentContainer } from './helpers/fake-agent-container';
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
@@ -36,24 +34,7 @@ const RESULT_LINE = JSON.stringify({
 });
 
 function mockCliSuccess(): void {
-  spawnMock.mockImplementation(() => {
-    const child = new EventEmitter() as ChildProcess;
-    Object.assign(child, {
-      stdout: new Readable({ read() {} }),
-      stderr: new Readable({ read() {} }),
-      stdin: new Writable({ write(_chunk, _enc, cb) { cb(); } }),
-      pid: 4242,
-      killed: false,
-      kill: vi.fn(),
-    });
-    setTimeout(() => {
-      (child.stdout as Readable).push(`${RESULT_LINE}\n`);
-      (child.stdout as Readable).push(null);
-      (child.stderr as Readable).push(null);
-      child.emit('close', 0, null);
-    }, 10);
-    return child;
-  });
+  spawnMock.mockImplementation((_command, args) => fakeAgentContainer(args, [RESULT_LINE]));
 }
 
 const skillMd = '---\nname: sdtm-mapping\ndescription: Map raw data to SDTM\n---\n# SDTM mapping\n';

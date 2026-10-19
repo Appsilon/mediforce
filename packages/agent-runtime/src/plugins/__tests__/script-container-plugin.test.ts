@@ -48,6 +48,12 @@ function createMockChild(): ChildProcess {
   return child;
 }
 
+/** Host folder mounted at /output — the step's output folder in the worktree. */
+function outputHostDir(dockerArgs: string[]): string | null {
+  const mount = dockerArgs.find((arg) => arg.endsWith(':/output'));
+  return mount === undefined ? null : mount.slice(0, -':/output'.length);
+}
+
 /** Set up spawnMock to return mockChild and emit close after a microtask delay */
 function mockSpawnSuccess(mockChild: ChildProcess) {
   spawnMock.mockImplementation(() => {
@@ -243,8 +249,7 @@ describe('ScriptContainerPlugin', () => {
       // writes its reason to result.json and exits 1 with no stdout/stderr.
       spawnMock.mockImplementation((_cmd, args) => {
         const argsArr = args as string[];
-        const vIdx = argsArr.indexOf('-v');
-        const capturedDir = vIdx >= 0 ? argsArr[vIdx + 1].split(':')[0] : null;
+        const capturedDir = outputHostDir(argsArr);
         setTimeout(async () => {
           if (capturedDir) {
             await writeFile(
@@ -300,9 +305,9 @@ describe('ScriptContainerPlugin', () => {
       const dockerArgs = spawnMock.mock.calls[0][1] as string[];
       const imageIdx = dockerArgs.indexOf('alpine:3.19');
       expect(imageIdx, 'runtime=bash defaults to alpine:3.19').toBeGreaterThan(-1);
-      // The command after the image is exactly `sh /output/script.sh` — two tokens,
+      // The command after the image is exactly `sh /engine/script.sh` — two tokens,
       // no shell splitting of the user's multi-line bash body.
-      expect(dockerArgs.slice(imageIdx + 1)).toEqual(['sh', '/output/script.sh']);
+      expect(dockerArgs.slice(imageIdx + 1)).toEqual(['sh', '/engine/script.sh']);
     });
 
     it('[DATA] command field is whitespace-split argv — complex shell belongs in inlineScript', async () => {
@@ -370,9 +375,8 @@ describe('ScriptContainerPlugin', () => {
       );
 
       const dockerArgs = spawnMock.mock.calls[0][1] as string[];
-      const volumeIdx = dockerArgs.indexOf('-v');
-      expect(volumeIdx).toBeGreaterThan(-1);
-      expect(dockerArgs[volumeIdx + 1]).toMatch(/.*:\/output$/);
+      expect(outputHostDir(dockerArgs)).toMatch(/\.mediforce\/output\/run-script$/);
+      expect(dockerArgs.some((arg) => arg.endsWith(':/engine'))).toBe(true);
     });
 
     it('[DATA] streams stdout lines as assistant events as they arrive (live, before close)', async () => {
@@ -706,10 +710,7 @@ describe('ScriptContainerPlugin', () => {
 
       spawnMock.mockImplementation((_cmd, args) => {
         const argsArr = args as string[];
-        const vIdx = argsArr.indexOf('-v');
-        if (vIdx >= 0) {
-          capturedOutputDir = argsArr[vIdx + 1].split(':')[0];
-        }
+        capturedOutputDir = outputHostDir(argsArr);
 
         setTimeout(async () => {
           if (capturedOutputDir) {
@@ -744,8 +745,7 @@ describe('ScriptContainerPlugin', () => {
 
       spawnMock.mockImplementation((_cmd, args) => {
         const argsArr = args as string[];
-        const vIdx = argsArr.indexOf('-v');
-        const capturedDir = vIdx >= 0 ? argsArr[vIdx + 1].split(':')[0] : null;
+        const capturedDir = outputHostDir(argsArr);
 
         setTimeout(async () => {
           if (capturedDir) {

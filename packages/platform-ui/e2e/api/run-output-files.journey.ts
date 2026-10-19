@@ -93,13 +93,14 @@ test.describe('Run Output Files — API E2E', () => {
     // -------- Seed the git side for this runId (see module doc) --------
     await seedOutputFiles(wdName, runId, {
       generate: {
+        'result.json': '{"grade":2}',
         'report.csv': csvContent,
         'charts/plot.svg': svgContent,
         'data.bin': binaryContent,
       },
     });
 
-    // -------- List --------
+    // -------- List: every file in the step's folder but its result.json (ADR-0030) --------
     const listRes = await request.get(`/api/runs/${runId}/files`, { headers: AUTH_HEADERS });
     expect(listRes.status(), await listRes.text()).toBe(200);
     const { files } = (await listRes.json()) as { files: OutputFileEntry[] };

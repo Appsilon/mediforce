@@ -13,6 +13,8 @@ import {
   toContainerFilePaths,
   cleanupTempDir,
   CONTAINER_DATA_MOUNT,
+  CONTAINER_ENGINE_MOUNT,
+  CONTAINER_OUTPUT_MOUNT,
 } from './base-container-agent-plugin';
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 
@@ -39,9 +41,9 @@ export const RUNTIME_CONFIG: Record<string, { image: string; ext: string; cmd: (
  * frequently the only actionable signal on failure. Returns null when the file
  * is absent, unparseable, or carries no error field.
  */
-async function readResultError(outputDir: string): Promise<string | null> {
+async function readResultError(stepOutputDir: string): Promise<string | null> {
   try {
-    const raw = await readFile(join(outputDir, 'result.json'), 'utf-8');
+    const raw = await readFile(join(stepOutputDir, 'result.json'), 'utf-8');
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     if (typeof parsed.error === 'string' && parsed.error.length > 0) {
       return `result.json error: ${parsed.error}`;
@@ -69,9 +71,12 @@ async function readResultError(outputDir: string): Promise<string | null> {
  *
  * **Inline script mode**: script.inlineScript + script.runtime
  *   1. Writes step input as /output/input.json
- *   2. Writes inlineScript to /output/script.{ext}
+ *   2. Writes inlineScript to /engine/script.{ext}
  *   3. Runs the script using the runtime's command in an auto-resolved Docker image
  *   4. Reads /output/result.json from the container
+ *
+ * `/output` is the step's output folder in the run worktree (ADR-0030): what
+ * the script leaves there besides the seeded inputs is committed with the step.
  */
 export class ScriptContainerPlugin extends ContainerPlugin {
   readonly metadata: PluginCapabilityMetadata = {
@@ -154,7 +159,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         this.commandDisplay = `${runtimeCfg.cmd('script' + runtimeCfg.ext).join(' ')} (local)`;
       } else {
         this.image = scriptConfig.image ?? runtimeCfg.image;
-        const scriptPath = `/output/script${runtimeCfg.ext}`;
+        const scriptPath = `${CONTAINER_ENGINE_MOUNT}/script${runtimeCfg.ext}`;
         this.commandArgs = runtimeCfg.cmd(scriptPath);
         this.commandDisplay = this.commandArgs.join(' ');
       }
@@ -200,16 +205,18 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       timestamp: new Date().toISOString(),
     });
 
-    let outputDir: string | null = null;
+    let engineDir: string | null = null;
     let downloadDir: string | null = null;
 
     try {
-      // Every run gets a shared git worktree; mounted into the container at /workspace.
+      // Every run gets a shared git worktree; mounted into the container at
+      // /workspace, with the step's output folder at /output.
       await this.resolveRunWorkspace();
+      const stepOutputDir = await this.resetStepOutputDir();
 
-      // Create temp directory for container /output mount
-      const rawOutputDir = await mkdtemp(join(tmpdir(), 'mediforce-script-output-'));
-      outputDir = await realpath(rawOutputDir);
+      // Create temp directory for the container's /engine mount
+      const rawEngineDir = await mkdtemp(join(tmpdir(), 'mediforce-script-engine-'));
+      engineDir = await realpath(rawEngineDir);
 
       // Uploaded files arrive as references (downloadUrl); fetch them so the
       // script can open them at files[].localPath, same as agent steps.
@@ -225,14 +232,14 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       const scriptInput = this.isLocalMode ? updatedInput : toContainerFilePaths(updatedInput);
 
       // Write step input as /output/input.json
-      const inputPath = join(outputDir, 'input.json');
+      const inputPath = join(stepOutputDir, 'input.json');
       await writeFile(inputPath, JSON.stringify(scriptInput, null, 2), 'utf-8');
 
       // Write carry-over snapshot as /output/previous_run.json when the
       // workflow declares inputForNextRun. Always an object — `{}` on first
       // run. Scripts that don't carry anything simply ignore the file.
       if (isWorkflowAgentContext(this.context) && this.context.previousRun !== undefined) {
-        const previousRunPath = join(outputDir, 'previous_run.json');
+        const previousRunPath = join(stepOutputDir, 'previous_run.json');
         await writeFile(
           previousRunPath,
           JSON.stringify(this.context.previousRun, null, 2),
@@ -247,10 +254,10 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         ? await materializeArtifacts(this.context.workflowDefinition.artifacts)
         : null;
 
-      // Write inline script to /output/script.{ext}
+      // Write inline script to /engine/script.{ext}
       if (this.inlineScript && this.runtime) {
         const runtimeCfg = RUNTIME_CONFIG[this.runtime];
-        const scriptPath = join(outputDir, `script${runtimeCfg.ext}`);
+        const scriptPath = join(engineDir, `script${runtimeCfg.ext}`);
         await writeFile(scriptPath, this.inlineScript, 'utf-8');
       }
 
@@ -302,12 +309,12 @@ export class ScriptContainerPlugin extends ContainerPlugin {
 
       if (this.isLocalMode && this.inlineScript && this.runtime) {
         // Local execution: run the inline script as a child process. The
-        // /output mount is replaced by the host outputDir, so we rewrite any
-        // hard-coded `/output/` references in the script source to point at
-        // the temp dir. No Docker, no /workspace mount.
+        // /output mount is replaced by the host output folder, so we rewrite
+        // any hard-coded `/output/` references in the script source to point
+        // at it. No Docker, no /workspace mount.
         const runtimeCfg = RUNTIME_CONFIG[this.runtime];
-        const rewrittenScript = this.inlineScript.replaceAll('/output/', `${outputDir}/`);
-        const localScriptPath = join(outputDir, `script${runtimeCfg.ext}`);
+        const rewrittenScript = this.inlineScript.replaceAll('/output/', `${stepOutputDir}/`);
+        const localScriptPath = join(engineDir, `script${runtimeCfg.ext}`);
         await writeFile(localScriptPath, rewrittenScript, 'utf-8');
 
         const cmdArgs = runtimeCfg.cmd(localScriptPath);
@@ -319,7 +326,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           timestamp: new Date().toISOString(),
         });
 
-        spawnResult = await this.spawnLocalScript(cmdArgs, outputDir, timeoutMs, emitLine);
+        spawnResult = await this.spawnLocalScript(cmdArgs, stepOutputDir, timeoutMs, emitLine);
       } else {
         const containerName = `mediforce-script-${this.context.processInstanceId}-${this.context.stepId}`.slice(0, 63);
 
@@ -338,8 +345,9 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           '--name', containerName,
           '--memory', '8g',
           '--cpus', '2',
-          '-v', `${outputDir}:/output`,
+          '-v', `${engineDir}:${CONTAINER_ENGINE_MOUNT}`,
           '-v', `${this.runWorkspaceHandle!.path}:/workspace`,
+          '-v', `${stepOutputDir}:${CONTAINER_OUTPUT_MOUNT}`,
           ...(artifactsHostDir === null
             ? []
             : ['-v', `${artifactsHostDir}:${CONTAINER_ARTIFACTS_MOUNT}:ro`]),
@@ -370,7 +378,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           containerName,
           processInstanceId: this.context.processInstanceId,
           stepId: this.context.stepId,
-          outputDir,
+          outputDir: engineDir,
           logFile,
           // A script's stdout has no event structure; it goes to the log verbatim,
           // written live by whichever process is watching the container.
@@ -402,7 +410,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           // output (incl. an `error`/`errors` field on failure) to result.json
           // by convention, then exit non-zero without printing. Surface that
           // reported error before falling back to bare invocation metadata.
-          const reportedError = await readResultError(outputDir);
+          const reportedError = await readResultError(stepOutputDir);
           if (reportedError !== null) {
             detail = reportedError;
           } else {
@@ -416,7 +424,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
             const envKeys = [...Object.keys(this.resolvedEnv.vars), ...injectedKeys].join(',');
             let inputSize = '?';
             try {
-              const inputStat = await stat(join(outputDir, 'input.json'));
+              const inputStat = await stat(join(stepOutputDir, 'input.json'));
               inputSize = `${inputStat.size}b`;
             } catch { /* missing — shouldn't happen */ }
             detail = `no stdout/stderr/result captured — image=${this.image}, cmd=${this.commandDisplay}, env=[${envKeys}], inputSize=${inputSize}`;
@@ -445,7 +453,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       // No reasoningSummary — the file delta is the more useful subject line
       // for deterministic scripts; the command is available via Agent-Image
       // + script.sh artefact for anyone digging deeper.
-      await this.commitRunWorkspace(outputDir, {
+      await this.commitRunWorkspace({
         status: 'success',
         durationMs: Date.now() - startTime,
         agentPlugin: 'script-container',
@@ -453,7 +461,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       });
 
       // Read result.json from the output directory
-      const resultPath = join(outputDir, 'result.json');
+      const resultPath = join(stepOutputDir, 'result.json');
       let result: Record<string, unknown>;
       try {
         const resultRaw = await readFile(resultPath, 'utf-8');
@@ -470,13 +478,13 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       try {
         presentation = {
           kind: 'markdown',
-          content: await readFile(join(outputDir, 'presentation.md'), 'utf-8'),
+          content: await readFile(join(stepOutputDir, 'presentation.md'), 'utf-8'),
         };
       } catch {
         try {
           presentation = {
             kind: 'html',
-            content: await readFile(join(outputDir, 'presentation.html'), 'utf-8'),
+            content: await readFile(join(stepOutputDir, 'presentation.html'), 'utf-8'),
           };
         } catch {
           // No presentation file — fine
@@ -504,14 +512,14 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      // Commit whatever landed in /workspace before the error — ✗ marker,
-      // full error excerpt in body. Best-effort: if the commit itself fails
-      // (e.g. worktree corrupt, detected secret), swallow that error and
-      // rethrow the original step error. We never mask the real failure.
+      // Commit whatever landed in /workspace and /output before the error —
+      // ✗ marker, full error excerpt in body. Best-effort: if the commit
+      // itself fails (e.g. worktree corrupt, detected secret), swallow that
+      // error and rethrow the original step error. We never mask the real failure.
       const errMessage = error instanceof Error ? error.message : String(error);
-      if (outputDir) {
+      if (this.stepOutputDir !== null) {
         try {
-          await this.commitRunWorkspace(outputDir, {
+          await this.commitRunWorkspace({
             status: 'failed',
             error: errMessage,
             durationMs: Date.now() - startTime,
@@ -521,14 +529,12 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         } catch (commitErr) {
           console.warn('[ScriptContainer] Failed to commit failure artefacts:', commitErr);
         }
-        await rm(outputDir, { recursive: true, force: true }).catch(() => {});
-        outputDir = null;
       }
       // Script steps are deterministic — errors must fail the step, not produce a low-confidence result
       throw error;
     } finally {
-      if (outputDir) {
-        await rm(outputDir, { recursive: true, force: true }).catch(() => {});
+      if (engineDir) {
+        await rm(engineDir, { recursive: true, force: true }).catch(() => {});
       }
       await cleanupTempDir(downloadDir);
     }

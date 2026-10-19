@@ -1,48 +1,27 @@
 /**
- * Output Files — copy a step's `/output` deliverables into the run worktree
- * under `.mediforce/output/<stepId>/` so the per-step commit captures them.
- *
- * The `/output` dir is an ephemeral host↔container I/O channel (deleted after
- * every step). Anything the agent leaves there besides the engine-owned
- * control files becomes a durable Output File on the run branch.
+ * Output Files — a step's output folder is `.mediforce/output/<stepId>/` in
+ * the run worktree, bind-mounted at `/output` (ADR-0030). The step writes
+ * `result.json` and its Output Files straight into it, and the step commit
+ * captures them: nothing is copied and nothing is deleted after the step.
  */
-import { copyFile, mkdir, readdir, stat } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { MCP_TAPE_DIR } from '../mcp/mcp-tape';
-
-/**
- * Engine-owned control files that must never become Output Files. Shared with
- * `persistDeliverableFile`, which additionally excludes the presentation
- * files — derive from these constants so the two lists cannot drift apart.
- */
-export const INTERNAL_OUTPUT_FILE_NAMES: ReadonlySet<string> = new Set([
-  'auth.json',
-  'prompt.txt',
-  'result.json',
-  'git-result.json',
-  'mock-result.json',
-  'opencode.json',
-  'input.json',
-  'previous_run.json',
-  'mcp-config.json',
-  // An eval trial's MCP recordings and replay tapes (mcp/mcp-tape.ts) — tool
-  // results the platform stores itself, never the agent's deliverable.
-  MCP_TAPE_DIR,
-  // Inline-script payloads seeded by ScriptContainerPlugin — one per
-  // RUNTIME_CONFIG extension (script-container-plugin.ts).
-  'script.mjs',
-  'script.py',
-  'script.R',
-  'script.sh',
-]);
-
-/** Presentation files — already surfaced via spawnResult.presentation, but
- *  still copied as Output Files (product decision). Markdown first: order
- *  matters for the persistDeliverableFile fallback. */
-export const PRESENTATION_FILE_NAMES: readonly string[] = ['presentation.md', 'presentation.html'];
+import { mkdir, readdir, rm, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 
 /** Repo-relative root under which Output Files live on the run branch. */
 export const OUTPUT_FILES_REPO_ROOT = '.mediforce/output';
+
+/** The step's result. Committed with the folder, but not an Output File. */
+export const RESULT_FILE_NAME = 'result.json';
+
+/** Inputs the engine seeds into the output folder, where every script and
+ *  skill has always read them (`/output/input.json`). Removed before the step
+ *  commit, so they never become Output Files. */
+export const SEEDED_INPUT_FILE_NAMES: readonly string[] = ['input.json', 'previous_run.json'];
+
+/** Presentation files — surfaced via the envelope's `presentation`, and still
+ *  Output Files (product decision). Markdown first: order matters for the
+ *  persistDeliverableFile fallback. */
+export const PRESENTATION_FILE_NAMES: readonly string[] = ['presentation.md', 'presentation.html'];
 
 export const DEFAULT_OUTPUT_FILE_MAX_BYTES = 100 * 1024 * 1024;
 
@@ -54,97 +33,56 @@ export function resolveOutputFileMaxBytes(): number {
   return parsed;
 }
 
-interface PendingCopy {
-  sourcePath: string;
-  relativePath: string;
+/** Host path of a step's output folder in the run worktree. */
+export function stepOutputDirPath(worktreePath: string, stepId: string): string {
+  return join(worktreePath, OUTPUT_FILES_REPO_ROOT, stepId);
 }
 
-async function collectCopyableFile(
-  sourcePath: string,
-  relativePath: string,
-  maxBytes: number,
-  pending: PendingCopy[],
-): Promise<void> {
-  const info = await stat(sourcePath);
-  if (info.isFile() === false) return;
-  if (info.size > maxBytes) {
-    console.warn(
-      `[output-files] Skipping ${relativePath} (${info.size} bytes) — exceeds the ` +
-      `MEDIFORCE_OUTPUT_FILE_MAX_BYTES cap of ${maxBytes} bytes`,
-    );
-    return;
-  }
-  pending.push({ sourcePath, relativePath });
+/**
+ * Empty the step's output folder (creating it when missing), so a step that
+ * runs again — a loop, a retry — never inherits files from its earlier
+ * execution. Those files stay in git history.
+ */
+export async function resetStepOutputDir(worktreePath: string, stepId: string): Promise<string> {
+  const dir = stepOutputDirPath(worktreePath, stepId);
+  await rm(dir, { recursive: true, force: true });
+  await mkdir(dir, { recursive: true });
+  return dir;
 }
 
-async function collectDirectory(
-  dir: string,
-  relativePrefix: string,
-  maxBytes: number,
-  pending: PendingCopy[],
-): Promise<void> {
+async function removeOversizedFiles(dir: string, relativePrefix: string, maxBytes: number): Promise<void> {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const sourcePath = join(dir, entry.name);
+    const path = join(dir, entry.name);
     const relativePath = join(relativePrefix, entry.name);
     if (entry.isDirectory()) {
-      await collectDirectory(sourcePath, relativePath, maxBytes, pending);
-    } else if (entry.isFile()) {
-      await collectCopyableFile(sourcePath, relativePath, maxBytes, pending);
+      await removeOversizedFiles(path, relativePath, maxBytes);
+      continue;
     }
+    if (entry.isFile() === false) continue;
+    const { size } = await stat(path);
+    if (size <= maxBytes) continue;
+    console.warn(
+      `[output-files] Not committing ${relativePath} (${size} bytes) — exceeds the ` +
+      `MEDIFORCE_OUTPUT_FILE_MAX_BYTES cap of ${maxBytes} bytes`,
+    );
+    await rm(path, { force: true });
   }
 }
 
 /**
- * Copy the step's Output Files from `outputDir` into
- * `<worktreePath>/.mediforce/output/<stepId>/`.
- *
- * - Internal runtime files and dotfiles are skipped at the top level only;
- *   nested directories are copied recursively as-is.
- * - Files over the per-file size cap (`MEDIFORCE_OUTPUT_FILE_MAX_BYTES`,
- *   default 100 MiB) are skipped with a warning.
- * - Best-effort: never throws — a copy failure must not fail the step commit.
- * - Creates no directory when there is nothing to copy.
+ * Make the step's output folder ready for the step commit: remove the inputs
+ * the engine seeded, and every file over the per-file size cap
+ * (`MEDIFORCE_OUTPUT_FILE_MAX_BYTES`, default 100 MiB), logging each.
+ * Best-effort: never throws — a cleanup failure must not fail the step commit.
  */
-export async function copyOutputFilesIntoWorkspace(
-  outputDir: string,
-  worktreePath: string,
-  stepId: string,
-): Promise<void> {
+export async function prepareStepOutputDirForCommit(stepOutputDir: string): Promise<void> {
   try {
-    let topLevelEntries;
-    try {
-      topLevelEntries = await readdir(outputDir, { withFileTypes: true });
-    } catch {
-      return;
+    for (const name of SEEDED_INPUT_FILE_NAMES) {
+      await rm(join(stepOutputDir, name), { force: true });
     }
-
-    const maxBytes = resolveOutputFileMaxBytes();
-    const pending: PendingCopy[] = [];
-
-    for (const entry of topLevelEntries) {
-      if (entry.name.startsWith('.')) continue;
-      if (INTERNAL_OUTPUT_FILE_NAMES.has(entry.name)) continue;
-      const sourcePath = join(outputDir, entry.name);
-      if (entry.isDirectory()) {
-        await collectDirectory(sourcePath, entry.name, maxBytes, pending);
-      } else if (entry.isFile()) {
-        await collectCopyableFile(sourcePath, entry.name, maxBytes, pending);
-      }
-    }
-
-    if (pending.length === 0) return;
-
-    const destRoot = join(worktreePath, OUTPUT_FILES_REPO_ROOT, stepId);
-    for (const { sourcePath, relativePath } of pending) {
-      try {
-        const destPath = join(destRoot, relativePath);
-        await mkdir(dirname(destPath), { recursive: true });
-        await copyFile(sourcePath, destPath);
-      } catch (copyError) {
-        console.warn(`[output-files] Failed to copy ${relativePath} into the workspace:`, copyError);
-      }
-    }
-  } catch (collectError) {
-    console.warn('[output-files] Failed to copy output files into the workspace:', collectError);
+    await removeOversizedFiles(stepOutputDir, '', resolveOutputFileMaxBytes());
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    console.warn('[output-files] Failed to prepare the output folder for the step commit:', error);
   }
 }

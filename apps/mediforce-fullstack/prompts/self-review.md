@@ -70,4 +70,4 @@ Write ONLY this JSON to `/output/result.json`:
 observability and do **not** route the run.
 
 `concerns` may be empty for `ship`. Each concern is one line, prefixed with its
-axis. Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "..."}`.
+axis. 

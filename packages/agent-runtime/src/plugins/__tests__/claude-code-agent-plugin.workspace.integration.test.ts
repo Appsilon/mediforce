@@ -3,8 +3,8 @@
  *
  * Exercises the real `run()` → `resolveRunWorkspace()` → `spawnLocalProcess()` →
  * `commitRunWorkspace()` path. The CLI command is swapped for a harmless shell
- * that writes a file and emits a synthetic stream-json result, so the plugin's
- * plumbing (prompt file, output dir, commit, git-result.json) actually runs.
+ * that writes files and emits a synthetic stream-json result, so the plugin's
+ * plumbing (engine dir, step output folder, commit) actually runs.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm, readFile } from 'node:fs/promises';
@@ -65,28 +65,35 @@ function buildEmitSpy(): { emit: EmitFn; events: EmitPayload[] } {
 }
 
 /**
- * Build a shell command that acts as the mock agent: writes `bodyCommand` in the
- * worktree, then emits a synthetic stream-json result line on stdout.
+ * Build a shell command that acts as the mock agent: runs `writeScript` in the
+ * worktree, writes `result.json` into the step's output folder (unless told
+ * not to), then emits a synthetic stream-json result line on stdout.
  * Plugin runs this via its real `spawn` path, so `commitRunWorkspace` fires after.
  */
-function mockAgentShellCommand(writeScript: string): AgentCommandSpec {
-  const resultPayload = JSON.stringify({ ok: true });
-  const streamLine = JSON.stringify({ type: 'result', subtype: 'success', result: resultPayload });
+function mockAgentShellCommand(writeScript: string, stepId = 'extract', writesResult = true): AgentCommandSpec {
+  const streamLine = JSON.stringify({ type: 'result', subtype: 'success', result: 'Done.' });
+  const writeResult = writesResult ? `echo '{"ok":true}' > .mediforce/output/${stepId}/result.json;` : '';
   // `cat > /dev/null` drains stdin before the shell exits. Without it the shell
   // finishes before the plugin finishes writing the prompt, and the plugin's
   // `stdin.end()` lands on a closed pipe — an unhandled EPIPE that vitest
   // surfaces as an "unhandled error" even though the test passed. Draining
   // stdin keeps the shell alive until the plugin's write completes.
   return {
-    args: ['sh', '-c', `cat > /dev/null; ${writeScript}; echo '${streamLine}'`],
+    args: ['sh', '-c', `cat > /dev/null; ${writeScript}; ${writeResult} echo '${streamLine}'`],
     promptDelivery: 'stdin',
   };
+}
+
+function stepCommitFiles(wtDir: string, revision = 'HEAD'): string[] {
+  return execFileSync('git', ['diff-tree', '--no-commit-id', '--name-only', '-r', revision], { cwd: wtDir, encoding: 'utf-8' })
+    .trim().split('\n').filter(Boolean).sort();
 }
 
 describe('ClaudeCodeAgentPlugin ↔ WorkspaceManager integration', () => {
   let dataDir: string;
   const originalAllowLocal = process.env.ALLOW_LOCAL_AGENTS;
   const originalDataDir = process.env.MEDIFORCE_DATA_DIR;
+  const originalMaxBytes = process.env.MEDIFORCE_OUTPUT_FILE_MAX_BYTES;
 
   beforeEach(async () => {
     dataDir = await mkdtemp(join(tmpdir(), 'wsmgr-integ-'));
@@ -100,93 +107,91 @@ describe('ClaudeCodeAgentPlugin ↔ WorkspaceManager integration', () => {
     else process.env.MEDIFORCE_DATA_DIR = originalDataDir;
     if (originalAllowLocal === undefined) delete process.env.ALLOW_LOCAL_AGENTS;
     else process.env.ALLOW_LOCAL_AGENTS = originalAllowLocal;
+    if (originalMaxBytes === undefined) delete process.env.MEDIFORCE_OUTPUT_FILE_MAX_BYTES;
+    else process.env.MEDIFORCE_OUTPUT_FILE_MAX_BYTES = originalMaxBytes;
+    vi.restoreAllMocks();
   });
 
-  it('creates a worktree, commits the step output, and writes git-result.json', async () => {
+  function worktreeOf(context: WorkflowAgentContext): string {
+    return join(dataDir, 'worktrees', '_default', context.workflowDefinition.name, context.processInstanceId);
+  }
+
+  async function runStep(context: WorkflowAgentContext, command: AgentCommandSpec): Promise<void> {
     const plugin = new ClaudeCodeAgentPlugin();
-    const context = buildWorkflowContext();
     await plugin.initialize(context);
-    vi.spyOn(plugin as unknown as GetAgentCommandTarget, 'getAgentCommand').mockReturnValue(
-      mockAgentShellCommand('echo "# extracted" > report.md'),
-    );
+    vi.spyOn(plugin as unknown as GetAgentCommandTarget, 'getAgentCommand').mockReturnValue(command);
+    await plugin.run(buildEmitSpy().emit);
+  }
 
-    const { emit } = buildEmitSpy();
-    await plugin.run(emit);
+  it('creates a worktree and commits the repository edit, result.json and the Output Files — never the engine\'s files', async () => {
+    const context = buildWorkflowContext({ stepInput: { trial: 'CDISCPILOT01' } });
 
-    const name = context.workflowDefinition.name;
-    const wtDir = join(dataDir, 'worktrees', '_default', name, context.processInstanceId);
+    await runStep(context, mockAgentShellCommand('echo "# extracted" > report.md; echo "a,b" > .mediforce/output/extract/listing.csv'));
+
+    const wtDir = worktreeOf(context);
     const log = execFileSync('git', ['log', '--oneline'], { cwd: wtDir, encoding: 'utf-8' });
     // 2 commits: initial .gitignore seed on main + this step's commit
     expect(log.split('\n').filter(Boolean).length).toBe(2);
     expect(log).toMatch(/Extract Step/);
+    expect(stepCommitFiles(wtDir)).toEqual([
+      '.mediforce/output/extract/listing.csv',
+      '.mediforce/output/extract/result.json',
+      'report.md',
+    ]);
 
     // The run branch exists in the bare repo and carries the committed file
-    const bareRepoPath = join(dataDir, 'bare-repos', '_default', `${name}.git`);
+    const bareRepoPath = join(dataDir, 'bare-repos', '_default', `${context.workflowDefinition.name}.git`);
     const branches = execFileSync('git', ['--git-dir', bareRepoPath, 'branch', '--list'], { encoding: 'utf-8' });
     expect(branches).toContain(`run/${context.processInstanceId}`);
-    const report = await readFile(join(wtDir, 'report.md'), 'utf-8');
-    expect(report.trim()).toBe('# extracted');
+    expect((await readFile(join(wtDir, 'report.md'), 'utf-8')).trim()).toBe('# extracted');
   });
 
-  it('commits an empty audit marker when the agent writes no files (Step-Status: success, no changes)', async () => {
-    const plugin = new ClaudeCodeAgentPlugin();
+  it('fails a step whose agent wrote no result.json, and still commits what it left (✗)', async () => {
     const context = buildWorkflowContext();
-    await plugin.initialize(context);
-    vi.spyOn(plugin as unknown as GetAgentCommandTarget, 'getAgentCommand').mockReturnValue(
-      mockAgentShellCommand('true'), // no file writes
-    );
 
-    const { emit } = buildEmitSpy();
-    await plugin.run(emit);
+    await expect(runStep(context, mockAgentShellCommand('echo "half" > .mediforce/output/extract/partial.md', 'extract', false)))
+      .rejects.toThrow('agent wrote no result.json');
 
-    const name = context.workflowDefinition.name;
-    const bareRepoPath = join(dataDir, 'bare-repos', '_default', `${name}.git`);
-    const mainSha = execFileSync('git', ['--git-dir', bareRepoPath, 'rev-parse', 'refs/heads/main'], { encoding: 'utf-8' }).trim();
-    const runSha = execFileSync('git', ['--git-dir', bareRepoPath, 'rev-parse', `refs/heads/run/${context.processInstanceId}`], { encoding: 'utf-8' }).trim();
+    const wtDir = worktreeOf(context);
+    expect(stepCommitFiles(wtDir)).toEqual(['.mediforce/output/extract/partial.md']);
+    expect(execFileSync('git', ['log', '-1', '--format=%s'], { cwd: wtDir, encoding: 'utf-8' })).toContain('✗');
+  });
 
-    // The run branch advances even with no changes — full audit trail.
-    expect(runSha).not.toBe(mainSha);
+  it('never commits an Output File over the size cap', async () => {
+    process.env.MEDIFORCE_OUTPUT_FILE_MAX_BYTES = '64';
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const context = buildWorkflowContext();
 
-    const body = execFileSync(
-      'git', ['--git-dir', bareRepoPath, 'log', '-1', '--format=%B', `refs/heads/run/${context.processInstanceId}`],
-      { encoding: 'utf-8' },
-    );
-    expect(body.split('\n')[0]).toMatch(/— no changes$/);
-    expect(body).toMatch(/Step-Status: success/);
+    await runStep(context, mockAgentShellCommand('head -c 200 /dev/zero > .mediforce/output/extract/dump.bin'));
+
+    expect(stepCommitFiles(worktreeOf(context))).toEqual(['.mediforce/output/extract/result.json']);
   });
 
   it('step 2 of the same run reattaches to the worktree and sees step 1 commits', async () => {
-    // --- Step 1 ---
     const context1 = buildWorkflowContext();
-    const plugin1 = new ClaudeCodeAgentPlugin();
-    await plugin1.initialize(context1);
-    vi.spyOn(plugin1 as unknown as GetAgentCommandTarget, 'getAgentCommand').mockReturnValue(
-      mockAgentShellCommand('echo "step 1 content" > foo.txt'),
-    );
-    await plugin1.run(buildEmitSpy().emit);
+    await runStep(context1, mockAgentShellCommand('echo "step 1 content" > foo.txt'));
 
-    // --- Step 2: same run, different step id — must re-use the same worktree ---
-    const context2: WorkflowAgentContext = {
-      ...context1,
-      stepId: 'refine',
-      step: { ...context1.step, id: 'refine' },
-    };
-    const plugin2 = new ClaudeCodeAgentPlugin();
-    await plugin2.initialize(context2);
-    // Assert inside the shell command that foo.txt exists — if step 2 got a fresh
-    // worktree without step 1's commits, the file wouldn't be there and the exit
-    // code would flip to non-zero, failing the test.
-    vi.spyOn(plugin2 as unknown as GetAgentCommandTarget, 'getAgentCommand').mockReturnValue(
-      mockAgentShellCommand('test -f foo.txt && echo "step 2 content" > bar.txt'),
-    );
-    await plugin2.run(buildEmitSpy().emit);
+    // Same run, different step id — must re-use the same worktree. The shell
+    // asserts foo.txt exists: a fresh worktree would flip its exit code.
+    const context2: WorkflowAgentContext = { ...context1, stepId: 'refine', step: { ...context1.step, id: 'refine' } };
+    await runStep(context2, mockAgentShellCommand('test -f foo.txt && echo "step 2 content" > bar.txt', 'refine'));
 
-    const name = context1.workflowDefinition.name;
-    const wtDir = join(dataDir, 'worktrees', '_default', name, context1.processInstanceId);
+    const wtDir = worktreeOf(context1);
     const log = execFileSync('git', ['log', '--oneline'], { cwd: wtDir, encoding: 'utf-8' });
     // 3 commits: gitignore seed + step 1 + step 2
     expect(log.split('\n').filter(Boolean).length).toBe(3);
     expect(await readFile(join(wtDir, 'foo.txt'), 'utf-8')).toBe('step 1 content\n');
     expect(await readFile(join(wtDir, 'bar.txt'), 'utf-8')).toBe('step 2 content\n');
+  });
+
+  it('empties the output folder when a step runs again, so it never inherits its earlier files', async () => {
+    const context = buildWorkflowContext();
+    await runStep(context, mockAgentShellCommand('echo "draft 1" > .mediforce/output/extract/draft-1.md'));
+
+    // The shell fails the step if draft-1.md is still there.
+    await runStep(context, mockAgentShellCommand('test ! -e .mediforce/output/extract/draft-1.md && echo "draft 2" > .mediforce/output/extract/draft-2.md'));
+
+    const tree = execFileSync('git', ['ls-tree', '-r', '--name-only', 'HEAD', '--', '.mediforce/output/extract/'], { cwd: worktreeOf(context), encoding: 'utf-8' });
+    expect(tree.trim().split('\n').sort()).toEqual(['.mediforce/output/extract/draft-2.md', '.mediforce/output/extract/result.json']);
   });
 });

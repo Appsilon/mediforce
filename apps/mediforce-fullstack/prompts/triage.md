@@ -159,4 +159,3 @@ If the batch is empty, write `{ "verdicts": [] }` (with `confidence`).
 `confidence` (0–1) is how often a batch classified like this one would be right;
 `confidence_rationale` says why in 1–2 sentences. Both are recorded for
 observability — they do **not** route the run.
-Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "classified N issues (M obsolete)"}`.

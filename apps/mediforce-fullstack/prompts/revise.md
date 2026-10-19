@@ -49,4 +49,3 @@ Write ONLY this JSON to `/output/result.json`:
 }
 ```
 
-Your FINAL message must be ONLY: `{"output_file": "/output/result.json", "summary": "revise pass <n>"}`.

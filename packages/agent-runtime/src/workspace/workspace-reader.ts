@@ -8,7 +8,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { bareRepoPathFor, defaultDataDir, runBranchName, type WorkflowIdentity } from './workspace-paths';
-import { OUTPUT_FILES_REPO_ROOT, resolveOutputFileMaxBytes } from './output-files';
+import { OUTPUT_FILES_REPO_ROOT, RESULT_FILE_NAME, resolveOutputFileMaxBytes } from './output-files';
 
 const execFileAsync = promisify(execFile);
 
@@ -103,6 +103,27 @@ export async function readCommitFile(bareRepoPath: string, revision: string, pat
   }
 }
 
+/**
+ * Every step's Output Files at a revision: the files under
+ * `.mediforce/output/<stepId>/`, except each step's `result.json`, which is
+ * committed beside them but is the step's result (ADR-0030).
+ * Returns [] when the repo, revision, or directory doesn't exist.
+ */
+export async function listRevisionOutputFiles(bareRepoPath: string, revision: string): Promise<OutputFileEntry[]> {
+  const files = await listCommitFiles(bareRepoPath, revision, OUTPUT_FILES_PATH_PREFIX);
+  const entries: OutputFileEntry[] = [];
+  for (const { path: repoPath, size } of files) {
+    if (repoPath.startsWith(OUTPUT_FILES_PATH_PREFIX) === false) continue;
+    const stepRelativePath = repoPath.slice(OUTPUT_FILES_PATH_PREFIX.length);
+    const slashIndex = stepRelativePath.indexOf('/');
+    if (slashIndex <= 0 || slashIndex === stepRelativePath.length - 1) continue;
+    const name = stepRelativePath.slice(slashIndex + 1);
+    if (name === RESULT_FILE_NAME) continue;
+    entries.push({ stepId: stepRelativePath.slice(0, slashIndex), name, path: repoPath, size });
+  }
+  return entries;
+}
+
 export class WorkspaceReader {
   private readonly dataDir: string;
 
@@ -116,21 +137,7 @@ export class WorkspaceReader {
    * Returns [] when the repo, branch, or directory doesn't exist.
    */
   async listOutputFiles(workflow: WorkflowIdentity, runId: string): Promise<OutputFileEntry[]> {
-    const files = await listCommitFiles(bareRepoPathFor(this.dataDir, workflow), runBranchName(runId), OUTPUT_FILES_PATH_PREFIX);
-    const entries: OutputFileEntry[] = [];
-    for (const { path: repoPath, size } of files) {
-      if (repoPath.startsWith(OUTPUT_FILES_PATH_PREFIX) === false) continue;
-      const stepRelativePath = repoPath.slice(OUTPUT_FILES_PATH_PREFIX.length);
-      const slashIndex = stepRelativePath.indexOf('/');
-      if (slashIndex <= 0 || slashIndex === stepRelativePath.length - 1) continue;
-      entries.push({
-        stepId: stepRelativePath.slice(0, slashIndex),
-        name: stepRelativePath.slice(slashIndex + 1),
-        path: repoPath,
-        size,
-      });
-    }
-    return entries;
+    return listRevisionOutputFiles(bareRepoPathFor(this.dataDir, workflow), runBranchName(runId));
   }
 
   /**

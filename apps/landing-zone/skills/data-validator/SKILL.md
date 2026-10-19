@@ -27,7 +27,7 @@ The downstream `human-review` step (or, for `clean` / `escalate` / `chaos`, an a
 
 The agent receives two sources of data:
 
-- **`## Input Data` section in the prompt** — the engine-provided step input is embedded as JSON in the prompt itself (agent steps do not receive `/output/input.json` on disk; only script steps do). The fields you care about:
+- **`## Input Data` section in the prompt** — the engine-provided step input is embedded as JSON in the prompt itself, and also on disk at `/output/input.json`. The fields you care about:
   ```json
   {
     "scriptStatus": "ok" | "failed",

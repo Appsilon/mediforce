@@ -46,6 +46,20 @@ describe('WorkspaceReader', () => {
   }
 
   describe('listOutputFiles', () => {
+    it('leaves out each step\'s result.json, which is committed beside its Output Files but is its result', async () => {
+      const workflow = { name: 'wd-list-result' };
+      await commitOutputFiles(workflow, 'run-1', 'grade', {
+        'result.json': '{"ctcaeGrade":3}',
+        'ae-listing.csv': 'USUBJID,AETERM\n',
+        'nested/result.json': '{}',
+      });
+
+      const entries = await reader.listOutputFiles(workflow, 'run-1');
+
+      expect(entries.map((entry) => entry.name).sort()).toEqual(['ae-listing.csv', 'nested/result.json']);
+      expect(await reader.readOutputFile(workflow, 'run-1', '.mediforce/output/grade/result.json')).not.toBeNull();
+    });
+
     it('returns entries with stepId, name, path, and size across two steps', async () => {
       const workflow = { name: 'wd-list' };
       await commitOutputFiles(workflow, 'run-1', 'extract', {

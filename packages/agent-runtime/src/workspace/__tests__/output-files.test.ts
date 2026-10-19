@@ -1,147 +1,78 @@
 /**
- * Tests for copyOutputFilesIntoWorkspace and its wiring into
- * ContainerPlugin.commitRunWorkspace. Real git via WorkspaceManager
- * against temp dirs — no network, no Docker.
+ * Tests for the step output folder (ADR-0030) — emptied when a step starts,
+ * committed with the step minus the seeded inputs and oversized files — and
+ * its wiring into ContainerPlugin. Real git via WorkspaceManager against temp
+ * dirs — no network, no Docker.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, rm, writeFile, mkdir, readFile, stat, symlink } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, mkdir, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { PluginCapabilityMetadata, WorkflowDefinition, WorkflowStep, WorkflowWorkspace } from '@mediforce/platform-core';
 import { WorkspaceManager, type RunWorkspaceHandle } from '../workspace-manager';
-import { copyOutputFilesIntoWorkspace } from '../output-files';
+import { prepareStepOutputDirForCommit, resetStepOutputDir } from '../output-files';
 import { ContainerPlugin, type CommitRunWorkspaceOptions, type WorkspaceManagerLike } from '../../plugins/container-plugin';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../../interfaces/step-executor-plugin';
 import type { GitMetadata } from '@mediforce/platform-core';
 
 const MAX_BYTES_ENV = 'MEDIFORCE_OUTPUT_FILE_MAX_BYTES';
 
-describe('copyOutputFilesIntoWorkspace', () => {
-  let outputDir: string;
+describe('step output folder', () => {
   let worktreeDir: string;
   const originalMaxBytes = process.env[MAX_BYTES_ENV];
 
   beforeEach(async () => {
-    outputDir = await mkdtemp(join(tmpdir(), 'outfiles-output-'));
     worktreeDir = await mkdtemp(join(tmpdir(), 'outfiles-worktree-'));
   });
 
   afterEach(async () => {
-    await rm(outputDir, { recursive: true, force: true }).catch(() => {});
     await rm(worktreeDir, { recursive: true, force: true }).catch(() => {});
     if (originalMaxBytes === undefined) delete process.env[MAX_BYTES_ENV];
     else process.env[MAX_BYTES_ENV] = originalMaxBytes;
     vi.restoreAllMocks();
   });
 
-  it('copies top-level files into .mediforce/output/<stepId>/', async () => {
-    await writeFile(join(outputDir, 'report.csv'), 'a,b\n1,2\n');
-    await copyOutputFilesIntoWorkspace(outputDir, worktreeDir, 'extract');
+  it('is .mediforce/output/<stepId>/ in the worktree, emptied of an earlier execution\'s files', async () => {
+    const first = await resetStepOutputDir(worktreeDir, 'extract');
+    await writeFile(join(first, 'result.json'), '{"stale":true}');
+    await mkdir(join(first, 'charts'));
+    await writeFile(join(first, 'charts', 'plot.svg'), '<svg/>');
 
-    const copied = await readFile(join(worktreeDir, '.mediforce', 'output', 'extract', 'report.csv'), 'utf-8');
-    expect(copied).toBe('a,b\n1,2\n');
+    const second = await resetStepOutputDir(worktreeDir, 'extract');
+
+    expect(second).toBe(join(worktreeDir, '.mediforce', 'output', 'extract'));
+    expect(await readdir(second)).toEqual([]);
   });
 
-  it('filters internal runtime files by name but copies presentation files', async () => {
-    const internals = [
-      'auth.json', 'prompt.txt', 'result.json', 'git-result.json', 'mock-result.json', 'opencode.json',
-      'input.json', 'previous_run.json', 'mcp-config.json',
-      'script.mjs', 'script.py', 'script.R', 'script.sh',
-    ];
-    for (const name of internals) {
-      await writeFile(join(outputDir, name), '{}');
+  it('removes the seeded inputs before the commit, keeping result.json and the Output Files', async () => {
+    const dir = await resetStepOutputDir(worktreeDir, 'extract');
+    for (const name of ['input.json', 'previous_run.json', 'result.json', 'report.csv', 'presentation.md']) {
+      await writeFile(join(dir, name), 'x');
     }
-    await writeFile(join(outputDir, 'presentation.md'), '# deck');
-    await writeFile(join(outputDir, 'presentation.html'), '<h1>deck</h1>');
-    await writeFile(join(outputDir, 'findings.json'), '{"ok":true}');
 
-    await copyOutputFilesIntoWorkspace(outputDir, worktreeDir, 'step-1');
+    await prepareStepOutputDirForCommit(dir);
 
-    const destDir = join(worktreeDir, '.mediforce', 'output', 'step-1');
-    await expect(readFile(join(destDir, 'presentation.md'), 'utf-8')).resolves.toBe('# deck');
-    await expect(readFile(join(destDir, 'presentation.html'), 'utf-8')).resolves.toBe('<h1>deck</h1>');
-    await expect(readFile(join(destDir, 'findings.json'), 'utf-8')).resolves.toBe('{"ok":true}');
-    for (const name of internals) {
-      await expect(stat(join(destDir, name))).rejects.toThrow();
-    }
+    expect((await readdir(dir)).sort()).toEqual(['presentation.md', 'report.csv', 'result.json']);
   });
 
-  it('skips dotfiles at the top level', async () => {
-    await writeFile(join(outputDir, '.hidden'), 'nope');
-    await writeFile(join(outputDir, 'visible.txt'), 'yes');
+  it('removes files over the MEDIFORCE_OUTPUT_FILE_MAX_BYTES cap, nested ones too, with a warning', async () => {
+    process.env[MAX_BYTES_ENV] = '10';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const dir = await resetStepOutputDir(worktreeDir, 'extract');
+    await writeFile(join(dir, 'small.txt'), 'tiny');
+    await mkdir(join(dir, 'nested'));
+    await writeFile(join(dir, 'nested', 'big.bin'), 'x'.repeat(50));
 
-    await copyOutputFilesIntoWorkspace(outputDir, worktreeDir, 'step-1');
+    await prepareStepOutputDirForCommit(dir);
 
-    const destDir = join(worktreeDir, '.mediforce', 'output', 'step-1');
-    await expect(readFile(join(destDir, 'visible.txt'), 'utf-8')).resolves.toBe('yes');
-    await expect(stat(join(destDir, '.hidden'))).rejects.toThrow();
+    await expect(stat(join(dir, 'small.txt'))).resolves.toBeDefined();
+    await expect(stat(join(dir, 'nested', 'big.bin'))).rejects.toThrow();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('nested/big.bin'));
   });
 
-  it('copies nested directories recursively; internal-name filtering applies only at the top level', async () => {
-    await mkdir(join(outputDir, 'charts', 'q1'), { recursive: true });
-    await writeFile(join(outputDir, 'charts', 'q1', 'plot.svg'), '<svg/>');
-    await writeFile(join(outputDir, 'charts', 'result.json'), '{"nested":true}');
-
-    await copyOutputFilesIntoWorkspace(outputDir, worktreeDir, 'step-1');
-
-    const destDir = join(worktreeDir, '.mediforce', 'output', 'step-1');
-    await expect(readFile(join(destDir, 'charts', 'q1', 'plot.svg'), 'utf-8')).resolves.toBe('<svg/>');
-    await expect(readFile(join(destDir, 'charts', 'result.json'), 'utf-8')).resolves.toBe('{"nested":true}');
-  });
-
-  it('skips files over the MEDIFORCE_OUTPUT_FILE_MAX_BYTES cap with a warning', async () => {
-    process.env[MAX_BYTES_ENV] = '8';
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    await writeFile(join(outputDir, 'huge.bin'), 'x'.repeat(32));
-    await writeFile(join(outputDir, 'tiny.txt'), 'ok');
-
-    await copyOutputFilesIntoWorkspace(outputDir, worktreeDir, 'step-1');
-
-    const destDir = join(worktreeDir, '.mediforce', 'output', 'step-1');
-    await expect(readFile(join(destDir, 'tiny.txt'), 'utf-8')).resolves.toBe('ok');
-    await expect(stat(join(destDir, 'huge.bin'))).rejects.toThrow();
-    const warned = warnSpy.mock.calls.map((call) => call.join(' ')).join('\n');
-    expect(warned).toContain('huge.bin');
-    expect(warned).toContain('32');
-    expect(warned).toContain('8');
-  });
-
-  it('never follows symlinks — an agent-written link to a host path must not be copied', async () => {
-    const hostDir = await mkdtemp(join(tmpdir(), 'outfiles-host-'));
-    try {
-      await writeFile(join(hostDir, 'secret.txt'), 'host-sentinel-do-not-leak');
-      await mkdir(join(hostDir, 'secrets-dir'));
-      await writeFile(join(hostDir, 'secrets-dir', 'inner.txt'), 'host-sentinel-dir');
-      await symlink(join(hostDir, 'secret.txt'), join(outputDir, 'leak'));
-      await symlink(join(hostDir, 'secrets-dir'), join(outputDir, 'leak-dir'));
-      await writeFile(join(outputDir, 'legit.txt'), 'fine');
-
-      await copyOutputFilesIntoWorkspace(outputDir, worktreeDir, 'step-1');
-
-      const destDir = join(worktreeDir, '.mediforce', 'output', 'step-1');
-      await expect(readFile(join(destDir, 'legit.txt'), 'utf-8')).resolves.toBe('fine');
-      await expect(stat(join(destDir, 'leak'))).rejects.toThrow();
-      await expect(stat(join(destDir, 'leak-dir'))).rejects.toThrow();
-    } finally {
-      await rm(hostDir, { recursive: true, force: true }).catch(() => {});
-    }
-  });
-
-  it('does nothing when outputDir does not exist', async () => {
-    await expect(
-      copyOutputFilesIntoWorkspace(join(outputDir, 'missing-subdir'), worktreeDir, 'step-1'),
-    ).resolves.toBeUndefined();
-    await expect(stat(join(worktreeDir, '.mediforce'))).rejects.toThrow();
-  });
-
-  it('does not create an empty .mediforce/output/<stepId>/ dir when nothing is copyable', async () => {
-    await writeFile(join(outputDir, 'result.json'), '{}');
-    await writeFile(join(outputDir, '.dotfile'), 'skip');
-
-    await copyOutputFilesIntoWorkspace(outputDir, worktreeDir, 'step-1');
-
-    await expect(stat(join(worktreeDir, '.mediforce'))).rejects.toThrow();
+  it('does nothing when the folder does not exist', async () => {
+    await expect(prepareStepOutputDirForCommit(join(worktreeDir, 'missing'))).resolves.toBeUndefined();
   });
 });
 
@@ -165,8 +96,12 @@ class TestContainerPlugin extends ContainerPlugin {
     this.workspaceManager = manager;
   }
 
-  commit(outputDir: string, opts?: CommitRunWorkspaceOptions): Promise<GitMetadata | null> {
-    return this.commitRunWorkspace(outputDir, opts);
+  startStep(): Promise<string> {
+    return this.resetStepOutputDir();
+  }
+
+  commit(opts?: CommitRunWorkspaceOptions): Promise<GitMetadata | null> {
+    return this.commitRunWorkspace(opts);
   }
 }
 
@@ -202,23 +137,24 @@ function buildWorkflowContext(stepId: string): WorkflowAgentContext {
   };
 }
 
-describe('ContainerPlugin.commitRunWorkspace output-file capture', () => {
+describe('ContainerPlugin.commitRunWorkspace with the step output folder', () => {
   let dataDir: string;
-  let outputDir: string;
   let manager: WorkspaceManager;
+  const originalMaxBytes = process.env[MAX_BYTES_ENV];
 
   beforeEach(async () => {
     dataDir = await mkdtemp(join(tmpdir(), 'outfiles-commit-data-'));
-    outputDir = await mkdtemp(join(tmpdir(), 'outfiles-commit-output-'));
     manager = new WorkspaceManager({ dataDir });
   });
 
   afterEach(async () => {
     await rm(dataDir, { recursive: true, force: true }).catch(() => {});
-    await rm(outputDir, { recursive: true, force: true }).catch(() => {});
+    if (originalMaxBytes === undefined) delete process.env[MAX_BYTES_ENV];
+    else process.env[MAX_BYTES_ENV] = originalMaxBytes;
+    vi.restoreAllMocks();
   });
 
-  async function setupPlugin(stepId: string): Promise<{ plugin: TestContainerPlugin; handle: RunWorkspaceHandle; context: WorkflowAgentContext }> {
+  async function setupPlugin(stepId: string): Promise<{ plugin: TestContainerPlugin; handle: RunWorkspaceHandle }> {
     const context = buildWorkflowContext(stepId);
     const plugin = new TestContainerPlugin();
     await plugin.initialize(context);
@@ -227,43 +163,69 @@ describe('ContainerPlugin.commitRunWorkspace output-file capture', () => {
       context.processInstanceId,
     );
     plugin.attachWorkspace(handle, manager);
-    return { plugin, handle, context };
+    return { plugin, handle };
   }
 
-  it('copies output files into the workspace so the step commit captures them (success)', async () => {
-    const { plugin, handle } = await setupPlugin('extract');
-    await writeFile(join(outputDir, 'report.csv'), 'a,b\n');
-    await writeFile(join(outputDir, 'result.json'), '{"internal":true}');
-
-    const metadata = await plugin.commit(outputDir);
-
-    expect(metadata).not.toBeNull();
-    const committedFiles = execFileSync(
-      'git', ['diff-tree', '--no-commit-id', '--name-only', '-r', metadata!.commitSha],
+  function committedFiles(handle: RunWorkspaceHandle, commitSha: string): string[] {
+    return execFileSync(
+      'git', ['diff-tree', '--no-commit-id', '--name-only', '-r', commitSha],
       { cwd: handle.path, encoding: 'utf-8' },
     ).trim().split('\n');
-    expect(committedFiles).toContain('.mediforce/output/extract/report.csv');
-    expect(committedFiles).not.toContain('.mediforce/output/extract/result.json');
+  }
 
-    // git-result.json is still written into outputDir post-commit (existing contract)
-    const gitResult = JSON.parse(await readFile(join(outputDir, 'git-result.json'), 'utf-8')) as GitMetadata;
-    expect(gitResult.commitSha).toBe(metadata!.commitSha);
+  it('commits the folder as written — result.json and Output Files, never the seeded input', async () => {
+    const { plugin, handle } = await setupPlugin('extract');
+    const dir = await plugin.startStep();
+    await writeFile(join(dir, 'input.json'), '{"seeded":true}');
+    await writeFile(join(dir, 'result.json'), '{"grade":3}');
+    await writeFile(join(dir, 'report.csv'), 'a,b\n');
+
+    const metadata = await plugin.commit();
+
+    expect(committedFiles(handle, metadata!.commitSha).sort()).toEqual([
+      '.mediforce/output/extract/report.csv',
+      '.mediforce/output/extract/result.json',
+    ]);
+    expect(metadata!.changedFiles).toContain('.mediforce/output/extract/report.csv');
   });
 
-  it('copies output files on failed-step commits too', async () => {
+  it('commits the folder on failed-step commits too', async () => {
     const { plugin, handle } = await setupPlugin('doomed');
-    await writeFile(join(outputDir, 'partial.log'), 'got this far');
+    const dir = await plugin.startStep();
+    await writeFile(join(dir, 'partial.log'), 'got this far');
 
-    const metadata = await plugin.commit(outputDir, { status: 'failed', error: 'boom' });
+    const metadata = await plugin.commit({ status: 'failed', error: 'boom' });
 
-    expect(metadata).not.toBeNull();
-    const committedFiles = execFileSync(
-      'git', ['diff-tree', '--no-commit-id', '--name-only', '-r', metadata!.commitSha],
-      { cwd: handle.path, encoding: 'utf-8' },
-    ).trim().split('\n');
-    expect(committedFiles).toContain('.mediforce/output/doomed/partial.log');
-
+    expect(committedFiles(handle, metadata!.commitSha)).toContain('.mediforce/output/doomed/partial.log');
     const subject = execFileSync('git', ['log', '-1', '--format=%s'], { cwd: handle.path, encoding: 'utf-8' }).trim();
     expect(subject).toContain('✗');
+  });
+
+  it('never commits a file over the size cap', async () => {
+    process.env[MAX_BYTES_ENV] = '10';
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { plugin, handle } = await setupPlugin('export');
+    const dir = await plugin.startStep();
+    await writeFile(join(dir, 'result.json'), '{}');
+    await writeFile(join(dir, 'dump.bin'), 'x'.repeat(50));
+
+    const metadata = await plugin.commit();
+
+    expect(committedFiles(handle, metadata!.commitSha)).toEqual(['.mediforce/output/export/result.json']);
+  });
+
+  it('drops an earlier execution\'s files from the branch when the step runs again, keeping them in history', async () => {
+    const { plugin, handle } = await setupPlugin('revise');
+    const firstDir = await plugin.startStep();
+    await writeFile(join(firstDir, 'draft-1.md'), 'first');
+    await plugin.commit();
+
+    const secondDir = await plugin.startStep();
+    await writeFile(join(secondDir, 'draft-2.md'), 'second');
+    await plugin.commit();
+
+    expect((await manager.listOutputFiles(handle)).map((file) => file.name)).toEqual(['draft-2.md']);
+    const history = execFileSync('git', ['log', '--name-only', '--format='], { cwd: handle.path, encoding: 'utf-8' });
+    expect(history).toContain('.mediforce/output/revise/draft-1.md');
   });
 });
