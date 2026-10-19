@@ -628,6 +628,23 @@ describe('OpenCodeAgentPlugin', () => {
       expect(payload.result).toEqual(resultData);
     });
 
+    it.each([
+      ['missing', null, 'agent wrote no result.json'],
+      ['not JSON', 'All done.', 'result.json is not valid JSON'],
+      ['a JSON array', '[{"count":1}]', 'result.json is not a JSON object'],
+    ] as const)('[ERROR] fails the step when result.json is %s, even when the model\'s last message is JSON', async (_label, contents, message) => {
+      await plugin.initialize(buildMockContext());
+      mockSpawn(plugin).mockImplementation(async (_prompt, options) => {
+        if (contents !== null) await writeFile(join(options!.stepOutputDir as string, 'result.json'), contents);
+        return { cliOutput: openCodeJsonOutput('{"count":1,"confidence":0.9}'), injectedEnvVars: [] };
+      });
+
+      const { emit, events } = buildEmitSpy();
+      await expect(plugin.run(emit)).rejects.toThrow(message);
+
+      expect(events.find((e) => e.type === 'result')).toBeUndefined();
+    });
+
     it('[DATA] git metadata comes from the step commit', async () => {
       await plugin.initialize(buildMockContext());
 
@@ -652,16 +669,6 @@ describe('OpenCodeAgentPlugin', () => {
       expect(bashCommand).toContain('mock-opencode');
       expect(bashCommand).toContain('text');
       expect(bashCommand).toContain('/output/result.json');
-    });
-
-    it('[DATA] copies fixture workspace files into /workspace/ when _workspaceDir is set', async () => {
-      const context = buildMockContext();
-      await plugin.initialize(context);
-
-      const args = plugin.getMockDockerArgs('generate-tlg');
-      const bashCommand = args[2];
-      expect(bashCommand).toContain('_workspaceDir');
-      expect(bashCommand).toContain('/workspace/');
     });
   });
 });

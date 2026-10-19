@@ -1,5 +1,4 @@
 {
-  "_workspaceDir": "adam",
   "study_id": "CDISCPILOT01",
   "generation_date": "2026-03-12",
   "datasets": [
@@ -28,31 +27,5 @@
   ],
   "total_datasets": 10,
   "total_records": 100357,
-  "output_files": [
-    "adam/adam-spec.md",
-    "adam/issues.md",
-    "adam/tlg-adam-crossref.md",
-    "adam/code/00_setup.R",
-    "adam/code/01_adsl.R",
-    "adam/code/02_adae.R",
-    "adam/code/03_adlb.R",
-    "adam/code/04_advs.R",
-    "adam/code/05_adex.R",
-    "adam/code/06_adqsadas.R",
-    "adam/code/07_adqscibc.R",
-    "adam/code/08_adqsnpix.R",
-    "adam/code/09_adcm.R",
-    "adam/code/10_adtte.R",
-    "adam/data/adsl.json",
-    "adam/data/adae.json",
-    "adam/data/adlb.json",
-    "adam/data/advs.json",
-    "adam/data/adex.json",
-    "adam/data/adqsadas.json",
-    "adam/data/adqscibc.json",
-    "adam/data/adqsnpix.json",
-    "adam/data/adcm.json",
-    "adam/data/adtte.json"
-  ],
   "summary": "Generated 10 ADaM datasets with R scripts from SDTM source data for CDISCPILOT01."
 }

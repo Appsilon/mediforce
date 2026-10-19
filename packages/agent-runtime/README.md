@@ -30,7 +30,9 @@ carries `confidence` (0.0–1.0) and `confidence_rationale`.
 ([ADR-0030](../../docs/adr/0030-agent-step-output-contract.md)). `/output` is
 the step's folder in the run worktree, `.mediforce/output/<stepId>/`, emptied
 when the step starts and committed with the step; every other file there is an
-Output File. A missing or non-object `result.json` fails the step. Its reserved
+Output File, except the seeded `input.json`/`previous_run.json` and top-level
+dotfiles, which are removed before the commit. A missing or non-object
+`result.json` fails the step. Its reserved
 keys `confidence` and `confidence_rationale` move onto the envelope, so
 `outputSchema` sees the result without them. The agent's final message is
 ignored; token usage comes from the CLI's stream. The engine's own files —

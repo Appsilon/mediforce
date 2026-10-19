@@ -9,7 +9,7 @@ Most questions that look like they need a human do not. They need someone to rea
 `AGENTS.md`, `CONTEXT.md`, `docs/`, the existing tests, and `git log`. That is
 what this step is for.
 
-### Inputs (under `## Previous Step Outputs`)
+### Inputs (under `## Previous Steps`)
 - `select` — the chosen issue: `issueNumber`, `title`, `body`, `url`, `author`.
 - `select.blockers` — triage's open questions, each `{ question, kind }`. This is
   your worklist. It may be empty or absent (an issue triaged before blockers were

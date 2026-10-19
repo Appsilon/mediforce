@@ -37,8 +37,5 @@
     { "id": "F-1", "title": "Time to First Dermatological Event by Treatment Group", "population": "Safety" }
   ],
   "listings": [],
-  "output_files": [
-    "cdiscpilot01-mock-tlg-shells.md"
-  ],
   "summary": "Generated 30 TLG shells (29 tables, 1 figure) for CDISCPILOT01 based on trial metadata and SAP."
 }

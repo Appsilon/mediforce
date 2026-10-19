@@ -40,7 +40,7 @@ path and branch conventions live in `workspace-paths.ts` so the read-only
 |---|---|---|---|
 | `/workspace` | rw | the run | The git worktree; it is the working directory. Edits here are repository changes. |
 | `/output` | rw | the step | The step's output folder, `<worktree>/.mediforce/output/<stepId>/` ([ADR-0030](../adr/0030-agent-step-output-contract.md)). The step writes `result.json` (required for an agent step) and its Output Files, optional `presentation.md` among them. Host seeds `input.json` and `previous_run.json` here and removes both before the commit. |
-| `/engine` | rw | the step | The engine's own files, never committed: `prompt.txt`, the agent CLI's config (`mcp-config.json` for Claude Code, `opencode.json` and `auth.json` for OpenCode), an eval trial's MCP tapes, spilled previous-step values, `script.<ext>`. A host tempdir, deleted when the step ends; it is what the queued strategy ships to the worker. |
+| `/engine` | rw (agent), ro (script) | the step | The engine's own files, never committed: `prompt.txt`, the agent CLI's config (`mcp-config.json` for Claude Code, `opencode.json` and `auth.json` for OpenCode), an eval trial's MCP tapes, spilled previous-step values, `script.<ext>`. A host tempdir, deleted when the step ends; it is what the queued strategy ships to the worker. |
 | `/data` | ro | the step | Uploaded attachments the host downloaded for this step (agent and script steps). Each `files[].localPath` in the agent's prompt and `input.json` points here. |
 | `/artifacts` | ro | the definition | The files the workflow carries (`artifacts` on the definition): scripts, a Dockerfile, skills. Materialized to a content-addressed host directory per file set, so every step of every run of an unchanged workflow shares one write. Absent when the workflow carries none. |
 | `/plugin` | ro | the step | The plugin root (`skills/<id>/SKILL.md`), when an agent step is offered catalog Skills (its agent's or its own `agent.skills`; `claude-code-agent` via `--plugin-dir`, `opencode-agent` via `skills.paths` in `opencode.json`; [ADR-0025](../adr/0025-skill-catalog.md), [ADR-0028](../adr/0028-retire-file-skills.md)): a content-hashed folder under `mediforce-agent-skills/` holding them under `skills/<id>/`. |
@@ -50,8 +50,9 @@ The mounts are described in the header comment of
 `/output` is a bind mount of the step's own folder in the worktree: nothing is
 copied and nothing is deleted after the step. It is emptied when the step
 starts, so a step that runs again (a loop, a retry) never inherits its earlier
-files — those stay in git history. Before the commit, every file over
-`MEDIFORCE_OUTPUT_FILE_MAX_BYTES` is removed from it and logged.
+files — those stay in git history. Before the commit, top-level dotfiles (tool
+state such as `.Rhistory`) and every file over `MEDIFORCE_OUTPUT_FILE_MAX_BYTES`
+are removed from it, the oversized ones logged.
 Previous-step and previous-run values too large to inline in an agent's prompt
 are written to `/engine/previous-outputs/`. An agent's prompt has one entry per
 earlier step (`## Previous Steps`): its result plus the paths of its Output

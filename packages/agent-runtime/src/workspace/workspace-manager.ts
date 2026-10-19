@@ -28,7 +28,7 @@ import { createHash } from 'node:crypto';
 import type { WorkflowWorkspace } from '@mediforce/platform-core';
 import { normalizeRepoUrls, toHttpsWithToken } from '@mediforce/platform-core';
 import { bareRepoPathFor, defaultDataDir, runBranchName, worktreePathFor, type WorkflowIdentity } from './workspace-paths';
-import { OUTPUT_FILES_REPO_ROOT, RESULT_FILE_NAME } from './output-files';
+import { OUTPUT_FILES_REPO_ROOT, RESULT_FILE_NAME, parseOutputFilePath } from './output-files';
 import { listRevisionOutputFiles, type OutputFileEntry } from './workspace-reader';
 
 export type { WorkflowIdentity } from './workspace-paths';
@@ -199,8 +199,7 @@ function truncate(value: string, max: number): string {
 
 /** `.mediforce/output/<stepId>/result.json` — a step's result (ADR-0030). */
 function isStepResultPath(path: string): boolean {
-  const segments = path.split('/');
-  return path.startsWith(`${OUTPUT_FILES_REPO_ROOT}/`) && segments.length === 4 && segments[3] === RESULT_FILE_NAME;
+  return parseOutputFilePath(path)?.name === RESULT_FILE_NAME;
 }
 
 /**

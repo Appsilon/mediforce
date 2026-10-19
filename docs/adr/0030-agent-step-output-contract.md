@@ -58,10 +58,18 @@ step should rely on. `main` never carried it, so there is nothing to revert.
 
 1. **One folder.** A step's output folder is
    `<worktree>/.mediforce/output/<stepId>/`. The agent sees it as `/output`
-   through a bind mount of that same folder: nothing is copied and nothing is
-   deleted. The engine's own files (`prompt.txt`, `input.json`,
-   `mcp-config.json`, `auth.json`, …) move to a separate engine-owned mount and
-   are never committed.
+   through a bind mount of that same folder: nothing is copied. The engine's
+   own files (`prompt.txt`, `mcp-config.json`, `auth.json`, MCP recordings,
+   previous-step values too large for the prompt) move to a separate
+   engine-owned mount, `/engine`, which is never committed. The step's inputs
+   are the one exception: the engine seeds `input.json` (and
+   `previous_run.json`, when the workflow carries state between runs) into
+   `/output`, where every script and skill has always read them, and removes
+   both before the step commit. A step therefore cannot publish an Output File
+   named `input.json` or `previous_run.json`. Top-level dotfiles in `/output`
+   (tool state such as `.Rhistory` or `.cache/`) are removed before the commit
+   too, as ADR-0015's copy skipped them. Skill and workflow text names the
+   folder as `/output`; there is no `{output_dir}` placeholder.
 2. **Repository edits are code changes, not outputs.** An agent that edits code
    in the worktree (`mediforce-fullstack`, `sdtm-rule-migration`) keeps doing
    so. Those edits show as the step commit's diff, not as Output Files.
@@ -115,8 +123,10 @@ step should rely on. `main` never carried it, so there is nothing to revert.
 - The copy step after each agent step: the agent writes into the committed
   folder directly.
 - The `INTERNAL_OUTPUT_FILE_NAMES` exclusion list: the engine's files no longer
-  share the folder. The only file left out of the Output File list is
-  `result.json` (decision 5), filtered where the list is read from git.
+  share the folder. The seeded inputs and top-level dotfiles are removed before
+  the commit (decision 1), and the only committed file left out of the Output
+  File list is `result.json` (decision 5), filtered where the list is read from
+  git.
 
 ## Consequences
 

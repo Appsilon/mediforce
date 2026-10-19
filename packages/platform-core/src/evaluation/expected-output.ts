@@ -1,5 +1,6 @@
 import type { EvalCase, EvaluatorKind } from '../schemas/evaluation';
 import { canonicalJson } from './canonical-json';
+import { isRecord } from '../utils/is-record';
 
 /**
  * Whether an Evaluator grades a case: the case selects it (or selects none, so
@@ -12,10 +13,6 @@ export function evaluatorAppliesToCase(
 ): boolean {
   if (evalCase.evaluatorIds !== null && evalCase.evaluatorIds.includes(evaluator.evaluatorId) === false) return false;
   return evaluator.kind !== 'expected_output' || evalCase.expectedOutput !== null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && Array.isArray(value) === false;
 }
 
 function pathLabel(path: readonly string[]): string {

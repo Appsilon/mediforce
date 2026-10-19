@@ -116,7 +116,7 @@ Create a concise ADaM specification document. For each dataset include:
 - **Special derivations**: {LOCF, windowing, shift categories, etc.}
 ```
 
-Save to: `{output_dir}/adam-spec.md`
+Save to: `/output/adam-spec.md`
 
 ### Step 5: Generate {admiral} R scripts
 
@@ -188,7 +188,7 @@ library(stringr)
 4. **Data export** — use `datasetjson` package by default:
    ```r
    # Export to Dataset-JSON
-   datasetjson::write_dataset_json(adam_dataset, file.path(output_dir, "{adam_name}.json"))
+   datasetjson::write_dataset_json(adam_dataset, file.path("/output", "{adam_name}.json"))
    ```
    If the user requests `.xpt` format, use `xportr` instead:
    ```r
@@ -196,12 +196,12 @@ library(stringr)
      xportr_type(metacore) %>%
      xportr_label(metacore) %>%
      xportr_format(metacore) %>%
-     xportr_write(file.path(output_dir, "{adam_name}.xpt"))
+     xportr_write(file.path("/output", "{adam_name}.xpt"))
    ```
 5. **Variable labels** — always assign labels using `attr()` or admiral's labelling utilities. ADaM datasets must have labelled variables.
 6. **Controlled terminology** — use standard CDISC controlled terms (e.g., "SCREENING" not "Screen", "Y"/"N" for flag variables)
 
-Save scripts to: `{output_dir}/code/{adam_name}.R`
+Save scripts to: `/output/code/{adam_name}.R`
 
 ### Step 6: Execute the R scripts
 
@@ -246,7 +246,7 @@ After all scripts have executed successfully:
 | ...    | ...       | ...           | ...    | ...               |
 ```
 
-Save to: `{output_dir}/tlg-adam-crossref.md`
+Save to: `/output/tlg-adam-crossref.md`
 
 ### Step 8: Generate issue summary
 
@@ -272,7 +272,7 @@ Compile all issues encountered during the process:
 - [List any packages that were installed or failed to install]
 ```
 
-Save to: `{output_dir}/issues.md`
+Save to: `/output/issues.md`
 
 ### Step 9: Present summary to user
 
@@ -289,7 +289,7 @@ After completion, present:
 Default output structure (can be overridden by user):
 
 ```
-{output_dir}/
+/output/
 ├── adam-spec.md                    # ADaM specification document
 ├── code/                           # R scripts
 │   ├── 00_setup.R                  # Package loading + read_sdtm helper

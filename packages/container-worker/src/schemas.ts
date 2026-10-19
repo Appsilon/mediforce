@@ -24,7 +24,8 @@ export const DockerJobDataSchema = z.object({
   processInstanceId: z.string(),
   /** Tracing context. */
   stepId: z.string(),
-  /** Host-side output directory mounted at /output in the container. */
+  /** Host-side engine directory (mounted at /engine). Its files travel to a remote
+   *  worker and back; the field keeps its name so queued jobs stay compatible. */
   outputDir: z.string(),
   /** Host-side log file path for realtime activity streaming (null = no logging). */
   logFile: z.string().nullable(),

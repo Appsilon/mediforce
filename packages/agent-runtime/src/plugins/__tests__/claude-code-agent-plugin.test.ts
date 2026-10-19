@@ -225,7 +225,7 @@ describe('ClaudeCodeAgentPlugin', () => {
     it('[DATA] extracts last result event from stream-json', () => {
       const resultEvent = JSON.stringify({
         type: 'result', subtype: 'success',
-        result: JSON.stringify({ output_file: '/output/result.json' }),
+        result: 'Done.',
         usage: { input_tokens: 5000, output_tokens: 1200 },
       });
       const stdout = [
@@ -420,7 +420,7 @@ describe('ClaudeCodeAgentPlugin', () => {
 
     it.each([
       ['missing', null, 'agent wrote no result.json'],
-      ['not JSON', 'All done.', 'result.json is not a JSON object'],
+      ['not JSON', 'All done.', 'result.json is not valid JSON'],
       ['a JSON array', '[{"grade":3}]', 'result.json is not a JSON object'],
     ] as const)('[ERROR] fails the step when result.json is %s, even when the closing message is JSON', async (_label, contents, message) => {
       await plugin.initialize(buildMockContext());

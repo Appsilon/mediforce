@@ -198,8 +198,9 @@ export class ClaudeCodeAgentPlugin extends BaseContainerAgentPlugin {
   parseAgentOutput(rawStdout: string): string {
     // Claude CLI outputs NDJSON (stream-json). Keep the last `result` event —
     // its `usage` and, on failure, its error text — and track the peak
-    // per-turn context occupancy across all assistant turns. The final `result.usage` reports only the last turn, so peak saturation
-    // (what measures context against the model's window) must come from the
+    // per-turn context occupancy across all assistant turns. The final
+    // `result.usage` reports only the last turn, so peak saturation (what
+    // measures context against the model's window) must come from the
     // per-turn `assistant` events — mirrors the OpenCode plugin.
     let lastResult = '';
     let peakInputTokens = 0;

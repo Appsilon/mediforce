@@ -8,7 +8,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { bareRepoPathFor, defaultDataDir, runBranchName, type WorkflowIdentity } from './workspace-paths';
-import { OUTPUT_FILES_REPO_ROOT, RESULT_FILE_NAME, resolveOutputFileMaxBytes } from './output-files';
+import { OUTPUT_FILES_REPO_ROOT, RESULT_FILE_NAME, parseOutputFilePath, resolveOutputFileMaxBytes } from './output-files';
 
 const execFileAsync = promisify(execFile);
 
@@ -113,13 +113,9 @@ export async function listRevisionOutputFiles(bareRepoPath: string, revision: st
   const files = await listCommitFiles(bareRepoPath, revision, OUTPUT_FILES_PATH_PREFIX);
   const entries: OutputFileEntry[] = [];
   for (const { path: repoPath, size } of files) {
-    if (repoPath.startsWith(OUTPUT_FILES_PATH_PREFIX) === false) continue;
-    const stepRelativePath = repoPath.slice(OUTPUT_FILES_PATH_PREFIX.length);
-    const slashIndex = stepRelativePath.indexOf('/');
-    if (slashIndex <= 0 || slashIndex === stepRelativePath.length - 1) continue;
-    const name = stepRelativePath.slice(slashIndex + 1);
-    if (name === RESULT_FILE_NAME) continue;
-    entries.push({ stepId: stepRelativePath.slice(0, slashIndex), name, path: repoPath, size });
+    const outputFile = parseOutputFilePath(repoPath);
+    if (outputFile === null || outputFile.name === RESULT_FILE_NAME) continue;
+    entries.push({ ...outputFile, path: repoPath, size });
   }
   return entries;
 }

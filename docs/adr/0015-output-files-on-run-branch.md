@@ -18,9 +18,9 @@ step (success or failure) on a never-pushed run branch.
 **Decision:** after each agent step, copy the contents of `/output` —
 minus internal runtime files (`auth.json`, `prompt.txt`, `result.json`,
 `git-result.json`, `mock-result.json`, `opencode.json`, `input.json`,
-`previous_run.json`, `mcp-config.json`, `script.{mjs,py,R,sh}`; source of
-truth: `INTERNAL_OUTPUT_FILE_NAMES` in
-`packages/agent-runtime/src/workspace/output-files.ts`) and minus files
+`previous_run.json`, `mcp-config.json`, `script.{mjs,py,R,sh}`; the
+`INTERNAL_OUTPUT_FILE_NAMES` list is gone — superseded by
+[ADR-0030](./0030-agent-step-output-contract.md)) and minus files
 over a per-file size cap (`MEDIFORCE_OUTPUT_FILE_MAX_BYTES`, default
 100 MiB) — into
 `.mediforce/output/<stepId>/` inside the workspace, so the existing

@@ -167,6 +167,19 @@ describe('ClaudeCodeAgentPlugin ↔ WorkspaceManager integration', () => {
     expect(stepCommitFiles(worktreeOf(context))).toEqual(['.mediforce/output/extract/result.json']);
   });
 
+  it('never commits top-level dotfiles a tool leaves in the output folder', async () => {
+    const context = buildWorkflowContext();
+
+    await runStep(context, mockAgentShellCommand(
+      'echo "history" > .mediforce/output/extract/.Rhistory && mkdir -p .mediforce/output/extract/.cache && echo "x" > .mediforce/output/extract/.cache/blob && echo "# t" > .mediforce/output/extract/table.md',
+    ));
+
+    expect(stepCommitFiles(worktreeOf(context)).sort()).toEqual([
+      '.mediforce/output/extract/result.json',
+      '.mediforce/output/extract/table.md',
+    ]);
+  });
+
   it('step 2 of the same run reattaches to the worktree and sees step 1 commits', async () => {
     const context1 = buildWorkflowContext();
     await runStep(context1, mockAgentShellCommand('echo "step 1 content" > foo.txt'));

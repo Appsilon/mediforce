@@ -376,7 +376,7 @@ describe('ScriptContainerPlugin', () => {
 
       const dockerArgs = spawnMock.mock.calls[0][1] as string[];
       expect(outputHostDir(dockerArgs)).toMatch(/\.mediforce\/output\/run-script$/);
-      expect(dockerArgs.some((arg) => arg.endsWith(':/engine'))).toBe(true);
+      expect(dockerArgs.some((arg) => arg.endsWith(':/engine:ro'))).toBe(true);
     });
 
     it('[DATA] streams stdout lines as assistant events as they arrive (live, before close)', async () => {

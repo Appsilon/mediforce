@@ -19,13 +19,13 @@
  *       starts, committed with the step, never copied or deleted afterwards.
  *     - The engine seeds `input.json` (stepInput) and `previous_run.json`
  *       (carry-over) here, where scripts and skills read them, and removes
- *       both before the commit.
+ *       both before the commit, with top-level dotfiles and oversized files.
  *
  *   /engine (host path = per-step tempdir)
  *     - Engine plumbing the step never publishes: `prompt.txt`, the agent
  *       CLI's config (`mcp-config.json`, `opencode.json`, `auth.json`), MCP
  *       tapes, spilled previous-step values, `script.<ext>`. Deleted when the
- *       step ends; never committed.
+ *       step ends; never committed. Read-only for script steps.
  *     - It is the directory the queued spawn strategy ships to the worker.
  */
 import { createHash } from 'node:crypto';

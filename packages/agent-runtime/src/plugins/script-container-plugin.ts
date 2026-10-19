@@ -1,9 +1,9 @@
-import { readFile, mkdtemp, writeFile, rm, realpath, mkdir, appendFile, stat } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, realpath, mkdir, appendFile, stat } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
-import type { AgentConfig, ScriptStepConfig, StepConfig, PluginCapabilityMetadata, Presentation } from '@mediforce/platform-core';
+import type { AgentConfig, ScriptStepConfig, StepConfig, PluginCapabilityMetadata } from '@mediforce/platform-core';
 import { DEFAULT_SCRIPT_RUNTIME_IMAGES, DEFAULT_STEP_TIMEOUT_MINUTES, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 import { getDockerSpawnStrategy } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
@@ -17,6 +17,7 @@ import {
   CONTAINER_OUTPUT_MOUNT,
 } from './base-container-agent-plugin';
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
+import { RESULT_FILE_NAME, readPresentation, readStepResult } from '../workspace/output-files';
 
 // Last-resort for the legacy process-mode path only; the workflow path resolves
 // the timeout via resolveStepTimeoutMinutes. The resolver's own default, so the
@@ -43,13 +44,12 @@ export const RUNTIME_CONFIG: Record<string, { image: string; ext: string; cmd: (
  */
 async function readResultError(stepOutputDir: string): Promise<string | null> {
   try {
-    const raw = await readFile(join(stepOutputDir, 'result.json'), 'utf-8');
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const parsed = await readStepResult(stepOutputDir);
     if (typeof parsed.error === 'string' && parsed.error.length > 0) {
-      return `result.json error: ${parsed.error}`;
+      return `${RESULT_FILE_NAME} error: ${parsed.error}`;
     }
     if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
-      return `result.json errors: ${parsed.errors.join('; ')}`;
+      return `${RESULT_FILE_NAME} errors: ${parsed.errors.join('; ')}`;
     }
     return null;
   } catch {
@@ -345,7 +345,7 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           '--name', containerName,
           '--memory', '8g',
           '--cpus', '2',
-          '-v', `${engineDir}:${CONTAINER_ENGINE_MOUNT}`,
+          '-v', `${engineDir}:${CONTAINER_ENGINE_MOUNT}:ro`,
           '-v', `${this.runWorkspaceHandle!.path}:/workspace`,
           '-v', `${stepOutputDir}:${CONTAINER_OUTPUT_MOUNT}`,
           ...(artifactsHostDir === null
@@ -460,36 +460,9 @@ export class ScriptContainerPlugin extends ContainerPlugin {
         agentImage: this.image,
       });
 
-      // Read result.json from the output directory
-      const resultPath = join(stepOutputDir, 'result.json');
-      let result: Record<string, unknown>;
-      try {
-        const resultRaw = await readFile(resultPath, 'utf-8');
-        result = JSON.parse(resultRaw) as Record<string, unknown>;
-      } catch {
-        // If no result.json, use stdout as raw output
-        result = { raw: containerOutput };
-      }
-
-      // Read presentation.md or presentation.html if the script wrote one.
-      // Markdown wins on tie — safer surface, cheaper to author. HTML stays
-      // available for cases that genuinely need JS / iframe interactivity.
-      let presentation: Presentation | null = null;
-      try {
-        presentation = {
-          kind: 'markdown',
-          content: await readFile(join(stepOutputDir, 'presentation.md'), 'utf-8'),
-        };
-      } catch {
-        try {
-          presentation = {
-            kind: 'html',
-            content: await readFile(join(stepOutputDir, 'presentation.html'), 'utf-8'),
-          };
-        } catch {
-          // No presentation file — fine
-        }
-      }
+      // A script without a usable result.json keeps its stdout as the raw result.
+      const result = await readStepResult(stepOutputDir).catch((): Record<string, unknown> => ({ raw: containerOutput }));
+      const presentation = await readPresentation(stepOutputDir);
 
       const durationMs = Date.now() - startTime;
 

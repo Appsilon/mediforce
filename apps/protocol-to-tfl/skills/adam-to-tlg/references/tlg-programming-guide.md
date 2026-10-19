@@ -28,7 +28,7 @@ library(mmrm)
 
 # ---- Paths ----
 adam_dir   <- "{path_to_adam_data}"
-output_dir <- "{path_to_tlg_outputs}"
+output_dir <- "/output"
 dir.create(file.path(output_dir, "tables"), recursive = TRUE, showWarnings = FALSE)
 dir.create(file.path(output_dir, "figures"), recursive = TRUE, showWarnings = FALSE)
 dir.create(file.path(output_dir, "listings"), recursive = TRUE, showWarnings = FALSE)

@@ -4,16 +4,16 @@ import { join, dirname, isAbsolute, resolve, posix, basename } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { AgentContext, WorkflowAgentContext, EmitFn } from '../interfaces/step-executor-plugin';
-import type { AgentConfig, StepConfig, PluginCapabilityMetadata, McpServerConfig, ResolvedMcpConfig, Presentation, AgentTrajectoryEntry } from '@mediforce/platform-core';
+import type { AgentConfig, StepConfig, PluginCapabilityMetadata, McpServerConfig, ResolvedMcpConfig, AgentTrajectoryEntry } from '@mediforce/platform-core';
 import { resolveStepEnv, resolveValue, type ResolvedEnv } from './resolve-env';
 import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-strategy';
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { RetiredFileSkillError } from '../skills/resolve-skills-for-step';
-import { PRESENTATION_FILE_NAMES, RESULT_FILE_NAME } from '../workspace/output-files';
+import { PRESENTATION_FILE_NAMES, RESULT_FILE_NAME, readPresentation, readStepResult } from '../workspace/output-files';
 import type { OutputFileEntry } from '../workspace/workspace-reader';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
-import { DEFAULT_STEP_TIMEOUT_MINUTES, agentLogEntries, createLineStreamReader, offeredSkill, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
+import { DEFAULT_STEP_TIMEOUT_MINUTES, isRecord, agentLogEntries, createLineStreamReader, offeredSkill, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
 import { MCP_TAPE_DIR, MCP_TAPE_SCRIPT, readRecordedTape, readReplayMisses } from '../mcp/mcp-tape';
 import type { AgentLogFormat } from '@mediforce/platform-core';
 
@@ -150,9 +150,8 @@ export interface SpawnDockerResult {
  * The `MOCK_AGENT` container command: copy the real output files from
  * `/mock-data/` into `/output/`, and the step's canned result from
  * `/mock-fixtures/<stepId>.json` as `/output/result.json` (a generic one when
- * there is none). A fixture's `_workspaceDir` is copied into `/workspace/` so
- * the host commits it. Ends by printing `finalStdoutLine`, the CLI's last
- * event, for `parseAgentOutput`.
+ * there is none). Ends by printing `finalStdoutLine`, the CLI's last event,
+ * for `parseAgentOutput`.
  */
 export function mockAgentDockerArgs(stepId: string, logLabel: string, finalStdoutLine: string): string[] {
   const copyOutputCmd =
@@ -165,16 +164,9 @@ export function mockAgentDockerArgs(stepId: string, logLabel: string, finalStdou
       `echo "[${logLabel}] step=${stepId}: no fixture, generic mock" >&2; ` +
     `fi`;
 
-  const copyWorkspaceCmd =
-    `WSDIR=$(grep -o '"_workspaceDir"[[:space:]]*:[[:space:]]*"[^"]*"' /mock-fixtures/${stepId}.json 2>/dev/null | sed 's/.*"\\([^"]*\\)"$/\\1/'); ` +
-    `if [ -n "$WSDIR" ] && [ -d "/mock-data/$WSDIR" ]; then ` +
-      `cp -r /mock-data/$WSDIR/* /workspace/ && ` +
-      `echo "[${logLabel}] step=${stepId}: copied $WSDIR/ into /workspace/" >&2; ` +
-    `fi`;
-
   return [
     'bash', '-c',
-    `${copyOutputCmd} && ${copyWorkspaceCmd}; ` +
+    `${copyOutputCmd}; ` +
     `echo '${finalStdoutLine.replace(/'/g, "'\\''")}'`,
   ];
 }
@@ -698,7 +690,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     instanceId: string,
     stepId: string,
   ): Promise<string | null> {
-    const INTERNAL_NAMES = new Set(PRESENTATION_FILE_NAMES);
+    const presentationFileNames = new Set(PRESENTATION_FILE_NAMES);
     const DELIVERABLE_EXTS = new Set(['.html', '.htm', '.pdf', '.csv', '.xlsx', '.md']);
 
     let entries: string[];
@@ -709,7 +701,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     }
 
     for (const name of entries) {
-      if (INTERNAL_NAMES.has(name)) continue;
+      if (presentationFileNames.has(name)) continue;
       if (name.startsWith('.')) continue;
       const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
       if (!DELIVERABLE_EXTS.has(ext)) continue;
@@ -1079,6 +1071,14 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       // The step's result is /output/result.json — never the agent's final message (ADR-0030).
       const parsedResult = await readStepResult(stepOutputDir);
 
+      // Persist any deliverable file for the Download Report button — before
+      // the commit, which removes files over the size cap from the folder.
+      const deliverableFile = await this.persistDeliverableFile(
+        stepOutputDir,
+        instanceId,
+        this.context.stepId,
+      );
+
       const gitMetadata = await this.commitRunWorkspace({
         status: 'success',
         agentPlugin: this.agentName,
@@ -1133,13 +1133,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
 
       replayMissesRecorded = true;
       await this.recordMcpReplayMisses(engineDir);
-
-      // Persist any deliverable file for the Download Report button
-      const deliverableFile = await this.persistDeliverableFile(
-        stepOutputDir,
-        instanceId,
-        this.context.stepId,
-      );
 
       await emit({
         type: 'result',
@@ -1272,8 +1265,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
       parts.push(
         `## Output\n` +
         `Your workspace is the git repository at ${workingDir}. Change files there only when the task asks you ` +
-        `to change the repository; those changes are committed when the step ends. ` +
-        `Whenever the skill instructions reference {output_dir}, use ${workingDir} instead.\n\n` +
+        `to change the repository; those changes are committed when the step ends.\n\n` +
         `Everything this step produces goes in ${outputDir}:\n` +
         `- ${outputDir}/${RESULT_FILE_NAME} — required. One JSON object: this step's result. Later steps, the ` +
         `output schema and Evaluators read it. It must include \`confidence\` (0.0–1.0) and ` +
@@ -1770,10 +1762,6 @@ async function spillPreviousOutput(paths: PromptPaths, filename: string, value: 
   return `${paths.engineDir}/${PREVIOUS_OUTPUTS_DIR}/${filename}`;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && Array.isArray(value) === false;
-}
-
 function formatFileList(files: string[], workingDir: string): string {
   const listed = files.slice(0, MAX_LISTED_FILES_PER_STEP).map((file) => `- ${workingDir}/${file}`);
   const unlisted = files.length - listed.length;
@@ -1781,44 +1769,4 @@ function formatFileList(files: string[], workingDir: string): string {
     listed.push(`- … and ${unlisted} more (\`git log --name-only\` in ${workingDir} lists them)`);
   }
   return listed.join('\n');
-}
-
-/** The step's result: `result.json` in its output folder, one JSON object.
- *  Throws when it is missing, invalid JSON, or not an object (ADR-0030). */
-async function readStepResult(stepOutputDir: string): Promise<Record<string, unknown>> {
-  let contents: string;
-  try {
-    contents = await readFile(join(stepOutputDir, RESULT_FILE_NAME), 'utf-8');
-  } catch {
-    throw new Error(`agent wrote no ${RESULT_FILE_NAME}`);
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(contents);
-  } catch {
-    throw new Error(`${RESULT_FILE_NAME} is not a JSON object`);
-  }
-  if (isRecord(parsed) === false) throw new Error(`${RESULT_FILE_NAME} is not a JSON object`);
-  return parsed;
-}
-
-/** Read presentation.md (preferred) or presentation.html from the step's
- *  output folder. Returns null when neither file exists. Markdown wins on
- *  tie — agents that want the iframe path must omit the .md file. */
-async function readPresentation(stepOutputDir: string): Promise<Presentation | null> {
-  try {
-    return {
-      kind: 'markdown',
-      content: await readFile(join(stepOutputDir, 'presentation.md'), 'utf-8'),
-    };
-  } catch {
-    try {
-      return {
-        kind: 'html',
-        content: await readFile(join(stepOutputDir, 'presentation.html'), 'utf-8'),
-      };
-    } catch {
-      return null;
-    }
-  }
 }

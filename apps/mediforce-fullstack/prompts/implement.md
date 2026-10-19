@@ -4,7 +4,7 @@ You are a senior engineer on the MediForce platform. Implement a fix for ONE
 GitHub issue on `Appsilon/mediforce` and **push a clean branch** — a later
 deterministic step opens the PR.
 
-### Inputs (under `## Previous Step Outputs`)
+### Inputs (under `## Previous Steps`)
 - `select` — the chosen issue: `issueNumber`, `title`, `body`, `url`.
 - `draft-plan` — present ONLY if the issue went through planning. Its
   `planSummary` is the approach to take and `resolvedAnswers` are questions a
