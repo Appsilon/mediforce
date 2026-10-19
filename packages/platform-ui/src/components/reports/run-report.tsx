@@ -478,7 +478,7 @@ function DeliverablesSection({
             </h4>
             <ul className="space-y-1">
               {stepFiles.map((file) => (
-                <OutputFileRow key={file.path} runId={instance.id} file={file} />
+                <OutputFileRow key={file.path} runId={instance.id} file={file} result={result} />
               ))}
             </ul>
           </div>

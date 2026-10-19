@@ -67,7 +67,15 @@ function fileTypeIcon(fileName: string): LucideIcon {
   return File;
 }
 
-export function OutputFileRow({ runId, file }: { runId: string; file: RunOutputFileEntry }) {
+export function OutputFileRow({
+  runId,
+  file,
+  result = null,
+}: {
+  runId: string;
+  file: RunOutputFileEntry;
+  result?: Record<string, unknown> | null;
+}) {
   const [downloading, setDownloading] = React.useState(false);
   const [downloadError, setDownloadError] = React.useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = React.useState(false);
@@ -115,7 +123,7 @@ export function OutputFileRow({ runId, file }: { runId: string; file: RunOutputF
         {downloading ? 'Downloading...' : 'Download'}
       </button>
       {canPreview && (
-        <OutputFilePreview runId={runId} file={file} open={previewOpen} onOpenChange={setPreviewOpen} />
+        <OutputFilePreview runId={runId} file={file} open={previewOpen} onOpenChange={setPreviewOpen} result={result} />
       )}
     </li>
   );
