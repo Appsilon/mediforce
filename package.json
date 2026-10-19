@@ -55,7 +55,7 @@
       "vite": "8.2.2",
       "colord": "2.10.0",
       "compression": "1.8.2",
-      "esbuild@0.18.20": "0.25.0",
+      "esbuild@0.18.20": "0.28.2",
       "fast-uri": "3.1.8",
       "fflate": "0.7.5",
       "image-size": "2.0.4",
