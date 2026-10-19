@@ -77,7 +77,8 @@ step should rely on. `main` never carried it, so there is nothing to revert.
 5. **The list of Output Files comes from git, never from the agent.** It is
    read from the run branch's tree under `.mediforce/output/<stepId>/`, as
    `mediforce.runs.listOutputFiles` already does. The step's Output Files are
-   every file in that folder except `result.json`. There is no new envelope
+   every file in that folder except `result.json`, which is still committed and
+   readable (decision 7). There is no new envelope
    field: ADR-0015 rejected file metadata on the envelope as a second source of
    truth.
 6. **Later steps get one entry per earlier step:** its result plus the paths of
@@ -105,7 +106,8 @@ step should rely on. `main` never carried it, so there is nothing to revert.
 - `.mediforce/` is a reserved namespace in the worktree;
 - `MEDIFORCE_OUTPUT_FILE_MAX_BYTES`, and its rule that the value must match on
   the runtime and API hosts;
-- listing through `git ls-tree` and downloads through `git cat-file`;
+- listing through `git ls-tree` and downloads through `git cat-file`, so the
+  API host shares a filesystem with `~/.mediforce/bare-repos`;
 - failed steps are still committed (✗ commits), Output Files included.
 
 ## What ADR-0015 loses
@@ -113,7 +115,8 @@ step should rely on. `main` never carried it, so there is nothing to revert.
 - The copy step after each agent step: the agent writes into the committed
   folder directly.
 - The `INTERNAL_OUTPUT_FILE_NAMES` exclusion list: the engine's files no longer
-  share the folder, so there is nothing to exclude.
+  share the folder. The only file left out of the Output File list is
+  `result.json` (decision 5), filtered where the list is read from git.
 
 ## Consequences
 
