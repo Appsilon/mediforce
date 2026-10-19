@@ -6,6 +6,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-10-19
+
+### Added
+
+- **Evaluate An Agent On Its Own:** The Agent page has its own Evaluation tab, so you can build a test suite for an Agent and run it without a workflow. Each Eval Run records exactly which version of the Agent it tested, and a step that runs a validated Agent unchanged shares its verdict. `mediforce agent versions` lists an Agent's versions ([#1540](https://github.com/Appsilon/mediforce/pull/1540)).
+- **Sign Off Every Eval Run:** A finished Eval Run waits for a person to confirm its verdict, or overwrite it with a written justification. Only a run signed off as passed counts as Qualified ([#1529](https://github.com/Appsilon/mediforce/pull/1529)).
+- **Production Check Outages:** When a check that runs in production can't run, the Summary tab shows a red alert. On the Problems tab you choose whether such an outage is ignored or counted as a failure ([#1539](https://github.com/Appsilon/mediforce/pull/1539)).
+- **Evaluation Guide And Demo:** The Guide button on the Evaluation tab walks you through evaluating a step, and a five-minute Demo shows the whole job end to end ([#1534](https://github.com/Appsilon/mediforce/pull/1534)).
+- **Catalog Skills On Steps:** Add Skills from the workspace catalog to a single step in the workflow editor ([#1506](https://github.com/Appsilon/mediforce/pull/1506)).
+- **Step Timeout:** Set how long an agent step may run before it is stopped, in the step editor ([#1506](https://github.com/Appsilon/mediforce/pull/1506)).
+- **Who Reviews An Agent Step:** A Human Review agent step can name who reviews its output and which roles may do it, the same as a human step ([#1513](https://github.com/Appsilon/mediforce/pull/1513)).
+- **Skill Usage:** The Skills page shows how many workflows use each Skill ([#1531](https://github.com/Appsilon/mediforce/pull/1531)).
+- **Default Version From The CLI:** `mediforce workflow set-default-version` picks which version of a workflow runs by default ([#1531](https://github.com/Appsilon/mediforce/pull/1531)).
+
+### Changed
+
+- **Larger Skills:** A Skill can now be up to 1 MB, enough for reference data such as rule tables ([#1515](https://github.com/Appsilon/mediforce/pull/1515)).
+- **One Output Schema Check Per Step:** Adding an output schema check only asks for the JSON Schema, and a step has at most one ([#1529](https://github.com/Appsilon/mediforce/pull/1529)).
+- **Save Cases Before A Run:** Start in Eval Runs stays disabled until your test cases are saved ([#1532](https://github.com/Appsilon/mediforce/pull/1532)).
+- **Shorter Evaluation Assistant Answers:** The Evaluation Assistant answers in a few sentences in the tab's own terms, gives results as counts, and ends with one next step ([#1533](https://github.com/Appsilon/mediforce/pull/1533)).
+- **Assistant Shows What It Can Do:** An empty Assistant lists what it can help with ([#1501](https://github.com/Appsilon/mediforce/pull/1501)).
+- **Agent Steps See The Step That Ran Before:** In a revise loop or a merge, an agent step now gets the output of the step that actually ran just before it, such as the review that sent it back. Every file an agent leaves in its output folder is published as an Output File ([#1540](https://github.com/Appsilon/mediforce/pull/1540)).
+- **Schema Mismatches Are Repaired:** When an agent's result doesn't match the step's output schema, Mediforce reshapes it once instead of rerunning the agent. A step that still escalates says why ([#1540](https://github.com/Appsilon/mediforce/pull/1540)).
+- **Workflow Tabs In The URL:** Switching tabs on a workflow page updates the URL, so reload, back and shared links open the same tab ([#1534](https://github.com/Appsilon/mediforce/pull/1534)).
+- **Release Version In The Footer:** On production the sidebar footer shows the release version, with the commit on hover ([#1510](https://github.com/Appsilon/mediforce/pull/1510)).
+
+### Removed
+
+- **Breaking:** Skills now come from the workspace catalog only. Skills kept in a folder next to a workflow, and a workflow's external skills repository, are retired. Bring them in with *Import from git* on the Skills page or `mediforce skill import`. After upgrading, the Workflows page flags each workflow that still names a retired skill, with links to import the skills, edit the step, or view the original definition. To move many at once, run `scripts/migrations/migrate_file_skills_to_catalog.py` ([#1515](https://github.com/Appsilon/mediforce/pull/1515), [#1531](https://github.com/Appsilon/mediforce/pull/1531)).
+
+### Fixed
+
+- The Assistant's error messages say what went wrong and what to try, for a missing OpenRouter key, model API failures, network drops and cut-off answers ([#1501](https://github.com/Appsilon/mediforce/pull/1501)).
+- Saving a step that still names a retired skill shows a clear error ([#1515](https://github.com/Appsilon/mediforce/pull/1515)).
+
 ## [1.3.0] - 2026-10-12
 
 ### Added
