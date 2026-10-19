@@ -1,100 +1,25 @@
 'use client';
 
 import * as React from 'react';
-import { CheckCircle2, ExternalLink, Gauge, GitBranch, Clock, FileText, DollarSign } from 'lucide-react';
+import { CheckCircle2, ExternalLink, GitBranch } from 'lucide-react';
 import type { StepExecution, AgentOutputSnapshot } from '@mediforce/platform-core';
-import { cn, isBrowsableRepoUrl } from '@/lib/utils';
-import { formatDuration, formatStepName, formatCostUsd } from '@/lib/format';
-import { SandboxedHtmlIframe } from '@/components/tasks/sandboxed-html-iframe';
-
-interface StepConfigInfo {
-  executorType?: string;
-  [key: string]: unknown;
-}
+import { isBrowsableRepoUrl } from '@/lib/utils';
+import { formatStepName } from '@/lib/format';
+import { StepOutputViewer } from '@/components/agents/step-output-viewer';
 
 interface RunResultsPanelProps {
+  runId: string;
   stepExecutions: StepExecution[];
-  stepConfigMap?: Map<string, StepConfigInfo>;
 }
 
-const RESULT_KEY_LABELS: Record<string, string> = {
-  prurl: 'PR URL',
-  prcreated: 'PR Created',
-  proposedruleids: 'Proposed Rule IDs',
-  branch: 'Branch',
-  reason: 'Reason',
-};
-
-function formatResultKey(key: string): string {
-  const normalized = key.toLowerCase().replace(/_/g, '');
-  const explicit = RESULT_KEY_LABELS[normalized];
-  if (explicit) return explicit;
-  return key
-    .replace(/_/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function findPrUrl(result: Record<string, unknown>): { key: string; url: string } | null {
+function findPrUrl(result: Record<string, unknown>): string | null {
   for (const [key, value] of Object.entries(result)) {
     const normalized = key.toLowerCase().replace(/_/g, '');
     if (normalized === 'prurl' && typeof value === 'string' && value.startsWith('https://')) {
-      return { key, url: value };
+      return value;
     }
   }
   return null;
-}
-
-function isEmptyResultValue(value: unknown): boolean {
-  if (value === null || value === undefined) return true;
-  if (typeof value === 'string' && value.length === 0) return true;
-  if (Array.isArray(value) && value.length === 0) return true;
-  return false;
-}
-
-function isHtmlString(value: string): boolean {
-  const trimmed = value.trimStart().toLowerCase();
-  return (
-    trimmed.startsWith('<!doctype html') ||
-    trimmed.startsWith('<html>') ||
-    trimmed.startsWith('<html ')
-  );
-}
-
-function ResultValue({ value }: { value: unknown }) {
-  if (typeof value === 'boolean') {
-    return <span className="text-sm">{value ? 'Yes' : 'No'}</span>;
-  }
-  if (typeof value === 'string') {
-    if (value.startsWith('https://')) {
-      return (
-        <a
-          href={value}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-sm text-primary hover:underline break-all"
-        >
-          {value}
-          <ExternalLink className="h-3 w-3 shrink-0" />
-        </a>
-      );
-    }
-    if (isHtmlString(value)) {
-      return <SandboxedHtmlIframe html={value} title="HTML output preview" />;
-    }
-    return <span className="text-sm font-mono break-all">{value}</span>;
-  }
-  if (typeof value === 'number') {
-    return <span className="text-sm font-mono">{value}</span>;
-  }
-  if (Array.isArray(value)) {
-    return (
-      <span className="text-sm font-mono break-all">
-        {value.map((item) => (typeof item === 'string' ? item : JSON.stringify(item))).join(', ')}
-      </span>
-    );
-  }
-  return <span className="text-sm font-mono break-all">{JSON.stringify(value)}</span>;
 }
 
 function GithubMark({ className }: { className?: string }) {
@@ -173,7 +98,7 @@ function findFinalAgentOutput(stepExecutions: StepExecution[]): {
   };
 }
 
-export function RunResultsPanel({ stepExecutions, stepConfigMap }: RunResultsPanelProps) {
+export function RunResultsPanel({ runId, stepExecutions }: RunResultsPanelProps) {
   const finalOutput = React.useMemo(
     () => findFinalAgentOutput(stepExecutions),
     [stepExecutions],
@@ -182,15 +107,11 @@ export function RunResultsPanel({ stepExecutions, stepConfigMap }: RunResultsPan
   if (!finalOutput) return null;
 
   const { stepId, output, result } = finalOutput;
-  const isScript = stepConfigMap?.get(stepId)?.executorType === 'script';
-  const confidencePct = !isScript && output.confidence !== null
-    ? Math.round(output.confidence * 100)
-    : null;
   const git = output.gitMetadata;
+  const prUrl = result ? findPrUrl(result) : null;
 
   return (
     <div className="rounded-lg border bg-card">
-      {/* Header */}
       <div className="px-4 py-3 border-b bg-green-50/50 dark:bg-green-900/10">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 text-green-500" />
@@ -201,53 +122,10 @@ export function RunResultsPanel({ stepExecutions, stepConfigMap }: RunResultsPan
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
-        {/* Metrics row */}
-        <div className="flex flex-wrap gap-4 text-sm">
-          {confidencePct !== null && (
-            <div className="flex items-center gap-1.5">
-              <Gauge className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground">Confidence:</span>
-              <span className={cn(
-                'font-medium',
-                confidencePct >= 80 ? 'text-green-600 dark:text-green-400' :
-                confidencePct >= 50 ? 'text-amber-600 dark:text-amber-400' :
-                'text-red-600 dark:text-red-400'
-              )}>{confidencePct}%</span>
-            </div>
-          )}
-          {!isScript && output.confidence_rationale && (
-            <p className="text-xs text-muted-foreground italic">{output.confidence_rationale}</p>
-          )}
-          {!isScript && output.model && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-muted-foreground">Model:</span>
-              <span className="font-mono text-xs">{output.model}</span>
-            </div>
-          )}
-          {output.duration_ms !== null && (
-            <div className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground">Duration:</span>
-              <span>{formatDuration(output.duration_ms)}</span>
-            </div>
-          )}
-          {output.estimatedCostUsd != null && (
-            <div className="flex items-center gap-1.5">
-              <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground">Cost:</span>
-              <span className="font-medium">{formatCostUsd(output.estimatedCostUsd)}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Git deliverables */}
-        {git && (
-          <div className="space-y-2">
-            {result && (() => {
-              const pr = findPrUrl(result);
-              return pr ? <ViewPullRequestButton url={pr.url} /> : null;
-            })()}
+      {(prUrl !== null || git) && (
+        <div className="px-4 py-3 border-b space-y-2">
+          {prUrl !== null && <ViewPullRequestButton url={prUrl} />}
+          {git && (
             <div className="flex items-center gap-4 text-sm">
               <div className="flex items-center gap-1.5">
                 <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />
@@ -280,74 +158,11 @@ export function RunResultsPanel({ stepExecutions, stepConfigMap }: RunResultsPan
                 </span>
               )}
             </div>
+          )}
+        </div>
+      )}
 
-            {git.changedFiles.length > 0 && (
-              <div>
-                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-                  Generated Files ({git.changedFiles.length})
-                </h4>
-                <ul className="space-y-0.5">
-                  {git.changedFiles.map((file: string) => (
-                    <li key={file}>
-                      {isBrowsableRepoUrl(git.repoUrl) ? (
-                        <a
-                          href={`${git.repoUrl}/blob/${git.commitSha}/${file}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-sm font-mono text-primary hover:underline"
-                        >
-                          <FileText className="h-3 w-3" />
-                          {file}
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-sm font-mono text-muted-foreground">
-                          <FileText className="h-3 w-3" />
-                          {file}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Result data (non-git output) */}
-        {!git && result && Object.keys(result).length > 0 && (() => {
-          const pr = findPrUrl(result);
-          const remainingEntries = Object.entries(result).filter(([key, value]) => {
-            if (pr && key === pr.key) return false;
-            return !isEmptyResultValue(value);
-          });
-          return (
-            <div className="space-y-3">
-              {pr && <ViewPullRequestButton url={pr.url} />}
-              {remainingEntries.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-                    Output
-                  </h4>
-                  <dl className="space-y-1.5">
-                    {remainingEntries.map(([key, value]) => {
-                      const isHtml = typeof value === 'string' && isHtmlString(value);
-                      return (
-                        <div key={key} className={isHtml ? 'space-y-1 text-sm' : 'flex flex-wrap items-baseline gap-2 text-sm'}>
-                          <dt className="text-muted-foreground">{formatResultKey(key)}:</dt>
-                          <dd className="min-w-0 flex-1">
-                            <ResultValue value={value} />
-                          </dd>
-                        </div>
-                      );
-                    })}
-                  </dl>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-      </div>
+      <StepOutputViewer result={result} runId={runId} stepId={stepId} runStatus="completed" />
     </div>
   );
 }
