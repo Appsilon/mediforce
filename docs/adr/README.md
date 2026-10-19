@@ -87,7 +87,7 @@ appendix can capture what actually shipped vs the original decision body.
 | [0012](./0012-unified-trigger-input-contract.md) | Trigger Input is a workflow's total input contract; every trigger validates against it | Accepted |
 | [0013](./0013-workflow-packages-outside-platform-repo.md) | Workflow packages live outside the platform repo | Accepted |
 | [0014](./0014-control-mode-ui-concept.md) | Control mode is a UI concept | Accepted |
-| [0015](./0015-output-files-on-run-branch.md) | Output Files live on the run branch of the git workspace | Accepted |
+| [0015](./0015-output-files-on-run-branch.md) | Output Files live on the run branch of the git workspace | Partially superseded by [0030](./0030-agent-step-output-contract.md) (copy step, internal-file exclusion list) |
 | [0016](./0016-unified-canvas-first-workflow-designer.md) | Unified canvas-first workflow designer (+ [PLAN](../archive/PLAN-0016.md)) | Proposed |
 | [0017](./0017-retire-llm-maintained-wiki.md) | Retire the LLM-maintained wiki; docs live next to what they describe (+ [PLAN](../archive/PLAN-0017.md), executed) | Accepted |
 | [0018](./0018-fan-out-is-child-workflows.md) | Fan-out over sub-graphs is child workflows; the engine stays linear | Accepted |
@@ -102,3 +102,4 @@ appendix can capture what actually shipped vs the original decision body.
 | [0027](./0027-step-adds-catalog-skills.md) | A Workflow Step may add catalog Skills on top of its Agent's, offered not imposed (partially supersedes [0025](./0025-skill-catalog.md) §4, §7) | Partially superseded by [0028](./0028-retire-file-skills.md) (decision 6, first Consequence) |
 | [0028](./0028-retire-file-skills.md) | Skills come from the catalog only; a Skill in git is imported (`skill import`, workflow import), and `skill` / `skillsDir` / `externalSkillsRepo` are retired (partially supersedes [0027](./0027-step-adds-catalog-skills.md), [0025](./0025-skill-catalog.md) §5–§6) | Accepted |
 | [0029](./0029-agent-evaluation.md) | An Agent can own an Evaluation; Agents are versioned, and an Agent's Eval Run assesses one Agent version, each trial a single-step run carrying its own Definition (partially supersedes [0023](./0023-step-evaluation.md) D2) | Accepted |
+| [0030](./0030-agent-step-output-contract.md) | An agent step writes `result.json` and its Output Files into one folder (`.mediforce/output/<stepId>/`, mounted as `/output`); no closing message, file list from git (partially supersedes [0015](./0015-output-files-on-run-branch.md)) | Accepted |
