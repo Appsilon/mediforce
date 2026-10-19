@@ -23,6 +23,8 @@ interface OutputFilePreviewProps {
   file: RunOutputFileEntry;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Step result exposed to an HTML file as `window.__data__`. */
+  result?: Record<string, unknown> | null;
 }
 
 /** Fetched file bytes, decoded lazily per-viewer. */
@@ -32,27 +34,26 @@ interface LoadedFile {
 }
 
 type LoadState =
-  | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'loaded'; file: LoadedFile }
   | { kind: 'error'; message: string };
 
-/**
- * Modal preview of one Output File. Renders the file in-browser via the
- * viewer that {@link selectViewer} picks from the name + size, falling back
- * to a download prompt for unsupported or oversized files. The bytes come
- * from `mediforce.runs.downloadOutputFile` — the same authenticated,
- * workspace-scoped route the download button uses; nothing renders the file
- * by navigating the browser at it directly.
- */
-export function OutputFilePreview({ runId, file, open, onOpenChange }: OutputFilePreviewProps) {
-  const selection = React.useMemo<ViewerSelection>(
-    () => selectViewer(file.name, file.size),
-    [file.name, file.size],
+/** Fetch one Output File and save it to the device. */
+export async function downloadOutputFile(runId: string, file: RunOutputFileEntry): Promise<void> {
+  const downloaded = await mediforce.runs.downloadOutputFile({ runId, path: file.path });
+  // `.slice()` re-types the view as Uint8Array<ArrayBuffer> (BlobPart
+  // rejects the wider ArrayBufferLike the client returns).
+  saveBlobToDevice(
+    new Blob([downloaded.bytes.slice()], { type: downloaded.contentType }),
+    downloaded.fileName,
   );
-  const previewable = selection.viewer !== 'download';
+}
 
-  const [state, setState] = React.useState<LoadState>({ kind: 'idle' });
+/**
+ * Modal preview of one Output File, rendered by {@link OutputFileContent}.
+ */
+export function OutputFilePreview({ runId, file, open, onOpenChange, result = null }: OutputFilePreviewProps) {
+  const previewable = selectViewer(file.name, file.size).viewer !== 'download';
   const [downloading, setDownloading] = React.useState(false);
   const [fullscreen, setFullscreen] = React.useState(false);
 
@@ -62,36 +63,10 @@ export function OutputFilePreview({ runId, file, open, onOpenChange }: OutputFil
     if (open === false) setFullscreen(false);
   }, [open]);
 
-  React.useEffect(() => {
-    if (open === false || previewable === false) return;
-    let cancelled = false;
-    setState({ kind: 'loading' });
-    mediforce.runs
-      .downloadOutputFile({ runId, path: file.path })
-      .then((downloaded) => {
-        if (cancelled) return;
-        setState({
-          kind: 'loaded',
-          file: { bytes: downloaded.bytes, contentType: downloaded.contentType },
-        });
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setState({ kind: 'error', message: err instanceof Error ? err.message : 'Failed to load file' });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, previewable, runId, file.path]);
-
   async function handleDownload() {
     setDownloading(true);
     try {
-      const downloaded = await mediforce.runs.downloadOutputFile({ runId, path: file.path });
-      saveBlobToDevice(
-        new Blob([downloaded.bytes.slice()], { type: downloaded.contentType }),
-        downloaded.fileName,
-      );
+      await downloadOutputFile(runId, file);
     } catch {
       // The inline download button is a convenience; the row's own download
       // surfaces errors. Swallow here to avoid a second error channel.
@@ -153,7 +128,7 @@ export function OutputFilePreview({ runId, file, open, onOpenChange }: OutputFil
           <Dialog.Description className="sr-only">Preview of output file {shortName}</Dialog.Description>
 
           <div className="flex min-h-0 flex-1 flex-col overflow-auto p-4">
-            <PreviewBody selection={selection} state={state} fileName={shortName} fill={fullscreen} />
+            <OutputFileContent runId={runId} file={file} result={result} fill={fullscreen} />
           </div>
         </Dialog.Content>
       </Dialog.Portal>
@@ -161,16 +136,70 @@ export function OutputFilePreview({ runId, file, open, onOpenChange }: OutputFil
   );
 }
 
+/**
+ * One Output File rendered in-browser via the viewer that {@link selectViewer}
+ * picks from the name + size, falling back to a download prompt for
+ * unsupported or oversized files. The bytes come from
+ * `mediforce.runs.downloadOutputFile` — the same authenticated,
+ * workspace-scoped route the download button uses; nothing renders the file
+ * by navigating the browser at it directly.
+ */
+export function OutputFileContent({
+  runId,
+  file,
+  result = null,
+  fill = false,
+}: {
+  runId: string;
+  file: RunOutputFileEntry;
+  result?: Record<string, unknown> | null;
+  fill?: boolean;
+}) {
+  const selection = React.useMemo<ViewerSelection>(
+    () => selectViewer(file.name, file.size),
+    [file.name, file.size],
+  );
+  const previewable = selection.viewer !== 'download';
+  const [state, setState] = React.useState<LoadState>({ kind: 'loading' });
+
+  React.useEffect(() => {
+    if (previewable === false) return;
+    let cancelled = false;
+    setState({ kind: 'loading' });
+    mediforce.runs
+      .downloadOutputFile({ runId, path: file.path })
+      .then((downloaded) => {
+        if (cancelled) return;
+        setState({
+          kind: 'loaded',
+          file: { bytes: downloaded.bytes, contentType: downloaded.contentType },
+        });
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setState({ kind: 'error', message: err instanceof Error ? err.message : 'Failed to load file' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [previewable, runId, file.path]);
+
+  const shortName = file.name.split('/').pop() ?? file.name;
+  return <PreviewBody selection={selection} state={state} fileName={shortName} fill={fill} result={result} />;
+}
+
 function PreviewBody({
   selection,
   state,
   fileName,
   fill,
+  result,
 }: {
   selection: ViewerSelection;
   state: LoadState;
   fileName: string;
   fill: boolean;
+  result: Record<string, unknown> | null;
 }) {
   if (selection.viewer === 'download') {
     const message =
@@ -180,7 +209,7 @@ function PreviewBody({
     return <Notice>{message}</Notice>;
   }
 
-  if (state.kind === 'loading' || state.kind === 'idle') {
+  if (state.kind === 'loading') {
     return (
       <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
@@ -193,7 +222,7 @@ function PreviewBody({
     return <Notice tone="error">{state.message}</Notice>;
   }
 
-  return <RenderedFile viewer={selection.viewer} file={state.file} fileName={fileName} fill={fill} />;
+  return <RenderedFile viewer={selection.viewer} file={state.file} fileName={fileName} fill={fill} result={result} />;
 }
 
 function RenderedFile({
@@ -201,11 +230,13 @@ function RenderedFile({
   file,
   fileName,
   fill,
+  result,
 }: {
   viewer: Exclude<ViewerSelection['viewer'], 'download'>;
   file: LoadedFile;
   fileName: string;
   fill: boolean;
+  result: Record<string, unknown> | null;
 }) {
   // Blob-backed viewers (image, svg-as-image, pdf) hand a same-origin blob URL
   // to the browser, which streams it natively. Kept in state so it can be
@@ -231,7 +262,7 @@ function RenderedFile({
     case 'markdown':
       return <MarkdownPresentation content={text} />;
     case 'html':
-      return <SandboxedHtmlIframe html={text} title={`Preview of ${fileName}`} fill={fill} />;
+      return <SandboxedHtmlIframe html={text} result={result} title={`Preview of ${fileName}`} fill={fill} />;
     case 'text':
       return (
         <pre className="whitespace-pre-wrap break-words rounded-md bg-muted p-3 text-xs leading-relaxed">

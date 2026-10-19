@@ -33,7 +33,7 @@
       "type": "creation",
       "executor": "script",
       "plugin": "script-container",
-      "description": "Renders the PO's question as a presentation card visible in the next step's context panel.",
+      "description": "Writes the PO's question to presentation.md, an Output File the next step's context panel lists.",
       "script": {
         "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const question = input.question || 'No question provided';\n  writeFileSync('/output/presentation.md', `## Question from your Product Owner\\n\\n${question}\\n\\nPlease share your perspective below.`);\n  writeFileSync('/output/result.json', JSON.stringify({ question }));\n  console.log('Question rendered for presentation');\n} catch (err) {\n  console.error('show_question crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n",
         "runtime": "javascript",

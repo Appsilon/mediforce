@@ -21,7 +21,7 @@ import { agentRuns } from '../schema/agent-run';
  * Hybrid storage: query-worthy envelope fields (confidence, model,
  * duration_ms, prompt_tokens, completion_tokens, cost_usd) are extracted
  * as columns; the rest of the envelope (reasoning_summary, reasoning_chain,
- * annotations, gitMetadata, presentation, deliverableFile, result,
+ * annotations, gitMetadata, result,
  * confidence_rationale, tokenUsage) lives in `envelope_payload` jsonb.
  *
  * The `workspace` column is derived at insert time from the parent

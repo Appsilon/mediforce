@@ -46,7 +46,6 @@ export type {
   Annotation,
   GitMetadata,
   TokenUsage,
-  Presentation,
   StepOutputEnvelope,
   AgentOutputEnvelope,
 } from '../schemas/agent-output-envelope';

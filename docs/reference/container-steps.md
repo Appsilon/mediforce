@@ -246,7 +246,7 @@ filenames.
 **Run branches are never pushed.** They are local to the host, which is why
 `GitMetadata.repoUrl` is the bare repo path rather than a remote URL — a GitHub
 URL there would render `/commit/<sha>` links that 404. The step page shows the
-metadata as plain text (`GitSection`); the review panel has no git view.
+metadata as plain text (`GitSection`); the review panel lists the changed files without links.
 
 ## Config
 

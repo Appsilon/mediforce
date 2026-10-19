@@ -167,7 +167,7 @@ holds its Output; the list is read from git, never reported by the agent
 (ADR-0030). Code the agent edits elsewhere in the worktree is not an Output
 File.
 _Avoid_: Artifact (= Cowork Session deliverable), "deliverable"/`deliverableFile`
-(legacy single-file mechanism), conflating with Output (= the structured result
+(removed single-file mechanism, ADR-0030), conflating with Output (= the structured result
 in `result.json`; Output Files are its file siblings).
 
 ### Agent + human work

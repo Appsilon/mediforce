@@ -853,7 +853,7 @@ describe('ClaudeCodeAgentPlugin', () => {
       expect(prompt).toContain('- /workspace/code/derive.R');
     });
 
-    it('[DATA] includes presentation in emitted result when the agent writes presentation.html', async () => {
+    it('[DATA] treats presentation.html as an ordinary Output File — the result carries no presentation', async () => {
       const context = buildMockContext();
       await plugin.initialize(context);
 
@@ -868,25 +868,8 @@ describe('ClaudeCodeAgentPlugin', () => {
       const resultEvent = events.find((e) => e.type === 'result');
       expect(resultEvent).toBeDefined();
       const payload = resultEvent!.payload as Record<string, unknown>;
-      expect(payload.presentation).toEqual({ kind: 'html', content: '<h1>My Report</h1>' });
-    });
-
-    it('[DATA] omits presentation from result when the agent writes none', async () => {
-      const context = buildMockContext();
-      await plugin.initialize(context);
-
-      const { emit, events } = buildEmitSpy();
-      mockSpawn(plugin).mockImplementation(finishesWith({ ok: true }, {
-        cliOutput: JSON.stringify({ result: 'ok', confidence: 0.9 }),
-        injectedEnvVars: [],
-      }));
-
-      await plugin.run(emit);
-
-      const resultEvent = events.find((e) => e.type === 'result');
-      expect(resultEvent).toBeDefined();
-      const payload = resultEvent!.payload as Record<string, unknown>;
-      expect(payload.presentation).toBeUndefined();
+      expect(payload).not.toHaveProperty('presentation');
+      expect(payload).not.toHaveProperty('deliverableFile');
     });
 
     it('[DATA] emits MCP servers status event when mcpServers configured', async () => {

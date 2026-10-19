@@ -10,7 +10,7 @@ import { saveBlobToDevice } from '@/lib/save-blob';
 import { selectViewer } from '@/lib/output-file-viewer';
 import { extensionOf } from '@/lib/file-extension';
 import { cn } from '@/lib/utils';
-import { OutputFilePreview } from './output-file-preview';
+import { OutputFilePreview, downloadOutputFile } from './output-file-preview';
 
 export interface OutputFileGroup {
   stepId: string;
@@ -65,16 +65,6 @@ function fileTypeIcon(fileName: string): LucideIcon {
   if (IMAGE_EXTENSIONS.has(extension)) return FileImage;
   if (ARCHIVE_EXTENSIONS.has(extension)) return FileArchive;
   return File;
-}
-
-async function downloadOutputFile(runId: string, file: RunOutputFileEntry): Promise<void> {
-  const downloaded = await mediforce.runs.downloadOutputFile({ runId, path: file.path });
-  // `.slice()` re-types the view as Uint8Array<ArrayBuffer> (BlobPart
-  // rejects the wider ArrayBufferLike the client returns).
-  saveBlobToDevice(
-    new Blob([downloaded.bytes.slice()], { type: downloaded.contentType }),
-    downloaded.fileName,
-  );
 }
 
 export function OutputFileRow({ runId, file }: { runId: string; file: RunOutputFileEntry }) {

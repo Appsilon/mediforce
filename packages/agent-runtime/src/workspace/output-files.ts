@@ -6,7 +6,7 @@
  */
 import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { isRecord, type Presentation } from '@mediforce/platform-core';
+import { isRecord } from '@mediforce/platform-core';
 
 /** Repo-relative root under which Output Files live on the run branch. */
 export const OUTPUT_FILES_REPO_ROOT = '.mediforce/output';
@@ -29,11 +29,6 @@ export function parseOutputFilePath(repoPath: string): { stepId: string; name: s
  *  skill has always read them (`/output/input.json`). Removed before the step
  *  commit, so they never become Output Files. */
 const SEEDED_INPUT_FILE_NAMES: readonly string[] = ['input.json', 'previous_run.json'];
-
-/** Presentation files — surfaced via the envelope's `presentation`, and still
- *  Output Files (product decision). Markdown first: order matters for the
- *  persistDeliverableFile fallback. */
-export const PRESENTATION_FILE_NAMES: readonly string[] = ['presentation.md', 'presentation.html'];
 
 export const DEFAULT_OUTPUT_FILE_MAX_BYTES = 100 * 1024 * 1024;
 
@@ -127,25 +122,4 @@ export async function readStepResult(stepOutputDir: string): Promise<Record<stri
 /** Overwrite the step's `result.json` — with the result reshaped to match `agent.outputSchema`. */
 export async function writeStepResult(stepOutputDir: string, result: Record<string, unknown>): Promise<void> {
   await writeFile(join(stepOutputDir, RESULT_FILE_NAME), `${JSON.stringify(result, null, 2)}\n`, 'utf-8');
-}
-
-/** Read presentation.md (preferred) or presentation.html from the step's
- *  output folder. Returns null when neither file exists. Markdown wins on
- *  tie — agents that want the iframe path must omit the .md file. */
-export async function readPresentation(stepOutputDir: string): Promise<Presentation | null> {
-  try {
-    return {
-      kind: 'markdown',
-      content: await readFile(join(stepOutputDir, 'presentation.md'), 'utf-8'),
-    };
-  } catch {
-    try {
-      return {
-        kind: 'html',
-        content: await readFile(join(stepOutputDir, 'presentation.html'), 'utf-8'),
-      };
-    } catch {
-      return null;
-    }
-  }
 }

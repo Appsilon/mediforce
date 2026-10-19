@@ -17,7 +17,7 @@ import {
   CONTAINER_OUTPUT_MOUNT,
 } from './base-container-agent-plugin';
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
-import { RESULT_FILE_NAME, readPresentation, readStepResult } from '../workspace/output-files';
+import { RESULT_FILE_NAME, readStepResult } from '../workspace/output-files';
 
 // Last-resort for the legacy process-mode path only; the workflow path resolves
 // the timeout via resolveStepTimeoutMinutes. The resolver's own default, so the
@@ -462,7 +462,6 @@ export class ScriptContainerPlugin extends ContainerPlugin {
 
       // A script without a usable result.json keeps its stdout as the raw result.
       const result = await readStepResult(stepOutputDir).catch((): Record<string, unknown> => ({ raw: containerOutput }));
-      const presentation = await readPresentation(stepOutputDir);
 
       const durationMs = Date.now() - startTime;
 
@@ -480,7 +479,6 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           model: 'script',
           duration_ms: durationMs,
           result,
-          ...(presentation ? { presentation } : {}),
         },
         timestamp: new Date().toISOString(),
       });

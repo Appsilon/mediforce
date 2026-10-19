@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { readFile, readdir, mkdtemp, writeFile, rm, mkdir, appendFile, realpath, cp } from 'node:fs/promises';
+import { readFile, mkdtemp, writeFile, rm, mkdir, appendFile, realpath } from 'node:fs/promises';
 import { join, dirname, isAbsolute, resolve, posix, basename } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -10,7 +10,7 @@ import { getDockerSpawnStrategy, type ImageBuildMeta } from './docker-spawn-stra
 import { ContainerPlugin, isWorkflowAgentContext, resolveImageBuild, formatExitInfo, missingExecutableHint, type ContainerPluginInit } from './container-plugin';
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { RetiredFileSkillError } from '../skills/resolve-skills-for-step';
-import { PRESENTATION_FILE_NAMES, RESULT_FILE_NAME, readPresentation, readStepResult, writeStepResult } from '../workspace/output-files';
+import { RESULT_FILE_NAME, readStepResult, writeStepResult } from '../workspace/output-files';
 import type { OutputFileEntry } from '../workspace/workspace-reader';
 import { renderOAuthHeader } from '../oauth/resolve-oauth-token';
 import { DEFAULT_STEP_TIMEOUT_MINUTES, isRecord, agentLogEntries, createLineStreamReader, offeredSkill, formatAgentLogLine, mcpReplayMissEntry, resolveStepTimeoutMinutes } from '@mediforce/platform-core';
@@ -673,69 +673,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
     return mcpConfig;
   }
 
-  /**
-   * Scan the step's output folder for deliverable files (HTML, PDF, CSV,
-   * etc.). Copy the first match to a stable temp location for the Download
-   * Report button, and return the absolute copied path. Returns null if
-   * nothing found.
-   *
-   * Two-phase logic:
-   * 1. Loop over known deliverable extensions, skipping the presentation
-   *    files, which the envelope already carries as `presentation`.
-   * 2. Fallback: try `presentation.md` then `presentation.html` separately,
-   *    so the Download Report button can still serve them.
-   */
-  protected async persistDeliverableFile(
-    outputDir: string,
-    instanceId: string,
-    stepId: string,
-  ): Promise<string | null> {
-    const presentationFileNames = new Set(PRESENTATION_FILE_NAMES);
-    const DELIVERABLE_EXTS = new Set(['.html', '.htm', '.pdf', '.csv', '.xlsx', '.md']);
-
-    let entries: string[];
-    try {
-      entries = await readdir(outputDir);
-    } catch {
-      return null;
-    }
-
-    for (const name of entries) {
-      if (presentationFileNames.has(name)) continue;
-      if (name.startsWith('.')) continue;
-      const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
-      if (!DELIVERABLE_EXTS.has(ext)) continue;
-
-      const srcPath = join(outputDir, name);
-      const destDir = join(tmpdir(), 'mediforce-deliverables', instanceId);
-      await mkdir(destDir, { recursive: true });
-      const destPath = join(destDir, name);
-      try {
-        await cp(srcPath, destPath);
-        return destPath;
-      } catch {
-        continue;
-      }
-    }
-
-    // Also handle presentation.{md,html} — already read into
-    // spawnResult.presentation but a persisted path is needed for the
-    // Download Report button. Markdown wins on tie.
-    for (const filename of PRESENTATION_FILE_NAMES) {
-      const presentationPath = join(outputDir, filename);
-      try {
-        const destDir = join(tmpdir(), 'mediforce-deliverables', instanceId);
-        await mkdir(destDir, { recursive: true });
-        const destPath = join(destDir, `${stepId}-${filename}`);
-        await cp(presentationPath, destPath);
-        return destPath;
-      } catch {
-        continue;
-      }
-    }
-    return null;
-  }
-
   /** Host path of the canned step results a `MOCK_AGENT` container copies
    *  (`<stepId>.json`, see `getMockDockerArgs`): `MOCK_FIXTURES_DIR`, resolved
    *  from the project root, or null when it is not set. */
@@ -1082,21 +1019,11 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         });
       }
 
-      // Persist any deliverable file for the Download Report button — before
-      // the commit, which removes files over the size cap from the folder.
-      const deliverableFile = await this.persistDeliverableFile(
-        stepOutputDir,
-        instanceId,
-        this.context.stepId,
-      );
-
       const gitMetadata = await this.commitRunWorkspace({
         status: 'success',
         agentPlugin: this.agentName,
         agentImage: this.agentConfig.image,
       });
-      const presentation = await readPresentation(stepOutputDir);
-
       const duration_ms = Date.now() - startTime;
 
       const confidence = typeof parsedResult.confidence === 'number'
@@ -1163,8 +1090,6 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
           duration_ms,
           result: cleanResult,
           ...(gitMetadata ? { gitMetadata } : {}),
-          ...(presentation ? { presentation } : {}),
-          ...(deliverableFile ? { deliverableFile } : {}),
           ...(tokenUsage ? { tokenUsage } : {}),
         },
         timestamp: new Date().toISOString(),

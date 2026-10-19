@@ -442,7 +442,6 @@ export type {
   AgentOutputEnvelope,
   GitMetadata,
   TokenUsage,
-  Presentation,
   AgentEvent,
   AgentRunStatus,
   AgentRun,

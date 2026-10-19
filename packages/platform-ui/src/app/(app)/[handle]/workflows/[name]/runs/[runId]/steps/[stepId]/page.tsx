@@ -105,7 +105,7 @@ export default function StepDetailPage() {
 
   // Locate the agent output for this step. Two sources, in order:
   //   1. AgentRun envelope (always present for any agent step — L2/L3) —
-  //      this is the source of truth and carries `presentation` HTML.
+  //      this is the source of truth.
   //   2. HumanTask.completionData.agentOutput (only for L3 review steps) —
   //      fallback for older runs where envelope wasn't queryable.
   const { data: agentRuns } = useAgentRunsForStep(runId ?? null, decodedStepId || null);
@@ -226,12 +226,12 @@ export default function StepDetailPage() {
         )}
       </div>
 
-      {/* Agent output snapshot — the rich tabbed view (metrics, files, tabs)
+      {/* Agent output — metrics, changed files and the step's output viewer,
           shared with human reviewers. Becomes the primary content for any
           agent step. */}
       {agentOutput && runId && (
         <div className="rounded-lg border bg-card">
-          <AgentOutputDisplay agentOutput={agentOutput} instanceId={runId} />
+          <AgentOutputDisplay agentOutput={agentOutput} runId={runId} stepId={decodedStepId} runStatus={instance.status} />
         </div>
       )}
 

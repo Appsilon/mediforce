@@ -66,7 +66,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
       startedAt,
       agentOutput: {
         confidence: 0.9, confidence_rationale: null, reasoning: null, model: 'anthropic/claude-sonnet-4',
-        duration_ms: 4200, gitMetadata: null, deliverableFile: null, presentation: null,
+        duration_ms: 4200, gitMetadata: null, presentation: null,
         tokenUsage: { inputTokens: 1000, outputTokens: 200 },
         estimatedCostUsd: costUsd,
       },

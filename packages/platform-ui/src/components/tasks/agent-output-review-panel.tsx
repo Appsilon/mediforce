@@ -2,43 +2,30 @@
 
 import * as React from 'react';
 import { AlertTriangle, Bot } from 'lucide-react';
+import type { InstanceStatus } from '@mediforce/platform-core';
 import type { AgentOutputData, EscalationReason } from './task-utils';
 import { formatStepName } from '@/lib/format';
 import { AgentOutputDisplay } from '@/components/agents/agent-output-display';
 
 interface AgentOutputReviewPanelProps {
   agentOutput: AgentOutputData;
-  stepId?: string;
-  onContentLoaded?: (hasContent: boolean) => void;
-  instanceId: string;
+  stepId: string;
+  runId: string;
+  runStatus: InstanceStatus | undefined;
 }
 
 /**
  * Review-mode wrapper around {@link AgentOutputDisplay}. Adds only the
  * "Agent Output for Review" label, step name, and the escalation pill. All
- * metrics, git metadata, and tabbed content live inside `AgentOutputDisplay`
+ * metrics, git metadata, and the step's output viewer live inside `AgentOutputDisplay`
  * so the step detail page and the human-review page render the same body.
  */
 export function AgentOutputReviewPanel({
   agentOutput,
   stepId,
-  onContentLoaded,
-  instanceId,
+  runId,
+  runStatus,
 }: AgentOutputReviewPanelProps) {
-  const hasResult = agentOutput.result !== null && Object.keys(agentOutput.result).length > 0;
-  const hasPresentation = agentOutput.presentation !== null;
-  const hasContent = hasResult || hasPresentation;
-
-  if (!hasContent) {
-    return (
-      <div className="rounded-lg border border-dashed p-6 text-center">
-        <p className="text-sm text-muted-foreground">
-          No agent output to review.
-        </p>
-      </div>
-    );
-  }
-
   const confidencePct = agentOutput.confidence !== null
     ? Math.round(agentOutput.confidence * 100)
     : null;
@@ -50,11 +37,9 @@ export function AgentOutputReviewPanel({
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Agent Output for Review
         </span>
-        {stepId && (
-          <span className="text-xs font-medium text-foreground">
-            — {formatStepName(stepId)}
-          </span>
-        )}
+        <span className="text-xs font-medium text-foreground">
+          — {formatStepName(stepId)}
+        </span>
         {agentOutput.escalationReason !== null && (
           <span
             className="inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
@@ -67,11 +52,7 @@ export function AgentOutputReviewPanel({
         )}
       </div>
 
-      <AgentOutputDisplay
-        agentOutput={agentOutput}
-        instanceId={instanceId}
-        onContentLoaded={onContentLoaded}
-      />
+      <AgentOutputDisplay agentOutput={agentOutput} runId={runId} stepId={stepId} runStatus={runStatus} />
     </div>
   );
 }
