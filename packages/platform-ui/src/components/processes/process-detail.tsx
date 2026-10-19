@@ -333,38 +333,41 @@ export function ProcessDetail({
               </dd>
             </div>
           </dl>
+        </div>
 
-          {/* Opens the side panel. The only switcher for it — open or closed,
-              these buttons sit in the same place and say what is behind them. */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {rightPanels.map(({ value, label, Icon, ready, tour }) => {
-              const active = logsOpen && rightTab === value;
-              return (
-                <button
-                  key={value}
-                  data-tour={tour}
-                  aria-pressed={active}
-                  onClick={() => {
-                    if (active) {
-                      setLogsOpen(false);
-                      return;
-                    }
-                    setRightTab(value);
-                    setLogsOpen(true);
-                  }}
-                  className={cn(
-                    secondaryButtonClass,
-                    'cursor-pointer',
-                    (active || ready === true) && 'border-primary/30 text-primary bg-primary-subtle',
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+        {/* Opens the side panel. The only switcher for it — open or closed,
+            these buttons sit in the same place and say what is behind them.
+            Make it sticky during scrolling. */}
+        <div className="sticky top-0 z-10 flex items-center gap-2 flex-wrap bg-background">
+          {rightPanels.map(({ value, label, Icon, ready, tour }) => {
+            const active = logsOpen && rightTab === value;
+            return (
+              <button
+                key={value}
+                data-tour={tour}
+                aria-pressed={active}
+                onClick={() => {
+                  if (active) {
+                    setLogsOpen(false);
+                    return;
+                  }
+                  setRightTab(value);
+                  setLogsOpen(true);
+                }}
+                className={cn(
+                  secondaryButtonClass,
+                  'cursor-pointer',
+                  (active || ready === true) && 'border-primary/30 text-primary bg-primary-subtle',
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            );
+          })}
+        </div>
 
+        <div className="space-y-2">
           {needsHumanTaskAction && blockingTask && (
             <div className="rounded-lg border border-primary/20 bg-primary/5 dark:bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
               <div className="text-sm">
