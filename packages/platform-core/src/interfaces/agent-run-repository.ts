@@ -17,6 +17,7 @@ export interface ListAgentRunsOptions {
    *  processInstanceId → definitionName map) into the matching instance
    *  ids — avoids a repository-level join against process_instances. */
   readonly processInstanceIds?: readonly string[];
+  readonly excludeExecutorType?: 'script';
 }
 
 export interface ListAgentRunsPage {
@@ -60,11 +61,11 @@ export interface AgentRunRepository {
    *  `cardStatus` itself and pagination, so a KPI card's number always
    *  matches what clicking it would filter the table to. */
   countByCardStatus(
-    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status'>,
+    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status' | 'excludeExecutorType'>,
   ): Promise<AgentRunCardStatusCounts>;
   /** Namespace-scoped variant. */
   countByCardStatusInNamespaces(
     allowed: readonly string[],
-    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status'>,
+    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status' | 'excludeExecutorType'>,
   ): Promise<AgentRunCardStatusCounts>;
 }

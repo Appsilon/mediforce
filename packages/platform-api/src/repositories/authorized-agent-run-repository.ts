@@ -64,7 +64,7 @@ export class AuthorizedAgentRunRepository extends AuthorizedScope {
   /** Grouped `AgentRunCardStatus` counts for the Agents tab's KPI cards —
    *  same namespace-scoped routing as `listPage`. */
   countByCardStatus = async (
-    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status'>,
+    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status' | 'excludeExecutorType'>,
   ): Promise<AgentRunCardStatusCounts> =>
     this.caller.isSystemActor
       ? this.raw.countByCardStatus(opts)

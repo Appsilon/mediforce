@@ -224,7 +224,7 @@ describe('AgentLogViewer fetch cadence', () => {
   });
 });
 
-describe('AgentLogViewer trajectory source (#1573)', () => {
+describe('AgentLogViewer trajectory source', () => {
   beforeEach(() => {
     apiFetchMock.mockReset();
     trajectoryMock.mockReset();

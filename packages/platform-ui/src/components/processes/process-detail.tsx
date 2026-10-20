@@ -98,27 +98,32 @@ export function ProcessDetail({
 
   const agentLogFiles = React.useMemo(() => {
     const stepExecutorMap = new Map(definitionSteps.map((s) => [s.id, (s as unknown as WorkflowStep).executor]));
+    const stepsWithAgentRun = new Set(agentRuns.map((run) => run.stepId));
 
-    const scriptLogs = agentEvents
-      .filter((e) => e.type === 'status' && typeof e.payload === 'string' && (e.payload as string).startsWith('agent activity log:') && stepExecutorMap.get(e.stepId) === 'script')
+    const legacyLogs = agentEvents
+      .filter((e) => e.type === 'status' && typeof e.payload === 'string' && (e.payload as string).startsWith('agent activity log:') && !stepsWithAgentRun.has(e.stepId))
       .map((e) => {
         const fullPath = (e.payload as string).replace('agent activity log: ', '');
         return {
           stepId: e.stepId,
           file: fullPath.split(/[/\\]/).pop() ?? '',
-          executor: 'script',
+          executor: stepExecutorMap.get(e.stepId) ?? 'agent',
         };
       })
       .filter((entry) => entry.file.length > 0);
 
     const agentLogs = agentRuns
-      .filter((run) => stepExecutorMap.get(run.stepId) === 'agent')
       .slice()
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
-      .map((run) => ({ stepId: run.stepId, file: run.id, executor: 'agent', agentRunId: run.id }));
+      .map((run) => ({
+        stepId: run.stepId,
+        file: run.id,
+        executor: stepExecutorMap.get(run.stepId) ?? 'agent',
+        agentRunId: run.id,
+      }));
 
     const stepOrder = new Map(definitionSteps.map((s, i) => [s.id, i]));
-    return [...scriptLogs, ...agentLogs].sort((a, b) => (stepOrder.get(a.stepId) ?? 0) - (stepOrder.get(b.stepId) ?? 0));
+    return [...legacyLogs, ...agentLogs].sort((a, b) => (stepOrder.get(a.stepId) ?? 0) - (stepOrder.get(b.stepId) ?? 0));
   }, [agentEvents, definitionSteps, agentRuns]);
 
   const runningStepIds = React.useMemo(

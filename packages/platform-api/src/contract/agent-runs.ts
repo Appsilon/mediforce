@@ -45,6 +45,7 @@ export const ListAgentRunsInputSchema = z
      * param (`?processInstanceId=a&processInstanceId=b`).
      */
     processInstanceIds: z.array(z.string().min(1)).optional(),
+    excludeExecutorType: z.literal('script').optional(),
   })
   .refine((v) => v.stepId === undefined || v.runId !== undefined, {
     message: 'stepId requires runId',
@@ -70,6 +71,7 @@ export const GetAgentRunCardStatusCountsInputSchema = z.object({
   namespace: z.string().min(1).optional(),
   status: AgentRunStatusSchema.optional(),
   processInstanceIds: z.array(z.string().min(1)).optional(),
+  excludeExecutorType: z.literal('script').optional(),
 });
 
 export const AgentRunCardStatusCountsSchema = z.object({
