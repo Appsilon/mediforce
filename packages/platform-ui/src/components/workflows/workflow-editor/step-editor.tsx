@@ -172,7 +172,7 @@ const TIP = {
   selectionMin:            'Minimum number of reviewers required to reach a binding verdict.',
   selectionMax:            'Maximum number of reviewers who may participate in this review step.',
 
-  actionKind:              'Action type: http (outbound API call), reshape (update workflow variables), email, spawn (run another workflow) or wait (pause). Fixed at creation.',
+  actionKind:              'Action type: http (outbound API call), reshape (update workflow variables), email, spawn (run another workflow), wait (pause) or collect (read back what spawned workflows produced). Fixed at creation.',
   actionTargets:           'The workflow(s) this step starts. Each target names a registered workflow; leave the version unset to use its default.',
   actionForEach:           'Interpolation path to an array — the step spawns one child per element, with ${item} bound to it. Leave empty to spawn each target once.',
   // Written explicitly rather than as absence, unlike the optional `allowSkip`
@@ -181,7 +181,8 @@ const TIP = {
   actionContinueOnSpawnError: 'On by default: one child failing to start does not fail this step. Turn off to fail the step on the first error.',
   actionWaitDuration:      'How long to pause. Fields combine, so 1 hour 30 minutes is hours 1 + minutes 30.',
   actionWaitDeadline:      'Absolute time to wait until — an ISO timestamp, or an interpolation like ${steps.x.dueAt}. Takes precedence over a duration.',
-  actionWaitCondition:     'Transition-language expression checked while waiting; the step proceeds as soon as it is true.',
+  actionWaitCondition:     'Transition-language expression checked while waiting; the step proceeds as soon as it is true. `children.allCompleted` is true once every spawned workflow has finished.',
+  actionCollectStep:       'Step id whose output to read from each spawned workflow. Leave empty to read all of its variables.',
   verdictLabel:            'Button text shown to the reviewer. Defaults to a title-cased form of the verdict key.',
   verdictIntent:           'Button styling: success, danger, warning or neutral. Defaults from the key for the common names.',
   verdictRequiresComment:  'Enforced server-side — the task cannot be completed on this verdict without a comment.',
@@ -386,6 +387,7 @@ export function StepEditor({
   const emailAction   = step.action?.kind === 'email'   ? step.action : undefined;
   const spawnAction   = step.action?.kind === 'spawn'   ? step.action : undefined;
   const waitAction    = step.action?.kind === 'wait'    ? step.action : undefined;
+  const collectAction = step.action?.kind === 'collect' ? step.action : undefined;
 
   // `targets` is one target or a list; the editor always works on a list and
   // writes back a bare object when there is exactly one, so a hand-authored
@@ -1502,6 +1504,17 @@ export function StepEditor({
                 />
               </FieldRow>
             </>
+          )}
+
+          {collectAction && (
+            <FieldRow label="action.step" tooltip={TIP.actionCollectStep}>
+              <input
+                value={collectAction.config.step ?? ''}
+                placeholder="provide_perspective"
+                onChange={(e) => onChange({ action: { ...collectAction, config: { ...collectAction.config, step: e.target.value || undefined } } })}
+                className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
+              />
+            </FieldRow>
           )}
         </FieldGroup>
       )}

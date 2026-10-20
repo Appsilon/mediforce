@@ -86,16 +86,13 @@ describe('team-pulse', () => {
     expect(action.config.deadline).toBeDefined();
   });
 
-  it('collect_responses is script step on golden image', () => {
+  it('collect_responses is action step with collect kind reading the perspective step', () => {
     const result = loadDefinition();
     expect(result.success).toBe(true);
     if (!result.success) return;
     const step = result.data.steps.find((s) => s.id === 'collect_responses');
-    expect(step?.executor).toBe('script');
-    expect(step?.plugin).toBe('script-container');
-    expect(step?.script?.image).toBe('mediforce-golden-image:latest');
-    expect(step?.script?.runtime).toBe('javascript');
-    expect(step?.script?.inlineScript).toBeDefined();
+    expect(step?.executor).toBe('action');
+    expect(step?.action).toEqual({ kind: 'collect', config: { step: 'provide_perspective' } });
   });
 
   it('synthesize is agent step with OpenRouter env', () => {

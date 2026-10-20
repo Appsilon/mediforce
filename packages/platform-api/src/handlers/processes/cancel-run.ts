@@ -4,6 +4,7 @@ import { ACTIONABLE_STATUSES } from '../../contract/tasks';
 import type { CallerScope } from '../../repositories/index';
 import { PreconditionFailedError } from '../../errors';
 import { loadOr404 } from '../_helpers';
+import { settleRunWaits } from './settle-run-waits';
 
 const DEFAULT_REASON = 'Cancelled by user';
 const ACTIONABLE_TASK_STATUSES = new Set<HumanTaskStatus>(ACTIONABLE_STATUSES);
@@ -86,6 +87,8 @@ export async function cancelRun(
     processInstanceId: input.runId,
     processDefinitionVersion: run.definitionVersion,
   });
+
+  await settleRunWaits(input.runId, scope);
 
   const updated = await loadOr404(
     scope.runs.getById(input.runId),

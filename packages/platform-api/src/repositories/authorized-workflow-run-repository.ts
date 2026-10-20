@@ -198,4 +198,23 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
     }
     await this.raw.update(id, updates);
   };
+
+  /** Same gates as `update`; see `ProcessInstanceRepository.updateIfPaused`. */
+  updateIfPaused = async (
+    id: string,
+    pauseReason: string,
+    updates: Partial<ProcessInstance>,
+  ): Promise<boolean> => {
+    const existing = await this.getById(id);
+    if (existing === null) {
+      throw new ForbiddenError();
+    }
+    if (updates.namespace !== undefined && updates.namespace !== existing.namespace) {
+      throw new ForbiddenError();
+    }
+    if (updates.deleted !== undefined && !this.caller.isSystemActor) {
+      throw new ForbiddenError();
+    }
+    return this.raw.updateIfPaused(id, pauseReason, updates);
+  };
 }

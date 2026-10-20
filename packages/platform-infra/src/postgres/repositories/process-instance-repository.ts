@@ -83,6 +83,31 @@ function displayStatusConditions(): Record<WorkflowDisplayStatus, SQL> {
   };
 }
 
+function toUpdateSet(updates: Partial<ProcessInstance>): Record<string, unknown> {
+  const set: Record<string, unknown> = {};
+  if (updates.status !== undefined) set.status = updates.status;
+  if (updates.currentStepId !== undefined) set.currentStepId = updates.currentStepId;
+  if (updates.variables !== undefined) set.variables = updates.variables;
+  if (updates.triggerPayload !== undefined) set.triggerPayload = updates.triggerPayload;
+  if (updates.pauseReason !== undefined) set.pauseReason = updates.pauseReason;
+  if (updates.error !== undefined) set.error = updates.error;
+  if (updates.assignedRoles !== undefined) set.assignedRoles = updates.assignedRoles;
+  if (updates.previousRun !== undefined) set.previousRun = updates.previousRun;
+  if (updates.previousRunSourceId !== undefined) {
+    set.previousRunSourceId = updates.previousRunSourceId;
+  }
+  if (updates.totalCostUsd !== undefined) {
+    set.totalCostUsd = String(updates.totalCostUsd);
+  }
+  if (updates.archived !== undefined) {
+    set.archivedAt = updates.archived ? new Date() : null;
+  }
+  if (updates.deleted !== undefined) {
+    set.deletedAt = updates.deleted ? new Date() : null;
+  }
+  return set;
+}
+
 /**
  * Postgres-backed ProcessInstanceRepository (ADR-0001, PLAN §1.2
  * process_instances + step_executions + agent_events).
@@ -511,6 +536,20 @@ export class PostgresProcessInstanceRepository
     return this.selectChildStatuses(parentInstanceId, allowed);
   }
 
+  async getChildren(parentInstanceId: string): Promise<ProcessInstance[]> {
+    const rows = await this.db
+      .select()
+      .from(processInstances)
+      .where(
+        and(
+          eq(processInstances.parentInstanceId, parentInstanceId),
+          isNull(processInstances.deletedAt),
+        ),
+      )
+      .orderBy(asc(processInstances.createdAt));
+    return rows.map((row) => toInstance(row));
+  }
+
   private async selectChildStatuses(
     parentInstanceId: string,
     allowed: readonly string[] | undefined,
@@ -533,32 +572,33 @@ export class PostgresProcessInstanceRepository
     instanceId: string,
     updates: Partial<ProcessInstance>,
   ): Promise<void> {
-    const set: Record<string, unknown> = {};
-    if (updates.status !== undefined) set.status = updates.status;
-    if (updates.currentStepId !== undefined) set.currentStepId = updates.currentStepId;
-    if (updates.variables !== undefined) set.variables = updates.variables;
-    if (updates.triggerPayload !== undefined) set.triggerPayload = updates.triggerPayload;
-    if (updates.pauseReason !== undefined) set.pauseReason = updates.pauseReason;
-    if (updates.error !== undefined) set.error = updates.error;
-    if (updates.assignedRoles !== undefined) set.assignedRoles = updates.assignedRoles;
-    if (updates.previousRun !== undefined) set.previousRun = updates.previousRun;
-    if (updates.previousRunSourceId !== undefined) {
-      set.previousRunSourceId = updates.previousRunSourceId;
-    }
-    if (updates.totalCostUsd !== undefined) {
-      set.totalCostUsd = String(updates.totalCostUsd);
-    }
-    if (updates.archived !== undefined) {
-      set.archivedAt = updates.archived ? new Date() : null;
-    }
-    if (updates.deleted !== undefined) {
-      set.deletedAt = updates.deleted ? new Date() : null;
-    }
+    const set = toUpdateSet(updates);
     if (Object.keys(set).length === 0) return;
     await this.db
       .update(processInstances)
       .set(set)
       .where(eq(processInstances.id, instanceId));
+  }
+
+  async updateIfPaused(
+    instanceId: string,
+    pauseReason: string,
+    updates: Partial<ProcessInstance>,
+  ): Promise<boolean> {
+    const set = toUpdateSet(updates);
+    if (Object.keys(set).length === 0) return false;
+    const rows = await this.db
+      .update(processInstances)
+      .set(set)
+      .where(
+        and(
+          eq(processInstances.id, instanceId),
+          eq(processInstances.status, 'paused'),
+          eq(processInstances.pauseReason, pauseReason),
+        ),
+      )
+      .returning({ id: processInstances.id });
+    return rows.length > 0;
   }
 
   async getByDefinition(

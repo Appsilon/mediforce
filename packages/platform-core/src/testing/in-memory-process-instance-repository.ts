@@ -87,6 +87,19 @@ export class InMemoryProcessInstanceRepository
     this.instances.set(instanceId, { ...existing, ...updates });
   }
 
+  async updateIfPaused(
+    instanceId: string,
+    pauseReason: string,
+    updates: Partial<ProcessInstance>,
+  ): Promise<boolean> {
+    const existing = this.instances.get(instanceId);
+    if (existing?.status !== 'paused' || existing.pauseReason !== pauseReason) {
+      return false;
+    }
+    this.instances.set(instanceId, { ...existing, ...updates });
+    return true;
+  }
+
   async listAll(options: ListInstancesOptions): Promise<ProcessInstance[]> {
     return this.applyListFilters([...this.instances.values()], options);
   }
@@ -307,6 +320,12 @@ export class InMemoryProcessInstanceRepository
     return [...this.instances.values()]
       .filter((i) => i.parentInstanceId === parentInstanceId && i.deleted !== true)
       .map((i) => i.status);
+  }
+
+  async getChildren(parentInstanceId: string): Promise<ProcessInstance[]> {
+    return [...this.instances.values()]
+      .filter((i) => i.parentInstanceId === parentInstanceId && i.deleted !== true)
+      .map((i) => ({ ...i }));
   }
 
   async getChildStatusesInNamespaces(

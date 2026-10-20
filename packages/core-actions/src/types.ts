@@ -5,6 +5,7 @@ import type {
   EmailActionConfig,
   SpawnActionConfig,
   WaitActionConfig,
+  CollectActionConfig,
   InterpolationSources,
 } from '@mediforce/platform-core';
 
@@ -48,6 +49,7 @@ export type ReshapeActionHandler = ActionHandler<ReshapeActionConfig>;
 export type EmailActionHandler = ActionHandler<EmailActionConfig>;
 export type SpawnActionHandler = ActionHandler<SpawnActionConfig>;
 export type WaitActionHandler = ActionHandler<WaitActionConfig>;
+export type CollectActionHandler = ActionHandler<CollectActionConfig>;
 
 export type AnyActionHandler = ActionHandler<unknown>;
 

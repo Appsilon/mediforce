@@ -88,12 +88,18 @@ export async function resumeWait(
   const waitOutput = { resumeReason, waitedSeconds, resolvedAt: now.toISOString() };
 
   const { __wait: _, ...cleanVars } = run.variables as Record<string, unknown>;
-  await scope.runs.update(input.runId, {
+  // Several callers can reach this point for one run at once (each finishing
+  // child, the heartbeat, a manual call); the guarded write lets exactly one
+  // of them resume it.
+  const won = await scope.runs.updateIfPaused(input.runId, 'waiting_for_timer', {
     status: 'running',
     pauseReason: null,
     variables: { ...cleanVars, [waitMeta.stepId]: waitOutput },
     updatedAt: now.toISOString(),
   });
+  if (!won) {
+    return { resumed: false, resumeAt: waitMeta.resumeAt };
+  }
 
   const actor = actorFromCaller(scope, 'scheduler');
 

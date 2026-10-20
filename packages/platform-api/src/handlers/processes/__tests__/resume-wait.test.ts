@@ -242,6 +242,26 @@ describe('resumeWait handler', () => {
       vi.useRealTimers();
     });
 
+    it('lets exactly one of several concurrent callers resume the run', async () => {
+      await seedParentWaitingOnChildren(['completed', 'completed']);
+      const kicker = noopRunKicker();
+      const scope = createTestScope({
+        instanceRepo,
+        auditRepo,
+        runKicker: kicker,
+        caller: userCaller('u-1', ['team-alpha']),
+      });
+
+      const results = await Promise.all([
+        resumeWait({ runId: 'inst-parent' }, scope),
+        resumeWait({ runId: 'inst-parent' }, scope),
+        resumeWait({ runId: 'inst-parent' }, scope),
+      ]);
+
+      expect(results.filter((result) => result.resumed)).toHaveLength(1);
+      expect(kicker.kicks).toHaveLength(1);
+    });
+
     it('keeps waiting while a child is still running', async () => {
       await seedParentWaitingOnChildren(['completed', 'running']);
       vi.useFakeTimers();

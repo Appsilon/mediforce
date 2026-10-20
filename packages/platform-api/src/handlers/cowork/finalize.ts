@@ -1,5 +1,6 @@
 import { PreconditionFailedError } from '../../errors';
 import { actorFromCaller, loadOr404 } from '../_helpers';
+import { settleRunWaits } from '../processes/settle-run-waits';
 import type { CallerScope } from '../../repositories/index';
 import type {
   FinalizeCoworkSessionInput,
@@ -94,6 +95,7 @@ export async function finalizeCoworkSession(
   await scope.system.runKicker.kick(session.processInstanceId, {
     triggeredBy: actor.actorId,
   });
+  await settleRunWaits(session.processInstanceId, scope);
 
   const updatedInstance = await scope.runs.getById(session.processInstanceId);
 

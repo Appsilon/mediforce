@@ -22,17 +22,18 @@ Two definitions:
 
 `spawn_perspectives` starts one `gather-perspective` run per selected member,
 and `wait_for_responses` suspends until they return or the box expires — its
-`children.allCompleted == true` condition ends the wait at the first heartbeat
-after the last member answers. Each
+`children.allCompleted == true` condition ends the wait the moment the last
+member answers. Each
 person gets their own run with their own task, so responses stay independent —
 nobody sees another's answer before writing their own, which is the entire point
 of gathering perspectives separately.
 
-This is the fan-out/fan-in pattern using the built-in `spawn` and `wait`
-actions ([`@mediforce/core-actions`](../../packages/core-actions/README.md)) —
+This is the fan-out/fan-in pattern using the built-in `spawn`, `wait` and
+`collect` actions ([`@mediforce/core-actions`](../../packages/core-actions/README.md)) —
 no custom container involved.
 
-`collect_responses` stays a script step. The wait's `children.*` root carries
-child *status*, not child *output*, so reading each member's perspective still
-means fetching their run by `spawned[].instanceId`. It still tolerates members
-who never answered, since the deadline can win the race.
+`collect_responses` is the built-in `collect` action with `step:
+provide_perspective`: it hands the parent each member's run as `{ instanceId,
+status, output }`, where `output` is the perspective they submitted. Members
+who never answered are listed with a `null` output, since the deadline can win
+the race, and the synthesis step skips them.

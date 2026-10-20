@@ -329,6 +329,36 @@ function contract(
       expect(await repo.getChildStatusesInNamespaces(parent.id, [])).toEqual([]);
     });
 
+    it('getChildren returns the spawned runs with their variables, skipping deleted ones', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      const parent = await repo.create(instanceFor('ws-1', { status: 'paused' }));
+      const childLink = { parentInstanceId: parent.id, parentDefinitionName: parent.definitionName };
+      const child = await repo.create(
+        instanceFor('ws-1', { status: 'completed', variables: { review: { verdict: 'approve' } }, ...childLink }),
+      );
+      await repo.create(instanceFor('ws-1', { status: 'running', ...childLink, deleted: true }));
+      await repo.create(instanceFor('ws-1', { status: 'running' }));
+
+      const children = await repo.getChildren(parent.id);
+
+      expect(children.map((run) => run.id)).toEqual([child.id]);
+      expect(children[0]?.variables).toEqual({ review: { verdict: 'approve' } });
+    });
+
+    it('updateIfPaused applies the update once and refuses it once the run is no longer paused for that reason', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      const run = await repo.create(instanceFor('ws-1', { status: 'paused', pauseReason: 'waiting_for_timer' }));
+
+      expect(await repo.updateIfPaused(run.id, 'waiting_for_human', { status: 'running' })).toBe(false);
+      expect((await repo.getById(run.id))?.status).toBe('paused');
+
+      expect(await repo.updateIfPaused(run.id, 'waiting_for_timer', { status: 'running', pauseReason: null })).toBe(true);
+      expect(await repo.updateIfPaused(run.id, 'waiting_for_timer', { status: 'running', pauseReason: null })).toBe(false);
+      expect((await repo.getById(run.id))?.status).toBe('running');
+    });
+
     it('getLastCompletedByDefinitionName picks newest completed run', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');

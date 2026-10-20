@@ -2,18 +2,19 @@ import { z } from 'zod';
 import { WorkflowStepSchema, WorkflowAuthorableSchema, WorkflowArtifactSchema } from './workflow-definition';
 import { BLOCK_PRESETS } from '../blocks/block-presets';
 
-const ACTION_KIND_ALIASES: Record<string, 'http' | 'reshape' | 'email' | 'spawn' | 'wait'> = {
+const ACTION_KIND_ALIASES: Record<string, 'http' | 'reshape' | 'email' | 'spawn' | 'wait' | 'collect'> = {
   sendemail: 'email', mail: 'email', notify: 'email', notification: 'email',
   webhook: 'http', apicall: 'http', request: 'http',
   delay: 'wait', pause: 'wait', sleep: 'wait',
   trigger: 'spawn', childworkflow: 'spawn',
+  join: 'collect', gather: 'collect', collectchildren: 'collect',
   transform: 'reshape', map: 'reshape',
 };
 
 function normalizeActionKind(kind: unknown): unknown {
   if (typeof kind !== 'string') return kind;
   const key = kind.toLowerCase().replace(/[\s_-]/g, '');
-  const validKinds = ['http', 'reshape', 'email', 'spawn', 'wait'];
+  const validKinds = ['http', 'reshape', 'email', 'spawn', 'wait', 'collect'];
   if (validKinds.includes(key)) return key;
   return ACTION_KIND_ALIASES[key] ?? kind;
 }

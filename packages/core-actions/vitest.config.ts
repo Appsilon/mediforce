@@ -7,6 +7,10 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      '@mediforce/platform-core/testing': path.resolve(
+        __dirname,
+        '../platform-core/src/testing/index.ts',
+      ),
       '@mediforce/platform-core': path.resolve(
         __dirname,
         '../platform-core/src/index.ts',

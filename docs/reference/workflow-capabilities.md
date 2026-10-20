@@ -47,14 +47,15 @@ to a handler in [`core-actions/src/handlers/`](../../packages/core-actions/src/h
 | `reshape` | Pure data transform — rebuild an object from interpolated leaves | `ReshapeActionConfigSchema` |
 | `email` | Send email (Mailgun/SMTP; disabled when `MEDIFORCE_DISABLE_EMAIL=true`) | `EmailActionConfigSchema` |
 | `spawn` | Launch child workflow run(s); **`forEach` fans out one child per item** | `SpawnActionConfigSchema` |
-| `wait` | Pause the run until a `duration` or `deadline` elapses | `WaitActionConfigSchema` |
+| `wait` | Pause the run until a `duration` or `deadline` elapses, or earlier when its `condition` is true | `WaitActionConfigSchema` |
+| `collect` | Read back what the run's spawned children produced (the read half of spawn + wait) | `CollectActionConfigSchema` |
 
 **Fan-out** (the "spawn a workflow per team member" pattern) is
 `action.kind: spawn` with `forEach: "${steps.x.list}"` and a single `targets`
 template using `${item.*}`; the rationale for child runs over parallel branches
 is [ADR-0018](../adr/0018-fan-out-is-child-workflows.md). End-to-end working
 example: [`apps/team-pulse/src/team-pulse.wd.json`](../../apps/team-pulse/src/team-pulse.wd.json)
-(`spawn_perspectives` → `wait` on `children.allCompleted` → `collect_responses`), distilled in
+(`spawn_perspectives` → `wait` on `children.allCompleted` → `collect` as `collect_responses`), distilled in
 [`workflow-examples/11-fan-out-orchestration.wd.json`](../workflow-examples/11-fan-out-orchestration.wd.json).
 
 Handler nuances not visible in the schema (in
@@ -71,14 +72,26 @@ Handler nuances not visible in the schema (in
   interpolated at pause time, stored on the sentinel, and re-evaluated with
   transition-`when` syntax by
   [`resume-wait.ts`](../../packages/platform-api/src/handlers/processes/resume-wait.ts)
-  (`resumeReason: condition_met`) on every cron-heartbeat sweep, so resume
-  granularity is ~15 minutes. Besides this run's step outputs it can read the
-  reserved `children` root — the runs this run's `spawn` steps fired:
+  (`resumeReason: condition_met`). That runs whenever something may have made
+  the condition true — a spawned child finishing (by auto-runner, task, cowork session) or being cancelled, the run
+  parking on its wait after its children already ended — and again on every
+  cron-heartbeat sweep, which is what resolves a plain `duration` / `deadline`
+  and backstops a missed event. Callers can race, so the resume is a guarded
+  write: exactly one wins. Besides this run's step outputs the condition can
+  read the reserved `children` root — the runs this run's `spawn` steps fired:
   `children.allCompleted` (every child completed or failed; true when none
   were spawned), `children.totalCount`, `children.completedCount`,
   `children.failedCount`. `children.allCompleted == true` is the spawn + wait
   join ([ADR-0018](../adr/0018-fan-out-is-child-workflows.md)). Outside a
   `wait` condition `children` is an unknown root and the expression throws.
+- `collect` returns `{ children: [{ instanceId, definitionName, status, error,
+  output }], count, completedCount, failedCount }` for the runs this run
+  spawned ([`collect.ts`](../../packages/core-actions/src/handlers/collect.ts)).
+  `output` is the child's `variables[step]` when `config.step` is set (`null`
+  if that step never produced output), otherwise all of the child's
+  `variables`. Children that failed or are still running are listed too — the
+  next step decides what a partial result means. Read on demand from the
+  children, so nothing is ever written into the parent when a child finishes.
 - `email` supports `cc` / `bcc` / `replyTo` / `html` and is **rate-limited**
   (default 50/run, 30/minute) in [`email.ts`](../../packages/core-actions/src/handlers/email.ts).
 - `http` never throws on a non-2xx response — it returns `{ status, headers, body }`;

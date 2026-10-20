@@ -22,6 +22,7 @@ export { getProcessSteps } from './processes/get-process-steps';
 export { cancelRun } from './processes/cancel-run';
 export { resumeRun } from './processes/resume-run';
 export { resumeWait } from './processes/resume-wait';
+export { settleRunWaits } from './processes/settle-run-waits';
 export { retryStep } from './processes/retry-step';
 export { archiveRun } from './processes/archive-run';
 export { bulkCancelRuns } from './processes/bulk-cancel-runs';

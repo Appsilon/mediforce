@@ -111,6 +111,7 @@ import {
   httpActionHandler,
   reshapeActionHandler,
   createSpawnActionHandler,
+  createCollectActionHandler,
   createEmailActionHandler,
   waitActionHandler,
 } from '@mediforce/core-actions';
@@ -395,6 +396,7 @@ export function getPlatformServices(): PlatformServices {
   });
   actionRegistry.register('spawn', createSpawnActionHandler(manualTrigger, processRepo, spawnRunKicker));
   actionRegistry.register('wait', waitActionHandler);
+  actionRegistry.register('collect', createCollectActionHandler(instanceRepo));
   if (emailSender) {
     actionRegistry.register('email', createEmailActionHandler(emailSender));
   }

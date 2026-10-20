@@ -9,9 +9,15 @@ import { pollUntil } from '../helpers/poll-until';
  * finished — read from the children's own rows at sweep time, so this also
  * proves the spawned child's `parentInstanceId` survives Postgres.
  *
+ * The join is event-driven: a child ending resumes its parent on the spot, and
+ * a parent that parks after its children already ended resumes as it parks, so
+ * the join tests never poke `POST /resume-wait`. Only the deadline test does —
+ * a deadline has no event behind it, so the heartbeat sweep that calls the same
+ * handler is what resolves it. After the join, a `collect` step hands the parent
+ * what its children produced.
+ *
  * Children are a single verdict review, so the journey finishes them through
- * the task API; `POST /resume-wait` stands in for the heartbeat sweep that
- * calls the same handler.
+ * the task API.
  */
 
 const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
@@ -71,11 +77,19 @@ async function registerFamily(
         executor: 'action',
         action: { kind: 'wait', config: options.wait },
       },
+      {
+        id: 'collect',
+        name: 'Collect',
+        type: 'creation',
+        executor: 'action',
+        action: { kind: 'collect', config: { step: 'review' } },
+      },
       { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
     ],
     transitions: [
       { from: 'fan-out', to: 'join' },
-      { from: 'join', to: 'done' },
+      { from: 'join', to: 'collect' },
+      { from: 'collect', to: 'done' },
     ],
   });
   return parentName;
@@ -152,7 +166,7 @@ async function expectParentCompletes(request: APIRequestContext, runId: string, 
 }
 
 test.describe('spawn + wait join on children.allCompleted — API E2E', () => {
-  test('resolves early once every spawned child has finished', async ({ request }) => {
+  test('resumes the parent the moment its last child finishes, then collects their results', async ({ request }) => {
     const parentName = await registerFamily(request, {
       childCount: 2,
       wait: { duration: { hours: 1 }, condition: JOIN_CONDITION },
@@ -161,11 +175,26 @@ test.describe('spawn + wait join on children.allCompleted — API E2E', () => {
     const [firstChild, secondChild] = spawnedChildIds(await getRun(request, parentId));
 
     await finishChild(request, firstChild);
-    expect((await resumeWait(request, parentId)).resumed).toBe(false);
+    const stillWaiting = await getRun(request, parentId);
+    expect(stillWaiting.status).toBe('paused');
+    expect(stillWaiting.pauseReason).toBe('waiting_for_timer');
 
     await finishChild(request, secondChild);
-    expect(await resumeWait(request, parentId)).toEqual({ resumed: true, resumeReason: 'condition_met' });
     await expectParentCompletes(request, parentId, 'condition_met');
+
+    const parent = await getRun(request, parentId);
+    const collected = parent.variables.collect as {
+      count: number;
+      completedCount: number;
+      children: Array<{ instanceId: string; status: string; output: unknown }>;
+    };
+    expect(collected.count).toBe(2);
+    expect(collected.completedCount).toBe(2);
+    expect(collected.children.map((child) => child.instanceId).sort()).toEqual([firstChild, secondChild].sort());
+    for (const child of collected.children) {
+      expect(child.status).toBe('completed');
+      expect(child.output).not.toBeNull();
+    }
   });
 
   test('resolves on the deadline with children still running', async ({ request }) => {
@@ -194,9 +223,13 @@ test.describe('spawn + wait join on children.allCompleted — API E2E', () => {
       childCount: 0,
       wait: { duration: { hours: 1 }, condition: JOIN_CONDITION },
     });
-    const parentId = await startParentAndAwaitWait(request, parentName);
+    const res = await request.post('/api/processes', {
+      headers: HEADERS,
+      data: { namespace: TEST_ORG_HANDLE, definitionName: parentName, triggeredBy: 'e2e-test', triggerName: 'Start' },
+    });
+    expect(res.status(), await res.text()).toBe(201);
+    const { run } = (await res.json()) as { run: { id: string } };
 
-    expect(await resumeWait(request, parentId)).toEqual({ resumed: true, resumeReason: 'condition_met' });
-    await expectParentCompletes(request, parentId, 'condition_met');
+    await expectParentCompletes(request, run.id, 'condition_met');
   });
 });

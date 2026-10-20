@@ -3,7 +3,7 @@ import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
-import { advanceEvalRunOfInstance, checkRetiredModels, checkUnknownModels } from '@mediforce/platform-api/handlers';
+import { advanceEvalRunOfInstance, checkRetiredModels, checkUnknownModels, settleRunWaits } from '@mediforce/platform-api/handlers';
 import { defaultBuildScope } from '@/lib/route-adapter';
 import { DEFAULT_MODEL, resolveCoworkOutputSchema, resolveDefinitionModels, resolvePreviousStepId, resolveStepTimeoutMs, buildTaskVerdicts, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
@@ -83,6 +83,16 @@ async function advanceEvalRunOfTrial(instance: ProcessInstance): Promise<void> {
   } catch (err) {
     console.error(`[auto-runner] Failed to advance the Eval Run of trial '${instance.id}':`, err);
   }
+}
+
+/**
+ * The auto-runner stopped driving this run: wake the waits that depend on it
+ * (a parent joining its children, or this run's own join whose children ended
+ * before it paused). As the system, for the same reason as the Eval Run above.
+ */
+async function afterRunStopped(instance: ProcessInstance): Promise<void> {
+  await advanceEvalRunOfTrial(instance);
+  await settleRunWaits(instance.id, defaultBuildScope({ kind: 'apiKey', isSystemActor: true }));
 }
 
 export async function POST(
@@ -204,7 +214,7 @@ export async function POST(
         });
         releaseRunLock(instanceId);
         runLockAcquired = false;
-        after(() => advanceEvalRunOfTrial(initialInstance));
+        after(() => afterRunStopped(initialInstance));
         return NextResponse.json(
           { error: 'Missing environment variables', missing: allMissing, instanceId },
           { status: 422 },
@@ -237,7 +247,7 @@ export async function POST(
         });
         releaseRunLock(instanceId);
         runLockAcquired = false;
-        after(() => advanceEvalRunOfTrial(initialInstance));
+        after(() => afterRunStopped(initialInstance));
         return NextResponse.json(
           { error: unknown.message, unknownModels: unknown.unknownModels, instanceId },
           { status: 422 },
@@ -255,7 +265,7 @@ export async function POST(
         });
         releaseRunLock(instanceId);
         runLockAcquired = false;
-        after(() => advanceEvalRunOfTrial(initialInstance));
+        after(() => afterRunStopped(initialInstance));
         return NextResponse.json(
           { error: retired.message, retiredModels: retired.refs, instanceId },
           { status: 422 },
@@ -976,7 +986,7 @@ export async function POST(
         releaseRunLock(instanceId);
       }
 
-      await advanceEvalRunOfTrial(initialInstance);
+      await afterRunStopped(initialInstance);
     });
 
     return NextResponse.json(
