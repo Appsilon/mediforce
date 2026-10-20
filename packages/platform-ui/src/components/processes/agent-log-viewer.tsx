@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Bot, Terminal, CheckCircle2, ChevronRight, Copy, Check, ListTodo, Loader2, Clock } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
+import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { SearchField } from '@/components/ui/search-field';
 
@@ -24,6 +25,7 @@ interface AgentLogFile {
   stepId: string;
   file: string;
   executor: string;
+  agentRunId?: string;
 }
 
 interface AgentLogViewerProps {
@@ -407,6 +409,15 @@ function LogGroupList({ groups }: { groups: LogGroup[] }) {
   );
 }
 
+async function fetchTrajectoryLog(agentRunId: string): Promise<{ entries: LogEntry[]; rawContent: string | null; error: string | null }> {
+  try {
+    const { entries } = await mediforce.agentRuns.trajectory({ agentRunId });
+    return { entries, rawContent: null, error: null };
+  } catch (err) {
+    return { entries: [], rawContent: null, error: err instanceof Error ? err.message : 'Failed to load log' };
+  }
+}
+
 async function fetchSingleLog(file: string): Promise<{ entries: LogEntry[]; rawContent: string | null; error: string | null }> {
   let response: Response;
   try {
@@ -637,7 +648,9 @@ export function AgentLogViewer({ logFiles, initialStepId, runningStepIds, runAct
     try {
       const results = await Promise.all(
         latest.current.logFiles.map(async (logFile) => {
-          const result = await fetchSingleLog(logFile.file);
+          const result = logFile.agentRunId
+            ? await fetchTrajectoryLog(logFile.agentRunId)
+            : await fetchSingleLog(logFile.file);
           return { stepId: logFile.stepId, file: logFile.file, executor: logFile.executor, ...result };
         }),
       );

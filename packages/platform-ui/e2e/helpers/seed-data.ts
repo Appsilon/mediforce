@@ -51,20 +51,21 @@ export const SEEDED_DEFINITION_CREATED_AT = minutesAgo(90_000);
 // `${tmpdir()}/mediforce-step-logs/${AGENT_LOG_FILENAME}` alongside the
 // agent_events insert for RUN_COMPLETED_1_ID's step.
 export const AGENT_LOG_FILENAME = 'seed-narrative-summary.jsonl';
-export const AGENT_LOG_FIXTURE_CONTENT = [
+const AGENT_LOG_FIXTURE_ENTRIES = [
   { ts: oneHourAgo, type: 'assistant', subtype: 'tool_call', tool: 'Read', input: { file_path: '/workspace/vendor-submissions.csv' } },
   { ts: oneHourAgo, type: 'tool_result', tool_name: 'Read', content: '12 rows loaded, all fields present.' },
   { ts: oneHourAgo, type: 'assistant', subtype: 'tool_call', tool: 'Bash', input: { command: 'grep -c missing vendor-submissions.csv' } },
   { ts: oneHourAgo, type: 'tool_result', tool_name: 'Bash', content: '0' },
   { ts: oneHourAgo, type: 'assistant', subtype: 'text', text: 'Reviewed 12 vendor submissions. No issues detected. All items within expected parameters.' },
   { ts: now, type: 'result', subtype: 'completed' },
-].map((entry) => JSON.stringify(entry)).join('\n');
+];
+export const AGENT_LOG_FIXTURE_CONTENT = AGENT_LOG_FIXTURE_ENTRIES.map((entry) => JSON.stringify(entry)).join('\n');
 
 // A second step's log on the same run, so the execution log has more than one
 // step to show. The all-steps view, the per-step tabs and the stage entries a
 // container build writes are all invisible with a single-step fixture.
 export const AGENT_LOG_SECOND_FILENAME = 'seed-vendor-assessment.jsonl';
-export const AGENT_LOG_SECOND_FIXTURE_CONTENT = [
+const AGENT_LOG_SECOND_FIXTURE_ENTRIES = [
   { ts: oneHourAgo, type: 'stage', text: 'Preparing container image mediforce-golden-image' },
   { ts: oneHourAgo, type: 'stage', text: 'Container image ready' },
   // Two revisions of one task list, the echo the agent sends back, and a
@@ -83,7 +84,10 @@ export const AGENT_LOG_SECOND_FIXTURE_CONTENT = [
     { content: 'Check for missing fields', status: 'completed' },
   ] } },
   { ts: now, type: 'result', subtype: 'completed' },
-].map((entry) => JSON.stringify(entry)).join('\n');
+];
+export const AGENT_LOG_SECOND_FIXTURE_CONTENT = AGENT_LOG_SECOND_FIXTURE_ENTRIES.map((entry) => JSON.stringify(entry)).join('\n');
+
+export const RUN_VENDOR_ASSESSMENT_1_ID = '00000000-0000-4000-8000-000000000006';
 
 export interface SeedOptions {
   /** Base URL of the mock OAuth server (from globalSetup). Used to build the
@@ -946,6 +950,20 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       executorType: 'agent',
       reviewerType: 'none',
     },
+    [RUN_VENDOR_ASSESSMENT_1_ID]: {
+      id: RUN_VENDOR_ASSESSMENT_1_ID,
+      processInstanceId: 'proc-running-1',
+      stepId: 'vendor-assessment',
+      pluginId: 'vendor-assessment',
+      autonomyLevel: 'L2',
+      status: 'completed',
+      envelope: null,
+      fallbackReason: null,
+      startedAt: oneHourAgo,
+      completedAt: now,
+      executorType: 'agent',
+      reviewerType: 'none',
+    },
     [RUN_ESCALATED_1_ID]: {
       id: RUN_ESCALATED_1_ID,
       processInstanceId: 'proc-paused-1',
@@ -1090,6 +1108,15 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
     ...monitoringLoadMoreAgentRuns,
   };
+
+  const agentTrajectoryEntries: Record<string, Record<string, unknown>> = {};
+  function seedTrajectory(agentRunId: string, entries: Record<string, unknown>[]): void {
+    entries.filter((entry) => entry.type !== 'stage').forEach((entry, seq) => {
+      agentTrajectoryEntries[`${agentRunId}:${String(seq)}`] = { agentRunId, seq, entry };
+    });
+  }
+  seedTrajectory(RUN_COMPLETED_1_ID, AGENT_LOG_FIXTURE_ENTRIES);
+  seedTrajectory(RUN_VENDOR_ASSESSMENT_1_ID, AGENT_LOG_SECOND_FIXTURE_ENTRIES);
 
   const agentEvents: Record<string, Record<string, unknown>> = {
     'agent-event-1': {
@@ -2590,5 +2617,5 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     }
   }
 
-  return { humanTasks, processInstances, agentRuns, agentEvents, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, retryAuditStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, modelRegistry };
+  return { humanTasks, processInstances, agentRuns, agentEvents, agentTrajectoryEntries, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, retryAuditStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, modelRegistry };
 }

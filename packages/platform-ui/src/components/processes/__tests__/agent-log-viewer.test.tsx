@@ -15,6 +15,9 @@ import userEvent from '@testing-library/user-event';
 const apiFetchMock = vi.fn();
 vi.mock('@/lib/api-fetch', () => ({ apiFetch: (...args: unknown[]) => apiFetchMock(...args) }));
 
+const trajectoryMock = vi.fn();
+vi.mock('@/lib/mediforce', () => ({ mediforce: { agentRuns: { trajectory: (input: unknown) => trajectoryMock(input) } } }));
+
 const { AgentLogSections, AgentLogViewer, shouldStopPolling, buildGroups, filterGroups, latestTodos, callSummary, resultSummary, entryMatches } = await import('../agent-log-viewer');
 type AgentLogSection = import('../agent-log-viewer').AgentLogSection;
 
@@ -218,6 +221,66 @@ describe('AgentLogViewer fetch cadence', () => {
     await Promise.resolve();
 
     expect(apiFetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('AgentLogViewer trajectory source (#1573)', () => {
+  beforeEach(() => {
+    apiFetchMock.mockReset();
+    trajectoryMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('reads an agentRunId entry from the trajectory endpoint, not the tmp file', async () => {
+    trajectoryMock.mockResolvedValue({
+      agentRunId: 'run-1',
+      entries: [{ ts: '2026-01-01T00:00:00.000Z', type: 'assistant', subtype: 'text', text: 'from the database' }],
+    });
+
+    render(
+      <AgentLogViewer
+        logFiles={[{ stepId: 'extract', file: 'run-1', executor: 'agent', agentRunId: 'run-1' }]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('from the database')).toBeInTheDocument());
+    expect(trajectoryMock).toHaveBeenCalledWith({ agentRunId: 'run-1' });
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
+
+  it('shows the trajectory error instead of claiming the step wrote no log', async () => {
+    trajectoryMock.mockRejectedValue(new Error('agent run not found'));
+
+    render(
+      <AgentLogViewer
+        logFiles={[{ stepId: 'extract', file: 'run-1', executor: 'agent', agentRunId: 'run-1' }]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('agent run not found')).toBeInTheDocument());
+    expect(screen.queryByText('This step wrote no log.')).not.toBeInTheDocument();
+  });
+
+  it('still uses the tmp-file path for an entry with no agentRunId', async () => {
+    apiFetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: JSON.stringify({ ts: '2026-01-01T00:00:00.000Z', type: 'assistant', subtype: 'text', text: 'from the tmp file' }) }),
+      text: async () => '',
+      status: 200,
+      statusText: 'OK',
+    });
+
+    render(
+      <AgentLogViewer
+        logFiles={[{ stepId: 'build', file: 'build.jsonl', executor: 'script' }]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('from the tmp file')).toBeInTheDocument());
+    expect(trajectoryMock).not.toHaveBeenCalled();
   });
 });
 
