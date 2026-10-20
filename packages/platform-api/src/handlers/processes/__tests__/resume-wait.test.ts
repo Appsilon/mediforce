@@ -189,6 +189,152 @@ describe('resumeWait handler', () => {
     vi.useRealTimers();
   });
 
+  describe('children.* condition (spawn + wait join)', () => {
+    const JOIN_CONDITION = 'children.allFinished == true';
+
+    async function seedParentWaitingOnChildren(childStatuses: Array<'running' | 'paused' | 'completed' | 'failed'>) {
+      await instanceRepo.create(
+        buildProcessInstance({
+          id: 'inst-parent',
+          namespace: 'team-alpha',
+          status: 'paused',
+          pauseReason: 'waiting_for_timer',
+          variables: {
+            __wait: {
+              stepId: 'wait-step',
+              resumeAt: '2026-06-02T00:00:00.000Z',
+              pausedAt: '2026-06-01T10:00:00.000Z',
+              mode: 'deadline',
+              condition: JOIN_CONDITION,
+            },
+          },
+        }),
+      );
+      for (const [index, status] of childStatuses.entries()) {
+        await instanceRepo.create(
+          buildProcessInstance({
+            id: `inst-child-${index}`,
+            namespace: 'team-alpha',
+            status,
+            parentInstanceId: 'inst-parent',
+          }),
+        );
+      }
+    }
+
+    function scopeFor() {
+      return createTestScope({
+        instanceRepo,
+        auditRepo,
+        runKicker: noopRunKicker(),
+        caller: userCaller('u-1', ['team-alpha']),
+      });
+    }
+
+    it('resumes early once every child has finished, failed ones included', async () => {
+      await seedParentWaitingOnChildren(['completed', 'failed']);
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
+
+      const result = await resumeWait({ runId: 'inst-parent' }, scopeFor());
+
+      expect(result).toEqual({ resumed: true, resumeReason: 'condition_met' });
+      vi.useRealTimers();
+    });
+
+    it('lets exactly one of several concurrent callers resume the run', async () => {
+      await seedParentWaitingOnChildren(['completed', 'completed']);
+      const kicker = noopRunKicker();
+      const scope = createTestScope({
+        instanceRepo,
+        auditRepo,
+        runKicker: kicker,
+        caller: userCaller('u-1', ['team-alpha']),
+      });
+
+      const results = await Promise.all([
+        resumeWait({ runId: 'inst-parent' }, scope),
+        resumeWait({ runId: 'inst-parent' }, scope),
+        resumeWait({ runId: 'inst-parent' }, scope),
+      ]);
+
+      expect(results.filter((result) => result.resumed)).toHaveLength(1);
+      expect(kicker.kicks).toHaveLength(1);
+    });
+
+    it('keeps waiting while a child is still running', async () => {
+      await seedParentWaitingOnChildren(['completed', 'running']);
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
+
+      const result = await resumeWait({ runId: 'inst-parent' }, scopeFor());
+
+      expect(result.resumed).toBe(false);
+      vi.useRealTimers();
+    });
+
+    it('resumes on the deadline with children still running', async () => {
+      await seedParentWaitingOnChildren(['completed', 'paused']);
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-06-02T01:00:00.000Z'));
+
+      const result = await resumeWait({ runId: 'inst-parent' }, scopeFor());
+
+      expect(result).toEqual({ resumed: true, resumeReason: 'deadline_reached' });
+      vi.useRealTimers();
+    });
+
+    it('resumes at once when nothing was spawned', async () => {
+      await seedParentWaitingOnChildren([]);
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
+
+      const result = await resumeWait({ runId: 'inst-parent' }, scopeFor());
+
+      expect(result).toEqual({ resumed: true, resumeReason: 'condition_met' });
+      vi.useRealTimers();
+    });
+
+    it('exposes the counts to the condition', async () => {
+      await seedParentWaitingOnChildren(['completed', 'completed', 'failed', 'running']);
+      const parent = await instanceRepo.getById('inst-parent');
+      const waitMeta = (parent!.variables as Record<string, Record<string, unknown>>).__wait;
+      await instanceRepo.update('inst-parent', {
+        variables: {
+          __wait: {
+            ...waitMeta,
+            condition: 'children.totalCount == 4 && children.completedCount == 2 && children.failedCount == 1',
+          },
+        },
+      });
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
+
+      const result = await resumeWait({ runId: 'inst-parent' }, scopeFor());
+
+      expect(result).toEqual({ resumed: true, resumeReason: 'condition_met' });
+      vi.useRealTimers();
+    });
+
+    it('skips the child query when the condition never reads children', async () => {
+      await seedParentWaitingOnChildren(['running']);
+      const parent = await instanceRepo.getById('inst-parent');
+      const waitMeta = (parent!.variables as Record<string, Record<string, unknown>>).__wait;
+      await instanceRepo.update('inst-parent', {
+        variables: { ready: true, __wait: { ...waitMeta, condition: 'variables.ready == true' } },
+      });
+      const childQuery = vi.spyOn(instanceRepo, 'getChildrenInNamespaces');
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
+
+      const result = await resumeWait({ runId: 'inst-parent' }, scopeFor());
+
+      expect(result).toEqual({ resumed: true, resumeReason: 'condition_met' });
+      expect(childQuery).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+  });
+
   it('throws PreconditionFailedError for non-waiting instance', async () => {
     await instanceRepo.create(
       buildProcessInstance({

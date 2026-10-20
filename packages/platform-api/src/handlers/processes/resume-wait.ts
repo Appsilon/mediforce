@@ -1,3 +1,4 @@
+import type { InstanceStatus } from '@mediforce/platform-core';
 import { evaluateExpression } from '@mediforce/workflow-engine';
 import type { ResumeWaitInput, ResumeWaitOutput } from '../../contract/processes';
 import type { CallerScope } from '../../repositories/index';
@@ -10,6 +11,32 @@ interface WaitMetadata {
   pausedAt: string;
   mode: 'duration' | 'deadline';
   condition?: string;
+}
+
+const TERMINAL_STATUSES: readonly InstanceStatus[] = ['completed', 'failed'];
+
+type ChildrenSummary = {
+  totalCount: number;
+  completedCount: number;
+  failedCount: number;
+  allFinished: boolean;
+};
+
+const REFERENCES_CHILDREN = /\bchildren\b/;
+
+// The `children.*` root of a wait condition — the join half of spawn + wait.
+// Read from the children at sweep time, so a child finishing
+// never writes into its parent. A child that failed has still finished: the
+// join waits for every child to stop, not for every child to succeed.
+async function summarizeChildren(runId: string, scope: CallerScope): Promise<ChildrenSummary> {
+  const statuses = (await scope.runs.getChildren(runId)).map((child) => child.status);
+  const finishedCount = statuses.filter((status) => TERMINAL_STATUSES.includes(status)).length;
+  return {
+    totalCount: statuses.length,
+    completedCount: statuses.filter((status) => status === 'completed').length,
+    failedCount: statuses.filter((status) => status === 'failed').length,
+    allFinished: finishedCount === statuses.length,
+  };
 }
 
 export async function resumeWait(
@@ -43,9 +70,14 @@ export async function resumeWait(
         output: run.variables as Record<string, unknown>,
         variables: run.variables as Record<string, unknown>,
         verdict: undefined,
+        ...(REFERENCES_CHILDREN.test(waitMeta.condition)
+          ? { children: await summarizeChildren(input.runId, scope) }
+          : {}),
       });
-    } catch {
-      // Condition evaluation failure — don't resume, let next poll retry
+    } catch (err) {
+      // Condition evaluation failure — don't resume, let next poll retry.
+      // Logged so a mistyped condition is visible instead of silently waiting out the deadline.
+      console.error(`[resume-wait] Condition evaluation failed for '${input.runId}':`, err);
     }
   }
 
@@ -62,12 +94,18 @@ export async function resumeWait(
   const waitOutput = { resumeReason, waitedSeconds, resolvedAt: now.toISOString() };
 
   const { __wait: _, ...cleanVars } = run.variables as Record<string, unknown>;
-  await scope.runs.update(input.runId, {
+  // Several callers can reach this point for one run at once (each finishing
+  // child, the heartbeat, a manual call); the guarded write lets exactly one
+  // of them resume it.
+  const won = await scope.runs.updateIfPaused(input.runId, 'waiting_for_timer', {
     status: 'running',
     pauseReason: null,
     variables: { ...cleanVars, [waitMeta.stepId]: waitOutput },
     updatedAt: now.toISOString(),
   });
+  if (!won) {
+    return { resumed: false, resumeAt: waitMeta.resumeAt };
+  }
 
   const actor = actorFromCaller(scope, 'scheduler');
 

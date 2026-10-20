@@ -185,7 +185,31 @@ export interface ProcessInstanceRepository {
   getByStatusAll(status: InstanceStatus): Promise<ProcessInstance[]>;
   getByStatusInNamespaces(status: InstanceStatus, allowed: readonly string[]): Promise<ProcessInstance[]>;
 
+  /**
+   * Every non-deleted run a `spawn` step fired from `parentInstanceId`,
+   * oldest first. Backs the join half of spawn: the `children.*` root of a
+   * `wait` condition and the `collect` action both read the children on
+   * demand, so a child never writes back into its parent.
+   */
+  getChildrenAll(parentInstanceId: string): Promise<ProcessInstance[]>;
+  getChildrenInNamespaces(
+    parentInstanceId: string,
+    allowed: readonly string[],
+  ): Promise<ProcessInstance[]>;
+
   update(instanceId: string, updates: Partial<ProcessInstance>): Promise<void>;
+
+  /**
+   * Compare-and-set: applies `updates` only while the run is still paused for
+   * `pauseReason`, and returns whether this call was the one that did. Lets
+   * several callers race to resume the same run (a child finishing, the
+   * heartbeat, a manual call) with exactly one of them winning.
+   */
+  updateIfPaused(
+    instanceId: string,
+    pauseReason: string,
+    updates: Partial<ProcessInstance>,
+  ): Promise<boolean>;
   getByDefinition(name: string, version: string): Promise<ProcessInstance[]>;
 
   /**

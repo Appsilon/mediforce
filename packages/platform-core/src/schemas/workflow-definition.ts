@@ -73,6 +73,13 @@ export const WaitActionConfigSchema = z.object({
   condition: z.string().optional(),
 });
 
+/** collect action config: read the results of the runs this run spawned.
+ *  `step` narrows each child's output to one of its steps; without it the
+ *  child's whole variables map is returned. */
+export const CollectActionConfigSchema = z.object({
+  step: z.string().min(1).optional(),
+});
+
 /** Discriminated union of action configs. New kinds plug in here. */
 export const ActionConfigSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('http'), config: HttpActionConfigSchema }),
@@ -80,6 +87,7 @@ export const ActionConfigSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('email'), config: EmailActionConfigSchema }),
   z.object({ kind: z.literal('spawn'), config: SpawnActionConfigSchema }),
   z.object({ kind: z.literal('wait'), config: WaitActionConfigSchema }),
+  z.object({ kind: z.literal('collect'), config: CollectActionConfigSchema }),
 ]);
 
 export type HttpMethod = z.infer<typeof HttpMethodSchema>;
@@ -89,6 +97,7 @@ export type EmailActionConfig = z.infer<typeof EmailActionConfigSchema>;
 export type SpawnTargetConfig = z.infer<typeof SpawnTargetSchema>;
 export type SpawnActionConfig = z.infer<typeof SpawnActionConfigSchema>;
 export type WaitActionConfig = z.infer<typeof WaitActionConfigSchema>;
+export type CollectActionConfig = z.infer<typeof CollectActionConfigSchema>;
 export type ActionConfig = z.infer<typeof ActionConfigSchema>;
 
 /**

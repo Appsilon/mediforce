@@ -19,6 +19,7 @@ import {
 import { actorFromCaller, loadOr404 } from '../_helpers';
 import { assertCallerMayActOnTask } from './_role-gate';
 import { recordHumanVerdictScore } from '../scores/record-human-verdict';
+import { settleRunWaits } from '../processes/settle-run-waits';
 
 export async function completeTask(
   input: CompleteTaskInput,
@@ -31,6 +32,9 @@ export async function completeTask(
   await scope.system.runKicker.kick(result.task.processInstanceId, {
     triggeredBy: ctx.actorId,
   });
+  // Finishing the last step ends the run right here — the kick is a no-op for
+  // a run that is no longer running, so the auto-runner never sees it end.
+  await settleRunWaits(result.task.processInstanceId, scope);
   return { task: result.task, run: result.instance };
 }
 

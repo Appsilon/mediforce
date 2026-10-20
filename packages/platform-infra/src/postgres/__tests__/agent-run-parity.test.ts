@@ -13,11 +13,10 @@ import {
 import type {
   AgentRun,
   AgentRunRepository,
-  ProcessInstance,
-  ProcessInstanceRepository,
 } from '@mediforce/platform-core';
 import { PostgresAgentRunRepository } from '../repositories/agent-run-repository';
 import { PostgresNamespaceRepository } from '../repositories/namespace-repository';
+import { StubProcessInstanceRepository } from './stub-process-instance-repository';
 import * as schema from '../schema/index';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -25,64 +24,6 @@ const MIGRATIONS_DIR = resolve(__dirname, '..', 'migrations');
 
 const DATABASE_URL = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const skipPg = !DATABASE_URL;
-
-/**
- * Stub ProcessInstanceRepository — only `getById` is invoked from the
- * agent-run parity contract. Returns a minimal-shape instance with the
- * namespace mapping registered in `nsByInstance`.
- */
-class StubProcessInstanceRepository implements ProcessInstanceRepository {
-  constructor(
-    private readonly nsByInstance: Map<string, string>,
-    private readonly evalRunByInstance: Map<string, string> = new Map(),
-  ) {}
-
-  async getNamespaceById(instanceId: string): Promise<string | null> {
-    return this.nsByInstance.get(instanceId) ?? null;
-  }
-
-  async getById(instanceId: string): Promise<ProcessInstance | null> {
-    const namespace = this.nsByInstance.get(instanceId);
-    if (namespace === undefined) return null;
-    return {
-      id: instanceId,
-      definitionName: 'stub-def',
-      definitionVersion: '1.0.0',
-      status: 'completed',
-      namespace,
-      ...(this.evalRunByInstance.has(instanceId) ? { evalRunId: this.evalRunByInstance.get(instanceId) } : {}),
-      input: {},
-      output: {},
-      createdAt: '2026-05-27T00:00:00.000Z',
-      updatedAt: '2026-05-27T00:00:00.000Z',
-    } as unknown as ProcessInstance;
-  }
-
-  // Methods unused by the parity contract — throw if accidentally hit.
-  async create(): Promise<ProcessInstance> { throw new Error('stub'); }
-  async getByIdInNamespaces(): Promise<ProcessInstance | null> { throw new Error('stub'); }
-  async listAll(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async listInNamespaces(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async listDefinitionNames(): Promise<never> { throw new Error('stub'); }
-  async getDefinitionPinsAll(): Promise<never[]> { throw new Error('stub'); }
-  async getDefinitionPinsInNamespaces(): Promise<never[]> { throw new Error('stub'); }
-  async summarizeRunsByWorkflow(): Promise<never> { throw new Error('stub'); }
-  async getByStatusAll(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async getByStatusInNamespaces(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async update(): Promise<void> { throw new Error('stub'); }
-  async getByDefinition(): Promise<ProcessInstance[]> { throw new Error('stub'); }
-  async getLastCompletedByDefinitionName(): Promise<ProcessInstance | null> { throw new Error('stub'); }
-  async addStepExecution(): Promise<never> { throw new Error('stub'); }
-  async getStepExecutions(): Promise<never[]> { throw new Error('stub'); }
-  async getLatestStepExecution(): Promise<null> { throw new Error('stub'); }
-  async updateStepExecution(): Promise<void> { throw new Error('stub'); }
-  async getIdsByDefinitionName(): Promise<string[]> { throw new Error('stub'); }
-  async setDeletedByDefinitionName(): Promise<void> { throw new Error('stub'); }
-  async listPage(): Promise<never> { throw new Error('stub'); }
-  async listPageInNamespaces(): Promise<never> { throw new Error('stub'); }
-  async countByDisplayStatus(): Promise<never> { throw new Error('stub'); }
-  async countByDisplayStatusInNamespaces(): Promise<never> { throw new Error('stub'); }
-}
 
 function runFor(
   instanceId: string,
@@ -443,7 +384,7 @@ function contract(
 contract('InMemoryAgentRunRepository', async () => {
   const nsByInstance = new Map<string, string>();
   const evalRunByInstance = new Map<string, string>();
-  const parents = new StubProcessInstanceRepository(nsByInstance, evalRunByInstance);
+  const parents = new StubProcessInstanceRepository(nsByInstance, { evalRunByInstance });
   const repo = new InMemoryAgentRunRepository(parents);
   return {
     repo,
@@ -512,7 +453,7 @@ describe.skipIf(skipPg)('PostgresAgentRunRepository (parity)', () => {
     );
     const nsByInstance = new Map<string, string>();
     const evalRunByInstance = new Map<string, string>();
-    const parents = new StubProcessInstanceRepository(nsByInstance, evalRunByInstance);
+    const parents = new StubProcessInstanceRepository(nsByInstance, { evalRunByInstance });
     const repo = new PostgresAgentRunRepository(db, parents);
     return {
       repo,

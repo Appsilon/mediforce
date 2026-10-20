@@ -310,6 +310,55 @@ function contract(
       expect(scopedIds).not.toContain(r2.id);
     });
 
+    it('getChildren reads the runs a parent spawned, oldest first, round-tripping the parent link', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      await registerWorkspace('ws-2');
+      const parent = await repo.create(instanceFor('ws-1', { status: 'paused' }));
+      const childLink = { parentInstanceId: parent.id, parentDefinitionName: parent.definitionName };
+      const later = await repo.create(
+        instanceFor('ws-1', { status: 'running', createdAt: '2026-05-27T00:00:02.000Z', ...childLink }),
+      );
+      const earlier = await repo.create(
+        instanceFor('ws-1', {
+          status: 'completed',
+          createdAt: '2026-05-27T00:00:01.000Z',
+          variables: { review: { verdict: 'approve' } },
+          ...childLink,
+        }),
+      );
+      const elsewhere = await repo.create(
+        instanceFor('ws-2', { status: 'failed', createdAt: '2026-05-27T00:00:03.000Z', ...childLink }),
+      );
+      await repo.create(instanceFor('ws-1', { status: 'running', ...childLink, deleted: true }));
+      await repo.create(instanceFor('ws-1', { status: 'running' }));
+
+      const children = await repo.getChildrenAll(parent.id);
+
+      expect(children.map((run) => run.id)).toEqual([earlier.id, later.id, elsewhere.id]);
+      expect(children[0]?.variables).toEqual({ review: { verdict: 'approve' } });
+      expect(children[0]?.parentInstanceId).toBe(parent.id);
+      expect(children[0]?.parentDefinitionName).toBe(parent.definitionName);
+      expect((await repo.getChildrenInNamespaces(parent.id, ['ws-1'])).map((run) => run.id)).toEqual([
+        earlier.id,
+        later.id,
+      ]);
+      expect(await repo.getChildrenInNamespaces(parent.id, [])).toEqual([]);
+    });
+
+    it('updateIfPaused applies the update once and refuses it once the run is no longer paused for that reason', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      const run = await repo.create(instanceFor('ws-1', { status: 'paused', pauseReason: 'waiting_for_timer' }));
+
+      expect(await repo.updateIfPaused(run.id, 'waiting_for_human', { status: 'running' })).toBe(false);
+      expect((await repo.getById(run.id))?.status).toBe('paused');
+
+      expect(await repo.updateIfPaused(run.id, 'waiting_for_timer', { status: 'running', pauseReason: null })).toBe(true);
+      expect(await repo.updateIfPaused(run.id, 'waiting_for_timer', { status: 'running', pauseReason: null })).toBe(false);
+      expect((await repo.getById(run.id))?.status).toBe('running');
+    });
+
     it('getLastCompletedByDefinitionName picks newest completed run', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');

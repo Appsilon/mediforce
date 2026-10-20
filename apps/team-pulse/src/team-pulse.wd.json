@@ -153,11 +153,12 @@
       "name": "Wait for responses",
       "type": "creation",
       "executor": "action",
-      "description": "Wait until collection deadline passes.",
+      "description": "Wait until every member has answered, or the collection deadline passes.",
       "action": {
         "kind": "wait",
         "config": {
-          "deadline": "${steps.prepare.deadline}"
+          "deadline": "${steps.prepare.deadline}",
+          "condition": "children.allFinished == true"
         }
       }
     },
@@ -165,13 +166,13 @@
       "id": "collect_responses",
       "name": "Collect responses",
       "type": "creation",
-      "executor": "script",
-      "plugin": "script-container",
-      "description": "Fetch each spawned child instance and extract the perspective step output.",
-      "script": {
-        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\ntry {\n  const input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\n  const spawned = input.steps?.spawn_perspectives?.spawned || [];\n  const apiKey = process.env.PLATFORM_API_KEY;\n  const baseUrl = process.env.APP_BASE_URL;\n  if (!apiKey || !baseUrl) { console.error('PLATFORM_API_KEY or APP_BASE_URL missing'); process.exit(1); }\n  const responses = [];\n  for (const entry of spawned) {\n    const instanceId = entry.instanceId;\n    try {\n      const res = await fetch(`${baseUrl}/api/processes/${instanceId}`, {\n        headers: { 'X-Api-Key': apiKey, Accept: 'application/json' },\n      });\n      if (!res.ok) { console.error(`Failed to fetch instance ${instanceId}: ${res.status}`); continue; }\n      const instance = await res.json();\n      const stepOutput = instance.variables?.provide_perspective;\n      const perspective = stepOutput?.paramValues?.perspective ?? stepOutput;\n      responses.push({ instanceId, perspective: perspective || null });\n    } catch (err) {\n      console.error(`Error fetching instance ${instanceId}: ${err?.message || err}`);\n    }\n  }\n  const summary = `Collected ${responses.length} of ${spawned.length} responses`;\n  console.log(summary);\n  writeFileSync('/output/result.json', JSON.stringify({\n    responses,\n    responseCount: responses.length,\n    totalSpawned: spawned.length,\n    summary\n  }));\n} catch (err) {\n  console.error('collect_responses crashed:', err?.stack || err?.message || String(err));\n  process.exit(1);\n}\n",
-        "runtime": "javascript",
-        "image": "mediforce-golden-image:latest"
+      "executor": "action",
+      "description": "Read each member's perspective from the spawned child runs. Members who never answered are listed with their status and a null output.",
+      "action": {
+        "kind": "collect",
+        "config": {
+          "step": "provide_perspective"
+        }
       }
     },
     {
@@ -191,7 +192,7 @@
         "image": "mediforce-golden-image:latest",
         "model": "sonnet",
         "timeoutMinutes": 15,
-        "prompt": "# Synthesize Team Perspectives\n\nYou are synthesizing team perspectives collected during a team pulse check. The product owner asked the team a question and each member provided their perspective.\n\n## Input\n\nRead `/output/input.json`. You will find:\n\n- `question` — the original question posed by the product owner (from triggerPayload).\n- `responses[]` — array of `{ instanceId, perspective }` from the collect_responses step.\n- `responseCount` — number of responses collected.\n- `totalSpawned` — total number of child workflows spawned.\n\n## Task\n\nAnalyze all perspectives and produce a structured synthesis:\n\n1. **Themes** — recurring topics or concerns across responses.\n2. **Agreements** — points where multiple team members align.\n3. **Tensions** — areas of disagreement or conflicting viewpoints.\n4. **Insights** — actionable takeaways for the product owner.\n5. **Summary** — a concise 2-3 sentence summary of the team pulse.\n\nBe specific. Quote or paraphrase individual perspectives where relevant. Do not invent perspectives that were not provided.\n\n## Output contract\n\nWrite `/output/result.json` with:\n\n```json\n{\n  \"synthesis\": {\n    \"themes\": [\"theme 1\", \"theme 2\"],\n    \"agreements\": [\"agreement 1\"],\n    \"tensions\": [\"tension 1\"],\n    \"insights\": [\"insight 1\", \"insight 2\"],\n    \"summary\": \"2-3 sentence summary\"\n  },\n  \"question\": \"<copy from input>\",\n  \"responseCount\": 5\n}\n```\n\nOutput strict JSON only — no markdown, no commentary outside the result file."
+        "prompt": "# Synthesize Team Perspectives\n\nYou are synthesizing team perspectives collected during a team pulse check. The product owner asked the team a question and each member provided their perspective.\n\n## Input\n\nRead `/output/input.json`. You will find:\n\n- `question` — the original question posed by the product owner (from triggerPayload).\n- `children[]` — one entry per member from the collect_responses step: `{ instanceId, status, output }`. For a member who answered, `status` is `completed` and `output.paramValues.perspective` holds their perspective (if `output` has no `paramValues`, `output` itself is the perspective). A member who never answered has `output: null` — skip them.\n- `count` — number of members asked.\n\n## Task\n\nAnalyze all perspectives and produce a structured synthesis:\n\n1. **Themes** — recurring topics or concerns across responses.\n2. **Agreements** — points where multiple team members align.\n3. **Tensions** — areas of disagreement or conflicting viewpoints.\n4. **Insights** — actionable takeaways for the product owner.\n5. **Summary** — a concise 2-3 sentence summary of the team pulse.\n\nBe specific. Quote or paraphrase individual perspectives where relevant. Do not invent perspectives that were not provided.\n\n## Output contract\n\nWrite `/output/result.json` with:\n\n```json\n{\n  \"synthesis\": {\n    \"themes\": [\"theme 1\", \"theme 2\"],\n    \"agreements\": [\"agreement 1\"],\n    \"tensions\": [\"tension 1\"],\n    \"insights\": [\"insight 1\", \"insight 2\"],\n    \"summary\": \"2-3 sentence summary\"\n  },\n  \"question\": \"<copy from input>\",\n  \"responseCount\": 5\n}\n```\n\n`responseCount` is the number of members whose perspective you used.\n\nOutput strict JSON only — no markdown, no commentary outside the result file."
       }
     },
     {

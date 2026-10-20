@@ -1,7 +1,7 @@
 {
   "name": "tutorial-fan-out-orchestration",
   "title": "Fan-out Orchestration",
-  "description": "Parent workflow that fans a child workflow out to every item in a list, waits for a collection window, then gathers the replies. Demonstrates action spawn with forEach (${item.*}), the wait action, and ${steps.*} interpolation. Distilled from apps/team-pulse.",
+  "description": "Parent workflow that fans a child workflow out to every item in a list, waits for a collection window, then gathers the replies. Demonstrates action spawn with forEach (${item.*}), the wait action joined on children.allFinished, the collect action, and ${steps.*} interpolation. Distilled from apps/team-pulse.",
   "preamble": "## Domain Context\nA coordinator launches one child workflow per reviewer to collect parallel input, waits for a fixed window, then aggregates whatever came back. This is the canonical fan-out shape: one parent run spawns N child runs and reconciles them.",
   "roles": ["coordinator"],
   "triggerInput": [
@@ -58,11 +58,12 @@
       "name": "Await replies",
       "type": "creation",
       "executor": "action",
-      "description": "Wait a fixed window for child workflows to report back.",
+      "description": "Wait until every child workflow has finished, or the window closes.",
       "action": {
         "kind": "wait",
         "config": {
-          "duration": { "minutes": 5 }
+          "duration": { "minutes": 5 },
+          "condition": "children.allFinished == true"
         }
       }
     },
@@ -70,14 +71,9 @@
       "id": "gather",
       "name": "Gather replies",
       "type": "creation",
-      "executor": "script",
-      "plugin": "script-container",
-      "description": "Read the spawned child handles and summarize how many replied. A production version fetches each instance's output via the platform API.",
-      "script": {
-        "inlineScript": "import { readFileSync, writeFileSync } from 'fs';\nconst input = JSON.parse(readFileSync('/output/input.json', 'utf8'));\nconst spawned = input.steps?.fan_out?.spawned || [];\nwriteFileSync('/output/result.json', JSON.stringify({ spawnedCount: spawned.length, summary: `Spawned ${spawned.length} child run(s)` }));\nconsole.log(`Spawned ${spawned.length} child run(s)`);\n",
-        "runtime": "javascript",
-        "image": "mediforce-golden-image:latest"
-      }
+      "executor": "action",
+      "description": "Read what each spawned child produced. Children that have not finished are listed with their status and a null output.",
+      "action": { "kind": "collect", "config": {} }
     },
     {
       "id": "done",
