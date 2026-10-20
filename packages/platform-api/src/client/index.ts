@@ -2654,6 +2654,7 @@ export class Mediforce {
         });
         const res = await this.request(
           `/api/agent-runs/${encodeURIComponent(validated.agentRunId)}/trajectory${qs}`,
+          { cache: 'no-store' },
         );
         const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.trajectory');
         return GetAgentTrajectoryOutputSchema.parse(body);
