@@ -92,11 +92,11 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
       ? this.raw.getByStatusAll(status)
       : this.raw.getByStatusInNamespaces(status, [...this.caller.namespaces]);
 
-  /** Statuses of the runs a `spawn` step fired from `parentInstanceId`. */
-  getChildStatuses = async (parentInstanceId: string): Promise<InstanceStatus[]> =>
+  /** The runs a `spawn` step fired from `parentInstanceId`, oldest first. */
+  getChildren = async (parentInstanceId: string): Promise<ProcessInstance[]> =>
     this.caller.isSystemActor
-      ? this.raw.getChildStatusesAll(parentInstanceId)
-      : this.raw.getChildStatusesInNamespaces(parentInstanceId, [...this.caller.namespaces]);
+      ? this.raw.getChildrenAll(parentInstanceId)
+      : this.raw.getChildrenInNamespaces(parentInstanceId, [...this.caller.namespaces]);
 
   getByDefinition = async (name: string, version: string): Promise<ProcessInstance[]> => {
     const all = await this.raw.getByDefinition(name, version);
@@ -186,16 +186,7 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
   };
 
   update = async (id: string, updates: Partial<ProcessInstance>): Promise<void> => {
-    const existing = await this.getById(id);
-    if (existing === null) {
-      throw new ForbiddenError();
-    }
-    if (updates.namespace !== undefined && updates.namespace !== existing.namespace) {
-      throw new ForbiddenError();
-    }
-    if (updates.deleted !== undefined && !this.caller.isSystemActor) {
-      throw new ForbiddenError();
-    }
+    await this.assertMayUpdate(id, updates);
     await this.raw.update(id, updates);
   };
 
@@ -205,6 +196,11 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
     pauseReason: string,
     updates: Partial<ProcessInstance>,
   ): Promise<boolean> => {
+    await this.assertMayUpdate(id, updates);
+    return this.raw.updateIfPaused(id, pauseReason, updates);
+  };
+
+  private async assertMayUpdate(id: string, updates: Partial<ProcessInstance>): Promise<void> {
     const existing = await this.getById(id);
     if (existing === null) {
       throw new ForbiddenError();
@@ -215,6 +211,5 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
     if (updates.deleted !== undefined && !this.caller.isSystemActor) {
       throw new ForbiddenError();
     }
-    return this.raw.updateIfPaused(id, pauseReason, updates);
-  };
+  }
 }

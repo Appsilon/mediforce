@@ -310,40 +310,40 @@ function contract(
       expect(scopedIds).not.toContain(r2.id);
     });
 
-    it('getChildStatuses reads the runs a parent spawned, round-tripping the parent link', async () => {
+    it('getChildren reads the runs a parent spawned, oldest first, round-tripping the parent link', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');
       await registerWorkspace('ws-2');
       const parent = await repo.create(instanceFor('ws-1', { status: 'paused' }));
       const childLink = { parentInstanceId: parent.id, parentDefinitionName: parent.definitionName };
-      const child = await repo.create(instanceFor('ws-1', { status: 'completed', ...childLink }));
-      await repo.create(instanceFor('ws-1', { status: 'running', ...childLink }));
-      await repo.create(instanceFor('ws-2', { status: 'failed', ...childLink }));
-      await repo.create(instanceFor('ws-1', { status: 'running', ...childLink, deleted: true }));
-      await repo.create(instanceFor('ws-1', { status: 'running' }));
-
-      expect((await repo.getById(child.id))?.parentInstanceId).toBe(parent.id);
-      expect((await repo.getById(child.id))?.parentDefinitionName).toBe(parent.definitionName);
-      expect((await repo.getChildStatusesAll(parent.id)).sort()).toEqual(['completed', 'failed', 'running']);
-      expect((await repo.getChildStatusesInNamespaces(parent.id, ['ws-1'])).sort()).toEqual(['completed', 'running']);
-      expect(await repo.getChildStatusesInNamespaces(parent.id, [])).toEqual([]);
-    });
-
-    it('getChildren returns the spawned runs with their variables, skipping deleted ones', async () => {
-      const { repo, registerWorkspace } = await factory();
-      await registerWorkspace('ws-1');
-      const parent = await repo.create(instanceFor('ws-1', { status: 'paused' }));
-      const childLink = { parentInstanceId: parent.id, parentDefinitionName: parent.definitionName };
-      const child = await repo.create(
-        instanceFor('ws-1', { status: 'completed', variables: { review: { verdict: 'approve' } }, ...childLink }),
+      const later = await repo.create(
+        instanceFor('ws-1', { status: 'running', createdAt: '2026-05-27T00:00:02.000Z', ...childLink }),
+      );
+      const earlier = await repo.create(
+        instanceFor('ws-1', {
+          status: 'completed',
+          createdAt: '2026-05-27T00:00:01.000Z',
+          variables: { review: { verdict: 'approve' } },
+          ...childLink,
+        }),
+      );
+      const elsewhere = await repo.create(
+        instanceFor('ws-2', { status: 'failed', createdAt: '2026-05-27T00:00:03.000Z', ...childLink }),
       );
       await repo.create(instanceFor('ws-1', { status: 'running', ...childLink, deleted: true }));
       await repo.create(instanceFor('ws-1', { status: 'running' }));
 
-      const children = await repo.getChildren(parent.id);
+      const children = await repo.getChildrenAll(parent.id);
 
-      expect(children.map((run) => run.id)).toEqual([child.id]);
+      expect(children.map((run) => run.id)).toEqual([earlier.id, later.id, elsewhere.id]);
       expect(children[0]?.variables).toEqual({ review: { verdict: 'approve' } });
+      expect(children[0]?.parentInstanceId).toBe(parent.id);
+      expect(children[0]?.parentDefinitionName).toBe(parent.definitionName);
+      expect((await repo.getChildrenInNamespaces(parent.id, ['ws-1'])).map((run) => run.id)).toEqual([
+        earlier.id,
+        later.id,
+      ]);
+      expect(await repo.getChildrenInNamespaces(parent.id, [])).toEqual([]);
     });
 
     it('updateIfPaused applies the update once and refuses it once the run is no longer paused for that reason', async () => {

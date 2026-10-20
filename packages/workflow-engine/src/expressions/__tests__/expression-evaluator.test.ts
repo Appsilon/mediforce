@@ -295,20 +295,20 @@ describe('evaluateExpression', () => {
   });
 
   describe('children', () => {
-    it('children.allCompleted reads the spawned-children summary', () => {
-      const ctx = makeContext({ children: { allCompleted: true, totalCount: 2 } });
-      expect(evaluateExpression('children.allCompleted == true', ctx)).toBe(true);
+    it('children.allFinished reads the spawned-children summary', () => {
+      const ctx = makeContext({ children: { allFinished: true, totalCount: 2 } });
+      expect(evaluateExpression('children.allFinished == true', ctx)).toBe(true);
       expect(evaluateExpression('children.totalCount > 2', ctx)).toBe(false);
     });
 
     it('[ERROR] children outside a wait condition throws ExpressionError', () => {
       expect(() =>
-        evaluateExpression('children.allCompleted == true', makeContext()),
+        evaluateExpression('children.allFinished == true', makeContext()),
       ).toThrow(ExpressionError);
     });
 
     it('[ERROR] a mistyped children field throws instead of evaluating to null', () => {
-      const ctx = makeContext({ children: { allCompleted: true, totalCount: 2 } });
+      const ctx = makeContext({ children: { allFinished: true, totalCount: 2 } });
       expect(() => evaluateExpression('children.allComplete == true', ctx)).toThrow(ExpressionError);
     });
   });

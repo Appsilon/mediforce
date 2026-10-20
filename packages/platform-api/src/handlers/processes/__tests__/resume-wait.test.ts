@@ -190,7 +190,7 @@ describe('resumeWait handler', () => {
   });
 
   describe('children.* condition (spawn + wait join)', () => {
-    const JOIN_CONDITION = 'children.allCompleted == true';
+    const JOIN_CONDITION = 'children.allFinished == true';
 
     async function seedParentWaitingOnChildren(childStatuses: Array<'running' | 'paused' | 'completed' | 'failed'>) {
       await instanceRepo.create(
@@ -313,6 +313,24 @@ describe('resumeWait handler', () => {
       const result = await resumeWait({ runId: 'inst-parent' }, scopeFor());
 
       expect(result).toEqual({ resumed: true, resumeReason: 'condition_met' });
+      vi.useRealTimers();
+    });
+
+    it('skips the child query when the condition never reads children', async () => {
+      await seedParentWaitingOnChildren(['running']);
+      const parent = await instanceRepo.getById('inst-parent');
+      const waitMeta = (parent!.variables as Record<string, Record<string, unknown>>).__wait;
+      await instanceRepo.update('inst-parent', {
+        variables: { ready: true, __wait: { ...waitMeta, condition: 'variables.ready == true' } },
+      });
+      const childQuery = vi.spyOn(instanceRepo, 'getChildrenInNamespaces');
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
+
+      const result = await resumeWait({ runId: 'inst-parent' }, scopeFor());
+
+      expect(result).toEqual({ resumed: true, resumeReason: 'condition_met' });
+      expect(childQuery).not.toHaveBeenCalled();
       vi.useRealTimers();
     });
   });

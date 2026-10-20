@@ -4,8 +4,8 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { pollUntil } from '../helpers/poll-until';
 
 /**
- * Spawn + wait join (issue #1215): a parent `wait` whose condition reads
- * `children.allCompleted` resolves once every run its `spawn` step fired has
+ * Spawn + wait join: a parent `wait` whose condition reads
+ * `children.allFinished` resolves once every run its `spawn` step fired has
  * finished — read from the children's own rows at sweep time, so this also
  * proves the spawned child's `parentInstanceId` survives Postgres.
  *
@@ -23,12 +23,18 @@ import { pollUntil } from '../helpers/poll-until';
 const API_KEY = process.env.PLATFORM_API_KEY ?? 'test-api-key';
 const HEADERS = { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' };
 const POLL_OPTIONS = { timeoutMs: 20_000, intervalMs: 250 };
-const JOIN_CONDITION = 'children.allCompleted == true';
+const JOIN_CONDITION = 'children.allFinished == true';
 
 interface RunBody {
   status: string;
   pauseReason: string | null;
   variables: Record<string, unknown>;
+}
+
+interface CollectedOutput {
+  count: number;
+  completedCount: number;
+  children: Array<{ instanceId: string; status: string; output: unknown }>;
 }
 
 async function registerWorkflow(request: APIRequestContext, wd: Record<string, unknown>): Promise<void> {
@@ -165,7 +171,7 @@ async function expectParentCompletes(request: APIRequestContext, runId: string, 
   expect(parent.variables.join).toMatchObject({ resumeReason });
 }
 
-test.describe('spawn + wait join on children.allCompleted — API E2E', () => {
+test.describe('spawn + wait join on children.allFinished — API E2E', () => {
   test('resumes the parent the moment its last child finishes, then collects their results', async ({ request }) => {
     const parentName = await registerFamily(request, {
       childCount: 2,
@@ -183,11 +189,7 @@ test.describe('spawn + wait join on children.allCompleted — API E2E', () => {
     await expectParentCompletes(request, parentId, 'condition_met');
 
     const parent = await getRun(request, parentId);
-    const collected = parent.variables.collect as {
-      count: number;
-      completedCount: number;
-      children: Array<{ instanceId: string; status: string; output: unknown }>;
-    };
+    const collected = parent.variables.collect as CollectedOutput;
     expect(collected.count).toBe(2);
     expect(collected.completedCount).toBe(2);
     expect(collected.children.map((child) => child.instanceId).sort()).toEqual([firstChild, secondChild].sort());
@@ -214,8 +216,17 @@ test.describe('spawn + wait join on children.allCompleted — API E2E', () => {
     expect(resumed.resumeReason).toBe('deadline_reached');
     await expectParentCompletes(request, parentId, 'deadline_reached');
 
-    const [childId] = spawnedChildIds(await getRun(request, parentId));
+    const parent = await getRun(request, parentId);
+    const [childId] = spawnedChildIds(parent);
     expect((await getRun(request, childId)).status).not.toBe('completed');
+
+    const collected = parent.variables.collect as CollectedOutput;
+    expect(collected.count).toBe(1);
+    expect(collected.completedCount).toBe(0);
+    expect(collected.children).toHaveLength(1);
+    expect(collected.children[0]?.instanceId).toBe(childId);
+    expect(collected.children[0]?.status).not.toBe('completed');
+    expect(collected.children[0]?.output).toBeNull();
   });
 
   test('resolves at once when the spawn fired no children', async ({ request }) => {

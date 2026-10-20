@@ -19,6 +19,7 @@ import type {
 import type { CallerScope } from '../../repositories/index';
 import { ForbiddenError, PreconditionFailedError } from '../../errors';
 import { resumeWait } from '../processes/resume-wait';
+import { settleRunWaits } from '../processes/settle-run-waits';
 import { driveOpenEvalRuns } from '../evaluation/eval-runs';
 
 type Evaluation = { fire: true } | { fire: false; reason: string };
@@ -256,6 +257,7 @@ export async function heartbeat(
         processDefinitionVersion: inst.definitionVersion,
       });
       console.log(`[cron-heartbeat] Escalated orphaned paused run '${inst.id}' (step: ${inst.currentStepId}) to failed`);
+      await settleRunWaits(inst.id, scope);
     } catch (err) {
       console.error(`[cron-heartbeat] Failed to escalate orphaned run '${inst.id}':`, err);
     }

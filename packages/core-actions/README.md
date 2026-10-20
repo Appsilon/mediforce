@@ -49,7 +49,7 @@ Handlers are pure functions and cannot pause a run, so `wait` returns a
 intercepts it. Resuming is a separate `resumeWait` handler rather than part of
 the auto-runner loop, because that loop rejects non-running instances. It is
 event-driven: when the auto-runner stops driving a run, a task or cowork session
-finishes one, or it is cancelled, `settleRunWaits` re-checks the wait of its parent (a child that just ended may
+finishes one, it is cancelled, or the heartbeat fails it as orphaned, `settleRunWaits` re-checks the wait of its parent (a child that just ended may
 be the last one the join needs) and of the run itself (it may have parked after
 its children had already ended). The cron heartbeat sweeps the same handler,
 which is what resolves a plain `duration` / `deadline` and backstops a missed
@@ -59,9 +59,9 @@ event. Callers can race, so `resumeWait` takes the run with a guarded write
 Two traps that cost real debugging time:
 
 - A `condition` sees child progress only through the reserved `children` root
-  — `children.allCompleted`, `children.totalCount`, `children.completedCount`,
+  — `children.allFinished`, `children.totalCount`, `children.completedCount`,
   `children.failedCount` — which `resumeWait` fills by querying the run's
-  children on `parentInstanceId` each time it is checked. `allCompleted` means every child
+  children on `parentInstanceId` each time it is checked. `allFinished` means every child
   has *stopped* (completed or failed), and is true when nothing was spawned. A
   child never writes into its parent, so `variables.*` never reflects child
   state. The wait still needs its `duration` or `deadline`: when the timer wins,

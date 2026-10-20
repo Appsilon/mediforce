@@ -191,16 +191,18 @@ class ExpressionParser {
       return this.context.verdict ?? null;
     }
 
-    if (root === 'children' && this.context.children === undefined) {
-      throw new ExpressionError(
-        `'children' is only available in a wait condition`,
-      );
-    }
-
-    if (root === 'children' && path.length > 1 && !(path[1] in this.context.children!)) {
-      throw new ExpressionError(
-        `Unknown children field '${path[1]}'. Expected ${Object.keys(this.context.children!).map((key) => `'${key}'`).join(', ')}`,
-      );
+    if (root === 'children') {
+      const children = this.context.children;
+      if (children === undefined) {
+        throw new ExpressionError(
+          `'children' is only available in a wait condition`,
+        );
+      }
+      if (path.length > 1 && !(path[1] in children)) {
+        throw new ExpressionError(
+          `Unknown children field '${path[1]}'. Expected ${Object.keys(children).map((key) => `'${key}'`).join(', ')}`,
+        );
+      }
     }
 
     if (root === 'output' || root === 'variables' || root === 'children') {

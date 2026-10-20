@@ -55,7 +55,7 @@ to a handler in [`core-actions/src/handlers/`](../../packages/core-actions/src/h
 template using `${item.*}`; the rationale for child runs over parallel branches
 is [ADR-0018](../adr/0018-fan-out-is-child-workflows.md). End-to-end working
 example: [`apps/team-pulse/src/team-pulse.wd.json`](../../apps/team-pulse/src/team-pulse.wd.json)
-(`spawn_perspectives` → `wait` on `children.allCompleted` → `collect` as `collect_responses`), distilled in
+(`spawn_perspectives` → `wait` on `children.allFinished` → `collect` as `collect_responses`), distilled in
 [`workflow-examples/11-fan-out-orchestration.wd.json`](../workflow-examples/11-fan-out-orchestration.wd.json).
 
 Handler nuances not visible in the schema (in
@@ -79,9 +79,9 @@ Handler nuances not visible in the schema (in
   and backstops a missed event. Callers can race, so the resume is a guarded
   write: exactly one wins. Besides this run's step outputs the condition can
   read the reserved `children` root — the runs this run's `spawn` steps fired:
-  `children.allCompleted` (every child completed or failed; true when none
+  `children.allFinished` (every child completed or failed; true when none
   were spawned), `children.totalCount`, `children.completedCount`,
-  `children.failedCount`. `children.allCompleted == true` is the spawn + wait
+  `children.failedCount`. `children.allFinished == true` is the spawn + wait
   join ([ADR-0018](../adr/0018-fan-out-is-child-workflows.md)). Outside a
   `wait` condition `children` is an unknown root and the expression throws.
 - `collect` returns `{ children: [{ instanceId, definitionName, status, error,

@@ -519,6 +519,42 @@ describe('heartbeat handler', () => {
     expect(events.map((e) => e.action)).toContain('instance.stranded_rekicked');
   });
 
+  it('resumes a parent joining an orphaned child in the same beat that fails the child', async () => {
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-parent',
+        namespace: 'team-alpha',
+        status: 'paused',
+        pauseReason: 'waiting_for_timer',
+        variables: {
+          __wait: {
+            stepId: 'join',
+            resumeAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            pausedAt: new Date().toISOString(),
+            mode: 'duration',
+            condition: 'children.allFinished == true',
+          },
+        },
+      }),
+    );
+    await instanceRepo.create(
+      buildProcessInstance({
+        id: 'inst-orphan-child',
+        namespace: 'team-alpha',
+        status: 'paused',
+        pauseReason: null,
+        parentInstanceId: 'inst-parent',
+      }),
+    );
+    const scope = createTestScope({ processRepo, instanceRepo, auditRepo, triggerRepo });
+    Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
+
+    await heartbeat({}, scope);
+
+    expect((await instanceRepo.getById('inst-orphan-child'))?.status).toBe('failed');
+    expect((await instanceRepo.getById('inst-parent'))?.status).toBe('running');
+  });
+
   it('honors a step\'s configured timeout: no re-kick while within the custom budget', async () => {
     // A step configured with a 90-minute timeout, idle 60m — over the 45m
     // default bound but well within its own budget (90m + grace). A fixed bound

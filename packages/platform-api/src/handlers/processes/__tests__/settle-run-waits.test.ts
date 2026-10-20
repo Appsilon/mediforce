@@ -17,7 +17,7 @@ const JOIN_WAIT = {
   resumeAt: '2999-01-01T00:00:00.000Z',
   pausedAt: '2026-06-01T10:00:00.000Z',
   mode: 'deadline',
-  condition: 'children.allCompleted == true',
+  condition: 'children.allFinished == true',
 };
 
 describe('settleRunWaits', () => {

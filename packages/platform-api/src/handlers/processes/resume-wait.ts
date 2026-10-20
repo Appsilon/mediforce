@@ -15,23 +15,27 @@ interface WaitMetadata {
 
 const TERMINAL_STATUSES: readonly InstanceStatus[] = ['completed', 'failed'];
 
+type ChildrenSummary = {
+  totalCount: number;
+  completedCount: number;
+  failedCount: number;
+  allFinished: boolean;
+};
+
+const REFERENCES_CHILDREN = /\bchildren\b/;
+
 // The `children.*` root of a wait condition — the join half of spawn + wait.
 // Read from the children at sweep time, so a child finishing
 // never writes into its parent. A child that failed has still finished: the
 // join waits for every child to stop, not for every child to succeed.
-async function summarizeChildren(
-  runId: string,
-  scope: CallerScope,
-): Promise<Record<string, unknown>> {
-  const statuses = await scope.runs.getChildStatuses(runId);
-  const completedCount = statuses.filter((status) => status === 'completed').length;
-  const failedCount = statuses.filter((status) => status === 'failed').length;
+async function summarizeChildren(runId: string, scope: CallerScope): Promise<ChildrenSummary> {
+  const statuses = (await scope.runs.getChildren(runId)).map((child) => child.status);
   const finishedCount = statuses.filter((status) => TERMINAL_STATUSES.includes(status)).length;
   return {
     totalCount: statuses.length,
-    completedCount,
-    failedCount,
-    allCompleted: finishedCount === statuses.length,
+    completedCount: statuses.filter((status) => status === 'completed').length,
+    failedCount: statuses.filter((status) => status === 'failed').length,
+    allFinished: finishedCount === statuses.length,
   };
 }
 
@@ -66,7 +70,9 @@ export async function resumeWait(
         output: run.variables as Record<string, unknown>,
         variables: run.variables as Record<string, unknown>,
         verdict: undefined,
-        children: await summarizeChildren(input.runId, scope),
+        ...(REFERENCES_CHILDREN.test(waitMeta.condition)
+          ? { children: await summarizeChildren(input.runId, scope) }
+          : {}),
       });
     } catch (err) {
       // Condition evaluation failure — don't resume, let next poll retry.

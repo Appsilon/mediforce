@@ -64,14 +64,14 @@ child workflow and spawn that N times.
   would be an unbounded column and a second write per spawn; children are found
   by querying `parentInstanceId`.
 - **The join is a child-status query, woken by an event.** `spawn` returns
-  immediately; a following `wait` with `condition: "children.allCompleted == true"`
+  immediately; a following `wait` with `condition: "children.allFinished == true"`
   resolves once every child has completed or failed. `resumeWait` reads the
   children by `parentInstanceId` and exposes the counts under a reserved
   `children` root
   ([#1215](https://github.com/Appsilon/mediforce/issues/1215)), so the child's
   state is never copied into the parent. What triggers the check is an event,
   not the clock: when the auto-runner stops driving a run, a task or cowork session
-  finishes it, or it is cancelled, `settleRunWaits` re-checks the wait of its parent and of the run itself — the
+  finishes it, it is cancelled, or the heartbeat fails it as orphaned, `settleRunWaits` re-checks the wait of its parent and of the run itself — the
   latter because a run can park on its wait after every child already ended, so
   no later child would ever wake it. The heartbeat sweep stays, resolving plain
   `duration` / `deadline` waits and backstopping a missed event. N children

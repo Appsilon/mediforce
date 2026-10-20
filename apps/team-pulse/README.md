@@ -22,7 +22,7 @@ Two definitions:
 
 `spawn_perspectives` starts one `gather-perspective` run per selected member,
 and `wait_for_responses` suspends until they return or the box expires — its
-`children.allCompleted == true` condition ends the wait the moment the last
+`children.allFinished == true` condition ends the wait the moment the last
 member answers. Each
 person gets their own run with their own task, so responses stay independent —
 nobody sees another's answer before writing their own, which is the entire point

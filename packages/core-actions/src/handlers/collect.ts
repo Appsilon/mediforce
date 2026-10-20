@@ -25,10 +25,10 @@ export interface CollectActionOutput {
  * the next step decides what a partial result means.
  */
 export function createCollectActionHandler(
-  instanceRepo: Pick<ProcessInstanceRepository, 'getChildren'>,
+  instanceRepo: Pick<ProcessInstanceRepository, 'getChildrenAll'>,
 ): CollectActionHandler {
   return async (config, ctx) => {
-    const runs = await instanceRepo.getChildren(ctx.processInstanceId);
+    const runs = await instanceRepo.getChildrenAll(ctx.processInstanceId);
     const children: CollectedChild[] = runs.map((run) => ({
       instanceId: run.id,
       definitionName: run.definitionName,

@@ -125,7 +125,7 @@ export const processInstances = pgTable(
     workspaceCreatedIdx: index('process_instances_workspace_created_idx')
       .on(table.workspace, table.createdAt.desc(), table.id.desc())
       .where(sql`${table.deletedAt} is null`),
-    // Backs `getChildStatuses*` — one lookup per swept wait per heartbeat.
+    // Backs `getChildren*` — one lookup per swept `children.*` wait per heartbeat.
     parentInstanceIdx: index('process_instances_parent_instance_idx')
       .on(table.parentInstanceId)
       .where(sql`${table.parentInstanceId} is not null`),

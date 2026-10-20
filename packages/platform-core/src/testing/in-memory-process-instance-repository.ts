@@ -316,30 +316,30 @@ export class InMemoryProcessInstanceRepository
     );
   }
 
-  async getChildStatusesAll(parentInstanceId: string): Promise<InstanceStatus[]> {
-    return [...this.instances.values()]
-      .filter((i) => i.parentInstanceId === parentInstanceId && i.deleted !== true)
-      .map((i) => i.status);
+  async getChildrenAll(parentInstanceId: string): Promise<ProcessInstance[]> {
+    return this.selectChildren(parentInstanceId, undefined);
   }
 
-  async getChildren(parentInstanceId: string): Promise<ProcessInstance[]> {
-    return [...this.instances.values()]
-      .filter((i) => i.parentInstanceId === parentInstanceId && i.deleted !== true)
-      .map((i) => ({ ...i }));
-  }
-
-  async getChildStatusesInNamespaces(
+  async getChildrenInNamespaces(
     parentInstanceId: string,
     allowed: readonly string[],
-  ): Promise<InstanceStatus[]> {
+  ): Promise<ProcessInstance[]> {
+    return this.selectChildren(parentInstanceId, allowed);
+  }
+
+  private selectChildren(
+    parentInstanceId: string,
+    allowed: readonly string[] | undefined,
+  ): ProcessInstance[] {
     return [...this.instances.values()]
       .filter(
-        (i) =>
-          i.parentInstanceId === parentInstanceId &&
-          i.deleted !== true &&
-          allowed.includes(i.namespace ?? ''),
+        (instance) =>
+          instance.parentInstanceId === parentInstanceId &&
+          instance.deleted !== true &&
+          (allowed === undefined || allowed.includes(instance.namespace ?? '')),
       )
-      .map((i) => i.status);
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+      .map((instance) => ({ ...instance }));
   }
 
   async getByDefinition(

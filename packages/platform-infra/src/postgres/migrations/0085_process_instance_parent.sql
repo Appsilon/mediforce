@@ -1,5 +1,5 @@
 -- A run a `spawn` step fired records its parent, so a `wait` condition can
--- join on its children (`children.allCompleted`, issue #1215). The Zod schema
+-- join on its children (`children.allFinished`). The Zod schema
 -- has carried `parentInstanceId` since spawn shipped; Postgres never stored it.
 --
 -- Additive and nullable: runs not fired by a spawn have no parent. Children

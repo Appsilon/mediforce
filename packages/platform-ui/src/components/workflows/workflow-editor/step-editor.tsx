@@ -181,7 +181,7 @@ const TIP = {
   actionContinueOnSpawnError: 'On by default: one child failing to start does not fail this step. Turn off to fail the step on the first error.',
   actionWaitDuration:      'How long to pause. Fields combine, so 1 hour 30 minutes is hours 1 + minutes 30.',
   actionWaitDeadline:      'Absolute time to wait until — an ISO timestamp, or an interpolation like ${steps.x.dueAt}. Takes precedence over a duration.',
-  actionWaitCondition:     'Transition-language expression checked while waiting; the step proceeds as soon as it is true. `children.allCompleted` is true once every spawned workflow has finished.',
+  actionWaitCondition:     'Transition-language expression checked while waiting; the step proceeds as soon as it is true. `children.allFinished` is true once every spawned workflow has completed or failed, and when none were spawned.',
   actionCollectStep:       'Step id whose output to read from each spawned workflow. Leave empty to read all of its variables.',
   verdictLabel:            'Button text shown to the reviewer. Defaults to a title-cased form of the verdict key.',
   verdictIntent:           'Button styling: success, danger, warning or neutral. Defaults from the key for the common names.',

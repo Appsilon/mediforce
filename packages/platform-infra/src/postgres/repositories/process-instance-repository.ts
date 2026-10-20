@@ -1,7 +1,6 @@
 import { and, asc, count, desc, eq, gt, inArray, isNull, lt, ne, notInArray, or, sql, type SQL } from 'drizzle-orm';
 import {
   ProcessInstanceSchema,
-  InstanceStatusSchema,
   StepExecutionSchema,
   AgentEventSchema,
   RunNameEntrySchema,
@@ -524,36 +523,22 @@ export class PostgresProcessInstanceRepository
     return rows.map((r) => toInstance(r));
   }
 
-  async getChildStatusesAll(parentInstanceId: string): Promise<InstanceStatus[]> {
-    return this.selectChildStatuses(parentInstanceId, undefined);
+  async getChildrenAll(parentInstanceId: string): Promise<ProcessInstance[]> {
+    return this.selectChildren(parentInstanceId, undefined);
   }
 
-  async getChildStatusesInNamespaces(
+  async getChildrenInNamespaces(
     parentInstanceId: string,
     allowed: readonly string[],
-  ): Promise<InstanceStatus[]> {
+  ): Promise<ProcessInstance[]> {
     if (allowed.length === 0) return [];
-    return this.selectChildStatuses(parentInstanceId, allowed);
+    return this.selectChildren(parentInstanceId, allowed);
   }
 
-  async getChildren(parentInstanceId: string): Promise<ProcessInstance[]> {
-    const rows = await this.db
-      .select()
-      .from(processInstances)
-      .where(
-        and(
-          eq(processInstances.parentInstanceId, parentInstanceId),
-          isNull(processInstances.deletedAt),
-        ),
-      )
-      .orderBy(asc(processInstances.createdAt));
-    return rows.map((row) => toInstance(row));
-  }
-
-  private async selectChildStatuses(
+  private async selectChildren(
     parentInstanceId: string,
     allowed: readonly string[] | undefined,
-  ): Promise<InstanceStatus[]> {
+  ): Promise<ProcessInstance[]> {
     const conditions = [
       eq(processInstances.parentInstanceId, parentInstanceId),
       isNull(processInstances.deletedAt),
@@ -562,10 +547,11 @@ export class PostgresProcessInstanceRepository
       conditions.push(inArray(processInstances.workspace, [...allowed]));
     }
     const rows = await this.db
-      .select({ status: processInstances.status })
+      .select()
       .from(processInstances)
-      .where(and(...conditions));
-    return rows.map((row) => InstanceStatusSchema.parse(row.status));
+      .where(and(...conditions))
+      .orderBy(asc(processInstances.createdAt));
+    return rows.map((row) => toInstance(row));
   }
 
   async update(

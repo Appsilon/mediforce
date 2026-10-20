@@ -186,23 +186,16 @@ export interface ProcessInstanceRepository {
   getByStatusInNamespaces(status: InstanceStatus, allowed: readonly string[]): Promise<ProcessInstance[]>;
 
   /**
-   * Status of every non-deleted run a `spawn` step fired from
-   * `parentInstanceId`. Backs the `children.*` root of a `wait` condition: the join is resolved by reading the children at sweep
-   * time, so a child never writes back into its parent. Projects only the
-   * `status` column.
+   * Every non-deleted run a `spawn` step fired from `parentInstanceId`,
+   * oldest first. Backs the join half of spawn: the `children.*` root of a
+   * `wait` condition and the `collect` action both read the children on
+   * demand, so a child never writes back into its parent.
    */
-  getChildStatusesAll(parentInstanceId: string): Promise<InstanceStatus[]>;
-  getChildStatusesInNamespaces(
+  getChildrenAll(parentInstanceId: string): Promise<ProcessInstance[]>;
+  getChildrenInNamespaces(
     parentInstanceId: string,
     allowed: readonly string[],
-  ): Promise<InstanceStatus[]>;
-
-  /**
-   * Every non-deleted run a `spawn` step fired from `parentInstanceId`, with
-   * the variables each one accumulated. Backs the `collect` action: the
-   * parent reads its children's results on demand, nothing is copied into it.
-   */
-  getChildren(parentInstanceId: string): Promise<ProcessInstance[]>;
+  ): Promise<ProcessInstance[]>;
 
   update(instanceId: string, updates: Partial<ProcessInstance>): Promise<void>;
 
