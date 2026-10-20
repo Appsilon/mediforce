@@ -13,6 +13,7 @@ import {
 import type {
   AgentRun,
   AgentRunRepository,
+  InstanceStatus,
   ProcessInstance,
   ProcessInstanceRepository,
 } from '@mediforce/platform-core';
@@ -69,6 +70,8 @@ class StubProcessInstanceRepository implements ProcessInstanceRepository {
   async summarizeRunsByWorkflow(): Promise<never> { throw new Error('stub'); }
   async getByStatusAll(): Promise<ProcessInstance[]> { throw new Error('stub'); }
   async getByStatusInNamespaces(): Promise<ProcessInstance[]> { throw new Error('stub'); }
+  async getChildStatusesAll(): Promise<InstanceStatus[]> { throw new Error('stub'); }
+  async getChildStatusesInNamespaces(): Promise<InstanceStatus[]> { throw new Error('stub'); }
   async update(): Promise<void> { throw new Error('stub'); }
   async getByDefinition(): Promise<ProcessInstance[]> { throw new Error('stub'); }
   async getLastCompletedByDefinitionName(): Promise<ProcessInstance | null> { throw new Error('stub'); }

@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-08-19
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0018: Fan-out over sub-graphs is child workflows; the engine stays linear
@@ -63,13 +63,20 @@ child workflow and spawn that N times.
   parsing. There is deliberately no reciprocal `childInstanceIds` array — that
   would be an unbounded column and a second write per spawn; children are found
   by querying `parentInstanceId`.
-- **The join is manual.** `spawn` returns immediately, and a `wait` step's
-  `condition` sees only the *parent's own* variables — it cannot observe child
-  status. The shipped pattern is deadline-only wait, then a script step
-  collects results by `spawned[].instanceId`, tolerating children that never
-  finished. "Wait until all children complete" does not exist; closing the gap
-  needs either child→parent write-back or a child-status query in the heartbeat
-  sweep, tracked in [#1215](https://github.com/Appsilon/mediforce/issues/1215).
+- **The join is a child-status query, not a write-back.** `spawn` returns
+  immediately; a following `wait` with `condition: "children.allCompleted == true"`
+  resolves once every child has completed or failed. `resumeWait` reads the
+  children by `parentInstanceId` on each heartbeat sweep and exposes the counts
+  under a reserved `children` root
+  ([#1215](https://github.com/Appsilon/mediforce/issues/1215)), so a finishing
+  child never writes into its parent and N children finishing at once need no
+  concurrent-write story. Postgres had never persisted the parent link, so this
+  needed migration `0085_process_instance_parent` (two columns plus a partial
+  index); children spawned before it have no link and count as zero children.
+  A mistyped `children.*` field throws and is logged by the sweep rather than
+  silently waiting out the deadline. The wait keeps its deadline: when it wins, the run
+  resumes with whatever finished, and child *outputs* are still collected by
+  `spawned[].instanceId`.
 - **Fan-out is sequential and capped** at 50 children per step execution.
   `Promise.all` would put concurrent write pressure on the storage backend; a
   configurable concurrency parameter is deferred until something needs it.

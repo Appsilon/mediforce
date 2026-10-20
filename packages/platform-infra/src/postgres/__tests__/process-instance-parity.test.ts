@@ -310,6 +310,25 @@ function contract(
       expect(scopedIds).not.toContain(r2.id);
     });
 
+    it('getChildStatuses reads the runs a parent spawned, round-tripping the parent link', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      await registerWorkspace('ws-2');
+      const parent = await repo.create(instanceFor('ws-1', { status: 'paused' }));
+      const childLink = { parentInstanceId: parent.id, parentDefinitionName: parent.definitionName };
+      const child = await repo.create(instanceFor('ws-1', { status: 'completed', ...childLink }));
+      await repo.create(instanceFor('ws-1', { status: 'running', ...childLink }));
+      await repo.create(instanceFor('ws-2', { status: 'failed', ...childLink }));
+      await repo.create(instanceFor('ws-1', { status: 'running', ...childLink, deleted: true }));
+      await repo.create(instanceFor('ws-1', { status: 'running' }));
+
+      expect((await repo.getById(child.id))?.parentInstanceId).toBe(parent.id);
+      expect((await repo.getById(child.id))?.parentDefinitionName).toBe(parent.definitionName);
+      expect((await repo.getChildStatusesAll(parent.id)).sort()).toEqual(['completed', 'failed', 'running']);
+      expect((await repo.getChildStatusesInNamespaces(parent.id, ['ws-1'])).sort()).toEqual(['completed', 'running']);
+      expect(await repo.getChildStatusesInNamespaces(parent.id, [])).toEqual([]);
+    });
+
     it('getLastCompletedByDefinitionName picks newest completed run', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');

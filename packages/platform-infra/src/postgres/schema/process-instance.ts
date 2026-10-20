@@ -85,6 +85,10 @@ export const processInstances = pgTable(
     evalRunId: text('eval_run_id'),
     evalDefinition: jsonb('eval_definition'),
     workspaceStartCommit: text('workspace_start_commit'),
+    // Set on a run a `spawn` step fired; a `wait` condition's `children.*`
+    // root reads the parent's children through it.
+    parentInstanceId: text('parent_instance_id'),
+    parentDefinitionName: text('parent_definition_name'),
 
     // Tombstones — null when not set.
     archivedAt: timestamp('archived_at', { withTimezone: true }),
@@ -121,6 +125,10 @@ export const processInstances = pgTable(
     workspaceCreatedIdx: index('process_instances_workspace_created_idx')
       .on(table.workspace, table.createdAt.desc(), table.id.desc())
       .where(sql`${table.deletedAt} is null`),
+    // Backs `getChildStatuses*` — one lookup per swept wait per heartbeat.
+    parentInstanceIdx: index('process_instances_parent_instance_idx')
+      .on(table.parentInstanceId)
+      .where(sql`${table.parentInstanceId} is not null`),
   }),
 );
 

@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-16
+last_reviewed: 2026-10-20
 ---
 
 # Workflow capabilities
@@ -54,7 +54,7 @@ to a handler in [`core-actions/src/handlers/`](../../packages/core-actions/src/h
 template using `${item.*}`; the rationale for child runs over parallel branches
 is [ADR-0018](../adr/0018-fan-out-is-child-workflows.md). End-to-end working
 example: [`apps/team-pulse/src/team-pulse.wd.json`](../../apps/team-pulse/src/team-pulse.wd.json)
-(`spawn_perspectives` → `wait` → `collect_responses`), distilled in
+(`spawn_perspectives` → `wait` on `children.allCompleted` → `collect_responses`), distilled in
 [`workflow-examples/11-fan-out-orchestration.wd.json`](../workflow-examples/11-fan-out-orchestration.wd.json).
 
 Handler nuances not visible in the schema (in
@@ -72,9 +72,13 @@ Handler nuances not visible in the schema (in
   transition-`when` syntax by
   [`resume-wait.ts`](../../packages/platform-api/src/handlers/processes/resume-wait.ts)
   (`resumeReason: condition_met`) on every cron-heartbeat sweep, so resume
-  granularity is ~15 minutes. It sees only **this run's** step outputs, so
-  it cannot wait for spawned children — see [ADR-0018](../adr/0018-fan-out-is-child-workflows.md)
-  and [#1215](https://github.com/Appsilon/mediforce/issues/1215).
+  granularity is ~15 minutes. Besides this run's step outputs it can read the
+  reserved `children` root — the runs this run's `spawn` steps fired:
+  `children.allCompleted` (every child completed or failed; true when none
+  were spawned), `children.totalCount`, `children.completedCount`,
+  `children.failedCount`. `children.allCompleted == true` is the spawn + wait
+  join ([ADR-0018](../adr/0018-fan-out-is-child-workflows.md)). Outside a
+  `wait` condition `children` is an unknown root and the expression throws.
 - `email` supports `cc` / `bcc` / `replyTo` / `html` and is **rate-limited**
   (default 50/run, 30/minute) in [`email.ts`](../../packages/core-actions/src/handlers/email.ts).
 - `http` never throws on a non-2xx response — it returns `{ status, headers, body }`;
@@ -84,7 +88,7 @@ Handler nuances not visible in the schema (in
 
 | Use site | Syntax | Roots available | Source |
 |----------|--------|-----------------|--------|
-| Transition `when`, `wait` `condition` | bare, no `${}`: `verdict == "x"`, `output.f > 1`, `&&`, `\|\|`, `!` | `output`, `variables`, `verdict` | [`expression-evaluator.ts`](../../packages/workflow-engine/src/expressions/expression-evaluator.ts) |
+| Transition `when`, `wait` `condition` | bare, no `${}`: `verdict == "x"`, `output.f > 1`, `&&`, `\|\|`, `!` | `output`, `variables`, `verdict`; `children` in a `wait` `condition` only | [`expression-evaluator.ts`](../../packages/workflow-engine/src/expressions/expression-evaluator.ts) |
 | Action configs, `spawn` payloads, `assignedTo`, step `env`, http body | `${...}` templates with dot/index paths | `steps`, `item` (in `forEach`), `triggerPayload`, `triggerContext`, `variables`, `secrets` | [`interpolation.ts`](../../packages/platform-core/src/interpolation.ts) |
 
 Notes that trip people up:

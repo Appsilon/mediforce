@@ -58,11 +58,12 @@
       "name": "Await replies",
       "type": "creation",
       "executor": "action",
-      "description": "Wait a fixed window for child workflows to report back.",
+      "description": "Wait until every child workflow has finished, or the window closes.",
       "action": {
         "kind": "wait",
         "config": {
-          "duration": { "minutes": 5 }
+          "duration": { "minutes": 5 },
+          "condition": "children.allCompleted == true"
         }
       }
     },

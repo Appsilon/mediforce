@@ -303,6 +303,26 @@ export class InMemoryProcessInstanceRepository
     );
   }
 
+  async getChildStatusesAll(parentInstanceId: string): Promise<InstanceStatus[]> {
+    return [...this.instances.values()]
+      .filter((i) => i.parentInstanceId === parentInstanceId && i.deleted !== true)
+      .map((i) => i.status);
+  }
+
+  async getChildStatusesInNamespaces(
+    parentInstanceId: string,
+    allowed: readonly string[],
+  ): Promise<InstanceStatus[]> {
+    return [...this.instances.values()]
+      .filter(
+        (i) =>
+          i.parentInstanceId === parentInstanceId &&
+          i.deleted !== true &&
+          allowed.includes(i.namespace ?? ''),
+      )
+      .map((i) => i.status);
+  }
+
   async getByDefinition(
     name: string,
     version: string,

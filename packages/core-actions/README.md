@@ -51,10 +51,13 @@ heartbeat calls it, so resume granularity is ~15 minutes.
 
 Two traps that cost real debugging time:
 
-- A `condition` sees only what **the parent's own steps** wrote. Child state is
-  invisible, so a condition on child progress never becomes true and the run
-  waits out its deadline. Collect children by `spawned[].instanceId` after the
-  wait instead — `apps/team-pulse` is the reference consumer, and closing the
-  gap is [#1215](https://github.com/Appsilon/mediforce/issues/1215).
+- A `condition` sees child progress only through the reserved `children` root
+  — `children.allCompleted`, `children.totalCount`, `children.completedCount`,
+  `children.failedCount` — which `resumeWait` fills by querying the run's
+  children on `parentInstanceId` at each sweep. `allCompleted` means every child
+  has *stopped* (completed or failed), and is true when nothing was spawned. A
+  child never writes into its parent, so `variables.*` never reflects child
+  state. The wait still needs its `duration` or `deadline`: when the timer wins,
+  the run resumes with whatever children finished.
 - Step ids inside a `condition` must use underscores. The expression parser
   reads `spawn-perspectives` as subtraction.

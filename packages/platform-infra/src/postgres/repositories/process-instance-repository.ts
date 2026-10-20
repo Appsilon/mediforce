@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, gt, inArray, isNull, lt, ne, notInArray, or, sql, type SQL } from 'drizzle-orm';
 import {
   ProcessInstanceSchema,
+  InstanceStatusSchema,
   StepExecutionSchema,
   AgentEventSchema,
   RunNameEntrySchema,
@@ -153,6 +154,8 @@ export class PostgresProcessInstanceRepository
         evalRunId: parsed.evalRunId ?? null,
         evalDefinition: parsed.evalDefinition ?? null,
         workspaceStartCommit: parsed.workspaceStartCommit ?? null,
+        parentInstanceId: parsed.parentInstanceId ?? null,
+        parentDefinitionName: parsed.parentDefinitionName ?? null,
         archivedAt: parsed.archived === true ? new Date() : null,
         deletedAt: parsed.deleted === true ? new Date() : null,
         createdAt: new Date(parsed.createdAt),
@@ -496,6 +499,36 @@ export class PostgresProcessInstanceRepository
     return rows.map((r) => toInstance(r));
   }
 
+  async getChildStatusesAll(parentInstanceId: string): Promise<InstanceStatus[]> {
+    return this.selectChildStatuses(parentInstanceId, undefined);
+  }
+
+  async getChildStatusesInNamespaces(
+    parentInstanceId: string,
+    allowed: readonly string[],
+  ): Promise<InstanceStatus[]> {
+    if (allowed.length === 0) return [];
+    return this.selectChildStatuses(parentInstanceId, allowed);
+  }
+
+  private async selectChildStatuses(
+    parentInstanceId: string,
+    allowed: readonly string[] | undefined,
+  ): Promise<InstanceStatus[]> {
+    const conditions = [
+      eq(processInstances.parentInstanceId, parentInstanceId),
+      isNull(processInstances.deletedAt),
+    ];
+    if (allowed !== undefined) {
+      conditions.push(inArray(processInstances.workspace, [...allowed]));
+    }
+    const rows = await this.db
+      .select({ status: processInstances.status })
+      .from(processInstances)
+      .where(and(...conditions));
+    return rows.map((row) => InstanceStatusSchema.parse(row.status));
+  }
+
   async update(
     instanceId: string,
     updates: Partial<ProcessInstance>,
@@ -812,6 +845,8 @@ function toInstance(row: typeof processInstances.$inferSelect): ProcessInstance 
     ...(row.evalRunId === null ? {} : { evalRunId: row.evalRunId }),
     ...(row.evalDefinition === null ? {} : { evalDefinition: row.evalDefinition }),
     ...(row.workspaceStartCommit === null ? {} : { workspaceStartCommit: row.workspaceStartCommit }),
+    ...(row.parentInstanceId === null ? {} : { parentInstanceId: row.parentInstanceId }),
+    ...(row.parentDefinitionName === null ? {} : { parentDefinitionName: row.parentDefinitionName }),
   });
 }
 

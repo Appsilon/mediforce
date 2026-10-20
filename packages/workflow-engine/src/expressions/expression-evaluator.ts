@@ -2,6 +2,8 @@ export interface ExpressionContext {
   output: Record<string, unknown>;
   variables: Record<string, unknown>;
   verdict?: string;
+  /** Spawned-children summary — present only where a `wait` condition is evaluated. */
+  children?: Record<string, unknown>;
 }
 
 export class ExpressionError extends Error {
@@ -21,7 +23,7 @@ export class ExpressionError extends Error {
  *
  * Supported syntax:
  *   - Literals: true, false, null, numbers, "strings"
- *   - Field access: output.field, variables.field, verdict
+ *   - Field access: output.field, variables.field, verdict, children.field
  *   - Comparisons: ==, !=, >, <, >=, <=
  *   - Logical: &&, ||, !
  *   - Parentheses for grouping
@@ -189,7 +191,19 @@ class ExpressionParser {
       return this.context.verdict ?? null;
     }
 
-    if (root === 'output' || root === 'variables') {
+    if (root === 'children' && this.context.children === undefined) {
+      throw new ExpressionError(
+        `'children' is only available in a wait condition`,
+      );
+    }
+
+    if (root === 'children' && path.length > 1 && !(path[1] in this.context.children!)) {
+      throw new ExpressionError(
+        `Unknown children field '${path[1]}'. Expected ${Object.keys(this.context.children!).map((key) => `'${key}'`).join(', ')}`,
+      );
+    }
+
+    if (root === 'output' || root === 'variables' || root === 'children') {
       let current: unknown = this.context[root];
       for (let idx = 1; idx < path.length; idx++) {
         if (current === null || current === undefined) return null;
@@ -200,7 +214,7 @@ class ExpressionParser {
     }
 
     throw new ExpressionError(
-      `Unknown context field '${root}'. Expected 'output', 'variables', or 'verdict'`,
+      `Unknown context field '${root}'. Expected 'output', 'variables', 'children', or 'verdict'`,
     );
   }
 

@@ -153,11 +153,12 @@
       "name": "Wait for responses",
       "type": "creation",
       "executor": "action",
-      "description": "Wait until collection deadline passes.",
+      "description": "Wait until every member has answered, or the collection deadline passes.",
       "action": {
         "kind": "wait",
         "config": {
-          "deadline": "${steps.prepare.deadline}"
+          "deadline": "${steps.prepare.deadline}",
+          "condition": "children.allCompleted == true"
         }
       }
     },

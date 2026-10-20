@@ -185,6 +185,18 @@ export interface ProcessInstanceRepository {
   getByStatusAll(status: InstanceStatus): Promise<ProcessInstance[]>;
   getByStatusInNamespaces(status: InstanceStatus, allowed: readonly string[]): Promise<ProcessInstance[]>;
 
+  /**
+   * Status of every non-deleted run a `spawn` step fired from
+   * `parentInstanceId`. Backs the `children.*` root of a `wait` condition: the join is resolved by reading the children at sweep
+   * time, so a child never writes back into its parent. Projects only the
+   * `status` column.
+   */
+  getChildStatusesAll(parentInstanceId: string): Promise<InstanceStatus[]>;
+  getChildStatusesInNamespaces(
+    parentInstanceId: string,
+    allowed: readonly string[],
+  ): Promise<InstanceStatus[]>;
+
   update(instanceId: string, updates: Partial<ProcessInstance>): Promise<void>;
   getByDefinition(name: string, version: string): Promise<ProcessInstance[]>;
 

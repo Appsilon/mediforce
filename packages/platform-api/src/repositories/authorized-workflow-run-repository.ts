@@ -92,6 +92,12 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
       ? this.raw.getByStatusAll(status)
       : this.raw.getByStatusInNamespaces(status, [...this.caller.namespaces]);
 
+  /** Statuses of the runs a `spawn` step fired from `parentInstanceId`. */
+  getChildStatuses = async (parentInstanceId: string): Promise<InstanceStatus[]> =>
+    this.caller.isSystemActor
+      ? this.raw.getChildStatusesAll(parentInstanceId)
+      : this.raw.getChildStatusesInNamespaces(parentInstanceId, [...this.caller.namespaces]);
+
   getByDefinition = async (name: string, version: string): Promise<ProcessInstance[]> => {
     const all = await this.raw.getByDefinition(name, version);
     if (this.caller.isSystemActor) return all;
