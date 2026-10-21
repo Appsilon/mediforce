@@ -19,6 +19,7 @@ import { workspaceSwitchHref } from '@/lib/workspace-switch';
 import { useNamespace } from '@/hooks/use-namespace';
 import { WorkspaceAccessError } from './workspace-access-error';
 import { formatStepName } from '@/lib/format';
+import { useMyActionableTasks } from '@/hooks/use-tasks';
 
 const NAV_ITEMS = [
   { href: '', label: 'Workflows', icon: GitBranch, badge: null, exact: true },
@@ -47,12 +48,14 @@ function NavItem({
   icon: Icon,
   active,
   badge,
+  badgeTestId,
 }: {
   href: string;
   label: string;
   icon: React.ElementType;
   active: boolean;
   badge?: string | null;
+  badgeTestId?: string;
 }) {
   return (
     <Link
@@ -67,7 +70,10 @@ function NavItem({
       <Icon className="h-4 w-4 shrink-0" />
       <span className="flex-1">{label}</span>
       {badge !== null && badge !== undefined && (
-        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground leading-none">
+        <span
+          data-testid={badgeTestId}
+          className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground leading-none"
+        >
           {badge}
         </span>
       )}
@@ -158,6 +164,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     loading: routeNamespaceLoading,
     accessDenied: routeNamespaceAccessDenied,
   } = useNamespace(isWorkspaceRoute ? handleFromPath : null);
+
+  // Same query as the tasks page's default "For me" view, so they share a cache.
+  const { data: pendingActions } = useMyActionableTasks({
+    actionable: true,
+    namespaces: [handleFromPath],
+    enabled: isWorkspaceRoute,
+  });
+  const pendingActionsBadge = pendingActions.length > 0 ? String(pendingActions.length) : null;
 
   // Find the active namespace by matching the handle from the URL
   const activeNamespace = namespaces.find((ns) => ns.handle === handleFromPath) ?? null;
@@ -343,7 +357,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 href={fullHref}
                 label={item.label}
                 icon={item.icon}
-                badge={item.badge}
+                badge={item.href === '/tasks' ? pendingActionsBadge : item.badge}
+                badgeTestId={item.href === '/tasks' ? 'pending-actions-badge' : undefined}
                 active={isActive}
               />
               {item.href === '/agents' && (

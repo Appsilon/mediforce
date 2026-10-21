@@ -62,10 +62,13 @@ export function useMyActionableTasksByRole(
  * of them to a workflow that does not exist under that handle. Omitted keeps
  * the cross-workspace roll-up, which is what the inbox's "All workspaces"
  * choice asks for.
+ *
+ * `enabled: false` holds the query, for a caller rendered outside a workspace.
  */
 export interface CallerTaskScope {
   actionable?: boolean;
   namespaces?: readonly string[];
+  enabled?: boolean;
 }
 
 /**
@@ -79,6 +82,7 @@ export function useMyActionableTasks(
 ): { data: HumanTask[]; loading: boolean; error: Error | null } {
   const actionable = scope.actionable === true;
   const namespaces = scope.namespaces;
+  const enabled = scope.enabled !== false;
   const query = useQuery({
     queryKey: queryKeys.tasks.forCaller({ status: [...ACTIONABLE_STATUSES], actionable, namespaces }),
     queryFn: async () => {
@@ -89,6 +93,7 @@ export function useMyActionableTasks(
       });
       return result.tasks;
     },
+    enabled,
     refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
     retry: stopRetryOn4xx,
   });

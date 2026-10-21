@@ -1,4 +1,4 @@
-import type { HumanTask } from '../schemas/human-task';
+import type { HumanTask, HumanTaskStatus } from '../schemas/human-task';
 
 /**
  * Storage-layer authorization (ADR-0004): tasks have no namespace field of
@@ -32,10 +32,16 @@ export interface HumanTaskRepository {
     allowed: readonly string[],
   ): Promise<HumanTask[]>;
 
-  /** Every task in the store, irrespective of role or instance. */
-  listAll(): Promise<HumanTask[]>;
+  /**
+   * Every task in the store, irrespective of role or instance. `statuses`
+   * narrows in storage, so a caller after open tasks never loads the history.
+   */
+  listAll(statuses?: readonly HumanTaskStatus[]): Promise<HumanTask[]>;
   /** Every task whose parent run's namespace appears in `allowed`. */
-  listInNamespaces(allowed: readonly string[]): Promise<HumanTask[]>;
+  listInNamespaces(
+    allowed: readonly string[],
+    statuses?: readonly HumanTaskStatus[],
+  ): Promise<HumanTask[]>;
 
   claim(taskId: string, userId: string): Promise<HumanTask>; // sets assignedUserId + status: 'claimed'
   complete(taskId: string, completionData: Record<string, unknown>): Promise<HumanTask>;

@@ -132,6 +132,25 @@ function contract(
       expect(empty).toHaveLength(0);
     });
 
+    it('listInNamespaces and listAll narrow to the given statuses', async () => {
+      const inst1 = randomUUID();
+      const inst2 = randomUUID();
+      await registerInstance(inst1, 'ws-1');
+      await registerInstance(inst2, 'ws-2');
+      const pending = await repo.create(taskFor(inst1, { status: 'pending' }));
+      const claimed = await repo.create(taskFor(inst1, { status: 'claimed' }));
+      await repo.create(taskFor(inst1, { status: 'completed' }));
+      const otherWorkspace = await repo.create(taskFor(inst2, { status: 'pending' }));
+
+      const scoped = await repo.listInNamespaces(['ws-1'], ['pending', 'claimed']);
+      expect(scoped.map((task) => task.id).sort()).toEqual([pending.id, claimed.id].sort());
+
+      const everywhere = await repo.listAll(['pending']);
+      expect(everywhere.map((task) => task.id).sort()).toEqual([pending.id, otherWorkspace.id].sort());
+
+      expect(await repo.listInNamespaces(['ws-1'])).toHaveLength(3);
+    });
+
     it('getByInstanceId returns tasks for a single instance only', async () => {
       const inst1 = randomUUID();
       const inst2 = randomUUID();
