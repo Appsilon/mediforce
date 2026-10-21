@@ -4,6 +4,8 @@ import {
   DEFAULT_JUDGE_MIN_CONFIDENCE,
   FALLBACK_PINNED_MODEL,
   TASK_COMPLETION_EVALUATOR_NAME,
+  extractionCheckSource,
+  filePresetCheckSource,
   isOwnedBy,
   taskCompletionRubric,
   type EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
@@ -181,6 +183,13 @@ export async function reviewEvaluationProposal(
         return { ok: false, error: `This step already has a live '${TASK_COMPLETION_EVALUATOR_NAME}' Evaluator (${taken.id}) — edit it directly instead of drafting a new one.` };
       }
       const check: EvaluatorCheck = { kind: 'llm_judge', model: FALLBACK_PINNED_MODEL, rubric: taskCompletionRubric(requirements), minConfidence: DEFAULT_JUDGE_MIN_CONFIDENCE };
+      return selfTest(scope, step, check, previewed);
+    }
+    case 'propose_preset_evaluator': {
+      const { preset } = args as Args<'propose_preset_evaluator'>;
+      const { stepId } = stepOnly(step, 'A deterministic preset');
+      const source = preset.kind === 'extraction' ? extractionCheckSource(preset) : filePresetCheckSource(preset, stepId);
+      const check: EvaluatorCheck = { kind: 'code', runtime: 'python', source };
       return selfTest(scope, step, check, previewed);
     }
     default:
