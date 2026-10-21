@@ -95,6 +95,13 @@ ignored rather than dropping anyone's work on open. `image` is the one field
 that changes meaning: in the two build modes it is the tag to build under, and
 it is labelled as such.
 
+A ready-image step that leaves `image` blank is given one when the workflow is
+saved: the image its agent names, or `mediforce-golden-image` when the agent
+names none or the step runs no agent. An agent's image is set on its page or
+with `mediforce agent set-image`; the step keeps the image it was saved with
+when the agent's changes later ([ADR-0029](../adr/0029-agent-evaluation.md)
+decision 9).
+
 A step that builds from a repository can be read without a checkout.
 **Repository** in the version editor, beside **Files**, is a read-only explorer
 over the whole commit a step pins: the container folder, the fixtures, whatever

@@ -1,3 +1,4 @@
+import { agentImageOf } from '@mediforce/platform-core';
 import { defineCommand } from '../define-command';
 import { printJson, printKv } from '../output';
 
@@ -25,6 +26,7 @@ export const agentGetCommand = defineCommand({
       ['model', agent.foundationModel],
       ['description', agent.description],
       ['runtimeId', agent.runtimeId],
+      ['image', agentImageOf(agent)],
       ['visibility', agent.visibility],
       ['namespace', agent.namespace],
       ['skills', agent.skills !== undefined && agent.skills.length > 0

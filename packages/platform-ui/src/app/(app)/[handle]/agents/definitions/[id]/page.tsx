@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import type { AgentOutputSchema, AgentSkillRef } from '@mediforce/platform-core';
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 import { AgentSkillsSection } from '@/components/agents/agent-skills-section';
-import { AGENT_ICON_OPTIONS, AgentOutputSchemaField, AgentRuntimeField, RecognitionLabel } from '@/components/agents/agent-form-parts';
+import { AGENT_ICON_OPTIONS, AgentImageField, AgentOutputSchemaField, AgentRuntimeField, RecognitionLabel } from '@/components/agents/agent-form-parts';
 import { AgentEvaluation } from '@/components/evaluation/agent-evaluation';
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
@@ -62,6 +62,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const [skills, setSkills] = useState<AgentSkillRef[]>([]);
   const [kind, setKind] = useState<'plugin' | 'cowork'>('plugin');
   const [runtimeId, setRuntimeId] = useState<string | undefined>(undefined);
+  const [image, setImage] = useState<string | undefined>(undefined);
   const [agentNamespace, setAgentNamespace] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +83,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         setSkills(def.skills ?? []);
         setKind(def.kind);
         setRuntimeId(def.runtimeId);
+        setImage(def.image);
         setAgentNamespace(def.namespace);
       })
       .catch((err: unknown) => {
@@ -107,6 +109,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         inputDescription,
         outputDescription,
         outputSchema: outputSchema ?? null,
+        ...(kind === 'plugin' ? { image: image ?? null } : {}),
         foundationModel: selectedModelId,
         systemPrompt: prompt,
         visibility,
@@ -273,6 +276,8 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
           </div>
 
           <AgentRuntimeField kind={kind} runtimeId={runtimeId} onChange={setRuntimeId} />
+
+          {kind === 'plugin' && <AgentImageField namespace={agentNamespace ?? handle} image={image} onChange={setImage} />}
 
           {/* 7. System prompt */}
           <div className="space-y-1.5">

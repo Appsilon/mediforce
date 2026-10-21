@@ -115,6 +115,14 @@ function contract(
       expect(plain.skills).toBeUndefined();
     });
 
+    it('round-trips the image; null clears it and an omitted one is kept', async () => {
+      const created = await repo.create(inputBase({ image: 'r-tools:2' }));
+      expect((await repo.getById(created.id))?.image).toBe('r-tools:2');
+      expect((await repo.update(created.id, { name: 'Renamed' })).image).toBe('r-tools:2');
+      expect((await repo.update(created.id, { image: null })).image).toBeUndefined();
+      expect((await repo.upsert('plain-image', inputBase())).image).toBeUndefined();
+    });
+
     it('findSkillHolders matches namespace and id together, scoped by visibility', async () => {
       await registerWorkspace('ws-1');
       await repo.upsert('holder-private', inputBase({ namespace: 'ws-1', skills: [{ namespace: 'shared', id: 'sdtm-mapping' }] }));

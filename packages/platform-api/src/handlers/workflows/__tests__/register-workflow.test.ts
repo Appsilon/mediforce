@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
+  InMemoryAgentDefinitionRepository,
   InMemoryAuditRepository,
   InMemoryModelRegistryRepository,
   InMemoryProcessInstanceRepository,
@@ -235,6 +236,40 @@ describe('registerWorkflow handler', () => {
     const stored = await processRepo.getWorkflowDefinition('team-alpha', 'no-image-flow', 1);
     const analyzeStep = stored?.steps.find((s) => s.id === 'analyze');
     expect(analyzeStep?.agent?.image).toBe('mediforce-golden-image');
+  });
+
+  it('gives an agent step without an image the image of the agent it runs, keeping one it names', async () => {
+    const agentDefinitionRepo = new InMemoryAgentDefinitionRepository();
+    const rAgent = await agentDefinitionRepo.create({
+      kind: 'plugin', runtimeId: 'claude-code-agent', image: 'r-tools:2', name: 'TLF programmer', iconName: 'Bot', description: '',
+      foundationModel: 'anthropic/claude-sonnet-4', systemPrompt: 'Program TLFs.', inputDescription: '', outputDescription: '',
+      namespace: 'team-alpha', visibility: 'private',
+    });
+    const plainAgent = await agentDefinitionRepo.create({
+      kind: 'plugin', runtimeId: 'claude-code-agent', name: 'Reviewer', iconName: 'Bot', description: '',
+      foundationModel: 'anthropic/claude-sonnet-4', systemPrompt: 'Review.', inputDescription: '', outputDescription: '',
+      namespace: 'team-alpha', visibility: 'private',
+    });
+    const scope = createTestScope({ processRepo, auditRepo, triggerRepo, agentDefinitionRepo, caller: userCaller('user-42', ['team-alpha']) });
+    const body = buildWorkflowDefinition({
+      name: 'agent-image-flow',
+      namespace: 'team-alpha',
+      steps: [
+        { id: 'program', name: 'Program', type: 'creation', executor: 'agent', plugin: 'claude-code-agent', agentId: rAgent.id, autonomyLevel: 'L2', agent: {} },
+        { id: 'pinned', name: 'Pinned', type: 'creation', executor: 'agent', plugin: 'claude-code-agent', agentId: rAgent.id, autonomyLevel: 'L2', agent: { image: 'custom:1' } },
+        { id: 'review', name: 'Review', type: 'creation', executor: 'agent', plugin: 'claude-code-agent', agentId: plainAgent.id, autonomyLevel: 'L2', agent: {} },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'program', to: 'pinned' }, { from: 'pinned', to: 'review' }, { from: 'review', to: 'done' }],
+    });
+    const { version: _v, createdAt: _c, namespace: _n, ...input } = body;
+
+    await registerWorkflow({ ...input, namespace: 'team-alpha' }, scope);
+    const stored = await processRepo.getWorkflowDefinition('team-alpha', 'agent-image-flow', 1);
+    const imageOf = (stepId: string) => stored?.steps.find((s) => s.id === stepId)?.agent?.image;
+    expect(imageOf('program')).toBe('r-tools:2');
+    expect(imageOf('pinned')).toBe('custom:1');
+    expect(imageOf('review')).toBe('mediforce-golden-image');
   });
 
   it('leaves a step alone when the workflow carries the Dockerfile it names', async () => {

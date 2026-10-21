@@ -526,6 +526,19 @@ describe('selectAgentPatch', () => {
     expect(selectAgentPatch({ plugin: 'opencode-agent' }, agent, SONNET).plugin).toBe('claude-code-agent');
   });
 
+  it('drops the image the previous agent gave the step, so saving gives it the new agent\'s', () => {
+    expect(selectAgentPatch({ agent: { image: 'mediforce-golden-image' } }, agent, SONNET).agent).toBeUndefined();
+    expect(selectAgentPatch({ agent: { image: 'mediforce-golden-image:latest' } }, agent, SONNET).agent).toBeUndefined();
+    expect(selectAgentPatch({ agent: { image: 'r-tools:2', prompt: 'Draft' } }, agent, SONNET, { currentAgent: { image: 'r-tools:2' } }).agent)
+      .toEqual({ prompt: 'Draft' });
+  });
+
+  it('keeps an image the author chose, and one a build source tags', () => {
+    expect(selectAgentPatch({ agent: { image: 'custom:1' } }, agent, SONNET).agent).toEqual({ image: 'custom:1' });
+    const repoBuild = { image: 'mediforce-golden-image', repo: 'https://github.com/acme/tools', commit: 'abc123', dockerfile: 'Dockerfile' };
+    expect(selectAgentPatch({ agent: repoBuild }, agent, SONNET).agent).toEqual(repoBuild);
+  });
+
   it('keeps the step\'s plugin for an agent that names no plugin runtime', () => {
     expect(selectAgentPatch({ plugin: 'opencode-agent' }, { id: 'agent-2', kind: 'plugin' }, SONNET).plugin).toBe('opencode-agent');
     expect(selectAgentPatch({ plugin: 'opencode-agent' }, { id: 'chat', kind: 'cowork', runtimeId: 'chat' }, SONNET).plugin).toBe('opencode-agent');

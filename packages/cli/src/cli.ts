@@ -84,6 +84,7 @@ import { agentGetCommand } from './commands/agent-get';
 import { agentVersionsCommand } from './commands/agent-versions';
 import { agentDeleteCommand } from './commands/agent-delete';
 import { agentSetVisibilityCommand } from './commands/agent-set-visibility';
+import { agentSetImageCommand } from './commands/agent-set-image';
 import { agentSetSkillsCommand } from './commands/agent-set-skills';
 import { agentCreateCommand } from './commands/agent-create';
 import { modelListCommand } from './commands/model-list';
@@ -267,7 +268,7 @@ export const TREE: Record<string, BranchEntry> = {
     },
   },
   agent: {
-    description: 'Agent definitions (list, get, versions, create, delete, visibility)',
+    description: 'Agent definitions (list, get, versions, create, delete, visibility, image)',
     leaves: {
       list: { description: 'List agent definitions', fn: agentListCommand },
       get: { description: 'Fetch an agent definition', fn: agentGetCommand },
@@ -276,6 +277,7 @@ export const TREE: Record<string, BranchEntry> = {
       delete: { description: 'Delete an agent definition', fn: agentDeleteCommand },
       'set-visibility': { description: 'Set agent visibility (public|private)', fn: agentSetVisibilityCommand },
       'set-skills': { description: 'Replace the Skills an agent holds', fn: agentSetSkillsCommand },
+      'set-image': { description: 'Set the image an agent runs in', fn: agentSetImageCommand },
     },
   },
   'tool-catalog': {

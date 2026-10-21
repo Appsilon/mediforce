@@ -52,6 +52,10 @@ entry is `<namespace>/<id>`, or a bare `<id>` for a Skill in the agent's own
 workspace; an empty list removes them all. The API refuses a Skill the agent may
 not hold (ADR-0025 decision 3), naming it.
 
+`agent set-image <id> --image <tag>` sets the image an agent runs in; an empty
+tag falls back to `mediforce-golden-image`. `agent create --image` sets it on
+create.
+
 `mediforce eval` commands name a workflow step with `--workflow` and `--step`,
 or an agent evaluated on its own with `--agent`
 ([ADR-0029](../../docs/adr/0029-agent-evaluation.md)); production-only ones

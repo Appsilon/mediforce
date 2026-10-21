@@ -17,6 +17,10 @@ export const agentCreateCommand = defineCommand({
       type: 'string',
       description: 'Target namespace (overrides any `namespace` in the file)',
     },
+    image: {
+      type: 'string',
+      description: 'Image tag the agent runs in (overrides any `image` in the file); omitted means the golden image',
+    },
   },
   async run({ args, output, mediforce, jsonMode }) {
     let raw: unknown;
@@ -28,6 +32,7 @@ export const agentCreateCommand = defineCommand({
     }
     const rawObject = typeof raw === 'object' && raw !== null ? { ...(raw as Record<string, unknown>) } : {};
     if (args.namespace !== undefined) rawObject.namespace = args.namespace;
+    if (args.image !== undefined && args.image.trim() !== '') rawObject.image = args.image.trim();
     const parsed = CreateAgentInputSchema.safeParse(rawObject);
     if (!parsed.success) {
       printError(output, { error: `invalid agent definition: ${parsed.error.message}` }, jsonMode);

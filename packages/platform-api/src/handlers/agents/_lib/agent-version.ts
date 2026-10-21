@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import {
   canonicalJson,
   offeredSkill,
+  ownAgentImage,
   type AgentConfigSnapshot,
   type AgentDefinition,
   type AgentVersion,
@@ -13,8 +14,8 @@ import { actorFromCaller } from '../../_helpers';
 const MISSING_SKILL_HASH = 'missing';
 
 /**
- * What shapes the Agent's behaviour (ADR-0029): its runtime, model, system
- * prompt, output schema, MCP bindings, and each Skill it holds by content hash,
+ * What shapes the Agent's behaviour (ADR-0029): its runtime, image, model,
+ * system prompt, output schema, MCP bindings, and each Skill it holds by content hash,
  * sorted, so a Skill edited in the catalog makes the Agent a new version.
  */
 export async function agentConfigOf(scope: CallerScope, agent: AgentDefinition): Promise<AgentConfigSnapshot> {
@@ -25,6 +26,7 @@ export async function agentConfigOf(scope: CallerScope, agent: AgentDefinition):
   return {
     kind: agent.kind,
     runtimeId: agent.runtimeId ?? null,
+    ...(ownAgentImage(agent) === undefined ? {} : { image: ownAgentImage(agent) }),
     foundationModel: agent.foundationModel,
     systemPrompt: agent.systemPrompt,
     ...(agent.outputSchema === undefined ? {} : { outputSchema: agent.outputSchema }),

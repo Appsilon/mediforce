@@ -6,9 +6,13 @@ import {
   Shield, Code, Database, Globe, Sparkles, Settings, Info,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { AgentOutputSchemaSchema, CoworkAgentSchema, type AgentDefinition, type AgentOutputSchema } from '@mediforce/platform-core';
+import { AgentOutputSchemaSchema, CoworkAgentSchema, DEFAULT_AGENT_IMAGE, type AgentDefinition, type AgentOutputSchema } from '@mediforce/platform-core';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { usePlugins } from '@/hooks/use-plugins';
+import { useDockerImages } from '@/hooks/use-docker-images';
+import { useImageCatalogEntries } from '@/hooks/use-image-catalog';
+import { buildImagePicker } from '@/components/workflows/workflow-editor/image-picker-options';
+import { ImageOptions, offersValue, pickerImageValue } from '@/components/workflows/workflow-editor/image-options';
 import { humanizeToken } from '@/components/workflows/workflow-editor/step-editor-fields';
 import { OutputSchemaEditor } from '@/components/workflows/workflow-editor/output-schema-editor';
 
@@ -71,6 +75,61 @@ export function AgentRuntimeField({ kind, runtimeId, onChange }: {
         {kind === 'plugin'
           ? 'What executes this agent. Required before the agent can be evaluated.'
           : 'The chat or voice runtime of this cowork agent.'}
+      </p>
+    </div>
+  );
+}
+
+/** Image a container agent runs in, picked from the workspace's image catalog. Blank is the golden image. */
+export function AgentImageField({ namespace, image, onChange }: {
+  namespace: string;
+  image: string | undefined;
+  onChange: (image: string | undefined) => void;
+}) {
+  const { images: dockerImages } = useDockerImages();
+  const { entries: catalogEntries } = useImageCatalogEntries(namespace);
+  const picker = React.useMemo(
+    () => buildImagePicker({ catalogEntries, dockerImages: dockerImages ?? [], executor: 'agent' }),
+    [catalogEntries, dockerImages],
+  );
+  const [naming, setNaming] = React.useState(false);
+
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor="agent-image" className="text-sm font-medium">Image</label>
+      {picker.hasSource && naming === false ? (
+        <select
+          id="agent-image"
+          value={pickerImageValue(image ?? '')}
+          onChange={(event) => onChange(event.target.value === '' ? undefined : event.target.value)}
+          className={selectClass}
+        >
+          <option value="">Default — {DEFAULT_AGENT_IMAGE}</option>
+          <ImageOptions groups={picker.groups} normalize={pickerImageValue} />
+          {image !== undefined && offersValue(picker.groups, image, pickerImageValue) === false && (
+            <option value={image}>{image}</option>
+          )}
+        </select>
+      ) : (
+        <input
+          id="agent-image"
+          value={image ?? ''}
+          placeholder={DEFAULT_AGENT_IMAGE}
+          onChange={(event) => { const typed = event.target.value.trim(); onChange(typed === '' ? undefined : typed); }}
+          className={`${selectClass} font-mono`}
+        />
+      )}
+      {picker.hasSource && (
+        <button
+          type="button"
+          className="text-xs text-muted-foreground underline"
+          onClick={() => setNaming(naming === false)}
+        >
+          {naming ? 'Pick from the catalog' : 'Name an image the catalog does not list'}
+        </button>
+      )}
+      <p className="text-xs text-muted-foreground">
+        The image the agent runs in, which decides the tools it has. Its evaluations run in it, and a workflow step that names no image of its own is given it when the workflow is saved.
       </p>
     </div>
   );
