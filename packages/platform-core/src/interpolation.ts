@@ -28,6 +28,26 @@ export interface InterpolationSources {
   item?: unknown;
 }
 
+export interface RunInterpolationContext {
+  triggerPayload?: unknown;
+  triggerContext?: unknown;
+  variables?: Record<string, unknown>;
+}
+
+/** Sources for templates whose result is persisted (a task's assignee, a form
+ *  field's pre-filled value). Secrets are withheld: a `${secrets.*}` template
+ *  resolves to nothing, so a secret never lands in a stored record. */
+export function runInterpolationSources(run: RunInterpolationContext | null): InterpolationSources {
+  const variables = run?.variables ?? {};
+  return {
+    triggerPayload: (run?.triggerPayload as Record<string, unknown>) ?? {},
+    triggerContext: (run?.triggerContext as Record<string, unknown>) ?? {},
+    steps: variables,
+    variables,
+    secrets: {},
+  };
+}
+
 /**
  * L3 path access: dot-notation walk with array index support.
  *

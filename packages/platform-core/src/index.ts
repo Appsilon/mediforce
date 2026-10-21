@@ -816,6 +816,7 @@ export type {
 } from './workflows/resolve-runnable-version';
 export { carriedDockerfile, stepHasBuildSource } from './workflows/build-source';
 export { resolveStepAssignee, resolveInstanceAssignee, type ResolvedStepAssignee } from './workflows/step-assignee';
+export { resolveParamDefaults } from './workflows/step-params';
 export { resolvePreviousStepId } from './workflows/previous-step';
 export { applyAgentModel, applyAgentOutputSchema, resolveDefinitionModels } from './workflows/agent-models';
 export {
@@ -846,7 +847,9 @@ export type { HandoffTypeRegistration } from './collaboration/index';
 export {
   getPath,
   interpolate,
+  runInterpolationSources,
   type InterpolationSources,
+  type RunInterpolationContext,
 } from './interpolation';
 
 // Utils (zero-dep helpers shared across runtime + worker)

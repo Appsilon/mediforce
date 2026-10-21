@@ -5,7 +5,7 @@ import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { advanceEvalRunOfInstance, checkRetiredModels, checkUnknownModels, settleRunWaits } from '@mediforce/platform-api/handlers';
 import { defaultBuildScope } from '@/lib/route-adapter';
-import { DEFAULT_MODEL, resolveCoworkOutputSchema, resolveDefinitionModels, resolvePreviousStepId, resolveStepTimeoutMs, buildTaskVerdicts, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
+import { DEFAULT_MODEL, resolveCoworkOutputSchema, resolveDefinitionModels, resolvePreviousStepId, resolveStepTimeoutMs, buildTaskVerdicts, resolveParamDefaults, runInterpolationSources, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -489,17 +489,11 @@ export async function POST(
             let assignedUserId: string | null = null;
             let taskStatus: 'pending' | 'claimed' = 'pending';
             if (currentStep.assignedTo !== undefined) {
-              const resolved = interpolate(currentStep.assignedTo, {
-                triggerPayload: (instance.triggerPayload as Record<string, unknown>) ?? {},
-                triggerContext: (instance.triggerContext as Record<string, unknown>) ?? {},
-                steps: instance.variables,
-                variables: instance.variables,
-                // Secrets are deliberately withheld: the resolved value is persisted
-                // as the task's assignedUserId and shown in the UI/audit, and secrets
-                // must never be persisted. A `${secrets.*}` template resolves to
-                // nothing here and hard-fails below — a secret is never an assignee.
-                secrets: {},
-              });
+              // Secrets are withheld by `runInterpolationSources`: the resolved value is
+              // persisted as the task's assignedUserId and shown in the UI/audit. A
+              // `${secrets.*}` template resolves to nothing and hard-fails below —
+              // a secret is never an assignee.
+              const resolved = interpolate(currentStep.assignedTo, runInterpolationSources(instance));
               if (typeof resolved === 'string' && resolved.length > 0) {
                 // The persisted assignedUserId must be a Mediforce uid: the task
                 // queues surface a claimed task only to the viewer whose uid
@@ -548,7 +542,7 @@ export async function POST(
               completionData: null,
               creationReason: 'human_executor',
               ...(currentStep.ui ? { ui: currentStep.ui } : {}),
-              ...(currentStep.params?.length ? { params: currentStep.params } : {}),
+              ...(currentStep.params?.length ? { params: resolveParamDefaults(currentStep.params, instance) } : {}),
               ...(options ? { options } : {}),
               ...(resolvedVerdicts ? { verdicts: resolvedVerdicts } : {}),
             });

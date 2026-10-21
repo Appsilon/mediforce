@@ -19,7 +19,7 @@ import type {
   ProcessNotificationConfig,
 } from '@mediforce/platform-core';
 import type { AgentFallbackReason, Selection, TaskVerdict } from '@mediforce/platform-core';
-import { normalizeSelection, buildTaskVerdicts, toProcessDefinition, resolveInstanceAssignee } from '@mediforce/platform-core';
+import { normalizeSelection, buildTaskVerdicts, toProcessDefinition, resolveInstanceAssignee, resolveParamDefaults } from '@mediforce/platform-core';
 import { validateStepGraph } from '@mediforce/platform-core';
 import { StepExecutor, type StepActor } from './step-executor';
 import { RoutingError, InvalidTransitionError, ParentInstanceNotFoundError } from './errors';
@@ -305,7 +305,7 @@ export class WorkflowEngine {
             completionData: null,
             creationReason: 'human_executor',
             ...(nextStep.ui ? { ui: nextStep.ui } : {}),
-            ...(nextStep.params?.length ? { params: nextStep.params } : {}),
+            ...(nextStep.params?.length ? { params: resolveParamDefaults(nextStep.params, updatedInstance) } : {}),
             ...selectionFields,
             ...verdictsField,
           };
