@@ -31,8 +31,8 @@ import { PreviousRunBanner } from './previous-run-banner';
 import { formatDuration, formatCostUsd, formatStepName } from '@/lib/format';
 import { getWorkflowStatus } from '@/lib/workflow-status';
 
-const WorkflowDiagram = dynamic(
-  () => import('@/components/workflows/workflow-diagram').then((m) => ({ default: m.WorkflowDiagram })),
+const RunReplayDiagram = dynamic(
+  () => import('./run-replay-diagram').then((m) => ({ default: m.RunReplayDiagram })),
   { ssr: false, loading: () => <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Loading diagram…</div> },
 );
 
@@ -545,7 +545,7 @@ export function ProcessDetail({
 
           <div className={cn('flex-1 min-h-0 overflow-auto grid place-items-center p-4', rightTab !== 'diagram' && 'hidden')}>
             {definition && rightTab === 'diagram' && (
-              <WorkflowDiagram definition={definition} className="w-full" />
+              <RunReplayDiagram definition={definition} stepExecutions={stepExecutions} completed={instance.status === 'completed'} className="w-full" />
             )}
           </div>
 

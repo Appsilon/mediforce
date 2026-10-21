@@ -5,6 +5,7 @@ import { trackPageErrors } from '../helpers/page-errors';
 
 const BRANCH_FAN_OUT_URL = `/${TEST_ORG_HANDLE}/workflows/Diagram%20Branch%20Fan%20Out/definitions/1`;
 const BACK_EDGE_URL = `/${TEST_ORG_HANDLE}/workflows/Diagram%20Back%20Edge/definitions/1`;
+const LOOP_RUN_URL = `/${TEST_ORG_HANDLE}/workflows/Diagram%20Back%20Edge/runs/proc-diagram-loop-1`;
 
 const nodeNamed = (page: Page, name: string | RegExp) =>
   page.locator('.react-flow__node').filter({ hasText: name });
@@ -67,5 +68,25 @@ test.describe('Workflow Diagram Journey', () => {
     // The arc itself: ReactFlow renders back edges dashed.
     const backEdge = page.locator('.react-flow__edges path[style*="stroke-dasharray"]');
     await expect(backEdge.first()).toBeVisible({ timeout: 5_000 });
+  });
+
+  // ── Run replay ──────────────────────────────────────────────────────────────
+
+  test('a run\'s diagram shows the path it took and replays it as a ball', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(LOOP_RUN_URL);
+    await page.getByRole('button', { name: 'Diagram' }).first().click();
+    const controls = page.getByTestId('run-replay-controls');
+    await expect(controls).toBeVisible({ timeout: 10_000 });
+
+    // Opens on the end of the run: every hop taken, the loop counted on the arrow ridden twice.
+    await expect(page.getByTestId('run-replay-position')).toHaveText('Hop 3 of 3 · Review Document');
+    await expect(page.locator('.react-flow__edges').getByText('×2')).toBeVisible();
+
+    await controls.getByRole('radio', { name: 'Path only' }).click();
+    await controls.getByRole('button', { name: /Replay run/ }).click();
+    await expect(page.getByTestId('replay-ball')).toBeVisible({ timeout: 5_000 });
+    await expect(controls.getByRole('button', { name: /Replay run/ })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('run-replay-position')).toHaveText('Hop 3 of 3 · Review Document');
   });
 });

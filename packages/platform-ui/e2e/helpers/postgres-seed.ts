@@ -255,6 +255,7 @@ export async function seedPostgresNamespace(
       ...data.retryAuditStepExecutions,
       ...data.agentEscalatedCancelStepExecutions,
       ...data.workflowRunStepExecutions,
+      ...data.diagramLoopStepExecutions,
     };
     for (const exec of Object.values(allStepExecutions)) {
       await sql`

@@ -31,7 +31,10 @@ export type GraphLayout = {
   height: number;
 };
 
-const edgeKey = (edge: GraphEdge) => `${edge.from}->${edge.to}`;
+/** The id an edge between two steps carries everywhere: layout, diagram, and run replay. */
+export const edgeIdOf = (from: string, to: string) => `${from}->${to}`;
+
+const edgeKey = (edge: GraphEdge) => edgeIdOf(edge.from, edge.to);
 
 function outgoingByNode(nodeIds: string[], edges: GraphEdge[]) {
   const outgoing = new Map<string, GraphEdge[]>(nodeIds.map((id) => [id, []]));
