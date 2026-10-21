@@ -415,6 +415,8 @@ function AddStepEdge({
 export interface DiagramReplayFrame {
   activeStepId: string | null;
   travel: { edgeId: string; key: number; durationMs: number } | null;
+  /** Freezes the ball where it is on its ride, until playback resumes. */
+  paused: boolean;
   edgeTraversals: ReadonlyMap<string, number>;
   /** Step the viewport pans to, so a tall diagram keeps the ball in view; null leaves the viewport alone. */
   followStepId: string | null;
@@ -422,6 +424,7 @@ export interface DiagramReplayFrame {
 
 type ReplayEdgeData = {
   travel: DiagramReplayFrame['travel'];
+  paused: boolean;
   traversals: number;
   isBack: boolean;
 };
@@ -448,6 +451,15 @@ function ReplayEdge({
   useLayoutEffect(() => {
     if (travel !== null) motionRef.current?.beginElement();
   }, [travel]);
+
+  const paused = data?.paused ?? false;
+  useLayoutEffect(() => {
+    const svg = motionRef.current?.ownerSVGElement;
+    if (svg === null || svg === undefined || paused === false) return;
+    // SMIL pauses per document: unpause on the way out, or the next ride would start frozen.
+    svg.pauseAnimations();
+    return () => svg.unpauseAnimations();
+  }, [paused, travel]);
 
   const traversals = data?.traversals ?? 0;
   const counter = traversals > 1 ? `×${traversals}` : undefined;
@@ -772,6 +784,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
           type: 'replay',
           data: {
             travel: replay.travel?.edgeId === e.id ? replay.travel : null,
+            paused: replay.paused,
             traversals: replay.edgeTraversals.get(e.id) ?? 0,
             isBack: isForward === false,
           } satisfies ReplayEdgeData,

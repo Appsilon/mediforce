@@ -18,6 +18,7 @@ vi.mock('@/components/workflows/workflow-diagram', async (importOriginal) => {
           data-testid="diagram"
           data-active={replay?.activeStepId ?? ''}
           data-travel={replay?.travel?.edgeId ?? ''}
+          data-paused={String(replay?.paused ?? false)}
           data-traversals={JSON.stringify([...(replay?.edgeTraversals ?? new Map())])}
         />
       );
@@ -72,6 +73,7 @@ function diagram() {
   return {
     active: element.dataset.active,
     travel: element.dataset.travel,
+    paused: element.dataset.paused,
     traversals: JSON.parse(element.dataset.traversals ?? '[]') as Array<[string, number]>,
   };
 }
@@ -84,7 +86,7 @@ describe('RunReplayDiagram', () => {
   afterEach(() => vi.useRealTimers());
 
   it('[RENDER] opens on the whole path the run took, loop counts included', () => {
-    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} />);
+    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} completed={false} />);
 
     expect(screen.getByTestId('run-replay-position')).toHaveTextContent('Hop 3 of 3 · Review');
     expect(diagram().active).toBe('review');
@@ -92,7 +94,7 @@ describe('RunReplayDiagram', () => {
   });
 
   it('[CLICK] replay walks the ball hop by hop and stops at the last step', () => {
-    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} />);
+    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} completed={false} />);
     fireEvent.click(screen.getByRole('radio', { name: 'Path only' }));
     fireEvent.click(screen.getByRole('button', { name: /Replay run/ }));
 
@@ -112,32 +114,44 @@ describe('RunReplayDiagram', () => {
     expect(screen.getByRole('button', { name: /Replay run/ })).toBeInTheDocument();
   });
 
-  it('[CLICK] pausing mid-hop lets the ball finish its ride, then holds at the step', () => {
-    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} />);
+  it('[CLICK] pausing mid-hop freezes the ball, and resuming finishes the same ride', () => {
+    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} completed={false} />);
     fireEvent.click(screen.getByRole('radio', { name: 'Path only' }));
     fireEvent.click(screen.getByRole('button', { name: /Replay run/ }));
-    act(() => { vi.advanceTimersByTime(300); });
+    act(() => { vi.advanceTimersByTime(250); });
+    act(() => { vi.advanceTimersByTime(200); });
     const ride = rendered.travels.at(-1);
     expect(ride?.edgeId).toBe('draft->review');
 
     fireEvent.click(screen.getByRole('button', { name: /Pause/ }));
     // A new travel object would restart the ball's <animateMotion> from the source.
     expect(rendered.travels.at(-1)).toBe(ride);
+    expect(diagram().paused).toBe('true');
 
-    act(() => { vi.advanceTimersByTime(700); });
-    expect(diagram().active).toBe('review');
     act(() => { vi.advanceTimersByTime(5_000); });
-    expect(diagram().active).toBe('review');
-    expect(diagram().travel).toBe('');
-    expect(screen.getByTestId('run-replay-position')).toHaveTextContent('Hop 1 of 3 · Review');
+    expect(diagram().travel).toBe('draft->review');
+    expect(screen.getByTestId('run-replay-position')).toHaveTextContent('Hop 1 of 3');
 
     fireEvent.click(screen.getByRole('button', { name: /Replay run/ }));
-    act(() => { vi.advanceTimersByTime(300); });
-    expect(diagram().travel).toBe('review->draft');
+    expect(rendered.travels.at(-1)).toBe(ride);
+    expect(diagram().paused).toBe('false');
+    // 200 of the 600 ms ride were played before the pause; the rest finishes it.
+    act(() => { vi.advanceTimersByTime(399); });
+    expect(diagram().travel).toBe('draft->review');
+    act(() => { vi.advanceTimersByTime(2); });
+    expect(diagram().active).toBe('review');
+  });
+
+  it('[RENDER] a completed run ends on the terminal step it reached', () => {
+    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} completed={true} />);
+
+    expect(screen.getByTestId('run-replay-position')).toHaveTextContent('Hop 4 of 4 · Done');
+    expect(diagram().active).toBe('done');
+    expect(diagram().traversals).toContainEqual(['review->done', 1]);
   });
 
   it('[RENDER] no controls for a run with a single step', () => {
-    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions.slice(0, 1)} />);
+    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions.slice(0, 1)} completed={false} />);
 
     expect(screen.queryByTestId('run-replay-controls')).not.toBeInTheDocument();
   });

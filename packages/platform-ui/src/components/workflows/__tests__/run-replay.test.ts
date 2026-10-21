@@ -58,6 +58,31 @@ describe('buildReplayPath hops', () => {
   });
 });
 
+describe('buildReplayPath terminal hop', () => {
+  const terminalStepIds = new Set(['done', 'rejected']);
+  const ran = [
+    execution('draft', '2026-10-21T10:00:00.000Z'),
+    { ...execution('review', '2026-10-21T10:01:00.000Z'), completedAt: '2026-10-21T10:03:00.000Z' },
+  ];
+
+  it('rides into the only terminal step the last step has an arrow to', () => {
+    const hops = buildReplayPath(ran, new Set(['draft->review', 'review->done']), terminalStepIds).hops;
+    expect(hops.at(-1)).toEqual({ from: 'review', to: 'done', edgeId: 'review->done', realGapMs: 120_000 });
+  });
+
+  it('follows the last step\'s routing when it could end at several terminal steps', () => {
+    const routed = [ran[0], { ...ran[1], gateResult: { next: 'rejected', reason: 'verdict' } }];
+    const hops = buildReplayPath(routed, new Set(['draft->review', 'review->done', 'review->rejected']), terminalStepIds).hops;
+    expect(hops.at(-1)?.to).toBe('rejected');
+  });
+
+  it('adds no hop when the terminal step cannot be told apart, or the run has not completed', () => {
+    const edges = new Set(['draft->review', 'review->done', 'review->rejected']);
+    expect(buildReplayPath(ran, edges, terminalStepIds).hops).toHaveLength(1);
+    expect(buildReplayPath(ran, new Set(['draft->review', 'review->done'])).hops).toHaveLength(1);
+  });
+});
+
 describe('buildReplayPath first step', () => {
   it('is the earliest started step', () => {
     expect(buildReplayPath(executions, edgeIds).firstStepId).toBe('draft');

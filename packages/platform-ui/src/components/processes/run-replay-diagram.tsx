@@ -28,19 +28,28 @@ type Cursor = { hopsDone: number; phase: 'dwell' | 'travel' } | null;
 export function RunReplayDiagram({
   definition,
   stepExecutions,
+  completed,
   className,
 }: {
   definition: WorkflowDefinition;
   stepExecutions: StepExecution[];
+  /** A completed run also rides the arrow into the terminal step it reached. */
+  completed: boolean;
   className?: string;
 }) {
   const edgeIds = React.useMemo(
     () => new Set(graphEdgesOf(definition).map((edge) => edgeIdOf(edge.from, edge.to))),
     [definition],
   );
+  const terminalStepIds = React.useMemo(
+    () => completed === true
+      ? new Set(definition.steps.filter((step) => step.type === 'terminal').map((step) => step.id))
+      : null,
+    [definition, completed],
+  );
   const { firstStepId, hops } = React.useMemo(
-    () => buildReplayPath(stepExecutions, edgeIds),
-    [stepExecutions, edgeIds],
+    () => buildReplayPath(stepExecutions, edgeIds, terminalStepIds),
+    [stepExecutions, edgeIds, terminalStepIds],
   );
 
   const [pacing, setPacing] = React.useState<ReplayPacing>('proportional');
@@ -53,11 +62,11 @@ export function RunReplayDiagram({
   const hopsDone = cursor === null ? hops.length : cursor.hopsDone;
   const travelling = cursor !== null && cursor.phase === 'travel';
   const currentHop = travelling ? hops[hopsDone] : undefined;
+  // Share of the cursor's phase already played, so resuming after a pause continues it.
+  const playedRef = React.useRef<{ cursor: Cursor; share: number }>({ cursor: null, share: 0 });
 
   React.useEffect(() => {
-    if (cursor === null) return;
-    // Pausing mid-hop lets the ball finish its ride; it holds at the step it lands on.
-    if (playing === false && cursor.phase === 'dwell') return;
+    if (cursor === null || playing === false) return;
     if (cursor.hopsDone >= hops.length) {
       setPlaying(false);
       setCursor(null);
@@ -68,18 +77,28 @@ export function RunReplayDiagram({
       cursor.phase === 'dwell'
         ? dwells[cursor.hopsDone]
         : hop.edgeId === null ? JUMP_MS : REPLAY_TRAVEL_MS;
+    const phaseMs = durationMs / speed;
+    const playedShare = playedRef.current.cursor === cursor ? playedRef.current.share : 0;
+    const resumedAt = Date.now();
+    let finished = false;
     const timer = setTimeout(() => {
+      finished = true;
       setCursor(
         cursor.phase === 'dwell'
           ? { hopsDone: cursor.hopsDone, phase: 'travel' }
           : { hopsDone: cursor.hopsDone + 1, phase: 'dwell' },
       );
-    }, durationMs / speed);
-    return () => clearTimeout(timer);
+    }, phaseMs * (1 - playedShare));
+    return () => {
+      clearTimeout(timer);
+      if (finished === false) {
+        playedRef.current = { cursor, share: Math.min(1, playedShare + (Date.now() - resumedAt) / phaseMs) };
+      }
+    };
   }, [playing, cursor, hops, dwells, speed]);
 
   // Kept apart from the frame: a new travel object restarts the ball's ride, so
-  // toggling play/pause must not rebuild it.
+  // toggling play/pause must not rebuild it — the frame's `paused` freezes it instead.
   const travel = React.useMemo<DiagramReplayFrame['travel']>(
     () =>
       currentHop !== undefined && currentHop.edgeId !== null
@@ -96,7 +115,7 @@ export function RunReplayDiagram({
     }
     const activeStepId = currentHop !== undefined ? null : hopsDone === 0 ? firstStepId : hops[hopsDone - 1].to;
     const followStepId = playing === true ? currentHop?.to ?? activeStepId : null;
-    return { activeStepId, travel, edgeTraversals, followStepId };
+    return { activeStepId, travel, paused: playing === false, edgeTraversals, followStepId };
   }, [hops, hopsDone, currentHop, firstStepId, travel, playing]);
 
   const togglePlay = () => {
