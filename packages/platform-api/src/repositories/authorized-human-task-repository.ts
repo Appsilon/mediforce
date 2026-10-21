@@ -1,6 +1,7 @@
 import type {
   HumanTask,
   HumanTaskRepository,
+  HumanTaskStatus,
 } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../auth';
 import { ForbiddenError } from '../errors';
@@ -52,16 +53,20 @@ export class AuthorizedHumanTaskRepository extends AuthorizedScope {
    * tasks whose parent run belongs to one of their namespaces.
    *
    * `namespaces` narrows to a chosen subset — the inbox's workspace filter.
+   * `statuses` narrows in storage — the inbox only wants open tasks.
    */
-  listForCaller = async (namespaces?: readonly string[]): Promise<HumanTask[]> => {
+  listForCaller = async (
+    namespaces?: readonly string[],
+    statuses?: readonly HumanTaskStatus[],
+  ): Promise<HumanTask[]> => {
     if (namespaces !== undefined) {
       const allowed = this.narrowToMemberships(namespaces);
       if (allowed.length === 0) return [];
-      return this.raw.listInNamespaces(allowed);
+      return this.raw.listInNamespaces(allowed, statuses);
     }
     return this.caller.isSystemActor
-      ? this.raw.listAll()
-      : this.raw.listInNamespaces([...this.caller.namespaces]);
+      ? this.raw.listAll(statuses)
+      : this.raw.listInNamespaces([...this.caller.namespaces], statuses);
   };
 
   claim = async (taskId: string, userId: string): Promise<HumanTask> => {

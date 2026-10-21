@@ -34,7 +34,7 @@ async function selectBase(
 ): Promise<readonly HumanTask[]> {
   if (input.instanceId !== undefined) return scope.tasks.getByInstanceId(input.instanceId);
   if (input.role !== undefined) return scope.tasks.getByRole(input.role, input.namespace);
-  return scope.tasks.listForCaller(input.namespace);
+  return scope.tasks.listForCaller(input.namespace, input.status);
 }
 
 function applyFilters(

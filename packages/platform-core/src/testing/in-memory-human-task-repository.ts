@@ -1,4 +1,4 @@
-import { HumanTaskSchema, type HumanTask } from '../schemas/human-task';
+import { HumanTaskSchema, type HumanTask, type HumanTaskStatus } from '../schemas/human-task';
 import type { HumanTaskRepository } from '../interfaces/human-task-repository';
 import type { ProcessInstanceRepository } from '../interfaces/process-instance-repository';
 
@@ -94,12 +94,17 @@ export class InMemoryHumanTaskRepository implements HumanTaskRepository {
     return this.getByInstanceIdsAll(allowedIds);
   }
 
-  async listAll(): Promise<HumanTask[]> {
-    return [...this.tasks.values()].map((t) => ({ ...t }));
+  async listAll(statuses?: readonly HumanTaskStatus[]): Promise<HumanTask[]> {
+    return [...this.tasks.values()]
+      .filter((task) => statuses === undefined || statuses.includes(task.status))
+      .map((t) => ({ ...t }));
   }
 
-  async listInNamespaces(allowed: readonly string[]): Promise<HumanTask[]> {
-    const tasks = await this.listAll();
+  async listInNamespaces(
+    allowed: readonly string[],
+    statuses?: readonly HumanTaskStatus[],
+  ): Promise<HumanTask[]> {
+    const tasks = await this.listAll(statuses);
     return this.filterByParentNamespace(tasks, allowed);
   }
 

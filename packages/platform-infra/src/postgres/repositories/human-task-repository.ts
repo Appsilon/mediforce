@@ -4,6 +4,7 @@ import {
   parseRow,
   type HumanTask,
   type HumanTaskRepository,
+  type HumanTaskStatus,
   type ProcessInstanceRepository,
 } from '@mediforce/platform-core';
 import type { Database } from '../client';
@@ -189,17 +190,28 @@ export class PostgresHumanTaskRepository implements HumanTaskRepository {
     return rows.map((r) => toHumanTask(r));
   }
 
-  async listAll(): Promise<HumanTask[]> {
-    const rows = await this.db.select().from(humanTasks);
+  async listAll(statuses?: readonly HumanTaskStatus[]): Promise<HumanTask[]> {
+    const rows = await this.db
+      .select()
+      .from(humanTasks)
+      .where(statuses !== undefined ? inArray(humanTasks.status, [...statuses]) : undefined);
     return rows.map((r) => toHumanTask(r));
   }
 
-  async listInNamespaces(allowed: readonly string[]): Promise<HumanTask[]> {
+  async listInNamespaces(
+    allowed: readonly string[],
+    statuses?: readonly HumanTaskStatus[],
+  ): Promise<HumanTask[]> {
     if (allowed.length === 0) return [];
     const rows = await this.db
       .select()
       .from(humanTasks)
-      .where(inArray(humanTasks.workspace, [...allowed]));
+      .where(
+        and(
+          inArray(humanTasks.workspace, [...allowed]),
+          statuses !== undefined ? inArray(humanTasks.status, [...statuses]) : undefined,
+        ),
+      );
     return rows.map((r) => toHumanTask(r));
   }
 
