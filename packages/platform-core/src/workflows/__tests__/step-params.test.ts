@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveParamDefaults } from '../step-params';
+import { resolveParamDefaults, resolveStepParams, UnresolvedStepParamError } from '../step-params';
 import type { StepParam } from '../../schemas/process-definition';
 
 const run = {
@@ -81,5 +81,46 @@ describe('resolveParamDefaults', () => {
     const [token] = resolveParamDefaults([param('token', 'key=${secrets.API_KEY}')], run);
 
     expect(token.default).toBeUndefined();
+  });
+});
+
+describe('resolveStepParams', () => {
+  const intakeRun = {
+    triggerPayload: { case: { documentType: 'protocol' } },
+    variables: { register_version: { pdfPath: '/data/protocol-v2.pdf', pages: [1, 2] } },
+  };
+
+  it('maps run values onto a flat input the Agent reads at the top level', () => {
+    const resolved = resolveStepParams({
+      documentType: '${triggerPayload.case.documentType}',
+      pdfPath: '${steps.register_version.pdfPath}',
+      pages: '${steps.register_version.pages}',
+      label: '${triggerPayload.case.documentType} (${steps.register_version.pdfPath})',
+    }, intakeRun);
+
+    expect(resolved.mappings).toEqual({
+      documentType: 'protocol',
+      pdfPath: '/data/protocol-v2.pdf',
+      pages: [1, 2],
+      label: 'protocol (/data/protocol-v2.pdf)',
+    });
+  });
+
+  it('keeps literal params apart as defaults', () => {
+    const resolved = resolveStepParams({ repo: 'Appsilon/mediforce', lookbackHours: 48, source: { path: '${steps.register_version.pdfPath}' } }, intakeRun);
+
+    expect(resolved.defaults).toEqual({ repo: 'Appsilon/mediforce', lookbackHours: 48 });
+    expect(resolved.mappings).toEqual({ source: { path: '/data/protocol-v2.pdf' } });
+  });
+
+  it('fails on a reference the run does not have instead of passing the literal template', () => {
+    const resolve = () => resolveStepParams({ pdfPath: '${steps.never_ran.pdfPath}', note: 'see ${triggerPayload.missing}' }, intakeRun);
+
+    expect(resolve).toThrow(UnresolvedStepParamError);
+    expect(resolve).toThrow('${steps.never_ran.pdfPath}, ${triggerPayload.missing}');
+  });
+
+  it('never resolves secrets into the audited input', () => {
+    expect(() => resolveStepParams({ token: '${secrets.API_TOKEN}' }, intakeRun)).toThrow(UnresolvedStepParamError);
   });
 });

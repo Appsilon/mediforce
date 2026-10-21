@@ -127,6 +127,7 @@ point at.
    no prompt, Skills, output schema or MCP servers of its own, no MCP
    restriction that removes something, and no workflow preamble
    (`agentStepChanges`). What the Step provides around the Agent — params,
+   `stepParams` (which map run values onto the Agent's flat input, #1599),
    env, timeout, autonomy, review — is not a change. _Amended 2026-10-21: an
    Agent names an image (decision 9), so a Step that runs another image than
    the Agent's, or builds its own, changes it; the image decides which tools

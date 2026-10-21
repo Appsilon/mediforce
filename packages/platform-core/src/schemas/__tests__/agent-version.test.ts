@@ -14,6 +14,11 @@ describe('agentStepChanges', () => {
     expect(agentStepChanges({}, agent)).toEqual([]);
   });
 
+  it('finds nothing in a step that only maps its input through stepParams', () => {
+    const mappingStep = { plugin: 'claude-code-agent', stepParams: { pdfPath: '${steps.register_version.pdfPath}' } };
+    expect(agentStepChanges(mappingStep, agent)).toEqual([]);
+  });
+
   it('names every part of the agent the step changes', () => {
     expect(agentStepChanges({
       plugin: 'opencode-agent',

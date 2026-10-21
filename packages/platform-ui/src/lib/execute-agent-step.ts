@@ -29,6 +29,7 @@ import {
   mcpEvalRestrictions,
   mergeMcpTapes,
   MCP_REPLAY_RECORDINGS,
+  resolveStepParams,
   type AgentDefinitionRepository,
   type AgentOAuthTokenRepository,
   type EvaluationRepository,
@@ -159,10 +160,13 @@ export async function executeAgentStep(
     ? 'L4'
     : (workflowStep.autonomyLevel ?? 'L2');
 
-  // Merge step params into context — stepParams take lower priority than appContext
+  // Literal stepParams are defaults the step's input overrides; a `${…}` mapping
+  // the author wrote out wins, so a step can hand its Agent a flat input (#1599).
+  const stepParams = resolveStepParams(workflowStep.stepParams ?? {}, instance);
   const mergedInput: Record<string, unknown> = {
-    ...(workflowStep.stepParams ?? {}),
+    ...stepParams.defaults,
     ...appContext,
+    ...stepParams.mappings,
   };
 
   // Pre-fetch secrets for {{TEMPLATE}} resolution.

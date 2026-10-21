@@ -1169,6 +1169,47 @@ describe('executeAgentStep', () => {
     });
   });
 
+  it('[DATA] resolves ${…} in stepParams against the run and lets the mapping win over appContext', async () => {
+    mockInstanceRepo.getById.mockResolvedValue({
+      ...defaultInstance,
+      triggerPayload: { case: { documentType: 'protocol' } },
+      variables: { register_version: { pdfPath: '/data/protocol-v2.pdf' } },
+    });
+    const stepWithMapping: WorkflowStep = {
+      ...firstStep,
+      stepParams: {
+        documentType: '${triggerPayload.case.documentType}',
+        pdfPath: '${steps.register_version.pdfPath}',
+        language: 'en',
+      },
+    };
+
+    await executeAgentStep(
+      'inst-wf-001', 'gather-data', stepWithMapping,
+      { pdfPath: 'from-previous-step', language: 'de' },
+      'user-1',
+    );
+
+    const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
+    expect(contextArg.stepInput).toEqual({
+      documentType: 'protocol',
+      pdfPath: '/data/protocol-v2.pdf',
+      language: 'de',
+    });
+  });
+
+  it('[ERROR] fails the step when a stepParams reference names nothing in the run', async () => {
+    const stepWithMapping: WorkflowStep = {
+      ...firstStep,
+      stepParams: { pdfPath: '${steps.never_ran.pdfPath}' },
+    };
+
+    await expect(
+      executeAgentStep('inst-wf-001', 'gather-data', stepWithMapping, {}, 'user-1'),
+    ).rejects.toThrow('${steps.never_ran.pdfPath}');
+    expect(mockAgentRunner.runWithWorkflowStep).not.toHaveBeenCalled();
+  });
+
   // ---- Error-fallback must not masquerade as success ----
 
   describe('error-fallback step execution status', () => {

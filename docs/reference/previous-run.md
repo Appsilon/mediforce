@@ -133,8 +133,9 @@ just typed.
 
 ## What is NOT done
 
-- No template syntax like `${previousRun.cursor}` in `stepParams`. The step
-  reads `previousRun` directly from its runtime context (agent prompt or
+- No `${previousRun.*}` root in `stepParams` templates (they resolve
+  `${triggerPayload.*}` and `${steps.*}` only). The step reads `previousRun`
+  directly from its runtime context (agent prompt or
   `/output/previous_run.json`).
 - No cross-workflow chains. Each workflow name owns its own chain.
 - No schema enforcement on carried values. The shape is whatever the step
