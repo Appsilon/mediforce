@@ -1,7 +1,11 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { z } from 'zod';
 import {
+  DEFAULT_JUDGE_MIN_CONFIDENCE,
+  FALLBACK_PINNED_MODEL,
+  TASK_COMPLETION_EVALUATOR_NAME,
   isOwnedBy,
+  taskCompletionRubric,
   type EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   type EvaluationSubject,
   type EvaluationAssistantProposalToolName,
@@ -169,6 +173,15 @@ export async function reviewEvaluationProposal(
       if (step.kind === 'agent') return reviewAgentCase(agentRunId, input);
       if (agentRunId !== undefined) await loadCaseSource(scope, agentRunId, step, 'read');
       return { ok: true };
+    }
+    case 'propose_task_completion_judge': {
+      const { requirements } = args as Args<'propose_task_completion_judge'>;
+      const taken = (await scope.evaluation.listEvaluators(step)).find((evaluator) => evaluator.name === TASK_COMPLETION_EVALUATOR_NAME && evaluator.archived === false);
+      if (taken !== undefined) {
+        return { ok: false, error: `This step already has a live '${TASK_COMPLETION_EVALUATOR_NAME}' Evaluator (${taken.id}) — edit it directly instead of drafting a new one.` };
+      }
+      const check: EvaluatorCheck = { kind: 'llm_judge', model: FALLBACK_PINNED_MODEL, rubric: taskCompletionRubric(requirements), minConfidence: DEFAULT_JUDGE_MIN_CONFIDENCE };
+      return selfTest(scope, step, check, previewed);
     }
     default:
       return { ok: true };
