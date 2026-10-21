@@ -2016,7 +2016,7 @@ describe('StepEditor — wait config', () => {
 });
 
 describe('StepEditor — verdict presentation and conditional params', () => {
-  it('writes the verdict label, intent and comment requirement', () => {
+  it('writes the verdict label', () => {
     const onChange = vi.fn();
     render(
       <StepEditor
@@ -2031,11 +2031,6 @@ describe('StepEditor — verdict presentation and conditional params', () => {
     fireEvent.change(screen.getByPlaceholderText('Approve'), { target: { value: 'Sign off' } });
     expect((onChange.mock.calls[0]?.[0] as { verdicts?: Record<string, { label?: string }> })
       .verdicts?.approve?.label).toBe('Sign off');
-
-    onChange.mockClear();
-    fireEvent.click(screen.getByRole('checkbox', { name: /comment/i }));
-    expect((onChange.mock.calls[0]?.[0] as { verdicts?: Record<string, { requiresComment?: boolean }> })
-      .verdicts?.approve?.requiresComment).toBe(true);
   });
 
   it('marks a param required only for the verdicts the step defines', () => {

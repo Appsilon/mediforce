@@ -234,7 +234,6 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
         target: 'interpret-validation',
         label: 'Ask agent to make changes',
         intent: 'warning',
-        requiresComment: true,
       },
     });
   });
@@ -248,13 +247,12 @@ describe('landing-zone-CDISCPILOT01.wd.json', () => {
     expect(humanReview).toBeDefined();
     const descriptors = buildTaskVerdicts(humanReview!.verdicts);
 
-    // Order, labels, intents and the per-verdict requiresComment must
-    // survive parse + descriptor build. This is what the engine writes
-    // onto the HumanTask and what VerdictForm renders.
+    // Order, labels and intents must survive parse + descriptor build. This
+    // is what the engine writes onto the HumanTask and what VerdictForm renders.
     expect(descriptors).toEqual([
-      { key: 'accept', label: 'Accept delivery', intent: 'success', requiresComment: false },
-      { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger', requiresComment: false },
-      { key: 'ask_agent_to_revise', label: 'Ask agent to make changes', intent: 'warning', requiresComment: true },
+      { key: 'accept', label: 'Accept delivery', intent: 'success' },
+      { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger' },
+      { key: 'ask_agent_to_revise', label: 'Ask agent to make changes', intent: 'warning' },
     ]);
   });
 });

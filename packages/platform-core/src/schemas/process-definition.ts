@@ -4,7 +4,6 @@ export const VerdictSchema = z.object({
   target: z.string(),
   label: z.string().min(1).optional(),
   intent: z.enum(['success', 'danger', 'warning', 'neutral']).optional(),
-  requiresComment: z.boolean().optional(),
 });
 
 export const StepUiSchema = z.object({

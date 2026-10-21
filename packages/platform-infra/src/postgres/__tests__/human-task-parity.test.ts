@@ -69,7 +69,7 @@ function contract(
         params: [{ name: 'note', type: 'string', required: false }],
         options: [{ id: 'opt1', label: 'A' }],
         verdicts: [
-          { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+          { key: 'approve', label: 'Approve', intent: 'success' },
         ],
         selection: 2,
       });
@@ -82,7 +82,7 @@ function contract(
       expect(created.params).toEqual([{ name: 'note', type: 'string', required: false }]);
       expect(created.options).toEqual([{ id: 'opt1', label: 'A' }]);
       expect(created.verdicts).toEqual([
-        { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+        { key: 'approve', label: 'Approve', intent: 'success' },
       ]);
       expect(created.selection).toBe(2);
 

@@ -107,33 +107,17 @@ describe('validateVerdictPayload', () => {
     ).toThrow(/verdict 'reject' not allowed/);
   });
 
-  it('enforces requiresComment for verdicts that mandate one', () => {
+  it('accepts any allowed verdict without a comment', () => {
     const task = baseTask({
       verdicts: [
-        {
-          key: 'reject',
-          label: 'Reject',
-          intent: 'negative' as never,
-          requiresComment: true,
-        },
+        { key: 'reject', label: 'Reject', intent: 'negative' as never },
       ] as never,
     });
     expect(() =>
       validateVerdictPayload(task, { kind: 'verdict', verdict: 'reject' }),
-    ).toThrow(/requires a non-empty comment/);
+    ).not.toThrow();
     expect(() =>
-      validateVerdictPayload(task, {
-        kind: 'verdict',
-        verdict: 'reject',
-        comment: '   ',
-      }),
-    ).toThrow(/requires a non-empty comment/);
-    expect(() =>
-      validateVerdictPayload(task, {
-        kind: 'verdict',
-        verdict: 'reject',
-        comment: 'no good',
-      }),
+      validateVerdictPayload(task, { kind: 'verdict', verdict: 'reject', comment: '   ' }),
     ).not.toThrow();
   });
 });
@@ -160,7 +144,7 @@ describe('shapeCompletion — verdict-with-params variant', () => {
       params: [{ key: 'dose', label: 'Dose', type: 'string' }] as never,
       verdicts: [
         { key: 'approve', label: 'Approve', intent: 'positive' as never },
-        { key: 'reject', label: 'Reject', intent: 'negative' as never, requiresComment: true },
+        { key: 'reject', label: 'Reject', intent: 'negative' as never },
       ] as never,
     });
   }

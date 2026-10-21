@@ -132,8 +132,7 @@
         "reject": {
           "target": "mark-needs-info",
           "label": "Reject / need more info",
-          "intent": "neutral",
-          "requiresComment": true
+          "intent": "neutral"
         },
         "approve": {
           "target": "claim",

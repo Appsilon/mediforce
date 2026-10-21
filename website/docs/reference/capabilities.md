@@ -48,8 +48,8 @@ approve/revise loop, and its revision path keys off the literal `approve` and
 
 - Every path ends at a `terminal` step. A step nothing transitions to is rejected
   at save.
-- Human review steps declare their verdicts explicitly; use `requiresComment`
-  when the reason matters.
+- Human review steps declare their verdicts explicitly. The comment is always
+  optional; when the reason matters, add a param with `requiredForVerdicts`.
 - Prefer `script` over `agent` for anything deterministic — it is cheaper, faster
   and repeatable.
 - Fail fast by default. `continueOnError: true` is for steps whose failure

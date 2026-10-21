@@ -195,8 +195,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { name: 'riskScore', type: 'number', required: false, description: 'Risk score 1–10' },
       ],
       verdicts: [
-        { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
-        { key: 'reject', label: 'Reject', intent: 'danger', requiresComment: true },
+        { key: 'approve', label: 'Approve', intent: 'success' },
+        { key: 'reject', label: 'Reject', intent: 'danger' },
       ],
     },
     // Already-completed variant — used by the read-only CompletionReadOnly test
@@ -222,8 +222,8 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
         { name: 'riskScore', type: 'number', required: false, description: 'Risk score 1–10' },
       ],
       verdicts: [
-        { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
-        { key: 'reject', label: 'Reject', intent: 'danger', requiresComment: true },
+        { key: 'approve', label: 'Approve', intent: 'success' },
+        { key: 'reject', label: 'Reject', intent: 'danger' },
       ],
     },
     'task-upload-docs': {

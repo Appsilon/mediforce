@@ -185,7 +185,6 @@ const TIP = {
   actionCollectStep:       'Step id whose output to read from each spawned workflow. Leave empty to read all of its variables.',
   verdictLabel:            'Button text shown to the reviewer. Defaults to a title-cased form of the verdict key.',
   verdictIntent:           'Button styling: success, danger, warning or neutral. Defaults from the key for the common names.',
-  verdictRequiresComment:  'Enforced server-side — the task cannot be completed on this verdict without a comment.',
   paramRequiredForVerdicts: 'Verdict keys that make this parameter mandatory. Leave empty to use the plain required flag.',
   actionMethod:            'HTTP method for the outbound request.',
   actionUrl:               'Target URL. Supports ${steps.<id>.<field>} and ${triggerPayload.<field>} interpolation — never put ${secrets.NAME} here, the resolved URL is persisted as this step\'s output.',
@@ -1589,15 +1588,6 @@ export function StepEditor({
                     <option value="warning">Warning</option>
                     <option value="neutral">Neutral</option>
                   </select>
-                  <label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground" title={TIP.verdictRequiresComment}>
-                    <input
-                      type="checkbox"
-                      checked={verdict.requiresComment === true}
-                      onChange={(e) => onChange({ verdicts: { ...step.verdicts, [verdictName]: { ...verdict, requiresComment: e.target.checked ? true : undefined } } })}
-                      className="h-3.5 w-3.5 accent-primary"
-                    />
-                    comment
-                  </label>
                 </div>
               </FieldRow>
             ))}

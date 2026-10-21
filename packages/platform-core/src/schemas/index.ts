@@ -20,7 +20,6 @@ export {
   buildTaskVerdicts,
   defaultVerdictIntent,
   defaultVerdictLabel,
-  defaultRequiresComment,
   type TaskVerdict,
 } from './verdicts';
 

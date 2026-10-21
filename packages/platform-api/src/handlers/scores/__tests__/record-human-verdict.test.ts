@@ -44,8 +44,8 @@ describe('recordHumanVerdictScore', () => {
   it('maps the verdict intent from the task\'s own vocabulary to 0 / 0.5 / 1', async () => {
     const task = reviewTask({
       verdicts: [
-        { key: 'unsafe', label: 'Unsafe', intent: 'danger', requiresComment: false },
-        { key: 'recheck', label: 'Recheck', intent: 'warning', requiresComment: false },
+        { key: 'unsafe', label: 'Unsafe', intent: 'danger' },
+        { key: 'recheck', label: 'Recheck', intent: 'warning' },
       ],
     });
 

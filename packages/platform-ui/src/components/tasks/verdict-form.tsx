@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MessageSquarePlus } from 'lucide-react';
 import type { TaskVerdict, StepParam } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
@@ -30,8 +30,8 @@ interface SubmittedData {
 }
 
 const LEGACY_VERDICTS: TaskVerdict[] = [
-  { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
-  { key: 'revise', label: 'Request changes', intent: 'warning', requiresComment: true },
+  { key: 'approve', label: 'Approve', intent: 'success' },
+  { key: 'revise', label: 'Request changes', intent: 'warning' },
 ];
 
 export function RemainingTasksFooter({ remainingTaskCount }: { remainingTaskCount?: number }) {
@@ -54,10 +54,59 @@ export function RemainingTasksFooter({ remainingTaskCount }: { remainingTaskCoun
   );
 }
 
+/** Optional reviewer comment, collapsed behind an "Add a comment" toggle. */
+export function OptionalCommentField({
+  value,
+  onChange,
+  disabled,
+  rows,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  disabled: boolean;
+  rows: number;
+}) {
+  const [expanded, setExpanded] = React.useState(false);
+
+  if (expanded === false) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        disabled={disabled}
+        className={cn(
+          'inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors',
+          disabled && 'opacity-50 cursor-not-allowed',
+        )}
+      >
+        <MessageSquarePlus className="h-3.5 w-3.5" />
+        Add a comment
+      </button>
+    );
+  }
+
+  return (
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="Add a comment (optional)..."
+      rows={rows}
+      disabled={disabled}
+      autoFocus
+      aria-label="Review comment"
+      className={cn(
+        'w-full rounded-md border bg-background px-3 py-2 text-sm',
+        'placeholder:text-muted-foreground resize-y min-h-[56px]',
+        'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary',
+        disabled && 'opacity-50 cursor-not-allowed',
+      )}
+    />
+  );
+}
+
 export function VerdictButtons({
   verdicts,
   submitting,
-  trimmedComment,
   outerBlocked,
   outerBlockedHint,
   isVerdictBlocked,
@@ -65,7 +114,6 @@ export function VerdictButtons({
 }: {
   verdicts: TaskVerdict[];
   submitting: string | null;
-  trimmedComment: string;
   outerBlocked?: boolean;
   outerBlockedHint?: string;
   /** Per-verdict param block — overrides `outerBlocked` when provided. */
@@ -80,9 +128,8 @@ export function VerdictButtons({
     <div className="flex flex-col gap-2">
       {sorted.map((cfg) => {
         const paramBlocked = isVerdictBlocked ? isVerdictBlocked(cfg.key) : !!outerBlocked;
-        const commentBlocked = cfg.requiresComment && !trimmedComment;
         const isSubmittingThis = submitting === cfg.key;
-        const isDisabled = submitting !== null || paramBlocked || commentBlocked;
+        const isDisabled = submitting !== null || paramBlocked;
         return (
           <div key={cfg.key} className="flex flex-col items-start gap-1">
             <button
@@ -102,9 +149,6 @@ export function VerdictButtons({
             </button>
             {paramBlocked && outerBlockedHint && (
               <span className="text-xs text-muted-foreground/70 pl-1">{outerBlockedHint}</span>
-            )}
-            {!paramBlocked && commentBlocked && (
-              <span className="text-xs text-muted-foreground/70 pl-1">Comment required</span>
             )}
           </div>
         );
@@ -136,7 +180,6 @@ export function VerdictForm({
   const trimmedComment = comment.trim();
 
   async function handleSubmit(cfg: TaskVerdict) {
-    if (cfg.requiresComment && !trimmedComment) return;
     if (submitting) return;
 
     setSubmitting(cfg.key);
@@ -168,20 +211,11 @@ export function VerdictForm({
 
   return (
     <div className="space-y-3">
-      <textarea
+      <OptionalCommentField
         value={comment}
-        onChange={(e) => setComment(e.target.value)}
-        placeholder="Add a comment (optional)..."
+        onChange={setComment}
         rows={3}
         disabled={disabled || submitting !== null}
-        aria-label="Review comment"
-        className={cn(
-          'w-full rounded-md border bg-background px-3 py-2 text-sm',
-          'placeholder:text-muted-foreground',
-          'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary',
-          'resize-y min-h-[72px]',
-          (disabled || submitting !== null) && 'opacity-50 cursor-not-allowed',
-        )}
       />
 
       {error && (
@@ -191,7 +225,6 @@ export function VerdictForm({
       <VerdictButtons
         verdicts={resolved}
         submitting={submitting}
-        trimmedComment={trimmedComment}
         outerBlocked={disabled}
         onVerdict={handleSubmit}
       />
@@ -297,7 +330,7 @@ export function VerdictConfirmationReadOnly({
 
   const cfg = verdicts?.find((v) => v.key === verdict)
     ?? LEGACY_VERDICTS.find((v) => v.key === verdict)
-    ?? { key: verdict, label: verdict, intent: 'neutral' as Intent, requiresComment: false };
+    ?? { key: verdict, label: verdict, intent: 'neutral' as Intent };
 
   return (
     <VerdictConfirmation

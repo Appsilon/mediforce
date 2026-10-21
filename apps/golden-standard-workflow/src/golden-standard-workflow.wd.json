@@ -182,14 +182,12 @@
         "revise": {
           "target": "cowork-refine",
           "label": "Revise",
-          "intent": "warning",
-          "requiresComment": true
+          "intent": "warning"
         },
         "reject": {
           "target": "rejected",
           "label": "Reject",
-          "intent": "danger",
-          "requiresComment": true
+          "intent": "danger"
         }
       }
     },

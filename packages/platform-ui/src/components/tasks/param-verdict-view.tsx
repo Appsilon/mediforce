@@ -1,13 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { cn } from '@/lib/utils';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { ParamField } from '@/components/ui/param-field';
 import type { TaskVerdict, StepParam } from '@mediforce/platform-core';
 import type { TaskBodyProps } from './task-body-registry';
 import { useParamValues } from './params-form';
-import { VerdictButtons, VerdictConfirmationReadOnly, RemainingTasksFooter } from './verdict-form';
+import { VerdictButtons, VerdictConfirmationReadOnly, RemainingTasksFooter, OptionalCommentField } from './verdict-form';
 
 export function ParamVerdictView({ task, remainingTaskCount }: TaskBodyProps) {
   const isActionable = task.status === 'claimed' || task.status === 'pending';
@@ -70,7 +69,6 @@ function ParamVerdictForm({
 
   async function handleVerdict(cfg: TaskVerdict) {
     if (isParamBlockedForVerdict(cfg.key, params, values)) return;
-    if (cfg.requiresComment && !trimmedComment) return;
     if (submitting !== null) return;
 
     setSubmitting(cfg.key);
@@ -111,18 +109,11 @@ function ParamVerdictForm({
         ))}
       </div>
 
-      <textarea
+      <OptionalCommentField
         value={comment}
-        onChange={(e) => setComment(e.target.value)}
-        placeholder="Add a comment (optional, required for some choices)..."
+        onChange={setComment}
         rows={2}
         disabled={submitting !== null}
-        className={cn(
-          'w-full rounded-md border bg-background px-3 py-2 text-sm',
-          'placeholder:text-muted-foreground resize-y min-h-[56px]',
-          'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary',
-          submitting !== null && 'opacity-50 cursor-not-allowed',
-        )}
       />
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -130,7 +121,6 @@ function ParamVerdictForm({
       <VerdictButtons
         verdicts={verdicts}
         submitting={submitting}
-        trimmedComment={trimmedComment}
         isVerdictBlocked={(key) => isParamBlockedForVerdict(key, params, values)}
         outerBlockedHint="Fill required fields first"
         onVerdict={handleVerdict}

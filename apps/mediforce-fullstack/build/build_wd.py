@@ -118,7 +118,7 @@ steps = [
         "params": [{"name": "guidance", "type": "string", "required": False,
                     "description": "Answers to the agent's questions and any implementation guidance."}],
         "verdicts": {
-            "reject": {"target": "mark-needs-info", "label": "Reject / need more info", "intent": "neutral", "requiresComment": True},
+            "reject": {"target": "mark-needs-info", "label": "Reject / need more info", "intent": "neutral"},
             "approve": {"target": "claim", "label": "Approve & implement", "intent": "success"},
         },
         "executor": "human",

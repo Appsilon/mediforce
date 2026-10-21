@@ -47,7 +47,7 @@ export function validateVerdictPayload(
   task: HumanTask,
   payload: Extract<CompleteHumanTaskPayload, { kind: 'verdict' }>,
 ): void {
-  const { verdict, comment } = payload;
+  const { verdict } = payload;
 
   const taskVerdicts = task.verdicts;
   const descriptor = taskVerdicts?.find((v) => v.key === verdict);
@@ -62,16 +62,6 @@ export function validateVerdictPayload(
       `verdict '${verdict}' not allowed for step '${task.stepId}' — must be one of: ${allowedKeys}`,
       { stepId: task.stepId, verdict, allowed: allowedKeys },
     );
-  }
-
-  if (descriptor?.requiresComment) {
-    const trimmed = typeof comment === 'string' ? comment.trim() : '';
-    if (trimmed.length === 0) {
-      throw new CompleteHumanTaskValidationError(
-        `verdict '${verdict}' requires a non-empty comment`,
-        { stepId: task.stepId, verdict },
-      );
-    }
   }
 
   if (payload.selectedIndex !== undefined) {

@@ -684,7 +684,6 @@ describe('WorkflowEngine', () => {
                 target: 'done',
                 label: 'Ask agent to make changes',
                 intent: 'warning' as const,
-                requiresComment: true,
               },
             },
           },
@@ -714,9 +713,9 @@ describe('WorkflowEngine', () => {
       expect(tasks).toHaveLength(1);
       // Array shape — order matches WD insertion order.
       expect(tasks[0].verdicts).toEqual([
-        { key: 'accept', label: 'Accept delivery', intent: 'success', requiresComment: false },
-        { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger', requiresComment: false },
-        { key: 'ask_agent_to_revise', label: 'Ask agent to make changes', intent: 'warning', requiresComment: true },
+        { key: 'accept', label: 'Accept delivery', intent: 'success' },
+        { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger' },
+        { key: 'ask_agent_to_revise', label: 'Ask agent to make changes', intent: 'warning' },
       ]);
     });
 

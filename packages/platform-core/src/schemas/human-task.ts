@@ -34,7 +34,6 @@ export const HumanTaskSchema = z.object({
     key: z.string().min(1),
     label: z.string(),
     intent: z.enum(['success', 'danger', 'warning', 'neutral']),
-    requiresComment: z.boolean(),
   })).optional(),
   deleted: z.boolean().optional(),
 });

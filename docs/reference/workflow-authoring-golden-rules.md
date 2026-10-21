@@ -265,8 +265,9 @@ separate human `type: review` step, which keeps working for existing workflows â
 but per [ADR-0014](../adr/0014-control-mode-ui-concept.md) the designer no longer
 offers that type for new steps, so reach for CM3 when authoring.
 
-Human review steps MUST define explicit `verdicts`. Use `requiresComment: true`
-for revise/reject-style verdicts.
+Human review steps MUST define explicit `verdicts`. The reviewer comment is
+always optional; when a verdict needs a reason, add a param with
+`requiredForVerdicts` listing that verdict.
 
 Default failure behavior SHOULD be fail-fast. Use `continueOnError: true` only
 for non-critical `action` steps that may fail while the run continues â€” it is

@@ -245,7 +245,7 @@ describe('WorkflowEngine.completeHumanTask', () => {
       status: 'claimed',
       assignedUserId: 'u-1',
       verdicts: [
-        { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+        { key: 'approve', label: 'Approve', intent: 'success' },
       ],
     });
     await humanTaskRepo.create(task);

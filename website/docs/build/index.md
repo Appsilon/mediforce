@@ -144,8 +144,8 @@ A step that can go more than one way declares **verdicts** — the named outcome
 person or agent picks between — and a transition per verdict. A verdict may point
 back to an earlier step, which is how revision loops are drawn.
 
-Human review steps must define their verdicts explicitly; `requiresComment` makes
-the reviewer say why.
+Human review steps must define their verdicts explicitly. The comment is always
+optional; a param with `requiredForVerdicts` makes the reviewer say why.
 
 ## Secrets
 

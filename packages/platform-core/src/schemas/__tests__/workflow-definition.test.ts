@@ -103,7 +103,7 @@ describe('WorkflowDefinitionSchema — verdicts', () => {
 
   it('accepts a human review step with N custom verdict keys (no autonomyLevel)', () => {
     // Allowlist applies to L3 only — human review steps can carry any verdict
-    // key, with label/intent/requiresComment overrides.
+    // key, with label/intent overrides.
     const wd = {
       ...wdWithReview,
       steps: wdWithReview.steps.map((step) =>
@@ -116,13 +116,11 @@ describe('WorkflowDefinitionSchema — verdicts', () => {
                   target: 'scan',
                   label: 'Reject',
                   intent: 'danger' as const,
-                  requiresComment: true,
                 },
                 ask_changes: {
                   target: 'scan',
                   label: 'Ask for changes',
                   intent: 'warning' as const,
-                  requiresComment: true,
                 },
               },
             }

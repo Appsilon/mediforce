@@ -35,18 +35,24 @@ describe('VerdictSchema', () => {
     }
   });
 
-  it('accepts label/intent/requiresComment as optional overrides', () => {
+  it('accepts label/intent as optional overrides', () => {
     const result = VerdictSchema.safeParse({
       target: 'complete',
       label: 'Accept delivery',
       intent: 'success',
-      requiresComment: false,
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.label).toBe('Accept delivery');
       expect(result.data.intent).toBe('success');
-      expect(result.data.requiresComment).toBe(false);
+    }
+  });
+
+  it('strips the retired requiresComment key so older definitions still parse', () => {
+    const result = VerdictSchema.safeParse({ target: 'complete', requiresComment: true });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).not.toHaveProperty('requiresComment');
     }
   });
 
@@ -56,7 +62,6 @@ describe('VerdictSchema', () => {
     if (result.success) {
       expect(result.data.label).toBeUndefined();
       expect(result.data.intent).toBeUndefined();
-      expect(result.data.requiresComment).toBeUndefined();
     }
   });
 

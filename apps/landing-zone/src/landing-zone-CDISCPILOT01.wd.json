@@ -120,8 +120,7 @@
         "ask_agent_to_revise": {
           "target": "interpret-validation",
           "label": "Ask agent to make changes",
-          "intent": "warning",
-          "requiresComment": true
+          "intent": "warning"
         }
       }
     },

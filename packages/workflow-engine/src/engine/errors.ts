@@ -43,7 +43,7 @@ export class MaxIterationsExceededError extends Error {
 }
 
 // Per-variant payload validation failure that needs the task's runtime
-// config to detect (verdict allowlist, requiresComment, file constraints).
+// config to detect (verdict allowlist, file constraints).
 // Distinct from InvalidTransitionError (state) and Zod parse errors (shape).
 export class CompleteHumanTaskValidationError extends Error {
   override name = 'CompleteHumanTaskValidationError';

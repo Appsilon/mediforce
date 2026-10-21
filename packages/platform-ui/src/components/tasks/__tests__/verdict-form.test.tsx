@@ -37,15 +37,16 @@ describe('VerdictForm (single-click GitHub flow)', () => {
 
   it('renders one button per descriptor with success intent sorted last', () => {
     const verdicts: TaskVerdict[] = [
-      { key: 'accept', label: 'Accept delivery', intent: 'success', requiresComment: false },
-      { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger', requiresComment: false },
-      { key: 'ask_agent_to_revise', label: 'Ask agent to make changes', intent: 'warning', requiresComment: true },
+      { key: 'accept', label: 'Accept delivery', intent: 'success' },
+      { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger' },
+      { key: 'ask_agent_to_revise', label: 'Ask agent to make changes', intent: 'warning' },
     ];
 
     render(<VerdictForm taskId="t1" disabled={false} verdicts={verdicts} />);
 
     const buttons = screen.getAllByRole('button').map((b) => b.textContent?.trim());
     expect(buttons).toEqual([
+      'Add a comment',
       'Reject — notify CRO',
       'Ask agent to make changes',
       'Accept delivery', // success intent always sorted last
@@ -54,8 +55,8 @@ describe('VerdictForm (single-click GitHub flow)', () => {
 
   it('fires completeTask immediately on a single button click (no Submit step)', async () => {
     const verdicts: TaskVerdict[] = [
-      { key: 'accept', label: 'Accept delivery', intent: 'success', requiresComment: false },
-      { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger', requiresComment: false },
+      { key: 'accept', label: 'Accept delivery', intent: 'success' },
+      { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger' },
     ];
     const user = userEvent.setup();
 
@@ -69,35 +70,32 @@ describe('VerdictForm (single-click GitHub flow)', () => {
     });
   });
 
-  it('disables a requiresComment verdict button until a comment is typed', async () => {
-    const verdicts: TaskVerdict[] = [
-      { key: 'reject', label: 'Reject', intent: 'danger', requiresComment: true },
-    ];
+  it('hides the comment box by default and submits any verdict without a comment', async () => {
     const user = userEvent.setup();
 
-    render(<VerdictForm taskId="t1" disabled={false} verdicts={verdicts} />);
-    const rejectBtn = screen.getByRole('button', { name: /^Reject$/ });
-    expect(rejectBtn).toBeDisabled();
+    render(<VerdictForm taskId="t1" disabled={false} />);
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
 
-    await user.type(screen.getByRole('textbox'), 'broken manifest');
-    expect(rejectBtn).not.toBeDisabled();
+    const reviseBtn = screen.getByRole('button', { name: /Request changes/ });
+    expect(reviseBtn).not.toBeDisabled();
+    await user.click(reviseBtn);
 
-    await user.click(rejectBtn);
     await waitFor(() => expect(completeMock).toHaveBeenCalledTimes(1));
     expect(completeMock).toHaveBeenCalledWith({
       taskId: 't1',
-      payload: { kind: 'verdict', verdict: 'reject', comment: 'broken manifest' },
+      payload: { kind: 'verdict', verdict: 'revise', comment: '' },
     });
   });
 
-  it('passes the typed comment with a non-required verdict when present', async () => {
+  it('passes the typed comment once the comment box is expanded', async () => {
     const verdicts: TaskVerdict[] = [
-      { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+      { key: 'approve', label: 'Approve', intent: 'success' },
     ];
     const user = userEvent.setup();
 
     render(<VerdictForm taskId="t1" disabled={false} verdicts={verdicts} />);
-    await user.type(screen.getByRole('textbox'), 'looks good');
+    await user.click(screen.getByRole('button', { name: /Add a comment/ }));
+    await user.type(screen.getByRole('textbox', { name: 'Review comment' }), 'looks good');
     await user.click(screen.getByRole('button', { name: /Approve/ }));
 
     await waitFor(() => expect(completeMock).toHaveBeenCalledTimes(1));
@@ -111,7 +109,7 @@ describe('VerdictForm (single-click GitHub flow)', () => {
 describe('VerdictConfirmationReadOnly', () => {
   it('renders label + comment from task.verdicts when present', () => {
     const verdicts: TaskVerdict[] = [
-      { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger', requiresComment: true },
+      { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger' },
     ];
     render(
       <VerdictConfirmationReadOnly

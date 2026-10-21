@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildTaskVerdicts,
-  defaultRequiresComment,
   defaultVerdictIntent,
   defaultVerdictLabel,
 } from '../verdicts';
@@ -43,20 +42,6 @@ describe('defaultVerdictIntent', () => {
   });
 });
 
-describe('defaultRequiresComment', () => {
-  it('requires a comment for revise', () => {
-    expect(defaultRequiresComment('revise')).toBe(true);
-  });
-
-  it('does not require a comment for approve', () => {
-    expect(defaultRequiresComment('approve')).toBe(false);
-  });
-
-  it('does not require a comment for unknown keys', () => {
-    expect(defaultRequiresComment('reject')).toBe(false);
-  });
-});
-
 describe('buildTaskVerdicts', () => {
   it('returns undefined for missing or empty verdicts', () => {
     expect(buildTaskVerdicts(undefined)).toBeUndefined();
@@ -69,24 +54,23 @@ describe('buildTaskVerdicts', () => {
       revise: { target: 'scan' },
     });
     expect(out).toEqual([
-      { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
-      { key: 'revise', label: 'Request changes', intent: 'warning', requiresComment: true },
+      { key: 'approve', label: 'Approve', intent: 'success' },
+      { key: 'revise', label: 'Request changes', intent: 'warning' },
     ]);
   });
 
-  it('respects explicit overrides on label/intent/requiresComment', () => {
+  it('respects explicit overrides on label/intent', () => {
     const out = buildTaskVerdicts({
       accept: { target: 'accept-delivery', label: 'Accept delivery', intent: 'success' },
       reject_and_notify: {
         target: 'draft-rejection-note',
         label: 'Reject — notify CRO',
         intent: 'danger',
-        requiresComment: true,
       },
     });
     expect(out).toEqual([
-      { key: 'accept', label: 'Accept delivery', intent: 'success', requiresComment: false },
-      { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger', requiresComment: true },
+      { key: 'accept', label: 'Accept delivery', intent: 'success' },
+      { key: 'reject_and_notify', label: 'Reject — notify CRO', intent: 'danger' },
     ]);
   });
 
@@ -95,10 +79,10 @@ describe('buildTaskVerdicts', () => {
     expect(out?.[0]).not.toHaveProperty('target');
   });
 
-  it('defaults a custom (non approve/revise) key with only target to neutral intent + no comment required', () => {
+  it('defaults a custom (non approve/revise) key with only target to neutral intent', () => {
     const out = buildTaskVerdicts({ escalate: { target: 'oncall' } });
     expect(out).toEqual([
-      { key: 'escalate', label: 'Escalate', intent: 'neutral', requiresComment: false },
+      { key: 'escalate', label: 'Escalate', intent: 'neutral' },
     ]);
   });
 });

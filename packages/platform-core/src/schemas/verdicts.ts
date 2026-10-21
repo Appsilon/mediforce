@@ -16,17 +16,12 @@ export function defaultVerdictIntent(key: string): 'success' | 'danger' | 'warni
   return 'neutral';
 }
 
-export function defaultRequiresComment(key: string): boolean {
-  return key === 'revise';
-}
-
 /** Resolved verdict descriptor for HumanTask. Carries its own key so the
  *  array shape preserves WD insertion order through Firestore + React. */
 export interface TaskVerdict {
   key: string;
   label: string;
   intent: 'success' | 'danger' | 'warning' | 'neutral';
-  requiresComment: boolean;
 }
 
 /** Build the verdicts payload attached to a HumanTask: strip target, fill defaults.
@@ -39,7 +34,6 @@ export function buildTaskVerdicts(
     key,
     label: cfg.label ?? defaultVerdictLabel(key),
     intent: cfg.intent ?? defaultVerdictIntent(key),
-    requiresComment: cfg.requiresComment ?? defaultRequiresComment(key),
   }));
 }
 

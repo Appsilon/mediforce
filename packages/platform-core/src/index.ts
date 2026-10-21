@@ -276,7 +276,6 @@ export {
   buildTaskVerdicts,
   defaultVerdictIntent,
   defaultVerdictLabel,
-  defaultRequiresComment,
   AttachmentSchema,
   AssignmentItemSchema,
   TableEditorRowSchema,
