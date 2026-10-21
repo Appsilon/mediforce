@@ -365,6 +365,8 @@ export {
   ProposeControlSettingsToolSchema,
   ProposeDiagnosisToolSchema,
   ProposeTaskCompletionJudgeToolSchema,
+  ProposePresetEvaluatorToolSchema,
+  PresetCheckSchema,
   TaskCompletionRequirementSchema,
   TaskCompletionRequirementSourceSchema,
   FailureRootCauseSchema,
@@ -373,6 +375,7 @@ export {
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EVALUATION_ASSISTANT_TOOLSETS,
   DRAFT_TASK_COMPLETION_JUDGE_TOOLSET,
+  DRAFT_DETERMINISTIC_PRESETS_TOOLSET,
   pickTools,
   EvaluationAssistantProposalSchema,
   type EvaluationAssistantProposalToolName,
@@ -381,6 +384,8 @@ export {
   type FailureRootCause,
   type FixKind,
   type TaskCompletionRequirement,
+  type ProposePresetEvaluator,
+  type PresetCheck,
 } from './schemas/evaluation-assistant-tools';
 export {
   evaluatorTrust,
@@ -416,6 +421,12 @@ export {
   TASK_COMPLETION_EVALUATOR_NAME,
   TASK_COMPLETION_EVALUATOR_RULE,
   taskCompletionRubric,
+  EXTRACTION_EVALUATOR_NAME,
+  EXTRACTION_EVALUATOR_RULE,
+  extractionCheckSource,
+  filePresetCheckSource,
+  filePresetEvaluatorName,
+  filePresetEvaluatorRule,
 } from './evaluation/index';
 
 // Types (re-exported from schemas for convenience)

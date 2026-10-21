@@ -189,6 +189,27 @@ describe('executeEvaluationTool', () => {
     }
   });
 
+  it('lists and reads a run\'s Output Files, filtered to this step, and says so when there are none (F2)', async () => {
+    const { fixture, scope, context } = await setup();
+    const workspace = gitWorkspace({ 'README.md': 'seed' }, { '.mediforce/output/grade-aes/summary.csv': 'id,grade\n1,5\n' });
+    try {
+      await addStepRun(fixture, {
+        instanceId: 'run-with-output', agentRunId: 'agent-run-with-output', result: {}, at: '2026-09-22T11:00:00.000Z',
+        gitMetadata: { repoUrl: workspace.repoPath, commitSha: workspace.stepCommit },
+      });
+      expect(await executeEvaluationTool('list_output_files', { agentRunId: 'agent-run-with-output' }, scope, context))
+        .toEqual({ files: [{ stepId: 'grade-aes', name: 'summary.csv', path: '.mediforce/output/grade-aes/summary.csv', size: 13 }] });
+      expect(await executeEvaluationTool('read_output_file', { agentRunId: 'agent-run-with-output', path: '.mediforce/output/grade-aes/summary.csv' }, scope, context))
+        .toEqual({ path: '.mediforce/output/grade-aes/summary.csv', size: 13, content: 'id,grade\n1,5\n' });
+      await expect(executeEvaluationTool('read_output_file', { agentRunId: 'agent-run-with-output', path: '.mediforce/output/grade-aes/missing.csv' }, scope, context))
+        .rejects.toThrow("has no Output File '.mediforce/output/grade-aes/missing.csv'");
+      expect(await executeEvaluationTool('list_output_files', { agentRunId: GRADED_RUN }, scope, context))
+        .toEqual({ files: [], note: 'This run committed no Output Files.' });
+    } finally {
+      workspace.remove();
+    }
+  });
+
   it('reads a production run\'s input and result', async () => {
     const { scope, context } = await setup();
     const result = await executeEvaluationTool('get_agent_run', { agentRunId: GRADED_RUN }, scope, context);
