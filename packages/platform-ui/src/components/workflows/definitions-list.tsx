@@ -125,7 +125,7 @@ export function DefinitionsList({ workflowName }: DefinitionsListProps) {
                 href={`/${handle}/workflows/${encodeURIComponent(workflowName)}/definitions/${def.version}`}
                 className="flex items-center gap-2.5 flex-1 min-w-0"
               >
-                <VersionLabel version={def.version} title={def.title} className="text-sm shrink-0" />
+                <VersionLabel version={def.version} title={def.title} className="text-sm min-w-0" />
 
                 {isArchived && (
                   <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">

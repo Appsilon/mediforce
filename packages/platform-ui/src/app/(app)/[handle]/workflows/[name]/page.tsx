@@ -730,9 +730,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
 
         {/* Definitions tab */}
         <Tabs.Content value="definitions" className="flex-1 p-6">
-          <div className="max-w-2xl">
-            <DefinitionsList workflowName={decodedName} />
-          </div>
+          <DefinitionsList workflowName={decodedName} />
         </Tabs.Content>
 
         {/* Triggers tab */}
