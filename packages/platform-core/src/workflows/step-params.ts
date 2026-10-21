@@ -1,5 +1,5 @@
 import type { StepParam } from '../schemas/process-definition';
-import { interpolate, resolvesFully, runInterpolationSources, type RunInterpolationContext } from '../interpolation';
+import { interpolate, resolvesFully, runInterpolationSources, unresolvedPlaceholders, type RunInterpolationContext } from '../interpolation';
 
 // Widgets that edit the value itself; every other type renders a text input that needs a string.
 const STRUCTURED_PARAM_TYPES = new Set(['boolean', 'number', 'multiselect', 'object']);
@@ -34,7 +34,7 @@ export interface ResolvedStepParams {
   mappings: Record<string, unknown>;
 }
 
-// Renders `${steps.*}` / `${triggerPayload.*}` in an agent step's stepParams against the run, so a step can hand its Agent a flat input.
+// Renders `${triggerPayload.*}` / `${triggerContext.*}` / `${steps.*}` / `${variables.*}` in an agent or script step's stepParams against the run, so a step can hand its Agent a flat input.
 // A reference that names nothing fails the step instead of reaching the Agent as a literal `${…}`; secrets are withheld, as the input is audited.
 export function resolveStepParams(stepParams: Record<string, unknown>, run: RunInterpolationContext | null): ResolvedStepParams {
   const sources = runInterpolationSources(run);
@@ -42,12 +42,12 @@ export function resolveStepParams(stepParams: Record<string, unknown>, run: RunI
   const mappings: Record<string, unknown> = {};
   const unresolved: string[] = [];
   for (const [name, value] of Object.entries(stepParams)) {
-    const placeholders = templateStrings(value).flatMap((template) => [...template.matchAll(/\$\{[^}]+\}/g)].map(([placeholder]) => placeholder));
-    if (placeholders.length === 0) {
+    const templates = templateStrings(value);
+    if (templates.length === 0) {
       defaults[name] = value;
       continue;
     }
-    unresolved.push(...placeholders.filter((placeholder) => interpolate(placeholder, sources) === undefined));
+    unresolved.push(...templates.flatMap((template) => unresolvedPlaceholders(template, sources)));
     mappings[name] = interpolate(value, sources);
   }
   if (unresolved.length > 0) throw new UnresolvedStepParamError([...new Set(unresolved)]);

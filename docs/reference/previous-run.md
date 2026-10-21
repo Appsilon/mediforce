@@ -134,7 +134,8 @@ just typed.
 ## What is NOT done
 
 - No `${previousRun.*}` root in `stepParams` templates (they resolve
-  `${triggerPayload.*}` and `${steps.*}` only). The step reads `previousRun`
+  `${triggerPayload.*}`, `${triggerContext.*}`, `${steps.*}` and
+  `${variables.*}` only). The step reads `previousRun`
   directly from its runtime context (agent prompt or
   `/output/previous_run.json`).
 - No cross-workflow chains. Each workflow name owns its own chain.

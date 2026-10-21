@@ -120,6 +120,12 @@ describe('resolveStepParams', () => {
     expect(resolve).toThrow('${steps.never_ran.pdfPath}, ${triggerPayload.missing}');
   });
 
+  it('fails on a reference to a null value instead of rendering it empty', () => {
+    const resolve = () => resolveStepParams({ note: 'see ${steps.register_version.note}' }, { variables: { register_version: { note: null } } });
+
+    expect(resolve).toThrow('${steps.register_version.note}');
+  });
+
   it('never resolves secrets into the audited input', () => {
     expect(() => resolveStepParams({ token: '${secrets.API_TOKEN}' }, intakeRun)).toThrow(UnresolvedStepParamError);
   });

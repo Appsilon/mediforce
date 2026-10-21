@@ -63,6 +63,7 @@ const mockPluginRegistry = {
 };
 const mockAgentRunner = {
   runWithWorkflowStep: vi.fn(),
+  reapAsTimeout: vi.fn(),
   run: vi.fn(),
 };
 const mockAuditRepo = {
@@ -1205,9 +1206,26 @@ describe('executeAgentStep', () => {
     };
 
     await expect(
-      executeAgentStep('inst-wf-001', 'gather-data', stepWithMapping, {}, 'user-1'),
+      executeAgentStep('inst-wf-001', 'gather-data', stepWithMapping, {}, 'user-1', 'exec-001'),
     ).rejects.toThrow('${steps.never_ran.pdfPath}');
     expect(mockAgentRunner.runWithWorkflowStep).not.toHaveBeenCalled();
+    expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith('inst-wf-001', 'exec-001', expect.objectContaining({
+      status: 'failed',
+      error: expect.stringContaining('${steps.never_ran.pdfPath}'),
+    }));
+  });
+
+  it('[DATA] a reap does not render stepParams, so a stranded step still reaches its timeout fallback', async () => {
+    const stepWithMapping: WorkflowStep = {
+      ...firstStep,
+      stepParams: { pdfPath: '${steps.never_ran.pdfPath}' },
+    };
+
+    mockAgentRunner.reapAsTimeout.mockResolvedValue({ status: 'error', envelope: null, appliedToWorkflow: false, fallbackReason: 'timeout' });
+
+    await executeAgentStep('inst-wf-001', 'gather-data', stepWithMapping, {}, 'user-1', 'exec-001', { reapTimedOut: true });
+
+    expect(mockAgentRunner.reapAsTimeout).toHaveBeenCalled();
   });
 
   // ---- Error-fallback must not masquerade as success ----

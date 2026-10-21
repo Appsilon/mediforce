@@ -4,7 +4,7 @@ import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { pollUntil } from '../helpers/poll-until';
 
 /**
- * API E2E for `${…}` in an agent step's `stepParams` (#1599): the step maps
+ * API E2E for `${…}` in an agent step's `stepParams`: the step maps
  * run values onto a flat input, so its Agent reads `documentType` and
  * `summary` at the top level instead of workflow-specific paths.
  *
@@ -101,5 +101,12 @@ test.describe('Agent step stepParams mapping — API E2E', () => {
     const run = await dryRunToTerminal(request, name);
     expect(run.status).toBe('failed');
     expect(run.error).toContain('${steps.register_version.pdfPath}');
+
+    const stepsRes = await request.get(`/api/processes/${run.id}/steps`, { headers: AUTH_HEADERS });
+    expect(stepsRes.status(), await stepsRes.text()).toBe(200);
+    const { steps } = (await stepsRes.json()) as { steps: Array<{ stepId: string; executions: Array<{ status: string; error: string | null }> }> };
+    const extract = steps.find((step) => step.stepId === 'extract_document');
+    expect(extract?.executions.map((execution) => execution.status)).toEqual(['failed']);
+    expect(extract?.executions[0].error).toContain('${steps.register_version.pdfPath}');
   });
 });

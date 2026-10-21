@@ -102,7 +102,8 @@ Handler nuances not visible in the schema (in
 | Use site | Syntax | Roots available | Source |
 |----------|--------|-----------------|--------|
 | Transition `when`, `wait` `condition` | bare, no `${}`: `verdict == "x"`, `output.f > 1`, `&&`, `\|\|`, `!` | `output`, `variables`, `verdict`; `children` in a `wait` `condition` only | [`expression-evaluator.ts`](../../packages/workflow-engine/src/expressions/expression-evaluator.ts) |
-| Action configs, `spawn` payloads, `assignedTo`, `params[].default`, agent/script `stepParams`, step `env`, http body | `${...}` templates with dot/index paths | `steps`, `item` (in `forEach`), `triggerPayload`, `triggerContext`, `variables`, `secrets` | [`interpolation.ts`](../../packages/platform-core/src/interpolation.ts) |
+| Action configs, `spawn` payloads, `assignedTo`, `params[].default`, step `env`, http body | `${...}` templates with dot/index paths | `steps`, `item` (in `forEach`), `triggerPayload`, `triggerContext`, `variables`, `secrets` | [`interpolation.ts`](../../packages/platform-core/src/interpolation.ts) |
+| Agent/script `stepParams` | `${...}` templates with dot/index paths | `steps`, `triggerPayload`, `triggerContext`, `variables` | [`step-params.ts`](../../packages/platform-core/src/workflows/step-params.ts) |
 
 Notes that trip people up:
 - `triggerInput` is the workflow's **total input contract**, and every trigger
@@ -120,7 +121,7 @@ Notes that trip people up:
   reads the same top-level fields in a workflow as in its Eval Cases. A param
   holding `${...}` wins over the previous step's output on a key clash; a
   literal param stays a default it overrides. A reference that resolves to
-  nothing fails the step, and `${secrets.*}` never resolves (the input is
+  nothing (missing or `null`) fails the step, and `${secrets.*}` never resolves (the input is
   audited) — [`step-params.ts`](../../packages/platform-core/src/workflows/step-params.ts).
 - Step ids inside a bare expression must use **underscores**: the parser reads
   `output.spawn-perspectives.x` as subtraction. `${...}` templates are unaffected.
