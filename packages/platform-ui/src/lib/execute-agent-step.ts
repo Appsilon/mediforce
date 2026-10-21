@@ -29,11 +29,14 @@ import {
   mcpEvalRestrictions,
   mergeMcpTapes,
   MCP_REPLAY_RECORDINGS,
+  resolveStepParams,
+  UnresolvedStepParamError,
   type AgentDefinitionRepository,
   type AgentOAuthTokenRepository,
   type EvaluationRepository,
   type OAuthProviderRepository,
   type ResolvedMcpConfig,
+  type ResolvedStepParams,
   type ToolCatalogRepository,
   type WorkflowDefinition,
   type WorkflowStep,
@@ -115,6 +118,25 @@ export async function executeAgentStep(
     );
   }
 
+  // Literal stepParams are defaults the step's input overrides; a `${…}` mapping
+  // the author wrote out wins, so a step can hand its Agent a flat input. A reap
+  // launches nothing, so it renders nothing.
+  let stepParams: ResolvedStepParams = { defaults: workflowStep.stepParams ?? {}, mappings: {} };
+  if (reapTimedOut === false) {
+    try {
+      stepParams = resolveStepParams(workflowStep.stepParams ?? {}, instance);
+    } catch (err) {
+      if (err instanceof UnresolvedStepParamError && stepExecutionId !== undefined) {
+        await instanceRepo.updateStepExecution(instanceId, stepExecutionId, {
+          status: 'failed',
+          completedAt: new Date().toISOString(),
+          error: err.message,
+        });
+      }
+      throw err;
+    }
+  }
+
   // An eval trial runs the step its Eval Run froze, with its MCP servers
   // under the run's policy (ADR-0023 D5, D6).
   const evalTrial = reapTimedOut || instance.evalRunId === undefined
@@ -159,10 +181,10 @@ export async function executeAgentStep(
     ? 'L4'
     : (workflowStep.autonomyLevel ?? 'L2');
 
-  // Merge step params into context — stepParams take lower priority than appContext
   const mergedInput: Record<string, unknown> = {
-    ...(workflowStep.stepParams ?? {}),
+    ...stepParams.defaults,
     ...appContext,
+    ...stepParams.mappings,
   };
 
   // Pre-fetch secrets for {{TEMPLATE}} resolution.

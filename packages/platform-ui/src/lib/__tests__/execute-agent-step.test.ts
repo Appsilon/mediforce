@@ -63,6 +63,7 @@ const mockPluginRegistry = {
 };
 const mockAgentRunner = {
   runWithWorkflowStep: vi.fn(),
+  reapAsTimeout: vi.fn(),
   run: vi.fn(),
 };
 const mockAuditRepo = {
@@ -1167,6 +1168,64 @@ describe('executeAgentStep', () => {
       shared: 'app-value', // appContext wins
       extra: 'from-app',
     });
+  });
+
+  it('[DATA] resolves ${…} in stepParams against the run and lets the mapping win over appContext', async () => {
+    mockInstanceRepo.getById.mockResolvedValue({
+      ...defaultInstance,
+      triggerPayload: { case: { documentType: 'protocol' } },
+      variables: { register_version: { pdfPath: '/data/protocol-v2.pdf' } },
+    });
+    const stepWithMapping: WorkflowStep = {
+      ...firstStep,
+      stepParams: {
+        documentType: '${triggerPayload.case.documentType}',
+        pdfPath: '${steps.register_version.pdfPath}',
+        language: 'en',
+      },
+    };
+
+    await executeAgentStep(
+      'inst-wf-001', 'gather-data', stepWithMapping,
+      { pdfPath: 'from-previous-step', language: 'de' },
+      'user-1',
+    );
+
+    const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
+    expect(contextArg.stepInput).toEqual({
+      documentType: 'protocol',
+      pdfPath: '/data/protocol-v2.pdf',
+      language: 'de',
+    });
+  });
+
+  it('[ERROR] fails the step when a stepParams reference names nothing in the run', async () => {
+    const stepWithMapping: WorkflowStep = {
+      ...firstStep,
+      stepParams: { pdfPath: '${steps.never_ran.pdfPath}' },
+    };
+
+    await expect(
+      executeAgentStep('inst-wf-001', 'gather-data', stepWithMapping, {}, 'user-1', 'exec-001'),
+    ).rejects.toThrow('${steps.never_ran.pdfPath}');
+    expect(mockAgentRunner.runWithWorkflowStep).not.toHaveBeenCalled();
+    expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith('inst-wf-001', 'exec-001', expect.objectContaining({
+      status: 'failed',
+      error: expect.stringContaining('${steps.never_ran.pdfPath}'),
+    }));
+  });
+
+  it('[DATA] a reap does not render stepParams, so a stranded step still reaches its timeout fallback', async () => {
+    const stepWithMapping: WorkflowStep = {
+      ...firstStep,
+      stepParams: { pdfPath: '${steps.never_ran.pdfPath}' },
+    };
+
+    mockAgentRunner.reapAsTimeout.mockResolvedValue({ status: 'error', envelope: null, appliedToWorkflow: false, fallbackReason: 'timeout' });
+
+    await executeAgentStep('inst-wf-001', 'gather-data', stepWithMapping, {}, 'user-1', 'exec-001', { reapTimedOut: true });
+
+    expect(mockAgentRunner.reapAsTimeout).toHaveBeenCalled();
   });
 
   // ---- Error-fallback must not masquerade as success ----
