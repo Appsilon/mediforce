@@ -529,8 +529,13 @@ describe('selectAgentPatch', () => {
   it('drops the image the previous agent gave the step, so saving gives it the new agent\'s', () => {
     expect(selectAgentPatch({ agent: { image: 'mediforce-golden-image' } }, agent, SONNET).agent).toBeUndefined();
     expect(selectAgentPatch({ agent: { image: 'mediforce-golden-image:latest' } }, agent, SONNET).agent).toBeUndefined();
-    expect(selectAgentPatch({ agent: { image: 'r-tools:2', prompt: 'Draft' } }, agent, SONNET, { currentAgent: { image: 'r-tools:2' } }).agent)
+    expect(selectAgentPatch({ agent: { image: 'r-tools:2', prompt: 'Draft' } }, agent, SONNET, { currentAgentImages: ['r-tools:2'] }).agent)
       .toEqual({ prompt: 'Draft' });
+  });
+
+  it('drops an image an earlier version of the previous agent gave the step', () => {
+    expect(selectAgentPatch({ agent: { image: 'r-tools:1' } }, agent, SONNET, { currentAgentImages: ['r-tools:2', 'r-tools:1'] }).agent)
+      .toBeUndefined();
   });
 
   it('keeps an image the author chose, and one a build source tags', () => {

@@ -271,8 +271,9 @@ export function withDefaultModel(step: WorkflowStep, defaultModel: string): Work
  * The patch for picking a saved agent on a step. A model that is still the
  * default `withDefaultModel` filled in is dropped, so the step inherits the
  * agent's own model rather than overriding it with the default. An image that
- * is the one the step's current agent gave it on save is dropped too, so the
- * next save gives the step the new agent's image. A plugin agent names the
+ * the step's current agent has, or had in any of its versions, is one it gave
+ * the step on save, so it is dropped too and the next save gives the step the
+ * new agent's image. A plugin agent names the
  * runtime it runs on, so the step's plugin is filled from it; the author may
  * still change it afterwards.
  */
@@ -280,13 +281,13 @@ export function selectAgentPatch(
   step: Pick<WorkflowStep, 'agent' | 'plugin'>,
   agent: Pick<AgentDefinition, 'id' | 'kind' | 'runtimeId'> | undefined,
   defaultModel: string,
-  { currentAgent = {}, artifacts }: { currentAgent?: Pick<AgentDefinition, 'image'>; artifacts?: WorkflowDefinition['artifacts'] } = {},
+  { currentAgentImages = [agentImageOf({})], artifacts }: { currentAgentImages?: readonly string[]; artifacts?: WorkflowDefinition['artifacts'] } = {},
 ): Pick<WorkflowStep, 'agentId' | 'agent' | 'plugin'> {
   const plugin = agent?.kind === 'plugin' && agent.runtimeId !== undefined ? agent.runtimeId : step.plugin;
   if (agent === undefined) return { agentId: undefined, agent: step.agent, plugin };
   const { model, image, ...rest } = step.agent ?? {};
   const givenByCurrentAgent = image !== undefined
-    && normalizeImageRef(image) === normalizeImageRef(agentImageOf(currentAgent))
+    && currentAgentImages.some((agentImage) => normalizeImageRef(agentImage) === normalizeImageRef(image))
     && stepHasBuildSource(step.agent, { artifacts }) === false;
   const kept = {
     ...(model === undefined || model === defaultModel ? {} : { model }),

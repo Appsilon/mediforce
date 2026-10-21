@@ -19,7 +19,7 @@ export const agentCreateCommand = defineCommand({
     },
     image: {
       type: 'string',
-      description: 'Image tag the agent runs in (overrides any `image` in the file); omitted means the golden image',
+      description: 'Image tag the agent runs in (overrides any `image` in the file); omitted or empty means the golden image',
     },
   },
   async run({ args, output, mediforce, jsonMode }) {
@@ -32,6 +32,7 @@ export const agentCreateCommand = defineCommand({
     }
     const rawObject = typeof raw === 'object' && raw !== null ? { ...(raw as Record<string, unknown>) } : {};
     if (args.namespace !== undefined) rawObject.namespace = args.namespace;
+    if (args.image !== undefined && args.image.trim() === '') delete rawObject.image;
     if (args.image !== undefined && args.image.trim() !== '') rawObject.image = args.image.trim();
     const parsed = CreateAgentInputSchema.safeParse(rawObject);
     if (!parsed.success) {

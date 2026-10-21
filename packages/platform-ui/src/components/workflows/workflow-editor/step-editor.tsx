@@ -9,7 +9,7 @@ import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { useNamespaceMembers } from '@/hooks/use-namespace-members';
 import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
 import { useAuth } from '@/contexts/auth-context';
-import { useAgentValidationStatuses, useStepQualification } from '@/hooks/use-step-evaluation';
+import { useAgentValidationStatuses, useAgentVersions, useStepQualification } from '@/hooks/use-step-evaluation';
 import { mediforce } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
@@ -432,6 +432,9 @@ export function StepEditor({
   // nothing to ask about; one that names none runs in the default image.
   const toolCatalog = useToolCatalogEntries(isAgent ? handle : undefined);
   const selectedAgent = agentDefinitions.find((agent) => agent.id === step.agentId);
+  const selectedAgentVersions = useAgentVersions(selectedAgent?.id);
+  const selectedAgentImages = [selectedAgent ?? {}, ...(selectedAgentVersions.data?.versions ?? []).map((version) => version.config)]
+    .map(agentImageOf);
   // A step that runs a validated agent as it is shares its validation; one
   // that changes it needs a validation of its own (ADR-0029 D8).
   const agentQualification = useStepQualification(
@@ -852,7 +855,7 @@ export function StepEditor({
                 step,
                 e.target.value === '' ? undefined : agentDefinitions.find((agent) => agent.id === e.target.value) ?? { id: e.target.value, kind: 'plugin' },
                 pinnedDefaultModel,
-                { currentAgent: selectedAgent, artifacts: workflowArtifacts },
+                { currentAgentImages: selectedAgentImages, artifacts: workflowArtifacts },
               ))}
               className={rs}
             >

@@ -152,7 +152,8 @@ point at.
    not move it, and with decision 8 such a Step reads as changing the Agent
    until it is saved with the new image or validated on its own. Picking
    another Agent for a Step in the editor drops the image the previous Agent
-   gave it, so the next save gives it the new Agent's.
+   gave it — its image now or in any of its versions — so the next save gives
+   it the new Agent's.
 
 ## Considered options
 
