@@ -22,6 +22,7 @@ export const GET = createRouteAdapter<typeof ListRunsInputSchema, ListRunsInput>
       namespace: params.get('namespace') ?? undefined,
       limit: params.get('limit') ?? undefined,
       dryRun: params.get('dryRun') ?? undefined,
+      parent: params.get('parent') ?? undefined,
     };
   },
   listRuns,

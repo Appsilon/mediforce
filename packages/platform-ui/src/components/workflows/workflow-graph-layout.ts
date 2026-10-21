@@ -29,6 +29,7 @@ export type GraphLayout = {
   edges: PlacedEdge[];
   positions: Map<string, { x: number; y: number }>;
   height: number;
+  width: number;
 };
 
 /** The id an edge between two steps carries everywhere: layout, diagram, and run replay. */
@@ -164,12 +165,15 @@ function assignColumns(order: string[], forwardEdges: PlacedEdge[], depth: Map<s
  * caller can route them around the side instead of through the layers.
  *
  * `heightOf` is told how many back edges leave the node, because the card grows
- * a row per loop it can take.
+ * a row per loop it can take. `widthOf` widens a node's whole column, so a node
+ * drawn wider than a card (a child workflow drawn inline) pushes the columns to
+ * its right aside instead of covering them.
  */
 export function computeGraphLayout(
   nodeIds: string[],
   edges: GraphEdge[],
   heightOf: (nodeId: string, outgoingBackEdges: number) => number,
+  widthOf: (nodeId: string) => number = () => NODE_WIDTH,
 ): GraphLayout {
   const known = new Set(nodeIds);
   const graphEdges = edges.filter((edge) => known.has(edge.from) === true && known.has(edge.to) === true);
@@ -215,15 +219,30 @@ export function computeGraphLayout(
     cursorY += (rowHeights.get(level) ?? 0) + ROW_GAP;
   }
 
+  const columnWidths = new Map<number, number>();
+  for (const id of order) {
+    const col = column.get(id) ?? 0;
+    columnWidths.set(col, Math.max(columnWidths.get(col) ?? NODE_WIDTH, widthOf(id)));
+  }
+  const xByColumn = new Map<number, number>();
+  const maxColumn = Math.max(0, ...columnWidths.keys());
+  let cursorX = 0;
+  for (let col = 0; col <= maxColumn; col++) {
+    xByColumn.set(col, cursorX);
+    cursorX += (columnWidths.get(col) ?? NODE_WIDTH) + COLUMN_GAP;
+  }
+
   const positions = new Map<string, { x: number; y: number }>();
   for (const id of order) {
+    const col = column.get(id) ?? 0;
+    // Centred in a column a wider node widened, so the edges through it stay straight.
     positions.set(id, {
-      x: (column.get(id) ?? 0) * (NODE_WIDTH + COLUMN_GAP),
+      x: (xByColumn.get(col) ?? 0) + ((columnWidths.get(col) ?? NODE_WIDTH) - widthOf(id)) / 2,
       y: yByDepth.get(depth.get(id) ?? 0) ?? 0,
     });
   }
 
-  return { order, edges: placedEdges, positions, height: cursorY + CANVAS_PADDING };
+  return { order, edges: placedEdges, positions, height: cursorY + CANVAS_PADDING, width: cursorX - COLUMN_GAP };
 }
 
 /** A node as the canvas currently holds it: where it sits and how tall it is. */

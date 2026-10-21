@@ -22,18 +22,20 @@ function formatAge(iso: string): string {
 
 export const runListCommand = defineCommand({
   name: 'mediforce run list',
-  description: 'List recent runs, optionally filtered by workflow name or status.',
+  description: 'List recent runs, optionally filtered by workflow name, status, or the run that spawned them.',
   args: {
     workflow: { type: 'string', description: 'Filter by workflow definition name' },
     status: enumArg(['created', 'running', 'paused', 'completed', 'failed'] as const, {
       description: 'Filter by status',
     }),
+    parent: { type: 'string', description: 'List the runs this run id spawned' },
     limit: { type: 'string', description: 'Max results (default: 20, max: 100)' },
   },
   async run({ args, output, mediforce, jsonMode }) {
     const result = await mediforce.runs.list({
       workflow: args.workflow,
       status: args.status,
+      parent: args.parent,
       limit: args.limit !== undefined ? Number(args.limit) : 20,
     });
 

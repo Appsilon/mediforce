@@ -78,6 +78,8 @@ export const queryKeys = {
       handle: string,
       filters: { workflow?: string; dryRun?: boolean; archived?: boolean },
     ) => ['runs', 'status-counts', handle, { ...filters }] as const,
+    /** The runs one run spawned (runs.list `parent`). */
+    children: (parentRunId: string) => ['runs', 'children', parentRunId] as const,
   },
   run: (runId: string) => ['run', runId] as const,
 

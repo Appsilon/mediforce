@@ -218,7 +218,7 @@ export async function seedPostgresNamespace(
           id, workspace, definition_name, definition_version, status,
           current_step_id, variables, trigger_type, trigger_payload,
           pause_reason, error, assigned_roles, total_cost_usd, created_by, created_at, updated_at,
-          deleted_at, dry_run
+          deleted_at, dry_run, parent_instance_id, parent_definition_name
         ) VALUES (
           ${proc.id as string},
           ${proc.namespace as string},
@@ -237,7 +237,9 @@ export async function seedPostgresNamespace(
           ${proc.createdAt as string},
           ${proc.updatedAt as string},
           ${(proc.deletedAt as string | null) ?? null},
-          ${(proc.dryRun as boolean | undefined) ?? false}
+          ${(proc.dryRun as boolean | undefined) ?? false},
+          ${(proc.parentInstanceId as string | undefined) ?? null},
+          ${(proc.parentDefinitionName as string | undefined) ?? null}
         )
         ON CONFLICT (id) DO NOTHING
       `;

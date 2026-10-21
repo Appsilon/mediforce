@@ -27,6 +27,29 @@ const tealflow = {
 const layoutTealflow = () => computeGraphLayout(tealflow.nodes, tealflow.edges, () => 100);
 
 describe('computeGraphLayout', () => {
+  it('[UNIT] a wide node widens its column and pushes the columns beside it aside', () => {
+    const wide = 600;
+    const layout = computeGraphLayout(
+      ['split', 'open', 'side', 'join'],
+      [
+        { from: 'split', to: 'open' },
+        { from: 'split', to: 'side' },
+        { from: 'open', to: 'join' },
+        { from: 'side', to: 'join' },
+      ],
+      () => 100,
+      (id) => (id === 'open' ? wide : NODE_WIDTH),
+    );
+
+    const open = layout.positions.get('open')!;
+    const side = layout.positions.get('side')!;
+    const split = layout.positions.get('split')!;
+    expect(side.x).toBeGreaterThanOrEqual(open.x + wide + COLUMN_GAP);
+    // The narrower step in the wide column sits on its centre line, so the edge into `open` drops straight.
+    expect(split.x + NODE_WIDTH / 2).toBe(open.x + wide / 2);
+    expect(layout.width).toBe(wide + COLUMN_GAP + NODE_WIDTH);
+  });
+
   it('[UNIT] places every step, including both sides of a branch', () => {
     const { positions } = layoutTealflow();
 

@@ -1988,6 +1988,7 @@ export class Mediforce {
           status: validated.status,
           namespace: validated.namespace,
           limit: validated.limit !== undefined ? String(validated.limit) : undefined,
+          parent: validated.parent,
         });
         const res = await this.request(`/api/runs${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.runs.list');
