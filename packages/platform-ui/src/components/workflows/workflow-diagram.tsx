@@ -405,7 +405,82 @@ function AddStepEdge({
   );
 }
 
-const edgeTypes = { addStep: AddStepEdge };
+// ---------------------------------------------------------------------------
+// Custom edge — run replay: a ball rides the edge the run is taking now, and a
+// counter names how many times the run has taken it so far.
+// ---------------------------------------------------------------------------
+
+/** What a run replay shows at one moment: where the run is, and which edge it is crossing. */
+export interface DiagramReplayFrame {
+  activeStepId: string | null;
+  travel: { edgeId: string; key: number; durationMs: number } | null;
+  edgeTraversals: ReadonlyMap<string, number>;
+  /** Step the viewport pans to, so a tall diagram keeps the ball in view; null leaves the viewport alone. */
+  followStepId: string | null;
+}
+
+type ReplayEdgeData = {
+  travel: DiagramReplayFrame['travel'];
+  traversals: number;
+  isBack: boolean;
+};
+
+const REPLAY_BALL_COLOR = '#2563eb';
+
+function ReplayEdge({
+  id,
+  sourceX, sourceY, sourcePosition,
+  targetX, targetY, targetPosition,
+  style, markerEnd, pathOptions,
+  label, labelStyle, labelBgStyle, labelBgPadding, labelBgBorderRadius,
+  data,
+}: EdgeProps & { data?: ReplayEdgeData }) {
+  const [path, midX, midY] = getSmoothStepPath({
+    sourceX, sourceY, sourcePosition,
+    targetX, targetY, targetPosition,
+    borderRadius: pathOptions?.borderRadius,
+    offset: pathOptions?.offset,
+  });
+  const motionRef = useRef<SVGAnimateMotionElement>(null);
+  const travel = data?.travel ?? null;
+
+  // A freshly mounted <animateMotion> with the default begin would count from
+  // page load and already be over — start each hop's animation explicitly.
+  useLayoutEffect(() => {
+    if (travel !== null) motionRef.current?.beginElement();
+  }, [travel]);
+
+  const traversals = data?.traversals ?? 0;
+  const counter = traversals > 1 ? `×${traversals}` : undefined;
+  const replayLabel = [label, counter].filter((part) => part !== undefined).join('  ');
+
+  return (
+    <>
+      <BaseEdge
+        id={id}
+        path={path}
+        style={traversals > 0 ? { ...style, strokeOpacity: 1 } : { ...style, strokeOpacity: 0.45 }}
+        markerEnd={markerEnd}
+        label={replayLabel.length > 0 ? replayLabel : undefined}
+        // A back edge's midpoint sits on the cards it joins; put its counter on the arc instead.
+        labelX={data?.isBack === true ? sourceX + (pathOptions?.offset ?? 0) : midX}
+        labelY={midY}
+        labelStyle={labelStyle}
+        labelBgStyle={labelBgStyle ?? { fill: 'white', fillOpacity: 0.85 }}
+        labelBgPadding={labelBgPadding}
+        labelBgBorderRadius={labelBgBorderRadius}
+        labelShowBg={true}
+      />
+      {travel !== null && (
+        <circle key={travel.key} r={7} fill={REPLAY_BALL_COLOR} stroke="white" strokeWidth={2} data-testid="replay-ball">
+          <animateMotion ref={motionRef} dur={`${travel.durationMs}ms`} path={path} begin="indefinite" fill="freeze" />
+        </circle>
+      )}
+    </>
+  );
+}
+
+const edgeTypes = { addStep: AddStepEdge, replay: ReplayEdge };
 
 // ---------------------------------------------------------------------------
 // Layout engine — layered, every path placed
@@ -662,9 +737,11 @@ interface WorkflowDiagramProps {
   canRedo?: boolean;
   onAddBlock?: () => void;
   addBlockActive?: boolean;
+  /** Replays a run on the diagram: highlights its current step and animates the edge it is crossing. */
+  replay?: DiagramReplayFrame;
 }
 
-export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, onPaneClick, selectedStepId, errorStepIds, warningStepIds, stepEvaluation, canMoveUp, canMoveDown, onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive }: WorkflowDiagramProps) {
+export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, onPaneClick, selectedStepId, errorStepIds, warningStepIds, stepEvaluation, canMoveUp, canMoveDown, onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive, replay }: WorkflowDiagramProps) {
   const { nodes: layoutNodes, edges: layoutEdges, height } = useMemo(
     () => buildLayout(definition),
     [definition],
@@ -675,7 +752,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
       const d = n.data as StepNodeData;
       return {
         ...n,
-        selected: n.id === selectedStepId,
+        selected: replay ? n.id === replay.activeStepId : n.id === selectedStepId,
         data: {
           ...d,
           hasError: errorStepIds?.has(n.id) ?? false,
@@ -690,6 +767,17 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
     });
     const styledEdges: Edge[] = layoutEdges.map((e) => {
       const isForward = e.sourceHandle !== 'right-out';
+      if (replay) {
+        return {
+          ...e,
+          type: 'replay',
+          data: {
+            travel: replay.travel?.edgeId === e.id ? replay.travel : null,
+            traversals: replay.edgeTraversals.get(e.id) ?? 0,
+            isBack: isForward === false,
+          } satisfies ReplayEdgeData,
+        };
+      }
       if (isForward && onRequestAddStep) {
         return {
           ...e,
@@ -702,7 +790,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
       return e;
     });
     return { nodes: styledNodes as Node[], edges: styledEdges };
-  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, warningStepIds, stepEvaluation, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, canMoveUp, canMoveDown]);
+  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, warningStepIds, stepEvaluation, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, canMoveUp, canMoveDown, replay]);
 
   // Controlled node state, lazily seeded from computedNodes so XYFlow never sees an
   // empty array on first render (an empty seed would throw XYFlow error #015 on drag).
@@ -770,6 +858,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
         onAddBlock={onAddBlock}
         addBlockActive={addBlockActive}
         onTidy={handleTidy}
+        followStepId={replay?.followStepId ?? null}
       />
     </ReactFlowProvider>
   );
@@ -789,10 +878,23 @@ type FlowCanvasProps = {
   onNodesChange: (changes: NodeChange[]) => void;
   onNodeClick?: (stepId: string) => void;
   onPaneClick?: () => void;
+  followStepId?: string | null;
 } & CanvasControlsProps;
 
-function FlowCanvas({ className, style, height, localNodes, edges, onNodesChange, onNodeClick, onPaneClick, onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive, onTidy }: FlowCanvasProps) {
-  const { fitView } = useReactFlow();
+function FlowCanvas({ className, style, height, localNodes, edges, onNodesChange, onNodeClick, onPaneClick, onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive, onTidy, followStepId }: FlowCanvasProps) {
+  const { fitView, getZoom } = useReactFlow();
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  // The canvas is as tall as the diagram, so on a short screen the page scrolls
+  // rather than the viewport — bring the step into view both ways.
+  useEffect(() => {
+    if (followStepId === null || followStepId === undefined) return;
+    const zoom = getZoom();
+    fitView({ nodes: [{ id: followStepId }], duration: 300, minZoom: zoom, maxZoom: zoom });
+    canvasRef.current
+      ?.querySelector(`.react-flow__node[data-id="${CSS.escape(followStepId)}"]`)
+      ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [followStepId, fitView, getZoom]);
   const hasEditableSteps = localNodes.some((node) => (node.data as StepNodeData).stepType !== 'terminal');
 
   const handleNodeClick = useCallback(
@@ -807,6 +909,7 @@ function FlowCanvas({ className, style, height, localNodes, edges, onNodesChange
 
   return (
     <div
+      ref={canvasRef}
       className={cn('rounded-lg', className)}
       style={{ width: '100%', height: `${Math.max(360, height)}px`, ...style }}
     >
