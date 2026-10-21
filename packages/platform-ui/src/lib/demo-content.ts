@@ -108,7 +108,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
         title: 'The log streams as the agent works',
         body: 'One collapsible section per step, with the tool calls and their results as they arrive. No reloading, and no waiting for the step to finish before you learn what it is doing.',
         target: 'run-pull-log',
-        action: 'Open the Log pull',
+        action: 'Open Log',
       },
       {
         id: 'audit',
@@ -116,7 +116,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
         title: 'Decisions are separated from bookkeeping',
         body: 'A run records hundreds of events. The ones where somebody or something chose are kept apart from the routine trail, so a reviewer reads the decisions first and the rest only when they need it.',
         target: 'run-pull-audit',
-        action: 'Open the Audit pull',
+        action: 'Open Audit',
       },
       {
         id: 'attribution',
@@ -131,7 +131,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
         title: 'The report is the run, written up',
         body: 'Once a run finishes it can be read as a document rather than a timeline, and printed as the record — not as a screenshot of a screen.',
         target: 'run-pull-report',
-        action: 'Open the Report pull',
+        action: 'Open Report',
       },
     ],
   },

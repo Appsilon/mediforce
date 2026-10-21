@@ -55,6 +55,25 @@ export function useAgentRunsForStep(
   };
 }
 
+export function useAgentRunsForProcess(processInstanceId: string | null): { data: AgentRun[]; loading: boolean } {
+  const enabled = processInstanceId !== null;
+  const query = useQuery({
+    queryKey: queryKeys.agentRuns.list(undefined, { runId: processInstanceId ?? undefined }),
+    queryFn: async () => {
+      const result = await mediforce.agentRuns.list({ runId: processInstanceId as string });
+      return result.runs;
+    },
+    enabled,
+    retry: stopRetryOn4xx,
+    refetchInterval: (q) => (q.state.error !== null ? false : STANDARD_LIVE_INTERVAL_MS),
+  });
+
+  return {
+    data: enabled ? query.data ?? [] : [],
+    loading: enabled && query.isLoading,
+  };
+}
+
 /**
  * Single agent-run detail. CRITICAL LIVE while non-terminal so an operator
  * watching a still-running agent sees envelope updates within ~1.5 s; polling

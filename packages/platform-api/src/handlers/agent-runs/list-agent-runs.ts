@@ -28,6 +28,7 @@ export async function listAgentRuns(
     status: input.status,
     cardStatus: input.cardStatus,
     processInstanceIds: input.processInstanceIds,
+    excludeExecutorType: input.excludeExecutorType,
   });
   return {
     runs: [...page.items],

@@ -379,7 +379,7 @@ export function getPlatformServices(): PlatformServices {
     agentTrajectoryRepo,
   );
 
-  const scriptStepExecutor = new ScriptStepExecutor(pluginRunner);
+  const scriptStepExecutor = new ScriptStepExecutor(pluginRunner, agentRunRepo, agentTrajectoryRepo);
   const agentStepExecutor = new AgentStepExecutor(agentRunner);
 
   const manualTrigger = new ManualTrigger(engine, processRepo, triggerRepo);

@@ -289,13 +289,17 @@ export class ScriptContainerPlugin extends ContainerPlugin {
       });
 
       const emitLine = (text: string): void => {
-        const entry = JSON.stringify({
+        const payload = {
           ts: new Date().toISOString(),
-          type: 'assistant',
-          subtype: 'text',
+          type: 'assistant' as const,
+          subtype: 'text' as const,
           text,
-        });
+        };
+        const entry = JSON.stringify(payload);
         appendFile(logFile, entry + '\n').catch(() => {});
+        if (isWorkflowAgentContext(this.context) && this.context.trajectory !== undefined) {
+          this.context.trajectory.record([payload]);
+        }
         emit({
           type: 'assistant',
           payload: entry,

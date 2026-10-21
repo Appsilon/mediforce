@@ -24,6 +24,7 @@ export const GET = createRouteAdapter<
       namespace: params.get('namespace') ?? undefined,
       status: params.get('status') ?? undefined,
       processInstanceIds: processInstanceIds.length > 0 ? processInstanceIds : undefined,
+      excludeExecutorType: params.get('excludeExecutorType') ?? undefined,
     };
   },
   getAgentRunCardStatusCounts,

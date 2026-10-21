@@ -19,6 +19,7 @@ export async function getAgentRunCardStatusCounts(
     namespace: input.namespace,
     status: input.status,
     processInstanceIds: input.processInstanceIds,
+    excludeExecutorType: input.excludeExecutorType,
   });
   return { counts };
 }

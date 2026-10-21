@@ -346,6 +346,13 @@ export async function seedPostgresNamespace(
       `;
     }
 
+    for (const row of Object.values(data.agentTrajectoryEntries)) {
+      await sql`
+        INSERT INTO agent_trajectory_entries (agent_run_id, seq, entry)
+        VALUES (${row.agentRunId as string}, ${row.seq as number}, ${sql.json(row.entry as unknown)})
+      `;
+    }
+
     // ── 8. audit_events ─────────────────────────────────────────────────────
     for (const ev of Object.values(data.auditEvents)) {
       const parent = data.processInstances[ev.processInstanceId as string];

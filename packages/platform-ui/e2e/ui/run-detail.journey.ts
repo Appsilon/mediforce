@@ -16,8 +16,8 @@ test.describe('Run Detail Journey', () => {
     await expect(historyPanel.getByText('Vendor Assessment', { exact: true })).toBeVisible();
     await expect(historyPanel.getByText('Narrative Summary', { exact: true })).toBeVisible();
 
-    // Right panel: each view has its own pull down the edge; opening one shows
-    // the tab strip. No Step History tab.
+    // Right panel: each view has its own button in the main column; opening
+    // one shows the tab strip. No Step History tab.
     await expect(page.getByRole('button', { name: /^Log$/i }).first()).toBeVisible();
     await page.getByRole('button', { name: /^Log$/i }).first().click();
     await expect(page.getByRole('button', { name: /^Audit$/i }).first()).toBeVisible();
@@ -35,7 +35,7 @@ test.describe('Run Detail Journey', () => {
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1`);
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
 
-    // The panel opens from its own tab down the edge, not a header button.
+    // The panel opens from its own button under the run facts.
     await page.getByRole('button', { name: 'Log' }).first().click();
 
     // Both steps are listed, and a finished step opens on click.
@@ -72,7 +72,7 @@ test.describe('Run Detail Journey', () => {
     // Duration is visible for a completed run
     await expect(page.getByText('Duration', { exact: true })).toBeVisible();
 
-    // Right panel: every run has an Audit pull, whether or not it wrote logs.
+    // Right panel: every run has an Audit button, whether or not it wrote logs.
     await page.getByRole('button', { name: /^Audit$/i }).first().click();
     await expect(page.getByRole('heading', { name: 'Audit' })).toBeVisible();
   });

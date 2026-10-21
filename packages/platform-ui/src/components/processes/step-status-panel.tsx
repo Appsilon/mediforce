@@ -344,19 +344,7 @@ function StepProgress({ stepId, agentEvents }: { stepId: string; agentEvents: Ag
   );
 }
 
-function StepConfigDetail({
-  stepId,
-  config,
-  hasAgentLog,
-  onAgentLogClick,
-  assembledPrompt,
-}: {
-  stepId: string;
-  config: StepConfigInfo;
-  hasAgentLog: boolean;
-  onAgentLogClick?: (stepId: string) => void;
-  assembledPrompt?: string;
-}) {
+function buildConfigEntries(config: StepConfigInfo): Array<{ label: string; value: string }> {
   const entries: Array<{ label: string; value: string }> = [];
   if (config.plugin) entries.push({ label: 'Plugin', value: config.plugin });
   if (config.executorType !== 'script') {
@@ -370,8 +358,29 @@ function StepConfigDetail({
   if (config.reviewerType && config.reviewerType !== 'none') entries.push({ label: 'Reviewer', value: config.reviewerType });
   if (config.agentConfig?.mcpServers?.length)
     entries.push({ label: 'MCP Tools', value: config.agentConfig.mcpServers.map((s) => s.name).join(', ') });
+  return entries;
+}
 
-  if (entries.length === 0 && !assembledPrompt && !config.agentConfig?.prompt && !hasAgentLog) return null;
+/** Whether `StepConfigDetail` would render anything — used to hide the
+ *  `Details` disclosure entirely rather than show an empty one. */
+function hasConfigDetail(config: StepConfigInfo, hasAgentLog: boolean, assembledPrompt?: string): boolean {
+  return buildConfigEntries(config).length > 0 || Boolean(assembledPrompt) || Boolean(config.agentConfig?.prompt) || hasAgentLog;
+}
+
+function StepConfigDetail({
+  stepId,
+  config,
+  hasAgentLog,
+  onAgentLogClick,
+  assembledPrompt,
+}: {
+  stepId: string;
+  config: StepConfigInfo;
+  hasAgentLog: boolean;
+  onAgentLogClick?: (stepId: string) => void;
+  assembledPrompt?: string;
+}) {
+  const entries = buildConfigEntries(config);
 
   return (
     <div className="mt-2 rounded-md bg-muted/50 border px-3 py-2 space-y-2" onClick={(e) => e.stopPropagation()}>
@@ -537,7 +546,6 @@ export function StepStatusPanel({
           const stepId = execution.stepId;
           const status = getExecEffectiveStatus(execution, instance);
           const stepConfig = stepConfigMap?.get(stepId);
-          const hasConfig = stepConfig?.executorType === 'agent';
           const isExpanded = expandedExecId === execId;
           const isFilesExpanded = filesExpandedExecId === execId;
           const stepOutputFiles = outputFilesByStep.get(stepId) ?? [];
@@ -557,17 +565,13 @@ export function StepStatusPanel({
             ? (definitionSteps.find((s) => s.id === takenVerdictTarget)?.name ?? takenVerdictTarget)
             : undefined;
 
+          const hasOutputContent = execution.output !== null || Boolean(execution.error) || Boolean(takenVerdict && takenVerdictTargetName);
+          const showDetails = stepConfig !== undefined && hasConfigDetail(stepConfig, hasAgentLog, assembledPrompt);
+
           return (
             <li
               key={execId}
-              className={cn(
-                'flex gap-3 py-2 pl-3 rounded-md',
-                getStatusClasses(status),
-                hasConfig && 'cursor-pointer',
-              )}
-              onClick={() => {
-                if (hasConfig) setExpandedExecId(isExpanded ? null : execId);
-              }}
+              className={cn('flex gap-3 py-2 pl-3 rounded-md', getStatusClasses(status))}
             >
               <div className="flex flex-col items-center">
                 <div className="mt-0.5"><StatusIcon status={status} /></div>
@@ -587,15 +591,27 @@ export function StepStatusPanel({
                   ) : (
                     <span className="text-sm font-medium">{step?.name ?? stepId}</span>
                   )}
-                  <ExecutorChip
-                    executorType={stepConfig?.executorType}
-                    autonomyLevel={stepConfig?.autonomyLevel}
-                    plugin={stepConfig?.plugin}
-                    runtime={stepConfig?.agentConfig?.runtime}
-                  />
-                  {status === 'waiting' && (
-                    <span className="text-xs text-amber-700 dark:text-amber-300">Waiting for action</span>
-                  )}
+
+                  <button
+                    type="button"
+                    aria-expanded={isExpanded}
+                    onClick={() => setExpandedExecId(isExpanded ? null : execId)}
+                    className="flex flex-1 min-w-0 items-center gap-2 -mx-1 px-1 py-0.5 rounded-sm text-left hover:bg-muted/60 transition-colors"
+                  >
+                    <ExecutorChip
+                      executorType={stepConfig?.executorType}
+                      autonomyLevel={stepConfig?.autonomyLevel}
+                      plugin={stepConfig?.plugin}
+                      runtime={stepConfig?.agentConfig?.runtime}
+                    />
+                    {status === 'waiting' && (
+                      <span className="text-xs text-amber-700 dark:text-amber-300">Waiting for action</span>
+                    )}
+                    {isExpanded
+                      ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                      : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+                  </button>
+
                   {stepOutputFiles.length > 0 && (
                     <button
                       onClick={(e) => {
@@ -608,10 +624,6 @@ export function StepStatusPanel({
                       <Paperclip className="h-3 w-3" />
                       {stepOutputFiles.length}
                     </button>
-                  )}
-                  {hasConfig && (isExpanded
-                    ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                    : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                   )}
                   {wfStatus.isRetryable && isCurrent && (
                     <RetryStepButton instanceId={instance.id} stepId={stepId} />
@@ -647,21 +659,6 @@ export function StepStatusPanel({
                   />
                 </div>
 
-                {status === 'running' && stepConfig?.executorType === 'agent' && (
-                  <StepProgress stepId={stepId} agentEvents={agentEvents} />
-                )}
-
-                {/* Taken verdict — only shown for completed review steps */}
-                {takenVerdict && takenVerdictTargetName && (
-                  <div className="ml-4 mt-1.5">
-                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                      {takenVerdict}
-                      <span className="mx-1 text-muted-foreground">{'→'}</span>
-                      {takenVerdictTargetName}
-                    </span>
-                  </div>
-                )}
-
                 {isFilesExpanded && stepOutputFiles.length > 0 && (
                   <div className="mt-2 rounded-md bg-muted/50 border px-3 py-2" onClick={(e) => e.stopPropagation()}>
                     <ul className="space-y-1">
@@ -672,14 +669,50 @@ export function StepStatusPanel({
                   </div>
                 )}
 
-                {isExpanded && stepConfig && (
-                  <StepConfigDetail
-                    stepId={stepId}
-                    config={stepConfig}
-                    hasAgentLog={hasAgentLog}
-                    onAgentLogClick={onAgentLogClick}
-                    assembledPrompt={assembledPrompt}
-                  />
+                {isExpanded && (
+                  <div className="mt-2 space-y-2">
+                    <div>
+                      <h4 className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1">Output</h4>
+                      <div className="rounded-md border bg-muted/50 px-3 py-2 text-xs space-y-2">
+                        {execution.output !== null && (
+                          <pre className="font-mono whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
+                            {JSON.stringify(execution.output, null, 2)}
+                          </pre>
+                        )}
+                        {execution.error && (
+                          <p className="text-destructive whitespace-pre-wrap break-words">{execution.error}</p>
+                        )}
+                        {takenVerdict && takenVerdictTargetName && (
+                          <p className="font-medium text-blue-600 dark:text-blue-400">
+                            {takenVerdict}
+                            <span className="mx-1 text-muted-foreground">{'→'}</span>
+                            {takenVerdictTargetName}
+                          </p>
+                        )}
+                        {!hasOutputContent && (
+                          <>
+                            <p className="text-muted-foreground">No output yet</p>
+                            {status === 'running' && stepConfig?.executorType === 'agent' && (
+                              <StepProgress stepId={stepId} agentEvents={agentEvents} />
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {showDetails && stepConfig && (
+                      <details>
+                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground font-medium select-none">Details</summary>
+                        <StepConfigDetail
+                          stepId={stepId}
+                          config={stepConfig}
+                          hasAgentLog={hasAgentLog}
+                          onAgentLogClick={onAgentLogClick}
+                          assembledPrompt={assembledPrompt}
+                        />
+                      </details>
+                    )}
+                  </div>
                 )}
               </div>
             </li>

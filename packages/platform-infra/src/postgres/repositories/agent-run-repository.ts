@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, ne, or, sql, type SQL } from 'drizzle-orm';
 import {
   AgentRunSchema,
   parseRow,
@@ -214,10 +214,13 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
   }
 
   private baseConditions(
-    opts: Pick<ListAgentRunsOptions, 'namespace' | 'runId' | 'stepId' | 'status' | 'processInstanceIds'>,
+    opts: Pick<ListAgentRunsOptions, 'namespace' | 'runId' | 'stepId' | 'status' | 'processInstanceIds' | 'excludeExecutorType'>,
     allowed: readonly string[] | undefined,
   ): SQL[] {
     const conditions: SQL[] = [isNull(agentRuns.evalRunId)];
+    if (opts.excludeExecutorType !== undefined) {
+      conditions.push(or(isNull(agentRuns.executorType), ne(agentRuns.executorType, opts.excludeExecutorType))!);
+    }
     if (allowed !== undefined) {
       conditions.push(inArray(agentRuns.workspace, [...allowed]));
     }
@@ -283,14 +286,14 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
   }
 
   async countByCardStatus(
-    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status'>,
+    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status' | 'excludeExecutorType'>,
   ): Promise<AgentRunCardStatusCounts> {
     return this.countByCardStatusImpl(opts, undefined);
   }
 
   async countByCardStatusInNamespaces(
     allowed: readonly string[],
-    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status'>,
+    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status' | 'excludeExecutorType'>,
   ): Promise<AgentRunCardStatusCounts> {
     if (allowed.length === 0) {
       return { total: 0, running: 0, completed: 0, error: 0, flagged: 0 };
@@ -299,7 +302,7 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
   }
 
   private async countByCardStatusImpl(
-    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status'>,
+    opts: Pick<ListAgentRunsOptions, 'namespace' | 'processInstanceIds' | 'status' | 'excludeExecutorType'>,
     allowed: readonly string[] | undefined,
   ): Promise<AgentRunCardStatusCounts> {
     const conditions = this.baseConditions(opts, allowed);

@@ -362,3 +362,48 @@ describe('ScriptStepExecutor reap mode (issue #868)', () => {
     );
   });
 });
+
+describe('ScriptStepExecutor Agent Run + trajectory recording (#1573)', () => {
+  let executor: ScriptStepExecutor;
+  const mockAgentRunRepo = { create: vi.fn() };
+  const mockAgentTrajectoryRepo = { append: vi.fn().mockResolvedValue(undefined) };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAgentRunRepo.create.mockResolvedValue(undefined);
+    executor = new ScriptStepExecutor(mockPluginRunner as never, mockAgentRunRepo as never, mockAgentTrajectoryRepo as never);
+    mockInstanceRepo.getById.mockResolvedValue({
+      status: 'running', currentStepId: 'transform-data', definitionVersion: '1', variables: {},
+    });
+    mockEngine.advanceStep.mockResolvedValue({ status: 'running', currentStepId: 'done' });
+  });
+
+  it('creates a running row, then a completed one with the same id', async () => {
+    mockPluginRunner.execute.mockResolvedValue({
+      resultPayload: buildStepOutputEnvelope({ result: { rows: 1 } }),
+      timedOut: false,
+      errorMessage: null,
+    });
+
+    await executor.execute(mockPlugin, makeContext(), services, meta);
+
+    expect(mockAgentRunRepo.create).toHaveBeenCalledTimes(2);
+    const [running, completed] = mockAgentRunRepo.create.mock.calls.map((call) => call[0]);
+    expect(running).toMatchObject({ status: 'running', executorType: 'script', stepId: 'transform-data' });
+    expect(completed).toMatchObject({ id: running.id, status: 'completed', executorType: 'script' });
+  });
+
+  it('records the plugin\'s activity lines to the trajectory', async () => {
+    mockPluginRunner.execute.mockImplementation(async (_plugin, runContext) => {
+      runContext.trajectory?.record([{ ts: '2026-01-01T00:00:00.000Z', type: 'assistant', subtype: 'text', text: 'hello' }]);
+      return { resultPayload: buildStepOutputEnvelope({ result: {} }), timedOut: false, errorMessage: null };
+    });
+
+    await executor.execute(mockPlugin, makeContext(), services, meta);
+
+    expect(mockAgentTrajectoryRepo.append).toHaveBeenCalledWith(
+      expect.any(String),
+      [expect.objectContaining({ text: 'hello', seq: 0 })],
+    );
+  });
+});
