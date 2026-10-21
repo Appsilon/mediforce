@@ -14,7 +14,11 @@ export function createRunWorkflowActionHandler(spawn: SpawnChildren): RunWorkflo
   return async (config, ctx) => {
     const timeout = String(interpolate(config.timeout, ctx.sources));
     const timeoutMs = parseIsoDurationMs(timeout);
-    if (timeoutMs === null || timeoutMs === 0) {
+    const now = new Date();
+    // An oversized duration parses but lands past the Date range; reject it
+    // here, before the child is spawned, not at toISOString() after.
+    const resumeAt = new Date(now.getTime() + (timeoutMs ?? Number.NaN));
+    if (timeoutMs === null || timeoutMs === 0 || Number.isNaN(resumeAt.getTime())) {
       throw new Error(invalidTimeoutMessage(timeout));
     }
 
@@ -25,11 +29,10 @@ export function createRunWorkflowActionHandler(spawn: SpawnChildren): RunWorkflo
       throw new Error(`workflow '${config.definitionName}' was not started`);
     }
 
-    const now = new Date();
     const sentinel: WaitSentinel = {
       __wait: {
         stepId: ctx.stepId,
-        resumeAt: new Date(now.getTime() + timeoutMs).toISOString(),
+        resumeAt: resumeAt.toISOString(),
         pausedAt: now.toISOString(),
         mode: 'deadline',
         child: {

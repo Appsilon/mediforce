@@ -14,6 +14,7 @@ import { mediforce } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
+import { parseJsonObjectText } from '@/lib/trigger-input-payload';
 
 import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, agentImageOf, agentStepChanges, DEFAULT_STEP_TIMEOUT_MINUTES, defaultVerdictLabel, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
 import type { AgentDefinition, AgentStepChange, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
@@ -265,6 +266,39 @@ function StepIdField({ currentId, onChange, error }: { currentId: string; onChan
       onKeyDown={(e) => { if (e.key === 'Enter') commit(); }}
       className={cn(riMono, error && 'border-red-400 focus:border-red-500')}
     />
+  );
+}
+
+// Blank clears the payload; text that is not a JSON object stays in the box
+// with the error shown and never replaces the last committed payload.
+function JsonObjectPayloadField({ value, onChange, label, tooltip, placeholder }: {
+  value: Record<string, unknown> | undefined;
+  onChange: (payload: Record<string, unknown> | undefined) => void;
+  label: string;
+  tooltip: string;
+  placeholder: string;
+}) {
+  const [draft, setDraft] = useState(value === undefined ? '' : JSON.stringify(value, null, 2));
+  const rejected = draft.trim() !== '' && parseJsonObjectText(draft) === null;
+
+  return (
+    <FieldRow label={label} tooltip={tooltip} alignStart error={rejected ? 'Must be a JSON object — not saved' : undefined}>
+      <textarea
+        value={draft}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          if (e.target.value.trim() === '') {
+            onChange(undefined);
+            return;
+          }
+          const parsed = parseJsonObjectText(e.target.value);
+          if (parsed !== null) onChange(parsed);
+        }}
+        rows={3}
+        placeholder={placeholder}
+        className={cn(rt, 'font-mono text-[11px] placeholder:italic placeholder:text-muted-foreground/40', rejected && 'ring-1 ring-red-400')}
+      />
+    </FieldRow>
   );
 }
 
@@ -1547,25 +1581,14 @@ export function StepEditor({
                 </div>
               </FieldRow>
 
-              <FieldRow label="action.payload" tooltip={TIP.actionRunWorkflowPayload} alignStart>
-                <textarea
-                  key={`run-workflow-payload-${step.id}`}
-                  defaultValue={runWorkflowAction.config.payload === undefined ? '' : JSON.stringify(runWorkflowAction.config.payload, null, 2)}
-                  onChange={(e) => {
-                    if (e.target.value.trim() === '') {
-                      onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, payload: undefined } } });
-                      return;
-                    }
-                    try {
-                      const parsed = JSON.parse(e.target.value);
-                      onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, payload: parsed } } });
-                    } catch { /* invalid JSON */ }
-                  }}
-                  rows={3}
-                  placeholder='{"case": "${steps.intake.case}"}'
-                  className={cn(rt, 'font-mono text-[11px] placeholder:italic placeholder:text-muted-foreground/40')}
-                />
-              </FieldRow>
+              <JsonObjectPayloadField
+                key={`run-workflow-payload-${step.id}`}
+                label="action.payload"
+                tooltip={TIP.actionRunWorkflowPayload}
+                placeholder='{"case": "${steps.intake.case}"}'
+                value={runWorkflowAction.config.payload}
+                onChange={(payload) => onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, payload } } })}
+              />
 
               <FieldRow label="action.timeout" tooltip={TIP.actionRunWorkflowTimeout}>
                 <input

@@ -80,6 +80,16 @@ describe('run-workflow action', () => {
     expect(spawn).not.toHaveBeenCalled();
   });
 
+  it('fails before spawning when the deadline is past the Date range', async () => {
+    const spawn = makeSpawn();
+    const handler = createRunWorkflowActionHandler(spawn);
+
+    await expect(handler({ definitionName: 'intake', timeout: 'P100000001D' }, ctx)).rejects.toThrow(
+      "got 'P100000001D'",
+    );
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   it('fails when no child was started', async () => {
     const handler = createRunWorkflowActionHandler(makeSpawn([]));
 

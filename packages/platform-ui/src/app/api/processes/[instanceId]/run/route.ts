@@ -603,8 +603,11 @@ export async function POST(
             // Close that execution with the output and advance instead of
             // dispatching again — closing it is what lets a loop that comes
             // back to this step dispatch afresh rather than reuse this output.
+            // resumeWait clears `__wait` in the same write, so a `__wait` still
+            // present means the current park never resolved and the step output
+            // is an earlier iteration's.
             const preResolved = instance.variables[instance.currentStepId] as Record<string, unknown> | undefined;
-            if (preResolved !== undefined) {
+            if (preResolved !== undefined && instance.variables.__wait === undefined) {
               const parkedExecutions = await instanceRepo.getStepExecutions(instanceId);
               const latestParkedExecution = parkedExecutions
                 .filter((execution) => execution.stepId === instance.currentStepId)
