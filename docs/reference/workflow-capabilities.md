@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-20
+last_reviewed: 2026-10-22
 ---
 
 # Workflow capabilities
@@ -106,8 +106,11 @@ Handler nuances not visible in the schema (in
   its new child, never an earlier one. It parks on the same `__wait` sentinel as
   `wait` (with the child's id on it), and resumes the moment that child
   completes or fails, or at the timeout with the child's current status; branch
-  on `output.status` / `output.output.*`. Use `spawn` / `wait` / `collect` for
-  fan-out.
+  on `output.status` / `output.output.*`. The timeout does **not** cancel the
+  child — it keeps running, and a later step can cancel it by
+  `output.instanceId`. While parked, the step execution's output is
+  `{ instanceId, definitionName, step? }` of the child it waits on. Use
+  `spawn` / `wait` / `collect` for fan-out.
 - `email` supports `cc` / `bcc` / `replyTo` / `html` and is **rate-limited**
   (default 50/run, 30/minute) in [`email.ts`](../../packages/core-actions/src/handlers/email.ts).
 - `http` never throws on a non-2xx response — it returns `{ status, headers, body }`;

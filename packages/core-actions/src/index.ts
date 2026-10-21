@@ -3,7 +3,7 @@ export { interpolate, getPath } from './interpolation';
 export { httpActionHandler, type HttpActionOutput } from './handlers/http';
 export { reshapeActionHandler } from './handlers/reshape';
 export { createEmailActionHandler, type EmailActionOutput, type EmailRateLimitConfig } from './handlers/email';
-export { createSpawnActionHandler, type SpawnActionOutput } from './handlers/spawn';
+export { createSpawnActionHandler, type SpawnActionOutput, type SpawnChildren } from './handlers/spawn';
 export { createCollectActionHandler, toCollectedChild, type CollectActionOutput, type CollectedChild } from './handlers/collect';
 export { createRunWorkflowActionHandler } from './handlers/run-workflow';
 export { waitActionHandler, isWaitSentinel, type WaitActionOutput, type WaitSentinel } from './handlers/wait';

@@ -109,6 +109,30 @@ export function buildExecutorChangePatch(step: WorkflowStep, targetExecutor: Wor
 
 const ri = inputBase;
 const riMono = inputBaseMono;
+
+function WorkflowTargetInputs({ target, onChange }: {
+  target: SpawnTargetConfig;
+  onChange: (patch: Pick<SpawnTargetConfig, 'definitionName' | 'definitionVersion'>) => void;
+}) {
+  return (
+    <>
+      <input
+        value={target.definitionName}
+        placeholder="workflow-name"
+        onChange={(e) => onChange({ definitionName: e.target.value, definitionVersion: target.definitionVersion })}
+        className={cn(riMono, 'flex-1 placeholder:italic placeholder:text-muted-foreground/40')}
+      />
+      <input
+        type="number"
+        min={1}
+        value={target.definitionVersion ?? ''}
+        placeholder="default"
+        onChange={(e) => onChange({ definitionName: target.definitionName, definitionVersion: e.target.value ? Number(e.target.value) : undefined })}
+        className={cn(ri, 'w-20 placeholder:italic placeholder:text-muted-foreground/40')}
+      />
+    </>
+  );
+}
 const rs = selectBase;
 const rt = textareaBase;
 
@@ -1412,27 +1436,11 @@ export function StepEditor({
                 <div className="space-y-1.5">
                   {spawnTargets.map((target, idx) => (
                     <div key={idx} className="flex items-center gap-1.5">
-                      <input
-                        value={target.definitionName}
-                        placeholder="workflow-name"
-                        onChange={(e) => writeSpawnTargets(
-                          spawnTargets.map((t, i) => (i === idx ? { ...t, definitionName: e.target.value } : t)),
+                      <WorkflowTargetInputs
+                        target={target}
+                        onChange={(patch) => writeSpawnTargets(
+                          spawnTargets.map((t, i) => (i === idx ? { ...t, ...patch } : t)),
                         )}
-                        className={cn(riMono, 'flex-1 placeholder:italic placeholder:text-muted-foreground/40')}
-                      />
-                      <input
-                        type="number"
-                        min={1}
-                        value={target.definitionVersion ?? ''}
-                        placeholder="default"
-                        onChange={(e) => writeSpawnTargets(
-                          spawnTargets.map((t, i) => (
-                            i === idx
-                              ? { ...t, definitionVersion: e.target.value ? Number(e.target.value) : undefined }
-                              : t
-                          )),
-                        )}
-                        className={cn(ri, 'w-20 placeholder:italic placeholder:text-muted-foreground/40')}
                       />
                       <button
                         type="button"
@@ -1532,25 +1540,16 @@ export function StepEditor({
             <>
               <FieldRow label="action.definitionName" tooltip={TIP.actionRunWorkflowName}>
                 <div className="flex items-center gap-1.5">
-                  <input
-                    value={runWorkflowAction.config.definitionName}
-                    placeholder="workflow-name"
-                    onChange={(e) => onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, definitionName: e.target.value } } })}
-                    className={cn(riMono, 'flex-1 placeholder:italic placeholder:text-muted-foreground/40')}
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    value={runWorkflowAction.config.definitionVersion ?? ''}
-                    placeholder="default"
-                    onChange={(e) => onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, definitionVersion: e.target.value ? Number(e.target.value) : undefined } } })}
-                    className={cn(ri, 'w-20 placeholder:italic placeholder:text-muted-foreground/40')}
+                  <WorkflowTargetInputs
+                    target={runWorkflowAction.config}
+                    onChange={(patch) => onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, ...patch } } })}
                   />
                 </div>
               </FieldRow>
 
               <FieldRow label="action.payload" tooltip={TIP.actionRunWorkflowPayload} alignStart>
                 <textarea
+                  key={`run-workflow-payload-${step.id}`}
                   defaultValue={runWorkflowAction.config.payload === undefined ? '' : JSON.stringify(runWorkflowAction.config.payload, null, 2)}
                   onChange={(e) => {
                     if (e.target.value.trim() === '') {

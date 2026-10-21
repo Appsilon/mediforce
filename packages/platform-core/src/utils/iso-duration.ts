@@ -10,6 +10,12 @@ const MS_PER_DAY = 24 * MS_PER_HOUR;
  * when the text is not one. Years and months are refused: their length depends
  * on the calendar, so the same timeout would mean different things per run.
  */
+/** The error a run-workflow `timeout` that is not a positive ISO 8601 duration
+ *  reports — the same text at definition validation and at run time. */
+export function invalidTimeoutMessage(text: string): string {
+  return `timeout must be an ISO 8601 duration greater than zero (e.g. P14D, PT2H), got '${text}'`;
+}
+
 export function parseIsoDurationMs(text: string): number | null {
   const match = ISO_DURATION.exec(text);
   if (match === null || text === 'P' || text.endsWith('T')) return null;

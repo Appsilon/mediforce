@@ -18,7 +18,7 @@ export interface WaitSentinel {
     condition?: string;
     /** Set by run-workflow: the one child this step started. The wait
      *  resolves when it ends (or at `resumeAt`) with its result as output. */
-    child?: { instanceId: string; step?: string };
+    child?: { instanceId: string; definitionName: string; step?: string };
   };
 }
 

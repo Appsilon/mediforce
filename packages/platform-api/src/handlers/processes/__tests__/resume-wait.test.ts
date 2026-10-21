@@ -395,7 +395,7 @@ describe('resumeWait handler', () => {
               resumeAt,
               pausedAt,
               mode: 'deadline',
-              child: { instanceId: 'child', step: 'return_result' },
+              child: { instanceId: 'child', definitionName: 'intake', step: 'return_result' },
             },
           },
         }),
@@ -485,7 +485,7 @@ describe('resumeWait handler', () => {
 
       await resumeWait({ runId: 'parent' }, scope);
 
-      expect(await stepOutput()).toMatchObject({ instanceId: 'child', status: 'failed', output: null });
+      expect(await stepOutput()).toMatchObject({ instanceId: 'child', definitionName: 'intake', status: 'failed', output: null });
     });
   });
 });

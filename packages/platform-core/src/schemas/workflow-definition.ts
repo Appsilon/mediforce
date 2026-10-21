@@ -10,7 +10,7 @@ import {
 } from './process-definition';
 import { ProcessNotificationConfigSchema } from './process-config';
 import { BuildContextSchema } from '../utils/docker-build-paths';
-import { parseIsoDurationMs } from '../utils/iso-duration';
+import { invalidTimeoutMessage, parseIsoDurationMs } from '../utils/iso-duration';
 import { McpServerConfigSchema } from './mcp-server-config';
 import { StepMcpRestrictionSchema } from './agent-mcp-binding';
 import { AgentSkillRefsSchema } from './agent-definition';
@@ -542,7 +542,7 @@ function validateSteps(
           ctx.addIssue({
             code: 'custom',
             path: ['steps', i, 'action', 'config', 'timeout'],
-            message: `step '${step.id}': timeout must be an ISO 8601 duration greater than zero (e.g. P14D, PT2H), got '${timeout}'`,
+            message: `step '${step.id}': ${invalidTimeoutMessage(timeout)}`,
           });
         }
       }

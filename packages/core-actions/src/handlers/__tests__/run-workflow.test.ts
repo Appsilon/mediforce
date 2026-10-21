@@ -54,7 +54,7 @@ describe('run-workflow action', () => {
         resumeAt: '2026-10-15T00:00:00.000Z',
         pausedAt: '2026-10-01T00:00:00.000Z',
         mode: 'deadline',
-        child: { instanceId: 'child-1', step: 'return_result' },
+        child: { instanceId: 'child-1', definitionName: 'intake', step: 'return_result' },
       },
     });
   });

@@ -1,12 +1,13 @@
 import type { InstanceStatus, ProcessInstance } from '@mediforce/platform-core';
 import { evaluateExpression } from '@mediforce/workflow-engine';
-import { toCollectedChild, type CollectedChild, type WaitSentinel } from '@mediforce/core-actions';
+import { toCollectedChild, type CollectedChild, type WaitActionOutput, type WaitSentinel } from '@mediforce/core-actions';
 import type { ResumeWaitInput, ResumeWaitOutput } from '../../contract/processes';
 import type { CallerScope } from '../../repositories/index';
 import { PreconditionFailedError } from '../../errors';
 import { actorFromCaller, loadOr404 } from '../_helpers';
 
 type WaitMetadata = WaitSentinel['__wait'];
+type ResumeReason = WaitActionOutput['resumeReason'] | 'child_finished';
 
 const TERMINAL_STATUSES: readonly InstanceStatus[] = ['completed', 'failed'];
 
@@ -61,10 +62,10 @@ export async function resumeWait(
   if (waitMeta.child !== undefined) {
     const child = await readChild(waitMeta.child, scope);
     const childEnded = TERMINAL_STATUSES.includes(child.status);
-    if (now < resumeAt && !childEnded) {
+    if (now < resumeAt && childEnded === false) {
       return { resumed: false, resumeAt: waitMeta.resumeAt };
     }
-    return resolveWait(run, waitMeta, scope, now, childEnded ? 'child_finished' : 'deadline_reached', { ...child });
+    return resolveWait(run, waitMeta, scope, now, childEnded ? 'child_finished' : 'deadline_reached', child);
   }
 
   let conditionMet = false;
@@ -89,10 +90,10 @@ export async function resumeWait(
     return { resumed: false, resumeAt: waitMeta.resumeAt };
   }
 
-  const resumeReason = conditionMet
+  const resumeReason: WaitActionOutput['resumeReason'] = conditionMet
     ? 'condition_met'
     : waitMeta.mode === 'deadline' ? 'deadline_reached' : 'duration_elapsed';
-  const waitOutput = { resumeReason, waitedSeconds: waitedSecondsSince(waitMeta, now), resolvedAt: now.toISOString() };
+  const waitOutput: WaitActionOutput = { resumeReason, waitedSeconds: waitedSecondsSince(waitMeta, now), resolvedAt: now.toISOString() };
   return resolveWait(run, waitMeta, scope, now, resumeReason, waitOutput);
 }
 
@@ -110,7 +111,7 @@ async function readChild(
   if (childRun === null) {
     return {
       instanceId: child.instanceId,
-      definitionName: '',
+      definitionName: child.definitionName,
       status: 'failed',
       error: `Child run '${child.instanceId}' no longer exists`,
       output: null,
@@ -124,8 +125,8 @@ async function resolveWait(
   waitMeta: WaitMetadata,
   scope: CallerScope,
   now: Date,
-  resumeReason: string,
-  waitOutput: Record<string, unknown>,
+  resumeReason: ResumeReason,
+  waitOutput: WaitActionOutput | CollectedChild,
 ): Promise<ResumeWaitOutput> {
   const waitedSeconds = waitedSecondsSince(waitMeta, now);
   const { __wait: _, ...cleanVars } = run.variables as Record<string, unknown>;
@@ -153,7 +154,7 @@ async function resolveWait(
       description: `Wait action resumed for '${run.id}' (reason: ${resumeReason}, waited ${waitedSeconds}s)`,
       timestamp: now.toISOString(),
       inputSnapshot: { stepId: waitMeta.stepId, resumeAt: waitMeta.resumeAt, condition: waitMeta.condition, child: waitMeta.child },
-      outputSnapshot: waitOutput,
+      outputSnapshot: { ...waitOutput },
       basis: `Timer expired, condition met or child ended: ${resumeReason}`,
       entityType: 'processInstance',
       entityId: run.id,

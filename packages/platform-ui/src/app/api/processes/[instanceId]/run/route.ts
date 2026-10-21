@@ -699,9 +699,10 @@ export async function POST(
               if (isWaitSentinel(output)) {
                 const waitMeta = output.__wait;
                 if (waitMeta.stepId === instance.currentStepId) {
+                  // A run-workflow park shows which child it waits on.
                   await instanceRepo.updateStepExecution(instanceId, executionId, {
                     status: 'paused',
-                    output: null,
+                    output: waitMeta.child ?? null,
                   });
                   await instanceRepo.update(instanceId, {
                     status: 'paused',
