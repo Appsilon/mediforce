@@ -11,6 +11,7 @@ gets without a container, an image, or an LLM.
 | `spawn` | Starts one or more child workflow runs; `forEach` fans out one per item |
 | `wait` | Suspends the run until a `duration` elapses or a `deadline` passes; an optional `condition` can resume it early |
 | `collect` | Returns what the run's spawned children produced — status, error and one step's output (or all variables) per child |
+| `run-workflow` | Starts one child workflow, suspends until it ends or `timeout` passes, and returns that child's result |
 
 ## Why these are not scripts
 
@@ -38,7 +39,7 @@ with a list, rather than halfway through a run with one `undefined`.
 when an email sender is configured — an unconfigured action is not offered
 rather than failing at run time.
 
-## `spawn`, `wait` and `collect`
+## `spawn`, `wait`, `collect` and `run-workflow`
 
 Fan-out is one child *workflow* per item, not one step repeated N times — the
 rejected alternatives and the parent→child linkage are in
@@ -73,5 +74,13 @@ Two traps that cost real debugging time:
   `null` when that step never ran). It reads the children on demand — a
   finishing child still writes nothing into its parent — and lists failed and
   unfinished children too, so the next step decides what a partial result means.
+- `run-workflow` is the one-child shorthand. It runs the `spawn` handler for a
+  single target and returns the `__wait` sentinel with `child.instanceId` on
+  it, so `resumeWait` resolves the step with exactly that child's
+  `collect`-shaped entry — when the child completes or fails, or at `timeout`
+  with its current status. A parked step's execution stays `paused` until the
+  auto-runner, picking the resumed run back up, closes it with the output; that
+  is what makes a loop returning to the step dispatch a new child rather than
+  reuse the last one's result.
 - Step ids inside a `condition` must use underscores. The expression parser
   reads `spawn-perspectives` as subtraction.

@@ -199,4 +199,16 @@ export const BLOCK_PRESETS: BlockPreset[] = [
       },
     },
   },
+  {
+    id: 'run-workflow-and-wait',
+    label: 'Run a workflow and use its result',
+    purpose: 'Start one workflow, wait for it to end, and pass on what it produced.',
+    category: 'control',
+    needsInput: ['action.config.definitionName'],
+    payload: {
+      type: 'creation',
+      executor: 'action',
+      action: { kind: 'run-workflow', config: { definitionName: '', timeout: 'P7D' } },
+    },
+  },
 ];

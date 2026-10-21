@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-10-20
+last_reviewed: 2026-10-22
 ---
 
 # ADR-0018: Fan-out over sub-graphs is child workflows; the engine stays linear
@@ -92,6 +92,15 @@ child workflow and spawn that N times.
 - **Fan-out is sequential and capped** at 50 children per step execution.
   `Promise.all` would put concurrent write pressure on the storage backend; a
   configurable concurrency parameter is deferred until something needs it.
+- **One child has a one-step shorthand.** Running a single child and using
+  its result took `spawn` → `wait` → `collect` plus scripts to turn a
+  configured deadline into a timestamp and to pick *this* spawn's child out of
+  `collect` (which returns every child the run ever spawned)
+  ([#1603](https://github.com/Appsilon/mediforce/issues/1603)). `run-workflow`
+  spawns one child, parks on it, and returns that child's result. It is still a
+  separate child run — not option (c)'s inline sub-steps — and it reuses this
+  ADR's machinery: the spawn handler, the `__wait` park (carrying the child's
+  id), `resumeWait`, and `settleRunWaits` waking the parent when the child ends.
 - **Spawning is same-namespace.** CRO-to-sponsor use cases may need
   cross-namespace spawn with explicit permission grants later.
 

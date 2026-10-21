@@ -112,6 +112,7 @@ import {
   reshapeActionHandler,
   createSpawnActionHandler,
   createCollectActionHandler,
+  createRunWorkflowActionHandler,
   createEmailActionHandler,
   waitActionHandler,
 } from '@mediforce/core-actions';
@@ -394,9 +395,11 @@ export function getPlatformServices(): PlatformServices {
     baseUrl: () => process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9003',
     apiKey: () => process.env.PLATFORM_API_KEY ?? '',
   });
-  actionRegistry.register('spawn', createSpawnActionHandler(manualTrigger, processRepo, spawnRunKicker));
+  const spawnActionHandler = createSpawnActionHandler(manualTrigger, processRepo, spawnRunKicker);
+  actionRegistry.register('spawn', spawnActionHandler);
   actionRegistry.register('wait', waitActionHandler);
   actionRegistry.register('collect', createCollectActionHandler(instanceRepo));
+  actionRegistry.register('run-workflow', createRunWorkflowActionHandler(spawnActionHandler));
   if (emailSender) {
     actionRegistry.register('email', createEmailActionHandler(emailSender));
   }

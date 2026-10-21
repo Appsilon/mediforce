@@ -5,7 +5,7 @@ import {
   validatePayload,
 } from '@mediforce/platform-core';
 import { interpolate } from '../interpolation';
-import type { SpawnActionHandler, InterpolationSources } from '../types';
+import type { ActionContext, InterpolationSources } from '../types';
 
 interface TriggerResult {
   instanceId: string;
@@ -46,6 +46,10 @@ export interface SpawnActionOutput {
   [key: string]: unknown;
 }
 
+/** The spawn handler, typed with its own output so run-workflow can read
+ *  `spawned` without a cast. */
+export type SpawnChildren = (config: SpawnActionConfig, ctx: ActionContext) => Promise<SpawnActionOutput>;
+
 interface RunKicker {
   kick(instanceId: string, opts?: { readonly triggeredBy?: string }): Promise<void>;
 }
@@ -60,7 +64,7 @@ export function createSpawnActionHandler(
     | 'getDefaultWorkflowVersion'
   >,
   runKicker?: RunKicker,
-): SpawnActionHandler {
+): SpawnChildren {
   const versionSource = toWorkflowVersionSource(processRepo);
   return async (config, ctx) => {
     const spawned: SpawnActionOutput['spawned'] = [];

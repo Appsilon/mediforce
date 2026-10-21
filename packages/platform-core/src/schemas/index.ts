@@ -440,6 +440,7 @@ export {
   SpawnActionConfigSchema,
   WaitActionConfigSchema,
   CollectActionConfigSchema,
+  RunWorkflowActionConfigSchema,
   ActionConfigSchema,
   validateInputForNextRun,
   validateSteps,
@@ -481,6 +482,7 @@ export {
   type SpawnActionConfig,
   type WaitActionConfig,
   type CollectActionConfig,
+  type RunWorkflowActionConfig,
   type ActionConfig,
 } from './workflow-definition';
 

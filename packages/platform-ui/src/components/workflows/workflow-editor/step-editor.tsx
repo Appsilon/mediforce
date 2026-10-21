@@ -14,6 +14,7 @@ import { mediforce } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
+import { parseJsonObjectText } from '@/lib/trigger-input-payload';
 
 import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, agentImageOf, agentStepChanges, DEFAULT_STEP_TIMEOUT_MINUTES, defaultVerdictLabel, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
 import type { AgentDefinition, AgentStepChange, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
@@ -109,6 +110,30 @@ export function buildExecutorChangePatch(step: WorkflowStep, targetExecutor: Wor
 
 const ri = inputBase;
 const riMono = inputBaseMono;
+
+function WorkflowTargetInputs({ target, onChange }: {
+  target: SpawnTargetConfig;
+  onChange: (patch: Pick<SpawnTargetConfig, 'definitionName' | 'definitionVersion'>) => void;
+}) {
+  return (
+    <>
+      <input
+        value={target.definitionName}
+        placeholder="workflow-name"
+        onChange={(e) => onChange({ definitionName: e.target.value, definitionVersion: target.definitionVersion })}
+        className={cn(riMono, 'flex-1 placeholder:italic placeholder:text-muted-foreground/40')}
+      />
+      <input
+        type="number"
+        min={1}
+        value={target.definitionVersion ?? ''}
+        placeholder="default"
+        onChange={(e) => onChange({ definitionName: target.definitionName, definitionVersion: e.target.value ? Number(e.target.value) : undefined })}
+        className={cn(ri, 'w-20 placeholder:italic placeholder:text-muted-foreground/40')}
+      />
+    </>
+  );
+}
 const rs = selectBase;
 const rt = textareaBase;
 
@@ -172,7 +197,7 @@ const TIP = {
   selectionMin:            'Minimum number of reviewers required to reach a binding verdict.',
   selectionMax:            'Maximum number of reviewers who may participate in this review step.',
 
-  actionKind:              'Action type: http (outbound API call), reshape (update workflow variables), email, spawn (run another workflow), wait (pause) or collect (read back what spawned workflows produced). Fixed at creation.',
+  actionKind:              'Action type: http (outbound API call), reshape (update workflow variables), email, spawn (run another workflow), wait (pause), collect (read back what spawned workflows produced) or run-workflow (run one workflow, wait for it and return its result). Fixed at creation.',
   actionTargets:           'The workflow(s) this step starts. Each target names a registered workflow; leave the version unset to use its default.',
   actionForEach:           'Interpolation path to an array — the step spawns one child per element, with ${item} bound to it. Leave empty to spawn each target once.',
   // Written explicitly rather than as absence, unlike the optional `allowSkip`
@@ -183,6 +208,10 @@ const TIP = {
   actionWaitDeadline:      'Absolute time to wait until — an ISO timestamp, or an interpolation like ${steps.x.dueAt}. Takes precedence over a duration.',
   actionWaitCondition:     'Transition-language expression checked while waiting; the step proceeds as soon as it is true. `children.allFinished` is true once every spawned workflow has completed or failed, and when none were spawned.',
   actionCollectStep:       'Step id whose output to read from each spawned workflow. Leave empty to read all of its variables.',
+  actionRunWorkflowName:   'The workflow this step runs; the version is its default unless pinned.',
+  actionRunWorkflowPayload: 'Trigger payload for the workflow, as JSON. Values interpolate, e.g. ${steps.intake.case}.',
+  actionRunWorkflowTimeout: 'ISO 8601 duration (P14D, PT2H) or an interpolation. When it passes, the step continues with the workflow\'s current status.',
+  actionRunWorkflowStep:   'Step id whose output to return from the workflow. Leave empty to return all of its variables.',
   verdictLabel:            'Button text shown to the reviewer. Defaults to a title-cased form of the verdict key.',
   verdictIntent:           'Button styling: success, danger, warning or neutral. Defaults from the key for the common names.',
   verdictRequiresComment:  'Enforced server-side — the task cannot be completed on this verdict without a comment.',
@@ -237,6 +266,39 @@ function StepIdField({ currentId, onChange, error }: { currentId: string; onChan
       onKeyDown={(e) => { if (e.key === 'Enter') commit(); }}
       className={cn(riMono, error && 'border-red-400 focus:border-red-500')}
     />
+  );
+}
+
+// Blank clears the payload; text that is not a JSON object stays in the box
+// with the error shown and never replaces the last committed payload.
+function JsonObjectPayloadField({ value, onChange, label, tooltip, placeholder }: {
+  value: Record<string, unknown> | undefined;
+  onChange: (payload: Record<string, unknown> | undefined) => void;
+  label: string;
+  tooltip: string;
+  placeholder: string;
+}) {
+  const [draft, setDraft] = useState(value === undefined ? '' : JSON.stringify(value, null, 2));
+  const rejected = draft.trim() !== '' && parseJsonObjectText(draft) === null;
+
+  return (
+    <FieldRow label={label} tooltip={tooltip} alignStart error={rejected ? 'Must be a JSON object — not saved' : undefined}>
+      <textarea
+        value={draft}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          if (e.target.value.trim() === '') {
+            onChange(undefined);
+            return;
+          }
+          const parsed = parseJsonObjectText(e.target.value);
+          if (parsed !== null) onChange(parsed);
+        }}
+        rows={3}
+        placeholder={placeholder}
+        className={cn(rt, 'font-mono text-[11px] placeholder:italic placeholder:text-muted-foreground/40', rejected && 'ring-1 ring-red-400')}
+      />
+    </FieldRow>
   );
 }
 
@@ -388,6 +450,7 @@ export function StepEditor({
   const spawnAction   = step.action?.kind === 'spawn'   ? step.action : undefined;
   const waitAction    = step.action?.kind === 'wait'    ? step.action : undefined;
   const collectAction = step.action?.kind === 'collect' ? step.action : undefined;
+  const runWorkflowAction = step.action?.kind === 'run-workflow' ? step.action : undefined;
 
   // `targets` is one target or a list; the editor always works on a list and
   // writes back a bare object when there is exactly one, so a hand-authored
@@ -1407,27 +1470,11 @@ export function StepEditor({
                 <div className="space-y-1.5">
                   {spawnTargets.map((target, idx) => (
                     <div key={idx} className="flex items-center gap-1.5">
-                      <input
-                        value={target.definitionName}
-                        placeholder="workflow-name"
-                        onChange={(e) => writeSpawnTargets(
-                          spawnTargets.map((t, i) => (i === idx ? { ...t, definitionName: e.target.value } : t)),
+                      <WorkflowTargetInputs
+                        target={target}
+                        onChange={(patch) => writeSpawnTargets(
+                          spawnTargets.map((t, i) => (i === idx ? { ...t, ...patch } : t)),
                         )}
-                        className={cn(riMono, 'flex-1 placeholder:italic placeholder:text-muted-foreground/40')}
-                      />
-                      <input
-                        type="number"
-                        min={1}
-                        value={target.definitionVersion ?? ''}
-                        placeholder="default"
-                        onChange={(e) => writeSpawnTargets(
-                          spawnTargets.map((t, i) => (
-                            i === idx
-                              ? { ...t, definitionVersion: e.target.value ? Number(e.target.value) : undefined }
-                              : t
-                          )),
-                        )}
-                        className={cn(ri, 'w-20 placeholder:italic placeholder:text-muted-foreground/40')}
                       />
                       <button
                         type="button"
@@ -1521,6 +1568,46 @@ export function StepEditor({
                 className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
               />
             </FieldRow>
+          )}
+
+          {runWorkflowAction && (
+            <>
+              <FieldRow label="action.definitionName" tooltip={TIP.actionRunWorkflowName}>
+                <div className="flex items-center gap-1.5">
+                  <WorkflowTargetInputs
+                    target={runWorkflowAction.config}
+                    onChange={(patch) => onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, ...patch } } })}
+                  />
+                </div>
+              </FieldRow>
+
+              <JsonObjectPayloadField
+                key={`run-workflow-payload-${step.id}`}
+                label="action.payload"
+                tooltip={TIP.actionRunWorkflowPayload}
+                placeholder='{"case": "${steps.intake.case}"}'
+                value={runWorkflowAction.config.payload}
+                onChange={(payload) => onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, payload } } })}
+              />
+
+              <FieldRow label="action.timeout" tooltip={TIP.actionRunWorkflowTimeout}>
+                <input
+                  value={runWorkflowAction.config.timeout}
+                  placeholder="P14D"
+                  onChange={(e) => onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, timeout: e.target.value } } })}
+                  className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
+                />
+              </FieldRow>
+
+              <FieldRow label="action.step" tooltip={TIP.actionRunWorkflowStep}>
+                <input
+                  value={runWorkflowAction.config.step ?? ''}
+                  placeholder="return_result"
+                  onChange={(e) => onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, step: e.target.value || undefined } } })}
+                  className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
+                />
+              </FieldRow>
+            </>
           )}
         </FieldGroup>
       )}

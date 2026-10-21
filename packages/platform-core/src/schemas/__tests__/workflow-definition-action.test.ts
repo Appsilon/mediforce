@@ -314,4 +314,51 @@ describe('workflow-definition action executor', () => {
       expect(JSON.stringify(result.error.issues)).toContain('duration must be greater than zero');
     }
   });
+
+  function parseRunWorkflow(config: Record<string, unknown>) {
+    return parseWorkflowDefinitionForCreation({
+      ...baseTemplate,
+      namespace: 'examples',
+      steps: [
+        {
+          id: 'intake',
+          name: 'Run intake',
+          type: 'creation',
+          executor: 'action',
+          action: { kind: 'run-workflow', config },
+        },
+      ],
+    });
+  }
+
+  it('parses run-workflow with an ISO 8601 timeout', () => {
+    const result = parseRunWorkflow({
+      definitionName: 'document-readiness-intake',
+      payload: { case: '${steps.intake_case.case}' },
+      timeout: 'P14D',
+      step: 'return_result',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('parses run-workflow with an interpolated timeout', () => {
+    const result = parseRunWorkflow({
+      definitionName: 'document-readiness-intake',
+      timeout: 'P${triggerContext.phaseDeadlineDays}D',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it.each(['14 days', 'PT0S', 'P1M'])('rejects run-workflow with timeout %s', (timeout) => {
+    const result = parseRunWorkflow({ definitionName: 'document-readiness-intake', timeout });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(JSON.stringify(result.error.issues)).toContain('timeout must be an ISO 8601 duration');
+    }
+  });
+
+  it('rejects run-workflow without a timeout', () => {
+    const result = parseRunWorkflow({ definitionName: 'document-readiness-intake' });
+    expect(result.success).toBe(false);
+  });
 });
