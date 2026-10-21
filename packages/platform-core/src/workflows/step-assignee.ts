@@ -1,5 +1,5 @@
 import type { UserDirectoryService } from '../interfaces/user-directory-service';
-import { interpolate } from '../interpolation';
+import { interpolate, runInterpolationSources, type RunInterpolationContext } from '../interpolation';
 
 export interface ResolvedStepAssignee {
   // The uid the task is pinned to, or null when nobody could be resolved.
@@ -22,26 +22,13 @@ export async function resolveStepAssignee(
   return { userId: user.uid, email: user.email ?? null, unresolved: null };
 }
 
-export interface AssigneeInstanceContext {
-  triggerPayload?: unknown;
-  triggerContext?: unknown;
-  variables?: Record<string, unknown>;
-}
-
 // Interpolates a step's `assignedTo` against the run, then resolves it. Null when the template renders empty.
 export async function resolveInstanceAssignee(
   assignedTo: string,
-  instance: AssigneeInstanceContext | null,
+  instance: RunInterpolationContext | null,
   directory: Pick<UserDirectoryService, 'resolveUser'> | undefined,
 ): Promise<ResolvedStepAssignee | null> {
-  const variables = instance?.variables ?? {};
-  const resolved = interpolate(assignedTo, {
-    triggerPayload: (instance?.triggerPayload as Record<string, unknown>) ?? {},
-    triggerContext: (instance?.triggerContext as Record<string, unknown>) ?? {},
-    steps: variables,
-    variables,
-    secrets: {},
-  });
+  const resolved = interpolate(assignedTo, runInterpolationSources(instance));
   if (typeof resolved !== 'string' || resolved.length === 0) return null;
   return resolveStepAssignee(resolved, directory);
 }
