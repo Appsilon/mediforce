@@ -41,6 +41,9 @@ test.describe('Step Output Viewer Journey', () => {
 
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/${encodeURIComponent(workflowName)}/runs/${runId}`);
     await page.getByRole('link', { name: /Grade adverse events/ }).first().click();
+    // The run page's Results panel holds the same picker, so wait out the
+    // navigation before driving it.
+    await page.waitForURL(new RegExp(`/runs/${runId}/steps/${STEP_ID}`));
 
     // Opens on result.json, with the step's three files after it.
     const picker = stepOutputFile(page);
