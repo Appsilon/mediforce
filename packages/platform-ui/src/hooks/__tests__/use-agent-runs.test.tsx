@@ -20,7 +20,7 @@ vi.mock('../use-collection', () => ({
   useCollection: () => ({ data: [], loading: false, error: null }),
 }));
 
-const { useAgentRunsForStep, useAgentRun } = await import('../use-agent-runs');
+const { useAgentRunsForStep, useAgentRunsForProcess, useAgentRun } = await import('../use-agent-runs');
 
 beforeEach(() => {
   listMock.mockReset();
@@ -45,6 +45,23 @@ describe('useAgentRunsForStep', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(listMock).toHaveBeenCalledWith({ runId: 'inst-a', stepId: 'review' });
     expect(result.current.data.map((r) => r.id)).toEqual(['r-2']);
+  });
+});
+
+describe('useAgentRunsForProcess', () => {
+  it('is disabled until processInstanceId is provided', () => {
+    const { wrapper } = createQueryWrapper();
+    renderHook(() => useAgentRunsForProcess(null), { wrapper });
+    expect(listMock).not.toHaveBeenCalled();
+  });
+
+  it('GETs with only { runId }, no stepId filter', async () => {
+    listMock.mockResolvedValue({ runs: [buildAgentRun({ id: 'r-1' }), buildAgentRun({ id: 'r-2' })] });
+    const { wrapper } = createQueryWrapper();
+    const { result } = renderHook(() => useAgentRunsForProcess('inst-a'), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(listMock).toHaveBeenCalledWith({ runId: 'inst-a' });
+    expect(result.current.data.map((r) => r.id)).toEqual(['r-1', 'r-2']);
   });
 });
 

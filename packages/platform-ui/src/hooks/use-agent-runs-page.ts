@@ -47,6 +47,7 @@ export function useAgentRunsPage(params: {
         processInstanceIds,
         cursor,
         limit: PAGE_SIZE,
+        excludeExecutorType: 'script',
       }),
     selectItems: (page) => page.runs,
     enabled,
@@ -69,7 +70,7 @@ export function useAgentRunCardStatusCounts(params: {
   const query = useQuery({
     queryKey: queryKeys.agentRuns.cardStatusCounts(namespace, { status, processInstanceIds }),
     queryFn: async () => {
-      const result = await mediforce.agentRuns.cardStatusCounts({ namespace, status, processInstanceIds });
+      const result = await mediforce.agentRuns.cardStatusCounts({ namespace, status, processInstanceIds, excludeExecutorType: 'script' });
       return result.counts;
     },
     enabled,

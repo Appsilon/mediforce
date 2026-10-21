@@ -2623,6 +2623,7 @@ export class Mediforce {
           status: validated.status,
           cardStatus: validated.cardStatus,
           processInstanceId: validated.processInstanceIds,
+          excludeExecutorType: validated.excludeExecutorType,
         });
         const res = await this.request(`/api/agent-runs${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.list');
@@ -2642,6 +2643,7 @@ export class Mediforce {
           namespace: validated.namespace,
           status: validated.status,
           processInstanceId: validated.processInstanceIds,
+          excludeExecutorType: validated.excludeExecutorType,
         });
         const res = await this.request(`/api/agent-runs/card-status-counts${qs}`);
         const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.cardStatusCounts');
@@ -2654,6 +2656,7 @@ export class Mediforce {
         });
         const res = await this.request(
           `/api/agent-runs/${encodeURIComponent(validated.agentRunId)}/trajectory${qs}`,
+          { cache: 'no-store' },
         );
         const body = await parseJsonOrThrow(res, 'mediforce.agentRuns.trajectory');
         return GetAgentTrajectoryOutputSchema.parse(body);

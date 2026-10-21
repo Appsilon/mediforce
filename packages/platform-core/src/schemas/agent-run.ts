@@ -52,7 +52,7 @@ export const AgentRunSchema = z.object({
   fallbackReason: z.string().nullable(),
   startedAt: z.string().datetime(),
   completedAt: z.string().datetime().nullable(),
-  executorType: z.enum(['human', 'agent']).optional(), // for UI display
+  executorType: z.enum(['human', 'agent', 'script']).optional(), // for UI display
   reviewerType: z.enum(['human', 'agent', 'none']).optional(), // for UI display
   trace: AgentRunTraceSchema.nullable().optional(),
 });

@@ -21,6 +21,7 @@ import { useArchiveRun, useCancelRun } from '@/hooks/use-run-mutations';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
+import { useAgentRunsForProcess } from '@/hooks/use-agent-runs';
 import { cn } from '@/lib/utils';
 import { secondaryButtonClass, destructiveButtonClass } from '@/components/ui/button-styles';
 import { RunReport } from '@/components/reports/run-report';
@@ -93,23 +94,37 @@ export function ProcessDetail({
     && sourceLoading === false
     && (sourceInstance === null || sourceInstance.deleted === true);
 
+  const { data: agentRuns } = useAgentRunsForProcess(instance.id);
+
   const agentLogFiles = React.useMemo(() => {
-    const logEvents = agentEvents.filter(
-      (e) => e.type === 'status' && typeof e.payload === 'string' && (e.payload as string).startsWith('agent activity log:'),
-    );
     const stepExecutorMap = new Map(definitionSteps.map((s) => [s.id, (s as unknown as WorkflowStep).executor]));
-    const unsorted = logEvents.map((e) => {
-      const fullPath = (e.payload as string).replace('agent activity log: ', '');
-      return {
-        stepId: e.stepId,
-        file: fullPath.split('/').pop() ?? '',
-        executor: stepExecutorMap.get(e.stepId) ?? 'agent',
-      };
-    }).filter((entry) => entry.file.length > 0);
+    const stepsWithAgentRun = new Set(agentRuns.map((run) => run.stepId));
+
+    const legacyLogs = agentEvents
+      .filter((e) => e.type === 'status' && typeof e.payload === 'string' && (e.payload as string).startsWith('agent activity log:') && !stepsWithAgentRun.has(e.stepId))
+      .map((e) => {
+        const fullPath = (e.payload as string).replace('agent activity log: ', '');
+        return {
+          stepId: e.stepId,
+          file: fullPath.split(/[/\\]/).pop() ?? '',
+          executor: stepExecutorMap.get(e.stepId) ?? 'agent',
+        };
+      })
+      .filter((entry) => entry.file.length > 0);
+
+    const agentLogs = agentRuns
+      .slice()
+      .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+      .map((run) => ({
+        stepId: run.stepId,
+        file: run.id,
+        executor: stepExecutorMap.get(run.stepId) ?? 'agent',
+        agentRunId: run.id,
+      }));
 
     const stepOrder = new Map(definitionSteps.map((s, i) => [s.id, i]));
-    return unsorted.sort((a, b) => (stepOrder.get(a.stepId) ?? 0) - (stepOrder.get(b.stepId) ?? 0));
-  }, [agentEvents, definitionSteps]);
+    return [...legacyLogs, ...agentLogs].sort((a, b) => (stepOrder.get(a.stepId) ?? 0) - (stepOrder.get(b.stepId) ?? 0));
+  }, [agentEvents, definitionSteps, agentRuns]);
 
   const runningStepIds = React.useMemo(
     () => new Set(stepExecutions.filter((e) => e.status === 'running').map((e) => e.stepId)),

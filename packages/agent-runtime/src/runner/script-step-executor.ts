@@ -1,10 +1,14 @@
+import { randomUUID } from 'crypto';
 import {
   StepOutputEnvelopeSchema,
   resolveStepTimeoutMinutes,
   type StepOutputEnvelope,
+  type AgentRunRepository,
+  type AgentTrajectoryRepository,
 } from '@mediforce/platform-core';
 import type { StepExecutorPlugin, WorkflowAgentContext } from '../interfaces/step-executor-plugin';
 import type { PluginRunner } from './plugin-runner';
+import { TrajectoryRecorder } from './trajectory-recorder';
 import type {
   StepExecutor,
   StepExecutorServices,
@@ -13,7 +17,11 @@ import type {
 } from './step-executor';
 
 export class ScriptStepExecutor implements StepExecutor {
-  constructor(private readonly pluginRunner: PluginRunner) {}
+  constructor(
+    private readonly pluginRunner: PluginRunner,
+    private readonly agentRunRepository?: AgentRunRepository,
+    private readonly agentTrajectoryRepository?: AgentTrajectoryRepository,
+  ) {}
 
   async execute(
     plugin: StepExecutorPlugin,
@@ -45,6 +53,28 @@ export class ScriptStepExecutor implements StepExecutor {
       });
     }
 
+    const runId = randomUUID();
+    const runStartedAt = new Date().toISOString();
+    if (meta.reapTimedOut !== true && this.agentRunRepository) {
+      await this.agentRunRepository.create({
+        id: runId,
+        processInstanceId: instanceId,
+        stepId,
+        pluginId,
+        autonomyLevel: 'L4',
+        status: 'running',
+        envelope: null,
+        fallbackReason: null,
+        startedAt: runStartedAt,
+        completedAt: null,
+        executorType: 'script',
+        reviewerType: 'none',
+      });
+    }
+    const trajectory = this.agentTrajectoryRepository
+      ? new TrajectoryRecorder(this.agentTrajectoryRepository, runId)
+      : undefined;
+
     // Reap mode: the prior driver died with this step still running past its
     // timeout — synthesize the timeout instead of launching the plugin (ADR-0010).
     let resultPayload: unknown;
@@ -56,9 +86,11 @@ export class ScriptStepExecutor implements StepExecutor {
       errorMessage = 'Script step timed out — stranded past its timeout after its driver stopped';
     } else {
       const timeoutMs = resolveStepTimeoutMinutes(context.step) * 60_000;
+      const runContext = trajectory ? { ...context, trajectory } : context;
       ({ resultPayload, timedOut, errorMessage } = await this.pluginRunner.execute(
-        plugin, context, timeoutMs,
+        plugin, runContext, timeoutMs,
       ));
+      await trajectory?.flush();
     }
 
     let envelope: StepOutputEnvelope | null = null;
@@ -77,6 +109,23 @@ export class ScriptStepExecutor implements StepExecutor {
       } else {
         envelope = parseResult.data;
       }
+    }
+
+    if (meta.reapTimedOut !== true && this.agentRunRepository) {
+      await this.agentRunRepository.create({
+        id: runId,
+        processInstanceId: instanceId,
+        stepId,
+        pluginId,
+        autonomyLevel: 'L4',
+        status: fallbackReason === 'timeout' ? 'timed_out' : fallbackReason === 'error' ? 'error' : 'completed',
+        envelope: null,
+        fallbackReason,
+        startedAt: runStartedAt,
+        completedAt: new Date().toISOString(),
+        executorType: 'script',
+        reviewerType: 'none',
+      });
     }
 
     // In-flight cancel guard: if the run was cancelled/terminated out from under

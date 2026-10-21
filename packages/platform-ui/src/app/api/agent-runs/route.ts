@@ -33,6 +33,7 @@ export const GET = createRouteAdapter<typeof ListAgentRunsInputSchema, ListAgent
       status: params.get('status') ?? undefined,
       cardStatus: params.get('cardStatus') ?? undefined,
       processInstanceIds: processInstanceIds.length > 0 ? processInstanceIds : undefined,
+      excludeExecutorType: params.get('excludeExecutorType') ?? undefined,
     };
   },
   listAgentRuns,
