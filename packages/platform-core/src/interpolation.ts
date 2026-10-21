@@ -137,6 +137,16 @@ export function interpolate(
   return interpolateString(template, sources);
 }
 
+/** Whether every `${...}` in the template names a value that is neither missing
+ *  nor null. `interpolate` renders such placeholders as '' inside a wider
+ *  template; callers that must not persist a half-rendered string check first. */
+export function resolvesFully(template: string, sources: InterpolationSources): boolean {
+  return [...template.matchAll(PLACEHOLDER_RE)].every(([, path]) => {
+    const value = resolvePath(path, sources);
+    return value !== undefined && value !== null;
+  });
+}
+
 function interpolateString(
   template: string,
   sources: InterpolationSources,

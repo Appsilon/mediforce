@@ -34,6 +34,7 @@ describe('resolveParamDefaults', () => {
     const params: StepParam[] = [
       param('greeting', 'Dear site'),
       { name: 'urgent', type: 'boolean', required: false, default: true },
+      { name: 'retries', type: 'string', required: false, default: 5 },
       { name: 'notes', type: 'string', required: false },
     ];
 
@@ -55,6 +56,12 @@ describe('resolveParamDefaults', () => {
     expect(body.default).toBeUndefined();
   });
 
+  it('drops a mixed template when any placeholder is missing, so a required field cannot be submitted half-rendered', () => {
+    const [subject] = resolveParamDefaults([param('subject', 'Re: ${steps.never-ran.subject}')], run);
+
+    expect(subject.default).toBeUndefined();
+  });
+
   it('serialises structured output into a text field so the reviewer edits it instead of seeing [object Object]', () => {
     const [findings] = resolveParamDefaults([param('findings', '${steps.review-outcome.findings}')], run);
 
@@ -73,6 +80,6 @@ describe('resolveParamDefaults', () => {
   it('never resolves secrets into a persisted default', () => {
     const [token] = resolveParamDefaults([param('token', 'key=${secrets.API_KEY}')], run);
 
-    expect(token.default).toBe('key=');
+    expect(token.default).toBeUndefined();
   });
 });
