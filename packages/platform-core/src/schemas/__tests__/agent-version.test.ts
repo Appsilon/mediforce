@@ -58,4 +58,9 @@ describe('agentEvalDefinition', () => {
     expect(agentEvalDefinition(evaluated, 1).steps[0]!.agent).toEqual({ image: DEFAULT_AGENT_IMAGE });
     expect(agentEvalDefinition({ ...evaluated, image: 'r-tools:2' }, 1).steps[0]!.agent).toEqual({ image: 'r-tools:2' });
   });
+
+  it('runs an agent that names no image on the host when local execution is allowed', () => {
+    expect(agentEvalDefinition(evaluated, 1, {}, { localExecution: true }).steps[0]!.agent).toEqual({});
+    expect(agentEvalDefinition({ ...evaluated, image: 'r-tools:2' }, 1, {}, { localExecution: true }).steps[0]!.agent).toEqual({ image: 'r-tools:2' });
+  });
 });

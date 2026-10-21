@@ -409,7 +409,6 @@ export function StepEditor({
   const selMin = typeof step.selection === 'number' ? step.selection : step.selection?.min;
   const selMax = typeof step.selection === 'number' ? step.selection : step.selection?.max;
 
-
   // The picker's options come from the namespace's image catalog: name and
   // intent instead of a bare `repo:tag`, grouped by what each was built on, and
   // filtered to what the step can actually run — an agent step is not offered
@@ -444,7 +443,7 @@ export function StepEditor({
     agentDefinitions.filter(isEvaluableAgent).map((agent) => ({ namespace: agent.namespace, agentId: agent.id })),
   );
   const agentValidated = agentQualification.data?.validation.status === 'passed';
-  const agentChangeContext = { preamble: workflowPreamble, artifacts: workflowArtifacts };
+  const agentChangeContext = { ...imageSourceDefinition, preamble: workflowPreamble };
   const agentChanges = selectedAgent === undefined ? [] : agentStepChanges(step, selectedAgent, agentChangeContext);
   const hasOwnVerdict = savedValidation === 'failed' || savedValidation === 'awaiting_approval';
   // A patch to apply once confirmed, or an edit to a field that commits on

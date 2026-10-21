@@ -61,13 +61,9 @@ export async function registerWorkflow(
     throw new ValidationError(retired.message.replace('Cannot run', 'Cannot save'));
   }
 
-  // Every agent step must carry an image so the persisted definition is
-  // deployable — when the author gave neither an image nor a build source, the
-  // step gets the image of the Agent it runs, or the shared golden image. The
-  // step records it, so a later change to the Agent's image does not move it.
-  // Applied in every mode, so a definition saved in local-agent mode still runs
-  // in a real (container-worker) deployment. The agent lookup is the caller's
-  // scoped read: an Agent they cannot see lends no image.
+  // Every agent step must carry an image so the saved definition is deployable
+  // in any mode: one with neither an image nor a build source gets its Agent's
+  // (by the caller's scoped read) or golden, frozen at save (ADR-0029 D9).
   for (const step of parsed.data.steps) {
     if (step.executor !== 'agent') continue;
     const cfg = step.agent;

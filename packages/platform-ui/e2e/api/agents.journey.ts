@@ -239,7 +239,8 @@ test.describe('An agent\'s image — API E2E', () => {
     expect(cleared.status(), await cleared.text()).toBe(200);
     expect(await readImage(request, agent.id)).toBeUndefined();
     const versions = await request.get(`/api/agents/${agent.id}/versions`, { headers: apiKeyHeaders() });
-    expect((await versions.json() as { versions: Array<{ version: number }> }).versions.map((version) => version.version)).toEqual([2, 1]);
+    const listed = (await versions.json() as { versions: Array<{ version: number; config: { image?: string } }> }).versions;
+    expect(listed.map((version) => [version.version, version.config.image])).toEqual([[2, undefined], [1, 'r-tools:2']]);
     expect(await savedStepImage(request, workflowName, agent.id)).toBe('mediforce-golden-image');
   });
 });

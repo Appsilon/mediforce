@@ -54,13 +54,15 @@ export const AGENT_EVAL_STEP_ID = 'agent';
  * it may add is `env` — the step env a Workflow Step would declare, such as
  * `{{OPENROUTER_API_KEY}}` templates — so the trial resolves its secrets like
  * any run. It runs in the Agent's image, so the trial has the tools the Agent
- * is meant to have. It is never stored as a Workflow; each trial carries it on
- * its run.
+ * is meant to have — except under `localExecution` (ALLOW_LOCAL_AGENTS), where
+ * an Agent that names no image runs on the host as it did before Agents had
+ * one. It is never stored as a Workflow; each trial carries it on its run.
  */
 export function agentEvalDefinition(
   agent: Pick<AgentDefinition, 'id' | 'name' | 'image'> & { namespace: string; runtimeId: string },
   agentVersion: number,
   env: Record<string, string> = {},
+  { localExecution = false }: { localExecution?: boolean } = {},
 ): WorkflowDefinition {
   return {
     name: `agent:${agent.id}`,
@@ -75,7 +77,7 @@ export function agentEvalDefinition(
       executor: 'agent',
       plugin: agent.runtimeId,
       agentId: agent.id,
-      agent: { image: agentImageOf(agent) },
+      agent: agent.image === undefined && localExecution === true ? {} : { image: agentImageOf(agent) },
       ...(Object.keys(env).length === 0 ? {} : { env }),
     }],
     transitions: [],
@@ -128,4 +130,3 @@ export function agentStepChanges(
   };
   return (Object.keys(changed) as AgentStepChange[]).filter((change) => changed[change]);
 }
-

@@ -12,7 +12,8 @@ import { usePlugins } from '@/hooks/use-plugins';
 import { useDockerImages } from '@/hooks/use-docker-images';
 import { useImageCatalogEntries } from '@/hooks/use-image-catalog';
 import { buildImagePicker } from '@/components/workflows/workflow-editor/image-picker-options';
-import { ImageOptions, offersValue, pickerImageValue } from '@/components/workflows/workflow-editor/image-options';
+import { pickerImageValue } from '@/components/workflows/workflow-editor/image-options';
+import { ReadyImagePicker } from '@/components/workflows/workflow-editor/image-source-fields';
 import { humanizeToken } from '@/components/workflows/workflow-editor/step-editor-fields';
 import { OutputSchemaEditor } from '@/components/workflows/workflow-editor/output-schema-editor';
 
@@ -92,42 +93,18 @@ export function AgentImageField({ namespace, image, onChange }: {
     () => buildImagePicker({ catalogEntries, dockerImages: dockerImages ?? [], executor: 'agent' }),
     [catalogEntries, dockerImages],
   );
-  const [naming, setNaming] = React.useState(false);
 
   return (
     <div className="space-y-1.5">
-      <label htmlFor="agent-image" className="text-sm font-medium">Image</label>
-      {picker.hasSource && naming === false ? (
-        <select
-          id="agent-image"
-          value={pickerImageValue(image ?? '')}
-          onChange={(event) => onChange(event.target.value === '' ? undefined : event.target.value)}
-          className={selectClass}
-        >
-          <option value="">Default — {DEFAULT_AGENT_IMAGE}</option>
-          <ImageOptions groups={picker.groups} normalize={pickerImageValue} />
-          {image !== undefined && offersValue(picker.groups, image, pickerImageValue) === false && (
-            <option value={image}>{image}</option>
-          )}
-        </select>
-      ) : (
-        <input
-          id="agent-image"
-          value={image ?? ''}
-          placeholder={DEFAULT_AGENT_IMAGE}
-          onChange={(event) => { const typed = event.target.value.trim(); onChange(typed === '' ? undefined : typed); }}
-          className={`${selectClass} font-mono`}
-        />
-      )}
-      {picker.hasSource && (
-        <button
-          type="button"
-          className="text-xs text-muted-foreground underline"
-          onClick={() => setNaming(naming === false)}
-        >
-          {naming ? 'Pick from the catalog' : 'Name an image the catalog does not list'}
-        </button>
-      )}
+      <ReadyImagePicker
+        label="Image"
+        picker={picker}
+        image={image}
+        onChange={onChange}
+        blankOptionLabel={`Default — ${DEFAULT_AGENT_IMAGE}`}
+        placeholder={DEFAULT_AGENT_IMAGE}
+        pickerValue={pickerImageValue}
+      />
       <p className="text-xs text-muted-foreground">
         The image the agent runs in, which decides the tools it has. Its evaluations run in it, and a workflow step that names no image of its own is given it when the workflow is saved.
       </p>

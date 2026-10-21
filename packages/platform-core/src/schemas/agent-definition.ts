@@ -50,7 +50,7 @@ export const AgentDefinitionSchema = z.object({
   /** Image tag a container agent runs in — its tools come from it. Unset
    *  means the golden image (`agentImageOf`). A Step that names no image of
    *  its own is given this one when its Workflow is saved. */
-  image: z.string().min(1).optional(),
+  image: z.string().trim().min(1).optional(),
   name: z.string().min(1),
   iconName: z.string(),
   description: z.string(),

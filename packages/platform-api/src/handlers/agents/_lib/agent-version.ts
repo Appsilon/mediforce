@@ -23,10 +23,11 @@ export async function agentConfigOf(scope: CallerScope, agent: AgentDefinition):
     const contentHash = await scope.skills.heldContentHash(ref.namespace, ref.id);
     return offeredSkill({ ...ref, contentHash: contentHash ?? MISSING_SKILL_HASH });
   }));
+  const image = ownAgentImage(agent);
   return {
     kind: agent.kind,
     runtimeId: agent.runtimeId ?? null,
-    ...(ownAgentImage(agent) === undefined ? {} : { image: ownAgentImage(agent) }),
+    ...(image === undefined ? {} : { image }),
     foundationModel: agent.foundationModel,
     systemPrompt: agent.systemPrompt,
     ...(agent.outputSchema === undefined ? {} : { outputSchema: agent.outputSchema }),

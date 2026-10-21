@@ -84,7 +84,8 @@ point at.
    Eval Run freezes a copy at prepare (`eval_runs.env`)._ _Amended 2026-10-21:
    the trial's step names the Agent's image, or the golden image when the
    Agent names none (decision 9), so a trial runs with the tools the Agent is
-   meant to have rather than in no image at all._
+   meant to have rather than in no image at all. Under `ALLOW_LOCAL_AGENTS` an
+   Agent that names no image still runs its trial on the host._
 
 5. **Production-only features stay a Step's.** An Agent has no production runs
    of its own — its runs belong to the Steps that use it. Harvesting a case
