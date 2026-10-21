@@ -135,20 +135,19 @@ export function ProcessDetail({
     agentLogFiles.length > 0 ? 'agent-log' : 'audit',
   );
 
-  // One list for the edge pulls and the panel header, so they cannot drift.
+  // One list for the buttons and the panel header, so they cannot drift.
   const rightPanels = React.useMemo((): Array<{
     value: 'agent-log' | 'audit' | 'diagram' | 'report';
     label: string;
     Icon: LucideIcon;
-    /** The report only exists once the run finishes, so its pull announces
-     *  itself rather than sitting quietly with the other three. */
+    /** The report only exists once the run finishes — it's always there to
+     *  read, open or not, so its button stays marked rather than looking
+     *  like the other three. */
     ready?: boolean;
-    /** `data-tour` anchor, so a walkthrough can ring one pull rather than the rail. */
+    /** `data-tour` anchor, so a walkthrough can ring one button rather than the rail. */
     tour: string;
   }> => [
-    ...(agentLogFiles.length > 0
-      ? [{ value: 'agent-log' as const, label: 'Log', Icon: ScrollText, tour: 'run-pull-log' }]
-      : []),
+    { value: 'agent-log' as const, label: 'Log', Icon: ScrollText, tour: 'run-pull-log' },
     { value: 'audit' as const, label: 'Audit', Icon: ShieldCheck, tour: 'run-pull-audit' },
     ...(definition
       ? [{ value: 'diagram' as const, label: 'Diagram', Icon: GitBranch, tour: 'run-pull-diagram' }]
@@ -156,7 +155,7 @@ export function ProcessDetail({
     ...(instance.status === 'completed'
       ? [{ value: 'report' as const, label: 'Report', Icon: CheckCircle2, ready: true, tour: 'run-pull-report' }]
       : []),
-  ], [agentLogFiles.length, definition, instance.status]);
+  ], [definition, instance.status]);
 
   // When a new agent log file appears (new step started), switch to Agent Log.
   // Only switch when the count increases so the user's manual tab choice is
@@ -349,7 +348,41 @@ export function ProcessDetail({
               </dd>
             </div>
           </dl>
+        </div>
 
+        {/* Opens the side panel. The only switcher for it — open or closed,
+            these buttons sit in the same place and say what is behind them.
+            Make it sticky during scrolling. */}
+        <div className="sticky top-0 z-10 flex items-center gap-2 flex-wrap bg-background">
+          {rightPanels.map(({ value, label, Icon, ready, tour }) => {
+            const active = logsOpen && rightTab === value;
+            return (
+              <button
+                key={value}
+                data-tour={tour}
+                aria-pressed={active}
+                onClick={() => {
+                  if (active) {
+                    setLogsOpen(false);
+                    return;
+                  }
+                  setRightTab(value);
+                  setLogsOpen(true);
+                }}
+                className={cn(
+                  secondaryButtonClass,
+                  'cursor-pointer',
+                  (active || ready === true) && 'border-primary/30 text-primary bg-primary-subtle',
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="space-y-2">
           {needsHumanTaskAction && blockingTask && (
             <div className="rounded-lg border border-primary/20 bg-primary/5 dark:bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
               <div className="text-sm">
@@ -450,48 +483,18 @@ export function ProcessDetail({
         )}
       </div>
 
-      {/* Right panel. The pulls down the edge are the only switcher — open or
-          closed, they sit in the same place and say what is behind them. A
-          second row of tabs inside meant two controls for one job. */}
+      {/* Right panel. The buttons in the main column are the only switcher —
+          open or closed, they sit in the same place and say what is behind
+          them. A second row of tabs inside meant two controls for one job. */}
       <div
         className={cn(
-          'sticky top-4 h-[calc(100vh-2rem)] shrink-0 flex gap-0 transition-[width] duration-300 ease-in-out',
-          logsOpen ? 'w-1/2' : 'w-8',
+          'sticky top-4 h-[calc(100vh-2rem)] shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out',
+          logsOpen ? 'w-1/2' : 'w-0',
         )}
       >
-        <div className="w-8 shrink-0 flex flex-col items-end justify-center gap-1.5">
-          {rightPanels.map(({ value, label, Icon, ready, tour }) => {
-            const active = logsOpen && rightTab === value;
-            return (
-              <button
-                key={value}
-                data-tour={tour}
-                onClick={() => {
-                  if (active) {
-                    setLogsOpen(false);
-                    return;
-                  }
-                  setRightTab(value);
-                  setLogsOpen(true);
-                }}
-                className={cn(
-                  'flex flex-col items-center gap-1.5 rounded-l-md border border-r-0 px-2 py-3 text-xs font-medium tracking-wide whitespace-nowrap transition-colors',
-                  active && 'bg-card text-foreground border-border',
-                  !active && ready === true && 'bg-primary-subtle text-primary border-primary/30 hover:brightness-95',
-                  !active && ready !== true && 'bg-muted/60 text-muted-foreground border-transparent hover:text-foreground hover:bg-muted',
-                )}
-              >
-                {/* Turned with the label, which `vertical-rl` rotates 90°. */}
-                <Icon className={cn('h-3.5 w-3.5 shrink-0 rotate-90', ready === true && 'text-primary')} />
-                <span style={{ writingMode: 'vertical-rl' }}>{label}</span>
-              </button>
-            );
-          })}
-        </div>
-
         <div
           className={cn(
-            'flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden rounded-l-lg border bg-card shadow-sm transition-opacity duration-200',
+            'h-full flex flex-col min-h-0 min-w-0 overflow-hidden rounded-l-lg border bg-card shadow-sm transition-opacity duration-200',
             logsOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
           )}
         >
@@ -501,7 +504,7 @@ export function ProcessDetail({
               if (panel === undefined) return null;
               return (
                 <>
-                  <panel.Icon className={cn('h-4 w-4 shrink-0', panel.ready === true ? 'text-primary' : 'text-muted-foreground')} />
+                  <panel.Icon className="h-4 w-4 shrink-0 text-primary" />
                   <h2 className="font-headline text-sm font-semibold truncate">{panel.label}</h2>
                 </>
               );
@@ -516,12 +519,16 @@ export function ProcessDetail({
           </div>
 
           <div className={cn('flex-1 min-h-0 p-4 flex flex-col overflow-hidden', rightTab !== 'agent-log' && 'hidden')}>
-            <AgentLogViewer
-              logFiles={agentLogFiles}
-              initialStepId={agentLogStepId}
-              runningStepIds={runningStepIds}
-              runActive={isTerminal === false}
-            />
+            {agentLogFiles.length > 0 ? (
+              <AgentLogViewer
+                logFiles={agentLogFiles}
+                initialStepId={agentLogStepId}
+                runningStepIds={runningStepIds}
+                runActive={isTerminal === false}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground py-8 text-center">No agent log yet.</p>
+            )}
           </div>
 
           <div
@@ -532,7 +539,7 @@ export function ProcessDetail({
               events={auditEvents}
               loading={auditEventsLoading}
               error={auditEventsError}
-              printable={rightTab === 'audit'}
+              printable={rightTab === 'audit' && logsOpen}
             />
           </div>
 
