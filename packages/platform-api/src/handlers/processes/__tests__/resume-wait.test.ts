@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   InMemoryAuditRepository,
   InMemoryProcessInstanceRepository,
@@ -376,5 +376,116 @@ describe('resumeWait handler', () => {
     await expect(
       resumeWait({ runId: 'inst-human' }, scope),
     ).rejects.toBeInstanceOf(PreconditionFailedError);
+  });
+
+  describe('run-workflow child wait', () => {
+    const pausedAt = '2026-06-01T10:00:00.000Z';
+    const resumeAt = '2026-06-15T10:00:00.000Z';
+
+    async function parkOnChild(childStatus: 'running' | 'completed' | 'failed' | null) {
+      await instanceRepo.create(
+        buildProcessInstance({
+          id: 'parent',
+          namespace: 'team-alpha',
+          status: 'paused',
+          pauseReason: 'waiting_for_timer',
+          variables: {
+            __wait: {
+              stepId: 'intake',
+              resumeAt,
+              pausedAt,
+              mode: 'deadline',
+              child: { instanceId: 'child', step: 'return_result' },
+            },
+          },
+        }),
+      );
+      if (childStatus !== null) {
+        await instanceRepo.create(
+          buildProcessInstance({
+            id: 'child',
+            namespace: 'team-alpha',
+            definitionName: 'intake',
+            status: childStatus,
+            parentInstanceId: 'parent',
+            ...(childStatus === 'failed' ? { error: 'boom' } : {}),
+            variables: childStatus === 'completed' ? { return_result: { outcome: 'ready' } } : {},
+          }),
+        );
+      }
+      const kicker = noopRunKicker();
+      const scope = createTestScope({
+        instanceRepo,
+        auditRepo,
+        runKicker: kicker,
+        caller: userCaller('u-1', ['team-alpha']),
+      });
+      return { scope, kicker };
+    }
+
+    async function stepOutput() {
+      const parent = await instanceRepo.getById('parent');
+      return (parent!.variables as Record<string, unknown>).intake;
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-06-02T10:00:00.000Z'));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('resumes with the child result as soon as the child completes', async () => {
+      const { scope, kicker } = await parkOnChild('completed');
+
+      const result = await resumeWait({ runId: 'parent' }, scope);
+
+      expect(result).toEqual({ resumed: true, resumeReason: 'child_finished' });
+      expect(await stepOutput()).toEqual({
+        instanceId: 'child',
+        definitionName: 'intake',
+        status: 'completed',
+        error: null,
+        output: { outcome: 'ready' },
+      });
+      expect(kicker.kicks).toHaveLength(1);
+    });
+
+    it('resumes with status failed when the child fails', async () => {
+      const { scope } = await parkOnChild('failed');
+
+      await resumeWait({ runId: 'parent' }, scope);
+
+      expect(await stepOutput()).toMatchObject({ status: 'failed', error: 'boom', output: null });
+    });
+
+    it('keeps waiting while the child runs and the timeout has not passed', async () => {
+      const { scope } = await parkOnChild('running');
+
+      const result = await resumeWait({ runId: 'parent' }, scope);
+
+      expect(result).toEqual({ resumed: false, resumeAt });
+      expect((await instanceRepo.getById('parent'))!.status).toBe('paused');
+    });
+
+    it('resumes with the unfinished child status once the timeout passes', async () => {
+      const { scope } = await parkOnChild('running');
+      vi.setSystemTime(new Date('2026-06-16T10:00:00.000Z'));
+
+      const result = await resumeWait({ runId: 'parent' }, scope);
+
+      expect(result).toEqual({ resumed: true, resumeReason: 'deadline_reached' });
+      expect(await stepOutput()).toMatchObject({ instanceId: 'child', status: 'running', output: null });
+    });
+
+    it('resolves as failed when the child run no longer exists', async () => {
+      const { scope } = await parkOnChild(null);
+
+      await resumeWait({ runId: 'parent' }, scope);
+
+      expect(await stepOutput()).toMatchObject({ instanceId: 'child', status: 'failed', output: null });
+    });
   });
 });

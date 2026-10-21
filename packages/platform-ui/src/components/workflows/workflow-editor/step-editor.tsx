@@ -172,7 +172,7 @@ const TIP = {
   selectionMin:            'Minimum number of reviewers required to reach a binding verdict.',
   selectionMax:            'Maximum number of reviewers who may participate in this review step.',
 
-  actionKind:              'Action type: http (outbound API call), reshape (update workflow variables), email, spawn (run another workflow), wait (pause) or collect (read back what spawned workflows produced). Fixed at creation.',
+  actionKind:              'Action type: http (outbound API call), reshape (update workflow variables), email, spawn (run another workflow), wait (pause), collect (read back what spawned workflows produced) or run-workflow (run one workflow, wait for it and return its result). Fixed at creation.',
   actionTargets:           'The workflow(s) this step starts. Each target names a registered workflow; leave the version unset to use its default.',
   actionForEach:           'Interpolation path to an array — the step spawns one child per element, with ${item} bound to it. Leave empty to spawn each target once.',
   // Written explicitly rather than as absence, unlike the optional `allowSkip`
@@ -183,6 +183,10 @@ const TIP = {
   actionWaitDeadline:      'Absolute time to wait until — an ISO timestamp, or an interpolation like ${steps.x.dueAt}. Takes precedence over a duration.',
   actionWaitCondition:     'Transition-language expression checked while waiting; the step proceeds as soon as it is true. `children.allFinished` is true once every spawned workflow has completed or failed, and when none were spawned.',
   actionCollectStep:       'Step id whose output to read from each spawned workflow. Leave empty to read all of its variables.',
+  actionRunWorkflowName:   'The workflow this step runs; the version is its default unless pinned.',
+  actionRunWorkflowPayload: 'Trigger payload for the workflow, as JSON. Values interpolate, e.g. ${steps.intake.case}.',
+  actionRunWorkflowTimeout: 'ISO 8601 duration (P14D, PT2H) or an interpolation. When it passes, the step continues with the workflow\'s current status.',
+  actionRunWorkflowStep:   'Step id whose output to return from the workflow. Leave empty to return all of its variables.',
   verdictLabel:            'Button text shown to the reviewer. Defaults to a title-cased form of the verdict key.',
   verdictIntent:           'Button styling: success, danger, warning or neutral. Defaults from the key for the common names.',
   verdictRequiresComment:  'Enforced server-side — the task cannot be completed on this verdict without a comment.',
@@ -388,6 +392,7 @@ export function StepEditor({
   const spawnAction   = step.action?.kind === 'spawn'   ? step.action : undefined;
   const waitAction    = step.action?.kind === 'wait'    ? step.action : undefined;
   const collectAction = step.action?.kind === 'collect' ? step.action : undefined;
+  const runWorkflowAction = step.action?.kind === 'run-workflow' ? step.action : undefined;
 
   // `targets` is one target or a list; the editor always works on a list and
   // writes back a bare object when there is exactly one, so a hand-authored
@@ -1521,6 +1526,66 @@ export function StepEditor({
                 className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
               />
             </FieldRow>
+          )}
+
+          {runWorkflowAction && (
+            <>
+              <FieldRow label="action.definitionName" tooltip={TIP.actionRunWorkflowName}>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    value={runWorkflowAction.config.definitionName}
+                    placeholder="workflow-name"
+                    onChange={(e) => onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, definitionName: e.target.value } } })}
+                    className={cn(riMono, 'flex-1 placeholder:italic placeholder:text-muted-foreground/40')}
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    value={runWorkflowAction.config.definitionVersion ?? ''}
+                    placeholder="default"
+                    onChange={(e) => onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, definitionVersion: e.target.value ? Number(e.target.value) : undefined } } })}
+                    className={cn(ri, 'w-20 placeholder:italic placeholder:text-muted-foreground/40')}
+                  />
+                </div>
+              </FieldRow>
+
+              <FieldRow label="action.payload" tooltip={TIP.actionRunWorkflowPayload} alignStart>
+                <textarea
+                  defaultValue={runWorkflowAction.config.payload === undefined ? '' : JSON.stringify(runWorkflowAction.config.payload, null, 2)}
+                  onChange={(e) => {
+                    if (e.target.value.trim() === '') {
+                      onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, payload: undefined } } });
+                      return;
+                    }
+                    try {
+                      const parsed = JSON.parse(e.target.value);
+                      onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, payload: parsed } } });
+                    } catch { /* invalid JSON */ }
+                  }}
+                  rows={3}
+                  placeholder='{"case": "${steps.intake.case}"}'
+                  className={cn(rt, 'font-mono text-[11px] placeholder:italic placeholder:text-muted-foreground/40')}
+                />
+              </FieldRow>
+
+              <FieldRow label="action.timeout" tooltip={TIP.actionRunWorkflowTimeout}>
+                <input
+                  value={runWorkflowAction.config.timeout}
+                  placeholder="P14D"
+                  onChange={(e) => onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, timeout: e.target.value } } })}
+                  className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
+                />
+              </FieldRow>
+
+              <FieldRow label="action.step" tooltip={TIP.actionRunWorkflowStep}>
+                <input
+                  value={runWorkflowAction.config.step ?? ''}
+                  placeholder="return_result"
+                  onChange={(e) => onChange({ action: { ...runWorkflowAction, config: { ...runWorkflowAction.config, step: e.target.value || undefined } } })}
+                  className={cn(riMono, 'placeholder:italic placeholder:text-muted-foreground/40')}
+                />
+              </FieldRow>
+            </>
           )}
         </FieldGroup>
       )}

@@ -10,6 +10,7 @@ import {
 } from './process-definition';
 import { ProcessNotificationConfigSchema } from './process-config';
 import { BuildContextSchema } from '../utils/docker-build-paths';
+import { parseIsoDurationMs } from '../utils/iso-duration';
 import { McpServerConfigSchema } from './mcp-server-config';
 import { StepMcpRestrictionSchema } from './agent-mcp-binding';
 import { AgentSkillRefsSchema } from './agent-definition';
@@ -80,6 +81,14 @@ export const CollectActionConfigSchema = z.object({
   step: z.string().min(1).optional(),
 });
 
+/** run-workflow action config: spawn one child, park the run until it ends or
+ *  `timeout` (an ISO 8601 duration, interpolated) passes, and return that
+ *  child's result. `step` narrows its output the way collect's does. */
+export const RunWorkflowActionConfigSchema = SpawnTargetSchema.extend({
+  timeout: z.string().min(1),
+  step: z.string().min(1).optional(),
+});
+
 /** Discriminated union of action configs. New kinds plug in here. */
 export const ActionConfigSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('http'), config: HttpActionConfigSchema }),
@@ -88,6 +97,7 @@ export const ActionConfigSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('spawn'), config: SpawnActionConfigSchema }),
   z.object({ kind: z.literal('wait'), config: WaitActionConfigSchema }),
   z.object({ kind: z.literal('collect'), config: CollectActionConfigSchema }),
+  z.object({ kind: z.literal('run-workflow'), config: RunWorkflowActionConfigSchema }),
 ]);
 
 export type HttpMethod = z.infer<typeof HttpMethodSchema>;
@@ -98,6 +108,7 @@ export type SpawnTargetConfig = z.infer<typeof SpawnTargetSchema>;
 export type SpawnActionConfig = z.infer<typeof SpawnActionConfigSchema>;
 export type WaitActionConfig = z.infer<typeof WaitActionConfigSchema>;
 export type CollectActionConfig = z.infer<typeof CollectActionConfigSchema>;
+export type RunWorkflowActionConfig = z.infer<typeof RunWorkflowActionConfigSchema>;
 export type ActionConfig = z.infer<typeof ActionConfigSchema>;
 
 /**
@@ -522,6 +533,17 @@ function validateSteps(
               message: `step '${step.id}': duration must be greater than zero`,
             });
           }
+        }
+      }
+      if (action.kind === 'run-workflow') {
+        const timeout = String(action.config.timeout);
+        const timeoutMs = timeout.includes('${') ? undefined : parseIsoDurationMs(timeout);
+        if (timeoutMs === null || timeoutMs === 0) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['steps', i, 'action', 'config', 'timeout'],
+            message: `step '${step.id}': timeout must be an ISO 8601 duration greater than zero (e.g. P14D, PT2H), got '${timeout}'`,
+          });
         }
       }
     }

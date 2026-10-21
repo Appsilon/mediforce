@@ -16,6 +16,7 @@ const ACTION_KIND_ALIASES: Record<string, ActionConfig['kind']> = {
   delay: 'wait', pause: 'wait', sleep: 'wait',
   trigger: 'spawn', childworkflow: 'spawn',
   join: 'collect', gather: 'collect', collectchildren: 'collect',
+  runworkflow: 'run-workflow', subworkflow: 'run-workflow', callworkflow: 'run-workflow',
   transform: 'reshape', map: 'reshape',
 };
 

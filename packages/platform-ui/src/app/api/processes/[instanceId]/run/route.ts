@@ -598,21 +598,28 @@ export async function POST(
 
             const { actionRegistry, engine } = getPlatformServices();
 
-            // Wait actions: if resumeWait already wrote the step output, skip dispatch
-            if (currentStep.action.kind === 'wait') {
-              const preResolved = instance.variables[instance.currentStepId] as Record<string, unknown> | undefined;
-              if (preResolved?.resumeReason) {
-                const waitExecutions = await instanceRepo.getStepExecutions(instanceId);
-                const latestWaitExecution = waitExecutions
-                  .filter((execution) => execution.stepId === instance.currentStepId)
-                  .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
+            // A parking action (wait, run-workflow) leaves its execution paused;
+            // resumeWait writes the step output and sets the run running again.
+            // Close that execution with the output and advance instead of
+            // dispatching again — closing it is what lets a loop that comes
+            // back to this step dispatch afresh rather than reuse this output.
+            const preResolved = instance.variables[instance.currentStepId] as Record<string, unknown> | undefined;
+            if (preResolved !== undefined) {
+              const parkedExecutions = await instanceRepo.getStepExecutions(instanceId);
+              const latestParkedExecution = parkedExecutions
+                .filter((execution) => execution.stepId === instance.currentStepId)
+                .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
 
-                if (latestWaitExecution?.status === 'paused') {
-                  console.log(`[auto-runner] Wait step '${instance.currentStepId}' already resolved (${preResolved.resumeReason}) — advancing`);
-                  await engine.advanceStep(instanceId, preResolved, { id: 'auto-runner', role: 'system' });
-                  stepsExecuted++;
-                  continue;
-                }
+              if (latestParkedExecution?.status === 'paused') {
+                console.log(`[auto-runner] Parked step '${instance.currentStepId}' already resolved — advancing`);
+                await instanceRepo.updateStepExecution(instanceId, latestParkedExecution.id, {
+                  status: 'completed',
+                  output: preResolved,
+                  completedAt: new Date().toISOString(),
+                });
+                await engine.advanceStep(instanceId, preResolved, { id: 'auto-runner', role: 'system' });
+                stepsExecuted++;
+                continue;
               }
             }
 
@@ -713,12 +720,21 @@ export async function POST(
                       `[auto-runner] Wait sentinel write lost for '${instanceId}': ` +
                       `pauseReason=${afterWrite?.pauseReason} — escalating to failed`,
                     );
+                    const error =
+                      `Wait step '${instance.currentStepId}' could not register its timer — ` +
+                      `the scheduler metadata was not persisted. ` +
+                      `Resume this run to restart from the wait step.`;
+                    // Not left paused: a paused execution reads as a resolved
+                    // park on the next pass, which would advance a resumed run
+                    // with whatever an earlier iteration of this step wrote.
+                    await instanceRepo.updateStepExecution(instanceId, executionId, {
+                      status: 'failed',
+                      completedAt: new Date().toISOString(),
+                      error,
+                    });
                     await instanceRepo.update(instanceId, {
                       status: 'failed',
-                      error:
-                        `Wait step '${instance.currentStepId}' could not register its timer — ` +
-                        `the scheduler metadata was not persisted. ` +
-                        `Resume this run to restart from the wait step.`,
+                      error,
                       updatedAt: new Date().toISOString(),
                     });
                   } else {

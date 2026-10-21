@@ -49,6 +49,7 @@ to a handler in [`core-actions/src/handlers/`](../../packages/core-actions/src/h
 | `spawn` | Launch child workflow run(s); **`forEach` fans out one child per item** | `SpawnActionConfigSchema` |
 | `wait` | Pause the run until a `duration` or `deadline` elapses, or earlier when its `condition` is true | `WaitActionConfigSchema` |
 | `collect` | Read back what the run's spawned children produced (the read half of spawn + wait) | `CollectActionConfigSchema` |
+| `run-workflow` | Run **one** child workflow, pause until it ends or `timeout` passes, and return that child's result | `RunWorkflowActionConfigSchema` |
 
 **Fan-out** (the "spawn a workflow per team member" pattern) is
 `action.kind: spawn` with `forEach: "${steps.x.list}"` and a single `targets`
@@ -92,6 +93,21 @@ Handler nuances not visible in the schema (in
   `variables`. Children that failed or are still running are listed too — the
   next step decides what a partial result means. Read on demand from the
   children, so nothing is ever written into the parent when a child finishes.
+- `run-workflow` is spawn + wait + collect for one child in one step
+  ([`run-workflow.ts`](../../packages/core-actions/src/handlers/run-workflow.ts)).
+  Config is a spawn target (`definitionName`, `definitionVersion`,
+  `triggerName`, `payload`) plus `timeout` — an ISO 8601 duration (`P14D`,
+  `PT2H`; no years or months), interpolated at run time, so
+  `P${triggerContext.days}D` needs no script step — and an optional `step` that
+  narrows the output like `collect`'s. The child is started with
+  `continueOnSpawnError: false`, so a bad payload fails the step. The step's
+  output is `{ instanceId, definitionName, status, error, output }` for **the
+  child this step execution started** — a loop that comes back to the step gets
+  its new child, never an earlier one. It parks on the same `__wait` sentinel as
+  `wait` (with the child's id on it), and resumes the moment that child
+  completes or fails, or at the timeout with the child's current status; branch
+  on `output.status` / `output.output.*`. Use `spawn` / `wait` / `collect` for
+  fan-out.
 - `email` supports `cc` / `bcc` / `replyTo` / `html` and is **rate-limited**
   (default 50/run, 30/minute) in [`email.ts`](../../packages/core-actions/src/handlers/email.ts).
 - `http` never throws on a non-2xx response — it returns `{ status, headers, body }`;

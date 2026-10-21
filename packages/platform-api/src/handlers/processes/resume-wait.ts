@@ -1,17 +1,12 @@
-import type { InstanceStatus } from '@mediforce/platform-core';
+import type { InstanceStatus, ProcessInstance } from '@mediforce/platform-core';
 import { evaluateExpression } from '@mediforce/workflow-engine';
+import { toCollectedChild, type CollectedChild, type WaitSentinel } from '@mediforce/core-actions';
 import type { ResumeWaitInput, ResumeWaitOutput } from '../../contract/processes';
 import type { CallerScope } from '../../repositories/index';
 import { PreconditionFailedError } from '../../errors';
 import { actorFromCaller, loadOr404 } from '../_helpers';
 
-interface WaitMetadata {
-  stepId: string;
-  resumeAt: string;
-  pausedAt: string;
-  mode: 'duration' | 'deadline';
-  condition?: string;
-}
+type WaitMetadata = WaitSentinel['__wait'];
 
 const TERMINAL_STATUSES: readonly InstanceStatus[] = ['completed', 'failed'];
 
@@ -63,6 +58,15 @@ export async function resumeWait(
   const now = new Date();
   const resumeAt = new Date(waitMeta.resumeAt);
 
+  if (waitMeta.child !== undefined) {
+    const child = await readChild(waitMeta.child, scope);
+    const childEnded = TERMINAL_STATUSES.includes(child.status);
+    if (now < resumeAt && !childEnded) {
+      return { resumed: false, resumeAt: waitMeta.resumeAt };
+    }
+    return resolveWait(run, waitMeta, scope, now, childEnded ? 'child_finished' : 'deadline_reached', { ...child });
+  }
+
   let conditionMet = false;
   if (waitMeta.condition) {
     try {
@@ -85,19 +89,50 @@ export async function resumeWait(
     return { resumed: false, resumeAt: waitMeta.resumeAt };
   }
 
-  const waitedSeconds = Math.round(
-    (now.getTime() - new Date(waitMeta.pausedAt).getTime()) / 1000,
-  );
   const resumeReason = conditionMet
     ? 'condition_met'
     : waitMeta.mode === 'deadline' ? 'deadline_reached' : 'duration_elapsed';
-  const waitOutput = { resumeReason, waitedSeconds, resolvedAt: now.toISOString() };
+  const waitOutput = { resumeReason, waitedSeconds: waitedSecondsSince(waitMeta, now), resolvedAt: now.toISOString() };
+  return resolveWait(run, waitMeta, scope, now, resumeReason, waitOutput);
+}
 
+function waitedSecondsSince(waitMeta: WaitMetadata, now: Date): number {
+  return Math.round((now.getTime() - new Date(waitMeta.pausedAt).getTime()) / 1000);
+}
+
+// The run-workflow child, read fresh. A child that is gone can never end, so it
+// resolves the step as failed rather than parking the parent until the timeout.
+async function readChild(
+  child: NonNullable<WaitMetadata['child']>,
+  scope: CallerScope,
+): Promise<CollectedChild> {
+  const childRun = await scope.runs.getById(child.instanceId);
+  if (childRun === null) {
+    return {
+      instanceId: child.instanceId,
+      definitionName: '',
+      status: 'failed',
+      error: `Child run '${child.instanceId}' no longer exists`,
+      output: null,
+    };
+  }
+  return toCollectedChild(childRun, child.step);
+}
+
+async function resolveWait(
+  run: ProcessInstance,
+  waitMeta: WaitMetadata,
+  scope: CallerScope,
+  now: Date,
+  resumeReason: string,
+  waitOutput: Record<string, unknown>,
+): Promise<ResumeWaitOutput> {
+  const waitedSeconds = waitedSecondsSince(waitMeta, now);
   const { __wait: _, ...cleanVars } = run.variables as Record<string, unknown>;
   // Several callers can reach this point for one run at once (each finishing
   // child, the heartbeat, a manual call); the guarded write lets exactly one
   // of them resume it.
-  const won = await scope.runs.updateIfPaused(input.runId, 'waiting_for_timer', {
+  const won = await scope.runs.updateIfPaused(run.id, 'waiting_for_timer', {
     status: 'running',
     pauseReason: null,
     variables: { ...cleanVars, [waitMeta.stepId]: waitOutput },
@@ -115,21 +150,21 @@ export async function resumeWait(
     await scope.system.audit.append({
       ...actor,
       action: 'instance.wait.resumed',
-      description: `Wait action resumed for '${input.runId}' (reason: ${resumeReason}, waited ${waitedSeconds}s)`,
+      description: `Wait action resumed for '${run.id}' (reason: ${resumeReason}, waited ${waitedSeconds}s)`,
       timestamp: now.toISOString(),
-      inputSnapshot: { stepId: waitMeta.stepId, resumeAt: waitMeta.resumeAt, condition: waitMeta.condition },
+      inputSnapshot: { stepId: waitMeta.stepId, resumeAt: waitMeta.resumeAt, condition: waitMeta.condition, child: waitMeta.child },
       outputSnapshot: waitOutput,
-      basis: `Timer expired or condition met: ${resumeReason}`,
+      basis: `Timer expired, condition met or child ended: ${resumeReason}`,
       entityType: 'processInstance',
-      entityId: input.runId,
-      processInstanceId: input.runId,
+      entityId: run.id,
+      processInstanceId: run.id,
       processDefinitionVersion: run.definitionVersion,
     });
   } catch (err) {
-    console.error(`[resume-wait] Audit write failed for '${input.runId}':`, err);
+    console.error(`[resume-wait] Audit write failed for '${run.id}':`, err);
   }
 
-  await scope.system.runKicker.kick(input.runId, { triggeredBy: actor.actorId });
+  await scope.system.runKicker.kick(run.id, { triggeredBy: actor.actorId });
 
   return { resumed: true, resumeReason };
 }
