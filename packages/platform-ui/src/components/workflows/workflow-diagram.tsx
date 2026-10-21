@@ -34,7 +34,7 @@ import {
   type ControlMode,
   type NewStepPayload,
 } from '@/lib/control-mode';
-import { computeGraphLayout, placeNewNodes, NODE_WIDTH, type GraphEdge } from './workflow-graph-layout';
+import { computeGraphLayout, placeNewNodes, edgeIdOf, NODE_WIDTH, type GraphEdge } from './workflow-graph-layout';
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -44,6 +44,7 @@ const COLORS = {
   forward: { stroke: '#cbd5e1', arrow: '#94a3b8' },
   back: { stroke: '#f59e0b', arrow: '#d97706' },
   label: { forward: '#64748b', back: '#b45309' },
+  replay: { ball: '#2563eb' },
 } as const;
 
 export const STEP_STYLES: Record<string, { bg: string; border: string; activeBorder: string; activeRing: string }> = {
@@ -425,8 +426,6 @@ type ReplayEdgeData = {
   isBack: boolean;
 };
 
-const REPLAY_BALL_COLOR = '#2563eb';
-
 function ReplayEdge({
   id,
   sourceX, sourceY, sourcePosition,
@@ -472,7 +471,7 @@ function ReplayEdge({
         labelShowBg={true}
       />
       {travel !== null && (
-        <circle key={travel.key} r={7} fill={REPLAY_BALL_COLOR} stroke="white" strokeWidth={2} data-testid="replay-ball">
+        <circle key={travel.key} r={7} fill={COLORS.replay.ball} stroke="white" strokeWidth={2} data-testid="replay-ball">
           <animateMotion ref={motionRef} dur={`${travel.durationMs}ms`} path={path} begin="indefinite" fill="freeze" />
         </circle>
       )}
@@ -510,7 +509,7 @@ export function graphEdgesOf(definition: WorkflowDefinition): GraphEdge[] {
   // one of the two paths the shared arrow is supposed to name.
   const labelsByKey = new Map<string, string[]>();
   function add(from: string, to: string, label?: string) {
-    const key = `${from}->${to}`;
+    const key = edgeIdOf(from, to);
     const labels = labelsByKey.get(key) ?? [];
     if (label !== undefined && labels.includes(label) === false) labels.push(label);
     labelsByKey.set(key, labels);
@@ -586,7 +585,7 @@ function buildLayout(definition: WorkflowDefinition): { nodes: Node[]; edges: Ed
     const isBack = edge.isBack;
     const offsetIdx = isBack ? backIdx++ : 0;
     return {
-      id: `${edge.from}->${edge.to}`,
+      id: edgeIdOf(edge.from, edge.to),
       source: edge.from,
       target: edge.to,
       sourceHandle: isBack ? 'right-out' : 'bottom',
@@ -752,7 +751,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
       const d = n.data as StepNodeData;
       return {
         ...n,
-        selected: replay ? n.id === replay.activeStepId : n.id === selectedStepId,
+        selected: replay !== undefined ? n.id === replay.activeStepId : n.id === selectedStepId,
         data: {
           ...d,
           hasError: errorStepIds?.has(n.id) ?? false,
@@ -767,7 +766,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
     });
     const styledEdges: Edge[] = layoutEdges.map((e) => {
       const isForward = e.sourceHandle !== 'right-out';
-      if (replay) {
+      if (replay !== undefined) {
         return {
           ...e,
           type: 'replay',

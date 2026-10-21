@@ -3,18 +3,25 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import React from 'react';
 import type { StepExecution } from '@mediforce/platform-core';
 
+const rendered = vi.hoisted(() => ({
+  travels: [] as Array<import('@/components/workflows/workflow-diagram').DiagramReplayFrame['travel']>,
+}));
+
 vi.mock('@/components/workflows/workflow-diagram', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/components/workflows/workflow-diagram')>();
   return {
     ...original,
-    WorkflowDiagram: ({ replay }: { replay?: import('@/components/workflows/workflow-diagram').DiagramReplayFrame }) => (
-      <div
-        data-testid="diagram"
-        data-active={replay?.activeStepId ?? ''}
-        data-travel={replay?.travel?.edgeId ?? ''}
-        data-traversals={JSON.stringify([...(replay?.edgeTraversals ?? new Map())])}
-      />
-    ),
+    WorkflowDiagram: ({ replay }: { replay?: import('@/components/workflows/workflow-diagram').DiagramReplayFrame }) => {
+      rendered.travels.push(replay?.travel ?? null);
+      return (
+        <div
+          data-testid="diagram"
+          data-active={replay?.activeStepId ?? ''}
+          data-travel={replay?.travel?.edgeId ?? ''}
+          data-traversals={JSON.stringify([...(replay?.edgeTraversals ?? new Map())])}
+        />
+      );
+    },
   };
 });
 
@@ -70,7 +77,10 @@ function diagram() {
 }
 
 describe('RunReplayDiagram', () => {
-  beforeEach(() => vi.useFakeTimers());
+  beforeEach(() => {
+    vi.useFakeTimers();
+    rendered.travels.length = 0;
+  });
   afterEach(() => vi.useRealTimers());
 
   it('[RENDER] opens on the whole path the run took, loop counts included', () => {
@@ -100,6 +110,30 @@ describe('RunReplayDiagram', () => {
     expect(diagram().active).toBe('review');
     expect(diagram().travel).toBe('');
     expect(screen.getByRole('button', { name: /Replay run/ })).toBeInTheDocument();
+  });
+
+  it('[CLICK] pausing mid-hop lets the ball finish its ride, then holds at the step', () => {
+    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Path only' }));
+    fireEvent.click(screen.getByRole('button', { name: /Replay run/ }));
+    act(() => { vi.advanceTimersByTime(300); });
+    const ride = rendered.travels.at(-1);
+    expect(ride?.edgeId).toBe('draft->review');
+
+    fireEvent.click(screen.getByRole('button', { name: /Pause/ }));
+    // A new travel object would restart the ball's <animateMotion> from the source.
+    expect(rendered.travels.at(-1)).toBe(ride);
+
+    act(() => { vi.advanceTimersByTime(700); });
+    expect(diagram().active).toBe('review');
+    act(() => { vi.advanceTimersByTime(5_000); });
+    expect(diagram().active).toBe('review');
+    expect(diagram().travel).toBe('');
+    expect(screen.getByTestId('run-replay-position')).toHaveTextContent('Hop 1 of 3 · Review');
+
+    fireEvent.click(screen.getByRole('button', { name: /Replay run/ }));
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(diagram().travel).toBe('review->draft');
   });
 
   it('[RENDER] no controls for a run with a single step', () => {

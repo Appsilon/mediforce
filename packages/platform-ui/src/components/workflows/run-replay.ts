@@ -1,4 +1,5 @@
 import type { StepExecution } from '@mediforce/platform-core';
+import { edgeIdOf } from './workflow-graph-layout';
 
 /** How long the ball waits at each step: in proportion to the time the run
  *  really spent there, or the same short beat everywhere (the path only). */
@@ -20,13 +21,19 @@ export const JOURNEY_DWELL_MS = 250;
 /** Total dwell time a proportional replay is squeezed into, whatever the real run length. */
 export const PROPORTIONAL_TOTAL_DWELL_MS = 20_000;
 
-export function buildReplayHops(executions: StepExecution[], edgeIds: ReadonlySet<string>): ReplayHop[] {
+/** The path a run took: the step it started at, and every hop after it, in start order. */
+export interface ReplayPath {
+  firstStepId: string | null;
+  hops: ReplayHop[];
+}
+
+export function buildReplayPath(executions: StepExecution[], edgeIds: ReadonlySet<string>): ReplayPath {
   const ordered = [...executions].sort((a, b) => a.startedAt.localeCompare(b.startedAt));
   const hops: ReplayHop[] = [];
   for (let index = 1; index < ordered.length; index++) {
     const previous = ordered[index - 1];
     const current = ordered[index];
-    const edgeId = `${previous.stepId}->${current.stepId}`;
+    const edgeId = edgeIdOf(previous.stepId, current.stepId);
     hops.push({
       from: previous.stepId,
       to: current.stepId,
@@ -34,15 +41,7 @@ export function buildReplayHops(executions: StepExecution[], edgeIds: ReadonlySe
       realGapMs: Math.max(0, Date.parse(current.startedAt) - Date.parse(previous.startedAt)),
     });
   }
-  return hops;
-}
-
-/** First step the run executed — where the ball sits before the first hop. */
-export function firstReplayStep(executions: StepExecution[]): string | null {
-  if (executions.length === 0) return null;
-  return executions.reduce((earliest, execution) =>
-    execution.startedAt < earliest.startedAt ? execution : earliest,
-  ).stepId;
+  return { firstStepId: ordered.length > 0 ? ordered[0].stepId : null, hops };
 }
 
 /** Dwell at each hop's source step, before the ball sets off. */

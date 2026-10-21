@@ -4,14 +4,15 @@ import * as React from 'react';
 import { Pause, Play, RotateCcw } from 'lucide-react';
 import type { StepExecution, WorkflowDefinition } from '@mediforce/platform-core';
 import { WorkflowDiagram, graphEdgesOf, type DiagramReplayFrame } from '@/components/workflows/workflow-diagram';
+import { edgeIdOf } from '@/components/workflows/workflow-graph-layout';
 import {
-  buildReplayHops,
-  firstReplayStep,
+  buildReplayPath,
   replayDwellsMs,
   REPLAY_TRAVEL_MS,
   type ReplayPacing,
 } from '@/components/workflows/run-replay';
 import { secondaryButtonClass } from '@/components/ui/button-styles';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { cn } from '@/lib/utils';
 
 const SPEEDS = [1, 2, 4] as const;
@@ -34,11 +35,13 @@ export function RunReplayDiagram({
   className?: string;
 }) {
   const edgeIds = React.useMemo(
-    () => new Set(graphEdgesOf(definition).map((edge) => `${edge.from}->${edge.to}`)),
+    () => new Set(graphEdgesOf(definition).map((edge) => edgeIdOf(edge.from, edge.to))),
     [definition],
   );
-  const hops = React.useMemo(() => buildReplayHops(stepExecutions, edgeIds), [stepExecutions, edgeIds]);
-  const firstStepId = React.useMemo(() => firstReplayStep(stepExecutions), [stepExecutions]);
+  const { firstStepId, hops } = React.useMemo(
+    () => buildReplayPath(stepExecutions, edgeIds),
+    [stepExecutions, edgeIds],
+  );
 
   const [pacing, setPacing] = React.useState<ReplayPacing>('proportional');
   const [speed, setSpeed] = React.useState<Speed>(1);
@@ -52,7 +55,9 @@ export function RunReplayDiagram({
   const currentHop = travelling ? hops[hopsDone] : undefined;
 
   React.useEffect(() => {
-    if (playing === false || cursor === null) return;
+    if (cursor === null) return;
+    // Pausing mid-hop lets the ball finish its ride; it holds at the step it lands on.
+    if (playing === false && cursor.phase === 'dwell') return;
     if (cursor.hopsDone >= hops.length) {
       setPlaying(false);
       setCursor(null);
@@ -73,22 +78,29 @@ export function RunReplayDiagram({
     return () => clearTimeout(timer);
   }, [playing, cursor, hops, dwells, speed]);
 
+  // Kept apart from the frame: a new travel object restarts the ball's ride, so
+  // toggling play/pause must not rebuild it.
+  const travel = React.useMemo<DiagramReplayFrame['travel']>(
+    () =>
+      currentHop !== undefined && currentHop.edgeId !== null
+        ? { edgeId: currentHop.edgeId, key: hopsDone, durationMs: REPLAY_TRAVEL_MS / speed }
+        : null,
+    [currentHop, hopsDone, speed],
+  );
+
   const frame = React.useMemo<DiagramReplayFrame>(() => {
     const edgeTraversals = new Map<string, number>();
-    const ridden = currentHop ? hops.slice(0, hopsDone + 1) : hops.slice(0, hopsDone);
+    const ridden = currentHop !== undefined ? hops.slice(0, hopsDone + 1) : hops.slice(0, hopsDone);
     for (const hop of ridden) {
       if (hop.edgeId !== null) edgeTraversals.set(hop.edgeId, (edgeTraversals.get(hop.edgeId) ?? 0) + 1);
     }
-    const activeStepId = currentHop ? null : hopsDone === 0 ? firstStepId : hops[hopsDone - 1].to;
-    const travel = currentHop?.edgeId
-      ? { edgeId: currentHop.edgeId, key: hopsDone, durationMs: REPLAY_TRAVEL_MS / speed }
-      : null;
-    const followStepId = playing ? currentHop?.to ?? activeStepId : null;
+    const activeStepId = currentHop !== undefined ? null : hopsDone === 0 ? firstStepId : hops[hopsDone - 1].to;
+    const followStepId = playing === true ? currentHop?.to ?? activeStepId : null;
     return { activeStepId, travel, edgeTraversals, followStepId };
-  }, [hops, hopsDone, currentHop, firstStepId, speed, playing]);
+  }, [hops, hopsDone, currentHop, firstStepId, travel, playing]);
 
   const togglePlay = () => {
-    if (playing) {
+    if (playing === true) {
       setPlaying(false);
       return;
     }
@@ -112,8 +124,8 @@ export function RunReplayDiagram({
       {hops.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 text-sm" data-testid="run-replay-controls">
           <button type="button" className={secondaryButtonClass} onClick={togglePlay}>
-            {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-            {playing ? 'Pause' : 'Replay run'}
+            {playing === true ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+            {playing === true ? 'Pause' : 'Replay run'}
           </button>
           <button type="button" className={secondaryButtonClass} onClick={restart} aria-label="Restart replay">
             <RotateCcw className="h-3.5 w-3.5" />
@@ -134,45 +146,12 @@ export function RunReplayDiagram({
             onChange={setSpeed}
           />
           <span className="text-xs text-muted-foreground tabular-nums" data-testid="run-replay-position">
-            Hop {hopsDone + (currentHop ? 1 : 0)} of {hops.length}
+            Hop {hopsDone + (currentHop !== undefined ? 1 : 0)} of {hops.length}
             {stepLabel !== null && <> · {stepLabel}</>}
           </span>
         </div>
       )}
       <WorkflowDiagram definition={definition} className="w-full" replay={frame} />
-    </div>
-  );
-}
-
-function SegmentedControl<Value extends string | number>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: Value;
-  options: Array<{ value: Value; label: string; title?: string }>;
-  onChange: (value: Value) => void;
-}) {
-  return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-md border p-0.5">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          role="radio"
-          aria-checked={option.value === value}
-          title={option.title}
-          onClick={() => onChange(option.value)}
-          className={cn(
-            'rounded px-2 py-1 text-xs font-medium transition-colors',
-            option.value === value ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
     </div>
   );
 }

@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { StepExecution } from '@mediforce/platform-core';
 import {
-  buildReplayHops,
-  firstReplayStep,
+  buildReplayPath,
   replayDwellsMs,
   JOURNEY_DWELL_MS,
   PROPORTIONAL_TOTAL_DWELL_MS,
@@ -36,9 +35,9 @@ const executions = [
 ];
 const edgeIds = new Set(['draft->review', 'review->draft', 'review->publish']);
 
-describe('buildReplayHops', () => {
+describe('buildReplayPath hops', () => {
   it('follows executions in start order, loops included', () => {
-    const hops = buildReplayHops(executions, edgeIds);
+    const hops = buildReplayPath(executions, edgeIds).hops;
     expect(hops.map((hop) => `${hop.from}->${hop.to}`)).toEqual([
       'draft->review',
       'review->draft',
@@ -49,25 +48,25 @@ describe('buildReplayHops', () => {
   });
 
   it('leaves the edge empty when the diagram draws no arrow between the steps', () => {
-    const hops = buildReplayHops(executions, new Set(['draft->review']));
+    const hops = buildReplayPath(executions, new Set(['draft->review'])).hops;
     expect(hops.map((hop) => hop.edgeId)).toEqual(['draft->review', null, 'draft->review', null]);
   });
 
   it('has no hops for zero or one execution', () => {
-    expect(buildReplayHops([], edgeIds)).toEqual([]);
-    expect(buildReplayHops([execution('draft', '2026-10-21T10:00:00.000Z')], edgeIds)).toEqual([]);
+    expect(buildReplayPath([], edgeIds).hops).toEqual([]);
+    expect(buildReplayPath([execution('draft', '2026-10-21T10:00:00.000Z')], edgeIds).hops).toEqual([]);
   });
 });
 
-describe('firstReplayStep', () => {
+describe('buildReplayPath first step', () => {
   it('is the earliest started step', () => {
-    expect(firstReplayStep(executions)).toBe('draft');
-    expect(firstReplayStep([])).toBeNull();
+    expect(buildReplayPath(executions, edgeIds).firstStepId).toBe('draft');
+    expect(buildReplayPath([], edgeIds).firstStepId).toBeNull();
   });
 });
 
 describe('replayDwellsMs', () => {
-  const hops = buildReplayHops(executions, edgeIds);
+  const hops = buildReplayPath(executions, edgeIds).hops;
 
   it('journey pacing waits the same beat at every step', () => {
     expect(replayDwellsMs(hops, 'journey')).toEqual([JOURNEY_DWELL_MS, JOURNEY_DWELL_MS, JOURNEY_DWELL_MS, JOURNEY_DWELL_MS]);
@@ -80,10 +79,10 @@ describe('replayDwellsMs', () => {
   });
 
   it('proportional pacing falls back to the journey beat when no time passed', () => {
-    const instant = buildReplayHops(
+    const instant = buildReplayPath(
       [execution('draft', '2026-10-21T10:00:00.000Z'), execution('review', '2026-10-21T10:00:00.000Z')],
       edgeIds,
-    );
+    ).hops;
     expect(replayDwellsMs(instant, 'proportional')).toEqual([JOURNEY_DWELL_MS]);
   });
 });

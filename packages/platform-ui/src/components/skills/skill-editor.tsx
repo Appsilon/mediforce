@@ -30,6 +30,7 @@ import { diffSkillFiles, readSkillUpload } from '@/lib/skill-upload';
 import { TextFilesPane } from '@/components/files/text-files-pane';
 import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { secondaryButtonClass } from '@/components/ui/button-styles';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { DeleteSkillDialog } from './delete-skill-dialog';
 import type { SkillWorkflow } from '@/hooks/use-skills';
 import { SkillHolders } from './skill-holders';
@@ -223,24 +224,15 @@ export function SkillEditor({
           </span>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
-            <div role="radiogroup" aria-label="Visibility" className="inline-flex rounded-md border p-0.5">
-              {(['private', 'public'] as const).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  role="radio"
-                  aria-checked={visibility === option}
-                  onClick={() => setVisibility(option)}
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors',
-                    visibility === option ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {option === 'public' ? <Globe className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-                  {option === 'public' ? 'Public' : 'Private'}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              label="Visibility"
+              value={visibility}
+              options={[
+                { value: 'private', label: <><Lock className="h-3.5 w-3.5" />Private</> },
+                { value: 'public', label: <><Globe className="h-3.5 w-3.5" />Public</> },
+              ]}
+              onChange={setVisibility}
+            />
             {skill !== null && (
               <button
                 type="button"
