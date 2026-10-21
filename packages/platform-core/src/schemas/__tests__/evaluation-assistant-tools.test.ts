@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import {
+  DRAFT_TASK_COMPLETION_JUDGE_TOOLSET,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   EVALUATION_ASSISTANT_TOOLSETS,
@@ -17,9 +18,13 @@ import {
 describe('Evaluation Assistant toolsets', () => {
   const toolsets = Object.values(EVALUATION_ASSISTANT_TOOLSETS);
 
-  it('offers every catalog tool to at least one subject, and names only catalog tools', () => {
-    expect(new Set(toolsets.flatMap((toolset) => toolset.platform))).toEqual(new Set(Object.keys(EVALUATION_ASSISTANT_PLATFORM_TOOLS)));
-    expect(new Set(toolsets.flatMap((toolset) => toolset.proposals))).toEqual(new Set(Object.keys(EVALUATION_ASSISTANT_PROPOSAL_TOOLS)));
+  it('offers every catalog tool to at least one subject, or reserves it for the dedicated draft_task_completion_judge action (F1), and names only catalog tools', () => {
+    const allToolsets = [...toolsets, DRAFT_TASK_COMPLETION_JUDGE_TOOLSET];
+    expect(new Set(allToolsets.flatMap((toolset) => toolset.platform))).toEqual(new Set(Object.keys(EVALUATION_ASSISTANT_PLATFORM_TOOLS)));
+    expect(new Set(allToolsets.flatMap((toolset) => toolset.proposals))).toEqual(new Set(Object.keys(EVALUATION_ASSISTANT_PROPOSAL_TOOLS)));
+    // Held back from ordinary conversation: offered only behind the dedicated action, never as a free-form proposal.
+    expect(toolsets.flatMap((toolset) => toolset.platform)).not.toContain('get_step_instructions');
+    expect(toolsets.flatMap((toolset) => toolset.proposals)).not.toContain('propose_task_completion_judge');
   });
 
   it('gives an Agent its own reads and none that need a Step\'s production runs', () => {
