@@ -66,8 +66,10 @@ test.describe('Agent MCP OAuth Journey', () => {
 
     const mcpHeading = page.getByRole('heading', { name: /mcp servers/i });
     await expect(mcpHeading).toBeVisible();
-    // The seeded binding name is `github-mcp`.
-    await expect(page.getByText(OAUTH_SERVER_NAME).first()).toBeVisible();
+    // The seeded binding name is `github-mcp`. Match the binding row's own
+    // control: bare text also hits the image picker's hidden
+    // `ghcr.io/github/github-mcp-server` option.
+    await expect(page.getByRole('button', { name: `Edit ${OAUTH_SERVER_NAME}` })).toBeVisible();
     // Wait for OAuthConnectionStatus to finish its initial token-list fetch
     // before clicking Connect — otherwise the click locator races against
     // the "Checking connection…" placeholder. The "Not connected" label

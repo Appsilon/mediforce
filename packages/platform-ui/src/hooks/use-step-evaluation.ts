@@ -256,10 +256,11 @@ export function useEvalTrial(evalRunId: string, trialId: string) {
 }
 
 /** The Agent's versions, newest first, and the one it has now (ADR-0029). */
-export function useAgentVersions(agentId: string) {
+export function useAgentVersions(agentId: string | undefined) {
   return useQuery({
-    queryKey: queryKeys.agentVersions(agentId),
-    queryFn: () => mediforce.agents.listVersions({ id: agentId }),
+    queryKey: queryKeys.agentVersions(agentId ?? ''),
+    queryFn: () => mediforce.agents.listVersions({ id: agentId ?? '' }),
+    enabled: agentId !== undefined,
     retry: stopRetryOn4xx,
   });
 }

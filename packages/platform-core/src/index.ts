@@ -668,6 +668,8 @@ export {
   CreateAgentDefinitionInputSchema,
   UpdateAgentDefinitionInputSchema,
   mergeAgentUpdate,
+  agentImageOf,
+  ownAgentImage,
   mayHoldSkill,
   type SkillHolder,
 } from './schemas/agent-definition';

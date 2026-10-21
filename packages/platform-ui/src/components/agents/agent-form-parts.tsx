@@ -6,9 +6,14 @@ import {
   Shield, Code, Database, Globe, Sparkles, Settings, Info,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { AgentOutputSchemaSchema, CoworkAgentSchema, type AgentDefinition, type AgentOutputSchema } from '@mediforce/platform-core';
+import { AgentOutputSchemaSchema, CoworkAgentSchema, DEFAULT_AGENT_IMAGE, type AgentDefinition, type AgentOutputSchema } from '@mediforce/platform-core';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { usePlugins } from '@/hooks/use-plugins';
+import { useDockerImages } from '@/hooks/use-docker-images';
+import { useImageCatalogEntries } from '@/hooks/use-image-catalog';
+import { buildImagePicker } from '@/components/workflows/workflow-editor/image-picker-options';
+import { pickerImageValue } from '@/components/workflows/workflow-editor/image-options';
+import { ReadyImagePicker } from '@/components/workflows/workflow-editor/image-source-fields';
 import { humanizeToken } from '@/components/workflows/workflow-editor/step-editor-fields';
 import { OutputSchemaEditor } from '@/components/workflows/workflow-editor/output-schema-editor';
 
@@ -71,6 +76,37 @@ export function AgentRuntimeField({ kind, runtimeId, onChange }: {
         {kind === 'plugin'
           ? 'What executes this agent. Required before the agent can be evaluated.'
           : 'The chat or voice runtime of this cowork agent.'}
+      </p>
+    </div>
+  );
+}
+
+/** Image a container agent runs in, picked from the workspace's image catalog. Blank is the golden image. */
+export function AgentImageField({ namespace, image, onChange }: {
+  namespace: string;
+  image: string | undefined;
+  onChange: (image: string | undefined) => void;
+}) {
+  const { images: dockerImages } = useDockerImages();
+  const { entries: catalogEntries } = useImageCatalogEntries(namespace);
+  const picker = React.useMemo(
+    () => buildImagePicker({ catalogEntries, dockerImages: dockerImages ?? [], executor: 'agent' }),
+    [catalogEntries, dockerImages],
+  );
+
+  return (
+    <div className="space-y-1.5">
+      <ReadyImagePicker
+        label="Image"
+        picker={picker}
+        image={image}
+        onChange={onChange}
+        blankOptionLabel={`Default — ${DEFAULT_AGENT_IMAGE}`}
+        placeholder={DEFAULT_AGENT_IMAGE}
+        pickerValue={pickerImageValue}
+      />
+      <p className="text-xs text-muted-foreground">
+        The image the agent runs in, which decides the tools it has. Its evaluations run in it, and a workflow step that names no image of its own is given it when the workflow is saved.
       </p>
     </div>
   );

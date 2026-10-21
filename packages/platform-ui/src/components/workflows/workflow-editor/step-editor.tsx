@@ -9,13 +9,13 @@ import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { useNamespaceMembers } from '@/hooks/use-namespace-members';
 import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
 import { useAuth } from '@/contexts/auth-context';
-import { useAgentValidationStatuses, useStepQualification } from '@/hooks/use-step-evaluation';
+import { useAgentValidationStatuses, useAgentVersions, useStepQualification } from '@/hooks/use-step-evaluation';
 import { mediforce } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 
-import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, agentStepChanges, DEFAULT_STEP_TIMEOUT_MINUTES, defaultVerdictLabel, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
+import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, agentImageOf, agentStepChanges, DEFAULT_STEP_TIMEOUT_MINUTES, defaultVerdictLabel, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
 import type { AgentDefinition, AgentStepChange, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo, ImageCatalogEntryView, StepValidation } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
@@ -409,11 +409,6 @@ export function StepEditor({
   const selMin = typeof step.selection === 'number' ? step.selection : step.selection?.min;
   const selMax = typeof step.selection === 'number' ? step.selection : step.selection?.max;
 
-  // Leaving agent.image blank is not "unset" — registration fills in the golden
-  // image. Only a step whose source is a ready image reaches the picker at all;
-  // one that builds its own never shows it, so the blank option has one meaning.
-  const agentBlankOptionLabel = `Default — ${DEFAULT_AGENT_IMAGE}`;
-
   // The picker's options come from the namespace's image catalog: name and
   // intent instead of a bare `repo:tag`, grouped by what each was built on, and
   // filtered to what the step can actually run — an agent step is not offered
@@ -437,6 +432,9 @@ export function StepEditor({
   // nothing to ask about; one that names none runs in the default image.
   const toolCatalog = useToolCatalogEntries(isAgent ? handle : undefined);
   const selectedAgent = agentDefinitions.find((agent) => agent.id === step.agentId);
+  const selectedAgentVersions = useAgentVersions(selectedAgent?.id);
+  const selectedAgentImages = [selectedAgent ?? {}, ...(selectedAgentVersions.data?.versions ?? []).map((version) => version.config)]
+    .map(agentImageOf);
   // A step that runs a validated agent as it is shares its validation; one
   // that changes it needs a validation of its own (ADR-0029 D8).
   const agentQualification = useStepQualification(
@@ -448,7 +446,8 @@ export function StepEditor({
     agentDefinitions.filter(isEvaluableAgent).map((agent) => ({ namespace: agent.namespace, agentId: agent.id })),
   );
   const agentValidated = agentQualification.data?.validation.status === 'passed';
-  const agentChanges = selectedAgent === undefined ? [] : agentStepChanges(step, selectedAgent, workflowPreamble);
+  const agentChangeContext = { ...imageSourceDefinition, preamble: workflowPreamble };
+  const agentChanges = selectedAgent === undefined ? [] : agentStepChanges(step, selectedAgent, agentChangeContext);
   const hasOwnVerdict = savedValidation === 'failed' || savedValidation === 'awaiting_approval';
   // A patch to apply once confirmed, or an edit to a field that commits on
   // blur — asked about when the edit starts, while the step is still selected.
@@ -467,7 +466,7 @@ export function StepEditor({
     const modifiesValidatedAgent = asksBeforeModifyingAgent
       && selectedAgent !== undefined
       && next.agentId === step.agentId
-      && agentStepChanges(next, selectedAgent, workflowPreamble).length > 0;
+      && agentStepChanges(next, selectedAgent, agentChangeContext).length > 0;
     if (modifiesValidatedAgent) {
       setPendingAgentChange({ patch });
       return;
@@ -479,7 +478,13 @@ export function StepEditor({
     [selectedAgent, toolCatalog, step.mcpRestrictions],
   );
   const stepBuildsItsImage = stepHasBuildSource(step.agent, imageSourceDefinition);
-  const stepImage = step.agent?.image !== undefined && step.agent.image !== '' ? step.agent.image : DEFAULT_AGENT_IMAGE;
+  // Leaving agent.image blank is not "unset" — registration fills in the image
+  // of the step's agent, or the golden one. Only a step whose source is a ready
+  // image reaches the picker at all; one that builds its own never shows it, so
+  // the blank option has one meaning.
+  const defaultStepImage = selectedAgent === undefined ? DEFAULT_AGENT_IMAGE : agentImageOf(selectedAgent);
+  const agentBlankOptionLabel = `Default — ${defaultStepImage}`;
+  const stepImage = step.agent?.image !== undefined && step.agent.image !== '' ? step.agent.image : defaultStepImage;
 
   const agentImagePicker = useMemo(
     () => buildImagePicker({ catalogEntries, dockerImages: dockerImages ?? [], executor: 'agent' }),
@@ -721,7 +726,7 @@ export function StepEditor({
           changes={
             pendingAgentChange === null ? []
               : 'edit' in pendingAgentChange ? [pendingAgentChange.edit]
-                : agentStepChanges({ ...step, ...pendingAgentChange.patch }, selectedAgent, workflowPreamble)
+                : agentStepChanges({ ...step, ...pendingAgentChange.patch }, selectedAgent, agentChangeContext)
           }
           open={pendingAgentChange !== null}
           onCancel={() => {
@@ -850,6 +855,7 @@ export function StepEditor({
                 step,
                 e.target.value === '' ? undefined : agentDefinitions.find((agent) => agent.id === e.target.value) ?? { id: e.target.value, kind: 'plugin' },
                 pinnedDefaultModel,
+                { currentAgentImages: selectedAgentImages, artifacts: workflowArtifacts },
               ))}
               className={rs}
             >

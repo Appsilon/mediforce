@@ -242,7 +242,7 @@ _Avoid_: "Step skill" for a Skill a Step adds — that is a Skill.
 
 **Agent**:
 A reusable, mutable agent configuration: system prompt, foundation model,
-output schema and MCP server bindings. Workflow Steps reference Agents; one Agent can power many
+image, output schema and MCP server bindings. Workflow Steps reference Agents; one Agent can power many
 Steps. Each configuration it is saved or evaluated with is an **Agent version**.
 _Avoid_: Agent Definition (legacy code term for the Agent itself, not a version).
 _Note_: A Step inherits three things from the Agent it names — `systemPrompt`
@@ -254,10 +254,12 @@ gets the Agent's Skills. Everything else the Step sets adds to the Agent:
 `step.agent.prompt` follows the system prompt and `step.agent.skills` follow
 the Agent's Skills. Only `step.agent.model`, `step.agent.outputSchema` (and `step.plugin`, which
 the editor fills in from the Agent's `runtimeId`) replace what the Agent names.
+A Step that names no image is given the Agent's `image` (golden when unset)
+when its Workflow is saved, and keeps it after (ADR-0029 decision 9).
 
 **Agent version**:
-One immutable snapshot of what shapes an Agent's behaviour — runtime, model,
-system prompt, output schema, MCP bindings, and each Skill it holds by content hash — with the
+One immutable snapshot of what shapes an Agent's behaviour — runtime, image,
+model, system prompt, output schema, MCP bindings, and each Skill it holds by content hash — with the
 hash of that snapshot. A new one is recorded when a save or an Eval Run finds
 the Agent's configuration changed; a rename is not a new version (ADR-0029).
 _Avoid_: "agent revision", "Step Fingerprint" (that is a Step's identity, which

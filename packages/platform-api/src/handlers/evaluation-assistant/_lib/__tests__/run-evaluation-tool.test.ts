@@ -390,7 +390,7 @@ describe('executeEvaluationTool', () => {
     it('reads the Agent itself, with the MCP servers and Skills it runs with', async () => {
       const { scope, context } = await agentSetup();
       expect(await executeEvaluationTool('get_agent', {}, scope, context)).toMatchObject({
-        agent: { name: 'AE grader', runtimeId: 'claude-code-agent', systemPrompt: 'You grade adverse events.', inputDescription: 'Extracted AEs' },
+        agent: { name: 'AE grader', runtimeId: 'claude-code-agent', image: 'mediforce-golden-image', systemPrompt: 'You grade adverse events.', inputDescription: 'Extracted AEs' },
         mcpServers: [expect.objectContaining({ name: 'edc' }), expect.objectContaining({ name: 'email' })],
         skills: [],
       });

@@ -21,6 +21,14 @@ describe('UpdateAgentDefinitionInputSchema', () => {
   });
 });
 
+describe('AgentDefinitionSchema.image', () => {
+  it('trims the tag and refuses a blank one, on create and on update', () => {
+    expect(AgentDefinitionSchema.parse({ ...baseAgent, image: ' r-tools:2 ' }).image).toBe('r-tools:2');
+    expect(UpdateAgentDefinitionInputSchema.parse({ image: ' r-tools:2 ' }).image).toBe('r-tools:2');
+    expect(AgentDefinitionSchema.safeParse({ ...baseAgent, image: '   ' }).success).toBe(false);
+  });
+});
+
 describe('AgentDefinitionSchema.skills', () => {
   it('leaves an agent without skills unchanged', () => {
     const parsed = AgentDefinitionSchema.parse(baseAgent);

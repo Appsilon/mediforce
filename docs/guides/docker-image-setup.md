@@ -26,7 +26,7 @@ any workspace member; only **Delete** needs workspace admin or owner.
 ## What your workspace already offers
 
 A workspace is created with five entries: `mediforce-golden-image`, which an
-agent step runs in when it names no image, and the four an inline script step
+agent step runs in when neither it nor its agent names an image, and the four an inline script step
 runs in — `mediforce-node`, `python`, `rocker/r-ver` and `alpine`
 ([ADR-0022](../adr/0022-image-catalog.md) decision 8). They are ordinary rows:
 yours to edit, yours to delete, and each carries a version per tag of it the

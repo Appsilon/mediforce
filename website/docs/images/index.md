@@ -25,7 +25,7 @@ register images; only **Delete** needs workspace admin or owner.
 ## What a workspace starts with
 
 A new workspace comes with five entries: `mediforce-golden-image`, which an
-agent step runs in when it names no image, and the four an inline script step
+agent step runs in when neither it nor its agent names an image, and the four an inline script step
 runs in — `mediforce-node`, `python`, `rocker/r-ver` and `alpine`. They are
 ordinary entries you can edit.
 

@@ -37,6 +37,7 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
       : { agentVersion: 3, validation: { status: qualificationState.status, reason: 'Eval Run 1a2b3c4d met its Acceptance Criteria', evalRunId: null, runInProgress: false } },
   }),
   useAgentValidationStatuses: () => new Map(Object.entries(qualificationState.byAgent)),
+  useAgentVersions: () => ({ data: undefined }),
 }));
 
 vi.mock('@/hooks/use-model-registry', () => ({

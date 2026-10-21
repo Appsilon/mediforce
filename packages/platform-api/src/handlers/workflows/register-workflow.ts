@@ -1,4 +1,4 @@
-import { parseWorkflowDefinitionForCreation, splitImageRef, stepHasBuildSource, DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
+import { agentImageOf, parseWorkflowDefinitionForCreation, splitImageRef, stepHasBuildSource, DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
 import { validateWorkflowGraphAndReferences } from '@mediforce/workflow-engine';
 import type {
   RegisterWorkflowInput,
@@ -61,17 +61,16 @@ export async function registerWorkflow(
     throw new ValidationError(retired.message.replace('Cannot run', 'Cannot save'));
   }
 
-  // Every agent step must carry an image so the persisted definition is
-  // deployable — default to the shared golden image when the author gave neither
-  // an image nor a build source. Applied in every mode: local-agent mode ignores
-  // the image at run time, but the saved definition still needs it to run in a
-  // real (container-worker) deployment.
+  // Every agent step must carry an image so the saved definition is deployable
+  // in any mode: one with neither an image nor a build source gets its Agent's
+  // (by the caller's scoped read) or golden, frozen at save (ADR-0029 D9).
   for (const step of parsed.data.steps) {
     if (step.executor !== 'agent') continue;
     const cfg = step.agent;
     const hasImage = typeof cfg?.image === 'string' && cfg.image.length > 0;
     if (hasImage || stepHasBuildSource(cfg, parsed.data)) continue;
-    step.agent = { ...cfg, image: DEFAULT_AGENT_IMAGE };
+    const agent = step.agentId === undefined ? null : await scope.agentDefinitions.getById(step.agentId);
+    step.agent = { ...cfg, image: agent === null ? DEFAULT_AGENT_IMAGE : agentImageOf(agent) };
   }
 
   const latestVersion = await scope.workflowDefinitions.getLatestVersion(

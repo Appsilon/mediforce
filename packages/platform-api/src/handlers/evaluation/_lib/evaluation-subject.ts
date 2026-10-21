@@ -10,6 +10,7 @@ import {
   type WorkflowDefinition,
   type WorkflowStep,
 } from '@mediforce/platform-core';
+import { isLocalExecutionAllowed } from '@mediforce/agent-runtime';
 import type { CallerScope } from '../../../repositories/index';
 import { NotFoundError, ValidationError } from '../../../errors';
 import { assertCallerMayEditWorkflow, assertCallerMayRunWorkflow } from '../../workflows/_access-gate';
@@ -115,7 +116,7 @@ async function loadEvaluatedAgent(
     throw new ValidationError(`Agent '${agent.name}' names no runtime; set one before evaluating it`);
   }
   const version = agentVersion ?? await upcomingAgentVersion(scope, agent);
-  const definition = agentEvalDefinition({ id: agent.id, name: agent.name, namespace: agent.namespace, runtimeId: agent.runtimeId }, version, env);
+  const definition = agentEvalDefinition({ id: agent.id, name: agent.name, image: agent.image, namespace: agent.namespace, runtimeId: agent.runtimeId }, version, env, { localExecution: isLocalExecutionAllowed() });
   return { subject, definition, step: definition.steps[0]!, agent };
 }
 

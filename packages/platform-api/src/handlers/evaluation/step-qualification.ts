@@ -217,7 +217,7 @@ async function withAgentValidation(
   if (own.status !== 'not_verified' || workflowStep.agentId === undefined) return own;
   const read = await validations(workflowStep.agentId);
   if (read === null || read.agent.namespace !== definition.namespace || read.qualification.validation.status !== 'passed') return own;
-  if (agentStepChanges(workflowStep, read.agent, definition.preamble).length > 0) return own;
+  if (agentStepChanges(workflowStep, read.agent, definition).length > 0) return own;
   const { agent, qualification } = read;
   if (qualification.agentVersion === null) return own;
   return {

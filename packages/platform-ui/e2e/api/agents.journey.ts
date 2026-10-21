@@ -6,6 +6,7 @@ import {
   setupMultiNamespaceCallers,
   type MultiNamespaceFixture,
 } from '../helpers/multi-namespace';
+import { agentStepWorkflow } from '../helpers/agent-step-runs';
 
 /**
  * L3 API E2E for the two migrated agent endpoints:
@@ -188,5 +189,58 @@ test.describe('Agent output schema — API E2E', () => {
     expect(cleared.status(), await cleared.text()).toBe(200);
     expect((await readAgent(request, agent.id)).outputSchema).toBeUndefined();
     expect(await versionNumbers(request, agent.id)).toEqual([2, 1]);
+  });
+});
+
+test.describe('An agent\'s image — API E2E', () => {
+  async function readImage(request: APIRequestContext, id: string) {
+    const res = await request.get(`/api/agents/${id}`, { headers: apiKeyHeaders() });
+    expect(res.status(), await res.text()).toBe(200);
+    return (await res.json() as { agent: { image?: string } }).agent.image;
+  }
+
+  async function savedStepImage(request: APIRequestContext, workflowName: string, agentId: string) {
+    const registered = await request.post('/api/workflow-definitions?namespace=test', {
+      headers: apiKeyHeaders(),
+      data: agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agentId, plugin: 'claude-code-agent' }),
+    });
+    expect(registered.status(), await registered.text()).toBe(201);
+    const { version } = await registered.json() as { version: number };
+    const res = await request.get(`/api/workflow-definitions/${workflowName}?namespace=test&version=${version}`, { headers: apiKeyHeaders() });
+    expect(res.status(), await res.text()).toBe(200);
+    const { definition } = await res.json() as { definition: { steps: Array<{ id: string; agent?: { image?: string } }> } };
+    return definition.steps.find((step) => step.id === 'grade-aes')?.agent?.image;
+  }
+
+  test('is stored, versions the agent, is given to a step that names none on save, and clears to the golden image', async ({ request }) => {
+    const created = await request.post('/api/agents', {
+      headers: apiKeyHeaders(),
+      data: {
+        name: `L3 Image Agent ${Date.now()}`,
+        iconName: 'Bot',
+        description: '',
+        foundationModel: 'anthropic/claude-sonnet-4',
+        systemPrompt: '',
+        inputDescription: '',
+        outputDescription: '',
+        runtimeId: 'claude-code-agent',
+        image: 'r-tools:2',
+        namespace: 'test',
+      },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    const { agent } = await created.json() as { agent: { id: string } };
+    expect(await readImage(request, agent.id)).toBe('r-tools:2');
+
+    const workflowName = `e2e-agent-image-${agent.id.slice(0, 8)}`;
+    expect(await savedStepImage(request, workflowName, agent.id)).toBe('r-tools:2');
+
+    const cleared = await request.put(`/api/agents/${agent.id}`, { headers: apiKeyHeaders(), data: { image: null } });
+    expect(cleared.status(), await cleared.text()).toBe(200);
+    expect(await readImage(request, agent.id)).toBeUndefined();
+    const versions = await request.get(`/api/agents/${agent.id}/versions`, { headers: apiKeyHeaders() });
+    const listed = (await versions.json() as { versions: Array<{ version: number; config: { image?: string } }> }).versions;
+    expect(listed.map((version) => [version.version, version.config.image])).toEqual([[2, undefined], [1, 'r-tools:2']]);
+    expect(await savedStepImage(request, workflowName, agent.id)).toBe('mediforce-golden-image');
   });
 });

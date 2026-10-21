@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { format } from 'date-fns';
-import type { AgentVersion } from '@mediforce/platform-core';
+import { agentImageOf, type AgentVersion } from '@mediforce/platform-core';
 
 /**
  * The exact Agent configuration an Agent's Eval Run assessed (ADR-0029): the
@@ -24,6 +24,10 @@ export function AssessedAgentConfiguration({ version }: { version: AgentVersion 
         <div>
           <dt className="text-xs text-muted-foreground">Runtime</dt>
           <dd className="font-mono text-xs">{config.runtimeId ?? '—'}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Image</dt>
+          <dd className="font-mono text-xs">{agentImageOf(config)}</dd>
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">Model</dt>

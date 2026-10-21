@@ -60,6 +60,21 @@ describe('recordAgentVersion (ADR-0029)', () => {
     expect(third.hash).toBe(first.hash);
   });
 
+  it('versions the agent on its image, and an agent without one keeps the hash it had before Agents could name one', async () => {
+    const first = await recordAgentVersion(scope(), agent);
+    expect('image' in first.config).toBe(false);
+
+    const withImage = await agentDefinitionRepo.update(agent.id, { image: 'r-tools:2' });
+    expect(await recordAgentVersion(scope(), withImage)).toMatchObject({ version: 2, config: { image: 'r-tools:2' } });
+
+    const golden = await agentDefinitionRepo.update(agent.id, { image: 'mediforce-golden-image:latest' });
+    expect((await recordAgentVersion(scope(), golden)).hash).toBe(first.hash);
+
+    const cleared = await agentDefinitionRepo.update(agent.id, { image: null });
+    expect(cleared.image).toBeUndefined();
+    expect((await recordAgentVersion(scope(), cleared)).hash).toBe(first.hash);
+  });
+
   it('hashes a private Skill the same for a caller outside its namespace, so the version does not depend on who asks', async () => {
     const first = await recordAgentVersion(scope(), agent);
     const outsider = createTestScope({ agentDefinitionRepo, skillRepo, caller: userCaller('u-2', ['team-beta']) });

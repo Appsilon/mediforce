@@ -27,6 +27,7 @@ import { workspaces } from './workspace';
  * `skills` is a `jsonb` array of `{ namespace, id }` Skill references
  * (ADR-0025), GIN-indexed for the "which agents hold this skill" lookup.
  * `output_schema` is the `jsonb` JSON Schema the agent's result must satisfy.
+ * `image` is the tag the agent runs in; null means the golden image.
  */
 export const agents = pgTable(
   'agents',
@@ -37,6 +38,7 @@ export const agents = pgTable(
     }),
     kind: text('kind').notNull().default('plugin'),
     runtimeId: text('runtime_id'),
+    image: text('image'),
     name: text('name').notNull(),
     iconName: text('icon_name').notNull(),
     description: text('description').notNull(),

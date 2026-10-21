@@ -76,11 +76,6 @@ export function ImageSourceFields({
   const [chosen, setChosen] = useState<ImageSourceMode | null>(null);
   const mode = chosen ?? deriveImageSourceMode(config, definition);
   const unused = unusedFieldsForMode(mode, config, definition);
-  // Hidden by default: an image worth running is one the catalog describes, and
-  // the picker keeps a value it does not recognise rather than dropping it
-  // (ADR-0022 decision 5). The escape hatch stays for an image nobody has
-  // catalogued yet — an imported package's, most often.
-  const [naming, setNaming] = useState(false);
 
   const dockerfileOptions = carriedDockerfileOptions(definition, config?.dockerfile);
 
@@ -122,38 +117,14 @@ export function ImageSourceFields({
 
       {mode === 'ready' && (
         <>
-          <FieldRow label={`${prefix}.image`}>
-            {picker.hasSource && naming === false ? (
-              <select
-                aria-label="Known Docker image"
-                value={pickerValue(config?.image ?? '')}
-                onChange={(event) => { onChange({ image: event.target.value || undefined }); }}
-                className={selectBase}
-              >
-                <option value="">{blankOptionLabel}</option>
-                <ImageOptions groups={picker.groups} normalize={pickerValue} />
-                {config?.image !== undefined && config.image !== '' && offersValue(picker.groups, config.image, pickerValue) === false && (
-                  <option value={config.image}>{config.image}</option>
-                )}
-              </select>
-            ) : (
-              <input
-                aria-label="Custom Docker image"
-                value={config?.image ?? ''}
-                onChange={(event) => { onChange({ image: event.target.value || undefined }); }}
-                className={inputBaseMono}
-              />
-            )}
-          </FieldRow>
-          {picker.hasSource && (
-            <button
-              type="button"
-              className="text-[11px] text-muted-foreground underline px-1 -mt-2 w-fit cursor-pointer"
-              onClick={() => { setNaming(naming === false); }}
-            >
-              {naming ? 'Pick from the catalog' : 'Name an image the catalog does not list'}
-            </button>
-          )}
+          <ReadyImagePicker
+            label={`${prefix}.image`}
+            picker={picker}
+            image={config?.image}
+            onChange={(image) => { onChange({ image }); }}
+            blankOptionLabel={blankOptionLabel}
+            pickerValue={pickerValue}
+          />
           {imageWarning !== undefined && imageWarning !== '' && (
             <div className="flex items-center gap-1.5 px-3 -mt-1">
               <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" strokeWidth={2} />
@@ -234,6 +205,72 @@ export function ImageSourceFields({
 
           <BuildTagField prefix={prefix} config={config} onChange={onChange} />
         </>
+      )}
+    </>
+  );
+}
+
+/**
+ * A ready image, picked from the catalog or named by hand. Shared by container
+ * steps and by an Agent's own image, which differ in what a blank one means.
+ */
+export function ReadyImagePicker({
+  label,
+  picker,
+  image,
+  onChange,
+  blankOptionLabel,
+  placeholder,
+  pickerValue = (value) => value,
+}: {
+  label: string;
+  picker: ImagePicker;
+  image: string | undefined;
+  onChange: (image: string | undefined) => void;
+  blankOptionLabel: string;
+  placeholder?: string;
+  pickerValue?: (image: string) => string;
+}) {
+  // Hidden by default: an image worth running is one the catalog describes, and
+  // the picker keeps a value it does not recognise rather than dropping it
+  // (ADR-0022 decision 5). The escape hatch stays for an image nobody has
+  // catalogued yet — an imported package's, most often.
+  const [naming, setNaming] = useState(false);
+
+  return (
+    <>
+      <FieldRow label={label}>
+        {picker.hasSource && naming === false ? (
+          <select
+            aria-label="Known Docker image"
+            value={pickerValue(image ?? '')}
+            onChange={(event) => { onChange(event.target.value || undefined); }}
+            className={selectBase}
+          >
+            <option value="">{blankOptionLabel}</option>
+            <ImageOptions groups={picker.groups} normalize={pickerValue} />
+            {image !== undefined && image !== '' && offersValue(picker.groups, image, pickerValue) === false && (
+              <option value={image}>{image}</option>
+            )}
+          </select>
+        ) : (
+          <input
+            aria-label="Custom Docker image"
+            value={image ?? ''}
+            placeholder={placeholder}
+            onChange={(event) => { onChange(event.target.value.trim() || undefined); }}
+            className={inputBaseMono}
+          />
+        )}
+      </FieldRow>
+      {picker.hasSource && (
+        <button
+          type="button"
+          className="text-[11px] text-muted-foreground underline px-1 -mt-2 w-fit cursor-pointer"
+          onClick={() => { setNaming(naming === false); }}
+        >
+          {naming ? 'Pick from the catalog' : 'Name an image the catalog does not list'}
+        </button>
       )}
     </>
   );

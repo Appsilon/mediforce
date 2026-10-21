@@ -1,4 +1,4 @@
-import { WorkflowAuthorableSchema } from '@mediforce/platform-core';
+import { WorkflowAuthorableSchema, agentImageOf, normalizeImageRef, stepHasBuildSource } from '@mediforce/platform-core';
 import { formatStepName } from '@/lib/format';
 import type { AgentDefinition, WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 
@@ -270,20 +270,29 @@ export function withDefaultModel(step: WorkflowStep, defaultModel: string): Work
 /**
  * The patch for picking a saved agent on a step. A model that is still the
  * default `withDefaultModel` filled in is dropped, so the step inherits the
- * agent's own model rather than overriding it with the default. A plugin agent
- * names the runtime it runs on, so the step's plugin is filled from it; the
- * author may still change it afterwards.
+ * agent's own model rather than overriding it with the default. An image that
+ * the step's current agent has, or had in any of its versions, is one it gave
+ * the step on save, so it is dropped too and the next save gives the step the
+ * new agent's image. A plugin agent names the
+ * runtime it runs on, so the step's plugin is filled from it; the author may
+ * still change it afterwards.
  */
 export function selectAgentPatch(
   step: Pick<WorkflowStep, 'agent' | 'plugin'>,
   agent: Pick<AgentDefinition, 'id' | 'kind' | 'runtimeId'> | undefined,
   defaultModel: string,
+  { currentAgentImages = [agentImageOf({})], artifacts }: { currentAgentImages?: readonly string[]; artifacts?: WorkflowDefinition['artifacts'] } = {},
 ): Pick<WorkflowStep, 'agentId' | 'agent' | 'plugin'> {
   const plugin = agent?.kind === 'plugin' && agent.runtimeId !== undefined ? agent.runtimeId : step.plugin;
-  const model = step.agent?.model;
-  if (agent === undefined || model !== defaultModel) {
-    return { agentId: agent?.id, agent: step.agent, plugin };
-  }
-  const { model: _defaultModel, ...rest } = step.agent ?? {};
-  return { agentId: agent.id, agent: Object.keys(rest).length > 0 ? rest : undefined, plugin };
+  if (agent === undefined) return { agentId: undefined, agent: step.agent, plugin };
+  const { model, image, ...rest } = step.agent ?? {};
+  const givenByCurrentAgent = image !== undefined
+    && currentAgentImages.some((agentImage) => normalizeImageRef(agentImage) === normalizeImageRef(image))
+    && stepHasBuildSource(step.agent, { artifacts }) === false;
+  const kept = {
+    ...(model === undefined || model === defaultModel ? {} : { model }),
+    ...(image === undefined || givenByCurrentAgent ? {} : { image }),
+    ...rest,
+  };
+  return { agentId: agent.id, agent: Object.keys(kept).length > 0 ? kept : undefined, plugin };
 }

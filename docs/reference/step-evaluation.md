@@ -809,9 +809,10 @@ person's sign-off on it:
   cannot be evaluated, so it stays not verified until they move onto its agent.
 - **Inherited from its agent** — a step with no verdict of its own that runs
   a validated Agent of its workspace as it is takes the Agent's **passed**
-  (ADR-0029 D8): no other runtime or model, no prompt, Skills, output schema
+  (ADR-0029 D8): no other runtime, model or image than the Agent's (a step
+  that builds its own image changes it), no prompt, Skills, output schema
   or MCP servers of its own, no MCP restriction that removes something, and
-  no workflow preamble. Image, params, env, timeout, autonomy and review are
+  no workflow preamble. Params, env, timeout, autonomy and review are
   not changes. The reason starts *Runs agent '…' vN as it was validated*,
   and `validation.inheritedFromAgent` names the Agent and version; a version
   verified with any such step reads **Verified via agent**, and its tooltip
@@ -868,7 +869,8 @@ Criteria, Eval Runs and Qualification work as above, with these differences:
   run's page as *Configuration assessed*. `mediforce agent versions <id>` lists
   them. Validation reads the newest finished run of the current version.
 - **A trial runs the Agent alone**: a single agent step with no prompt, model,
-  Skills or MCP restrictions of its own. It runs under the Agent's
+  Skills or MCP restrictions of its own, in the Agent's image (golden when it
+  names none). It runs under the Agent's
   `outputSchema`, when the Agent declares one; without one the agent is never
   asked to answer as JSON, so the Evaluation Assistant does not propose a
   `schema` Evaluator for it and asks for the Output schema to be set on the

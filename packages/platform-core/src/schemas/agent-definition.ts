@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { AgentMcpBindingMapSchema } from './agent-mcp-binding';
 import { AgentOutputSchemaSchema } from './agent-output-schema';
 import type { Skill } from './skill';
+import { DEFAULT_AGENT_IMAGE } from '../utils/container-defaults';
+import { normalizeImageRef } from '../utils/image-reference';
 
 export const AgentVisibilitySchema = z.enum(['public', 'private']);
 export type AgentVisibility = z.infer<typeof AgentVisibilitySchema>;
@@ -45,6 +47,10 @@ export const AgentDefinitionSchema = z.object({
    *  PluginRegistry key (e.g. 'claude-code-agent'). For kind='cowork'
    *  this is a cowork runtime key (e.g. 'chat', 'voice-realtime'). */
   runtimeId: z.string().optional(),
+  /** Image tag a container agent runs in — its tools come from it. Unset
+   *  means the golden image (`agentImageOf`). A Step that names no image of
+   *  its own is given this one when its Workflow is saved. */
+  image: z.string().trim().min(1).optional(),
   name: z.string().min(1),
   iconName: z.string(),
   description: z.string(),
@@ -94,11 +100,12 @@ export const CreateAgentDefinitionInputSchema = AgentDefinitionSchema.omit({
 
 /** A patch. `.partial()` keeps each field's `.default()`, which would reset an
  *  omitted `kind` or `visibility` on every update, so those two drop it. An
- *  omitted `outputSchema` is kept and `null` removes it. */
+ *  omitted `outputSchema` or `image` is kept and `null` removes it. */
 export const UpdateAgentDefinitionInputSchema = CreateAgentDefinitionInputSchema.partial().extend({
   kind: AgentDefinitionSchema.shape.kind.unwrap().optional(),
   visibility: AgentVisibilitySchema.optional(),
   outputSchema: AgentOutputSchemaSchema.nullable().optional(),
+  image: AgentDefinitionSchema.shape.image.unwrap().nullable().optional(),
 });
 
 export type CreateAgentDefinitionInput = z.infer<typeof CreateAgentDefinitionInputSchema>;
@@ -106,9 +113,23 @@ export type UpdateAgentDefinitionInput = z.infer<typeof UpdateAgentDefinitionInp
 
 /** The Agent with a patch applied, before the repository stamps and parses it. */
 export function mergeAgentUpdate(current: AgentDefinition, patch: UpdateAgentDefinitionInput): AgentDefinition {
-  const { outputSchema, ...rest } = patch;
+  const { outputSchema, image, ...rest } = patch;
   const merged: AgentDefinition = { ...current, ...rest };
   if (outputSchema === null) delete merged.outputSchema;
   if (outputSchema !== undefined && outputSchema !== null) merged.outputSchema = outputSchema;
+  if (image === null) delete merged.image;
+  if (image !== undefined && image !== null) merged.image = image;
   return merged;
+}
+
+/** The Agent's own image, or undefined when it names none or names the golden
+ *  one — picking golden explicitly is the same Agent, not a new version. */
+export function ownAgentImage(agent: Pick<AgentDefinition, 'image'>): string | undefined {
+  if (agent.image === undefined) return undefined;
+  return normalizeImageRef(agent.image) === normalizeImageRef(DEFAULT_AGENT_IMAGE) ? undefined : agent.image;
+}
+
+/** The image an Agent runs in: its own, or the golden image when it names none. */
+export function agentImageOf(agent: Pick<AgentDefinition, 'image'>): string {
+  return agent.image ?? DEFAULT_AGENT_IMAGE;
 }

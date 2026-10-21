@@ -364,7 +364,7 @@ export default function AgentsPage() {
               <p>
                 <strong>An agent is a reusable configuration a workflow step calls by id</strong> — a system prompt
                 plus the MCP servers that step is allowed to reach. One agent can power many steps, and agents are
-                versioned: saving a change to its runtime, model, system prompt, output schema, MCP servers or Skills records a new
+                versioned: saving a change to its runtime, image, model, system prompt, output schema, MCP servers or Skills records a new
                 version, and a step that references the agent uses its current one.
               </p>
               <p>

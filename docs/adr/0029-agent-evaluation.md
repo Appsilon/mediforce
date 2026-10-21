@@ -53,6 +53,8 @@ point at.
    versions`) lists them and says which one the Agent has now. _Amended
    2026-10-16: the snapshot also holds the Agent's `outputSchema` when it
    declares one (decision 7); an Agent without one keeps the hash it had._
+   _Amended 2026-10-21: and its `image` when it names one (decision 9); an
+   Agent without one keeps the hash it had._
 
 3. **An Agent's Eval Run assesses one Agent version.** Prepare records the
    version and freezes `agentVersion` on the run (`definitionVersion` is null);
@@ -79,7 +81,11 @@ point at.
    runs, not what it is, so it is not part of the Agent version. The Agent's
    Evaluation holds it beside its MCP eval policy (`mcp_eval_policies.env`, set
    from the Evaluation tab or `mediforce eval mcp-policy-set --env`), and each
-   Eval Run freezes a copy at prepare (`eval_runs.env`)._
+   Eval Run freezes a copy at prepare (`eval_runs.env`)._ _Amended 2026-10-21:
+   the trial's step names the Agent's image, or the golden image when the
+   Agent names none (decision 9), so a trial runs with the tools the Agent is
+   meant to have rather than in no image at all. Under `ALLOW_LOCAL_AGENTS` an
+   Agent that names no image still runs its trial on the host._
 
 5. **Production-only features stay a Step's.** An Agent has no production runs
    of its own — its runs belong to the Steps that use it. Harvesting a case
@@ -120,9 +126,11 @@ point at.
    when it adds nothing to the trial of decision 4: no other runtime or model,
    no prompt, Skills, output schema or MCP servers of its own, no MCP
    restriction that removes something, and no workflow preamble
-   (`agentStepChanges`). What the Step provides around the Agent — image,
-   params, env, timeout, autonomy, review — is not a change; an Agent names no
-   image. Such a Step with no verdict of its own, in the Agent's own workspace
+   (`agentStepChanges`). What the Step provides around the Agent — params,
+   env, timeout, autonomy, review — is not a change. _Amended 2026-10-21: an
+   Agent names an image (decision 9), so a Step that runs another image than
+   the Agent's, or builds its own, changes it; the image decides which tools
+   the Agent has._ Such a Step with no verdict of its own, in the Agent's own workspace
    (whose tool catalog its trials resolved MCP servers from), reads the
    Agent's validation when the Agent's current version passed, so a workflow
    whose agent steps all do is Verified without an Eval Run of its own; a
@@ -131,6 +139,21 @@ point at.
    Step that makes it stop doing so — from then on the Step needs its own
    validation on the workflow's Evaluation tab. A preamble is edited in the
    workflow's settings, which do not ask.
+
+9. **An Agent may name its image.** _Added 2026-10-21; reverses "an Agent
+   names no image" in decisions 4 and 8._ A container Agent's `image` is an
+   image tag — never a build source; an Agent has no repo or commit of its
+   own. Unset means the golden image (`agentImageOf`). It is part of the Agent
+   version when set (decision 2) and the trial of decision 4 runs in it. A
+   Workflow Step that names neither an image nor a build source is given its
+   Agent's image when its Workflow is saved (`registerWorkflow`), so every
+   saved Definition still names its image and the CLI, API and editor behave
+   alike. The Step records the image: a later change to the Agent's image does
+   not move it, and with decision 8 such a Step reads as changing the Agent
+   until it is saved with the new image or validated on its own. Picking
+   another Agent for a Step in the editor drops the image the previous Agent
+   gave it — its image now or in any of its versions — so the next save gives
+   it the new Agent's.
 
 ## Considered options
 
