@@ -551,6 +551,23 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       error: null,
       assignedRoles: ['reviewer'],
     },
+    // A run of a workflow far taller than any panel — workflow-diagram.journey.ts fits it whole.
+    'proc-diagram-long-1': {
+      id: 'proc-diagram-long-1',
+      namespace: 'test',
+      definitionName: 'Diagram Long Chain',
+      definitionVersion: '1',
+      status: 'running',
+      currentStepId: 'step-2',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: testUserId,
+      pauseReason: null,
+      error: null,
+    },
     // An orchestrator parked on its run-workflow step, and the child that step
     // started — workflow-diagram.journey.ts expands the step on both canvases.
     'proc-diagram-orchestrator-1': {
@@ -2407,6 +2424,21 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     createdAt: twoDaysAgo,
   };
 
+  // 21 steps in a line, like the staging run whose replay overflowed its panel.
+  const longChainStepIds = Array.from({ length: 20 }, (_, index) => `step-${index + 1}`);
+  workflowDefinitions['test:Diagram Long Chain:1'] = {
+    name: 'Diagram Long Chain',
+    namespace: 'test',
+    version: 1,
+    description: 'Test workflow taller than the run diagram panel',
+    steps: [
+      ...longChainStepIds.map((id, index) => ({ id, name: `Long Step ${index + 1}`, type: 'creation', executor: 'human' })),
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [...longChainStepIds, 'done'].slice(1).map((to, index) => ({ from: longChainStepIds[index], to })),
+    createdAt: twoDaysAgo,
+  };
+
   workflowDefinitions['test:Diagram Orchestrator:1'] = {
     name: 'Diagram Orchestrator',
     namespace: 'test',
@@ -2718,7 +2750,7 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
   };
 
   // draft → review → draft → review: the review loop taken once, so draft → review is ridden twice.
-  const diagramLoopStepExecutions: Record<string, Record<string, unknown>> = Object.fromEntries(
+  const diagramRunStepExecutions: Record<string, Record<string, unknown>> = Object.fromEntries(
     (['draft', 'review', 'draft', 'review'] as const).map((stepId, index) => {
       const id = `exec-diagram-loop-${index}`;
       return [id, {
@@ -2738,6 +2770,37 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       }];
     }),
   );
+
+  diagramRunStepExecutions['exec-diagram-long-0'] = {
+    id: 'exec-diagram-long-0',
+    instanceId: 'proc-diagram-long-1',
+    stepId: 'step-1',
+    status: 'completed',
+    input: {},
+    output: null,
+    verdict: null,
+    executedBy: testUserId,
+    startedAt: minutesAgo(30),
+    completedAt: minutesAgo(25),
+    iterationNumber: 0,
+    gateResult: null,
+    error: null,
+  };
+  diagramRunStepExecutions['exec-diagram-long-1'] = {
+    id: 'exec-diagram-long-1',
+    instanceId: 'proc-diagram-long-1',
+    stepId: 'step-2',
+    status: 'running',
+    input: {},
+    output: null,
+    verdict: null,
+    executedBy: testUserId,
+    startedAt: minutesAgo(24),
+    completedAt: null,
+    iterationNumber: 0,
+    gateResult: null,
+    error: null,
+  };
 
   const modelRegistry: Record<string, Record<string, unknown>> = {
     'anthropic__claude-sonnet-4': {
@@ -2814,5 +2877,5 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     }
   }
 
-  return { humanTasks, processInstances, agentRuns, agentEvents, agentTrajectoryEntries, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, retryAuditStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, diagramLoopStepExecutions, modelRegistry };
+  return { humanTasks, processInstances, agentRuns, agentEvents, agentTrajectoryEntries, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, retryAuditStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, diagramRunStepExecutions, modelRegistry };
 }

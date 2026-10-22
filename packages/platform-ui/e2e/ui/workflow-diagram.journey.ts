@@ -6,6 +6,7 @@ import { trackPageErrors } from '../helpers/page-errors';
 const BRANCH_FAN_OUT_URL = `/${TEST_ORG_HANDLE}/workflows/Diagram%20Branch%20Fan%20Out/definitions/1`;
 const BACK_EDGE_URL = `/${TEST_ORG_HANDLE}/workflows/Diagram%20Back%20Edge/definitions/1`;
 const LOOP_RUN_URL = `/${TEST_ORG_HANDLE}/workflows/Diagram%20Back%20Edge/runs/proc-diagram-loop-1`;
+const LONG_RUN_URL = `/${TEST_ORG_HANDLE}/workflows/Diagram%20Long%20Chain/runs/proc-diagram-long-1`;
 const ORCHESTRATOR_URL = `/${TEST_ORG_HANDLE}/workflows/Diagram%20Orchestrator/definitions/1`;
 const ORCHESTRATOR_RUN_URL = `/${TEST_ORG_HANDLE}/workflows/Diagram%20Orchestrator/runs/proc-diagram-orchestrator-1`;
 
@@ -90,6 +91,38 @@ test.describe('Workflow Diagram Journey', () => {
     await expect(page.getByTestId('replay-ball')).toBeVisible({ timeout: 5_000 });
     await expect(controls.getByRole('button', { name: /Replay run/ })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId('run-replay-position')).toHaveText('Hop 3 of 3 · Review Document');
+  });
+
+  test('a run\'s diagram fits the panel on a short screen and keeps its controls in reach', async ({ page }) => {
+    trackPageErrors(page);
+    // 21 steps on a 400px screen: fits only when scaled well below the editor's zoom floor.
+    await page.setViewportSize({ width: 1280, height: 400 });
+    await page.goto(LONG_RUN_URL);
+    await page.getByRole('button', { name: 'Diagram' }).first().click();
+    const controls = page.getByTestId('run-replay-controls');
+    await expect(controls).toBeInViewport({ ratio: 1, timeout: 10_000 });
+
+    // Every step is on screen without scrolling or zooming out: inside the panel's
+    // visible area, and the panel has nothing hidden to scroll to.
+    const panel = page.getByTestId('run-diagram-panel');
+    await expect(async () => {
+      const scroll = await panel.evaluate((element) => ({ scrollHeight: element.scrollHeight, clientHeight: element.clientHeight }));
+      expect(scroll.scrollHeight).toBeLessThanOrEqual(scroll.clientHeight);
+      const panelBox = (await panel.boundingBox())!;
+      for (const node of await page.locator('.react-flow__node').all()) {
+        const box = (await node.boundingBox())!;
+        expect(box.y).toBeGreaterThanOrEqual(panelBox.y);
+        expect(box.y + box.height).toBeLessThanOrEqual(panelBox.y + panelBox.height);
+        expect(box.x).toBeGreaterThanOrEqual(panelBox.x);
+        expect(box.x + box.width).toBeLessThanOrEqual(panelBox.x + panelBox.width);
+      }
+    }).toPass({ timeout: 5_000 });
+
+    // Playing the replay leaves the controls where they were.
+    await controls.getByRole('radio', { name: 'Path only' }).click();
+    await controls.getByRole('button', { name: /Replay run/ }).click();
+    await expect(controls.getByRole('button', { name: /Replay run/ })).toBeVisible({ timeout: 10_000 });
+    await expect(controls).toBeInViewport({ ratio: 1 });
   });
 
   // ── Child workflows ─────────────────────────────────────────────────────────

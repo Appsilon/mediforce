@@ -543,9 +543,9 @@ export function ProcessDetail({
             />
           </div>
 
-          <div className={cn('flex-1 min-h-0 overflow-auto grid place-items-center p-4', rightTab !== 'diagram' && 'hidden')}>
+          <div data-testid="run-diagram-panel" className={cn('flex-1 min-h-0 flex flex-col overflow-hidden p-4', rightTab !== 'diagram' && 'hidden')}>
             {definition && rightTab === 'diagram' && (
-              <RunReplayDiagram definition={definition} run={instance} stepExecutions={stepExecutions} className="w-full" />
+              <RunReplayDiagram definition={definition} run={instance} stepExecutions={stepExecutions} className="flex-1 min-h-0" />
             )}
           </div>
 
