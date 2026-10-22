@@ -65,6 +65,10 @@ vi.mock('@/hooks/use-model-registry', () => ({
   usePinnedDefaultModel: () => 'anthropic/claude-sonnet-5.5',
 }));
 
+vi.mock('@/hooks/use-child-workflows', () => ({
+  useChildDefinitionExpansion: () => undefined,
+}));
+
 vi.mock('../workflow-editor/step-editor', () => ({
   StepEditor: () => <div data-testid="step-editor" />,
 }));

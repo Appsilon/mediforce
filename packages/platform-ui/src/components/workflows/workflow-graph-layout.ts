@@ -29,6 +29,7 @@ export type GraphLayout = {
   edges: PlacedEdge[];
   positions: Map<string, { x: number; y: number }>;
   height: number;
+  width: number;
 };
 
 /** The id an edge between two steps carries everywhere: layout, diagram, and run replay. */
@@ -164,12 +165,15 @@ function assignColumns(order: string[], forwardEdges: PlacedEdge[], depth: Map<s
  * caller can route them around the side instead of through the layers.
  *
  * `heightOf` is told how many back edges leave the node, because the card grows
- * a row per loop it can take.
+ * a row per loop it can take. `widthOf` widens a node's whole column, so a node
+ * drawn wider than a card (a child workflow drawn inline) pushes the columns to
+ * its right aside instead of covering them.
  */
 export function computeGraphLayout(
   nodeIds: string[],
   edges: GraphEdge[],
   heightOf: (nodeId: string, outgoingBackEdges: number) => number,
+  widthOf: (nodeId: string) => number = () => NODE_WIDTH,
 ): GraphLayout {
   const known = new Set(nodeIds);
   const graphEdges = edges.filter((edge) => known.has(edge.from) === true && known.has(edge.to) === true);
@@ -215,15 +219,30 @@ export function computeGraphLayout(
     cursorY += (rowHeights.get(level) ?? 0) + ROW_GAP;
   }
 
+  const columnWidths = new Map<number, number>();
+  for (const id of order) {
+    const col = column.get(id) ?? 0;
+    columnWidths.set(col, Math.max(columnWidths.get(col) ?? NODE_WIDTH, widthOf(id)));
+  }
+  const xByColumn = new Map<number, number>();
+  const maxColumn = Math.max(0, ...columnWidths.keys());
+  let cursorX = 0;
+  for (let col = 0; col <= maxColumn; col++) {
+    xByColumn.set(col, cursorX);
+    cursorX += (columnWidths.get(col) ?? NODE_WIDTH) + COLUMN_GAP;
+  }
+
   const positions = new Map<string, { x: number; y: number }>();
   for (const id of order) {
+    const col = column.get(id) ?? 0;
+    // Centred in a column a wider node widened, so the edges through it stay straight.
     positions.set(id, {
-      x: (column.get(id) ?? 0) * (NODE_WIDTH + COLUMN_GAP),
+      x: (xByColumn.get(col) ?? 0) + ((columnWidths.get(col) ?? NODE_WIDTH) - widthOf(id)) / 2,
       y: yByDepth.get(depth.get(id) ?? 0) ?? 0,
     });
   }
 
-  return { order, edges: placedEdges, positions, height: cursorY + CANVAS_PADDING };
+  return { order, edges: placedEdges, positions, height: cursorY + CANVAS_PADDING, width: cursorX - COLUMN_GAP };
 }
 
 /** A node as the canvas currently holds it: where it sits and how tall it is. */
@@ -308,4 +327,50 @@ export function placeNewNodes(
   }
 
   return positioned;
+}
+
+/** A node as the canvas currently holds it, with how wide it is drawn. */
+export type SizedNode = AnchoredNode & { width: number };
+
+/**
+ * Dragged positions after some nodes changed size — a child workflow opened or
+ * closed under a step. A resized node keeps its card where it was and grows
+ * evenly to both sides; the nodes beside it step aside by half the change in
+ * width, and every node below its old bottom moves by the change in height.
+ * The opposite resize undoes each shift, so closing a child puts back the
+ * canvas the user had arranged.
+ */
+export function makeRoomForResized(previous: SizedNode[], current: SizedNode[]): AnchoredNode[] {
+  const positions = new Map(previous.map((node) => [node.id, node.position]));
+  const sizes = new Map(previous.map((node) => [node.id, { width: node.width, height: node.height }]));
+
+  for (const after of current) {
+    const before = sizes.get(after.id);
+    const position = positions.get(after.id);
+    if (before === undefined || position === undefined) continue;
+    const widthChange = after.width - before.width;
+    const heightChange = after.height - before.height;
+    if (widthChange === 0 && heightChange === 0) continue;
+
+    const oldBottom = position.y + before.height;
+    const centre = position.x + before.width / 2;
+    for (const [id, other] of positions) {
+      const size = sizes.get(id);
+      if (id === after.id || size === undefined) continue;
+      if (other.y >= oldBottom) {
+        positions.set(id, { x: other.x, y: other.y + heightChange });
+      } else if (other.y + size.height > position.y) {
+        const side = Math.sign(other.x + size.width / 2 - centre);
+        positions.set(id, { x: other.x + (side * widthChange) / 2, y: other.y });
+      }
+    }
+    positions.set(after.id, { x: position.x - widthChange / 2, y: position.y });
+    sizes.set(after.id, { width: after.width, height: after.height });
+  }
+
+  return previous.map((node) => ({
+    id: node.id,
+    position: positions.get(node.id) ?? node.position,
+    height: sizes.get(node.id)?.height ?? node.height,
+  }));
 }

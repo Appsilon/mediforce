@@ -26,6 +26,8 @@ vi.mock('@/components/workflows/workflow-diagram', async (importOriginal) => {
   };
 });
 
+vi.mock('@/hooks/use-child-workflows', () => ({ useChildRunExpansion: () => undefined }));
+
 import { RunReplayDiagram } from '../run-replay-diagram';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 
@@ -86,7 +88,7 @@ describe('RunReplayDiagram', () => {
   afterEach(() => vi.useRealTimers());
 
   it('[RENDER] opens on the whole path the run took, loop counts included', () => {
-    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} completed={false} />);
+    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} run={{ id: 'run-1', status: 'running' }} />);
 
     expect(screen.getByTestId('run-replay-position')).toHaveTextContent('Hop 3 of 3 · Review');
     expect(diagram().active).toBe('review');
@@ -94,7 +96,7 @@ describe('RunReplayDiagram', () => {
   });
 
   it('[CLICK] replay walks the ball hop by hop and stops at the last step', () => {
-    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} completed={false} />);
+    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} run={{ id: 'run-1', status: 'running' }} />);
     fireEvent.click(screen.getByRole('radio', { name: 'Path only' }));
     fireEvent.click(screen.getByRole('button', { name: /Replay run/ }));
 
@@ -115,7 +117,7 @@ describe('RunReplayDiagram', () => {
   });
 
   it('[CLICK] pausing mid-hop freezes the ball, and resuming finishes the same ride', () => {
-    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} completed={false} />);
+    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} run={{ id: 'run-1', status: 'running' }} />);
     fireEvent.click(screen.getByRole('radio', { name: 'Path only' }));
     fireEvent.click(screen.getByRole('button', { name: /Replay run/ }));
     act(() => { vi.advanceTimersByTime(250); });
@@ -143,7 +145,7 @@ describe('RunReplayDiagram', () => {
   });
 
   it('[RENDER] a completed run ends on the terminal step it reached', () => {
-    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} completed={true} />);
+    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions} run={{ id: 'run-1', status: 'completed' }} />);
 
     expect(screen.getByTestId('run-replay-position')).toHaveTextContent('Hop 4 of 4 · Done');
     expect(diagram().active).toBe('done');
@@ -151,7 +153,7 @@ describe('RunReplayDiagram', () => {
   });
 
   it('[RENDER] no controls for a run with a single step', () => {
-    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions.slice(0, 1)} completed={false} />);
+    render(<RunReplayDiagram definition={definition} stepExecutions={stepExecutions.slice(0, 1)} run={{ id: 'run-1', status: 'running' }} />);
 
     expect(screen.queryByTestId('run-replay-controls')).not.toBeInTheDocument();
   });

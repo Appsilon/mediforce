@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 
 // Mock @xyflow/react so StepNode renders as plain HTML without canvas deps.
@@ -118,5 +118,102 @@ describe('graphEdgesOf', () => {
     const shared = graphEdgesOf(definition).find((e) => e.from === 'review' && e.to === 'done');
 
     expect(shared?.label).toBe('approve_only / approve');
+  });
+});
+
+describe('child workflows (via WorkflowDiagram)', () => {
+  const orchestrator = buildWorkflowDefinition({
+    steps: [
+      {
+        id: 'phase',
+        name: 'Run Phase',
+        type: 'creation',
+        executor: 'action',
+        action: { kind: 'run-workflow', config: { definitionName: 'child', timeout: 'PT1H' } },
+      },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'phase', to: 'done' }],
+  });
+  const child = buildWorkflowDefinition({
+    name: 'child',
+    steps: [
+      { id: 'collect', name: 'Collect Evidence', type: 'creation', executor: 'human' },
+      { id: 'end', name: 'End', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'collect', to: 'end' }],
+  });
+
+  it('[RENDER] a collapsed step offers to expand and draws none of the child', () => {
+    const onToggle = vi.fn();
+    render(
+      <WorkflowDiagram
+        definition={orchestrator}
+        childWorkflows={{ expandable: new Set(['phase']), expanded: new Map(), onToggle }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand child workflow' }));
+
+    expect(onToggle).toHaveBeenCalledWith('phase');
+    expect(screen.queryByText('Collect Evidence')).not.toBeInTheDocument();
+  });
+
+  it('[RENDER] an expanded step draws the child\'s steps with their statuses, under a linked title', () => {
+    render(
+      <WorkflowDiagram
+        definition={orchestrator}
+        childWorkflows={{
+          expandable: new Set(['phase']),
+          expanded: new Map([['phase', {
+            definition: child,
+            namespace: 'test',
+            title: 'child v2',
+            href: '/test/workflows/child/definitions/2',
+            badge: '× N at runtime',
+            stepStatus: new Map([['collect', 'running' as const]]),
+          }]]),
+          onToggle: () => undefined,
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Collapse child workflow' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'child v2' })).toHaveAttribute('href', '/test/workflows/child/definitions/2');
+    expect(screen.getByText('× N at runtime')).toBeInTheDocument();
+    expect(screen.getByText('Collect Evidence')).toBeInTheDocument();
+    expect(screen.getByTestId('child-step-status')).toHaveAttribute('data-status', 'running');
+    // Read-only: a child step carries no expand control or edit buttons of its own.
+    expect(screen.getAllByRole('button', { name: /child workflow/ })).toHaveLength(1);
+  });
+
+  it('[RENDER] a nested step that starts its own workflow links to it instead of expanding', () => {
+    const middle = buildWorkflowDefinition({
+      name: 'child',
+      steps: [
+        {
+          id: 'nested-phase',
+          name: 'Run Nested Phase',
+          type: 'creation',
+          executor: 'action',
+          action: { kind: 'run-workflow', config: { definitionName: 'grandchild', timeout: 'PT1H' } },
+        },
+        { id: 'end', name: 'End', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'nested-phase', to: 'end' }],
+    });
+    render(
+      <WorkflowDiagram
+        definition={orchestrator}
+        childWorkflows={{
+          expandable: new Set(['phase']),
+          expanded: new Map([['phase', { definition: middle, namespace: 'test', title: 'child v1' }]]),
+          onToggle: () => undefined,
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: 'Open child workflow' })).toHaveAttribute('href', '/test/workflows/grandchild');
+    expect(screen.getAllByRole('button', { name: /child workflow/ })).toHaveLength(1);
   });
 });

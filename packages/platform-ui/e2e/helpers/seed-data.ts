@@ -551,6 +551,113 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       error: null,
       assignedRoles: ['reviewer'],
     },
+    // A run of a workflow far taller than any panel — workflow-diagram.journey.ts fits it whole.
+    'proc-diagram-long-1': {
+      id: 'proc-diagram-long-1',
+      namespace: 'test',
+      definitionName: 'Diagram Long Chain',
+      definitionVersion: '1',
+      status: 'running',
+      currentStepId: 'step-2',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: testUserId,
+      pauseReason: null,
+      error: null,
+    },
+    // An orchestrator parked on its run-workflow step, and the child that step
+    // started — workflow-diagram.journey.ts expands the step on both canvases.
+    'proc-diagram-orchestrator-1': {
+      id: 'proc-diagram-orchestrator-1',
+      namespace: 'test',
+      definitionName: 'Diagram Orchestrator',
+      definitionVersion: '1',
+      status: 'paused',
+      currentStepId: 'run-phase',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: testUserId,
+      pauseReason: 'waiting',
+      error: null,
+    },
+    'proc-diagram-child-1': {
+      id: 'proc-diagram-child-1',
+      namespace: 'test',
+      definitionName: 'Diagram Child Phase',
+      definitionVersion: '1',
+      status: 'running',
+      currentStepId: 'assess',
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: 'spawn',
+      pauseReason: null,
+      error: null,
+      parentInstanceId: 'proc-diagram-orchestrator-1',
+      parentDefinitionName: 'Diagram Orchestrator',
+    },
+    // A parent and the two runs it spawned — runs-children.journey.ts lists them
+    // through GET /api/runs?parent=; the newer child is seeded first on purpose.
+    'proc-runs-children-parent': {
+      id: 'proc-runs-children-parent',
+      namespace: 'test',
+      definitionName: 'Runs Children Journey Workflow',
+      definitionVersion: '1',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: twoHoursAgo,
+      updatedAt: now,
+      createdBy: testUserId,
+      pauseReason: null,
+      error: null,
+    },
+    'proc-runs-children-newer': {
+      id: 'proc-runs-children-newer',
+      namespace: 'test',
+      definitionName: 'Runs Children Journey Workflow',
+      definitionVersion: '1',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: now,
+      updatedAt: now,
+      createdBy: 'spawn',
+      pauseReason: null,
+      error: null,
+      parentInstanceId: 'proc-runs-children-parent',
+      parentDefinitionName: 'Runs Children Journey Workflow',
+    },
+    'proc-runs-children-older': {
+      id: 'proc-runs-children-older',
+      namespace: 'test',
+      definitionName: 'Runs Children Journey Workflow',
+      definitionVersion: '1',
+      status: 'completed',
+      currentStepId: null,
+      variables: {},
+      triggerType: 'manual',
+      triggerPayload: {},
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      createdBy: 'spawn',
+      pauseReason: null,
+      error: null,
+      parentInstanceId: 'proc-runs-children-parent',
+      parentDefinitionName: 'Runs Children Journey Workflow',
+    },
     'proc-upload-waiting': {
       id: 'proc-upload-waiting',
       namespace: 'test',
@@ -2317,6 +2424,57 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     createdAt: twoDaysAgo,
   };
 
+  // 21 steps in a line, like the staging run whose replay overflowed its panel.
+  const longChainStepIds = Array.from({ length: 20 }, (_, index) => `step-${index + 1}`);
+  workflowDefinitions['test:Diagram Long Chain:1'] = {
+    name: 'Diagram Long Chain',
+    namespace: 'test',
+    version: 1,
+    description: 'Test workflow taller than the run diagram panel',
+    steps: [
+      ...longChainStepIds.map((id, index) => ({ id, name: `Long Step ${index + 1}`, type: 'creation', executor: 'human' })),
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [...longChainStepIds, 'done'].slice(1).map((to, index) => ({ from: longChainStepIds[index], to })),
+    createdAt: twoDaysAgo,
+  };
+
+  workflowDefinitions['test:Diagram Orchestrator:1'] = {
+    name: 'Diagram Orchestrator',
+    namespace: 'test',
+    version: 1,
+    description: 'Test workflow whose phase runs a child workflow',
+    steps: [
+      {
+        id: 'run-phase',
+        name: 'Run Readiness Phase',
+        type: 'creation',
+        executor: 'action',
+        action: { kind: 'run-workflow', config: { definitionName: 'Diagram Child Phase', timeout: 'PT1H' } },
+      },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'run-phase', to: 'done' }],
+    createdAt: twoDaysAgo,
+  };
+
+  workflowDefinitions['test:Diagram Child Phase:1'] = {
+    name: 'Diagram Child Phase',
+    namespace: 'test',
+    version: 1,
+    description: 'Child workflow the Diagram Orchestrator runs',
+    steps: [
+      { id: 'collect', name: 'Collect Evidence', type: 'creation', executor: 'human' },
+      { id: 'assess', name: 'Assess Readiness', type: 'review', executor: 'human' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [
+      { from: 'collect', to: 'assess' },
+      { from: 'assess', to: 'done' },
+    ],
+    createdAt: twoDaysAgo,
+  };
+
   workflowDefinitions['test:Trigger Input Test:1'] = {
     name: 'Trigger Input Test',
     namespace: 'test',
@@ -2560,8 +2718,39 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     },
   };
 
+  stepExecutions['exec-diagram-child-collect'] = {
+    id: 'exec-diagram-child-collect',
+    instanceId: 'proc-diagram-child-1',
+    stepId: 'collect',
+    status: 'completed',
+    input: {},
+    output: {},
+    verdict: null,
+    executedBy: testUserId,
+    startedAt: minutesAgo(30),
+    completedAt: minutesAgo(25),
+    iterationNumber: 0,
+    gateResult: null,
+    error: null,
+  };
+  stepExecutions['exec-diagram-child-assess'] = {
+    id: 'exec-diagram-child-assess',
+    instanceId: 'proc-diagram-child-1',
+    stepId: 'assess',
+    status: 'running',
+    input: {},
+    output: null,
+    verdict: null,
+    executedBy: testUserId,
+    startedAt: minutesAgo(25),
+    completedAt: null,
+    iterationNumber: 0,
+    gateResult: null,
+    error: null,
+  };
+
   // draft → review → draft → review: the review loop taken once, so draft → review is ridden twice.
-  const diagramLoopStepExecutions: Record<string, Record<string, unknown>> = Object.fromEntries(
+  const diagramRunStepExecutions: Record<string, Record<string, unknown>> = Object.fromEntries(
     (['draft', 'review', 'draft', 'review'] as const).map((stepId, index) => {
       const id = `exec-diagram-loop-${index}`;
       return [id, {
@@ -2581,6 +2770,37 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       }];
     }),
   );
+
+  diagramRunStepExecutions['exec-diagram-long-0'] = {
+    id: 'exec-diagram-long-0',
+    instanceId: 'proc-diagram-long-1',
+    stepId: 'step-1',
+    status: 'completed',
+    input: {},
+    output: null,
+    verdict: null,
+    executedBy: testUserId,
+    startedAt: minutesAgo(30),
+    completedAt: minutesAgo(25),
+    iterationNumber: 0,
+    gateResult: null,
+    error: null,
+  };
+  diagramRunStepExecutions['exec-diagram-long-1'] = {
+    id: 'exec-diagram-long-1',
+    instanceId: 'proc-diagram-long-1',
+    stepId: 'step-2',
+    status: 'running',
+    input: {},
+    output: null,
+    verdict: null,
+    executedBy: testUserId,
+    startedAt: minutesAgo(24),
+    completedAt: null,
+    iterationNumber: 0,
+    gateResult: null,
+    error: null,
+  };
 
   const modelRegistry: Record<string, Record<string, unknown>> = {
     'anthropic__claude-sonnet-4': {
@@ -2657,5 +2877,5 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     }
   }
 
-  return { humanTasks, processInstances, agentRuns, agentEvents, agentTrajectoryEntries, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, retryAuditStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, diagramLoopStepExecutions, modelRegistry };
+  return { humanTasks, processInstances, agentRuns, agentEvents, agentTrajectoryEntries, auditEvents, stepExecutions, humanWaitingStepExecutions, stepFailureStepExecutions, retryTestStepExecutions, retryAuditStepExecutions, agentEscalatedCancelStepExecutions, reviewTargetStepExecutions, processDefinitions, completedProcessStepExecutions, completedSupplyChainStepExecutions, processConfigs, workflowDefinitions, namespaces, namespaceMembers, coworkSessions, toolCatalog, oauthProviders, agentDefinitions, workflowRunStepExecutions, diagramRunStepExecutions, modelRegistry };
 }

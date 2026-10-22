@@ -6,6 +6,9 @@ import { trackPageErrors } from '../helpers/page-errors';
 const BRANCH_FAN_OUT_URL = `/${TEST_ORG_HANDLE}/workflows/Diagram%20Branch%20Fan%20Out/definitions/1`;
 const BACK_EDGE_URL = `/${TEST_ORG_HANDLE}/workflows/Diagram%20Back%20Edge/definitions/1`;
 const LOOP_RUN_URL = `/${TEST_ORG_HANDLE}/workflows/Diagram%20Back%20Edge/runs/proc-diagram-loop-1`;
+const LONG_RUN_URL = `/${TEST_ORG_HANDLE}/workflows/Diagram%20Long%20Chain/runs/proc-diagram-long-1`;
+const ORCHESTRATOR_URL = `/${TEST_ORG_HANDLE}/workflows/Diagram%20Orchestrator/definitions/1`;
+const ORCHESTRATOR_RUN_URL = `/${TEST_ORG_HANDLE}/workflows/Diagram%20Orchestrator/runs/proc-diagram-orchestrator-1`;
 
 const nodeNamed = (page: Page, name: string | RegExp) =>
   page.locator('.react-flow__node').filter({ hasText: name });
@@ -92,9 +95,9 @@ test.describe('Workflow Diagram Journey', () => {
 
   test('a run\'s diagram fits the panel on a short screen and keeps its controls in reach', async ({ page }) => {
     trackPageErrors(page);
-    // Shorter than the diagram drawn at full size, so it only fits when scaled to the panel.
+    // 21 steps on a 400px screen: fits only when scaled well below the editor's zoom floor.
     await page.setViewportSize({ width: 1280, height: 400 });
-    await page.goto(LOOP_RUN_URL);
+    await page.goto(LONG_RUN_URL);
     await page.getByRole('button', { name: 'Diagram' }).first().click();
     const controls = page.getByTestId('run-replay-controls');
     await expect(controls).toBeInViewport({ ratio: 1, timeout: 10_000 });
@@ -120,5 +123,53 @@ test.describe('Workflow Diagram Journey', () => {
     await controls.getByRole('button', { name: /Replay run/ }).click();
     await expect(controls.getByRole('button', { name: /Replay run/ })).toBeVisible({ timeout: 10_000 });
     await expect(controls).toBeInViewport({ ratio: 1 });
+  });
+
+  // ── Child workflows ─────────────────────────────────────────────────────────
+
+  test('a run-workflow step opens to draw the child workflow\'s steps inside it', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(ORCHESTRATOR_URL);
+    const phase = nodeNamed(page, 'Run Readiness Phase').first();
+    await expect(phase).toBeVisible({ timeout: 10_000 });
+    await expect(nodeNamed(page, 'Collect Evidence')).toHaveCount(0);
+
+    await phase.getByRole('button', { name: 'Expand child workflow' }).click();
+
+    // The child's runnable version, named and linked, with its steps drawn in the frame.
+    const frame = page.getByTestId('child-workflow-frame');
+    await expect(frame.getByRole('link', { name: 'Diagram Child Phase v1' })).toHaveAttribute(
+      'href',
+      `/${TEST_ORG_HANDLE}/workflows/Diagram%20Child%20Phase/definitions/1`,
+    );
+    await expect(nodeNamed(page, 'Collect Evidence')).toBeVisible({ timeout: 10_000 });
+    await expect(nodeNamed(page, 'Assess Readiness')).toBeVisible();
+
+    // The step past the phase is pushed below the frame rather than drawn over it.
+    const frameBox = (await frame.boundingBox())!;
+    const doneBox = (await nodeNamed(page, /^Done$/).first().boundingBox())!;
+    expect(doneBox.y).toBeGreaterThan(frameBox.y + frameBox.height);
+
+    await phase.getByRole('button', { name: 'Collapse child workflow' }).click();
+    await expect(nodeNamed(page, 'Collect Evidence')).toHaveCount(0);
+  });
+
+  test('on a run, the step opens to the child run it started, with live step statuses', async ({ page }) => {
+    trackPageErrors(page);
+    await page.goto(ORCHESTRATOR_RUN_URL);
+    await page.getByRole('button', { name: 'Diagram' }).first().click();
+    const phase = nodeNamed(page, 'Run Readiness Phase').first();
+    await expect(phase).toBeVisible({ timeout: 10_000 });
+
+    await phase.getByRole('button', { name: 'Expand child workflow' }).click();
+
+    await expect(nodeNamed(page, 'Collect Evidence').getByTestId('child-step-status')).toHaveAttribute('data-status', 'completed', { timeout: 10_000 });
+    await expect(nodeNamed(page, 'Assess Readiness').getByTestId('child-step-status')).toHaveAttribute('data-status', 'running');
+
+    const frame = page.getByTestId('child-workflow-frame');
+    await expect(frame.getByRole('link', { name: /Open run/ })).toHaveAttribute(
+      'href',
+      `/${TEST_ORG_HANDLE}/workflows/Diagram%20Child%20Phase/runs/proc-diagram-child-1`,
+    );
   });
 });

@@ -100,6 +100,20 @@ describe('run list command', () => {
     expect(url).toMatch(/status=running/);
   });
 
+  it('passes --parent filter as query param', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ runs: [] }),
+    );
+    const output = captureOutput();
+    await runListCommand({
+      argv: ['--parent', 'run-parent'],
+      env: { MEDIFORCE_API_KEY: 'k' },
+      output,
+    });
+    const url = fetchSpy.mock.calls[0]?.[0] as string;
+    expect(url).toMatch(/parent=run-parent/);
+  });
+
   it('exits 2 on invalid --status', async () => {
     const output = captureOutput();
     const code = await runListCommand({
