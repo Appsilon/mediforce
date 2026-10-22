@@ -16,7 +16,7 @@ export const GUIDE_CHAPTERS: readonly TourChapter[] = [
       {
         id: 'workflows',
         title: 'Your workflows live here',
-        body: 'Each card is a workflow — a sequence of steps, some run by agents and some needing a person. Open one for its versions, its triggers and its runs.',
+        body: 'Each card is a workflow — a sequence of steps, some run by agents and some needing a person. Open one for its versions, its triggers and its runs. Drag a card by the grip on its top edge to keep it where you want it.',
         target: 'workflow-list',
       },
       {

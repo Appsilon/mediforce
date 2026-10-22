@@ -18,7 +18,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useUserMe } from '@/hooks/use-user-me';
 import { useUpdateNamespace } from '@/hooks/use-namespace-mutations';
 import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons } from '@/components/processes/process-card';
+import { SortableWorkflowCard } from '@/components/processes/sortable-workflow-card';
 import { WorkflowProblems } from '@/components/processes/workflow-problems';
+import { useWorkflowOrder } from '@/hooks/use-workflow-order';
+import { applyWorkflowOrder, moveWorkflow } from '@/lib/workflow-order';
 import { OpenRouterCreditsIndicator } from '@/components/namespace/openrouter-credits-indicator';
 import { WorkflowSecretKeysProvider } from '@/hooks/use-workflow-secret-keys';
 import { ImportWorkflowDialog, type ImportEntry } from '@/components/workflows/import-workflow-dialog';
@@ -430,6 +433,10 @@ function WorkflowCatalogPublic({ handle }: { handle: string }) {
   );
 }
 
+function isActiveDefinition(definition: { runSummary: { active: number } }): boolean {
+  return definition.runSummary.active > 0;
+}
+
 function WorkflowCatalogMember({ handle }: { handle: string }) {
   const searchParams = useSearchParams();
   // `?import=source` opens the importer on arrival: the authoring-paths popover
@@ -465,21 +472,44 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
   const workflowNames = useMemo(() => namespacedDefinitions.map((d) => d.name), [namespacedDefinitions]);
   const hasArchivedDefinitions = namespacedDefinitions.some((d) => d.archived === true);
 
-  const visibleDefinitions = useMemo(() => {
-    return definitions
-      .filter((d) => d.namespace === handle)
-      .filter((d) => showArchived || d.archived !== true);
-  }, [definitions, showArchived, handle]);
+  const visibleDefinitions = useMemo(
+    () => namespacedDefinitions.filter((d) => showArchived || d.archived !== true),
+    [namespacedDefinitions, showArchived],
+  );
 
-  const sortedDefinitions = useMemo(() => {
-    return [...visibleDefinitions].sort((defA, defB) => {
-      const activeA = defA.runSummary.active > 0;
-      const activeB = defB.runSummary.active > 0;
-      if (activeA && !activeB) return -1;
-      if (!activeA && activeB) return 1;
-      return defA.name.localeCompare(defB.name);
-    });
-  }, [visibleDefinitions]);
+  const [savedOrder, saveOrder] = useWorkflowOrder(handle);
+  const [draggedName, setDraggedName] = React.useState<string | null>(null);
+  const [dropTargetName, setDropTargetName] = React.useState<string | null>(null);
+
+  const sortedDefinitions = useMemo(
+    () => applyWorkflowOrder(visibleDefinitions, savedOrder, isActiveDefinition),
+    [visibleDefinitions, savedOrder],
+  );
+
+  function handleDragEnd() {
+    setDraggedName(null);
+    setDropTargetName(null);
+  }
+
+  function reorder(movedName: string, targetName: string) {
+    // Reorder over every workflow, not just the visible ones, so hidden
+    // archived cards keep their place.
+    const fullOrder = applyWorkflowOrder(namespacedDefinitions, savedOrder, isActiveDefinition).map(
+      (definition) => definition.name,
+    );
+    saveOrder(moveWorkflow(fullOrder, movedName, targetName));
+  }
+
+  function handleDrop(targetName: string) {
+    if (draggedName !== null) reorder(draggedName, targetName);
+    handleDragEnd();
+  }
+
+  function handleMove(movedName: string, offset: -1 | 1) {
+    const index = sortedDefinitions.findIndex((definition) => definition.name === movedName);
+    const target = sortedDefinitions[index + offset];
+    if (index !== -1 && target !== undefined) reorder(movedName, target.name);
+  }
 
   return (
     <WorkflowSecretKeysProvider handle={handle} workflowNames={workflowNames}>
@@ -574,15 +604,28 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
       ) : (
         <div className="grid gap-4 md:grid-cols-2" data-tour="workflow-list">
           {sortedDefinitions.map((definition) => (
-            <ProcessCard
+            <SortableWorkflowCard
               key={definition.name}
-              definition={definition}
-              runSummary={definition.runSummary}
-              steps={stepsByDefinition.get(definition.name)}
-              handle={handle}
-              activeTaskByInstance={activeTaskByInstance}
-              isMember={true}
-            />
+              name={definition.name}
+              isDragged={draggedName === definition.name}
+              isDropTarget={dropTargetName === definition.name}
+              onDragStart={setDraggedName}
+              onDragEnter={(name) => {
+                if (draggedName !== null) setDropTargetName(name);
+              }}
+              onDrop={handleDrop}
+              onDragEnd={handleDragEnd}
+              onMove={handleMove}
+            >
+              <ProcessCard
+                definition={definition}
+                runSummary={definition.runSummary}
+                steps={stepsByDefinition.get(definition.name)}
+                handle={handle}
+                activeTaskByInstance={activeTaskByInstance}
+                isMember={true}
+              />
+            </SortableWorkflowCard>
           ))}
         </div>
       )}
