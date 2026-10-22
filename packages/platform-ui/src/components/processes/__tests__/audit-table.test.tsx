@@ -113,6 +113,14 @@ describe('AuditTable', () => {
     expect(screen.getByText('2 of 2 records · 2 runs (this run and the runs it started)')).toBeInTheDocument();
   });
 
+  it('links a child run in another namespace to that namespace', () => {
+    const elsewhere = entries.map((entry) => entry.run === child ? { ...entry, run: { ...child, namespace: 'partner' } } : entry);
+    render(
+      <AuditTable entries={elsewhere} loading={false} error={null} currentRunId="run-parent" memberNames={names} handle="acme" />,
+    );
+    expect(screen.getByRole('link', { name: 'review' })).toHaveAttribute('href', '/partner/workflows/review/runs/run-child');
+  });
+
   it('filters rows by search', async () => {
     renderTable();
     await userEvent.type(screen.getByPlaceholderText('Search steps, actors, activities'), 'ada');

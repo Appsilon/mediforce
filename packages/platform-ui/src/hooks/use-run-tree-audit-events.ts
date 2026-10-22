@@ -1,16 +1,15 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useQueries, useQuery } from '@tanstack/react-query';
-import type { AuditEvent, InstanceStatus, ProcessInstance } from '@mediforce/platform-core';
+import { useQueries } from '@tanstack/react-query';
+import type { AuditEvent, ProcessInstance } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
-import { STANDARD_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
+import { STANDARD_LIVE_INTERVAL_MS, TERMINAL_STATUSES } from '@/lib/polling-cadence';
+import { useChildRuns } from './use-child-runs';
 
-const TERMINAL_RUN_STATUSES: ReadonlySet<InstanceStatus> = new Set(['completed', 'failed']);
-
-export type RunRef = Pick<ProcessInstance, 'id' | 'definitionName' | 'status'>;
+export type RunRef = Pick<ProcessInstance, 'id' | 'definitionName' | 'status' | 'namespace'>;
 
 export type RunAuditEvent = { run: RunRef; event: AuditEvent };
 
@@ -25,26 +24,15 @@ function combineSlices(results: AuditSlice[]): AuditSlice[] {
  * The audit trail of a run together with the trails of the runs it spawned
  * directly, so an orchestrator's table reads as one case. The parent's own
  * events come from `useAuditEvents` (already polled by the detail page);
- * this adds the children. Children share `queryKeys.runs.children` with the
- * diagram's inline child workflows. STANDARD LIVE while anything is running.
+ * this adds the children (`useChildRuns`, shared with the diagram's inline
+ * child workflows). STANDARD LIVE while anything is running.
  */
 export function useRunTreeAuditEvents(
   run: RunRef,
   parentEvents: AuditEvent[],
   enabled: boolean,
 ): { data: RunAuditEvent[]; loading: boolean; error: Error | null } {
-  const childrenQuery = useQuery({
-    queryKey: queryKeys.runs.children(run.id),
-    queryFn: async () => (await mediforce.runs.list({ parent: run.id, limit: 10000 })).runs,
-    enabled,
-    retry: stopRetryOn4xx,
-    refetchInterval: (query) => {
-      if (query.state.error !== null) return false;
-      const settled = TERMINAL_RUN_STATUSES.has(run.status)
-        && (query.state.data ?? []).every((child) => TERMINAL_RUN_STATUSES.has(child.status));
-      return settled ? false : STANDARD_LIVE_INTERVAL_MS;
-    },
-  });
+  const childrenQuery = useChildRuns(run, enabled);
 
   const children = useMemo(() => childrenQuery.data ?? [], [childrenQuery.data]);
 
@@ -54,7 +42,7 @@ export function useRunTreeAuditEvents(
       queryFn: async () => (await mediforce.processes.listAuditEvents({ instanceId: child.id })).events,
       enabled,
       retry: stopRetryOn4xx,
-      refetchInterval: TERMINAL_RUN_STATUSES.has(child.status) ? false as const : STANDARD_LIVE_INTERVAL_MS,
+      refetchInterval: TERMINAL_STATUSES.has(child.status) ? false as const : STANDARD_LIVE_INTERVAL_MS,
     })),
     combine: combineSlices,
   });
@@ -72,6 +60,6 @@ export function useRunTreeAuditEvents(
   return {
     data,
     loading: enabled && (childrenQuery.isPending || childAudits.some((query) => query.isPending)),
-    error: (childrenQuery.error as Error | null) ?? childError,
+    error: childrenQuery.error ?? childError,
   };
 }

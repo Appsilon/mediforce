@@ -13,8 +13,11 @@ import { saveBlobToDevice } from '@/lib/save-blob';
 import { describeParts, headlineFor } from './audit-log-tab';
 
 /** The engine announcing its own dispatch loop. Every step writes them and
- *  they say nothing the step's own rows don't, so the table leaves them out. */
-export const PLUMBING_ACTIONS: ReadonlySet<string> = new Set([
+ *  they say nothing the step's own rows don't, so the table leaves them out.
+ *  Narrower than platform-core's `routine` significance on purpose:
+ *  `step.completed` is routine there but carries the step → next step here,
+ *  and `agent.step.started` names the agent that ran. */
+const PLUMBING_ACTIONS: ReadonlySet<string> = new Set([
   'process.run.started',
   'process.run.step.started',
   'script.step.started',
@@ -31,6 +34,7 @@ export type AuditRow = {
   timestamp: string;
   runId: string;
   runName: string;
+  runNamespace: string;
   stepId: string;
   nextStepId: string;
   activity: string;
@@ -56,6 +60,7 @@ export function toAuditRows(entries: RunAuditEvent[], memberNames: Map<string, s
       timestamp: event.timestamp,
       runId: run.id,
       runName: run.definitionName,
+      runNamespace: run.namespace ?? '',
       // Task records carry the step in their snapshot rather than on the event.
       stepId: event.stepId ?? stringOrEmpty(event.inputSnapshot.stepId),
       nextStepId: stringOrEmpty(event.outputSnapshot.next),
@@ -113,7 +118,7 @@ export function AuditTable({ entries, loading, error, currentRunId, memberNames,
   const visible = React.useMemo(() => rows.filter((row) => matchesRow(row, query)), [rows, query]);
 
   if (loading) {
-    return <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 rounded bg-muted animate-pulse" />)}</div>;
+    return <div className="space-y-2">{Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-10 rounded bg-muted animate-pulse" />)}</div>;
   }
 
   if (error) {
@@ -128,8 +133,9 @@ export function AuditTable({ entries, loading, error, currentRunId, memberNames,
     return <div className="py-8 text-center text-sm text-muted-foreground">No audit events</div>;
   }
 
+  // The export is the whole trail, never the search's slice of it.
   function handleDownload() {
-    const blob = new Blob([auditRowsToCsv(visible)], { type: 'text/csv;charset=utf-8' });
+    const blob = new Blob([auditRowsToCsv(rows)], { type: 'text/csv;charset=utf-8' });
     saveBlobToDevice(blob, `audit-trail-${currentRunId}.csv`);
   }
 
@@ -182,7 +188,7 @@ export function AuditTable({ entries, loading, error, currentRunId, memberNames,
                     row.runName
                   ) : (
                     <Link
-                      href={routes.workflowRun(handle, row.runName, row.runId)}
+                      href={routes.workflowRun(row.runNamespace || handle, row.runName, row.runId)}
                       className="font-medium text-primary hover:underline"
                     >
                       {row.runName}

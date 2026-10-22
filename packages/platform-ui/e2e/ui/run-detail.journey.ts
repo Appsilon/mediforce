@@ -70,7 +70,7 @@ test.describe('Run Detail Journey', () => {
     await expect(historyPanel.getByText('Review Results', { exact: true })).toBeVisible();
 
     // Duration is visible for a completed run
-    await expect(page.getByText('Duration', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('run-main-column')).toBeVisible();
 
     // Right panel: every run has an Audit button, whether or not it wrote logs.
     await page.getByRole('button', { name: /^Audit$/i }).first().click();
@@ -78,14 +78,14 @@ test.describe('Run Detail Journey', () => {
 
     // The same trail as a table: one row per record, exportable, and the panel
     // can take the whole page so the columns fit.
-    await page.getByRole('button', { name: 'Table', exact: true }).click();
+    await page.getByRole('radio', { name: 'Table', exact: true }).click();
     await expect(page.getByRole('columnheader', { name: 'Actor' })).toBeVisible();
     await expect(page.getByRole('cell', { name: /Process completed successfully/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Download CSV' })).toBeVisible();
     await page.getByTitle('Expand table').click();
-    await expect(page.getByText('Duration', { exact: true })).not.toBeVisible();
+    await expect(page.getByTestId('run-main-column')).not.toBeVisible();
     await page.getByTitle('Collapse table').click();
-    await expect(page.getByText('Duration', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('run-main-column')).toBeVisible();
   });
 
   test('autonomy badges and executor identity labels', async ({ page }) => {
@@ -122,11 +122,11 @@ test.describe('Run Detail Journey', () => {
     // Running process: Duration metadata field must NOT appear
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Supply%20Chain%20Review/runs/proc-running-1`);
     await expect(page.getByRole('heading', { name: 'Supply Chain Review' })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Duration', { exact: true })).not.toBeVisible();
+    await expect(page.getByTestId('run-main-column')).not.toBeVisible();
 
     // Completed process: Duration metadata field IS visible
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/Data%20Quality%20Review/runs/proc-completed-1`);
     await expect(page.getByRole('heading', { name: 'Data Quality Review' })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Duration', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('run-main-column')).toBeVisible();
   });
 });

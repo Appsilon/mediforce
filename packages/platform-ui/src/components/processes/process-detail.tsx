@@ -26,6 +26,7 @@ import { useAgentRunsForProcess } from '@/hooks/use-agent-runs';
 import { useRunTreeAuditEvents } from '@/hooks/use-run-tree-audit-events';
 import { useUserDisplayNames } from '@/hooks/use-users';
 import { cn } from '@/lib/utils';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { secondaryButtonClass, destructiveButtonClass } from '@/components/ui/button-styles';
 import { RunReport } from '@/components/reports/run-report';
 import { MissingEnvBanner } from './missing-env-banner';
@@ -246,17 +247,17 @@ export function ProcessDetail({
 
   const { data: outputFiles } = useRunOutputFiles(instance.id, instance.status);
 
-  // Scroll audit log to bottom when events change
+  // Scroll audit log to bottom when events change or the timeline is shown again
   const auditScrollRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
-    if (rightTab === 'audit' && auditScrollRef.current) {
+    if (rightTab === 'audit' && auditView === 'timeline' && auditScrollRef.current) {
       auditScrollRef.current.scrollTop = auditScrollRef.current.scrollHeight;
     }
-  }, [auditEvents, rightTab]);
+  }, [auditEvents, rightTab, auditView]);
 
   return (
     <div className="flex items-start gap-0 p-6 pr-0">
-      <div className={cn('flex-1 min-w-0 space-y-6 pr-6', panelWide && 'hidden')}>
+      <div data-testid="run-main-column" className={cn('flex-1 min-w-0 space-y-6 pr-6', panelWide && 'hidden')}>
         {/* Header */}
         <div className="space-y-2">
           <div className="flex items-center gap-3">
@@ -520,22 +521,24 @@ export function ProcessDetail({
                 </>
               );
             })()}
-            {tableVisible && (
+            <div className="ml-auto flex shrink-0 items-center">
+              {tableVisible && (
+                <button
+                  onClick={() => setTableExpanded((prev) => !prev)}
+                  className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  title={tableExpanded ? 'Collapse table' : 'Expand table'}
+                >
+                  {tableExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </button>
+              )}
               <button
-                onClick={() => setTableExpanded((prev) => !prev)}
-                className="ml-auto shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                title={tableExpanded ? 'Collapse table' : 'Expand table'}
+                onClick={() => setLogsOpen(false)}
+                className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                title="Close panel"
               >
-                {tableExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                <X className="h-4 w-4" />
               </button>
-            )}
-            <button
-              onClick={() => setLogsOpen(false)}
-              className={cn(tableVisible === false && 'ml-auto', 'shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors')}
-              title="Close panel"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            </div>
           </div>
 
           <div className={cn('flex-1 min-h-0 p-4 flex flex-col overflow-hidden', rightTab !== 'agent-log' && 'hidden')}>
@@ -553,26 +556,15 @@ export function ProcessDetail({
 
           <div className={cn('flex-1 min-h-0 flex flex-col overflow-hidden', rightTab !== 'audit' && 'hidden')}>
             <div className="shrink-0 px-4 pt-4">
-              <div className="flex items-stretch gap-0.5 rounded-md border p-0.5">
-                {([
+              <SegmentedControl
+                label="Audit view"
+                value={auditView}
+                options={[
                   { value: 'timeline', label: 'Timeline' },
                   { value: 'table', label: 'Table' },
-                ] as const).map(({ value, label }) => (
-                  <button
-                    key={value}
-                    onClick={() => setAuditView(value)}
-                    aria-pressed={auditView === value}
-                    className={cn(
-                      'flex-1 rounded-sm px-2.5 py-1 text-sm font-medium transition-colors',
-                      auditView === value
-                        ? 'bg-primary-subtle text-primary'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+                ]}
+                onChange={setAuditView}
+              />
             </div>
 
             <div
