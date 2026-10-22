@@ -4,11 +4,12 @@ import * as React from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { format } from 'date-fns';
-import { Archive, ArchiveRestore, CheckCircle2, GitBranch, ScrollText, ShieldCheck, X } from 'lucide-react';
+import { Archive, ArchiveRestore, CheckCircle2, GitBranch, Maximize2, Minimize2, ScrollText, ShieldCheck, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ProcessInstance, StepExecution, AuditEvent, Step, WorkflowStep, WorkflowDefinition } from '@mediforce/platform-core';
 import { ProcessStatusBadge } from './process-status-badge';
 import { AuditLogTab } from './audit-log-tab';
+import { AuditTable } from './audit-table';
 import { StepStatusPanel } from './step-status-panel';
 import { AgentLogViewer } from './agent-log-viewer';
 import { RunResultsPanel } from './run-results-panel';
@@ -22,7 +23,10 @@ import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 import { useAgentRunsForProcess } from '@/hooks/use-agent-runs';
+import { useRunTreeAuditEvents } from '@/hooks/use-run-tree-audit-events';
+import { useUserDisplayNames } from '@/hooks/use-users';
 import { cn } from '@/lib/utils';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { secondaryButtonClass, destructiveButtonClass } from '@/components/ui/button-styles';
 import { RunReport } from '@/components/reports/run-report';
 import { MissingEnvBanner } from './missing-env-banner';
@@ -173,6 +177,14 @@ export function ProcessDetail({
 
   const [logsOpen, setLogsOpen] = React.useState(false);
 
+  const [auditView, setAuditView] = React.useState<'timeline' | 'table'>('timeline');
+  const [tableExpanded, setTableExpanded] = React.useState(false);
+  const tableVisible = logsOpen && rightTab === 'audit' && auditView === 'table';
+  const panelWide = tableVisible && tableExpanded;
+
+  const runTreeAudit = useRunTreeAuditEvents(instance, auditEvents, tableVisible);
+  const memberNames = useUserDisplayNames(handle);
+
   // Cancel double-confirm: 0 = idle, 1 = first confirm shown, 2 = cancelling in progress
   const [cancelStep, setCancelStep] = React.useState<0 | 1 | 2>(0);
   const [cancelError, setCancelError] = React.useState<string | null>(null);
@@ -235,17 +247,17 @@ export function ProcessDetail({
 
   const { data: outputFiles } = useRunOutputFiles(instance.id, instance.status);
 
-  // Scroll audit log to bottom when events change
+  // Scroll audit log to bottom when events change or the timeline is shown again
   const auditScrollRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
-    if (rightTab === 'audit' && auditScrollRef.current) {
+    if (rightTab === 'audit' && auditView === 'timeline' && auditScrollRef.current) {
       auditScrollRef.current.scrollTop = auditScrollRef.current.scrollHeight;
     }
-  }, [auditEvents, rightTab]);
+  }, [auditEvents, rightTab, auditView]);
 
   return (
     <div className="flex items-start gap-0 p-6 pr-0">
-      <div className="flex-1 min-w-0 space-y-6 pr-6">
+      <div data-testid="run-main-column" className={cn('flex-1 min-w-0 space-y-6 pr-6', panelWide && 'hidden')}>
         {/* Header */}
         <div className="space-y-2">
           <div className="flex items-center gap-3">
@@ -489,7 +501,7 @@ export function ProcessDetail({
       <div
         className={cn(
           'sticky top-4 h-[calc(100vh-2rem)] shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out',
-          logsOpen ? 'w-1/2' : 'w-0',
+          logsOpen ? (panelWide ? 'w-full' : 'w-1/2') : 'w-0',
         )}
       >
         <div
@@ -509,13 +521,24 @@ export function ProcessDetail({
                 </>
               );
             })()}
-            <button
-              onClick={() => setLogsOpen(false)}
-              className="ml-auto shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title="Close panel"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="ml-auto flex shrink-0 items-center">
+              {tableVisible && (
+                <button
+                  onClick={() => setTableExpanded((prev) => !prev)}
+                  className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  title={tableExpanded ? 'Collapse table' : 'Expand table'}
+                >
+                  {tableExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </button>
+              )}
+              <button
+                onClick={() => setLogsOpen(false)}
+                className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                title="Close panel"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           <div className={cn('flex-1 min-h-0 p-4 flex flex-col overflow-hidden', rightTab !== 'agent-log' && 'hidden')}>
@@ -531,16 +554,43 @@ export function ProcessDetail({
             )}
           </div>
 
-          <div
-            ref={auditScrollRef}
-            className={cn('flex-1 min-h-0 overflow-y-auto p-4', rightTab !== 'audit' && 'hidden')}
-          >
-            <AuditLogTab
-              events={auditEvents}
-              loading={auditEventsLoading}
-              error={auditEventsError}
-              printable={rightTab === 'audit' && logsOpen}
-            />
+          <div className={cn('flex-1 min-h-0 flex flex-col overflow-hidden', rightTab !== 'audit' && 'hidden')}>
+            <div className="shrink-0 px-4 pt-4">
+              <SegmentedControl
+                label="Audit view"
+                value={auditView}
+                options={[
+                  { value: 'timeline', label: 'Timeline' },
+                  { value: 'table', label: 'Table' },
+                ]}
+                onChange={setAuditView}
+              />
+            </div>
+
+            <div
+              ref={auditScrollRef}
+              className={cn('flex-1 min-h-0 overflow-y-auto p-4', auditView !== 'timeline' && 'hidden')}
+            >
+              <AuditLogTab
+                events={auditEvents}
+                loading={auditEventsLoading}
+                error={auditEventsError}
+                printable={rightTab === 'audit' && auditView === 'timeline' && logsOpen}
+              />
+            </div>
+
+            {auditView === 'table' && (
+              <div className="flex-1 min-h-0 flex flex-col p-4">
+                <AuditTable
+                  entries={runTreeAudit.data}
+                  loading={auditEventsLoading || runTreeAudit.loading}
+                  error={auditEventsError ?? runTreeAudit.error}
+                  currentRunId={instance.id}
+                  memberNames={memberNames}
+                  handle={handle}
+                />
+              </div>
+            )}
           </div>
 
           <div data-testid="run-diagram-panel" className={cn('flex-1 min-h-0 flex flex-col overflow-hidden p-4', rightTab !== 'diagram' && 'hidden')}>

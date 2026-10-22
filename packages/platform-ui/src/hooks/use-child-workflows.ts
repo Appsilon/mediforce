@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQueries } from '@tanstack/react-query';
 import {
   pickRunnableVersion,
   type InstanceStatus,
@@ -19,6 +19,7 @@ import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 import { routes } from '@/lib/routes';
+import { useChildRuns } from './use-child-runs';
 import {
   CRITICAL_LIVE_INTERVAL_MS,
   STANDARD_LIVE_INTERVAL_MS,
@@ -156,19 +157,9 @@ export function useChildRunExpansion(
   const { open, expandable, onToggle } = useOpenSteps(definition);
   const [selectedByStep, setSelectedByStep] = useState<ReadonlyMap<string, string>>(() => new Map());
 
-  const childrenQuery = useQuery({
-    queryKey: queryKeys.runs.children(run.id),
-    queryFn: async () => (await mediforce.runs.list({ parent: run.id, limit: 10000 })).runs,
-    enabled: open.length > 0,
-    retry: stopRetryOn4xx,
-    refetchInterval: (query) => {
-      if (query.state.error !== null) return false;
-      const settled = isTerminal(run.status) && (query.state.data ?? []).every((child) => isTerminal(child.status));
-      return settled ? false : STANDARD_LIVE_INTERVAL_MS;
-    },
-  });
+  const childrenQuery = useChildRuns(run, open.length > 0);
 
-  const childrenError = (childrenQuery.error as Error | null) ?? null;
+  const childrenError = childrenQuery.error;
 
   const shown = useMemo(() => {
     const children = childrenQuery.data ?? [];
