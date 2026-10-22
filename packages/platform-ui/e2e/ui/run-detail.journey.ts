@@ -75,6 +75,17 @@ test.describe('Run Detail Journey', () => {
     // Right panel: every run has an Audit button, whether or not it wrote logs.
     await page.getByRole('button', { name: /^Audit$/i }).first().click();
     await expect(page.getByRole('heading', { name: 'Audit' })).toBeVisible();
+
+    // The same trail as a table: one row per record, exportable, and the panel
+    // can take the whole page so the columns fit.
+    await page.getByRole('button', { name: 'Table', exact: true }).click();
+    await expect(page.getByRole('columnheader', { name: 'Actor' })).toBeVisible();
+    await expect(page.getByRole('cell', { name: /Process completed successfully/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Download CSV' })).toBeVisible();
+    await page.getByTitle('Expand table').click();
+    await expect(page.getByText('Duration', { exact: true })).not.toBeVisible();
+    await page.getByTitle('Collapse table').click();
+    await expect(page.getByText('Duration', { exact: true })).toBeVisible();
   });
 
   test('autonomy badges and executor identity labels', async ({ page }) => {
