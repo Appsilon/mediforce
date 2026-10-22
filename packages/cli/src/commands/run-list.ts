@@ -28,7 +28,7 @@ export const runListCommand = defineCommand({
     status: enumArg(['created', 'running', 'paused', 'completed', 'failed'] as const, {
       description: 'Filter by status',
     }),
-    parent: { type: 'string', description: 'List the runs this run id spawned' },
+    parent: { type: 'string', description: 'List every run this run id spawned, oldest first (ignores --limit)' },
     limit: { type: 'string', description: 'Max results (default: 20, max: 100)' },
   },
   async run({ args, output, mediforce, jsonMode }) {

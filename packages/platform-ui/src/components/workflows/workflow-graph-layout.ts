@@ -328,3 +328,49 @@ export function placeNewNodes(
 
   return positioned;
 }
+
+/** A node as the canvas currently holds it, with how wide it is drawn. */
+export type SizedNode = AnchoredNode & { width: number };
+
+/**
+ * Dragged positions after some nodes changed size — a child workflow opened or
+ * closed under a step. A resized node keeps its card where it was and grows
+ * evenly to both sides; the nodes beside it step aside by half the change in
+ * width, and every node below its old bottom moves by the change in height.
+ * The opposite resize undoes each shift, so closing a child puts back the
+ * canvas the user had arranged.
+ */
+export function makeRoomForResized(previous: SizedNode[], current: SizedNode[]): AnchoredNode[] {
+  const positions = new Map(previous.map((node) => [node.id, node.position]));
+  const sizes = new Map(previous.map((node) => [node.id, { width: node.width, height: node.height }]));
+
+  for (const after of current) {
+    const before = sizes.get(after.id);
+    const position = positions.get(after.id);
+    if (before === undefined || position === undefined) continue;
+    const widthChange = after.width - before.width;
+    const heightChange = after.height - before.height;
+    if (widthChange === 0 && heightChange === 0) continue;
+
+    const oldBottom = position.y + before.height;
+    const centre = position.x + before.width / 2;
+    for (const [id, other] of positions) {
+      const size = sizes.get(id);
+      if (id === after.id || size === undefined) continue;
+      if (other.y >= oldBottom) {
+        positions.set(id, { x: other.x, y: other.y + heightChange });
+      } else if (other.y + size.height > position.y) {
+        const side = Math.sign(other.x + size.width / 2 - centre);
+        positions.set(id, { x: other.x + (side * widthChange) / 2, y: other.y });
+      }
+    }
+    positions.set(after.id, { x: position.x - widthChange / 2, y: position.y });
+    sizes.set(after.id, { width: after.width, height: after.height });
+  }
+
+  return previous.map((node) => ({
+    id: node.id,
+    position: positions.get(node.id) ?? node.position,
+    height: sizes.get(node.id)?.height ?? node.height,
+  }));
+}

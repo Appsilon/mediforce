@@ -167,6 +167,7 @@ describe('child workflows (via WorkflowDiagram)', () => {
           expandable: new Set(['phase']),
           expanded: new Map([['phase', {
             definition: child,
+            namespace: 'test',
             title: 'child v2',
             href: '/test/workflows/child/definitions/2',
             badge: '× N at runtime',
@@ -183,6 +184,36 @@ describe('child workflows (via WorkflowDiagram)', () => {
     expect(screen.getByText('Collect Evidence')).toBeInTheDocument();
     expect(screen.getByTestId('child-step-status')).toHaveAttribute('data-status', 'running');
     // Read-only: a child step carries no expand control or edit buttons of its own.
+    expect(screen.getAllByRole('button', { name: /child workflow/ })).toHaveLength(1);
+  });
+
+  it('[RENDER] a nested step that starts its own workflow links to it instead of expanding', () => {
+    const middle = buildWorkflowDefinition({
+      name: 'child',
+      steps: [
+        {
+          id: 'nested-phase',
+          name: 'Run Nested Phase',
+          type: 'creation',
+          executor: 'action',
+          action: { kind: 'run-workflow', config: { definitionName: 'grandchild', timeout: 'PT1H' } },
+        },
+        { id: 'end', name: 'End', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'nested-phase', to: 'end' }],
+    });
+    render(
+      <WorkflowDiagram
+        definition={orchestrator}
+        childWorkflows={{
+          expandable: new Set(['phase']),
+          expanded: new Map([['phase', { definition: middle, namespace: 'test', title: 'child v1' }]]),
+          onToggle: () => undefined,
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: 'Open child workflow' })).toHaveAttribute('href', '/test/workflows/grandchild');
     expect(screen.getAllByRole('button', { name: /child workflow/ })).toHaveLength(1);
   });
 });

@@ -34,8 +34,9 @@ import {
   type ControlMode,
   type NewStepPayload,
 } from '@/lib/control-mode';
-import { computeGraphLayout, placeNewNodes, edgeIdOf, NODE_WIDTH, type GraphEdge } from './workflow-graph-layout';
-import type { ChildWorkflowExpansion, ExpandedChildWorkflow } from './child-workflow';
+import { computeGraphLayout, makeRoomForResized, placeNewNodes, edgeIdOf, NODE_WIDTH, type GraphEdge } from './workflow-graph-layout';
+import { childWorkflowTargetOf, type ChildWorkflowExpansion, type ExpandedChildWorkflow } from '@/lib/child-workflow';
+import { routes } from '@/lib/routes';
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -156,6 +157,8 @@ type StepNodeData = {
   child?: ChildFrame;
   /** A step of a child workflow drawn inside its parent step: read-only. */
   nested?: boolean;
+  /** A nested step that starts a workflow of its own links to it instead of expanding. */
+  childHref?: string;
   status?: StepExecutionStatus;
 };
 
@@ -258,6 +261,8 @@ function ChildWorkflowFrame({ child }: { child: ChildFrame }) {
 }
 
 const HANDLE_CLASS = '!bg-transparent !border-0 !w-px !h-px';
+const CHILD_FOOTER_CLASS = 'nodrag -mx-4 w-[calc(100%+2rem)] flex items-center gap-1.5 px-4 text-[11px] font-medium border-t border-border/40 '
+  + 'text-pink-600 hover:bg-pink-50 dark:text-pink-400 dark:hover:bg-pink-950/30';
 
 function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   // Measure the actual offsetTop of the branch section so the right-out handle
@@ -316,7 +321,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
         className={cn(
           'group rounded-xl border-[1.5px] px-4 pt-3 transition-shadow relative overflow-hidden mx-auto',
           data.nested === true ? 'cursor-default' : 'cursor-pointer',
-          data.backBranches?.length || data.expand !== undefined ? 'pb-0' : 'pb-3',
+          (data.backBranches?.length ?? 0) > 0 || data.expandable === true ? 'pb-0' : 'pb-3',
           'hover:shadow-md',
           style.bg,
           selected
@@ -422,9 +427,8 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
             onClick={(event) => { event.stopPropagation(); data.expand?.onToggle(); }}
             style={{ height: EXPAND_ROW_HEIGHT }}
             className={cn(
-              'nodrag -mx-4 w-[calc(100%+2rem)] flex items-center gap-1.5 px-4 text-[11px] font-medium border-t border-border/40',
-              'text-pink-600 hover:bg-pink-50 dark:text-pink-400 dark:hover:bg-pink-950/30',
-              data.backBranches?.length ? '' : 'mt-3',
+              CHILD_FOOTER_CLASS,
+              (data.backBranches?.length ?? 0) > 0 ? '' : 'mt-3',
             )}
             aria-label={expanded ? 'Collapse child workflow' : 'Expand child workflow'}
             aria-expanded={expanded}
@@ -432,6 +436,20 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
             {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             {expanded ? 'Hide child workflow' : 'Show child workflow'}
           </button>
+        )}
+        {data.childHref !== undefined && (
+          <Link
+            href={data.childHref}
+            onClick={(event) => event.stopPropagation()}
+            style={{ height: EXPAND_ROW_HEIGHT }}
+            className={cn(
+              CHILD_FOOTER_CLASS,
+              (data.backBranches?.length ?? 0) > 0 ? '' : 'mt-3',
+            )}
+          >
+            <ArrowRight className="h-3.5 w-3.5" />
+            Open child workflow
+          </Link>
         )}
       </div>
       {data.child !== undefined && <ChildWorkflowFrame child={data.child} />}
@@ -689,7 +707,16 @@ function frameChild(parentStepId: string, cardHeight: number, child: ExpandedChi
   if (child.definition === null) {
     return { frame: { ...child, width: NODE_WIDTH, height: headerHeight + FRAME_MESSAGE_HEIGHT }, nodes: [], edges: [] };
   }
-  const inner = buildLayout(child.definition);
+  const startsWorkflow = new Map(child.definition.steps.flatMap((step) => {
+    const target = childWorkflowTargetOf(step);
+    if (target === null) return [];
+    const href = target.definitionVersion === undefined
+      ? routes.workflow(child.namespace, target.definitionName)
+      : routes.workflowDefinition(child.namespace, target.definitionName, target.definitionVersion);
+    return [[step.id, href] as const];
+  }));
+  // One level deep: a nested spawn links to its workflow rather than opening a frame of its own.
+  const inner = buildLayout(child.definition, undefined, new Set(startsWorkflow.keys()));
   const innerHeight = Math.max(0, ...inner.nodes.map((node) => node.position.y + nodeHeight(node)));
   const width = Math.max(NODE_WIDTH, inner.width + 2 * FRAME_PADDING);
   const offset = { x: (width - inner.width) / 2, y: cardHeight + FRAME_GAP + headerHeight + FRAME_PADDING };
@@ -701,7 +728,12 @@ function frameChild(parentStepId: string, cardHeight: number, child: ExpandedChi
     draggable: false,
     selectable: false,
     position: { x: node.position.x + offset.x, y: node.position.y + offset.y },
-    data: { ...(node.data as StepNodeData), nested: true, status: child.stepStatus?.get(node.id) } satisfies StepNodeData,
+    data: {
+      ...(node.data as StepNodeData),
+      nested: true,
+      status: child.stepStatus?.get(node.id),
+      childHref: startsWorkflow.get(node.id),
+    } satisfies StepNodeData,
   }));
   const edges: Edge[] = inner.edges.map((edge) => ({
     ...edge,
@@ -1013,37 +1045,26 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
   // (most commonly the terminal/"Done" step) gets pushed further down if the
   // new node would otherwise land on top of it.
   //
-  // Opening or closing a child workflow resizes a step, which no dragged layout
-  // made room for — the canvas falls back to the canonical layout then.
-  const frameSizes = useMemo(
-    () => layoutNodes
-      .filter((n) => (n.data as StepNodeData).child !== undefined)
-      .map((n) => `${n.id}:${nodeWidth(n)}x${nodeHeight(n)}`)
-      .join('|'),
-    [layoutNodes],
-  );
-  const previousFrameSizes = useRef(frameSizes);
+  // Opening or closing a child workflow resizes a step: the nodes around it
+  // make room and give it back, keeping the arrangement the user dragged.
   useEffect(() => {
-    const resized = previousFrameSizes.current !== frameSizes;
-    previousFrameSizes.current = frameSizes;
     setLocalNodes((prev) => {
-      if (resized === true) return computedNodes;
-      const anchored = (nodes: Node[]) => nodes
-        .filter((n) => n.parentId === undefined)
-        .map((n) => ({ id: n.id, position: n.position, height: nodeHeight(n) }));
+      const sized = (nodes: Node[]) => nodes
+        .filter((node) => node.parentId === undefined)
+        .map((node) => ({ id: node.id, position: node.position, height: nodeHeight(node), width: nodeWidth(node) }));
       const positioned = placeNewNodes(
-        anchored(prev),
-        anchored(computedNodes),
+        makeRoomForResized(sized(prev), sized(computedNodes)),
+        sized(computedNodes),
         layoutEdges
           .filter((e) => e.sourceHandle !== 'right-out')
           .map((e) => ({ from: e.source, to: e.target })),
       );
-      return computedNodes.map((n) => {
-        const position = n.parentId === undefined ? positioned.get(n.id) : undefined;
-        return position ? { ...n, position } : n;
+      return computedNodes.map((node) => {
+        const position = node.parentId === undefined ? positioned.get(node.id) : undefined;
+        return position ? { ...node, position } : node;
       });
     });
-  }, [computedNodes, layoutEdges, frameSizes]);
+  }, [computedNodes, layoutEdges]);
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setLocalNodes((nds) => applyNodeChanges(changes, nds));
@@ -1052,22 +1073,22 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
   // Tidy up = throw away the dragged positions and re-run the canonical layout,
   // so the canvas snaps back to the same shape a freshly opened workflow has.
   const handleTidy = useCallback(() => {
-    const topLevel = localNodes.filter((n) => n.parentId === undefined);
+    const topLevel = localNodes.filter((node) => node.parentId === undefined);
     const layout = computeGraphLayout(
-      topLevel.map((n) => n.id),
+      topLevel.map((node) => node.id),
       layoutEdges.map((e) => ({ from: e.source, to: e.target })),
       (nodeId) => {
-        const node = topLevel.find((n) => n.id === nodeId);
+        const node = topLevel.find((candidate) => candidate.id === nodeId);
         return node ? nodeHeight(node) : NODE_INNER_HEIGHT;
       },
       (nodeId) => {
-        const node = topLevel.find((n) => n.id === nodeId);
+        const node = topLevel.find((candidate) => candidate.id === nodeId);
         return node ? nodeWidth(node) : NODE_WIDTH;
       },
     );
-    setLocalNodes((prev) => prev.map((n) => {
-      const position = n.parentId === undefined ? layout.positions.get(n.id) : undefined;
-      return position ? { ...n, position } : n;
+    setLocalNodes((prev) => prev.map((node) => {
+      const position = node.parentId === undefined ? layout.positions.get(node.id) : undefined;
+      return position ? { ...node, position } : node;
     }));
   }, [layoutEdges, localNodes]);
 

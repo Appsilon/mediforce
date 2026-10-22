@@ -119,4 +119,15 @@ describe('listRuns handler', () => {
 
     expect(result.runs.map((r) => r.id)).toEqual(['c1']);
   });
+
+  it('returns every child of a parent regardless of limit', async () => {
+    await instanceRepo.create(buildProcessInstance({ id: 'c1', parentInstanceId: 'p' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'c2', parentInstanceId: 'p' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'c3', parentInstanceId: 'p' }));
+
+    const scope = createTestScope({ instanceRepo });
+    const result = await listRuns({ parent: 'p', limit: 2 }, scope);
+
+    expect(result.runs).toHaveLength(3);
+  });
 });

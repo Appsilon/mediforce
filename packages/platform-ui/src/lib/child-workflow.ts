@@ -39,6 +39,8 @@ export interface ChildRunChoice {
 export interface ExpandedChildWorkflow {
   /** null while it loads, or when it could not be read — `message` says which. */
   definition: WorkflowDefinition | null;
+  /** Workspace the child workflow lives in — the workflows its own steps start resolve there too. */
+  namespace: string;
   title: string;
   href?: string;
   badge?: string;

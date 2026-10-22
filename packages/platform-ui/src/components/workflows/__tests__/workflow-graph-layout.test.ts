@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeGraphLayout, placeNewNodes, NODE_WIDTH, COLUMN_GAP } from '../workflow-graph-layout';
+import { computeGraphLayout, placeNewNodes, makeRoomForResized, NODE_WIDTH, COLUMN_GAP } from '../workflow-graph-layout';
 
 const COLUMN_PITCH = NODE_WIDTH + COLUMN_GAP;
 const columnOf = (x: number) => Math.round(x / COLUMN_PITCH);
@@ -209,5 +209,43 @@ describe('placeNewNodes', () => {
     const current = [node('root', 0, 0)];
 
     expect(placeNewNodes(previous, current, []).get('root')).toEqual({ x: 999, y: 42 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// makeRoomForResized
+// ---------------------------------------------------------------------------
+
+describe('makeRoomForResized', () => {
+  const sized = (id: string, x: number, y: number, width = NODE_WIDTH, height = 100) =>
+    ({ id, position: { x, y }, width, height });
+
+  // A dragged canvas: `spawn` with `beside` to its right and `below` under it.
+  const arranged = [sized('spawn', 40, 0), sized('beside', 400, 30), sized('below', 90, 260)];
+
+  it('keeps every dragged position when nothing changed size', () => {
+    const placed = makeRoomForResized(arranged, arranged);
+
+    expect(placed.map((node) => node.position)).toEqual(arranged.map((node) => node.position));
+  });
+
+  it('grows a resized node around its card, moving neighbours aside and nodes below down', () => {
+    const opened = [sized('spawn', 0, 0, NODE_WIDTH + 200, 400), arranged[1], arranged[2]];
+
+    const placed = new Map(makeRoomForResized(arranged, opened).map((node) => [node.id, node.position]));
+
+    expect(placed.get('spawn')).toEqual({ x: -60, y: 0 });
+    expect(placed.get('beside')).toEqual({ x: 500, y: 30 });
+    expect(placed.get('below')).toEqual({ x: 90, y: 560 });
+  });
+
+  it('closing the child puts the arranged canvas back', () => {
+    const opened = [sized('spawn', 0, 0, NODE_WIDTH + 200, 400), arranged[1], arranged[2]];
+    const afterOpen = makeRoomForResized(arranged, opened)
+      .map((node, index) => ({ ...node, width: opened[index].width }));
+
+    const placed = makeRoomForResized(afterOpen, arranged);
+
+    expect(placed.map((node) => node.position)).toEqual(arranged.map((node) => node.position));
   });
 });

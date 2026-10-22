@@ -79,7 +79,7 @@ export const ListRunsInputSchema = z.object({
   // cap drops back to a sane page size once cursor pagination lands.
   limit: z.coerce.number().int().positive().max(10000).default(20),
   dryRun: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
-  /** Run id. Narrows the result to the runs that run spawned, oldest first. */
+  /** Run id. Narrows the result to every run that run spawned, oldest first; `limit` does not apply. */
   parent: z.string().min(1).optional(),
 });
 

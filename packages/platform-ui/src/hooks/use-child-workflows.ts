@@ -14,7 +14,7 @@ import {
   type ChildWorkflowExpansion,
   type ChildWorkflowTarget,
   type ExpandedChildWorkflow,
-} from '@/components/workflows/child-workflow';
+} from '@/lib/child-workflow';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
@@ -118,14 +118,17 @@ export function useChildDefinitionExpansion(
       const error = listError ?? fetched?.error ?? null;
       byStep.set(stepId, {
         definition: fetched?.data ?? null,
+        namespace: handle,
         title: typeof version === 'number' ? `${target.definitionName} v${version}` : target.definitionName,
         href: typeof version === 'number' ? routes.workflowDefinition(handle, target.definitionName, version) : undefined,
         badge: target.forEach === true ? '× N at runtime' : undefined,
-        message: error !== null
-          ? errorMessage(error)
-          : version === null
-            ? 'No runnable version of this workflow.'
-            : fetched?.data === undefined ? 'Loading…' : undefined,
+        message: handle.length === 0
+          ? 'No workspace to look the child workflow up in.'
+          : error !== null
+            ? errorMessage(error)
+            : version === null
+              ? 'No runnable version of this workflow.'
+              : fetched?.data === undefined ? 'Loading…' : undefined,
       });
     });
     return byStep;
@@ -143,6 +146,8 @@ const isTerminal = (status: InstanceStatus) => TERMINAL_STATUSES.has(status);
  * Run view: an open step draws the child runs it started — matched by the
  * workflow they run — each at the version it pinned, with its steps' live
  * statuses. One child is drawn at a time; the frame lists the others.
+ * A run does not record which step spawned it, so two steps starting the
+ * same workflow each list the children of both.
  */
 export function useChildRunExpansion(
   definition: WorkflowDefinition,
@@ -196,7 +201,8 @@ export function useChildRunExpansion(
       queryFn: async () => (await mediforce.processes.getSteps({ instanceId: selected?.id ?? '' })).steps,
       enabled: selected !== undefined,
       retry: stopRetryOn4xx,
-      refetchInterval: selected !== undefined && isTerminal(selected.status) ? false : CRITICAL_LIVE_INTERVAL_MS,
+      refetchInterval: (query: { state: { error: Error | null } }) =>
+        query.state.error !== null || (selected !== undefined && isTerminal(selected.status)) ? false : CRITICAL_LIVE_INTERVAL_MS,
     })),
     combine: combineSlices,
   });
@@ -210,6 +216,7 @@ export function useChildRunExpansion(
       const handle = selected?.namespace ?? run.namespace ?? '';
       byStep.set(stepId, {
         definition: fetched?.data ?? null,
+        namespace: handle,
         title: selected !== undefined ? `${selected.definitionName} v${selected.definitionVersion}` : target.definitionName,
         href: selected !== undefined ? routes.workflowDefinition(handle, selected.definitionName, selected.definitionVersion) : undefined,
         badge: target.forEach === true ? `× ${candidates.length}` : undefined,
