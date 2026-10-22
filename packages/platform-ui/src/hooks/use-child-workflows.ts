@@ -201,8 +201,13 @@ export function useChildRunExpansion(
       queryFn: async () => (await mediforce.processes.getSteps({ instanceId: selected?.id ?? '' })).steps,
       enabled: selected !== undefined,
       retry: stopRetryOn4xx,
-      refetchInterval: (query: { state: { error: Error | null } }) =>
-        query.state.error !== null || (selected !== undefined && isTerminal(selected.status)) ? false : CRITICAL_LIVE_INTERVAL_MS,
+      // A terminal child stops only once its steps were fetched after its last
+      // update, so a transition seen between two step polls still lands.
+      refetchInterval: (query: { state: { error: Error | null; dataUpdatedAt: number } }) =>
+        query.state.error !== null
+        || (selected !== undefined && isTerminal(selected.status) && query.state.dataUpdatedAt >= Date.parse(selected.updatedAt))
+          ? false
+          : CRITICAL_LIVE_INTERVAL_MS,
     })),
     combine: combineSlices,
   });
@@ -212,7 +217,7 @@ export function useChildRunExpansion(
     shown.forEach(({ stepId, target, candidates, selected }, index) => {
       const fetched = definitions[index];
       const stepEntries = steps[index]?.data;
-      const error = childrenError ?? fetched?.error ?? null;
+      const error = childrenError ?? fetched?.error ?? steps[index]?.error ?? null;
       const handle = selected?.namespace ?? run.namespace ?? '';
       byStep.set(stepId, {
         definition: fetched?.data ?? null,
