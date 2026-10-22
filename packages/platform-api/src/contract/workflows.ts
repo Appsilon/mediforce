@@ -82,18 +82,9 @@ export const GetWorkflowSchemaOutputSchema = z.object({
 });
 
 /**
- * Per-workflow run aggregate attached to each card on the workspace home page.
- * Computed server-side via count aggregations + a bounded `latest` query so the
- * page never ships the whole run collection to the client (the pre-cutover
- * `onSnapshot` loaded everything; the naive parity poll re-read up to 10k runs
- * every 5s). `active` = runs in {running, created, paused}; `total` and
- * `latest` honour `includeCompletedRuns` on the request. Archived runs are
- * always excluded — the home cards never show them.
- */
-/**
- * A run as the card preview row renders it. The catalog lists every workflow,
- * so shipping each preview run whole (its `variables`, trigger payload) made
- * the list response megabytes large.
+ * A run as the card preview row renders it. Keep it to what the row reads: the
+ * catalog lists every workflow, so whole runs (`variables`, trigger payload)
+ * bloat the list response to megabytes.
  */
 export const WorkflowRunPreviewSchema = ProcessInstanceSchema.pick({
   id: true,
@@ -107,6 +98,15 @@ export const WorkflowRunPreviewSchema = ProcessInstanceSchema.pick({
   createdAt: true,
 });
 
+/**
+ * Per-workflow run aggregate attached to each card on the workspace home page.
+ * Computed server-side via count aggregations + a bounded `latest` query so the
+ * page never ships the whole run collection to the client (the pre-cutover
+ * `onSnapshot` loaded everything; the naive parity poll re-read up to 10k runs
+ * every 5s). `active` = runs in {running, created, paused}; `total` and
+ * `latest` honour `includeCompletedRuns` on the request. Archived runs are
+ * always excluded — the home cards never show them.
+ */
 export const WorkflowRunSummarySchema = z.object({
   total: z.number().int().nonnegative(),
   active: z.number().int().nonnegative(),
