@@ -254,6 +254,36 @@ describe('listWorkflows handler', () => {
       expect(flowA?.runSummary.latest.map((r) => r.status)).toEqual(['running']);
     });
 
+    it('previews each run with only the fields the card renders, not its variables or payload', async () => {
+      await seedRun({
+        status: 'paused',
+        pauseReason: 'step_failure',
+        error: 'boom',
+        currentStepId: 'review',
+        totalCostUsd: 1.5,
+        variables: { report: 'x'.repeat(10_000) },
+        triggerPayload: { file: 'big' },
+        createdAt: '2026-01-01T00:00:00.000Z',
+      });
+
+      const scope = createTestScope({ processRepo, instanceRepo });
+      const result = await listWorkflows({ includeCompletedRuns: true, includeArchived: false }, scope);
+
+      const [preview] = result.definitions.find((d) => d.name === 'flow-a')?.runSummary.latest ?? [];
+      expect(Object.keys(preview ?? {}).sort()).toEqual([
+        'createdAt',
+        'currentStepId',
+        'definitionName',
+        'definitionVersion',
+        'error',
+        'id',
+        'pauseReason',
+        'status',
+        'totalCostUsd',
+      ]);
+      expect(preview).toMatchObject({ status: 'paused', pauseReason: 'step_failure', error: 'boom', currentStepId: 'review', totalCostUsd: 1.5 });
+    });
+
     it('returns a zeroed summary for a workflow with no runs', async () => {
       const scope = createTestScope({ processRepo, instanceRepo });
       const result = await listWorkflows({ includeCompletedRuns: true, includeArchived: false }, scope);
