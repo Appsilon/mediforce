@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { ChevronRight, ExternalLink } from 'lucide-react';
-import type { ProcessInstance } from '@mediforce/platform-core';
+import type { WorkflowRunPreview } from '@mediforce/platform-api/contract';
 import { getWorkflowStatus, type WorkflowDisplayStatus } from '@/lib/workflow-status';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
@@ -155,7 +155,7 @@ function shortTimeAgo(date: Date): string {
   return `${Math.floor(diffDays / 7)}w ago`;
 }
 
-export function ProcessInstanceRow({ instance, showProcess = false, steps, stepStyle = 'dots', activeTaskId }: { instance: ProcessInstance; showProcess?: boolean; steps?: string[]; stepStyle?: 'dots' | 'bar'; activeTaskId?: string }) {
+export function ProcessInstanceRow({ instance, showProcess = false, steps, stepStyle = 'dots', activeTaskId }: { instance: WorkflowRunPreview; showProcess?: boolean; steps?: string[]; stepStyle?: 'dots' | 'bar'; activeTaskId?: string }) {
   const handle = useHandleFromPath();
   const router = useRouter();
   const timeAgo = shortTimeAgo(new Date(instance.createdAt));

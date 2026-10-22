@@ -90,11 +90,28 @@ export const GetWorkflowSchemaOutputSchema = z.object({
  * `latest` honour `includeCompletedRuns` on the request. Archived runs are
  * always excluded — the home cards never show them.
  */
+/**
+ * A run as the card preview row renders it. The catalog lists every workflow,
+ * so shipping each preview run whole (its `variables`, trigger payload) made
+ * the list response megabytes large.
+ */
+export const WorkflowRunPreviewSchema = ProcessInstanceSchema.pick({
+  id: true,
+  definitionName: true,
+  definitionVersion: true,
+  status: true,
+  currentStepId: true,
+  pauseReason: true,
+  error: true,
+  totalCostUsd: true,
+  createdAt: true,
+});
+
 export const WorkflowRunSummarySchema = z.object({
   total: z.number().int().nonnegative(),
   active: z.number().int().nonnegative(),
   /** Up to 3 newest-first runs for the card preview. */
-  latest: z.array(ProcessInstanceSchema).max(3),
+  latest: z.array(WorkflowRunPreviewSchema).max(3),
   /**
    * Non-terminal step IDs keyed by definition version (as string), covering
    * every version present in `latest`. Used by the card preview to render
@@ -224,6 +241,7 @@ export type ValidateWorkflowOutput = z.infer<typeof ValidateWorkflowOutputSchema
 export type WorkflowValidationIssue = z.infer<typeof WorkflowValidationIssueSchema>;
 export type GetWorkflowSchemaInput = z.infer<typeof GetWorkflowSchemaInputSchema>;
 export type GetWorkflowSchemaOutput = z.infer<typeof GetWorkflowSchemaOutputSchema>;
+export type WorkflowRunPreview = z.infer<typeof WorkflowRunPreviewSchema>;
 export type WorkflowRunSummary = z.infer<typeof WorkflowRunSummarySchema>;
 export type WorkflowDefinitionGroupSummary = z.infer<typeof WorkflowDefinitionGroupSchema>;
 export type ListWorkflowsInput = z.infer<typeof ListWorkflowsInputSchema>;

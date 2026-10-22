@@ -1,10 +1,11 @@
 import { pickRunnableVersion } from '@mediforce/platform-core';
 import { memoizeProcessRoleReads } from '../../auth';
 import type { CallerScope } from '../../repositories/index';
-import type {
-  ListWorkflowsInput,
-  ListWorkflowsOutput,
-  WorkflowDefinitionGroupSummary,
+import {
+  WorkflowRunPreviewSchema,
+  type ListWorkflowsInput,
+  type ListWorkflowsOutput,
+  type WorkflowDefinitionGroupSummary,
 } from '../../contract/workflows';
 import { resolveCallerWorkflowVerbs } from './_access-gate';
 
@@ -96,7 +97,11 @@ export async function listWorkflows(
         latestVersion: latest?.version ?? group.latestVersion,
         defaultVersion: group.defaultVersion,
         definition: latest,
-        runSummary: { ...rawSummary, stepsByVersion },
+        runSummary: {
+          ...rawSummary,
+          latest: rawSummary.latest.map((instance) => WorkflowRunPreviewSchema.parse(instance)),
+          stepsByVersion,
+        },
         manualStartEnabled: manualStartByWorkflow.has(`${group.namespace}:${group.name}`),
         callerMayRun: mayRun,
       };

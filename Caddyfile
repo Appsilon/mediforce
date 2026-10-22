@@ -1,3 +1,4 @@
 {$DOMAIN:localhost} {$DOMAIN_ALIASES} {
+	encode zstd gzip
 	reverse_proxy platform-ui:3000
 }
