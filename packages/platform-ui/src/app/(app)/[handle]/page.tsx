@@ -18,7 +18,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useUserMe } from '@/hooks/use-user-me';
 import { useUpdateNamespace } from '@/hooks/use-namespace-mutations';
 import { ProcessCard, DisplayPopover, WorkflowCatalogSkeletons } from '@/components/processes/process-card';
+import { SortableWorkflowCard } from '@/components/processes/sortable-workflow-card';
 import { WorkflowProblems } from '@/components/processes/workflow-problems';
+import { useWorkflowOrder } from '@/hooks/use-workflow-order';
+import { applyWorkflowOrder, moveWorkflow } from '@/lib/workflow-order';
 import { OpenRouterCreditsIndicator } from '@/components/namespace/openrouter-credits-indicator';
 import { WorkflowSecretKeysProvider } from '@/hooks/use-workflow-secret-keys';
 import { ImportWorkflowDialog, type ImportEntry } from '@/components/workflows/import-workflow-dialog';
@@ -471,15 +474,29 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
       .filter((d) => showArchived || d.archived !== true);
   }, [definitions, showArchived, handle]);
 
-  const sortedDefinitions = useMemo(() => {
-    return [...visibleDefinitions].sort((defA, defB) => {
-      const activeA = defA.runSummary.active > 0;
-      const activeB = defB.runSummary.active > 0;
-      if (activeA && !activeB) return -1;
-      if (!activeA && activeB) return 1;
-      return defA.name.localeCompare(defB.name);
-    });
-  }, [visibleDefinitions]);
+  const [savedOrder, saveOrder] = useWorkflowOrder(handle);
+  const [draggedName, setDraggedName] = React.useState<string | null>(null);
+  const [dropTargetName, setDropTargetName] = React.useState<string | null>(null);
+
+  const sortedDefinitions = useMemo(
+    () => applyWorkflowOrder(visibleDefinitions, savedOrder),
+    [visibleDefinitions, savedOrder],
+  );
+
+  function handleDragEnd() {
+    setDraggedName(null);
+    setDropTargetName(null);
+  }
+
+  function handleDrop(targetName: string) {
+    if (draggedName !== null) {
+      // Reorder over every workflow, not just the visible ones, so hidden
+      // archived cards keep their place.
+      const fullOrder = applyWorkflowOrder(namespacedDefinitions, savedOrder).map((definition) => definition.name);
+      saveOrder(moveWorkflow(fullOrder, draggedName, targetName));
+    }
+    handleDragEnd();
+  }
 
   return (
     <WorkflowSecretKeysProvider handle={handle} workflowNames={workflowNames}>
@@ -574,15 +591,25 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
       ) : (
         <div className="grid gap-4 md:grid-cols-2" data-tour="workflow-list">
           {sortedDefinitions.map((definition) => (
-            <ProcessCard
+            <SortableWorkflowCard
               key={definition.name}
-              definition={definition}
-              runSummary={definition.runSummary}
-              steps={stepsByDefinition.get(definition.name)}
-              handle={handle}
-              activeTaskByInstance={activeTaskByInstance}
-              isMember={true}
-            />
+              name={definition.name}
+              isDragged={draggedName === definition.name}
+              isDropTarget={dropTargetName === definition.name}
+              onDragStart={setDraggedName}
+              onDragEnter={setDropTargetName}
+              onDrop={handleDrop}
+              onDragEnd={handleDragEnd}
+            >
+              <ProcessCard
+                definition={definition}
+                runSummary={definition.runSummary}
+                steps={stepsByDefinition.get(definition.name)}
+                handle={handle}
+                activeTaskByInstance={activeTaskByInstance}
+                isMember={true}
+              />
+            </SortableWorkflowCard>
           ))}
         </div>
       )}
