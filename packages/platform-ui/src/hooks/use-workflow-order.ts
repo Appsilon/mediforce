@@ -2,30 +2,26 @@
 
 import * as React from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { parseWorkflowOrder, workflowOrderStorageKey } from '@/lib/workflow-order';
+import { readWorkflowOrder, workflowOrderStorageKey } from '@/lib/workflow-order';
 
 /**
  * The user's own card order for a workspace's catalog, kept in localStorage
  * (per browser). Storage failures (private mode, blocked site data) degrade to
- * the default alphabetical order for the session.
+ * the default order for the session.
  */
 export function useWorkflowOrder(handle: string): [string[], (order: string[]) => void] {
   const { user } = useAuth();
   const storageKey = user?.id !== undefined ? workflowOrderStorageKey(user.id, handle) : null;
-  const [order, setOrder] = React.useState<string[]>([]);
+  const [saved, setSaved] = React.useState(() => ({ key: storageKey, order: readWorkflowOrder(storageKey) }));
 
-  React.useEffect(() => {
-    if (storageKey === null) return;
-    try {
-      setOrder(parseWorkflowOrder(localStorage.getItem(storageKey)));
-    } catch {
-      setOrder([]);
-    }
-  }, [storageKey]);
+  // Read during render, not in an effect, so the cards never flash the default order first.
+  if (saved.key !== storageKey) {
+    setSaved({ key: storageKey, order: readWorkflowOrder(storageKey) });
+  }
 
   const saveOrder = React.useCallback(
     (next: string[]) => {
-      setOrder(next);
+      setSaved({ key: storageKey, order: next });
       if (storageKey === null) return;
       try {
         localStorage.setItem(storageKey, JSON.stringify(next));
@@ -36,5 +32,5 @@ export function useWorkflowOrder(handle: string): [string[], (order: string[]) =
     [storageKey],
   );
 
-  return [order, saveOrder];
+  return [saved.order, saveOrder];
 }

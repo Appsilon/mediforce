@@ -20,6 +20,17 @@ describe('applyWorkflowOrder', () => {
     );
   });
 
+  it('puts active workflows first among the ones the user has never placed', () => {
+    const items = [
+      { name: 'alpha', active: false },
+      { name: 'beta', active: true },
+      { name: 'gamma', active: false },
+      { name: 'delta', active: true },
+    ];
+    const ordered = applyWorkflowOrder(items, ['gamma'], (item) => item.active);
+    expect(ordered.map((item) => item.name)).toEqual(['gamma', 'beta', 'delta', 'alpha']);
+  });
+
   it('ignores saved names that no longer exist', () => {
     expect(applyWorkflowOrder(named('alpha', 'beta'), ['deleted', 'beta', 'alpha'])).toEqual(named('beta', 'alpha'));
   });

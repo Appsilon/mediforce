@@ -433,6 +433,10 @@ function WorkflowCatalogPublic({ handle }: { handle: string }) {
   );
 }
 
+function isActiveDefinition(definition: { runSummary: { active: number } }): boolean {
+  return definition.runSummary.active > 0;
+}
+
 function WorkflowCatalogMember({ handle }: { handle: string }) {
   const searchParams = useSearchParams();
   // `?import=source` opens the importer on arrival: the authoring-paths popover
@@ -468,18 +472,17 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
   const workflowNames = useMemo(() => namespacedDefinitions.map((d) => d.name), [namespacedDefinitions]);
   const hasArchivedDefinitions = namespacedDefinitions.some((d) => d.archived === true);
 
-  const visibleDefinitions = useMemo(() => {
-    return definitions
-      .filter((d) => d.namespace === handle)
-      .filter((d) => showArchived || d.archived !== true);
-  }, [definitions, showArchived, handle]);
+  const visibleDefinitions = useMemo(
+    () => namespacedDefinitions.filter((d) => showArchived || d.archived !== true),
+    [namespacedDefinitions, showArchived],
+  );
 
   const [savedOrder, saveOrder] = useWorkflowOrder(handle);
   const [draggedName, setDraggedName] = React.useState<string | null>(null);
   const [dropTargetName, setDropTargetName] = React.useState<string | null>(null);
 
   const sortedDefinitions = useMemo(
-    () => applyWorkflowOrder(visibleDefinitions, savedOrder),
+    () => applyWorkflowOrder(visibleDefinitions, savedOrder, isActiveDefinition),
     [visibleDefinitions, savedOrder],
   );
 
@@ -488,14 +491,24 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
     setDropTargetName(null);
   }
 
+  function reorder(movedName: string, targetName: string) {
+    // Reorder over every workflow, not just the visible ones, so hidden
+    // archived cards keep their place.
+    const fullOrder = applyWorkflowOrder(namespacedDefinitions, savedOrder, isActiveDefinition).map(
+      (definition) => definition.name,
+    );
+    saveOrder(moveWorkflow(fullOrder, movedName, targetName));
+  }
+
   function handleDrop(targetName: string) {
-    if (draggedName !== null) {
-      // Reorder over every workflow, not just the visible ones, so hidden
-      // archived cards keep their place.
-      const fullOrder = applyWorkflowOrder(namespacedDefinitions, savedOrder).map((definition) => definition.name);
-      saveOrder(moveWorkflow(fullOrder, draggedName, targetName));
-    }
+    if (draggedName !== null) reorder(draggedName, targetName);
     handleDragEnd();
+  }
+
+  function handleMove(movedName: string, offset: -1 | 1) {
+    const index = sortedDefinitions.findIndex((definition) => definition.name === movedName);
+    const target = sortedDefinitions[index + offset];
+    if (index !== -1 && target !== undefined) reorder(movedName, target.name);
   }
 
   return (
@@ -597,9 +610,12 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
               isDragged={draggedName === definition.name}
               isDropTarget={dropTargetName === definition.name}
               onDragStart={setDraggedName}
-              onDragEnter={setDropTargetName}
+              onDragEnter={(name) => {
+                if (draggedName !== null) setDropTargetName(name);
+              }}
               onDrop={handleDrop}
               onDragEnd={handleDragEnd}
+              onMove={handleMove}
             >
               <ProcessCard
                 definition={definition}

@@ -9,7 +9,7 @@ test.describe('Workflow card order journey', () => {
     await expect(page.getByRole('heading', { name: 'Workflows' })).toBeVisible({ timeout: 10_000 });
 
     const workflowList = page.locator('[data-tour="workflow-list"]');
-    const cards = workflowList.locator('[data-testid^="workflow-card-"]:not([data-testid^="workflow-card-handle-"])');
+    const cards = workflowList.locator('[data-testid^="workflow-card-"]');
     await expect(cards.nth(1)).toBeVisible({ timeout: 15_000 });
 
     const cardNames = async () =>
@@ -23,7 +23,7 @@ test.describe('Workflow card order journey', () => {
     // The grip only shows on hover, like a user would find it.
     const movedCard = page.getByTestId(`workflow-card-${movedName}`);
     await movedCard.hover();
-    await page.getByTestId(`workflow-card-handle-${movedName}`).dragTo(page.getByTestId(`workflow-card-${firstName}`));
+    await page.getByTestId(`workflow-grip-${movedName}`).dragTo(page.getByTestId(`workflow-card-${firstName}`));
 
     await expect.poll(async () => (await cardNames())[0]).toBe(movedName);
     expect((await cardNames())[1]).toBe(firstName);
@@ -32,6 +32,13 @@ test.describe('Workflow card order journey', () => {
     await expect(cards.nth(1)).toBeVisible({ timeout: 15_000 });
     await expect.poll(async () => (await cardNames())[0]).toBe(movedName);
     expect((await cardNames())[1]).toBe(firstName);
+
+    // Keyboard reorder: the grip takes focus and ArrowRight moves the card back one slot.
+    await page.getByTestId(`workflow-grip-${movedName}`).focus();
+    await page.keyboard.press('ArrowRight');
+    await expect.poll(async () => (await cardNames())[0]).toBe(firstName);
+    expect((await cardNames())[1]).toBe(movedName);
+    await expect(page.getByTestId(`workflow-grip-${movedName}`)).toBeFocused();
 
     expect(getPageErrors(page)).toEqual([]);
   });

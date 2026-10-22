@@ -19,9 +19,14 @@ export function parseWorkflowOrder(stored: string | null): string[] {
 
 /**
  * Saved names first, in saved order; workflows the user has never placed
- * (e.g. newly created ones) follow alphabetically. Run activity never moves a card.
+ * (e.g. newly created ones) follow with active ones first, then alphabetically.
+ * Run activity never moves a placed card.
  */
-export function applyWorkflowOrder<T extends { name: string }>(items: T[], savedOrder: string[]): T[] {
+export function applyWorkflowOrder<T extends { name: string }>(
+  items: T[],
+  savedOrder: string[],
+  isActive: (item: T) => boolean = () => false,
+): T[] {
   const position = new Map(savedOrder.map((name, index) => [name, index]));
   return [...items].sort((itemA, itemB) => {
     const positionA = position.get(itemA.name);
@@ -29,8 +34,21 @@ export function applyWorkflowOrder<T extends { name: string }>(items: T[], saved
     if (positionA !== undefined && positionB !== undefined) return positionA - positionB;
     if (positionA !== undefined) return -1;
     if (positionB !== undefined) return 1;
+    const activeA = isActive(itemA);
+    const activeB = isActive(itemB);
+    if (activeA === true && activeB === false) return -1;
+    if (activeA === false && activeB === true) return 1;
     return itemA.name.localeCompare(itemB.name);
   });
+}
+
+export function readWorkflowOrder(storageKey: string | null): string[] {
+  if (storageKey === null) return [];
+  try {
+    return parseWorkflowOrder(localStorage.getItem(storageKey));
+  } catch {
+    return [];
+  }
 }
 
 /** Moves `draggedName` into the slot currently held by `targetName`. */
