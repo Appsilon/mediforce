@@ -91,4 +91,43 @@ describe('listRuns handler', () => {
 
     expect(result.runs[0].totalCostUsd).toBe(1.5);
   });
+
+  it('lists only the runs a parent spawned, oldest first, in the caller’s namespaces', async () => {
+    await instanceRepo.create(buildProcessInstance({ id: 'parent', namespace: 'alpha' }));
+    await instanceRepo.create(buildProcessInstance({
+      id: 'child-b', namespace: 'alpha', parentInstanceId: 'parent', createdAt: '2026-01-02T00:00:00.000Z',
+    }));
+    await instanceRepo.create(buildProcessInstance({
+      id: 'child-a', namespace: 'alpha', parentInstanceId: 'parent', createdAt: '2026-01-01T00:00:00.000Z',
+    }));
+    await instanceRepo.create(buildProcessInstance({ id: 'child-beta', namespace: 'beta', parentInstanceId: 'parent' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'unrelated', namespace: 'alpha' }));
+
+    const scope = createTestScope({ instanceRepo, caller: userCaller('u-1', ['alpha']) });
+    const result = await listRuns({ parent: 'parent', limit: 20 }, scope);
+
+    expect(result.runs.map((r) => r.id)).toEqual(['child-a', 'child-b']);
+  });
+
+  it('applies the other filters to a parent’s children', async () => {
+    await instanceRepo.create(buildProcessInstance({ id: 'c1', parentInstanceId: 'p', definitionName: 'a', status: 'running' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'c2', parentInstanceId: 'p', definitionName: 'a', status: 'completed' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'c3', parentInstanceId: 'p', definitionName: 'b', status: 'running' }));
+
+    const scope = createTestScope({ instanceRepo });
+    const result = await listRuns({ parent: 'p', workflow: 'a', status: 'running', limit: 20 }, scope);
+
+    expect(result.runs.map((r) => r.id)).toEqual(['c1']);
+  });
+
+  it('returns every child of a parent regardless of limit', async () => {
+    await instanceRepo.create(buildProcessInstance({ id: 'c1', parentInstanceId: 'p' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'c2', parentInstanceId: 'p' }));
+    await instanceRepo.create(buildProcessInstance({ id: 'c3', parentInstanceId: 'p' }));
+
+    const scope = createTestScope({ instanceRepo });
+    const result = await listRuns({ parent: 'p', limit: 2 }, scope);
+
+    expect(result.runs).toHaveLength(3);
+  });
 });

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Pause, Play, RotateCcw } from 'lucide-react';
-import type { StepExecution, WorkflowDefinition } from '@mediforce/platform-core';
+import type { ProcessInstance, StepExecution, WorkflowDefinition } from '@mediforce/platform-core';
 import { WorkflowDiagram, graphEdgesOf, type DiagramReplayFrame } from '@/components/workflows/workflow-diagram';
 import { edgeIdOf } from '@/components/workflows/workflow-graph-layout';
 import {
@@ -14,6 +14,7 @@ import {
 import { secondaryButtonClass } from '@/components/ui/button-styles';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { cn } from '@/lib/utils';
+import { useChildRunExpansion } from '@/hooks/use-child-workflows';
 
 const SPEEDS = [1, 2, 4] as const;
 type Speed = (typeof SPEEDS)[number];
@@ -27,16 +28,18 @@ type Cursor = { hopsDone: number; phase: 'dwell' | 'travel' } | null;
 
 export function RunReplayDiagram({
   definition,
+  run,
   stepExecutions,
-  completed,
   className,
 }: {
   definition: WorkflowDefinition;
+  run: Pick<ProcessInstance, 'id' | 'status' | 'namespace'>;
   stepExecutions: StepExecution[];
-  /** A completed run also rides the arrow into the terminal step it reached. */
-  completed: boolean;
   className?: string;
 }) {
+  // A completed run also rides the arrow into the terminal step it reached.
+  const completed = run.status === 'completed';
+  const childWorkflows = useChildRunExpansion(definition, run);
   const edgeIds = React.useMemo(
     () => new Set(graphEdgesOf(definition).map((edge) => edgeIdOf(edge.from, edge.to))),
     [definition],
@@ -170,7 +173,7 @@ export function RunReplayDiagram({
           </span>
         </div>
       )}
-      <WorkflowDiagram definition={definition} className="w-full" replay={frame} />
+      <WorkflowDiagram definition={definition} className="w-full" replay={frame} childWorkflows={childWorkflows} />
     </div>
   );
 }

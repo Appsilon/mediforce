@@ -22,10 +22,10 @@ import {
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { User, Bot, Terminal, Trash2, Plus, Search, ArrowUp, ArrowDown, ArrowRight, AlertTriangle, Zap, Wand2, Undo2, Redo2 } from 'lucide-react';
+import { User, Bot, Terminal, Trash2, Plus, Search, ArrowUp, ArrowDown, ArrowRight, AlertTriangle, Zap, Wand2, Undo2, Redo2, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import type { WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
+import type { StepExecutionStatus, WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
 import type { StepValidation } from '@mediforce/platform-api/contract';
 import { VALIDATION_STATUS } from '@/components/evaluation/validation-status';
 import {
@@ -34,7 +34,9 @@ import {
   type ControlMode,
   type NewStepPayload,
 } from '@/lib/control-mode';
-import { computeGraphLayout, placeNewNodes, edgeIdOf, NODE_WIDTH, type GraphEdge } from './workflow-graph-layout';
+import { computeGraphLayout, makeRoomForResized, placeNewNodes, edgeIdOf, NODE_WIDTH, type GraphEdge } from './workflow-graph-layout';
+import { childWorkflowTargetOf, type ChildWorkflowExpansion, type ExpandedChildWorkflow } from '@/lib/child-workflow';
+import { routes } from '@/lib/routes';
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -132,6 +134,9 @@ export interface StepEvaluationMark {
   href: string;
 }
 
+/** An expanded step's child workflow, sized for the frame drawn under its card. */
+type ChildFrame = ExpandedChildWorkflow & { width: number; height: number };
+
 type StepNodeData = {
   label: string;
   stepType: string;
@@ -146,23 +151,118 @@ type StepNodeData = {
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   backBranches?: BackBranch[];
+  /** Starts a child workflow the card can open — it carries a footer row for the toggle. */
+  expandable?: boolean;
+  expand?: { expanded: boolean; onToggle: () => void };
+  child?: ChildFrame;
+  /** A step of a child workflow drawn inside its parent step: read-only. */
+  nested?: boolean;
+  /** A nested step that starts a workflow of its own links to it instead of expanding. */
+  childHref?: string;
+  status?: StepExecutionStatus;
 };
 
 const NODE_INNER_HEIGHT = 85;
 const TERMINAL_HEIGHT = 64;
 const BRANCH_ROW_HEIGHT = 32;
+const EXPAND_ROW_HEIGHT = 28;
 
-function stepNodeHeight(stepType: string, backBranchCount: number): number {
+function stepNodeHeight(stepType: string, backBranchCount: number, expandable = false): number {
   if (stepType === 'terminal') return TERMINAL_HEIGHT;
-  return NODE_INNER_HEIGHT + backBranchCount * BRANCH_ROW_HEIGHT;
+  return NODE_INNER_HEIGHT + backBranchCount * BRANCH_ROW_HEIGHT + (expandable ? EXPAND_ROW_HEIGHT : 0);
 }
+
+const FRAME_GAP = 12;
+const FRAME_PADDING = 16;
+const FRAME_HEADER_HEIGHT = 32;
+const FRAME_RUNS_HEIGHT = 30;
+const FRAME_MESSAGE_HEIGHT = 40;
 
 function nodeHeight(node: Node): number {
   const data = node.data as StepNodeData;
-  return stepNodeHeight(data.stepType, data.backBranches?.length ?? 0);
+  const cardHeight = stepNodeHeight(data.stepType, data.backBranches?.length ?? 0, data.expandable === true);
+  return data.child === undefined ? cardHeight : cardHeight + FRAME_GAP + data.child.height;
+}
+
+function nodeWidth(node: Node): number {
+  return (node.data as StepNodeData).child?.width ?? NODE_WIDTH;
+}
+
+const STEP_STATUS_CLASS: Partial<Record<StepExecutionStatus, string>> = {
+  completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  running: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  paused: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  escalated: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+};
+
+function StepStatusMark({ status }: { status: StepExecutionStatus }) {
+  return (
+    <span
+      data-testid="child-step-status"
+      data-status={status}
+      className={cn(
+        'ml-auto shrink-0 rounded-full px-1.5 py-px text-[9px] font-medium',
+        STEP_STATUS_CLASS[status] ?? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+      )}
+    >
+      {status}
+    </span>
+  );
+}
+
+/** The dashed group under an expanded step's card; the child's steps are drawn into it as sub-nodes. */
+function ChildWorkflowFrame({ child }: { child: ChildFrame }) {
+  return (
+    <div
+      data-testid="child-workflow-frame"
+      style={{ height: child.height, marginTop: FRAME_GAP }}
+      className="rounded-xl border-[1.5px] border-dashed border-pink-300 bg-pink-50/30 px-4 dark:border-pink-800 dark:bg-pink-950/10 cursor-default"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <div style={{ height: FRAME_HEADER_HEIGHT }} className="flex items-center gap-2 min-w-0 text-[11px]">
+        {child.href !== undefined ? (
+          <Link href={child.href} className="nodrag font-semibold text-foreground truncate hover:underline">
+            {child.title}
+          </Link>
+        ) : (
+          <span className="font-semibold text-foreground truncate">{child.title}</span>
+        )}
+        {child.badge !== undefined && (
+          <span className="shrink-0 rounded-full bg-pink-100 px-1.5 py-px text-[10px] font-medium text-pink-700 dark:bg-pink-900/40 dark:text-pink-300">
+            {child.badge}
+          </span>
+        )}
+      </div>
+      {child.runs !== undefined && child.runs.length > 0 && (
+        <div style={{ height: FRAME_RUNS_HEIGHT }} className="nodrag nowheel flex items-center gap-1 overflow-x-auto">
+          {child.runs.map((run) => (
+            <span key={run.id} className="inline-flex shrink-0 items-center rounded-md border border-border/60 bg-white text-[10px] dark:bg-slate-900">
+              <button
+                type="button"
+                onClick={run.onSelect}
+                aria-pressed={run.selected}
+                className={cn('px-1.5 py-0.5 rounded-l-md', run.selected === true ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+              >
+                {run.label}
+              </button>
+              <Link href={run.href} className="px-1 py-0.5 text-muted-foreground hover:text-foreground" aria-label={`Open run ${run.label}`} title="Open the child run">
+                ↗
+              </Link>
+            </span>
+          ))}
+        </div>
+      )}
+      {child.message !== undefined && (
+        <p className="text-[11px] text-muted-foreground">{child.message}</p>
+      )}
+    </div>
+  );
 }
 
 const HANDLE_CLASS = '!bg-transparent !border-0 !w-px !h-px';
+const CHILD_FOOTER_CLASS = 'nodrag -mx-4 w-[calc(100%+2rem)] flex items-center gap-1.5 px-4 text-[11px] font-medium border-t border-border/40 '
+  + 'text-pink-600 hover:bg-pink-50 dark:text-pink-400 dark:hover:bg-pink-950/30';
 
 function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   // Measure the actual offsetTop of the branch section so the right-out handle
@@ -200,6 +300,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   const style = STEP_STYLES[data.stepType] ?? STEP_STYLES.creation;
   const typeConfig = STEP_TYPE_CONFIG[data.stepType] ?? STEP_TYPE_CONFIG.creation;
   const mode = getControlMode(data.executor, data.autonomyLevel);
+  const expanded = data.expand?.expanded === true;
 
   // Anchor the right-out handle to the first loop row, so the amber arc leaves
   // the card next to the row that names where it goes. branchSectionTop is measured.
@@ -214,11 +315,13 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
       <Handle id="right-out" type="source" position={Position.Right} className={HANDLE_CLASS} style={rightOutTop !== undefined ? { top: rightOutTop } : undefined} />
       <Handle id="right-in" type="target" position={Position.Right} className={HANDLE_CLASS} />
 
+      <div style={{ width: data.child?.width ?? NODE_WIDTH }}>
       <div
         style={{ width: NODE_WIDTH, minHeight: NODE_INNER_HEIGHT }}
         className={cn(
-          'group rounded-xl border-[1.5px] px-4 pt-3 transition-shadow cursor-pointer relative overflow-hidden',
-          data.backBranches?.length ? 'pb-0' : 'pb-3',
+          'group rounded-xl border-[1.5px] px-4 pt-3 transition-shadow relative overflow-hidden mx-auto',
+          data.nested === true ? 'cursor-default' : 'cursor-pointer',
+          (data.backBranches?.length ?? 0) > 0 || data.expandable === true ? 'pb-0' : 'pb-3',
           'hover:shadow-md',
           style.bg,
           selected
@@ -283,6 +386,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
             {typeConfig.label}
           </span>
           {data.evaluation !== undefined && <StepEvaluationLink evaluation={data.evaluation} />}
+          {data.status !== undefined && <StepStatusMark status={data.status} />}
         </div>
 
         {/* Row 2: step name, max 2 lines */}
@@ -316,6 +420,39 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
             ))}
           </div>
         )}
+
+        {data.expand !== undefined && (
+          <button
+            type="button"
+            onClick={(event) => { event.stopPropagation(); data.expand?.onToggle(); }}
+            style={{ height: EXPAND_ROW_HEIGHT }}
+            className={cn(
+              CHILD_FOOTER_CLASS,
+              (data.backBranches?.length ?? 0) > 0 ? '' : 'mt-3',
+            )}
+            aria-label={expanded ? 'Collapse child workflow' : 'Expand child workflow'}
+            aria-expanded={expanded}
+          >
+            {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            {expanded ? 'Hide child workflow' : 'Show child workflow'}
+          </button>
+        )}
+        {data.childHref !== undefined && (
+          <Link
+            href={data.childHref}
+            onClick={(event) => event.stopPropagation()}
+            style={{ height: EXPAND_ROW_HEIGHT }}
+            className={cn(
+              CHILD_FOOTER_CLASS,
+              (data.backBranches?.length ?? 0) > 0 ? '' : 'mt-3',
+            )}
+          >
+            <ArrowRight className="h-3.5 w-3.5" />
+            Open child workflow
+          </Link>
+        )}
+      </div>
+      {data.child !== undefined && <ChildWorkflowFrame child={data.child} />}
       </div>
     </>
   );
@@ -551,14 +688,89 @@ export function graphEdgesOf(definition: WorkflowDefinition): GraphEdge[] {
   return edges;
 }
 
-function buildLayout(definition: WorkflowDefinition): { nodes: Node[]; edges: Edge[]; height: number } {
+type DiagramLayout = {
+  nodes: Node[];
+  edges: Edge[];
+  /** The steps of expanded child workflows, positioned inside their parent step's frame. */
+  nestedNodes: Node[];
+  nestedEdges: Edge[];
+  height: number;
+  width: number;
+};
+
+/** Node id of a child step drawn inside `parentStepId` — unique across the canvas. */
+const nestedIdOf = (parentStepId: string, childNodeId: string) => `${parentStepId}::${childNodeId}`;
+
+/** Sizes the frame around a child workflow, and lays the child out to fill it. */
+function frameChild(parentStepId: string, cardHeight: number, child: ExpandedChildWorkflow) {
+  const headerHeight = FRAME_HEADER_HEIGHT + (child.runs !== undefined && child.runs.length > 0 ? FRAME_RUNS_HEIGHT : 0);
+  if (child.definition === null) {
+    return { frame: { ...child, width: NODE_WIDTH, height: headerHeight + FRAME_MESSAGE_HEIGHT }, nodes: [], edges: [] };
+  }
+  const startsWorkflow = new Map(child.definition.steps.flatMap((step) => {
+    const target = childWorkflowTargetOf(step);
+    if (target === null) return [];
+    const href = target.definitionVersion === undefined
+      ? routes.workflow(child.namespace, target.definitionName)
+      : routes.workflowDefinition(child.namespace, target.definitionName, target.definitionVersion);
+    return [[step.id, href] as const];
+  }));
+  // One level deep: a nested spawn links to its workflow rather than opening a frame of its own.
+  const inner = buildLayout(child.definition, undefined, new Set(startsWorkflow.keys()));
+  const innerHeight = Math.max(0, ...inner.nodes.map((node) => node.position.y + nodeHeight(node)));
+  const width = Math.max(NODE_WIDTH, inner.width + 2 * FRAME_PADDING);
+  const offset = { x: (width - inner.width) / 2, y: cardHeight + FRAME_GAP + headerHeight + FRAME_PADDING };
+  const nodes: Node[] = inner.nodes.map((node) => ({
+    ...node,
+    id: nestedIdOf(parentStepId, node.id),
+    parentId: parentStepId,
+    extent: 'parent',
+    draggable: false,
+    selectable: false,
+    position: { x: node.position.x + offset.x, y: node.position.y + offset.y },
+    data: {
+      ...(node.data as StepNodeData),
+      nested: true,
+      status: child.stepStatus?.get(node.id),
+      childHref: startsWorkflow.get(node.id),
+    } satisfies StepNodeData,
+  }));
+  const edges: Edge[] = inner.edges.map((edge) => ({
+    ...edge,
+    id: nestedIdOf(parentStepId, edge.id),
+    source: nestedIdOf(parentStepId, edge.source),
+    target: nestedIdOf(parentStepId, edge.target),
+  }));
+  return { frame: { ...child, width, height: headerHeight + innerHeight + 2 * FRAME_PADDING }, nodes, edges };
+}
+
+function buildLayout(
+  definition: WorkflowDefinition,
+  expandedChildren?: ReadonlyMap<string, ExpandedChildWorkflow>,
+  expandable?: ReadonlySet<string>,
+): DiagramLayout {
+  const isExpandable = (stepId: string) => expandable?.has(stepId) === true;
   const stepMap = new Map(definition.steps.map((s) => [s.id, s]));
   const graphEdges = graphEdgesOf(definition);
+
+  // A step's back-edge rows are only known once the layout has run, but the
+  // frame sits below them — so frame with the card's base height, then grow the
+  // offset by the rows the layout found.
+  const framed = new Map<string, ReturnType<typeof frameChild>>();
+  for (const [stepId, child] of expandedChildren ?? []) {
+    const step = stepMap.get(stepId);
+    if (step !== undefined) framed.set(stepId, frameChild(stepId, stepNodeHeight(step.type, 0, isExpandable(stepId)), child));
+  }
 
   const layout = computeGraphLayout(
     definition.steps.map((s) => s.id),
     graphEdges,
-    (stepId, outgoingBackEdges) => stepNodeHeight(stepMap.get(stepId)?.type ?? 'creation', outgoingBackEdges),
+    (stepId, outgoingBackEdges) => {
+      const cardHeight = stepNodeHeight(stepMap.get(stepId)?.type ?? 'creation', outgoingBackEdges, isExpandable(stepId));
+      const frame = framed.get(stepId)?.frame;
+      return frame === undefined ? cardHeight : cardHeight + FRAME_GAP + frame.height;
+    },
+    (stepId) => framed.get(stepId)?.frame.width ?? NODE_WIDTH,
   );
 
   const backBranchesByStep = new Map<string, BackBranch[]>();
@@ -586,8 +798,18 @@ function buildLayout(definition: WorkflowDefinition): { nodes: Node[]; edges: Ed
         autonomyLevel: step.autonomyLevel,
         plugin: step.plugin,
         backBranches: backBranchesByStep.get(step.id),
+        expandable: isExpandable(step.id),
+        child: framed.get(step.id)?.frame,
       } as StepNodeData,
     });
+  }
+
+  const nestedNodes: Node[] = [];
+  const nestedEdges: Edge[] = [];
+  for (const [stepId, { nodes: childNodes, edges: childEdges }] of framed) {
+    const rowsAbove = (backBranchesByStep.get(stepId)?.length ?? 0) * BRANCH_ROW_HEIGHT;
+    nestedNodes.push(...childNodes.map((node) => ({ ...node, position: { ...node.position, y: node.position.y + rowsAbove } })));
+    nestedEdges.push(...childEdges);
   }
 
   // Back edges arc off the right-hand side; each gets its own offset so several
@@ -618,7 +840,7 @@ function buildLayout(definition: WorkflowDefinition): { nodes: Node[]; edges: Ed
     };
   });
 
-  return { nodes, edges, height: layout.height };
+  return { nodes, edges, nestedNodes, nestedEdges, height: layout.height, width: layout.width };
 }
 
 // ---------------------------------------------------------------------------
@@ -750,12 +972,16 @@ interface WorkflowDiagramProps {
   addBlockActive?: boolean;
   /** Replays a run on the diagram: highlights its current step and animates the edge it is crossing. */
   replay?: DiagramReplayFrame;
+  /** Steps that start a child workflow, and the ones drawn open with the child's steps inside. */
+  childWorkflows?: ChildWorkflowExpansion;
 }
 
-export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, onPaneClick, selectedStepId, errorStepIds, warningStepIds, stepEvaluation, canMoveUp, canMoveDown, onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive, replay }: WorkflowDiagramProps) {
-  const { nodes: layoutNodes, edges: layoutEdges, height } = useMemo(
-    () => buildLayout(definition),
-    [definition],
+export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, onPaneClick, selectedStepId, errorStepIds, warningStepIds, stepEvaluation, canMoveUp, canMoveDown, onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive, replay, childWorkflows }: WorkflowDiagramProps) {
+  const expandedChildren = childWorkflows?.expanded;
+  const expandable = childWorkflows?.expandable;
+  const { nodes: layoutNodes, edges: layoutEdges, nestedNodes, nestedEdges, height } = useMemo(
+    () => buildLayout(definition, expandedChildren, expandable),
+    [definition, expandedChildren, expandable],
   );
 
   const { nodes: computedNodes, edges } = useMemo<{ nodes: Node[]; edges: Edge[] }>(() => {
@@ -773,6 +999,9 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
           onDelete: onNodeDelete && d.stepType !== 'terminal' ? () => onNodeDelete(n.id) : undefined,
           onMoveUp: onNodeMoveUp && canMoveUp?.has(n.id) ? () => onNodeMoveUp(n.id) : undefined,
           onMoveDown: onNodeMoveDown && canMoveDown?.has(n.id) ? () => onNodeMoveDown(n.id) : undefined,
+          expand: childWorkflows?.expandable.has(n.id) === true
+            ? { expanded: childWorkflows.expanded.has(n.id), onToggle: () => childWorkflows.onToggle(n.id) }
+            : undefined,
         },
       };
     });
@@ -801,8 +1030,9 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
       }
       return e;
     });
-    return { nodes: styledNodes as Node[], edges: styledEdges };
-  }, [layoutNodes, layoutEdges, selectedStepId, errorStepIds, warningStepIds, stepEvaluation, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, canMoveUp, canMoveDown, replay]);
+    // Sub-nodes after their parents: XYFlow positions a child against a parent it has already placed.
+    return { nodes: [...(styledNodes as Node[]), ...nestedNodes], edges: [...styledEdges, ...nestedEdges] };
+  }, [layoutNodes, layoutEdges, nestedNodes, nestedEdges, selectedStepId, errorStepIds, warningStepIds, stepEvaluation, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, canMoveUp, canMoveDown, replay, childWorkflows]);
 
   // Controlled node state, lazily seeded from computedNodes so XYFlow never sees an
   // empty array on first render (an empty seed would throw XYFlow error #015 on drag).
@@ -814,19 +1044,24 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
   // buildLayout's from-scratch coordinates, and any existing downstream node
   // (most commonly the terminal/"Done" step) gets pushed further down if the
   // new node would otherwise land on top of it.
+  //
+  // Opening or closing a child workflow resizes a step: the nodes around it
+  // make room and give it back, keeping the arrangement the user dragged.
   useEffect(() => {
     setLocalNodes((prev) => {
-      const anchored = (nodes: Node[]) => nodes.map((n) => ({ id: n.id, position: n.position, height: nodeHeight(n) }));
+      const sized = (nodes: Node[]) => nodes
+        .filter((node) => node.parentId === undefined)
+        .map((node) => ({ id: node.id, position: node.position, height: nodeHeight(node), width: nodeWidth(node) }));
       const positioned = placeNewNodes(
-        anchored(prev),
-        anchored(computedNodes),
+        makeRoomForResized(sized(prev), sized(computedNodes)),
+        sized(computedNodes),
         layoutEdges
           .filter((e) => e.sourceHandle !== 'right-out')
           .map((e) => ({ from: e.source, to: e.target })),
       );
-      return computedNodes.map((n) => {
-        const position = positioned.get(n.id);
-        return position ? { ...n, position } : n;
+      return computedNodes.map((node) => {
+        const position = node.parentId === undefined ? positioned.get(node.id) : undefined;
+        return position ? { ...node, position } : node;
       });
     });
   }, [computedNodes, layoutEdges]);
@@ -838,17 +1073,22 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
   // Tidy up = throw away the dragged positions and re-run the canonical layout,
   // so the canvas snaps back to the same shape a freshly opened workflow has.
   const handleTidy = useCallback(() => {
+    const topLevel = localNodes.filter((node) => node.parentId === undefined);
     const layout = computeGraphLayout(
-      localNodes.map((n) => n.id),
+      topLevel.map((node) => node.id),
       layoutEdges.map((e) => ({ from: e.source, to: e.target })),
       (nodeId) => {
-        const node = localNodes.find((n) => n.id === nodeId);
+        const node = topLevel.find((candidate) => candidate.id === nodeId);
         return node ? nodeHeight(node) : NODE_INNER_HEIGHT;
       },
+      (nodeId) => {
+        const node = topLevel.find((candidate) => candidate.id === nodeId);
+        return node ? nodeWidth(node) : NODE_WIDTH;
+      },
     );
-    setLocalNodes((prev) => prev.map((n) => {
-      const position = layout.positions.get(n.id);
-      return position ? { ...n, position } : n;
+    setLocalNodes((prev) => prev.map((node) => {
+      const position = node.parentId === undefined ? layout.positions.get(node.id) : undefined;
+      return position ? { ...node, position } : node;
     }));
   }, [layoutEdges, localNodes]);
 
@@ -907,11 +1147,11 @@ function FlowCanvas({ className, style, height, localNodes, edges, onNodesChange
       ?.querySelector(`.react-flow__node[data-id="${CSS.escape(followStepId)}"]`)
       ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [followStepId, fitView, getZoom]);
-  const hasEditableSteps = localNodes.some((node) => (node.data as StepNodeData).stepType !== 'terminal');
+  const hasEditableSteps = localNodes.some((node) => node.parentId === undefined && (node.data as StepNodeData).stepType !== 'terminal');
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node<StepNodeData>) => {
-      if (node.data?.stepType === 'terminal') return;
+      if (node.data?.stepType === 'terminal' || node.data?.nested === true) return;
       onNodeClick?.(node.id);
       // Let the settings pane mount/resize the canvas first, then recenter.
       setTimeout(() => fitView({ padding: 0.2, duration: 300, maxZoom: 1 }), 60);

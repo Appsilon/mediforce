@@ -33,6 +33,7 @@ import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 import { useImageCatalogEntries } from '@/hooks/use-image-catalog';
 import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
+import { useChildDefinitionExpansion } from '@/hooks/use-child-workflows';
 import { mediforce, mediforceSilent, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
@@ -825,6 +826,7 @@ export function WorkflowEditorCanvas({
     steps: editedSteps,
     transitions: editedTransitions,
   }) as WorkflowDefinition, [editedSteps, editedTransitions]);
+  const childWorkflows = useChildDefinitionExpansion(diagramDefinition, namespace);
 
   const savePanel = renderSavePanel?.(editedSteps, editedTransitions, discardChanges) ?? null;
 
@@ -1050,6 +1052,7 @@ export function WorkflowEditorCanvas({
             canRedo={redoHistory.length > 0}
             onAddBlock={() => { setSelectedStepId(null); setAddBlockContext(null); setRightPanelView('add-block'); }}
             addBlockActive={rightPanelView === 'add-block'}
+            childWorkflows={childWorkflows}
           />
         </div>
 
