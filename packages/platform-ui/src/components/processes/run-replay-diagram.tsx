@@ -170,7 +170,10 @@ export function RunReplayDiagram({
           </span>
         </div>
       )}
-      <WorkflowDiagram definition={definition} className="w-full" replay={frame} />
+      {/* Fills the space it is given, so the whole run is on screen at once instead of a canvas taller than the panel. */}
+      <div className="flex-1 min-h-0">
+        <WorkflowDiagram definition={definition} className="w-full" style={{ height: '100%' }} replay={frame} />
+      </div>
     </div>
   );
 }

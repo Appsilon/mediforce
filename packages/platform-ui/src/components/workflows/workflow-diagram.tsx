@@ -418,7 +418,7 @@ export interface DiagramReplayFrame {
   /** Freezes the ball where it is on its ride, until playback resumes. */
   paused: boolean;
   edgeTraversals: ReadonlyMap<string, number>;
-  /** Step the viewport pans to, so a tall diagram keeps the ball in view; null leaves the viewport alone. */
+  /** Step the viewport pans to when it is out of view, so a zoomed-in diagram keeps the ball on screen; null leaves the viewport alone. */
   followStepId: string | null;
 }
 
@@ -871,6 +871,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
         addBlockActive={addBlockActive}
         onTidy={handleTidy}
         followStepId={replay?.followStepId ?? null}
+        fitOnResize={replay !== undefined}
       />
     </ReactFlowProvider>
   );
@@ -891,22 +892,38 @@ type FlowCanvasProps = {
   onNodeClick?: (stepId: string) => void;
   onPaneClick?: () => void;
   followStepId?: string | null;
+  /** Refits the whole diagram whenever the canvas changes size — e.g. a side panel sliding open. */
+  fitOnResize?: boolean;
 } & CanvasControlsProps;
 
-function FlowCanvas({ className, style, height, localNodes, edges, onNodesChange, onNodeClick, onPaneClick, onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive, onTidy, followStepId }: FlowCanvasProps) {
+const FIT_VIEW_OPTIONS = { padding: 0.15, maxZoom: 0.95 };
+
+function FlowCanvas({ className, style, height, localNodes, edges, onNodesChange, onNodeClick, onPaneClick, onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive, onTidy, followStepId, fitOnResize }: FlowCanvasProps) {
   const { fitView, getZoom } = useReactFlow();
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // The canvas is as tall as the diagram, so on a short screen the page scrolls
-  // rather than the viewport — bring the step into view both ways.
+  // Pan only when the step is off screen: panning while the ball rides an edge
+  // slides the canvas under it, and the ball reads as jumping.
   useEffect(() => {
     if (followStepId === null || followStepId === undefined) return;
+    const canvas = canvasRef.current;
+    const node = canvas?.querySelector(`.react-flow__node[data-id="${CSS.escape(followStepId)}"]`);
+    if (canvas === null || canvas === undefined || node === null || node === undefined) return;
+    const view = canvas.getBoundingClientRect();
+    const box = node.getBoundingClientRect();
+    const inView = box.top >= view.top && box.bottom <= view.bottom && box.left >= view.left && box.right <= view.right;
+    if (inView === true) return;
     const zoom = getZoom();
     fitView({ nodes: [{ id: followStepId }], duration: 300, minZoom: zoom, maxZoom: zoom });
-    canvasRef.current
-      ?.querySelector(`.react-flow__node[data-id="${CSS.escape(followStepId)}"]`)
-      ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [followStepId, fitView, getZoom]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (fitOnResize !== true || canvas === null) return;
+    const observer = new ResizeObserver(() => fitView(FIT_VIEW_OPTIONS));
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, [fitOnResize, fitView]);
   const hasEditableSteps = localNodes.some((node) => (node.data as StepNodeData).stepType !== 'terminal');
 
   const handleNodeClick = useCallback(
@@ -943,7 +960,7 @@ function FlowCanvas({ className, style, height, localNodes, edges, onNodesChange
         onPaneClick={onPaneClick}
         minZoom={0.2}
         fitView
-        fitViewOptions={{ padding: 0.15, maxZoom: 0.95 }}
+        fitViewOptions={FIT_VIEW_OPTIONS}
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={1} className="!bg-white dark:!bg-background" />
