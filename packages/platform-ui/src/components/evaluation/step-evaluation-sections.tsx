@@ -1497,6 +1497,15 @@ export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEd
               Review the Eval Run <ChevronRight className="h-3 w-3" aria-hidden />
             </Link>
           )}
+          {status.validation.inheritedFromAgent !== undefined && (
+            <Link
+              href={routes.agentEvaluation(step.namespace, status.validation.inheritedFromAgent.agentId)}
+              className="ml-2 inline-flex items-center gap-0.5 font-medium text-primary hover:underline"
+              data-testid="view-agent-evaluation"
+            >
+              View agent&apos;s evaluation <ChevronRight className="h-3 w-3" aria-hidden />
+            </Link>
+          )}
         </p>
       )}
       {showDetails && status !== undefined && (
