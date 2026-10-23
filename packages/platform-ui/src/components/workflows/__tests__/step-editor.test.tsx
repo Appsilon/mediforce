@@ -1692,7 +1692,8 @@ describe('StepEditor', () => {
       expect(text).not.toContain('/output/result.json');
     });
 
-    it('[REGRESSION] retyping the plugin to databricks-sql drops the old script config on blur', () => {
+    it('[REGRESSION] switching the plugin to databricks-sql drops the old script config', () => {
+      pluginState.plugins = [{ name: 'script-container' }, { name: 'databricks-sql' }];
       const onChange = vi.fn();
 
       function ControlledStepEditor() {
@@ -1716,11 +1717,10 @@ describe('StepEditor', () => {
       render(<ControlledStepEditor />);
       expandCard('Script');
 
-      const pluginInput = screen.getByDisplayValue('script-container');
-      fireEvent.change(pluginInput, { target: { value: 'databricks-sql' } });
-      fireEvent.blur(pluginInput);
+      fireEvent.change(screen.getByLabelText('plugin'), { target: { value: 'databricks-sql' } });
 
       expect(onChange).toHaveBeenLastCalledWith({
+        plugin: 'databricks-sql',
         script: undefined,
         databricks: undefined,
         databricksSql: undefined,

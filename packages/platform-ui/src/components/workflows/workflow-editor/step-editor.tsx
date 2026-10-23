@@ -1107,19 +1107,29 @@ export function StepEditor({
       {isScript && (<>
         <FieldGroup>
           <FieldRow label="plugin" tooltip={TIP.pluginScript}>
-            <input
+            <select
+              aria-label="plugin"
               value={step.plugin ?? ''}
-              onChange={(e) => onChange({ plugin: e.target.value || undefined })}
-              onBlur={() => {
-                const expectedKey = scriptConfigKeyForPlugin(step.plugin);
+              onChange={(e) => {
+                const nextPlugin = e.target.value || undefined;
+                const expectedKey = scriptConfigKeyForPlugin(nextPlugin);
                 onChange({
+                  plugin: nextPlugin,
                   script: expectedKey === 'script' ? step.script : undefined,
                   databricks: expectedKey === 'databricks' ? step.databricks : undefined,
                   databricksSql: expectedKey === 'databricksSql' ? step.databricksSql : undefined,
                 });
               }}
-              className={riMono}
-            />
+              className={rs}
+            >
+              <option value="">None</option>
+              {plugins.filter((p) => scriptConfigKeyForPlugin(p.name) !== undefined).map((p) => (
+                <option key={p.name} value={p.name}>{humanizeToken(p.name)}</option>
+              ))}
+              {step.plugin && scriptConfigKeyForPlugin(step.plugin) === undefined && (
+                <option value={step.plugin}>{humanizeToken(step.plugin)}</option>
+              )}
+            </select>
           </FieldRow>
 
           {step.plugin !== 'databricks-job' && step.plugin !== 'databricks-sql' && (<>
