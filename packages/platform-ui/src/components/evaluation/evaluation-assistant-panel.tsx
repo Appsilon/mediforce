@@ -2,13 +2,13 @@
 
 import * as React from 'react';
 import { Bot, Check, Loader2, Send, Settings, Sparkles, User, X } from 'lucide-react';
-import { DEFAULT_MODEL } from '@mediforce/platform-core';
+import { DEFAULT_MODEL, TASK_COMPLETION_EVALUATOR_NAME } from '@mediforce/platform-core';
 import type {
   EvaluationSubject,
   EvaluationAssistantPlatformToolName,
   EvaluationAssistantProposalToolName,
 } from '@mediforce/platform-core';
-import type { EvaluationAssistantProgress, PreparedEvalRun, ProposalView, StartedEvalRun } from '@mediforce/platform-api/contract';
+import type { AskEvaluationAssistantInput, EvaluationAssistantProgress, PreparedEvalRun, ProposalView, StartedEvalRun } from '@mediforce/platform-api/contract';
 import { useQueryClient } from '@tanstack/react-query';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
@@ -16,16 +16,22 @@ import { cn } from '@/lib/utils';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { selectBase } from '@/components/workflows/workflow-editor/step-editor-fields';
+import { useStepEvaluators } from '@/hooks/use-step-evaluation';
 import { StartEvalRunCard } from './step-evaluation-sections';
 import { EvaluationBriefField, EvaluationBriefToggle, type BriefQuery } from './evaluation-brief-field';
 import {
   ControlSettingsCard,
   DiagnosisCard,
   PlanCard,
+  PresetCheckCard,
   ProposalCard,
+  TaskCompletionJudgeCard,
   isDecidable,
   type ProposalStatus,
 } from './evaluation-assistant-cards';
+
+const DRAFT_TASK_COMPLETION_JUDGE_MESSAGE = 'Draft a task-completion judge from this step\'s instructions.';
+const DRAFT_DETERMINISTIC_PRESETS_MESSAGE = 'Suggest deterministic checks for this step, where they genuinely fit.';
 
 interface ProposalState {
   readonly proposal: ProposalView;
@@ -59,6 +65,7 @@ const FOLLOW_LATEST_THRESHOLD = 48;
 
 const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssistantProposalToolName, string> = {
   get_step: 'Reading the step',
+  get_step_instructions: 'Reading the step\'s instructions',
   get_agent: 'Reading the agent',
   list_agent_production_runs: 'Finding production runs of steps using the agent',
   list_step_runs: 'Listing recent runs',
@@ -66,6 +73,8 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   get_trajectory: 'Reading a run trajectory',
   list_workspace_files: 'Listing a run\'s workspace files',
   read_workspace_file: 'Reading a workspace file',
+  list_output_files: 'Listing a run\'s output files',
+  read_output_file: 'Reading an output file',
   list_evaluators: 'Listing evaluators',
   list_eval_cases: 'Listing eval cases',
   list_eval_runs: 'Listing eval runs',
@@ -84,6 +93,8 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   propose_control_settings: 'Recommending routing',
   get_failures: 'Reading an eval run\'s failures',
   propose_diagnosis: 'Diagnosing the failures',
+  propose_task_completion_judge: 'Drafting the task-completion judge',
+  propose_preset_evaluator: 'Drafting a deterministic check',
 };
 
 function toolLabel(tool: string): string {
@@ -175,8 +186,16 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
     }));
   };
 
+  const evaluators = useStepEvaluators(step);
+  const hasTaskCompletionJudge = evaluators.data?.evaluators.some((evaluator) => evaluator.name === TASK_COMPLETION_EVALUATOR_NAME) ?? false;
+  const offerTaskCompletionJudge = step.kind === 'step' && hasTaskCompletionJudge === false;
+  // Several deterministic presets may apply at once (one per file, plus extraction), so unlike the
+  // task-completion judge this is never hidden by what already exists — createEvaluator's own
+  // duplicate-name check is what refuses a repeat.
+  const offerDeterministicPresets = step.kind === 'step';
+
   /** Sends a message; one from a card leaves whatever the person is typing in the input. */
-  const send = async (message: string, from: 'input' | 'card') => {
+  const send = async (message: string, from: 'input' | 'card', action?: AskEvaluationAssistantInput['action']) => {
     const content = message.trim();
     if (content === '' || pending) return;
     const thread: PanelMessage[] = [...messages, { role: 'user', content }];
@@ -191,6 +210,7 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
       const result = await mediforce.evaluation.askAssistant({
         ...step,
         ...(definitionVersion === null ? {} : { definitionVersion }),
+        ...(action === undefined ? {} : { action }),
         messages: thread.map((message) => ({
           role: message.role,
           content: [message.content, ...(message.proposals ?? []).map(({ proposal }) => `[proposal: ${JSON.stringify(proposal)}]`)].join('\n'),
@@ -288,10 +308,30 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
         }}
       >
         {messages.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            Ask for an evaluation plan, turn a rule into a check tried on real runs,
-            synthesize edge cases, prepare an Eval Run or explain a report. It proposes; you decide.
-          </p>
+          <div className="space-y-2 text-xs text-muted-foreground">
+            <p>
+              Ask for an evaluation plan, turn a rule into a check tried on real runs,
+              synthesize edge cases, prepare an Eval Run or explain a report. It proposes; you decide.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {offerTaskCompletionJudge && (
+                <button
+                  type="button"
+                  className={cn('rounded-md border px-2 py-1 text-foreground hover:bg-muted', pending && 'pointer-events-none opacity-50')}
+                  data-testid="draft-task-completion-judge"
+                  onClick={() => void send(DRAFT_TASK_COMPLETION_JUDGE_MESSAGE, 'card', 'draft_task_completion_judge')}
+                >Create task-completion evaluator</button>
+              )}
+              {offerDeterministicPresets && (
+                <button
+                  type="button"
+                  className={cn('rounded-md border px-2 py-1 text-foreground hover:bg-muted', pending && 'pointer-events-none opacity-50')}
+                  data-testid="draft-deterministic-presets"
+                  onClick={() => void send(DRAFT_DETERMINISTIC_PRESETS_MESSAGE, 'card', 'draft_deterministic_presets')}
+                >Suggest deterministic checks</button>
+              )}
+            </div>
+          </div>
         )}
         {messages.map((message, index) => (
           <div key={index} className={cn('flex gap-2 text-sm', message.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
@@ -325,6 +365,30 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
                 }
                 if (proposal.tool === 'propose_diagnosis') {
                   return <DiagnosisCard key={proposalIndex} diagnosis={proposal.arguments} />;
+                }
+                if (proposal.tool === 'propose_task_completion_judge') {
+                  return (
+                    <TaskCompletionJudgeCard
+                      key={proposalIndex}
+                      step={step}
+                      state={{ proposal, status: state.status }}
+                      mayEdit={mayEdit}
+                      editReason={editReason}
+                      onDecided={(status) => decide(index, proposalIndex, status)}
+                    />
+                  );
+                }
+                if (proposal.tool === 'propose_preset_evaluator') {
+                  return (
+                    <PresetCheckCard
+                      key={proposalIndex}
+                      step={step}
+                      state={{ proposal, status: state.status }}
+                      mayEdit={mayEdit}
+                      editReason={editReason}
+                      onDecided={(status) => decide(index, proposalIndex, status)}
+                    />
+                  );
                 }
                 return isDecidable(proposal) && (
                   <ProposalCard
@@ -364,6 +428,26 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
         )}
         {error !== null && <p className="text-xs text-destructive">{error}</p>}
       </div>
+      {(offerTaskCompletionJudge || offerDeterministicPresets) && messages.length > 0 && (
+        <div className="flex flex-wrap gap-2 shrink-0 border-t px-2 pt-2">
+          {offerTaskCompletionJudge && (
+            <button
+              type="button"
+              className={cn('rounded-full border px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted', pending && 'pointer-events-none opacity-50')}
+              data-testid="draft-task-completion-judge-chip"
+              onClick={() => void send(DRAFT_TASK_COMPLETION_JUDGE_MESSAGE, 'card', 'draft_task_completion_judge')}
+            >Create task-completion evaluator</button>
+          )}
+          {offerDeterministicPresets && (
+            <button
+              type="button"
+              className={cn('rounded-full border px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted', pending && 'pointer-events-none opacity-50')}
+              data-testid="draft-deterministic-presets-chip"
+              onClick={() => void send(DRAFT_DETERMINISTIC_PRESETS_MESSAGE, 'card', 'draft_deterministic_presets')}
+            >Suggest deterministic checks</button>
+          )}
+        </div>
+      )}
       <div className="flex shrink-0 gap-2 border-t p-2">
         <textarea
           data-testid="evaluation-assistant-input"

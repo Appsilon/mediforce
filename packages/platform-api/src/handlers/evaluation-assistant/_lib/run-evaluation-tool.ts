@@ -17,6 +17,7 @@ import {
   RetiredFileSkillError,
   SkillNotFoundError,
   listCommitFiles,
+  listRevisionOutputFiles,
   readCommitFile,
   resolveMcpForStep,
   resolveSkillsForStep,
@@ -51,24 +52,37 @@ function clip(value: unknown, maxChars: number): unknown {
 
 /**
  * The catalog Skills the step is offered — its agent's and its own (ADR-0027)
- * — with each one's SKILL.md, resolved as the runtime resolves them. A step
- * whose Skill is gone does not start, and says so.
+ * — resolved as the runtime resolves them. `{ refused }` when a Skill the
+ * step names is gone, the way the step itself refuses to start.
  */
-async function offeredSkills(scope: CallerScope, definition: WorkflowDefinition, step: WorkflowStep): Promise<unknown> {
+async function resolveOfferedSkills(scope: CallerScope, definition: WorkflowDefinition, step: WorkflowStep) {
   try {
-    const skills = await resolveSkillsForStep(step, { agentDefinitionRepo: scope.agentDefinitions, skillRepo: scope.skills }, definition);
-    return (skills ?? []).map((skill) => ({
-      namespace: skill.namespace,
-      id: skill.id,
-      description: skill.description,
-      instructions: clip(skill.files.find((file) => file.path === SKILL_MANIFEST_PATH)?.contents ?? null, 8000),
-    }));
+    return await resolveSkillsForStep(step, { agentDefinitionRepo: scope.agentDefinitions, skillRepo: scope.skills }, definition) ?? [];
   } catch (error) {
     if (error instanceof SkillNotFoundError || error instanceof AgentDefinitionNotFoundError || error instanceof RetiredFileSkillError) {
       return { refused: error.message };
     }
     throw error;
   }
+}
+
+/** Offered Skills with each one's SKILL.md. */
+async function offeredSkills(scope: CallerScope, definition: WorkflowDefinition, step: WorkflowStep): Promise<unknown> {
+  const skills = await resolveOfferedSkills(scope, definition, step);
+  if (!Array.isArray(skills)) return skills;
+  return skills.map((skill) => ({
+    namespace: skill.namespace,
+    id: skill.id,
+    description: skill.description,
+    instructions: clip(skill.files.find((file) => file.path === SKILL_MANIFEST_PATH)?.contents ?? null, 8000),
+  }));
+}
+
+/** Offered Skills as name + description only, no SKILL.md (F1's get_step_instructions). */
+async function offeredSkillNames(scope: CallerScope, definition: WorkflowDefinition, step: WorkflowStep): Promise<unknown> {
+  const skills = await resolveOfferedSkills(scope, definition, step);
+  if (!Array.isArray(skills)) return skills;
+  return skills.map((skill) => ({ name: skill.name, description: skill.description }));
 }
 
 /** The steps whose outputs reach this one, nearest first, following transitions back. */
@@ -216,6 +230,18 @@ export async function executeEvaluationTool(
         skills: await offeredSkills(scope, definition, workflowStep),
       };
     }
+    case 'get_step_instructions': {
+      const stepAgent = workflowStep.agentId === undefined ? null : await scope.agentDefinitions.getById(workflowStep.agentId);
+      return {
+        preamble: definition.preamble ?? null,
+        stepDescription: workflowStep.description ?? null,
+        prompt: clip(workflowStep.agent?.prompt ?? stepAgent?.systemPrompt ?? null, 8000),
+        inputDescription: stepAgent?.inputDescription ?? null,
+        outputDescription: stepAgent?.outputDescription ?? null,
+        outputSchema: workflowStep.agent?.outputSchema ?? stepAgent?.outputSchema ?? null,
+        skills: await offeredSkillNames(scope, definition, workflowStep),
+      };
+    }
     case 'get_agent': {
       if (agent === null) throw new ValidationError('get_agent reads an Agent evaluated on its own; this is a step — read it with get_step');
       return {
@@ -317,6 +343,29 @@ export async function executeEvaluationTool(
         ? null
         : await readCommitFile(source.bareRepoPath, source.workspaceSeedCommit, path);
       if (content === null) throw new NotFoundError(`The workspace of Agent Run '${agentRunId}' has no file '${path}'`);
+      if (isBinary(content)) return { path, size: content.length, binary: true };
+      return { path, size: content.length, content: clip(content.toString('utf-8'), 20_000) };
+    }
+    case 'list_output_files': {
+      const { agentRunId } = args as Args<'list_output_files'>;
+      const { stepId } = stepOnly(step, 'Reading output files');
+      const source = await loadCaseSource(scope, agentRunId, stepOnly(step, 'Reading output files'), 'read');
+      const git = source.subject.agentRun.envelope?.gitMetadata;
+      if (source.bareRepoPath === null || git == null) {
+        return { files: [], note: 'This run committed no Output Files.' };
+      }
+      const files = (await listRevisionOutputFiles(source.bareRepoPath, git.commitSha))
+        .filter((file) => file.stepId === stepId);
+      return { files };
+    }
+    case 'read_output_file': {
+      const { agentRunId, path } = args as Args<'read_output_file'>;
+      const source = await loadCaseSource(scope, agentRunId, stepOnly(step, 'Reading an output file'), 'read');
+      const git = source.subject.agentRun.envelope?.gitMetadata;
+      const content = source.bareRepoPath === null || git == null
+        ? null
+        : await readCommitFile(source.bareRepoPath, git.commitSha, path);
+      if (content === null) throw new NotFoundError(`Agent Run '${agentRunId}' has no Output File '${path}'`);
       if (isBinary(content)) return { path, size: content.length, binary: true };
       return { path, size: content.length, content: clip(content.toString('utf-8'), 20_000) };
     }

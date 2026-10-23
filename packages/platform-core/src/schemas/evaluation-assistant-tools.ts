@@ -82,6 +82,65 @@ export const ProposeBriefToolSchema = z.object({
   text: z.string().min(1).max(4000),
 });
 
+/** Where a task-completion requirement came from (epic #1516 F1 / issue #1527). */
+export const TaskCompletionRequirementSourceSchema = z.enum(['preamble', 'prompt', 'output_schema', 'skill', 'brief']);
+
+/** One checkable thing the step's instructions ask the output to do. */
+export const TaskCompletionRequirementSchema = z.object({
+  text: z.string().min(1).max(500),
+  source: TaskCompletionRequirementSourceSchema,
+  /** A miss here matters most — carried into the rendered rubric. */
+  priority: z.literal('high').optional(),
+});
+
+/**
+ * Draft the step's task-completion judge: an `llm_judge` Evaluator checking
+ * that the output fulfils the step's instructions and omits nothing
+ * required (epic #1516 F1). Offered only behind the dedicated
+ * `action: 'draft_task_completion_judge'` request, never as a free-form
+ * proposal — the model fills in `requirements` and `vagueInstructions`; the
+ * platform renders the rubric and sets the model, confidence floor and
+ * production flag.
+ */
+export const ProposeTaskCompletionJudgeToolSchema = z.object({
+  requirements: z.array(TaskCompletionRequirementSchema).min(1).max(20),
+  /** Instructions with no testable criterion — e.g. "be thorough". */
+  vagueInstructions: z.array(z.object({
+    quote: z.string().min(1).max(500),
+    why: z.string().min(1).max(500),
+  })).max(10).default([]),
+  rationale: z.string().max(1000).optional(),
+});
+
+const PresetPathSchema = z.array(z.string().min(1)).min(1).max(6);
+
+/** One deterministic preset, by what it checks. */
+export const PresetCheckSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('extraction'),
+    /** Path into `result` to the ids it returned. */
+    resultIdsPath: PresetPathSchema,
+    /** Where in the step's input the valid ids live. */
+    inputIdsPart: z.enum(['triggerPayload', 'previousStepOutputs']),
+    inputIdsPath: PresetPathSchema,
+    rationale: z.string().max(500).optional(),
+  }),
+  z.object({
+    kind: z.literal('file_producing'),
+    /** Repo-relative name under this step's Output Files, e.g. "summary.csv". */
+    fileName: z.string().min(1).max(200),
+    format: z.enum(['json', 'csv']),
+    /** Top-level keys (json) or column headers (csv) the file must have. */
+    requiredFields: z.array(z.string().min(1)).min(1).max(20),
+    rationale: z.string().max(500).optional(),
+  }),
+]);
+
+
+export const ProposePresetEvaluatorToolSchema = z.object({
+  preset: PresetCheckSchema,
+});
+
 /**
  * An evaluation plan for the step: what could go wrong, the cheapest check
  * that would catch it, and the cases to try it on — plus the Acceptance
@@ -199,6 +258,8 @@ export const EVALUATION_ASSISTANT_PROPOSAL_TOOLS = {
   propose_acceptance_criteria: ProposeAcceptanceCriteriaToolSchema,
   propose_control_settings: ProposeControlSettingsToolSchema,
   propose_diagnosis: ProposeDiagnosisToolSchema,
+  propose_task_completion_judge: ProposeTaskCompletionJudgeToolSchema,
+  propose_preset_evaluator: ProposePresetEvaluatorToolSchema,
 } as const;
 
 const NoArguments = z.object({});
@@ -210,6 +271,14 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
    * Skills it is offered with their SKILL.md, and the steps upstream of it.
    */
   get_step: NoArguments,
+  /**
+   * The step's instructions alone — preamble, step description, agent prompt,
+   * input/output descriptions, outputSchema, and skills as name + description
+   * only (no SKILL.md) — to draft a task-completion judge from (F1). Offered
+   * only behind `action: 'draft_task_completion_judge'`, never in ordinary
+   * conversation.
+   */
+  get_step_instructions: NoArguments,
   /**
    * The Agent as it runs on its own (ADR-0029): system prompt, model, runtime,
    * input/output descriptions, effective MCP servers with their eval policy and
@@ -238,6 +307,10 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
   list_workspace_files: z.object({ agentRunId: z.string().min(1) }),
   /** One text file of that workspace. */
   read_workspace_file: z.object({ agentRunId: z.string().min(1), path: WorkspaceFilePathSchema }),
+  /** The step's Output Files from one run — artifacts it wrote, not its pre-run workspace. */
+  list_output_files: z.object({ agentRunId: z.string().min(1) }),
+  /** One Output File's contents. */
+  read_output_file: z.object({ agentRunId: z.string().min(1), path: WorkspaceFilePathSchema }),
   list_evaluators: NoArguments,
   list_eval_cases: NoArguments,
   list_eval_runs: NoArguments,
@@ -301,7 +374,7 @@ const SHARED_PROPOSALS = [
  */
 export const EVALUATION_ASSISTANT_TOOLSETS = {
   step: {
-    platform: ['get_step', 'list_step_runs', ...READ_RUNS, 'list_workspace_files', 'read_workspace_file', ...READ_EVALUATION, 'preview_evaluator', ...RUN_EVALUATION],
+    platform: ['get_step', 'list_step_runs', ...READ_RUNS, 'list_workspace_files', 'read_workspace_file', 'list_output_files', 'read_output_file', ...READ_EVALUATION, 'preview_evaluator', ...RUN_EVALUATION],
     proposals: [...SHARED_PROPOSALS, 'propose_perturbed_case', 'propose_control_settings'],
   },
   agent: {
@@ -309,6 +382,30 @@ export const EVALUATION_ASSISTANT_TOOLSETS = {
     proposals: SHARED_PROPOSALS,
   },
 } as const satisfies Record<EvaluationSubject['kind'], EvaluationAssistantToolset>;
+
+/**
+ * The only tools a `draft_task_completion_judge` request offers (epic #1516
+ * F1 decision B): a dedicated, narrow tool set instead of the Step's
+ * ordinary one, so drafting a task-completion judge stays predictable —
+ * never a free-form `propose_evaluator`. A Step only.
+ */
+export const DRAFT_TASK_COMPLETION_JUDGE_TOOLSET = {
+  platform: ['get_step_instructions', 'list_step_runs', 'get_agent_run', 'preview_evaluator'],
+  proposals: ['propose_task_completion_judge'],
+} as const satisfies EvaluationAssistantToolset;
+
+/**
+ * The only tools a `draft_deterministic_presets` request offers (epic #1516
+ * F2): a dedicated, narrow tool set instead of the Step's ordinary one, so
+ * suggesting a preset stays predictable — never a free-form
+ * `propose_evaluator`. A Step only.
+ */
+export const DRAFT_DETERMINISTIC_PRESETS_TOOLSET = {
+  // No preview_evaluator: it knows only schema/code/llm_judge/expected_output, never a preset's
+  // own kind — a preset's check is rendered and self-tested automatically when it is proposed.
+  platform: ['get_step', 'list_step_runs', 'get_agent_run', 'list_output_files', 'read_output_file'],
+  proposals: ['propose_preset_evaluator'],
+} as const satisfies EvaluationAssistantToolset;
 
 /** The catalog entries `names` select. */
 export function pickTools<Name extends string, Selected extends Name, Schema extends z.ZodType>(
@@ -329,8 +426,13 @@ export const EvaluationAssistantProposalSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('propose_acceptance_criteria'), arguments: ProposeAcceptanceCriteriaToolSchema }),
   z.object({ tool: z.literal('propose_control_settings'), arguments: ProposeControlSettingsToolSchema }),
   z.object({ tool: z.literal('propose_diagnosis'), arguments: ProposeDiagnosisToolSchema }),
+  z.object({ tool: z.literal('propose_task_completion_judge'), arguments: ProposeTaskCompletionJudgeToolSchema }),
+  z.object({ tool: z.literal('propose_preset_evaluator'), arguments: ProposePresetEvaluatorToolSchema }),
 ]);
 
 export type EvaluationAssistantProposal = z.infer<typeof EvaluationAssistantProposalSchema>;
 export type FailureRootCause = z.infer<typeof FailureRootCauseSchema>;
 export type FixKind = z.infer<typeof FixKindSchema>;
+export type TaskCompletionRequirement = z.infer<typeof TaskCompletionRequirementSchema>;
+export type ProposePresetEvaluator = z.infer<typeof ProposePresetEvaluatorToolSchema>;
+export type PresetCheck = z.infer<typeof PresetCheckSchema>;
