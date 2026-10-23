@@ -118,6 +118,19 @@ export const BLOCK_PRESETS: BlockPreset[] = [
     },
   },
   {
+    id: 'run-databricks',
+    label: 'Databricks',
+    purpose: 'Trigger an existing Databricks job, or run one SQL statement on a warehouse. Starts as a job; switch to SQL from the plugin field after adding.',
+    category: 'data',
+    needsInput: ['databricks.jobId'],
+    payload: {
+      type: 'creation',
+      executor: 'script',
+      plugin: 'databricks-job',
+      databricks: { jobId: '' },
+    },
+  },
+  {
     id: 'call-api',
     label: 'Call an API',
     purpose: 'One HTTP request, no container to maintain.',

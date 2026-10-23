@@ -77,10 +77,11 @@ type Props = {
 };
 
 /** Reuses the canvas's own node chrome, so picker and canvas cannot drift. */
-function BlockNodePreview({ label, executor, autonomyLevel, stepType, badge, dimmed }: {
+function BlockNodePreview({ label, executor, autonomyLevel, plugin, stepType, badge, dimmed }: {
   label: string;
   executor: string;
   autonomyLevel?: string;
+  plugin?: string;
   stepType: string;
   badge?: string;
   dimmed?: boolean;
@@ -98,9 +99,9 @@ function BlockNodePreview({ label, executor, autonomyLevel, stepType, badge, dim
       )}
     >
       <span className="flex items-center gap-1.5 min-w-0">
-        <ExecutorIcon executor={executor} autonomyLevel={autonomyLevel} />
+        <ExecutorIcon executor={executor} autonomyLevel={autonomyLevel} plugin={plugin} />
         <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">
-          {getExecutorLabel(executor, mode)}
+          {getExecutorLabel(executor, mode, plugin)}
         </span>
         <span className="text-muted-foreground/40 text-[10px] shrink-0">&middot;</span>
         <span className={cn('text-[10px] font-semibold truncate', typeConfig.color)}>
@@ -262,7 +263,7 @@ export function BlockPicker({ onAdd, onClose, insertingOnEdge = false }: Props) 
               </>
             }
           >
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-80 overflow-y-auto">
               {presets.map((preset) => {
                 const status = statusFor(preset);
                 const unavailable = status !== null && status.available === false;
@@ -287,6 +288,7 @@ export function BlockPicker({ onAdd, onClose, insertingOnEdge = false }: Props) 
                       label={preset.label}
                       executor={preset.payload.executor}
                       autonomyLevel={preset.payload.autonomyLevel}
+                      plugin={preset.payload.plugin}
                       stepType={preset.payload.type ?? 'creation'}
                       badge={status?.available === true ? status.detail : undefined}
                       dimmed={unavailable}
@@ -319,7 +321,7 @@ export function BlockPicker({ onAdd, onClose, insertingOnEdge = false }: Props) 
               </>
             }
           >
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-80 overflow-y-auto">
               {section.options.map((option) => {
                 // Per option, not per card: Assist is the only mode still
                 // unimplemented, and it now sits beside three that are not.
@@ -336,6 +338,7 @@ export function BlockPicker({ onAdd, onClose, insertingOnEdge = false }: Props) 
                       label={option.label}
                       executor={option.payload.executor}
                       autonomyLevel={option.payload.autonomyLevel}
+                      plugin={option.payload.plugin}
                       stepType={pendingType}
                       dimmed={disabled}
                     />

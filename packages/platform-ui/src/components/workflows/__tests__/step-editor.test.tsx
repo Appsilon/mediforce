@@ -1686,21 +1686,21 @@ describe('StepEditor', () => {
         />,
       );
 
-      expandCard('Script');
+      expandCard('Databricks');
       const text = dataFlowText();
       expect(text).toContain('JSON object the notebook exits with.');
       expect(text).not.toContain('/output/result.json');
     });
 
-    it('[REGRESSION] switching the plugin to databricks-sql drops the old script config', () => {
-      pluginState.plugins = [{ name: 'script-container' }, { name: 'databricks-sql' }];
+    it('[REGRESSION] switching the databricks plugin from Job to SQL drops the old config', () => {
+      pluginState.plugins = [{ name: 'databricks-job' }, { name: 'databricks-sql' }];
       const onChange = vi.fn();
 
       function ControlledStepEditor() {
         const [step, setStep] = React.useState(buildStep({
           executor: 'script',
-          plugin: 'script-container',
-          script: { inlineScript: 'console.log(1)', runtime: 'javascript' },
+          plugin: 'databricks-job',
+          databricks: { jobId: '123' },
         }));
         return (
           <StepEditor
@@ -1715,9 +1715,9 @@ describe('StepEditor', () => {
       }
 
       render(<ControlledStepEditor />);
-      expandCard('Script');
+      expandCard('Databricks');
 
-      fireEvent.change(screen.getByLabelText('plugin'), { target: { value: 'databricks-sql' } });
+      fireEvent.change(screen.getByLabelText('databricks'), { target: { value: 'databricks-sql' } });
 
       expect(onChange).toHaveBeenLastCalledWith({
         plugin: 'databricks-sql',
@@ -1725,6 +1725,36 @@ describe('StepEditor', () => {
         databricks: undefined,
         databricksSql: undefined,
       });
+    });
+
+    it('[RENDER] the generic plugin field never offers the Databricks plugins, which have their own selector', () => {
+      pluginState.plugins = [{ name: 'script-container' }, { name: 'databricks-job' }, { name: 'databricks-sql' }];
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'script', plugin: 'script-container' })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Script');
+      const options = Array.from((screen.getByLabelText('plugin') as HTMLSelectElement).options).map((o) => o.value);
+      expect(options).toEqual(['', 'script-container']);
+    });
+
+    it('[RENDER] the databricks selector offers only Job and SQL, never None or script-container', () => {
+      pluginState.plugins = [{ name: 'script-container' }, { name: 'databricks-job' }, { name: 'databricks-sql' }];
+      render(
+        <StepEditor
+          step={buildStep({ executor: 'script', plugin: 'databricks-job', databricks: { jobId: '123' } })}
+          allSteps={[]}
+          onChange={noop}
+        />,
+      );
+
+      expandCard('Databricks');
+      const options = Array.from((screen.getByLabelText('databricks') as HTMLSelectElement).options).map((o) => o.value);
+      expect(options).toEqual(['databricks-job', 'databricks-sql']);
     });
 
     // step.params only reach a task on the engine's human-executor branch.
