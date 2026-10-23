@@ -353,7 +353,7 @@ importers:
         version: 0.45.4(@opentelemetry/api@1.9.1)(postgres@3.4.9)
       nodemailer:
         specifier: 10.0.16
-        version: 10.0.16
+        version: 10.1.2
       postgres:
         specifier: ^3.4.9
         version: 3.4.9
@@ -7186,6 +7186,10 @@ packages:
 
   nodemailer@10.0.16:
     resolution: {integrity: sha512-VL9xKErxN+el77o8eBOuYKUPMyEx7F9hfnDCuiUKJRp9v3wnWMOudYgP/SWbwSHy8rUL4cylobuXtki1LpQS7A==}
+    engines: {node: '>=20.0.0'}
+
+  nodemailer@10.1.2:
+    resolution: {integrity: sha512-rnQn9Rzh8RAwcp42MVsIvxbsv6YZ2a2/av+uyJ/LPU1+2QSlrRgFsWWZTKenyRUqkIl8urOI0c4+CEcmFdsvQw==}
     engines: {node: '>=20.0.0'}
 
   normalize-path@3.0.0:
@@ -16777,7 +16781,10 @@ snapshots:
 
   node-releases@2.0.53: {}
 
-  nodemailer@10.0.16: {}
+  nodemailer@10.0.16:
+    optional: true
+
+  nodemailer@10.1.2: {}
 
   normalize-path@3.0.0: {}
 
