@@ -31,6 +31,8 @@ import { WorkflowAccessPanel } from '@/components/workflows/workflow-access-pane
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
 import { EvaluationTab } from '@/components/evaluation/evaluation-tab';
+import { VersionValidationBadge } from '@/components/evaluation/validation-status';
+import { useWorkflowValidation } from '@/hooks/use-step-evaluation';
 import { TriggersPanel } from './TriggersPanel';
 
 export default function ProcessDefinitionPage() {
@@ -315,6 +317,8 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
     handle,
     runnableVersionNumber,
   );
+  const workflowValidation = useWorkflowValidation(handle, decodedName);
+  const runnableValidation = workflowValidation.data?.versions.find((version) => version.definitionVersion === runnableVersionNumber);
   // The Triggers tab edits the input contract it explains, which means saving a
   // new version of the version a firing resolves. Offered only when that
   // version is also the head: registering appends, so editing a version with
@@ -496,6 +500,9 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 </>
               )}
               {latest && <VersionLabel version={latest.version} title={latest.title} />}
+              {runnableValidation && (
+                <VersionValidationBadge handle={handle} workflowName={decodedName} version={runnableValidation} />
+              )}
               <span className="flex items-center gap-1">
                 <Layers className="h-3 w-3" />
                 {latest?.steps.length} steps

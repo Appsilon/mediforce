@@ -77,10 +77,14 @@ export function VersionValidationBadge({ handle, workflowName, version }: { hand
   const shown = version.steps.find((step) => step.validation.status === 'failed')
     ?? version.steps.find((step) => step.validation.status === 'awaiting_approval')
     ?? version.steps.find((step) => step.validation.status === 'not_verified')
+    ?? version.steps.find((step) => step.validation.inheritedFromAgent === undefined)
     ?? version.steps[0]!;
+  const agentId = shown.validation.inheritedFromAgent?.agentId;
   return (
     <Link
-      href={routes.workflowEvaluation(handle, workflowName, { version: version.definitionVersion, step: shown.stepId })}
+      href={agentId === undefined
+        ? routes.workflowEvaluation(handle, workflowName, { version: version.definitionVersion, step: shown.stepId })
+        : routes.agentEvaluation(handle, agentId)}
       title={describeVersionValidation(version)}
       data-testid="version-validation-badge"
       data-status={version.status}

@@ -78,6 +78,8 @@ export const routes = {
   agentDefinition: (handle: string, definitionId: string) =>
     `/${handle}/agents/definitions/${definitionId}`,
   agentNew: (handle: string) => `/${handle}/agents/new`,
+  /** The Evaluation tab on one Agent's own page. */
+  agentEvaluation: (handle: string, agentId: string) => `/${handle}/agents/definitions/${agentId}?tab=evaluation`,
   agentEvalRun: (handle: string, agentId: string, evalRunId: string) =>
     `/${handle}/agents/definitions/${agentId}/eval-runs/${evalRunId}`,
   agentEvalTrial: (handle: string, agentId: string, evalRunId: string, trialId: string) =>

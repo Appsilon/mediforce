@@ -667,6 +667,17 @@ describe('AcceptanceCriteriaSection', () => {
     expect(screen.queryByTestId('review-eval-run') !== null).toBe(status === 'awaiting_approval');
   });
 
+  it('links to the agent\'s own evaluation when the step inherits its validation', () => {
+    const validation = {
+      status: 'passed', evalRunId: 'run-0000aaaa-0000-0000-0000-000000000000', runInProgress: false,
+      reason: "Runs agent 'AE grader' v3 as it was validated: Eval Run run-0000 met its Acceptance Criteria.",
+      inheritedFromAgent: { agentId: 'ae-grader', name: 'AE grader', version: 3 },
+    };
+    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
+
+    expect(screen.getByTestId('view-agent-evaluation')).toHaveAttribute('href', '/acme/agents/definitions/ae-grader?tab=evaluation');
+  });
+
   it.each([
     ['passed', 'green'],
     ['missed', 'red'],

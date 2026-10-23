@@ -9,6 +9,8 @@ import { StartRunButton } from '@/components/processes/start-run-button';
 import { workflowDisplayName } from '@/lib/workflow-save-utils';
 import { VersionLabel } from '@/components/ui/version-label';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
+import { VersionValidationBadge } from '@/components/evaluation/validation-status';
+import { useWorkflowValidation } from '@/hooks/use-step-evaluation';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import type { WorkflowRunSummary } from '@mediforce/platform-api/contract';
@@ -104,6 +106,8 @@ export function ProcessCard({
   // and shipped in `runSummary`; `latest` is already newest-first and capped at 3.
   const { total: totalCount, active: activeCount, latest: previewInstances } = runSummary;
   const hasMore = totalCount > PREVIEW_LIMIT;
+  const validation = useWorkflowValidation(handle, definition.name);
+  const effectiveValidation = validation.data?.versions.find((version) => String(version.definitionVersion) === definition.effectiveVersion);
 
   return (
     <>
@@ -187,6 +191,9 @@ export function ProcessCard({
               </>
             ) : (
               <span>No runs</span>
+            )}
+            {effectiveValidation && (
+              <VersionValidationBadge handle={handle} workflowName={definition.name} version={effectiveValidation} />
             )}
           </div>
           <div className="flex items-center gap-2">

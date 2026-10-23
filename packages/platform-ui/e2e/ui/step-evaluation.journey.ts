@@ -289,7 +289,8 @@ test.describe('Step Evaluation tab', () => {
     // The version reads Failed in the selector and on the Definitions tab; its agent step's box in the editor links back here.
     await expect(page.getByTestId('evaluation-version-select').locator('option:checked')).toHaveText(/v1.*Failed/);
     await page.getByRole('tab', { name: 'Definitions' }).click();
-    await expect(page.getByTestId('version-validation-badge')).toHaveAttribute('data-status', 'failed', { timeout: 10_000 });
+    const definitionsPanel = page.getByRole('tabpanel', { name: 'Definitions' });
+    await expect(definitionsPanel.getByTestId('version-validation-badge')).toHaveAttribute('data-status', 'failed', { timeout: 10_000 });
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}/definitions/1`);
     const mark = page.getByTestId('step-evaluation-mark');
     await expect(mark).toHaveAttribute('data-status', 'failed', { timeout: 15_000 });
