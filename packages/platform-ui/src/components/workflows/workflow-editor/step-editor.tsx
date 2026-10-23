@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, CircleCheck, X } from 'lucide-react';
+import { DatabricksLogo } from '../workflow-diagram';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { usePlugins } from '@/hooks/use-plugins';
@@ -149,6 +150,13 @@ const EXECUTOR_ICON: Record<string, { icon: React.ElementType; color: string; bg
   action: { icon: Terminal, color: 'text-sky-600 dark:text-sky-400',       bg: 'bg-sky-100 dark:bg-sky-900/30',      label: 'Action' },
 };
 
+// A plugin listed here overrides its executor's icon/label in the header,
+// so e.g. a Databricks script step reads as Databricks rather than "Script".
+const PLUGIN_ICON: Record<string, { icon: React.ElementType; color: string; bg: string; label: string }> = {
+  'databricks-job': { icon: DatabricksLogo, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30', label: 'Databricks' },
+  'databricks-sql': { icon: DatabricksLogo, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30', label: 'Databricks' },
+};
+
 const STEP_TYPE_ICON: Record<string, { icon: React.ElementType; color: string; label: string }> = {
   creation: { icon: PenLine,   color: 'text-blue-500 dark:text-blue-400',    label: 'Creation' },
   review:   { icon: Search,    color: 'text-amber-500 dark:text-amber-400',   label: 'Review' },
@@ -170,6 +178,7 @@ const TIP = {
   autonomyLevel:           'Assist: agent runs and produces a draft; human approves. Human review: explicit human approval required. Autonomous agent: agent executes without review. L0/L1 are developer-only flags set via raw YAML.',
   plugin:                  'Runtime that runs the agent (e.g. opencode-agent, claude-code-agent). Filled in from the agent you pick; change it to run this step on another runtime.',
   pluginScript:            'Plugin that runs the script (usually script-container). Must be registered in the platform.',
+  databricksKind:          'Job triggers an existing Databricks job and waits for its result. SQL runs one statement on a warehouse.',
   agentId:                 'Saved agent from the Agents page. Its system prompt, model, skills and MCP servers are used for this step; the fields below add to them.',
   agentModel:              'Leave on the default to run the agent\'s own model. Picking a model here replaces it for this step only; the agent itself is unchanged.',
   agentSkills:             'Skills offered to the agent in this step, on top of its own. The agent loads one when its description fits the task. A step skill replaces the agent\'s skill of the same name.',
@@ -575,6 +584,15 @@ export function StepEditor({
   function updateScript(patch: Partial<NonNullable<WorkflowStep['script']>>) {
     onChange({ script: { ...step.script, ...patch } });
   }
+  function handlePluginChange(nextPlugin: string | undefined) {
+    const expectedKey = scriptConfigKeyForPlugin(nextPlugin);
+    onChange({
+      plugin: nextPlugin,
+      script: expectedKey === 'script' ? step.script : undefined,
+      databricks: expectedKey === 'databricks' ? step.databricks : undefined,
+      databricksSql: expectedKey === 'databricksSql' ? step.databricksSql : undefined,
+    });
+  }
   function updateDatabricks(patch: Partial<NonNullable<WorkflowStep['databricks']>>) {
     onChange({ databricks: { ...(step.databricks ?? { jobId: 0 }), ...patch } });
   }
@@ -603,7 +621,11 @@ export function StepEditor({
     onChange({ selection: { min: newMin ?? 1, max: newMax ?? 1 } });
   }
 
-  const execStyle = EXECUTOR_ICON[step.executor] ?? EXECUTOR_ICON.human;
+  const execBaseStyle = EXECUTOR_ICON[step.executor] ?? EXECUTOR_ICON.human;
+  // Only a script step's plugin selects a Databricks config key — an agent
+  // step's own "Plugin" field (the agent runtime) can hold the same string
+  // without meaning the same thing.
+  const execStyle = (step.executor === 'script' && step.plugin !== undefined ? PLUGIN_ICON[step.plugin] : undefined) ?? execBaseStyle;
   const ExecIcon = execStyle.icon;
   const typeStyle = STEP_TYPE_ICON[step.type] ?? STEP_TYPE_ICON.creation;
   const TypeIcon = typeStyle.icon;
@@ -616,7 +638,7 @@ export function StepEditor({
   const primaryTitle = isAgent
     ? 'Prompt & model'
     : isScript
-      ? 'Script'
+      ? execStyle.label
       : isCowork
         ? 'Collaboration'
         : isAction
@@ -883,7 +905,7 @@ export function StepEditor({
         <FieldRow label="executor" tooltip={TIP.executor}>
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5" title="executor is set at creation. To change, remove this step and add a new one.">
             <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-            <span>{execStyle.label}</span>
+            <span>{execBaseStyle.label}</span>
           </span>
         </FieldRow>
 
@@ -1106,31 +1128,41 @@ export function StepEditor({
       {/* ── Script config ────────────────────────────────────────── */}
       {isScript && (<>
         <FieldGroup>
-          <FieldRow label="plugin" tooltip={TIP.pluginScript}>
-            <select
-              aria-label="plugin"
-              value={step.plugin ?? ''}
-              onChange={(e) => {
-                const nextPlugin = e.target.value || undefined;
-                const expectedKey = scriptConfigKeyForPlugin(nextPlugin);
-                onChange({
-                  plugin: nextPlugin,
-                  script: expectedKey === 'script' ? step.script : undefined,
-                  databricks: expectedKey === 'databricks' ? step.databricks : undefined,
-                  databricksSql: expectedKey === 'databricksSql' ? step.databricksSql : undefined,
-                });
-              }}
-              className={rs}
-            >
-              <option value="">None</option>
-              {plugins.filter((p) => scriptConfigKeyForPlugin(p.name) !== undefined).map((p) => (
-                <option key={p.name} value={p.name}>{humanizeToken(p.name)}</option>
-              ))}
-              {step.plugin && scriptConfigKeyForPlugin(step.plugin) === undefined && (
-                <option value={step.plugin}>{humanizeToken(step.plugin)}</option>
-              )}
-            </select>
-          </FieldRow>
+          {step.plugin === 'databricks-job' || step.plugin === 'databricks-sql' ? (
+            <FieldRow label="databricks" tooltip={TIP.databricksKind}>
+              <select
+                aria-label="databricks"
+                value={step.plugin}
+                onChange={(e) => handlePluginChange(e.target.value)}
+                className={rs}
+              >
+                {plugins
+                  .filter((p) => p.name === 'databricks-job' || p.name === 'databricks-sql')
+                  .map((p) => (
+                    <option key={p.name} value={p.name}>{p.name === 'databricks-job' ? 'Job' : 'SQL'}</option>
+                  ))}
+              </select>
+            </FieldRow>
+          ) : (
+            <FieldRow label="plugin" tooltip={TIP.pluginScript}>
+              <select
+                aria-label="plugin"
+                value={step.plugin ?? ''}
+                onChange={(e) => handlePluginChange(e.target.value || undefined)}
+                className={rs}
+              >
+                <option value="">None</option>
+                {plugins
+                  .filter((p) => scriptConfigKeyForPlugin(p.name) !== undefined && p.name !== 'databricks-job' && p.name !== 'databricks-sql')
+                  .map((p) => (
+                    <option key={p.name} value={p.name}>{humanizeToken(p.name)}</option>
+                  ))}
+                {step.plugin && scriptConfigKeyForPlugin(step.plugin) === undefined && (
+                  <option value={step.plugin}>{humanizeToken(step.plugin)}</option>
+                )}
+              </select>
+            </FieldRow>
+          )}
 
           {step.plugin !== 'databricks-job' && step.plugin !== 'databricks-sql' && (<>
           <FieldRow label="script.runtime" tooltip={TIP.scriptRuntime}>

@@ -39,7 +39,13 @@ export function CollapsibleCard({
     <div
       data-testid={testId}
       data-open={open}
-      className={cn('rounded-xl border shadow-lg overflow-hidden bg-white dark:bg-background flex flex-col', open && fill && 'flex-1 min-h-0')}
+      className={cn(
+        'rounded-xl border shadow-lg overflow-hidden bg-white dark:bg-background flex flex-col',
+        // Outside fill mode, this card must not flex-shrink either — otherwise a
+        // tall list of siblings squeezes it below its content height, and
+        // `overflow-hidden` above clips the squeeze instead of ever scrolling.
+        open && fill ? 'flex-1 min-h-0' : 'shrink-0',
+      )}
     >
       <div className="flex items-center gap-2 px-4 py-3 shrink-0">
         <button type="button" onClick={onToggle} className="flex flex-1 min-w-0 items-center gap-2 text-left cursor-pointer">

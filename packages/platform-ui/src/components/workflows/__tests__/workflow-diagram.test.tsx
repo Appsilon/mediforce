@@ -94,6 +94,36 @@ describe('StepNode (via WorkflowDiagram)', () => {
 
     expect(screen.getAllByText('Script').length).toBeGreaterThanOrEqual(1);
   });
+
+  it('[RENDER] databricks-job script steps show the Databricks label instead of Script', () => {
+    const definition = buildWorkflowDefinition({
+      steps: [
+        { id: 'run-job', name: 'Run Job', type: 'creation', executor: 'script', plugin: 'databricks-job', databricks: { jobId: '123' } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'run-job', to: 'done' }],
+    });
+
+    render(<WorkflowDiagram definition={definition} />);
+
+    expect(screen.getByText('Databricks')).toBeInTheDocument();
+    expect(screen.queryByText('Script')).not.toBeInTheDocument();
+  });
+
+  it('[RENDER] an agent step whose plugin string happens to be databricks-job keeps its agent label', () => {
+    const definition = buildWorkflowDefinition({
+      steps: [
+        { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent', autonomyLevel: 'L2', plugin: 'databricks-job' },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'analyze', to: 'done' }],
+    });
+
+    render(<WorkflowDiagram definition={definition} />);
+
+    expect(screen.getByText('Assist')).toBeInTheDocument();
+    expect(screen.queryByText('Databricks')).not.toBeInTheDocument();
+  });
 });
 
 describe('graphEdgesOf', () => {
