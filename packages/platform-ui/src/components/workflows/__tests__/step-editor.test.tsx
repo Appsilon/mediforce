@@ -1692,6 +1692,41 @@ describe('StepEditor', () => {
       expect(text).not.toContain('/output/result.json');
     });
 
+    it('[REGRESSION] switching the plugin to databricks-sql drops the old script config', () => {
+      pluginState.plugins = [{ name: 'script-container' }, { name: 'databricks-sql' }];
+      const onChange = vi.fn();
+
+      function ControlledStepEditor() {
+        const [step, setStep] = React.useState(buildStep({
+          executor: 'script',
+          plugin: 'script-container',
+          script: { inlineScript: 'console.log(1)', runtime: 'javascript' },
+        }));
+        return (
+          <StepEditor
+            step={step}
+            allSteps={[step]}
+            onChange={(patch) => {
+              onChange(patch);
+              setStep((current) => ({ ...current, ...patch }));
+            }}
+          />
+        );
+      }
+
+      render(<ControlledStepEditor />);
+      expandCard('Script');
+
+      fireEvent.change(screen.getByLabelText('plugin'), { target: { value: 'databricks-sql' } });
+
+      expect(onChange).toHaveBeenLastCalledWith({
+        plugin: 'databricks-sql',
+        script: undefined,
+        databricks: undefined,
+        databricksSql: undefined,
+      });
+    });
+
     // step.params only reach a task on the engine's human-executor branch.
     it('[RENDER] warns that parameters on a non-human step are never collected', () => {
       render(

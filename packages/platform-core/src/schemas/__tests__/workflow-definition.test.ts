@@ -401,6 +401,69 @@ describe('WorkflowDefinitionSchema — script step config', () => {
     const messages = issueMessages(wd);
     expect(messages.some((m) => /script config but plugin is 'databricks-job' \(expected 'script-container'\)/.test(m))).toBe(true);
   });
+
+  it('accepts a databricks-sql step without pollIntervalMs (plugin defaults to 2s)', () => {
+    const wd = wdWithScanStep({
+      executor: 'script',
+      plugin: 'databricks-sql',
+      databricksSql: { warehouseId: 'abc123', statement: 'SELECT 1' },
+    });
+    const result = WorkflowDefinitionSchema.safeParse(wd);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.steps[0].databricksSql?.pollIntervalMs).toBeUndefined();
+    }
+  });
+
+  it('accepts a databricks-sql step with named parameters', () => {
+    const wd = wdWithScanStep({
+      executor: 'script',
+      plugin: 'databricks-sql',
+      databricksSql: {
+        warehouseId: 'abc123',
+        statement: 'SELECT * FROM studies WHERE study_id = :study_id',
+        parameters: { study_id: '${triggerPayload.studyId}' },
+      },
+    });
+    expect(() => WorkflowDefinitionSchema.parse(wd)).not.toThrow();
+  });
+
+  it('rejects a databricks-sql step without databricksSql config', () => {
+    const wd = wdWithScanStep({
+      executor: 'script',
+      plugin: 'databricks-sql',
+    });
+    const messages = issueMessages(wd);
+    expect(messages.some((m) => /plugin 'databricks-sql' but no databricksSql config/.test(m))).toBe(true);
+  });
+
+  it('rejects databricksSql config missing statement', () => {
+    const wd = wdWithScanStep({
+      executor: 'script',
+      plugin: 'databricks-sql',
+      databricksSql: { warehouseId: 'abc123' },
+    });
+    expect(WorkflowDefinitionSchema.safeParse(wd).success).toBe(false);
+  });
+
+  it('rejects databricksSql config missing warehouseId', () => {
+    const wd = wdWithScanStep({
+      executor: 'script',
+      plugin: 'databricks-sql',
+      databricksSql: { statement: 'SELECT 1' },
+    });
+    expect(WorkflowDefinitionSchema.safeParse(wd).success).toBe(false);
+  });
+
+  it('rejects a databricks config paired with the databricks-sql plugin', () => {
+    const wd = wdWithScanStep({
+      executor: 'script',
+      plugin: 'databricks-sql',
+      databricks: { jobId: 1 },
+    });
+    const messages = issueMessages(wd);
+    expect(messages.some((m) => /databricks config but plugin is 'databricks-sql' \(expected 'databricks-job'\)/.test(m))).toBe(true);
+  });
 });
 
 describe('resolveStepTimeoutMinutes', () => {
@@ -432,6 +495,13 @@ describe('resolveStepTimeoutMinutes', () => {
       ...baseStep,
       databricks: { jobId: 1, pollIntervalMs: 10_000, timeoutMinutes: 20 },
     })).toBe(20);
+  });
+
+  it('falls back to databricksSql.timeoutMinutes', () => {
+    expect(resolveStepTimeoutMinutes({
+      ...baseStep,
+      databricksSql: { warehouseId: 'abc123', statement: 'SELECT 1', timeoutMinutes: 15 },
+    })).toBe(15);
   });
 
   it('defaults to 30 when no config carries a timeout', () => {

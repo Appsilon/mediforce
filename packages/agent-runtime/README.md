@@ -1,8 +1,9 @@
 # @mediforce/agent-runtime
 
 Executes a step that runs code — an LLM agent in a container, a deterministic
-script, or a Databricks job. Owns the `StepExecutorPlugin` contract, plugin dispatch,
-the output envelope, autonomy enforcement, and fallback handling.
+script, or a Databricks job or SQL statement. Owns the `StepExecutorPlugin`
+contract, plugin dispatch, the output envelope, autonomy enforcement, and
+fallback handling.
 
 The engine decides *which* step runs next; this package decides *how* that step
 actually executes and whether its result is trustworthy enough to continue.

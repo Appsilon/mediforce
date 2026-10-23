@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 import { parseJsonObjectText } from '@/lib/trigger-input-payload';
 
-import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, agentImageOf, agentStepChanges, DEFAULT_STEP_TIMEOUT_MINUTES, defaultVerdictLabel, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
+import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, agentImageOf, agentStepChanges, DEFAULT_STEP_TIMEOUT_MINUTES, defaultVerdictLabel, scriptConfigKeyForPlugin, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
 import type { AgentDefinition, AgentStepChange, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo, ImageCatalogEntryView, StepValidation } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
@@ -78,7 +78,7 @@ export function buildExecutorChangePatch(step: WorkflowStep, targetExecutor: Wor
   const base: Partial<WorkflowStep> = { executor: targetExecutor };
 
   if (targetExecutor === 'human') {
-    return { ...base, plugin: undefined, agent: undefined, script: undefined, databricks: undefined, cowork: undefined };
+    return { ...base, plugin: undefined, agent: undefined, script: undefined, databricks: undefined, databricksSql: undefined, cowork: undefined };
   }
   if (targetExecutor === 'agent') {
     const carriedFromScript = step.script
@@ -86,8 +86,8 @@ export function buildExecutorChangePatch(step: WorkflowStep, targetExecutor: Wor
       : undefined;
     const agent = step.agent ?? (Object.keys(carriedFromScript ?? {}).length > 0 ? carriedFromScript as WorkflowStep['agent'] : undefined);
     return {
-      ...base, cowork: undefined, script: undefined, databricks: undefined,
-      plugin: step.plugin === 'script-container' || step.plugin === 'databricks-job' ? 'opencode-agent' : step.plugin ?? 'opencode-agent',
+      ...base, cowork: undefined, script: undefined, databricks: undefined, databricksSql: undefined,
+      plugin: step.plugin === 'script-container' || step.plugin === 'databricks-job' || step.plugin === 'databricks-sql' ? 'opencode-agent' : step.plugin ?? 'opencode-agent',
       agent,
     };
   }
@@ -104,7 +104,7 @@ export function buildExecutorChangePatch(step: WorkflowStep, targetExecutor: Wor
   }
   return {
     ...base, plugin: undefined, autonomyLevel: undefined, allowedRoles: undefined, assignedTo: undefined,
-    agent: undefined, script: undefined, databricks: undefined, cowork: step.cowork ?? { agent: 'chat' },
+    agent: undefined, script: undefined, databricks: undefined, databricksSql: undefined, cowork: step.cowork ?? { agent: 'chat' },
   };
 }
 
@@ -185,6 +185,11 @@ const TIP = {
   databricksNotebookParams:'notebook_params for run-now as JSON object of string values. Values support ${steps.*} interpolation.',
   databricksJobParameters: 'job_parameters for run-now (jobs with job-level parameters) as JSON object of string values.',
   databricksPollIntervalMs:'How often to poll the run state, in milliseconds. Default 10000.',
+
+  databricksSqlWarehouseId:'ID of the Databricks SQL Warehouse to run the statement on (from the warehouse\'s Connection Details).',
+  databricksSqlStatement:  'SQL statement to run. Use :name placeholders for values from databricksSql.parameters — never interpolate values directly into this text.',
+  databricksSqlParameters: 'Named parameters bound into the statement\'s :name placeholders. Values support ${steps.*} interpolation and are sent to Databricks as parameters, never concatenated into the statement.',
+  databricksSqlPollIntervalMs: 'How often to poll the statement state, in milliseconds. Default 2000.',
 
   allowedRoles:            'Roles that can claim and complete this task. Enforced: a member holding none of them is refused, and a role nobody holds on this workflow makes the step unclaimable. Pick from the roles this workspace already knows, or type a new one. Leave empty to allow any workspace member.',
   assignedTo:              'Pre-assign this human task to a specific user. Pick a workspace member, or type an interpolated value like ${triggerPayload.userId} to assign per run. Human steps and Human Review agent steps only.',
@@ -579,6 +584,15 @@ export function StepEditor({
   ) {
     const next = mutate({ ...(step.databricks?.[field] ?? {}) });
     updateDatabricks({ [field]: Object.keys(next).length > 0 ? next : undefined });
+  }
+  function updateDatabricksSql(patch: Partial<NonNullable<WorkflowStep['databricksSql']>>) {
+    onChange({ databricksSql: { ...(step.databricksSql ?? { warehouseId: '', statement: '' }), ...patch } });
+  }
+  function updateDatabricksSqlParameters(
+    mutate: (params: Record<string, string>) => Record<string, string>,
+  ) {
+    const next = mutate({ ...(step.databricksSql?.parameters ?? {}) });
+    updateDatabricksSql({ parameters: Object.keys(next).length > 0 ? next : undefined });
   }
   function updateReview(patch: Partial<NonNullable<WorkflowStep['review']>>) {
     onChange({ review: { ...step.review, ...patch } });
@@ -1093,14 +1107,32 @@ export function StepEditor({
       {isScript && (<>
         <FieldGroup>
           <FieldRow label="plugin" tooltip={TIP.pluginScript}>
-            <input
+            <select
+              aria-label="plugin"
               value={step.plugin ?? ''}
-              onChange={(e) => onChange({ plugin: e.target.value || undefined })}
-              className={riMono}
-            />
+              onChange={(e) => {
+                const nextPlugin = e.target.value || undefined;
+                const expectedKey = scriptConfigKeyForPlugin(nextPlugin);
+                onChange({
+                  plugin: nextPlugin,
+                  script: expectedKey === 'script' ? step.script : undefined,
+                  databricks: expectedKey === 'databricks' ? step.databricks : undefined,
+                  databricksSql: expectedKey === 'databricksSql' ? step.databricksSql : undefined,
+                });
+              }}
+              className={rs}
+            >
+              <option value="">None</option>
+              {plugins.filter((p) => scriptConfigKeyForPlugin(p.name) !== undefined).map((p) => (
+                <option key={p.name} value={p.name}>{humanizeToken(p.name)}</option>
+              ))}
+              {step.plugin && scriptConfigKeyForPlugin(step.plugin) === undefined && (
+                <option value={step.plugin}>{humanizeToken(step.plugin)}</option>
+              )}
+            </select>
           </FieldRow>
 
-          {step.plugin !== 'databricks-job' && (<>
+          {step.plugin !== 'databricks-job' && step.plugin !== 'databricks-sql' && (<>
           <FieldRow label="script.runtime" tooltip={TIP.scriptRuntime}>
             <select
               value={step.script?.runtime ?? ''}
@@ -1187,9 +1219,73 @@ export function StepEditor({
             </div>
           ))}
           </>)}
+
+          {step.plugin === 'databricks-sql' && (<>
+          <FieldRow label="databricksSql.warehouseId" tooltip={TIP.databricksSqlWarehouseId}>
+            <input
+              value={step.databricksSql?.warehouseId ?? ''}
+              onChange={(e) => updateDatabricksSql({ warehouseId: e.target.value })}
+              className={riMono}
+            />
+          </FieldRow>
+          <FieldRow label="databricksSql.statement" tooltip={TIP.databricksSqlStatement} alignStart>
+            <textarea
+              value={step.databricksSql?.statement ?? ''}
+              onChange={(e) => updateDatabricksSql({ statement: e.target.value })}
+              rows={3}
+              placeholder="SELECT * FROM my_table WHERE id = :record_id"
+              className={cn(rt, 'font-mono text-[11px] placeholder:italic placeholder:text-muted-foreground/40')}
+            />
+          </FieldRow>
+          <FieldRow label="databricksSql.pollIntervalMs" tooltip={TIP.databricksSqlPollIntervalMs}>
+            <input
+              type="number"
+              value={step.databricksSql?.pollIntervalMs ?? ''}
+              onChange={(e) => updateDatabricksSql({ pollIntervalMs: e.target.value ? Number(e.target.value) : undefined })}
+              className={riMono}
+            />
+          </FieldRow>
+          <StepTimeoutField value={step.databricksSql?.timeoutMinutes} onChange={(timeoutMinutes) => updateDatabricksSql({ timeoutMinutes })} />
+          <div className="px-3 py-1.5 border-b border-border/30 last:border-0">
+            <div className="text-xs font-medium text-muted-foreground mb-1" title={TIP.databricksSqlParameters}>
+              {humanizeToken('databricksSql.parameters')}
+            </div>
+            {Object.entries(step.databricksSql?.parameters ?? {}).map(([key, val], idx) => (
+              <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-x-2 py-1 items-center">
+                <input
+                  value={key}
+                  onChange={(e) => updateDatabricksSqlParameters((params) => {
+                    const renamed: Record<string, string> = {};
+                    for (const [paramKey, paramValue] of Object.entries(params)) {
+                      renamed[paramKey === key ? e.target.value : paramKey] = paramValue;
+                    }
+                    return renamed;
+                  })}
+                  className={cn(riMono, 'text-muted-foreground/70')}
+                />
+                <input
+                  value={val}
+                  onChange={(e) => updateDatabricksSqlParameters((params) => ({ ...params, [key]: e.target.value }))}
+                  className={riMono}
+                />
+                <button
+                  onClick={() => updateDatabricksSqlParameters((params) => {
+                    delete params[key];
+                    return params;
+                  })}
+                  className="text-[10px] text-muted-foreground/30 hover:text-red-500 transition-colors"
+                >×</button>
+              </div>
+            ))}
+            <button
+              onClick={() => updateDatabricksSqlParameters((params) => ({ ...params, param: '' }))}
+              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            >+ Add parameter</button>
+          </div>
+          </>)}
         </FieldGroup>
 
-        {step.plugin !== 'databricks-job' && (
+        {step.plugin !== 'databricks-job' && step.plugin !== 'databricks-sql' && (
           <FieldGroup>
             <ImageSourceFields
               key={`script-${step.id}`}

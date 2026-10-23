@@ -77,6 +77,7 @@ export type {
   OutputSchemaPropertyType,
   ScriptStepConfig,
   DatabricksJobConfig,
+  DatabricksSqlConfig,
   WorkflowCoworkConfig,
   WorkflowReviewConfig,
   WorkflowStep,

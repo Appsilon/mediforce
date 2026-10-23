@@ -233,3 +233,117 @@ test.describe('databricks-job dispatch — API E2E', () => {
     expect(runNow?.body).toMatchObject({ job_id: 4242, notebook_params: { study: 'CDISC01' } });
   });
 });
+
+test.describe('databricks-sql dispatch — API E2E', () => {
+  let mockDatabricks: Server;
+  let mockHost: string;
+  const seenRequests: Array<{ method: string; path: string; authorization?: string; body?: unknown }> = [];
+
+  test.beforeAll(async () => {
+    mockDatabricks = createServer((req, res) => {
+      let raw = '';
+      req.on('data', (chunk: Buffer) => { raw += chunk.toString(); });
+      req.on('end', () => {
+        seenRequests.push({
+          method: req.method ?? '',
+          path: req.url ?? '',
+          authorization: req.headers.authorization,
+          body: raw.length > 0 ? JSON.parse(raw) : undefined,
+        });
+
+        const respond = (payload: Record<string, unknown>): void => {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(payload));
+        };
+        const url = req.url ?? '';
+        if (url === '/api/2.0/sql/statements') {
+          respond({ statement_id: 'e2e-stmt-1' });
+        } else if (url.startsWith('/api/2.0/sql/statements/e2e-stmt-1')) {
+          respond({
+            statement_id: 'e2e-stmt-1',
+            status: { state: 'SUCCEEDED' },
+            manifest: {
+              schema: { columns: [{ name: 'study_id' }, { name: 'n_subjects' }] },
+              total_chunk_count: 1,
+            },
+            result: { data_array: [['CDISC01', '42']] },
+          });
+        } else {
+          res.writeHead(404).end();
+        }
+      });
+    });
+    await new Promise<void>((resolve) => mockDatabricks.listen(0, '127.0.0.1', resolve));
+    mockHost = `http://127.0.0.1:${(mockDatabricks.address() as AddressInfo).port}`;
+  });
+
+  test.afterAll(async () => {
+    await new Promise<void>((resolve) => mockDatabricks.close(() => resolve()));
+  });
+
+  test('databricks-sql step runs a statement with workflow secrets and lands the rows as step output', async ({
+    request,
+  }) => {
+    const wdName = `e2e-databricks-sql-dispatch-${Date.now()}`;
+
+    const wd = {
+      name: wdName,
+      title: 'E2E databricks-sql dispatch',
+      steps: [
+        {
+          id: 'run-query',
+          name: 'Run query',
+          type: 'creation',
+          executor: 'script',
+          plugin: 'databricks-sql',
+          databricksSql: {
+            warehouseId: 'e2e-warehouse',
+            statement: 'SELECT * FROM studies WHERE study_id = :study_id',
+            parameters: { study_id: 'CDISC01' },
+            pollIntervalMs: 100,
+          },
+        },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'run-query', to: 'done' }],
+    };
+
+    const createWdRes = await request.post(
+      `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
+      { headers: JSON_HEADERS, data: wd },
+    );
+    expect(createWdRes.status(), await createWdRes.text()).toBe(201);
+
+    const secretsRes = await request.put(
+      `/api/workflow-secrets/values?namespace=${TEST_ORG_HANDLE}&workflow=${wdName}`,
+      {
+        headers: JSON_HEADERS,
+        data: {
+          secrets: {
+            DATABRICKS_HOST: mockHost,
+            DATABRICKS_TOKEN: 'e2e-mock-token',
+          },
+        },
+      },
+    );
+    expect(secretsRes.status(), await secretsRes.text()).toBe(200);
+
+    const instanceId = await startRun(request, wdName);
+    const execution = await waitForStepResult(request, instanceId, 'run-query');
+
+    expect(execution.output).toMatchObject({
+      columns: ['study_id', 'n_subjects'],
+      rows: [{ study_id: 'CDISC01', n_subjects: '42' }],
+      rowCount: 1,
+    });
+
+    const executeRequest = seenRequests.find((r) => r.path === '/api/2.0/sql/statements');
+    expect(executeRequest, 'mock Databricks never received the statement execution request').toBeDefined();
+    expect(executeRequest?.authorization).toBe('Bearer e2e-mock-token');
+    expect(executeRequest?.body).toMatchObject({
+      warehouse_id: 'e2e-warehouse',
+      statement: 'SELECT * FROM studies WHERE study_id = :study_id',
+      parameters: [{ name: 'study_id', value: 'CDISC01', type: 'STRING' }],
+    });
+  });
+});

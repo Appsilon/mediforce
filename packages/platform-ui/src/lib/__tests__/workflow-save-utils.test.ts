@@ -217,6 +217,20 @@ describe('validateSteps — script config', () => {
 
     expect(validateSteps(steps)).toMatch(/missing step config.*"Run job" needs a databricks block/i);
   });
+
+  it('rejects a databricks-sql step with no databricksSql config', () => {
+    const steps: WorkflowStep[] = [
+      {
+        id: 'query',
+        name: 'Run query',
+        type: 'creation',
+        executor: 'script',
+        plugin: 'databricks-sql',
+      } as WorkflowStep,
+    ];
+
+    expect(validateSteps(steps)).toMatch(/missing step config.*"Run query" needs a databricksSql block/i);
+  });
 });
 
 describe('buildRegisterBody', () => {

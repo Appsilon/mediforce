@@ -237,6 +237,14 @@ export const DatabricksJobConfigSchema = z.object({
   timeoutMinutes: StepTimeoutMinutesSchema.optional(),
 });
 
+export const DatabricksSqlConfigSchema = z.object({
+  warehouseId: z.string().min(1),
+  statement: z.string().min(1),
+  parameters: z.record(z.string(), z.string()).optional(),
+  pollIntervalMs: z.number().int().positive().optional(),
+  timeoutMinutes: StepTimeoutMinutesSchema.optional(),
+});
+
 export const CoworkChatConfigSchema = z.object({
   model: z.string().optional(),
 });
@@ -328,6 +336,7 @@ export const WorkflowStepSchema = z.object({
   script: ScriptStepConfigSchema.optional(),
   /** Required when executor='script' and plugin='databricks-job'. */
   databricks: DatabricksJobConfigSchema.optional(),
+  databricksSql: DatabricksSqlConfigSchema.optional(),
   review: WorkflowReviewConfigSchema.optional(),
   cowork: WorkflowCoworkConfigSchema.optional(),
   stepParams: z.record(z.string(), z.unknown()).optional(),
@@ -362,14 +371,16 @@ export const InputForNextRunEntrySchema = z.object({
  * here REQUIRES its config key on the step (and executor='script'); the
  * config keys are rejected everywhere else.
  */
-const SCRIPT_PLUGIN_CONFIG_KEY: Record<string, 'script' | 'databricks'> = {
+const SCRIPT_PLUGIN_CONFIG_KEY: Record<string, 'script' | 'databricks' | 'databricksSql'> = {
   'script-container': 'script',
   'databricks-job': 'databricks',
+  'databricks-sql': 'databricksSql',
 };
 
-const SCRIPT_CONFIG_KEY_PLUGIN: Record<'script' | 'databricks', string> = {
+const SCRIPT_CONFIG_KEY_PLUGIN: Record<'script' | 'databricks' | 'databricksSql', string> = {
   script: 'script-container',
   databricks: 'databricks-job',
+  databricksSql: 'databricks-sql',
 };
 
 /**
@@ -382,7 +393,7 @@ const SCRIPT_CONFIG_KEY_PLUGIN: Record<'script' | 'databricks', string> = {
  */
 function scriptConfigKeyForPlugin(
   plugin: string | undefined,
-): 'script' | 'databricks' | undefined {
+): 'script' | 'databricks' | 'databricksSql' | undefined {
   return plugin === undefined ? undefined : SCRIPT_PLUGIN_CONFIG_KEY[plugin];
 }
 
@@ -406,6 +417,7 @@ function validateSteps(
       cowork?: unknown;
       script?: unknown;
       databricks?: unknown;
+      databricksSql?: unknown;
     }>;
   },
   ctx: z.RefinementCtx,
@@ -413,7 +425,7 @@ function validateSteps(
   wd.steps.forEach((step, i) => {
     const pluginConfigKey = scriptConfigKeyForPlugin(step.plugin);
 
-    for (const configKey of ['script', 'databricks'] as const) {
+    for (const configKey of ['script', 'databricks', 'databricksSql'] as const) {
       if (step[configKey] === undefined) continue;
       if (step.executor !== 'script') {
         ctx.addIssue({
@@ -1055,6 +1067,7 @@ export type WorkflowAgentConfig = z.infer<typeof WorkflowAgentConfigSchema>;
 export type { AgentOutputSchema, OutputSchemaPropertyType } from './agent-output-schema';
 export type ScriptStepConfig = z.infer<typeof ScriptStepConfigSchema>;
 export type DatabricksJobConfig = z.infer<typeof DatabricksJobConfigSchema>;
+export type DatabricksSqlConfig = z.infer<typeof DatabricksSqlConfigSchema>;
 export type WorkflowCoworkConfig = z.infer<typeof WorkflowCoworkConfigSchema>;
 export type WorkflowReviewConfig = z.infer<typeof WorkflowReviewConfigSchema>;
 export type WorkflowWorkspace = z.infer<typeof WorkflowWorkspaceSchema>;
@@ -1069,11 +1082,12 @@ export const DEFAULT_STEP_TIMEOUT_MINUTES = 30;
  * Effective step timeout in minutes, regardless of executor flavour.
  */
 export function resolveStepTimeoutMinutes(
-  step: Pick<WorkflowStep, 'agent' | 'script' | 'databricks'>,
+  step: Pick<WorkflowStep, 'agent' | 'script' | 'databricks' | 'databricksSql'>,
 ): number {
   return step.agent?.timeoutMinutes
     ?? step.script?.timeoutMinutes
     ?? step.databricks?.timeoutMinutes
+    ?? step.databricksSql?.timeoutMinutes
     ?? DEFAULT_STEP_TIMEOUT_MINUTES;
 }
 
@@ -1082,7 +1096,7 @@ export function resolveStepTimeoutMinutes(
  * execution is reaped as a timeout (ADR-0010).
  */
 export function resolveStepTimeoutMs(
-  step: Pick<WorkflowStep, 'agent' | 'script' | 'databricks'>,
+  step: Pick<WorkflowStep, 'agent' | 'script' | 'databricks' | 'databricksSql'>,
 ): number {
   return resolveStepTimeoutMinutes(step) * 60_000;
 }
