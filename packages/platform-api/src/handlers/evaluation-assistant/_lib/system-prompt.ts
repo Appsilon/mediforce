@@ -157,6 +157,22 @@ export function briefMessage(brief: EvaluationBrief | null, kind: SubjectKind): 
     : `The ${kind}'s Evaluation Brief (v${brief.version}), its context of use:\n${brief.text}`;
 }
 
+/**
+ * The fixed instruction for a `draft_task_completion_judge` request (epic
+ * #1516 F1): the only thing this turn may do, with a narrow tool set instead
+ * of the ordinary one, so the output stays predictable.
+ */
+export function taskCompletionJudgeDraftMessage(): string {
+  return 'Draft the step\'s task-completion judge. Read get_step_instructions (its preamble, description, prompt, '
+    + 'input/output descriptions, outputSchema and skills — the Brief is in an earlier message). Turn every testable '
+    + 'instruction into one requirement: { text, source: preamble|prompt|output_schema|skill|brief, priority: "high" '
+    + 'only for one the Brief marks as mattering most }. List any instruction with no testable criterion (e.g. "be '
+    + 'thorough") in vagueInstructions as { quote, why }. If list_step_runs has runs, read one or two with get_agent_run '
+    + 'and try your draft requirements\' check with preview_evaluator before proposing. Then call '
+    + 'propose_task_completion_judge once with every requirement — do not call it more than once, and call no other '
+    + 'proposal tool this turn.';
+}
+
 export function unattendedBudgetMessage(unattendedBudgetUsd: number | undefined, kind: SubjectKind): string {
   return unattendedBudgetUsd === undefined
     ? 'No unattended budget was granted for this request: start_eval_run is refused; the person confirms each run on its card.'

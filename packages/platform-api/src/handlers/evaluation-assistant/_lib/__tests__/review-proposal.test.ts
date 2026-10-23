@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { EvaluationSubject } from '@mediforce/platform-core';
+import { TASK_COMPLETION_EVALUATOR_NAME, TASK_COMPLETION_EVALUATOR_RULE, type EvaluationSubject } from '@mediforce/platform-core';
 import { userCaller } from '../../../../repositories/__tests__/create-test-scope';
 import { createEvaluator } from '../../../evaluation/evaluators';
 import { createEvalCase } from '../../../evaluation/eval-cases';
@@ -56,6 +56,17 @@ describe('reviewEvaluationProposal', () => {
     await createEvaluator({ ...STEP, ...proposeEvaluator(findings), origin: 'user' }, fixture.scope());
     const taken = await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(findings), fixture.scope(), STEP, []);
     expect(taken).toMatchObject({ ok: false, error: expect.stringContaining('propose_evaluator_version') });
+  });
+
+  it('self-tests a drafted task-completion judge\'s rendered rubric, and refuses one while a live Evaluator already has that name', async () => {
+    const proposal = { requirements: [{ text: 'Every finding is graded.', source: 'prompt' as const }], vagueInstructions: [] };
+    // No model key in the workspace: the judge cannot grade anything, same as any other llm_judge self-test here.
+    const review = await reviewEvaluationProposal('propose_task_completion_judge', proposal, fixture.scope(), STEP, []);
+    expect(review).toMatchObject({ ok: false, error: expect.stringContaining('errored on every output it was tried on (2)') });
+
+    await createEvaluator({ ...STEP, name: TASK_COMPLETION_EVALUATOR_NAME, rule: TASK_COMPLETION_EVALUATOR_RULE, check: judge, origin: 'user' }, fixture.scope());
+    const taken = await reviewEvaluationProposal('propose_task_completion_judge', proposal, fixture.scope(), STEP, []);
+    expect(taken).toMatchObject({ ok: false, error: expect.stringContaining(`already has a live '${TASK_COMPLETION_EVALUATOR_NAME}'`) });
   });
 
   it('marks a check untested for a person who may not run checks, instead of dropping it', async () => {
