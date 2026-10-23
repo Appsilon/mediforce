@@ -103,6 +103,7 @@ import {
   OpenCodeAgentPlugin,
   ScriptContainerPlugin,
   DatabricksJobPlugin,
+  DatabricksSqlPlugin,
   ScriptStepExecutor,
   AgentStepExecutor,
 } from '@mediforce/agent-runtime';
@@ -320,6 +321,7 @@ export function getPlatformServices(): PlatformServices {
   pluginRegistry.register('opencode-agent', () => new OpenCodeAgentPlugin());
   pluginRegistry.register('script-container', () => new ScriptContainerPlugin());
   pluginRegistry.register('databricks-job', () => new DatabricksJobPlugin());
+  pluginRegistry.register('databricks-sql', () => new DatabricksSqlPlugin());
 
   const otelTracingOptions = {
     captureContent: process.env.MEDIFORCE_OTEL_CAPTURE_CONTENT === 'true',

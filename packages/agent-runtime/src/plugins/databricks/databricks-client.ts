@@ -30,6 +30,30 @@ export function isTerminalLifecycle(lifecycle: string): boolean {
   return TERMINAL_LIFECYCLES.has(lifecycle);
 }
 
+export interface DatabricksStatementStatus {
+  state: string;
+  errorMessage: string | null;
+  columns: string[];
+  rows: Array<Record<string, string | null>>;
+  totalChunkCount: number;
+}
+
+const TERMINAL_STATEMENT_STATES = new Set(['SUCCEEDED', 'FAILED', 'CANCELED', 'CLOSED']);
+
+export function isTerminalStatementState(state: string): boolean {
+  return TERMINAL_STATEMENT_STATES.has(state);
+}
+
+interface RawStatementResponse {
+  statement_id?: string;
+  status?: { state?: string; error?: { message?: string } };
+  manifest?: {
+    schema?: { columns?: Array<{ name?: string }> };
+    total_chunk_count?: number;
+  };
+  result?: { data_array?: Array<Array<string | null>> };
+}
+
 interface RawRunResponse {
   run_id?: number;
   run_page_url?: string;
@@ -100,6 +124,49 @@ export class DatabricksClient {
 
   async cancelRun(runId: number): Promise<void> {
     await this.request('POST', '/api/2.2/jobs/runs/cancel', { run_id: runId });
+  }
+
+  async executeStatement(args: {
+    warehouseId: string;
+    statement: string;
+    parameters?: Record<string, string>;
+  }): Promise<string> {
+    const response = await this.request('POST', '/api/2.0/sql/statements', {
+      warehouse_id: args.warehouseId,
+      statement: args.statement,
+      wait_timeout: '0s',
+      format: 'JSON_ARRAY',
+      disposition: 'INLINE',
+      ...(args.parameters !== undefined
+        ? { parameters: Object.entries(args.parameters).map(([name, value]) => ({ name, value, type: 'STRING' })) }
+        : {}),
+    });
+    const statementId = (response as { statement_id?: string }).statement_id;
+    if (typeof statementId !== 'string') {
+      throw new Error('Databricks statement execution returned no statement_id');
+    }
+    return statementId;
+  }
+
+  async getStatement(statementId: string): Promise<DatabricksStatementStatus> {
+    const raw = await this.request('GET', `/api/2.0/sql/statements/${statementId}`) as RawStatementResponse;
+    const columns = (raw.manifest?.schema?.columns ?? [])
+      .map((column) => column.name)
+      .filter((name): name is string => typeof name === 'string');
+    const rows = (raw.result?.data_array ?? []).map((row) =>
+      Object.fromEntries(columns.map((name, idx) => [name, row[idx] ?? null])),
+    );
+    return {
+      state: raw.status?.state ?? 'PENDING',
+      errorMessage: raw.status?.error?.message ?? null,
+      columns,
+      rows,
+      totalChunkCount: raw.manifest?.total_chunk_count ?? 1,
+    };
+  }
+
+  async cancelStatement(statementId: string): Promise<void> {
+    await this.request('POST', `/api/2.0/sql/statements/${statementId}/cancel`);
   }
 
   private async request(method: 'GET' | 'POST', path: string, body?: Record<string, unknown>): Promise<unknown> {

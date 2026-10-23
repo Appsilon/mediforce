@@ -206,7 +206,10 @@ per earlier step, its result and the paths of its Output Files.
 Small values need no file at all: `result.json` is the step's output and
 later steps read it as `${steps.<id>.<field>}`. A third mode is
 `plugin: databricks-job`, which requires step-level `databricks`
-(`DatabricksJobConfigSchema`) instead of `script`.
+(`DatabricksJobConfigSchema`) instead of `script`. A fourth is
+`plugin: databricks-sql`, which runs one statement against a Databricks SQL
+Warehouse and requires step-level `databricksSql`
+(`DatabricksSqlConfigSchema`) — no job or notebook needed.
 
 **Runtime auto-selection is inline-only.** A `command` can only execute code
 already reachable in the container: **carried by the workflow** and mounted at
@@ -296,8 +299,9 @@ Which runtime actually runs an `agent`/`script` step is the registered plugin
 (via `step.plugin` / Agent Definition `runtimeId`): `claude-code-agent` is the
 default executor, with `opencode-agent`
 ([`opencode-agent-plugin.ts`](../../packages/agent-runtime/src/plugins/opencode-agent-plugin.ts))
-as an alternative, plus `script-container` and `databricks-job` for `script`
-steps. All live in [`agent-runtime/src/plugins/`](../../packages/agent-runtime/src/plugins/).
+as an alternative, plus `script-container`, `databricks-job` and
+`databricks-sql` for `script` steps. All live in
+[`agent-runtime/src/plugins/`](../../packages/agent-runtime/src/plugins/).
 
 ## Tools & MCP governance
 

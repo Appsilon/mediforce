@@ -24,6 +24,13 @@ function fallbackIo(step: WorkflowStep): StepIo {
           readPath: '<field>',
         };
       }
+      if (step.plugin === 'databricks-sql') {
+        return {
+          input: 'The warehouse id, statement and named parameters below, with ${...} placeholders resolved.',
+          output: '{ columns, rows, rowCount } from the statement result.',
+          readPath: '<field>',
+        };
+      }
       return {
         input: 'Previous step outputs, written as JSON to /output/input.json. The working directory is /workspace.',
         output: 'The JSON object your code writes to /output/result.json. Without that file, raw stdout is used instead.',

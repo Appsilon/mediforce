@@ -182,9 +182,10 @@ Pick by intent:
 
 A `terminal` step still needs an `executor` — the schema requires one on every
 step. It never runs, so the value is normally inert filler carrying no executor
-config: no `plugin`, no `script`/`databricks` block, no `agent` block. The one
-exception is `action`, which the schema requires an `action` block for on every
-step, terminals included — so pick a different filler unless you mean it.
+config: no `plugin`, no `script`/`databricks`/`databricksSql` block, no `agent`
+block. The one exception is `action`, which the schema requires an `action`
+block for on every step, terminals included — so pick a different filler
+unless you mean it.
 
 Do not set `autonomyLevel` on non-agent steps. Use CM3/L3 when a human must
 approve agent output; use a separate human `type: review` step for custom

@@ -16,9 +16,10 @@ regardless of what produced it.
 | `opencode-agent` | `opencode-agent-plugin.ts` | OpenCode — local Ollama or cloud providers, same envelope, different CLI. |
 | `script-container` | `script-container-plugin.ts` | A command or inline script. No LLM. |
 | `databricks-job` | `databricks/databricks-job-plugin.ts` | Triggers an existing Databricks job over the Jobs REST API. No LLM. |
+| `databricks-sql` | `databricks/databricks-sql-plugin.ts` | Runs one statement against a Databricks SQL Warehouse over the Statement Execution API. No LLM. |
 | — | `mock-agent-plugin.ts` | Swapped in for `claude-code-agent` when `MOCK_AGENT=true`. Not separately registered. |
 
-All four are registered in
+All five are registered in
 `packages/platform-api/src/services/platform-services.ts`.
 
 ## Writing one
@@ -42,18 +43,22 @@ everything that is hard to get right and identical across plugins.
 
 ## Deterministic plugins
 
-`script-container` and `databricks-job` are the same execution class: no LLM,
-`confidence` pinned to `1.0`, errors fail the step and escalate, autonomy levels
-do not apply. They are configured through `executor: 'script'` with step config
-under `step.script` / `step.databricks` — **never** `step.agent`, which selects
-an LLM plugin.
+`script-container`, `databricks-job` and `databricks-sql` are the same
+execution class: no LLM, `confidence` pinned to `1.0`, errors fail the step
+and escalate, autonomy levels do not apply. They are configured through
+`executor: 'script'` with step config under `step.script` / `step.databricks`
+/ `step.databricksSql` — **never** `step.agent`, which selects an LLM plugin.
 
 For `databricks-job`, Mediforce orchestrates runs of a job that already exists
 in the customer's workspace; job creation and deployment stay in their own
-pipeline. `DATABRICKS_HOST` and `DATABRICKS_TOKEN` come from namespace secrets,
-and secrets are deliberately not an interpolation source — a token must never
-reach Databricks run parameters or an audit snapshot. v1 supports single-task
-jobs only.
+pipeline. v1 supports single-task jobs only. `databricks-sql` instead runs one
+statement against a SQL Warehouse directly — no job or notebook — for
+workflows that just need to read or write a table; `parameters` values are
+bound server-side as Databricks named parameters, never concatenated into the
+statement text. Both share `DATABRICKS_HOST` / `DATABRICKS_TOKEN` namespace
+secrets, and secrets are deliberately not an interpolation source — a token
+must never reach a Databricks run parameter, SQL parameter, or audit
+snapshot.
 
 ## Code checks
 
