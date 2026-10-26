@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-10-26
+
+### Added
+
+- **Run A Workflow As A Step:** A new Run Workflow action starts one child workflow, waits for it to finish or time out, and hands its result to the next step. Find it in Add Block as "Run a workflow and use its result" ([#1605](https://github.com/Appsilon/mediforce/pull/1605)).
+- **Wait For Spawned Children:** A wait step can check `children.allCompleted`, `totalCount`, `completedCount` and `failedCount`, so a workflow can carry on once the runs it spawned are done. Children spawned before this release are not counted ([#1578](https://github.com/Appsilon/mediforce/pull/1578)).
+- **Child Workflows On The Canvas:** A step that starts a single child workflow has a Show child workflow button that draws the child's steps right under it. On a run's Diagram tab it shows the child runs that step started, with each step's status and a link to the child run. `mediforce run list --parent <id>` lists a run's children ([#1606](https://github.com/Appsilon/mediforce/pull/1606)).
+- **Run Replay:** The Diagram tab on a run replays the path the run took as a ball moving along the diagram, loops included, with play, pause, speed and a choice between real-time proportions and an even beat per step. Edges taken more than once show a count, and edges never taken are dimmed ([#1602](https://github.com/Appsilon/mediforce/pull/1602), [#1607](https://github.com/Appsilon/mediforce/pull/1607)).
+- **Audit Table:** The Audit panel on a run can switch to a table of what happened, where, when and by whom, across the run and the runs it spawned. Search it, widen it to the full page, or download it as CSV ([#1608](https://github.com/Appsilon/mediforce/pull/1608)).
+- **Databricks SQL Steps:** A Databricks step can now run a SQL statement on a Databricks SQL Warehouse and return the rows, alongside running a Databricks job. Add Block has a single Databricks block with the Databricks icon, and the step editor lets you pick Job or SQL ([#1619](https://github.com/Appsilon/mediforce/pull/1619), [#1623](https://github.com/Appsilon/mediforce/pull/1623)).
+- **Agent Default Image:** An Agent can name the image it runs in, on the Agent page or with `mediforce agent set-image`. Its eval runs use that image, and steps that run the Agent get it unless they pick their own. A step that runs a validated Agent in a different image no longer shows as verified through that Agent ([#1593](https://github.com/Appsilon/mediforce/pull/1593)).
+- **Prefilled Human Forms:** A human step's field defaults can use `${steps.*}` and other run values, so a person opens the form on, for example, the e-mail an earlier step drafted ([#1585](https://github.com/Appsilon/mediforce/pull/1585)).
+- **Run Values In Step Params:** An agent or script step's `stepParams` can use `${triggerPayload.*}`, `${steps.*}` and other run values. A reference that doesn't resolve fails the step and names what was missing ([#1600](https://github.com/Appsilon/mediforce/pull/1600)).
+- **Pending Actions Count:** Human actions in the sidebar shows how many tasks are waiting on you in the current workspace ([#1587](https://github.com/Appsilon/mediforce/pull/1587)).
+- **Arrange Workflow Cards:** Drag workflow cards by their grip to put them in your own order on the workspace page. The order is kept in your browser ([#1609](https://github.com/Appsilon/mediforce/pull/1609)).
+- **Validation Status Everywhere:** A workflow's validation badge also appears in its page header and on its card on the workspace page. A step that inherits its Agent's validation links straight to that Agent's evaluation ([#1618](https://github.com/Appsilon/mediforce/pull/1618)).
+
+### Changed
+
+- **Run Page Layout:** Log, Audit, Diagram and Report sit in a row under the run details instead of a side rail. Every executed step can be expanded, and shows its result in an Output section separate from the technical details ([#1567](https://github.com/Appsilon/mediforce/pull/1567)).
+- **Workflow Card Order:** Workflows with active runs no longer jump to the top of the workspace page, so cards stay where you put them ([#1609](https://github.com/Appsilon/mediforce/pull/1609)).
+- **Breaking:** **Faster Workflow List:** Responses are compressed and the workflow list sends much less data, so pages load faster on slow connections. Update the CLI to this release, since older builds fail `mediforce workflow list` against the new server, and reload browser tabs left open across the upgrade. `mediforce workflow list --json` now shows only summary fields for recent runs; use `mediforce run get <id>` for the full run ([#1613](https://github.com/Appsilon/mediforce/pull/1613)).
+
+### Fixed
+
+- Step logs on the run page no longer go missing after a restart or redeploy, and live logs keep updating while a step runs ([#1589](https://github.com/Appsilon/mediforce/pull/1589)).
+- Changing a script step's plugin no longer keeps the old plugin's settings and blocks saving ([#1619](https://github.com/Appsilon/mediforce/pull/1619)).
+- Long version titles on a workflow's Definitions tab no longer overlap the badge, step count and date ([#1588](https://github.com/Appsilon/mediforce/pull/1588)).
+- Add Block categories with many blocks scroll instead of cutting off the last ones ([#1623](https://github.com/Appsilon/mediforce/pull/1623)).
+
 ## [1.3.1] - 2026-10-19
 
 ### Added
