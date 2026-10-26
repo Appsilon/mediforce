@@ -87,7 +87,32 @@ export const STEP_TYPE_CONFIG: Record<string, { label: string; color: string }> 
 // Custom nodes
 // ---------------------------------------------------------------------------
 
-export function ExecutorIcon({ executor, autonomyLevel }: { executor: string; autonomyLevel?: string }) {
+// Brand mark (simple-icons' Databricks glyph), not a generic Lucide icon —
+// same shape as the model logos in lib/agent-models.tsx.
+export function DatabricksLogo({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M.95 14.184L12 20.403l9.919-5.55v2.21L12 22.662l-10.484-5.96-.565.308v.77L12 24l11.05-6.218v-4.317l-.515-.309L12 19.118l-9.867-5.653v-2.21L12 16.805l11.05-6.218V6.32l-.515-.308L12 11.974 2.647 6.681 12 1.388l7.76 4.368.668-.411v-.566L12 0 .95 6.27v.72L12 13.207l9.919-5.55v2.26L12 15.52 1.516 9.56l-.565.308Z" />
+    </svg>
+  );
+}
+
+// Script steps share one executor-level icon; a plugin listed here gets its
+// own instead, so a Databricks step reads as Databricks rather than "Script".
+const PLUGIN_ICON: Record<string, { icon: React.ElementType; label: string }> = {
+  'databricks-job': { icon: DatabricksLogo, label: 'Databricks' },
+  'databricks-sql': { icon: DatabricksLogo, label: 'Databricks' },
+};
+
+export function ExecutorIcon({ executor, autonomyLevel, plugin }: { executor: string; autonomyLevel?: string; plugin?: string }) {
+  // Only a script step's plugin picks the config key these plugins require
+  // (scriptConfigKeyForPlugin) — an agent step's own, unrelated "Plugin"
+  // field can hold the same string without meaning the same thing.
+  const pluginIcon = executor === 'script' && plugin !== undefined ? PLUGIN_ICON[plugin] : undefined;
+  if (pluginIcon !== undefined) {
+    const Icon = pluginIcon.icon;
+    return <Icon className="h-3.5 w-3.5 shrink-0 text-yellow-500 dark:text-yellow-400" />;
+  }
   const mode = getControlMode(executor, autonomyLevel);
   if (executor === 'script') return <Terminal className="h-3.5 w-3.5 shrink-0 text-yellow-500 dark:text-yellow-400" />;
   if (executor === 'action') return <Zap className="h-3.5 w-3.5 shrink-0 text-pink-500 dark:text-pink-400" />;
@@ -113,7 +138,9 @@ export function ExecutorIcon({ executor, autonomyLevel }: { executor: string; au
   return <User className="h-3.5 w-3.5 shrink-0 text-orange-500 dark:text-orange-400" />;
 }
 
-export function getExecutorLabel(executor: string, mode: ControlMode): string {
+export function getExecutorLabel(executor: string, mode: ControlMode, plugin?: string): string {
+  const pluginIcon = executor === 'script' && plugin !== undefined ? PLUGIN_ICON[plugin] : undefined;
+  if (pluginIcon !== undefined) return pluginIcon.label;
   if (executor === 'human') return 'Human';
   if (executor === 'script') return 'Script';
   if (executor === 'action') return 'Action';
@@ -376,9 +403,9 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
         {/* Row 1: executor identity + step type, separated by a dot */}
         <div className="flex items-center gap-1.5 min-w-0">
           <div className="flex items-center gap-1 min-w-0 shrink-0">
-            <ExecutorIcon executor={data.executor} autonomyLevel={data.autonomyLevel} />
+            <ExecutorIcon executor={data.executor} autonomyLevel={data.autonomyLevel} plugin={data.plugin} />
             <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">
-              {getExecutorLabel(data.executor, mode)}
+              {getExecutorLabel(data.executor, mode, data.plugin)}
             </span>
           </div>
           <span className="text-muted-foreground/40 text-[10px] shrink-0">&middot;</span>
