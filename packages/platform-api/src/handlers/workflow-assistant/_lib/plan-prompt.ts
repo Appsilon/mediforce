@@ -13,7 +13,7 @@ export function buildPlanPrompt(): string {
   "phases": ["..."]
 }
 
-**plan** — two to four short lines saying what you are about to do, in the user's own terms, not the schema's. "Poll the SFTP server every 15 minutes" rather than "add a script step with a cron trigger". For a small edit, one line. This is what the person reads to catch a wrong assumption before you spend a minute building on it.
+**plan** — two to four short lines saying what you are about to do, in the user's own terms, not the schema's. "Poll the SFTP server every 15 minutes" rather than "add a script step with a cron trigger". For a small edit, one line. This is what the person reads to catch a wrong assumption before you spend a minute building on it. **If the user asked a question rather than asking for something built or changed — nothing on the canvas is about to be touched — return an empty \`plan\`.** The actual answer is written in the next turn; a plan that pre-answers the question here just shows the person the same thing twice, worded two different ways.
 
 **questions** — only what you genuinely cannot infer and would otherwise invent. A secret's name, who reviews something, where accepted files go, which of two readings of an ambiguous sentence was meant. Every question carries a \`recommended\` answer, so agreeing is one word. Ask nothing when the request and the canvas already answer everything — an edit to an existing workflow usually does, and a wall of questions is worse than a good guess plainly stated in the plan. Never ask for a secret's value: ask which key holds it. Never ask what you could look up in the canvas.
 

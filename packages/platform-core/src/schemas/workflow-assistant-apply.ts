@@ -2,6 +2,7 @@ import { uniqueSlug } from '../utils/slug';
 import { carriedDockerfile } from '../workflows/build-source';
 import type { WorkflowStep, WorkflowDefinition } from './workflow-definition';
 import type { WorkflowAuthorableSchema } from './workflow-definition';
+import { SCRIPT_CONFIG_KEY_PLUGIN } from './workflow-definition';
 import type { z } from 'zod';
 import type { WorkflowAssistantToolCall } from './workflow-assistant-tools';
 
@@ -31,6 +32,15 @@ export interface ApplyToolCallsResult {
   inputForNextRun: InputForNextRunEntry[] | undefined;
   outcomes: ToolCallOutcome[];
   addedStepIds: string[];
+}
+
+// A script step's plugin follows whichever config key it carries — never
+// settable directly (the tool schema omits `plugin`), so the assistant's only
+// way to pick databricks-job/databricks-sql is by filling in that config.
+function scriptPluginFor(step: Pick<WorkflowStep, 'databricks' | 'databricksSql'>): string {
+  if (step.databricks !== undefined) return SCRIPT_CONFIG_KEY_PLUGIN.databricks;
+  if (step.databricksSql !== undefined) return SCRIPT_CONFIG_KEY_PLUGIN.databricksSql;
+  return SCRIPT_CONFIG_KEY_PLUGIN.script;
 }
 
 // A step that names a Dockerfile with nothing to build it from.
@@ -96,7 +106,7 @@ export function applyWorkflowAssistantToolCalls(
         name: payload.name || `New Step ${String(stepCounter)}`,
         ...(payload.verdicts ? { verdicts: resolveVerdicts(payload.verdicts) } : {}),
         ...(payload.executor === 'agent' ? { plugin: 'opencode-agent', autonomyLevel: payload.autonomyLevel ?? 'L3' } : {}),
-        ...(payload.executor === 'script' ? { plugin: 'script-container' } : {}),
+        ...(payload.executor === 'script' ? { plugin: scriptPluginFor(payload) } : {}),
         ...(payload.executor === 'cowork' ? { cowork: payload.cowork ?? { agent: 'chat' as const } } : {}),
       } as WorkflowStep;
 
@@ -284,6 +294,7 @@ export function applyWorkflowAssistantToolCalls(
       const merged: WorkflowStep = { ...current, ...patch };
       if (patch.agent) merged.agent = { ...current.agent, ...patch.agent };
       if (patch.verdicts) merged.verdicts = resolveVerdicts(patch.verdicts);
+      if (merged.executor === 'script') merged.plugin = scriptPluginFor(merged);
       workingSteps = workingSteps.map((s) => (s.id === realId ? merged : s));
 
       const afterId = resolveId(insertAfterId);

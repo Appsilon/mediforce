@@ -61,6 +61,7 @@ const StepConfigSchema = WorkflowStepSchema.omit({
   agent: z.preprocess(preprocessJsonStringObject, withoutRepoBuildFields(WorkflowStepSchema.shape.agent)),
   script: z.preprocess(preprocessJsonStringObject, withoutRepoBuildFields(WorkflowStepSchema.shape.script)),
   databricks: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.databricks),
+  databricksSql: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.databricksSql),
   review: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.review),
   cowork: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.cowork),
   ui: z.preprocess(preprocessJsonStringObject, WorkflowStepSchema.shape.ui),

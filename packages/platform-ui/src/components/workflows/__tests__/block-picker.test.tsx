@@ -99,6 +99,7 @@ describe('BlockPicker executor guidance (#1186)', () => {
     expect(executorOption('human')).toHaveTextContent(/accountability, approval/i);
     expect(executorOption('script')).toHaveTextContent(/deterministic/i);
     expect(executorOption('action')).toHaveTextContent(/email/i);
+    expect(executorOption('databricks')).toHaveTextContent(/SQL statement/i);
     expect(executorOption('cowork')).toHaveTextContent(/real time/i);
     expect(executorOption('human-review')).toHaveTextContent(/approves/i);
     expect(executorOption('autonomous-agent')).toHaveTextContent(/no approval/i);
@@ -129,7 +130,7 @@ describe('BlockPicker executor guidance (#1186)', () => {
     expect(screen.queryByTestId('executor-option-human')).not.toBeInTheDocument();
 
     openSection('no-agent');
-    for (const id of ['human', 'script', 'action']) {
+    for (const id of ['human', 'script', 'action', 'databricks']) {
       expect(optionButton(id)).toBeInTheDocument();
     }
     expect(screen.queryByTestId('executor-option-autonomous-agent')).not.toBeInTheDocument();
@@ -142,6 +143,20 @@ describe('BlockPicker executor guidance (#1186)', () => {
     fireEvent.click(executorOption('script'));
 
     expect(onAdd).toHaveBeenCalledWith({ executor: 'script', type: 'creation' });
+  });
+
+  it('adds a Databricks step with its plugin and config, reachable from Full like any other executor', () => {
+    const onAdd = vi.fn();
+    renderFullTier(onAdd);
+
+    fireEvent.click(executorOption('databricks'));
+
+    expect(onAdd).toHaveBeenCalledWith({
+      executor: 'script',
+      plugin: 'databricks-job',
+      databricks: { jobId: '' },
+      type: 'creation',
+    });
   });
 
   it('carries the selected step type into the added step', () => {

@@ -34,4 +34,8 @@ describe('buildPlanPrompt', () => {
   it('speaks in the user\'s terms rather than the schema\'s', () => {
     expect(prompt).toMatch(/in the user's own terms, not the schema's/);
   });
+
+  it('returns an empty plan for a plain question, so the answer is not shown twice', () => {
+    expect(prompt).toMatch(/If the user asked a question rather than asking for something built or changed.*return an empty `plan`/s);
+  });
 });

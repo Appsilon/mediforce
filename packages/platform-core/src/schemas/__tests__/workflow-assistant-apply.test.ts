@@ -42,6 +42,48 @@ describe('applyWorkflowAssistantToolCalls', () => {
     expect(added?.continueOnError).toBe(true);
   });
 
+  it('derives plugin "databricks-sql" from databricksSql config, not the script-container default', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'add_step', arguments: {
+        type: 'creation', executor: 'script', name: 'Run SQL',
+        databricksSql: { warehouseId: 'abc123', statement: 'SELECT 1' },
+      } },
+    ];
+    const { steps } = applyWorkflowAssistantToolCalls(baseCanvas().steps, baseCanvas().transitions, calls);
+    const added = steps.find((s) => s.id === 'run-sql');
+    expect(added?.plugin).toBe('databricks-sql');
+  });
+
+  it('derives plugin "databricks-job" from databricks config', () => {
+    const calls: WorkflowAssistantToolCall[] = [
+      { tool: 'add_step', arguments: {
+        type: 'creation', executor: 'script', name: 'Trigger Job',
+        databricks: { jobId: 12345 },
+      } },
+    ];
+    const { steps } = applyWorkflowAssistantToolCalls(baseCanvas().steps, baseCanvas().transitions, calls);
+    const added = steps.find((s) => s.id === 'trigger-job');
+    expect(added?.plugin).toBe('databricks-job');
+  });
+
+  it('re-derives plugin when update_step adds databricksSql config to an existing script step', () => {
+    const canvas = baseCanvas();
+    const withScriptStep: typeof canvas.steps = [
+      ...canvas.steps,
+      { id: 'run', name: 'Run', type: 'creation', executor: 'script', plugin: 'script-container', script: { inlineScript: 'noop', runtime: 'python' } },
+    ];
+    const { steps } = applyWorkflowAssistantToolCalls(
+      withScriptStep, canvas.transitions,
+      [{ tool: 'update_step', arguments: {
+        stepId: 'run',
+        script: undefined,
+        databricksSql: { warehouseId: 'abc123', statement: 'SELECT 1' },
+      } }],
+    );
+    const updated = steps.find((s) => s.id === 'run');
+    expect(updated?.plugin).toBe('databricks-sql');
+  });
+
   it('assigns a new step the slugified id of its name, not its clientId', () => {
     const calls: WorkflowAssistantToolCall[] = [
       { tool: 'add_step', arguments: { type: 'creation', executor: 'action', name: 'Send Results Email', clientId: 'email' } },

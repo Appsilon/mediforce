@@ -79,6 +79,13 @@ export const EXECUTOR_SECTIONS: ExecutorSection[] = [
         mode: 'no-agent',
         payload: { executor: 'action' },
       },
+      {
+        id: 'databricks',
+        label: 'Databricks',
+        purpose: 'Trigger an existing Databricks job, or run one SQL statement on a warehouse.',
+        mode: 'no-agent',
+        payload: { executor: 'script', plugin: 'databricks-job', databricks: { jobId: '' } },
+      },
     ],
   },
   {

@@ -905,7 +905,7 @@ export function StepEditor({
         <FieldRow label="executor" tooltip={TIP.executor}>
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground py-0.5" title="executor is set at creation. To change, remove this step and add a new one.">
             <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-            <span>{execBaseStyle.label}</span>
+            <span>{execStyle.label}</span>
           </span>
         </FieldRow>
 

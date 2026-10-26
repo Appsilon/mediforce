@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { CONTROL_MODE_LABELS, getControlMode } from '@/lib/control-mode';
+import { DatabricksLogo } from '@/components/workflows/workflow-diagram';
 
 interface NextStepCardProps {
   processInstanceId: string;
@@ -88,6 +89,7 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
   const isTerminal = nextStep?.type === 'terminal';
   const executorType = nextStep?.executor ?? null;
   const autonomyLevel = nextStep?.autonomyLevel ?? null;
+  const plugin = nextStep?.plugin ?? null;
   const processCompleted = instance?.status === 'completed';
 
   const runHref = instance
@@ -105,7 +107,7 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
       </div>
 
       <div className="flex items-center gap-3">
-        <StepIcon isTerminal={isTerminal} processCompleted={processCompleted} executorType={executorType} autonomyLevel={autonomyLevel} />
+        <StepIcon isTerminal={isTerminal} processCompleted={processCompleted} executorType={executorType} autonomyLevel={autonomyLevel} plugin={plugin} />
 
         <div className="flex-1 min-w-0">
           {isTerminal || processCompleted ? (
@@ -126,6 +128,7 @@ export function NextStepCard({ processInstanceId, stepId }: NextStepCardProps) {
                 <StepDescription
                   executorType={executorType}
                   autonomyLevel={autonomyLevel}
+                  plugin={plugin}
                   nextHumanTask={nextHumanTask}
                   reason={stepExecution.gateResult?.reason}
                 />
@@ -152,16 +155,25 @@ function StepIcon({
   processCompleted,
   executorType,
   autonomyLevel,
+  plugin,
 }: {
   isTerminal: boolean;
   processCompleted: boolean;
   executorType: string | null;
   autonomyLevel: string | null;
+  plugin: string | null;
 }) {
   if (isTerminal || processCompleted) {
     return (
       <div className="rounded-full bg-green-100 p-1.5 dark:bg-green-900/30">
         <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+      </div>
+    );
+  }
+  if (executorType === 'script' && (plugin === 'databricks-job' || plugin === 'databricks-sql')) {
+    return (
+      <div className="rounded-full bg-amber-100 p-1.5 dark:bg-amber-900/30">
+        <DatabricksLogo className="h-4 w-4 text-amber-600 dark:text-amber-400" />
       </div>
     );
   }
@@ -219,17 +231,21 @@ function StepIcon({
 function StepDescription({
   executorType,
   autonomyLevel,
+  plugin,
   nextHumanTask,
   reason,
 }: {
   executorType: string | null;
   autonomyLevel: string | null;
+  plugin: string | null;
   nextHumanTask: HumanTask | null;
   reason: string | undefined;
 }) {
   const parts: string[] = [];
 
-  if (executorType === 'script') {
+  if (executorType === 'script' && (plugin === 'databricks-job' || plugin === 'databricks-sql')) {
+    parts.push('Databricks');
+  } else if (executorType === 'script') {
     parts.push('Script automation');
   } else if (executorType === 'action') {
     parts.push('Automated action');

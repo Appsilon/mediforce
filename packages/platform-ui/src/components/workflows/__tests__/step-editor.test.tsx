@@ -499,6 +499,19 @@ describe('StepEditor', () => {
     expect(screen.getAllByText('Script').length).toBeGreaterThanOrEqual(1);
   });
 
+  it('[RENDER] shows Databricks, not Script, for a databricks-job step — the executor row matches the header badge', () => {
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'script', type: 'creation', plugin: 'databricks-job', databricks: { jobId: '123' } })}
+        allSteps={[]}
+        onChange={noop}
+      />,
+    );
+
+    expect(screen.getAllByText('Databricks').length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText('Script')).toBeNull();
+  });
+
   it('[RENDER] header shows Review type label for review step', () => {
     render(
       <StepEditor
