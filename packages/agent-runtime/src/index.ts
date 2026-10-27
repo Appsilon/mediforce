@@ -46,12 +46,15 @@ export { OpenRouterLlmClient } from './runner/llm-client';
 export {
   LlmJudgeReviewPlugin,
   judgeOutputAgreement,
+  classifyReviewGap,
   llmJudgeMessages,
   outputAgreementMessages,
   type LlmJudgeConfig,
   type LlmJudgeResult,
   type OutputAgreement,
   type OutputAgreementConfig,
+  type ReviewGapConfig,
+  type ReviewGapVerdict,
 } from './runner/llm-judge';
 export { PluginRunner } from './runner/plugin-runner';
 export type { PluginRunResult } from './runner/plugin-runner';

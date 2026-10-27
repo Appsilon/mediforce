@@ -201,3 +201,62 @@ export async function judgeOutputAgreement(llm: LlmClient, config: OutputAgreeme
   }
   return { agreement: answer.agreement, rationale: answer.rationale, model: response.model };
 }
+
+export interface ReviewGapConfig {
+  readonly model: string;
+  /** What the step returned, judged against the reviewer's comment. */
+  readonly agentOutput: unknown;
+  /** A human reviewer's free-text reason for sending the output back. */
+  readonly comment: string;
+}
+
+export interface ReviewGapVerdict {
+  /** True when the comment points at something the output never covered — a miss, not a judgment call. */
+  readonly missed: boolean;
+  readonly rationale: string;
+  readonly model: string;
+}
+
+const ReviewGapAnswerSchema = z.object({
+  rationale: z.string().trim().min(1),
+  missed: z.boolean(),
+});
+
+function reviewGapMessages(config: Omit<ReviewGapConfig, 'model'>): LlmMessage[] {
+  return [
+    {
+      role: 'system',
+      content: [
+        'You read the output of one step of a pharmaceutical workflow and a human reviewer\'s comment explaining why they sent it back, and decide whether the comment points at something the output never covered.',
+        'missed is true when the comment raises an issue, fact or check the output does not mention or address at all. missed is false when the output already covers the same ground and the reviewer is simply weighing it differently — a judgment call, a stricter risk tolerance, a stylistic preference — not something the output missed.',
+        'Explain your decision: cite the specific part of the output (or its absence) and the specific part of the comment that decided it.',
+        'Answer with one JSON object and nothing else: {"rationale": "<your explanation>", "missed": <true or false>}. Write the rationale before deciding.',
+      ].join('\n\n'),
+    },
+    {
+      role: 'user',
+      content: [
+        `Step output:\n${section(config.agentOutput)}`,
+        `Reviewer's comment:\n${config.comment}`,
+      ].join('\n\n'),
+    },
+  ];
+}
+
+/**
+ * Whether a reviewer's correction comment names a gap the step's own output
+ * never covered, vs. a judgment call on ground the output already addressed.
+ * Feeds the production-review feedback loop (ADR-0023's Score model):
+ * `missed: true` is the signal that the step may need a new rule, Evaluator
+ * or prompt change. An answer without both fields throws — a judgment that
+ * did not run must not be scored as "not missed".
+ */
+export async function classifyReviewGap(llm: LlmClient, config: ReviewGapConfig): Promise<ReviewGapVerdict> {
+  const response = await llm.complete(reviewGapMessages(config), config.model);
+
+  const answer = parseAnswer(response.content, ReviewGapAnswerSchema);
+  if (answer === null) {
+    throw new Error(`the review-gap judge gave no usable verdict (rationale, missed): ${response.content.slice(0, 300)}`);
+  }
+  return { missed: answer.missed, rationale: answer.rationale, model: response.model };
+}

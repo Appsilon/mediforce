@@ -25,6 +25,10 @@ export const HumanTaskSchema = z.object({
   ui: StepUiSchema.optional(),  // copied from step definition — tells UI what form to render
   params: z.array(StepParamSchema).optional(),  // copied from step definition — tells UI what form fields to render
   creationReason: CreationReasonSchema.optional(),  // why this task was created
+  /** Id of the earlier step whose Agent Run this task reviews — copied from
+   *  the WD step so a plain (non-escalated) review can still be linked to
+   *  `recordHumanVerdictScore`'s `human_verdict` Score. */
+  reviewsAgentStep: z.string().min(1).optional(),
   selection: SelectionSchema.optional(),  // copied from step definition — enables "pick one" review mode
   options: z.array(z.record(z.string(), z.unknown())).optional(),  // options from previous step output
   // Resolved verdict descriptors copied from the WD step in WD insertion order

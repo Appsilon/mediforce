@@ -70,6 +70,7 @@ export const humanTasks = pgTable(
     verdicts: jsonb('verdicts'),
 
     creationReason: text('creation_reason').notNull(),  // human_executor | agent_review_l3
+    reviewsAgentStep: text('reviews_agent_step'),  // step id this review judges, when not self-escalated
 
     // Soft-delete tombstone (NULL = active).
     deletedAt: timestamp('deleted_at', { withTimezone: true }),

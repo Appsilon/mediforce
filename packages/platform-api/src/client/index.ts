@@ -716,9 +716,13 @@ import {
 import {
   AskEvaluationAssistantInputSchema,
   AskEvaluationAssistantOutputSchema,
+  AskAboutReviewGapsInputSchema,
+  AskAboutReviewGapsOutputSchema,
   EvaluationAssistantProgressSchema,
   type AskEvaluationAssistantInput,
   type AskEvaluationAssistantOutput,
+  type AskAboutReviewGapsInput,
+  type AskAboutReviewGapsOutput,
   type EvaluationAssistantProgress,
 } from '../contract/evaluation-assistant';
 import { BUILD_CONTEXT_MEDIA_TYPE } from '@mediforce/platform-core';
@@ -1169,6 +1173,8 @@ export class Mediforce {
       input: AskEvaluationAssistantInput,
       options?: { signal?: AbortSignal; onProgress?: (event: EvaluationAssistantProgress) => void },
     ) => Promise<AskEvaluationAssistantOutput>;
+    /** Feeds `review_gap` Scores since `since` into the Assistant, only when at least one is a real miss. */
+    askAboutReviewGaps: (input: AskAboutReviewGapsInput) => Promise<AskAboutReviewGapsOutput>;
   };
 
   readonly monitoring: {
@@ -2869,6 +2875,10 @@ export class Mediforce {
         return this.sendWithProgress('/api/evaluation/assistant', body, AskEvaluationAssistantOutputSchema,
           EvaluationAssistantProgressSchema, options.onProgress, ctx, options.signal);
       },
+      askAboutReviewGaps: async (input) => this.sendJson(
+        'POST', '/api/evaluation/assistant/review-gaps', AskAboutReviewGapsInputSchema.parse(input),
+        AskAboutReviewGapsOutputSchema, 'mediforce.evaluation.askAboutReviewGaps',
+      ),
     };
 
     this.scores = {
