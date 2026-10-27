@@ -117,6 +117,21 @@ export class AuthorizedAgentDefinitionRepository extends AuthorizedScope {
       this.caller.isSystemActor ? null : [...this.caller.namespaces],
     );
 
+  private imageAudit: Promise<AgentDefinition[]> | null = null;
+
+  /**
+   * Every agent in the deployment, regardless of namespace or visibility —
+   * mirrors `AuthorizedWorkflowDefinitionRepository.listGroupsForImageAudit`:
+   * deleting a Docker image breaks whichever agent names it, in whatever
+   * workspace, so the caller's own memberships cannot narrow the read. The
+   * caller must redact what it reveals. Read once per scope/request, since
+   * deleting a multi-tag catalog entry asks this once per tag.
+   */
+  listAllForImageAudit = async (): Promise<AgentDefinition[]> => {
+    this.imageAudit ??= this.raw.listAll();
+    return this.imageAudit;
+  };
+
   /** The versions of an Agent the caller can see, newest first; `[]` when it is not visible (ADR-0029). */
   listVersions = async (id: string): Promise<AgentVersion[]> =>
     (await this.getById(id)) === null ? [] : this.raw.listVersions(id);
