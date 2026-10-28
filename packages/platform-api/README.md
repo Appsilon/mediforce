@@ -191,12 +191,15 @@ an Agent reads itself (`get_agent`) and the production runs of the Steps that
 use it (`list_agent_production_runs`, from `evaluation/_lib/agent-production-runs.ts`)
 in place of a Step's own reads, previews, synthesized cases and routing. A
 tool added for both lands in both toolsets; one for a single subject, in its own.
-One exception: `get_step_instructions` and `propose_task_completion_judge`
+One exception: `get_step_instructions` and `propose_task_completion_evaluators`
 (epic #1516 F1) sit in the catalog but in neither Step toolset — offered only
-to a request flagged `action: 'draft_task_completion_judge'`
-(`DRAFT_TASK_COMPLETION_JUDGE_TOOLSET`), which also swaps in a fixed system
-prompt addendum, so drafting the step's `task-completion` Evaluator never
-competes with a free-form `propose_evaluator`.
+to a request flagged `action: 'draft_task_completion_evaluators'`
+(`DRAFT_TASK_COMPLETION_EVALUATORS_TOOLSET`), which also swaps in a fixed system
+prompt addendum, so drafting the step's `task-completion-*` Evaluators never
+competes with a free-form `propose_evaluator`. The draft is one Evaluator per
+requirement of the step's instructions, each of the cheapest kind that decides
+it (`schema`, `code`, or an `llm_judge` whose rubric the platform renders), so
+a failure names the requirement missed; each is self-tested on its own.
 
 A request may grant the Evaluation Assistant an unattended budget
 (`unattendedBudgetUsd`): `start_eval_run` then starts prepared runs of the step

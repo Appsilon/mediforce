@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { TASK_COMPLETION_EVALUATOR_NAME, TASK_COMPLETION_EVALUATOR_RULE, type EvaluationSubject } from '@mediforce/platform-core';
+import type { EvaluationSubject } from '@mediforce/platform-core';
 import { userCaller } from '../../../../repositories/__tests__/create-test-scope';
 import { createEvaluator } from '../../../evaluation/evaluators';
 import { createEvalCase } from '../../../evaluation/eval-cases';
@@ -58,15 +58,41 @@ describe('reviewEvaluationProposal', () => {
     expect(taken).toMatchObject({ ok: false, error: expect.stringContaining('propose_evaluator_version') });
   });
 
-  it('self-tests a drafted task-completion judge\'s rendered rubric, and refuses one while a live Evaluator already has that name', async () => {
-    const proposal = { requirements: [{ text: 'Every finding is graded.', source: 'prompt' as const }], vagueInstructions: [] };
-    // No model key in the workspace: the judge cannot grade anything, same as any other llm_judge self-test here.
-    const review = await reviewEvaluationProposal('propose_task_completion_judge', proposal, fixture.scope(), STEP, []);
-    expect(review).toMatchObject({ ok: false, error: expect.stringContaining('errored on every output it was tried on (2)') });
+  describe('drafted task-completion Evaluators (F1)', () => {
+    const present = { name: 'findings-present', requirement: 'The result lists findings.', source: 'output_schema' as const, check: findings };
+    const graded = { name: 'every-finding-graded', requirement: 'Every finding is graded.', source: 'prompt' as const, check: { kind: 'llm_judge' as const } };
 
-    await createEvaluator({ ...STEP, name: TASK_COMPLETION_EVALUATOR_NAME, rule: TASK_COMPLETION_EVALUATOR_RULE, check: judge, origin: 'user' }, fixture.scope());
-    const taken = await reviewEvaluationProposal('propose_task_completion_judge', proposal, fixture.scope(), STEP, []);
-    expect(taken).toMatchObject({ ok: false, error: expect.stringContaining(`already has a live '${TASK_COMPLETION_EVALUATOR_NAME}'`) });
+    it('self-tests each Evaluator on its own, one self-test per Evaluator drafted', async () => {
+      const review = await reviewEvaluationProposal('propose_task_completion_evaluators', { evaluators: [present], vagueInstructions: [] }, fixture.scope(), STEP, []);
+      expect(review).toEqual({
+        ok: true,
+        evidence: {
+          selfTests: [
+            { results: expect.arrayContaining([expect.objectContaining({ agentRunId: GRADED_RUN, passed: true }), expect.objectContaining({ agentRunId: UNGRADED_RUN, passed: false })]) },
+          ],
+        },
+      });
+    });
+
+    it('sends back a second output-schema check — in the suite, or beside the step\'s live one — since a step has one', async () => {
+      const summary = { ...present, name: 'summary-present', check: { kind: 'schema' as const, schema: { required: ['summary'] } } };
+      const twice = await reviewEvaluationProposal('propose_task_completion_evaluators', { evaluators: [present, summary], vagueInstructions: [] }, fixture.scope(), STEP, []);
+      expect(twice).toMatchObject({ ok: false, error: expect.stringContaining('A step has one output-schema check') });
+
+      await createEvaluator({ ...STEP, ...proposeEvaluator(findings), origin: 'user' }, fixture.scope());
+      const beside = await reviewEvaluationProposal('propose_task_completion_evaluators', { evaluators: [summary], vagueInstructions: [] }, fixture.scope(), STEP, []);
+      expect(beside).toMatchObject({ ok: false, error: expect.stringContaining('already has its output-schema check (\'findings-present\')') });
+    });
+
+    it('sends back the Evaluator whose check errors on every output by name, and names the step already uses', async () => {
+      // No model key in the workspace: the rendered judge cannot grade anything.
+      const broken = await reviewEvaluationProposal('propose_task_completion_evaluators', { evaluators: [present, graded], vagueInstructions: [] }, fixture.scope(), STEP, []);
+      expect(broken).toMatchObject({ ok: false, error: expect.stringMatching(/^task-completion-every-finding-graded: The check errored on every output it was tried on \(2\)/) });
+
+      await createEvaluator({ ...STEP, name: 'task-completion-findings-present', rule: present.requirement, check: findings, origin: 'user' }, fixture.scope());
+      const taken = await reviewEvaluationProposal('propose_task_completion_evaluators', { evaluators: [present], vagueInstructions: [] }, fixture.scope(), STEP, []);
+      expect(taken).toMatchObject({ ok: false, error: expect.stringContaining('\'task-completion-findings-present\' already') });
+    });
   });
 
   it('marks a check untested for a person who may not run checks, instead of dropping it', async () => {

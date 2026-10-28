@@ -13,10 +13,10 @@ export const AskEvaluationAssistantInputSchema = EvaluationSubjectRefSchema.exte
   definitionVersion: z.number().int().positive().optional(),
   /**
    * Restricts this one turn to a fixed task, with its own narrow tool set
-   * instead of the subject's ordinary toolset (D14). `draft_task_completion_judge`
-   * drafts the step's task-completion judge from its instructions (epic #1516 F1); a Step only.
+   * instead of the subject's ordinary toolset (D14). `draft_task_completion_evaluators`
+   * drafts the step's task-completion Evaluators from its instructions (epic #1516 F1); a Step only.
    */
-  action: z.enum(['draft_task_completion_judge']).optional(),
+  action: z.enum(['draft_task_completion_evaluators']).optional(),
   messages: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string().max(20_000),
@@ -52,9 +52,13 @@ export const EvaluatorSelfTestSchema = z.union([
   z.object({ unavailable: z.string() }),
 ]);
 
-/** A proposal as the person sees it; a proposed check carries its self-test. */
+/**
+ * A proposal as the person sees it; a proposed check carries its self-test,
+ * and drafted task-completion Evaluators one each, in the order drafted.
+ */
 export const ProposalViewSchema = EvaluationAssistantProposalSchema.and(z.object({
   selfTest: EvaluatorSelfTestSchema.optional(),
+  selfTests: z.array(EvaluatorSelfTestSchema).optional(),
 }));
 
 export const AskEvaluationAssistantOutputSchema = z.object({

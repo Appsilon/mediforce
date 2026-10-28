@@ -1,13 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import type { APIRequestContext } from '@playwright/test';
-import {
-  DEFAULT_JUDGE_MIN_CONFIDENCE,
-  FALLBACK_PINNED_MODEL,
-  TASK_COMPLETION_EVALUATOR_NAME,
-  TASK_COMPLETION_EVALUATOR_RULE,
-  taskCompletionRubric,
-} from '@mediforce/platform-core';
+import { DEFAULT_JUDGE_MIN_CONFIDENCE, FALLBACK_PINNED_MODEL, taskCompletionEvaluator } from '@mediforce/platform-core';
 import {
   AskEvaluationAssistantOutputSchema,
   EvalCaseOutputSchema,
@@ -284,8 +278,8 @@ test.describe('Evaluation Assistant — API E2E', () => {
     });
   });
 
-  test('drafts a task-completion judge from the step\'s instructions behind the dedicated action, offering only its own tools (F1)', async ({ request }) => {
-    // A fresh step with no production runs, so its draft's self-test preview finds nothing to try — and trivially passes.
+  test('drafts one task-completion Evaluator per requirement, each of its own kind, behind the dedicated action, offering only its own tools (F1)', async ({ request }) => {
+    // A fresh step with no production runs, so each draft's self-test preview finds nothing to try — and trivially passes.
     const workflowName = `e2e-eval-assistant-task-completion-${randomUUID().slice(0, 8)}`;
     const createRes = await request.post(`/api/workflow-definitions?namespace=${EVALUATION_WORKSPACE}`, {
       headers: JSON_HEADERS,
@@ -294,20 +288,24 @@ test.describe('Evaluation Assistant — API E2E', () => {
     expect(createRes.status(), await createRes.text()).toBe(201);
     const freshStep = { namespace: EVALUATION_WORKSPACE, workflowName, stepId: 'grade-aes' };
 
-    const question = `Draft the task-completion judge. ${randomUUID()}`;
-    const requirements = [
-      { text: 'Every adverse event in the input appears in the output.', source: 'prompt' as const },
-      { text: '`findings` is present and filled.', source: 'output_schema' as const, priority: 'high' as const },
+    const question = `Draft the task-completion evaluators. ${randomUUID()}`;
+    const evaluators = [
+      { name: 'findings-present', requirement: '`findings` is present.', source: 'output_schema' as const, priority: 'high' as const, check: { kind: 'schema' as const, schema: { required: ['findings'] } } },
+      {
+        name: 'every-ae-kept', requirement: 'Every adverse event in the input appears in the output.', source: 'prompt' as const,
+        check: { kind: 'code' as const, runtime: 'python' as const, source: 'import json\nprint(json.dumps({"passed": True}))' },
+      },
+      { name: 'grades-justified', requirement: 'Each grade is justified by the event\'s description.', source: 'prompt' as const, check: { kind: 'llm_judge' as const } },
     ];
     await scriptOpenRouter(question, [
       { toolCalls: [{ name: 'get_step_instructions', arguments: {} }] },
-      { toolCalls: [{ name: 'propose_task_completion_judge', arguments: { requirements, vagueInstructions: [] } }] },
-      { content: 'Drafted two requirements from the step\'s prompt and output schema.' },
+      { toolCalls: [{ name: 'propose_task_completion_evaluators', arguments: { evaluators, vagueInstructions: [] } }] },
+      { content: 'Drafted three Evaluators from the step\'s prompt and output schema.' },
     ]);
 
     const res = await request.post('/api/evaluation/assistant', {
       headers: JSON_HEADERS,
-      data: { ...freshStep, action: 'draft_task_completion_judge', messages: [{ role: 'user', content: question }] },
+      data: { ...freshStep, action: 'draft_task_completion_evaluators', messages: [{ role: 'user', content: question }] },
     });
     expect(res.status(), await res.text()).toBe(200);
     const answer = AskEvaluationAssistantOutputSchema.parse(await res.json());
@@ -315,40 +313,37 @@ test.describe('Evaluation Assistant — API E2E', () => {
     // The restricted toolset (D-B): no free-form propose_evaluator this turn.
     const requests = await openRouterRequests(question);
     expect((requests[0]!.tools ?? []).map((tool) => tool.function.name).sort()).toEqual(
-      ['get_agent_run', 'get_step_instructions', 'list_step_runs', 'preview_evaluator', 'propose_task_completion_judge'].sort(),
+      ['get_agent_run', 'get_step_instructions', 'list_step_runs', 'preview_evaluator', 'propose_task_completion_evaluators'].sort(),
     );
     // Skills come back as name + description only, never the full SKILL.md.
     expect(lastToolResult(requests[1]!.messages)).toMatchObject({ prompt: 'Grade each AE.', skills: [] });
 
     expect(answer.proposals).toEqual([{
-      tool: 'propose_task_completion_judge',
-      arguments: { requirements, vagueInstructions: [] },
-      selfTest: { results: [] },
+      tool: 'propose_task_completion_evaluators',
+      arguments: { evaluators, vagueInstructions: [] },
+      selfTests: [{ results: [] }, { results: [] }, { results: [] }],
     }]);
 
-    // Accepting it is the ordinary create: the fixed name and rule, the rendered rubric, production opt-in stays off.
-    const rubric = taskCompletionRubric(requirements);
-    const accepted = await request.post('/api/evaluation/evaluators', {
-      headers: JSON_HEADERS,
-      data: {
-        ...freshStep,
-        name: TASK_COMPLETION_EVALUATOR_NAME,
-        rule: TASK_COMPLETION_EVALUATOR_RULE,
-        check: { kind: 'llm_judge', model: FALLBACK_PINNED_MODEL, rubric, minConfidence: DEFAULT_JUDGE_MIN_CONFIDENCE },
-        origin: 'assistant',
-      },
-    });
-    expect(accepted.status(), await accepted.text()).toBe(201);
-    const evaluator = EvaluatorOutputSchema.parse(await accepted.json()).evaluator;
-    expect(evaluator.name).toBe(TASK_COMPLETION_EVALUATOR_NAME);
-    expect(evaluator.runInProduction).toBe(false);
-    expect(evaluator.latest.check).toEqual({ kind: 'llm_judge', model: FALLBACK_PINNED_MODEL, rubric, minConfidence: DEFAULT_JUDGE_MIN_CONFIDENCE });
+    // Accepting each is the ordinary create, one Evaluator per requirement: production opt-in stays off.
+    for (const drafted of evaluators) {
+      const accepted = await request.post('/api/evaluation/evaluators', {
+        headers: JSON_HEADERS,
+        data: { ...freshStep, ...taskCompletionEvaluator(drafted), origin: 'assistant' },
+      });
+      expect(accepted.status(), await accepted.text()).toBe(201);
+      expect(EvaluatorOutputSchema.parse(await accepted.json()).evaluator.runInProduction).toBe(false);
+    }
+    const listed = await request.get(`/api/evaluation/evaluators?${new URLSearchParams(freshStep)}`, { headers: AUTH_HEADERS });
+    const created = new Map(ListEvaluatorsOutputSchema.parse(await listed.json()).evaluators.map((evaluator) => [evaluator.name, evaluator.latest.check]));
+    expect([...created.keys()].sort()).toEqual(['task-completion-every-ae-kept', 'task-completion-findings-present', 'task-completion-grades-justified']);
+    expect(created.get('task-completion-findings-present')).toEqual(evaluators[0]!.check);
+    expect(created.get('task-completion-grades-justified')).toEqual({ kind: 'llm_judge', model: FALLBACK_PINNED_MODEL, rubric: expect.stringContaining(evaluators[2]!.requirement), minConfidence: DEFAULT_JUDGE_MIN_CONFIDENCE });
   });
 
   test('refuses the action for an agent evaluated on its own, which has no step instructions to draft from', async ({ request }) => {
     const res = await request.post('/api/evaluation/assistant', {
       headers: JSON_HEADERS,
-      data: { namespace: EVALUATION_WORKSPACE, agentId: 'nonexistent-agent', action: 'draft_task_completion_judge', messages: [{ role: 'user', content: 'Draft it.' }] },
+      data: { namespace: EVALUATION_WORKSPACE, agentId: 'nonexistent-agent', action: 'draft_task_completion_evaluators', messages: [{ role: 'user', content: 'Draft it.' }] },
     });
     expect(res.status(), await res.text()).toBe(400);
     expect((await res.json()).error.message).toContain('has none to draft from');

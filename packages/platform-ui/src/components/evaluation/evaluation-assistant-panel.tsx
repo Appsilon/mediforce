@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Bot, Check, Loader2, Send, Settings, Sparkles, User, X } from 'lucide-react';
-import { DEFAULT_MODEL, TASK_COMPLETION_EVALUATOR_NAME } from '@mediforce/platform-core';
+import { DEFAULT_MODEL, isTaskCompletionEvaluatorName } from '@mediforce/platform-core';
 import type {
   EvaluationSubject,
   EvaluationAssistantPlatformToolName,
@@ -24,12 +24,13 @@ import {
   DiagnosisCard,
   PlanCard,
   ProposalCard,
-  TaskCompletionJudgeCard,
+  TaskCompletionEvaluatorsCard,
   isDecidable,
   type ProposalStatus,
 } from './evaluation-assistant-cards';
 
-const DRAFT_TASK_COMPLETION_JUDGE_MESSAGE = 'Draft a task-completion judge from this step\'s instructions.';
+const ADD_TASK_COMPLETION_EVALUATORS_BUTTON = 'inline-flex h-8 items-center rounded-md border border-primary bg-muted/40 px-3 text-sm font-semibold text-primary transition-colors hover:bg-accent';
+const DRAFT_TASK_COMPLETION_EVALUATORS_MESSAGE = 'Draft task-completion Evaluators from this step\'s instructions.';
 
 interface ProposalState {
   readonly proposal: ProposalView;
@@ -89,7 +90,7 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   propose_control_settings: 'Recommending routing',
   get_failures: 'Reading an eval run\'s failures',
   propose_diagnosis: 'Diagnosing the failures',
-  propose_task_completion_judge: 'Drafting the task-completion judge',
+  propose_task_completion_evaluators: 'Drafting the task-completion Evaluators',
 };
 
 function toolLabel(tool: string): string {
@@ -182,8 +183,8 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
   };
 
   const evaluators = useStepEvaluators(step);
-  const hasTaskCompletionJudge = evaluators.data?.evaluators.some((evaluator) => evaluator.name === TASK_COMPLETION_EVALUATOR_NAME) ?? false;
-  const offerTaskCompletionJudge = step.kind === 'step' && hasTaskCompletionJudge === false;
+  const hasTaskCompletionEvaluators = evaluators.data?.evaluators.some((evaluator) => isTaskCompletionEvaluatorName(evaluator.name)) ?? false;
+  const offerTaskCompletionEvaluators = step.kind === 'step' && hasTaskCompletionEvaluators === false;
 
   /** Sends a message; one from a card leaves whatever the person is typing in the input. */
   const send = async (message: string, from: 'input' | 'card', action?: AskEvaluationAssistantInput['action']) => {
@@ -304,13 +305,13 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
               Ask for an evaluation plan, turn a rule into a check tried on real runs,
               synthesize edge cases, prepare an Eval Run or explain a report. It proposes; you decide.
             </p>
-            {offerTaskCompletionJudge && (
+            {offerTaskCompletionEvaluators && (
               <button
                 type="button"
-                className={cn('rounded-md border px-2 py-1 text-foreground hover:bg-muted', pending && 'pointer-events-none opacity-50')}
-                data-testid="draft-task-completion-judge"
-                onClick={() => void send(DRAFT_TASK_COMPLETION_JUDGE_MESSAGE, 'card', 'draft_task_completion_judge')}
-              >Create task-completion evaluator</button>
+                className={cn(ADD_TASK_COMPLETION_EVALUATORS_BUTTON, pending && 'pointer-events-none opacity-50')}
+                data-testid="draft-task-completion-evaluators"
+                onClick={() => void send(DRAFT_TASK_COMPLETION_EVALUATORS_MESSAGE, 'card', 'draft_task_completion_evaluators')}
+              >Add task-completion evaluators</button>
             )}
           </div>
         )}
@@ -347,9 +348,9 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
                 if (proposal.tool === 'propose_diagnosis') {
                   return <DiagnosisCard key={proposalIndex} diagnosis={proposal.arguments} />;
                 }
-                if (proposal.tool === 'propose_task_completion_judge') {
+                if (proposal.tool === 'propose_task_completion_evaluators') {
                   return (
-                    <TaskCompletionJudgeCard
+                    <TaskCompletionEvaluatorsCard
                       key={proposalIndex}
                       step={step}
                       state={{ proposal, status: state.status }}
@@ -397,14 +398,14 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
         )}
         {error !== null && <p className="text-xs text-destructive">{error}</p>}
       </div>
-      {offerTaskCompletionJudge && messages.length > 0 && (
+      {offerTaskCompletionEvaluators && messages.length > 0 && (
         <div className="shrink-0 border-t px-2 pt-2">
           <button
             type="button"
-            className={cn('rounded-full border px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted', pending && 'pointer-events-none opacity-50')}
-            data-testid="draft-task-completion-judge-chip"
-            onClick={() => void send(DRAFT_TASK_COMPLETION_JUDGE_MESSAGE, 'card', 'draft_task_completion_judge')}
-          >Create task-completion evaluator</button>
+            className={cn(ADD_TASK_COMPLETION_EVALUATORS_BUTTON, pending && 'pointer-events-none opacity-50')}
+            data-testid="draft-task-completion-evaluators-chip"
+            onClick={() => void send(DRAFT_TASK_COMPLETION_EVALUATORS_MESSAGE, 'card', 'draft_task_completion_evaluators')}
+          >Add task-completion evaluators</button>
         </div>
       )}
       <div className="flex shrink-0 gap-2 border-t p-2">

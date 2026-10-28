@@ -253,11 +253,11 @@ describe('mediforce eval ask --unattended-budget', () => {
     expect(await evalAskCommand({ argv: [...STEP_ARGV, 'Hello', '--unattended-budget', '-1', ...BASE], env: ENV, output })).toBe(2);
   });
 
-  it('sends the draft-task-completion-judge action, and refuses any other value', async () => {
+  it('sends the draft-task-completion-evaluators action, and refuses any other value', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ ...reply, startedEvalRuns: [] }));
     const output = captureOutput();
-    expect(await evalAskCommand({ argv: [...STEP_ARGV, 'Draft it', '--action', 'draft-task-completion-judge', ...BASE], env: ENV, output })).toBe(0);
-    expect(JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body))).toMatchObject({ action: 'draft_task_completion_judge' });
+    expect(await evalAskCommand({ argv: [...STEP_ARGV, 'Draft it', '--action', 'draft-task-completion-evaluators', ...BASE], env: ENV, output })).toBe(0);
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body))).toMatchObject({ action: 'draft_task_completion_evaluators' });
     expect(await evalAskCommand({ argv: [...STEP_ARGV, 'Draft it', '--action', 'bogus', ...BASE], env: ENV, output })).toBe(2);
   });
 });
