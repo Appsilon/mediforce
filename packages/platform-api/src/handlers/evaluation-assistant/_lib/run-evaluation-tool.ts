@@ -17,6 +17,7 @@ import {
   RetiredFileSkillError,
   SkillNotFoundError,
   listCommitFiles,
+  listRevisionOutputFiles,
   readCommitFile,
   resolveMcpForStep,
   resolveSkillsForStep,
@@ -342,6 +343,29 @@ export async function executeEvaluationTool(
         ? null
         : await readCommitFile(source.bareRepoPath, source.workspaceSeedCommit, path);
       if (content === null) throw new NotFoundError(`The workspace of Agent Run '${agentRunId}' has no file '${path}'`);
+      if (isBinary(content)) return { path, size: content.length, binary: true };
+      return { path, size: content.length, content: clip(content.toString('utf-8'), 20_000) };
+    }
+    case 'list_output_files': {
+      const { agentRunId } = args as Args<'list_output_files'>;
+      const { stepId } = stepOnly(step, 'Reading output files');
+      const source = await loadCaseSource(scope, agentRunId, stepOnly(step, 'Reading output files'), 'read');
+      const git = source.subject.agentRun.envelope?.gitMetadata;
+      if (source.bareRepoPath === null || git == null) {
+        return { files: [], note: 'This run committed no Output Files.' };
+      }
+      const files = (await listRevisionOutputFiles(source.bareRepoPath, git.commitSha))
+        .filter((file) => file.stepId === stepId);
+      return { files };
+    }
+    case 'read_output_file': {
+      const { agentRunId, path } = args as Args<'read_output_file'>;
+      const source = await loadCaseSource(scope, agentRunId, stepOnly(step, 'Reading an output file'), 'read');
+      const git = source.subject.agentRun.envelope?.gitMetadata;
+      const content = source.bareRepoPath === null || git == null
+        ? null
+        : await readCommitFile(source.bareRepoPath, git.commitSha, path);
+      if (content === null) throw new NotFoundError(`Agent Run '${agentRunId}' has no Output File '${path}'`);
       if (isBinary(content)) return { path, size: content.length, binary: true };
       return { path, size: content.length, content: clip(content.toString('utf-8'), 20_000) };
     }

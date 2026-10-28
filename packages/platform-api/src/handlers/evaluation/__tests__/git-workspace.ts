@@ -14,8 +14,8 @@ export interface GitWorkspace {
   remove(): void;
 }
 
-/** A real bare repo, like the workflow's, holding `files` as the seed commit and a step commit that adds `graded.json`. */
-export function gitWorkspace(files: Record<string, string>): GitWorkspace {
+/** A real bare repo, like the workflow's, holding `files` as the seed commit and a step commit that adds `stepFiles` (`graded.json` by default). */
+export function gitWorkspace(files: Record<string, string>, stepFiles: Record<string, string> = { 'graded.json': '{"findings":[]}' }): GitWorkspace {
   const dir = mkdtempSync(join(tmpdir(), 'mediforce-eval-ws-'));
   const git = (...args: string[]) => execFileSync('git', ['-C', dir, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', ...args], { encoding: 'utf-8' }).trim();
   git('init', '-q');
@@ -26,7 +26,10 @@ export function gitWorkspace(files: Record<string, string>): GitWorkspace {
   git('add', '-A');
   git('commit', '-qm', 'seed');
   const seedCommit = git('rev-parse', 'HEAD');
-  writeFileSync(join(dir, 'graded.json'), '{"findings":[]}');
+  for (const [path, content] of Object.entries(stepFiles)) {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), content);
+  }
   git('add', '-A');
   git('commit', '-qm', 'step');
   git('config', 'core.bare', 'true');

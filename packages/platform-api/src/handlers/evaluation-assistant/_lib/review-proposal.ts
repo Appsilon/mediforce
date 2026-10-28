@@ -1,6 +1,8 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { z } from 'zod';
 import {
+  extractionCheckSource,
+  filePresetCheckSource,
   isOwnedBy,
   taskCompletionEvaluator,
   type EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
@@ -221,6 +223,13 @@ export async function reviewEvaluationProposal(
     }
     case 'propose_task_completion_evaluators':
       return reviewTaskCompletionEvaluators(scope, step, args as Args<'propose_task_completion_evaluators'>, previewed);
+    case 'propose_preset_evaluator': {
+      const { preset } = args as Args<'propose_preset_evaluator'>;
+      const { stepId } = stepOnly(step, 'A deterministic preset');
+      const source = preset.kind === 'extraction' ? extractionCheckSource(preset) : filePresetCheckSource(preset, stepId);
+      const check: EvaluatorCheck = { kind: 'code', runtime: 'python', source };
+      return selfTest(scope, step, check, previewed);
+    }
     default:
       return { ok: true };
   }

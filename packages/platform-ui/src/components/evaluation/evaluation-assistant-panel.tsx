@@ -24,6 +24,7 @@ import {
   ControlSettingsCard,
   DiagnosisCard,
   PlanCard,
+  PresetCheckCard,
   ProposalCard,
   TaskCompletionEvaluatorsCard,
   isDecidable,
@@ -33,6 +34,7 @@ import {
 const ADD_TASK_COMPLETION_EVALUATORS_BUTTON = 'inline-flex h-8 items-center rounded-md border border-primary bg-muted/40 px-3 text-sm font-semibold text-primary transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50';
 const TASK_COMPLETION_EVALUATORS_ALREADY_ADDED = 'Task-completion Evaluators are already added to this step. Archive them all to draft a new set.';
 const DRAFT_TASK_COMPLETION_EVALUATORS_MESSAGE = 'Draft task-completion Evaluators from this step\'s instructions.';
+const DRAFT_DETERMINISTIC_PRESETS_MESSAGE = 'Suggest deterministic checks for this step, where they genuinely fit.';
 
 interface ProposalState {
   readonly proposal: ProposalView;
@@ -74,6 +76,8 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   get_trajectory: 'Reading a run trajectory',
   list_workspace_files: 'Listing a run\'s workspace files',
   read_workspace_file: 'Reading a workspace file',
+  list_output_files: 'Listing a run\'s output files',
+  read_output_file: 'Reading an output file',
   list_evaluators: 'Listing evaluators',
   list_eval_cases: 'Listing eval cases',
   list_eval_runs: 'Listing eval runs',
@@ -93,6 +97,7 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   get_failures: 'Reading an eval run\'s failures',
   propose_diagnosis: 'Diagnosing the failures',
   propose_task_completion_evaluators: 'Drafting the task-completion Evaluators',
+  propose_preset_evaluator: 'Drafting a deterministic check',
 };
 
 function toolLabel(tool: string): string {
@@ -187,6 +192,10 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
   const evaluators = useStepEvaluators(step);
   const hasTaskCompletionEvaluators = evaluators.data?.evaluators.some((evaluator) => isTaskCompletionEvaluatorName(evaluator.name)) ?? false;
   const offerTaskCompletionEvaluators = step.kind === 'step';
+  // Several deterministic presets may apply at once (one per file, plus extraction), so unlike the
+  // task-completion Evaluators this is never disabled by what already exists — createEvaluator's own
+  // duplicate-name check is what refuses a repeat.
+  const offerDeterministicPresets = step.kind === 'step';
 
   /** Sends a message; one from a card leaves whatever the person is typing in the input. */
   const send = async (message: string, from: 'input' | 'card', action?: AskEvaluationAssistantInput['action']) => {
@@ -309,14 +318,24 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
               Ask for an evaluation plan, turn a rule into a check tried on real runs,
               synthesize edge cases, prepare an Eval Run or explain a report. It proposes; you decide.
             </p>
-            {offerTaskCompletionEvaluators && (
-              <AddTaskCompletionEvaluatorsButton
-                testId="draft-task-completion-evaluators"
-                alreadyAdded={hasTaskCompletionEvaluators}
-                pending={pending}
-                onClick={draftTaskCompletionEvaluators}
-              />
-            )}
+            <div className="flex flex-wrap gap-2">
+              {offerTaskCompletionEvaluators && (
+                <AddTaskCompletionEvaluatorsButton
+                  testId="draft-task-completion-evaluators"
+                  alreadyAdded={hasTaskCompletionEvaluators}
+                  pending={pending}
+                  onClick={draftTaskCompletionEvaluators}
+                />
+              )}
+              {offerDeterministicPresets && (
+                <button
+                  type="button"
+                  className={cn('rounded-md border px-2 py-1 text-foreground hover:bg-muted', pending && 'pointer-events-none opacity-50')}
+                  data-testid="draft-deterministic-presets"
+                  onClick={() => void send(DRAFT_DETERMINISTIC_PRESETS_MESSAGE, 'card', 'draft_deterministic_presets')}
+                >Suggest deterministic checks</button>
+              )}
+            </div>
           </div>
         )}
         {messages.map((message, index) => (
@@ -364,6 +383,18 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
                     />
                   );
                 }
+                if (proposal.tool === 'propose_preset_evaluator') {
+                  return (
+                    <PresetCheckCard
+                      key={proposalIndex}
+                      step={step}
+                      state={{ proposal, status: state.status }}
+                      mayEdit={mayEdit}
+                      editReason={editReason}
+                      onDecided={(status) => decide(index, proposalIndex, status)}
+                    />
+                  );
+                }
                 return isDecidable(proposal) && (
                   <ProposalCard
                     key={proposalIndex}
@@ -402,14 +433,24 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
         )}
         {error !== null && <p className="text-xs text-destructive">{error}</p>}
       </div>
-      {offerTaskCompletionEvaluators && messages.length > 0 && (
-        <div className="shrink-0 border-t px-2 pt-2">
-          <AddTaskCompletionEvaluatorsButton
-            testId="draft-task-completion-evaluators-chip"
-            alreadyAdded={hasTaskCompletionEvaluators}
-            pending={pending}
-            onClick={draftTaskCompletionEvaluators}
-          />
+      {(offerTaskCompletionEvaluators || offerDeterministicPresets) && messages.length > 0 && (
+        <div className="flex flex-wrap gap-2 shrink-0 border-t px-2 pt-2">
+          {offerTaskCompletionEvaluators && (
+            <AddTaskCompletionEvaluatorsButton
+              testId="draft-task-completion-evaluators-chip"
+              alreadyAdded={hasTaskCompletionEvaluators}
+              pending={pending}
+              onClick={draftTaskCompletionEvaluators}
+            />
+          )}
+          {offerDeterministicPresets && (
+            <button
+              type="button"
+              className={cn('rounded-full border px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted', pending && 'pointer-events-none opacity-50')}
+              data-testid="draft-deterministic-presets-chip"
+              onClick={() => void send(DRAFT_DETERMINISTIC_PRESETS_MESSAGE, 'card', 'draft_deterministic_presets')}
+            >Suggest deterministic checks</button>
+          )}
         </div>
       )}
       <div className="flex shrink-0 gap-2 border-t p-2">

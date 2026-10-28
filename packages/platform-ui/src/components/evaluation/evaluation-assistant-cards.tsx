@@ -3,8 +3,14 @@
 import * as React from 'react';
 import { Check, X } from 'lucide-react';
 import {
+  EXTRACTION_EVALUATOR_NAME,
+  EXTRACTION_EVALUATOR_RULE,
   TASK_COMPLETION_SOURCE_LABELS,
   describeAcceptanceCriteria,
+  extractionCheckSource,
+  filePresetCheckSource,
+  filePresetEvaluatorName,
+  filePresetEvaluatorRule,
   taskCompletionEvaluator,
   type EvaluationSubject,
   type EvaluatorCheck,
@@ -25,19 +31,56 @@ type Proposal<Tool extends ProposalView['tool']> = Extract<ProposalView, { tool:
 /**
  * The proposals a person accepts or rejects as they stand. A plan is worked
  * through instead; a routing recommendation is applied in the workflow
- * editor; drafted task-completion Evaluators get their own card (F1).
+ * editor; drafted task-completion Evaluators (F1) and a deterministic preset
+ * (F2) each get their own card.
  */
-type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_control_settings' | 'propose_diagnosis' | 'propose_task_completion_evaluators' }>;
+type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_control_settings' | 'propose_diagnosis' | 'propose_task_completion_evaluators' | 'propose_preset_evaluator' }>;
 
 export function isDecidable(proposal: ProposalView): proposal is DecidableProposal {
   return proposal.tool !== 'propose_evaluation_plan'
     && proposal.tool !== 'propose_control_settings'
     && proposal.tool !== 'propose_diagnosis'
-    && proposal.tool !== 'propose_task_completion_evaluators';
+    && proposal.tool !== 'propose_task_completion_evaluators'
+    && proposal.tool !== 'propose_preset_evaluator';
 }
 
 const buttonClass = 'inline-flex items-center gap-1 rounded border px-2 py-0.5 disabled:opacity-50 disabled:pointer-events-none';
 const primaryButtonClass = 'inline-flex items-center gap-1 rounded bg-primary px-2 py-0.5 text-primary-foreground disabled:opacity-50 disabled:pointer-events-none';
+
+/** The Accept/Reject row every decidable card ends with, and what it settles into once decided. */
+function DecisionFooter({ status, mayEdit, editReason, pending, error, onAccept, onDecided }: {
+  status: ProposalStatus;
+  mayEdit: boolean;
+  editReason: string | undefined;
+  pending: boolean;
+  error: string | null;
+  onAccept: () => void;
+  onDecided: (status: ProposalStatus) => void;
+}) {
+  return (
+    <>
+      {error !== null && <p className="mt-1 text-destructive">{error}</p>}
+      {status === 'open' ? (
+        <div className="mt-2 flex gap-1.5">
+          <InstantTooltip label={editReason}>
+            <span className="inline-flex">
+              <button type="button" data-testid="proposal-accept" className={primaryButtonClass} disabled={mayEdit === false || pending} onClick={onAccept}>
+                <Check className="h-3 w-3" />Accept
+              </button>
+            </span>
+          </InstantTooltip>
+          <button type="button" className={buttonClass} onClick={() => onDecided('rejected')}>
+            <X className="h-3 w-3" />Reject
+          </button>
+        </div>
+      ) : (
+        <p className={cn('mt-1.5 font-medium', status === 'accepted' ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground')}>
+          {status === 'accepted' ? 'Accepted' : 'Rejected'}
+        </p>
+      )}
+    </>
+  );
+}
 
 const TITLES: Record<DecidableProposal['tool'], string> = {
   propose_evaluator: 'Evaluator',
@@ -184,25 +227,7 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
         ? <MarkdownPresentation content={proposal.arguments.text} />
         : <p className="whitespace-pre-wrap text-muted-foreground"><ProposalSummary step={step} proposal={proposal} /></p>}
       {proposal.selfTest !== undefined && <SelfTestSummary selfTest={proposal.selfTest} />}
-      {error !== null && <p className="mt-1 text-destructive">{error}</p>}
-      {state.status === 'open' ? (
-        <div className="mt-2 flex gap-1.5">
-          <InstantTooltip label={editReason}>
-            <span className="inline-flex">
-              <button type="button" data-testid="proposal-accept" className={primaryButtonClass} disabled={mayEdit === false || accept.isPending} onClick={onAccept}>
-                <Check className="h-3 w-3" />Accept
-              </button>
-            </span>
-          </InstantTooltip>
-          <button type="button" className={buttonClass} onClick={() => onDecided('rejected')}>
-            <X className="h-3 w-3" />Reject
-          </button>
-        </div>
-      ) : (
-        <p className={cn('mt-1.5 font-medium', state.status === 'accepted' ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground')}>
-          {state.status === 'accepted' ? 'Accepted' : 'Rejected'}
-        </p>
-      )}
+      <DecisionFooter status={state.status} mayEdit={mayEdit} editReason={editReason} pending={accept.isPending} error={error} onAccept={onAccept} onDecided={onDecided} />
     </div>
   );
 }
@@ -420,6 +445,51 @@ export function TaskCompletionEvaluatorsCard({ step, state, mayEdit, editReason,
           {state.status === 'accepted' ? 'Accepted' : 'Rejected'}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * A deterministic preset (epic #1516 F2): every id the output returns exists
+ * in the input, or an Output File exists, parses and has its required
+ * fields. The platform renders the script; accepting creates an ordinary
+ * `code` Evaluator — still untrusted until a person approves its source (D9),
+ * same as any other `code` check.
+ */
+export function PresetCheckCard({ step, state, mayEdit, editReason, onDecided }: {
+  step: EvaluationSubject;
+  state: { proposal: Proposal<'propose_preset_evaluator'>; status: ProposalStatus };
+  mayEdit: boolean;
+  editReason: string | undefined;
+  onDecided: (status: ProposalStatus) => void;
+}) {
+  const [error, setError] = React.useState<string | null>(null);
+  const { proposal } = state;
+  const { preset } = proposal.arguments;
+  const stepId = step.kind === 'step' ? step.stepId : '';
+  const { name, rule, source } = preset.kind === 'extraction'
+    ? { name: EXTRACTION_EVALUATOR_NAME, rule: EXTRACTION_EVALUATOR_RULE, source: extractionCheckSource(preset) }
+    : { name: filePresetEvaluatorName(preset.fileName), rule: filePresetEvaluatorRule(preset.fileName), source: filePresetCheckSource(preset, stepId) };
+  const accept = useStepEvaluationMutation(step, () => mediforce.evaluation.createEvaluator({
+    ...step, name, rule, check: { kind: 'code', runtime: 'python', source }, origin: 'assistant',
+  }));
+
+  const onAccept = () => {
+    setError(null);
+    accept.mutate(undefined, { onSuccess: () => onDecided('accepted'), onError: (err) => setError(err.message) });
+  };
+
+  return (
+    <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="preset-check-card">
+      <div className="mb-1 font-medium">Proposed {preset.kind === 'extraction' ? 'extraction' : 'file-producing'} check</div>
+      <p className="text-muted-foreground">{rule}</p>
+      {preset.rationale !== undefined && <p className="mt-1 text-muted-foreground">{preset.rationale}</p>}
+      <details className="mt-1.5">
+        <summary className="cursor-pointer text-muted-foreground">Script</summary>
+        <pre className="mt-1 max-h-64 overflow-auto rounded bg-muted p-2 font-mono whitespace-pre-wrap">{source}</pre>
+      </details>
+      {proposal.selfTest !== undefined && <SelfTestSummary selfTest={proposal.selfTest} />}
+      <DecisionFooter status={state.status} mayEdit={mayEdit} editReason={editReason} pending={accept.isPending} error={error} onAccept={onAccept} onDecided={onDecided} />
     </div>
   );
 }

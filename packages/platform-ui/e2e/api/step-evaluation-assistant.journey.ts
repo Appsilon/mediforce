@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import type { APIRequestContext } from '@playwright/test';
-import { DEFAULT_JUDGE_MIN_CONFIDENCE, FALLBACK_PINNED_MODEL, taskCompletionEvaluator } from '@mediforce/platform-core';
+import {
+  DEFAULT_JUDGE_MIN_CONFIDENCE,
+  FALLBACK_PINNED_MODEL,
+  filePresetCheckSource,
+  filePresetEvaluatorName,
+  filePresetEvaluatorRule,
+  taskCompletionEvaluator,
+} from '@mediforce/platform-core';
 import {
   AskEvaluationAssistantOutputSchema,
   EvalCaseOutputSchema,
@@ -347,6 +354,48 @@ test.describe('Evaluation Assistant — API E2E', () => {
     });
     expect(res.status(), await res.text()).toBe(400);
     expect((await res.json()).error.message).toContain('has none to draft from');
+  });
+
+  test('suggests a deterministic file-producing preset, self-tested for real against a run with no such file (F2)', async ({ request }) => {
+    const question = `Suggest deterministic checks. ${randomUUID()}`;
+    const preset = { kind: 'file_producing' as const, fileName: 'summary.csv', format: 'csv' as const, requiredFields: ['subjectId', 'grade'] };
+    await scriptOpenRouter(question, [
+      { toolCalls: [{ name: 'list_output_files', arguments: { agentRunId } }] },
+      { toolCalls: [{ name: 'propose_preset_evaluator', arguments: { preset } }] },
+      { content: 'The step writes no summary.csv on recent runs, but if it did this would check it.' },
+    ]);
+
+    const res = await request.post('/api/evaluation/assistant', {
+      headers: JSON_HEADERS,
+      data: { ...step, action: 'draft_deterministic_presets', messages: [{ role: 'user', content: question }] },
+    });
+    expect(res.status(), await res.text()).toBe(200);
+    const answer = AskEvaluationAssistantOutputSchema.parse(await res.json());
+
+    const requests = await openRouterRequests(question);
+    expect((requests[0]!.tools ?? []).map((tool) => tool.function.name).sort()).toEqual(
+      ['get_agent_run', 'get_step', 'list_output_files', 'list_step_runs', 'read_output_file', 'propose_preset_evaluator'].sort(),
+    );
+    expect(lastToolResult(requests[1]!.messages)).toEqual({ files: [], note: 'This run committed no Output Files.' });
+
+    expect(answer.proposals).toEqual([{
+      tool: 'propose_preset_evaluator',
+      arguments: { preset },
+      // Run for real in the script-container sandbox: no such file exists on this production run.
+      selfTest: { results: [{ agentRunId, passed: false, value: 0, label: 'fail', confidence: null, agreement: null, comment: expect.stringContaining('missing output file'), error: null }] },
+    }]);
+
+    const source = filePresetCheckSource(preset, step.stepId);
+    const accepted = await request.post('/api/evaluation/evaluators', {
+      headers: JSON_HEADERS,
+      data: { ...step, name: filePresetEvaluatorName(preset.fileName), rule: filePresetEvaluatorRule(preset.fileName), check: { kind: 'code', runtime: 'python', source }, origin: 'assistant' },
+    });
+    expect(accepted.status(), await accepted.text()).toBe(201);
+    const evaluator = EvaluatorOutputSchema.parse(await accepted.json()).evaluator;
+    expect(evaluator.name).toBe('output-file-summary-csv-valid');
+    expect(evaluator.runInProduction).toBe(false);
+    expect(evaluator.trust).toEqual({ trusted: false, reason: 'source not approved' });
+    expect(evaluator.latest.check).toEqual({ kind: 'code', runtime: 'python', source });
   });
 });
 

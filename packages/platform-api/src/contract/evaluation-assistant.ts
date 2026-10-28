@@ -14,9 +14,11 @@ export const AskEvaluationAssistantInputSchema = EvaluationSubjectRefSchema.exte
   /**
    * Restricts this one turn to a fixed task, with its own narrow tool set
    * instead of the subject's ordinary toolset (D14). `draft_task_completion_evaluators`
-   * drafts the step's task-completion Evaluators from its instructions (epic #1516 F1); a Step only.
+   * drafts the step's task-completion Evaluators from its instructions (epic #1516 F1);
+   * `draft_deterministic_presets` suggests extraction/file-producing `code`
+   * checks where the step's shape fits (epic #1516 F2). A Step only, both.
    */
-  action: z.enum(['draft_task_completion_evaluators']).optional(),
+  action: z.enum(['draft_task_completion_evaluators', 'draft_deterministic_presets']).optional(),
   messages: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string().max(20_000),
