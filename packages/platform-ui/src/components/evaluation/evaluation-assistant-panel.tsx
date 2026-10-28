@@ -17,6 +17,7 @@ import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { selectBase } from '@/components/workflows/workflow-editor/step-editor-fields';
 import { useStepEvaluators } from '@/hooks/use-step-evaluation';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { StartEvalRunCard } from './step-evaluation-sections';
 import { EvaluationBriefField, EvaluationBriefToggle, type BriefQuery } from './evaluation-brief-field';
 import {
@@ -29,7 +30,8 @@ import {
   type ProposalStatus,
 } from './evaluation-assistant-cards';
 
-const ADD_TASK_COMPLETION_EVALUATORS_BUTTON = 'inline-flex h-8 items-center rounded-md border border-primary bg-muted/40 px-3 text-sm font-semibold text-primary transition-colors hover:bg-accent';
+const ADD_TASK_COMPLETION_EVALUATORS_BUTTON = 'inline-flex h-8 items-center rounded-md border border-primary bg-muted/40 px-3 text-sm font-semibold text-primary transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50';
+const TASK_COMPLETION_EVALUATORS_ALREADY_ADDED = 'Task-completion Evaluators are already added to this step. Archive them all to draft a new set.';
 const DRAFT_TASK_COMPLETION_EVALUATORS_MESSAGE = 'Draft task-completion Evaluators from this step\'s instructions.';
 
 interface ProposalState {
@@ -184,7 +186,7 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
 
   const evaluators = useStepEvaluators(step);
   const hasTaskCompletionEvaluators = evaluators.data?.evaluators.some((evaluator) => isTaskCompletionEvaluatorName(evaluator.name)) ?? false;
-  const offerTaskCompletionEvaluators = step.kind === 'step' && hasTaskCompletionEvaluators === false;
+  const offerTaskCompletionEvaluators = step.kind === 'step';
 
   /** Sends a message; one from a card leaves whatever the person is typing in the input. */
   const send = async (message: string, from: 'input' | 'card', action?: AskEvaluationAssistantInput['action']) => {
@@ -232,6 +234,8 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
       setPending(false);
     }
   };
+
+  const draftTaskCompletionEvaluators = () => void send(DRAFT_TASK_COMPLETION_EVALUATORS_MESSAGE, 'card', 'draft_task_completion_evaluators');
 
   return (
     <aside className="flex h-full min-h-0 flex-col rounded-xl border bg-white shadow-lg dark:bg-background" data-testid="evaluation-assistant" data-tour="eval-assistant">
@@ -306,12 +310,12 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
               synthesize edge cases, prepare an Eval Run or explain a report. It proposes; you decide.
             </p>
             {offerTaskCompletionEvaluators && (
-              <button
-                type="button"
-                className={cn(ADD_TASK_COMPLETION_EVALUATORS_BUTTON, pending && 'pointer-events-none opacity-50')}
-                data-testid="draft-task-completion-evaluators"
-                onClick={() => void send(DRAFT_TASK_COMPLETION_EVALUATORS_MESSAGE, 'card', 'draft_task_completion_evaluators')}
-              >Add task-completion evaluators</button>
+              <AddTaskCompletionEvaluatorsButton
+                testId="draft-task-completion-evaluators"
+                alreadyAdded={hasTaskCompletionEvaluators}
+                pending={pending}
+                onClick={draftTaskCompletionEvaluators}
+              />
             )}
           </div>
         )}
@@ -400,12 +404,12 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
       </div>
       {offerTaskCompletionEvaluators && messages.length > 0 && (
         <div className="shrink-0 border-t px-2 pt-2">
-          <button
-            type="button"
-            className={cn(ADD_TASK_COMPLETION_EVALUATORS_BUTTON, pending && 'pointer-events-none opacity-50')}
-            data-testid="draft-task-completion-evaluators-chip"
-            onClick={() => void send(DRAFT_TASK_COMPLETION_EVALUATORS_MESSAGE, 'card', 'draft_task_completion_evaluators')}
-          >Add task-completion evaluators</button>
+          <AddTaskCompletionEvaluatorsButton
+            testId="draft-task-completion-evaluators-chip"
+            alreadyAdded={hasTaskCompletionEvaluators}
+            pending={pending}
+            onClick={draftTaskCompletionEvaluators}
+          />
         </div>
       )}
       <div className="flex shrink-0 gap-2 border-t p-2">
@@ -428,5 +432,27 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
         </button>
       </div>
     </aside>
+  );
+}
+
+/** Greyed out, with the reason on hover, while the step already has a live task-completion Evaluator. */
+function AddTaskCompletionEvaluatorsButton({ testId, alreadyAdded, pending, onClick }: {
+  testId: string;
+  alreadyAdded: boolean;
+  pending: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <InstantTooltip label={alreadyAdded ? TASK_COMPLETION_EVALUATORS_ALREADY_ADDED : undefined}>
+      <span className="inline-flex">
+        <button
+          type="button"
+          className={cn(ADD_TASK_COMPLETION_EVALUATORS_BUTTON, pending && 'pointer-events-none opacity-50')}
+          data-testid={testId}
+          disabled={alreadyAdded}
+          onClick={onClick}
+        >Add task-completion evaluators</button>
+      </span>
+    </InstantTooltip>
   );
 }

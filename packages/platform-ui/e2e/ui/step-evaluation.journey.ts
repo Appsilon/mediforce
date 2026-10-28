@@ -17,7 +17,7 @@ import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
  * panel widens from its left edge. Acceptance Criteria the assistant proposes
  * are set on accepting them, and a person confirms or overwrites a run's verdict from a
  * finished run's report. The task-completion Evaluators are added one by one,
- * and offered again once every one is archived. The model is the scripted mock OpenRouter.
+ * and the button stays greyed out until every one is archived. The model is the scripted mock OpenRouter.
  */
 test.describe('Step Evaluation tab', () => {
   // Each worker seeding the workspace's model key at once races on its insert, so the tab's journeys share one worker.
@@ -140,7 +140,7 @@ test.describe('Step Evaluation tab', () => {
     await expect(page.getByText('Drafting the fatal-outcome check now.')).toBeVisible({ timeout: 20_000 });
   });
 
-  test('a person adds the task-completion Evaluators one by one, and is offered them again once every one is archived', async ({ page, request }) => {
+  test('a person adds the task-completion Evaluators one by one, and can add them again only once every one is archived', async ({ page, request }) => {
     test.setTimeout(90_000);
     trackPageErrors(page);
     // No production runs: each drafted check's self-test finds nothing to try, so no judge is called on one.
@@ -201,16 +201,18 @@ test.describe('Step Evaluation tab', () => {
     await expect(evaluatorRows.filter({ hasText: 'task-completion-summary-present' })).toBeVisible({ timeout: 10_000 });
     await expect(evaluatorRows.filter({ hasText: 'task-completion-grades-justified' })).toBeVisible();
     await expect(evaluatorRows.filter({ hasText: 'task-completion-every-ae-kept' })).toHaveCount(0);
-    // A live task-completion Evaluator: nothing to add any more.
+    // A live task-completion Evaluator: the button stays, greyed out, and says why on hover.
     const addButton = page.getByRole('button', { name: 'Add task-completion evaluators' });
-    await expect(addButton).toHaveCount(0);
+    await expect(addButton).toBeDisabled();
+    await addButton.locator('..').hover();
+    await expect(page.getByRole('tooltip')).toContainText('Task-completion Evaluators are already added');
 
     // Archiving one still leaves a live one; archiving the last offers them again.
     await evaluatorRows.filter({ hasText: 'task-completion-summary-present' }).getByRole('button', { name: 'Archive' }).click();
     await expect(evaluatorRows.filter({ hasText: 'task-completion-summary-present' })).toHaveCount(0, { timeout: 10_000 });
-    await expect(addButton).toHaveCount(0);
+    await expect(addButton).toBeDisabled();
     await evaluatorRows.filter({ hasText: 'task-completion-grades-justified' }).getByRole('button', { name: 'Archive' }).click();
-    await expect(addButton).toBeVisible({ timeout: 10_000 });
+    await expect(addButton).toBeEnabled({ timeout: 10_000 });
   });
 
   test('a person reads a judge\'s rationale in the report and accepts a verdict it was unsure of, so it counts', async ({ page, request }) => {
