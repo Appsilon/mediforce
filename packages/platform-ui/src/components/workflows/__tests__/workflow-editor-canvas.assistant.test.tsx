@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, act } from '@testing-library/react';
 import type { WorkflowStep } from '@mediforce/platform-core';
 
 const secretState = vi.hoisted(() => ({ keys: ['OPENROUTER_API_KEY'] as string[] }));
@@ -245,6 +245,19 @@ describe('WorkflowEditorCanvas — the assistant pane', () => {
     const reply = document.querySelector('.cm-assistant-reply strong')?.closest('.cm-assistant-reply');
     expect(reply?.querySelectorAll('li')).toHaveLength(2);
     expect(screen.queryByText(/\*\*Poll\*\*/)).toBeNull();
+  });
+
+  it('does not send twice when Enter and the Send button both fire before the pane disables', async () => {
+    openAssistant();
+    const textarea = screen.getByPlaceholderText(/ask ai to build/i);
+    fireEvent.change(textarea, { target: { value: 'What does the Databricks step do?' } });
+    act(() => {
+      fireEvent.keyDown(textarea, { key: 'Enter' });
+      fireEvent.click(screen.getByLabelText('Send message to the assistant'));
+    });
+
+    await waitFor(() => { expect(assistantState.planCalls.length).toBeGreaterThan(0); });
+    expect(assistantState.planCalls).toHaveLength(1);
   });
 
   it('halts the turn in flight and says so, rather than leaving it running', async () => {

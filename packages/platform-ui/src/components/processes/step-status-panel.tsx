@@ -7,6 +7,7 @@ import { CheckCircle2, Clock, XCircle, Circle, Pause, RotateCcw, ChevronDown, Ch
 import type { ProcessInstance, StepExecution, Step, HumanTask } from '@mediforce/platform-core';
 import type { RunOutputFileEntry } from '@mediforce/platform-api/contract';
 import { getControlMode, CONTROL_MODE_LABELS } from '@/lib/control-mode';
+import { DatabricksLogo } from '../workflows/workflow-diagram';
 import { RetryStepButton } from './retry-step-button';
 import { OutputFileRow } from './run-output-files-panel';
 import { cn } from '@/lib/utils';
@@ -183,7 +184,9 @@ function ExecutorChip({ executorType, autonomyLevel, plugin, runtime }: {
   type Chip = { icon: React.ReactNode; label: string; className: string };
   let chip: Chip;
 
-  if (executorType === 'script') {
+  if (executorType === 'script' && (plugin === 'databricks-job' || plugin === 'databricks-sql')) {
+    chip = { icon: <DatabricksLogo className="h-3 w-3 shrink-0" />, label: 'Databricks', className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-300 dark:border-amber-800' };
+  } else if (executorType === 'script') {
     const rt = runtime ? (RUNTIME_LABELS[runtime] ?? (runtime.charAt(0).toUpperCase() + runtime.slice(1))) : null;
     chip = { icon: <Terminal className="h-3 w-3 shrink-0" />, label: rt ? `${rt} script` : 'Script', className: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/20 dark:text-yellow-300 dark:border-yellow-800' };
   } else if (executorType === 'action') {
@@ -245,6 +248,8 @@ function ExecutorText({ executedBy = '', executorType, plugin, runtime }: {
   let label: string;
   if (executorType === 'agent') {
     label = plugin ? `agent:${plugin}` : 'agent';
+  } else if (executorType === 'script' && (plugin === 'databricks-job' || plugin === 'databricks-sql')) {
+    label = 'Databricks';
   } else if (executorType === 'script') {
     const rt = runtime ? (RUNTIME_LABELS[runtime] ?? (runtime.charAt(0).toUpperCase() + runtime.slice(1))) : null;
     label = rt ? `${rt} script` : 'Script';

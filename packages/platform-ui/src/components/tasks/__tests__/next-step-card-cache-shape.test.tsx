@@ -109,3 +109,48 @@ describe('workflow definition cache shape', () => {
     expect(screen.getByTestId('step-count').textContent).toBe('2 steps');
   });
 });
+
+describe('NextStepCard — Databricks next step', () => {
+  const DATABRICKS_DEFINITION = {
+    name: WORKFLOW_NAME,
+    version: 3,
+    namespace: HANDLE,
+    steps: [
+      { id: 'review', type: 'task', executor: 'human' },
+      { id: 'run-sql', type: 'creation', executor: 'script', plugin: 'databricks-job' },
+      { id: 'done', type: 'terminal' },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockProcessInstance.mockReturnValue({
+      data: { id: 'run-1', status: 'running', definitionName: WORKFLOW_NAME, definitionVersion: '3' },
+      loading: false,
+    });
+    mockStepExecutions.mockReturnValue({
+      data: [{
+        id: 'exec-1',
+        stepId: 'review',
+        status: 'completed',
+        startedAt: '2026-08-01T10:00:00.000Z',
+        gateResult: { next: 'run-sql' },
+      }],
+      loading: false,
+    });
+    mockWorkflowsGet.mockResolvedValue({ definition: DATABRICKS_DEFINITION });
+    mockTasksList.mockResolvedValue({ tasks: [] });
+  });
+
+  it('says Databricks, not Script automation, when the next step is a databricks-job step', async () => {
+    const { queryClient } = createQueryWrapper();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <NextStepCard processInstanceId="run-1" stepId="review" />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => { expect(screen.getByText('Databricks')).toBeInTheDocument(); });
+    expect(screen.queryByText(/Script automation/)).not.toBeInTheDocument();
+  });
+});

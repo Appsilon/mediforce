@@ -43,4 +43,23 @@ describe('StepStatusPanel row expand', () => {
     expect(detailsEl).not.toBeNull();
     expect(detailsEl?.textContent).not.toMatch(/42/);
   });
+
+  it('labels a databricks-job step as Databricks, not Script, in the history row', () => {
+    const instance = buildProcessInstance({ status: 'completed', currentStepId: null });
+    const execution = buildStepExecution({ stepId: 'fetch-data', status: 'completed', output: {} });
+
+    const { wrapper } = createQueryWrapper();
+    render(
+      <StepStatusPanel
+        instance={instance}
+        definitionSteps={steps}
+        stepExecutions={[execution]}
+        stepConfigMap={new Map([['fetch-data', { executorType: 'script', plugin: 'databricks-job' }]])}
+      />,
+      { wrapper },
+    );
+
+    expect(screen.getAllByText('Databricks').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('Script')).not.toBeInTheDocument();
+  });
 });

@@ -377,7 +377,7 @@ const SCRIPT_PLUGIN_CONFIG_KEY: Record<string, 'script' | 'databricks' | 'databr
   'databricks-sql': 'databricksSql',
 };
 
-const SCRIPT_CONFIG_KEY_PLUGIN: Record<'script' | 'databricks' | 'databricksSql', string> = {
+export const SCRIPT_CONFIG_KEY_PLUGIN: Record<'script' | 'databricks' | 'databricksSql', string> = {
   script: 'script-container',
   databricks: 'databricks-job',
   databricksSql: 'databricks-sql',

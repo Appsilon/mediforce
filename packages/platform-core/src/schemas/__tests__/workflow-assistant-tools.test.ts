@@ -81,6 +81,15 @@ describe('AddStepToolSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('parses a double-encoded JSON string for databricksSql, not just a real nested object', () => {
+    const result = AddStepToolSchema.safeParse({
+      type: 'creation', executor: 'script', name: 'Run SQL', plugin: 'databricks-sql',
+      databricksSql: JSON.stringify({ warehouseId: 'abc123', statement: 'SELECT 1' }),
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.databricksSql?.warehouseId).toBe('abc123');
+  });
+
   it('treats action.type as an alias for action.kind — the step itself already has a sibling `type` field', () => {
     const result = AddStepToolSchema.safeParse({
       type: 'creation', executor: 'action', name: 'Notify',

@@ -473,6 +473,7 @@ export function WorkflowEditorCanvas({
   const [assistantKeyMissing, setAssistantKeyMissing] = useState(false);
   // The turn in flight, so the halt button can stop it.
   const assistantAbortRef = useRef<AbortController | null>(null);
+  const assistantSendingRef = useRef(false);
   const heldRolesRef = useRef<string[] | null>(null);
   const assistantScrollRef = useRef<HTMLDivElement>(null);
   const assistantInputRef = useRef<HTMLTextAreaElement>(null);
@@ -711,59 +712,64 @@ export function WorkflowEditorCanvas({
    */
   const sendAssistantMessage = useCallback(async () => {
     const content = assistantInput.trim();
-    if (!content || assistantLoading || assistantPlanning || !namespace) return;
+    if (!content || assistantLoading || assistantPlanning || !namespace || assistantSendingRef.current) return;
+    assistantSendingRef.current = true;
 
-    const nextMessages: AssistantMessage[] = [...assistantMessages, { role: 'user', content }];
-    setAssistantMessages(nextMessages);
-    setAssistantInput('');
-    setAssistantPlanning(true);
-    const controller = new AbortController();
-    assistantAbortRef.current = controller;
-
-    let planned: PlanWorkflowBuildOutput | null = null;
-    let refusal: ApiError | null = null;
     try {
-      planned = await mediforceSilent.assistant.plan(
-        { messages: messagesForModel(nextMessages), model: assistantModel, workflowDefinition: assistantWorkflowDefinition() },
-        { namespace, signal: controller.signal },
-      );
-    } catch (err) {
-      // The plan is an aid, not the work, so a plan this pane merely could not read costs nobody their turn.
-      if (err instanceof ApiError) refusal = err;
-      planned = null;
+      const nextMessages: AssistantMessage[] = [...assistantMessages, { role: 'user', content }];
+      setAssistantMessages(nextMessages);
+      setAssistantInput('');
+      setAssistantPlanning(true);
+      const controller = new AbortController();
+      assistantAbortRef.current = controller;
+
+      let planned: PlanWorkflowBuildOutput | null = null;
+      let refusal: ApiError | null = null;
+      try {
+        planned = await mediforceSilent.assistant.plan(
+          { messages: messagesForModel(nextMessages), model: assistantModel, workflowDefinition: assistantWorkflowDefinition() },
+          { namespace, signal: controller.signal },
+        );
+      } catch (err) {
+        // The plan is an aid, not the work, so a plan this pane merely could not read costs nobody their turn.
+        if (err instanceof ApiError) refusal = err;
+        planned = null;
+      } finally {
+        assistantAbortRef.current = null;
+        setAssistantPlanning(false);
+      }
+
+      // The server refused the request, and the build is the same request with a longer prompt.
+      if (refusal !== null) {
+        toast({ variant: 'error', title: 'Assistant error', description: refusal.message });
+        return;
+      }
+
+      if (controller.signal.aborted) {
+        setAssistantMessages((prev) => [...prev, {
+          role: 'assistant',
+          content: 'Stopped. Nothing was changed on the canvas.',
+          narration: true,
+        }]);
+        return;
+      }
+
+      setAssistantPhases(planned !== null && planned.phases.length > 0 ? planned.phases : ASSISTANT_PHASES);
+      if (planned !== null && planned.questions.length > 0) {
+        setAssistantPlan(planned);
+        return;
+      }
+      if (planned !== null && planned.plan.length > 0) {
+        setAssistantMessages((prev) => [...prev, {
+          role: 'assistant',
+          content: planned.plan.map((line) => `- ${line}`).join('\n'),
+          narration: true,
+        }]);
+      }
+      await runAssistantBuild(undefined, nextMessages);
     } finally {
-      assistantAbortRef.current = null;
-      setAssistantPlanning(false);
+      assistantSendingRef.current = false;
     }
-
-    // The server refused the request, and the build is the same request with a longer prompt.
-    if (refusal !== null) {
-      toast({ variant: 'error', title: 'Assistant error', description: refusal.message });
-      return;
-    }
-
-    if (controller.signal.aborted) {
-      setAssistantMessages((prev) => [...prev, {
-        role: 'assistant',
-        content: 'Stopped. Nothing was changed on the canvas.',
-        narration: true,
-      }]);
-      return;
-    }
-
-    setAssistantPhases(planned !== null && planned.phases.length > 0 ? planned.phases : ASSISTANT_PHASES);
-    if (planned !== null && planned.questions.length > 0) {
-      setAssistantPlan(planned);
-      return;
-    }
-    if (planned !== null && planned.plan.length > 0) {
-      setAssistantMessages((prev) => [...prev, {
-        role: 'assistant',
-        content: planned.plan.map((line) => `- ${line}`).join('\n'),
-        narration: true,
-      }]);
-    }
-    await runAssistantBuild(undefined, nextMessages);
   }, [assistantMessages, assistantInput, assistantLoading, assistantPlanning, assistantModel, namespace, assistantWorkflowDefinition, runAssistantBuild, toast]);
 
   const moveStep = useCallback((stepId: string, direction: 'up' | 'down') => {
