@@ -305,6 +305,10 @@ export const WorkflowStepSchema = z.object({
   verdicts: z.record(z.string(), VerdictSchema).optional(),
   selection: SelectionSchema.optional(),
   ui: StepUiSchema.optional(),
+  /** Id of an earlier step this (executor='human') step reviews the Agent Run
+   *  of — lets a plain review step feed `human_verdict` Scores the same way
+   *  an L3 agent-escalation review does. */
+  reviewsAgentStep: z.string().min(1).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   executor: z.enum(['human', 'agent', 'script', 'cowork', 'action']),
   /** Required when executor='action'. Discriminated by `kind`. */

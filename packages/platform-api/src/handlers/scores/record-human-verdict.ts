@@ -29,23 +29,27 @@ const ReviewTaskDataSchema = z.object({
  * all falls back to the step's latest Agent Run started by the time the review
  * was opened, so a re-run after a "revise" verdict is never picked.
  */
-async function reviewedAgentRunId(task: HumanTask, scope: CallerScope): Promise<string | null> {
-  const reviewData = ReviewTaskDataSchema.safeParse(task.completionData);
-  if (reviewData.success === false) return null;
-  const carried = reviewData.data.agentOutput.agentRunId;
-  if (carried !== undefined) return carried;
+async function reviewedAgentRunId(task: HumanTask, scope: CallerScope, reviewedStepId: string): Promise<string | null> {
+  if (task.reviewsAgentStep === undefined) {
+    const reviewData = ReviewTaskDataSchema.safeParse(task.completionData);
+    if (reviewData.success === false) return null;
+    const carried = reviewData.data.agentOutput.agentRunId;
+    if (carried !== undefined) return carried;
+  }
   const reviewOpenedAt = Date.parse(task.createdAt);
   const [latest] = (await scope.agentRuns.getByInstanceId(task.processInstanceId))
-    .filter((run) => run.stepId === task.stepId && Date.parse(run.startedAt) <= reviewOpenedAt)
+    .filter((run) => run.stepId === reviewedStepId && Date.parse(run.startedAt) <= reviewOpenedAt)
     .sort((left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt));
   return latest?.id ?? null;
 }
 
 /**
- * Turn a completed CM3 review into a `human_verdict` Score on the Agent Run it
- * reviewed (ADR-0023 D13). The verdict key is the label; its intent is mapped
- * to 1 / 0.5 / 0 so verdicts from different vocabularies aggregate. Returns
- * `null` for any task that is not an agent review with a verdict, or whose
+ * Turn a completed review into a `human_verdict` Score on the Agent Run it
+ * reviewed (ADR-0023 D13) — either a CM3 self-escalation, or a plain review
+ * step that names the earlier step it judges via `reviewsAgentStep`. The
+ * verdict key is the label; its intent is mapped to 1 / 0.5 / 0 so verdicts
+ * from different vocabularies aggregate. Returns `null` for any task that is
+ * neither kind of agent review, that carries no verdict, or whose
  * reviewed Agent Run cannot be identified.
  */
 export async function recordHumanVerdictScore(
@@ -58,10 +62,11 @@ export async function recordHumanVerdictScore(
   scope: CallerScope,
 ): Promise<Score | null> {
   const { task, payload, actorId, namespace } = params;
-  if (task.creationReason !== 'agent_review_l3') return null;
+  if (task.creationReason !== 'agent_review_l3' && task.reviewsAgentStep === undefined) return null;
   if (payload.kind !== 'verdict' && payload.kind !== 'verdict-with-params') return null;
 
-  const agentRunId = await reviewedAgentRunId(task, scope);
+  const reviewedStepId = task.reviewsAgentStep ?? task.stepId;
+  const agentRunId = await reviewedAgentRunId(task, scope, reviewedStepId);
   if (agentRunId === null) return null;
 
   const intent = task.verdicts?.find((descriptor) => descriptor.key === payload.verdict)?.intent
@@ -79,7 +84,7 @@ export async function recordHumanVerdictScore(
     metadata: { verdictKey: payload.verdict, intent, taskId: task.id },
     namespace,
     processInstanceId: task.processInstanceId,
-    stepId: task.stepId,
+    stepId: reviewedStepId,
     evaluatorId: null,
     supersedes: null,
     basis: 'Control Mode 3 review verdict',

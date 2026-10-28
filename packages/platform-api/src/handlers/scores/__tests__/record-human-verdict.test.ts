@@ -156,4 +156,52 @@ describe('recordHumanVerdictScore', () => {
 
     expect(score).toBeNull();
   });
+
+  describe('reviewsAgentStep (plain review step judging an earlier step)', () => {
+    it('records a Score against the named step\'s latest Agent Run, for a human_executor task', async () => {
+      await agentRunRepo.create(buildAgentRun({
+        id: AGENT_RUN_ID, processInstanceId: 'inst-a', stepId: 'recommend', startedAt: '2026-09-23T09:00:00.000Z',
+      }));
+
+      const task = buildHumanTask({
+        id: 'cra-decision-1',
+        processInstanceId: 'inst-a',
+        stepId: 'cra_decision',
+        creationReason: 'human_executor',
+        reviewsAgentStep: 'recommend',
+        createdAt: '2026-09-23T10:00:00.000Z',
+        completionData: null,
+      });
+
+      const score = await recordHumanVerdictScore(
+        { task, payload: { kind: 'verdict', verdict: 'request_correction', comment: 'Missed the signature date' }, actorId: 'u-1', namespace: 'team-alpha' },
+        scope(),
+      );
+
+      expect(score).toMatchObject({
+        subject: { type: 'agent_run', id: AGENT_RUN_ID }, label: 'request_correction', comment: 'Missed the signature date',
+        // stepId names the reviewed step ('recommend'), never the review task's own step ('cra_decision') —
+        // the Evaluation Assistant only resolves agent steps, so a wrong stepId here would be invisible until used live.
+        stepId: 'recommend',
+      });
+    });
+
+    it('still records nothing for a plain human_executor task without reviewsAgentStep', async () => {
+      const task = buildHumanTask({
+        id: 'ordinary-task',
+        processInstanceId: 'inst-a',
+        stepId: 'upload_document',
+        creationReason: 'human_executor',
+        completionData: null,
+      });
+
+      const score = await recordHumanVerdictScore(
+        { task, payload: { kind: 'verdict', verdict: 'accept' }, actorId: 'u-1', namespace: 'team-alpha' },
+        scope(),
+      );
+
+      expect(score).toBeNull();
+      expect(await scoreRepo.list({ limit: 10 })).toEqual([]);
+    });
+  });
 });

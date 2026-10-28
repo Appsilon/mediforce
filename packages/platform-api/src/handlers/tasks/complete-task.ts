@@ -19,6 +19,7 @@ import {
 import { actorFromCaller, loadOr404 } from '../_helpers';
 import { assertCallerMayActOnTask } from './_role-gate';
 import { recordHumanVerdictScore } from '../scores/record-human-verdict';
+import { classifyAndRecordReviewGap } from '../scores/classify-review-gap';
 import { settleRunWaits } from '../processes/settle-run-waits';
 
 export async function completeTask(
@@ -148,10 +149,13 @@ async function emitAuditEvents(
   });
 }
 
-/** A CM3 verdict also becomes a `human_verdict` Score, best-effort: the engine
- *  has already committed the task and no transaction spans the two, so a failed
- *  Score write is logged, not surfaced. The verdict itself stays on the
- *  `task.completed` audit event. */
+/** A CM3 verdict (or a plain review step naming `reviewsAgentStep`) also
+ *  becomes a `human_verdict` Score, best-effort: the engine has already
+ *  committed the task and no transaction spans the two, so a failed Score
+ *  write is logged, not surfaced. The verdict itself stays on the
+ *  `task.completed` audit event. A correction (danger/warning) with a comment
+ *  is further classified as `review_gap` — did the comment name something the
+ *  Agent Run's own output missed? — feeding the production-review loop. */
 async function recordReviewScore(
   scope: CallerScope,
   input: CompleteTaskInput,
@@ -160,13 +164,25 @@ async function recordReviewScore(
 ): Promise<void> {
   const namespace = result.instance.namespace;
   if (namespace === undefined) return;
+  const verdictScore = await tryRecord(
+    () => recordHumanVerdictScore({ task: ctx.task, payload: input.payload, actorId: ctx.actorId, namespace }, scope),
+    `human_verdict Score not recorded for task '${input.taskId}'`,
+  );
+  if (verdictScore === null) return;
+  const intent = verdictScore.metadata?.intent;
+  if ((intent !== 'danger' && intent !== 'warning') || verdictScore.comment === null) return;
+  await tryRecord(
+    () => classifyAndRecordReviewGap({ verdictScore, namespace }, scope),
+    `review_gap Score not recorded for task '${input.taskId}'`,
+  );
+}
+
+async function tryRecord<T>(write: () => Promise<T | null>, failureMessage: string): Promise<T | null> {
   try {
-    await recordHumanVerdictScore(
-      { task: ctx.task, payload: input.payload, actorId: ctx.actorId, namespace },
-      scope,
-    );
+    return await write();
   } catch (error) {
-    console.error(`[complete-task] human_verdict Score not recorded for task '${input.taskId}':`, error);
+    console.error(`[complete-task] ${failureMessage}:`, error);
+    return null;
   }
 }
 

@@ -304,6 +304,7 @@ export class WorkflowEngine {
             completedAt: null,
             completionData: null,
             creationReason: 'human_executor',
+            ...(nextStep.reviewsAgentStep ? { reviewsAgentStep: nextStep.reviewsAgentStep } : {}),
             ...(nextStep.ui ? { ui: nextStep.ui } : {}),
             ...(nextStep.params?.length ? { params: resolveParamDefaults(nextStep.params, updatedInstance) } : {}),
             ...selectionFields,
