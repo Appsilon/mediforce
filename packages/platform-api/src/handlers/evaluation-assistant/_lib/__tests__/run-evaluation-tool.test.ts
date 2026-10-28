@@ -243,7 +243,7 @@ describe('executeEvaluationTool', () => {
     expect(plain).toMatchObject({ skills: [] });
   });
 
-  it('reads a step\'s instructions to draft a task-completion judge from, skills as name + description only (F1)', async () => {
+  it('reads a step\'s instructions to draft task-completion Evaluators from, skills as name + description only (F1)', async () => {
     const { scope, context } = await setup();
     const skillMd = '---\nname: grade-aes\ndescription: Grade AEs by CTCAE v5\n---\nGrade by CTCAE v5.';
     await createSkill({ namespace: context.definition.namespace, files: [{ path: 'SKILL.md', contents: skillMd }] }, scope);

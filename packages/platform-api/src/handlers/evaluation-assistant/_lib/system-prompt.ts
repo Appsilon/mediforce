@@ -158,19 +158,25 @@ export function briefMessage(brief: EvaluationBrief | null, kind: SubjectKind): 
 }
 
 /**
- * The fixed instruction for a `draft_task_completion_judge` request (epic
- * #1516 F1): the only thing this turn may do, with a narrow tool set instead
- * of the ordinary one, so the output stays predictable.
+ * The fixed instruction for a `draft_task_completion_evaluators` request
+ * (epic #1516 F1): the only thing this turn may do, with a narrow tool set
+ * instead of the ordinary one, so the output stays predictable.
  */
-export function taskCompletionJudgeDraftMessage(): string {
-  return 'Draft the step\'s task-completion judge. Read get_step_instructions (its preamble, description, prompt, '
+export function taskCompletionEvaluatorsDraftMessage(): string {
+  return 'Draft the step\'s task-completion Evaluators. Read get_step_instructions (its preamble, description, prompt, '
     + 'input/output descriptions, outputSchema and skills — the Brief is in an earlier message). Turn every testable '
-    + 'instruction into one requirement: { text, source: preamble|prompt|output_schema|skill|brief, priority: "high" '
-    + 'only for one the Brief marks as mattering most }. List any instruction with no testable criterion (e.g. "be '
-    + 'thorough") in vagueInstructions as { quote, why }. If list_step_runs has runs, read one or two with get_agent_run '
-    + 'and try your draft requirements\' check with preview_evaluator before proposing. Then call '
-    + 'propose_task_completion_judge once with every requirement — do not call it more than once, and call no other '
-    + 'proposal tool this turn.';
+    + 'instruction into one Evaluator of its own, so a failure names the one requirement missed: { name, requirement, '
+    + 'source: preamble|prompt|output_schema|skill|brief, priority: "high" only for one the Brief marks as mattering '
+    + 'most, check }. Give each the cheapest check that decides it: schema for fields present and typed (the outputSchema '
+    + 'subset: type, required, per-property type) — a step has one schema check, so at most one, covering the output '
+    + 'schema; refused if the step already has one, then use code; code (python) for anything a script decides from /output/input.json — '
+    + 'counts, ids or records found in the step input, allowed values, ranges, a file written to /workspace that parses; '
+    + 'llm_judge ({ "kind": "llm_judge" }, the platform writes its rubric from the requirement) only when meeting the '
+    + 'requirement takes judgement. One requirement per Evaluator — never bundle several into one. List any instruction '
+    + 'with no testable criterion (e.g. "be thorough") in vagueInstructions as { quote, why }. If list_step_runs has '
+    + 'runs, read one or two with get_agent_run and try each schema and code check with preview_evaluator before '
+    + 'proposing. Then call propose_task_completion_evaluators once with every Evaluator — do not call it more than '
+    + 'once, and call no other proposal tool this turn.';
 }
 
 /**

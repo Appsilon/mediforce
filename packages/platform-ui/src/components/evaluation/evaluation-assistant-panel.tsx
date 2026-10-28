@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Bot, Check, Loader2, Send, Settings, Sparkles, User, X } from 'lucide-react';
-import { DEFAULT_MODEL, TASK_COMPLETION_EVALUATOR_NAME } from '@mediforce/platform-core';
+import { DEFAULT_MODEL, isTaskCompletionEvaluatorName } from '@mediforce/platform-core';
 import type {
   EvaluationSubject,
   EvaluationAssistantPlatformToolName,
@@ -17,6 +17,7 @@ import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { selectBase } from '@/components/workflows/workflow-editor/step-editor-fields';
 import { useStepEvaluators } from '@/hooks/use-step-evaluation';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { StartEvalRunCard } from './step-evaluation-sections';
 import { EvaluationBriefField, EvaluationBriefToggle, type BriefQuery } from './evaluation-brief-field';
 import {
@@ -25,12 +26,14 @@ import {
   PlanCard,
   PresetCheckCard,
   ProposalCard,
-  TaskCompletionJudgeCard,
+  TaskCompletionEvaluatorsCard,
   isDecidable,
   type ProposalStatus,
 } from './evaluation-assistant-cards';
 
-const DRAFT_TASK_COMPLETION_JUDGE_MESSAGE = 'Draft a task-completion judge from this step\'s instructions.';
+const ADD_TASK_COMPLETION_EVALUATORS_BUTTON = 'inline-flex h-8 items-center rounded-md border border-primary bg-muted/40 px-3 text-sm font-semibold text-primary transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50';
+const TASK_COMPLETION_EVALUATORS_ALREADY_ADDED = 'Task-completion Evaluators are already added to this step. Archive them all to draft a new set.';
+const DRAFT_TASK_COMPLETION_EVALUATORS_MESSAGE = 'Draft task-completion Evaluators from this step\'s instructions.';
 const DRAFT_DETERMINISTIC_PRESETS_MESSAGE = 'Suggest deterministic checks for this step, where they genuinely fit.';
 
 interface ProposalState {
@@ -93,7 +96,7 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   propose_control_settings: 'Recommending routing',
   get_failures: 'Reading an eval run\'s failures',
   propose_diagnosis: 'Diagnosing the failures',
-  propose_task_completion_judge: 'Drafting the task-completion judge',
+  propose_task_completion_evaluators: 'Drafting the task-completion Evaluators',
   propose_preset_evaluator: 'Drafting a deterministic check',
 };
 
@@ -187,10 +190,10 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
   };
 
   const evaluators = useStepEvaluators(step);
-  const hasTaskCompletionJudge = evaluators.data?.evaluators.some((evaluator) => evaluator.name === TASK_COMPLETION_EVALUATOR_NAME) ?? false;
-  const offerTaskCompletionJudge = step.kind === 'step' && hasTaskCompletionJudge === false;
+  const hasTaskCompletionEvaluators = evaluators.data?.evaluators.some((evaluator) => isTaskCompletionEvaluatorName(evaluator.name)) ?? false;
+  const offerTaskCompletionEvaluators = step.kind === 'step';
   // Several deterministic presets may apply at once (one per file, plus extraction), so unlike the
-  // task-completion judge this is never hidden by what already exists — createEvaluator's own
+  // task-completion Evaluators this is never disabled by what already exists — createEvaluator's own
   // duplicate-name check is what refuses a repeat.
   const offerDeterministicPresets = step.kind === 'step';
 
@@ -240,6 +243,8 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
       setPending(false);
     }
   };
+
+  const draftTaskCompletionEvaluators = () => void send(DRAFT_TASK_COMPLETION_EVALUATORS_MESSAGE, 'card', 'draft_task_completion_evaluators');
 
   return (
     <aside className="flex h-full min-h-0 flex-col rounded-xl border bg-white shadow-lg dark:bg-background" data-testid="evaluation-assistant" data-tour="eval-assistant">
@@ -314,13 +319,13 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
               synthesize edge cases, prepare an Eval Run or explain a report. It proposes; you decide.
             </p>
             <div className="flex flex-wrap gap-2">
-              {offerTaskCompletionJudge && (
-                <button
-                  type="button"
-                  className={cn('rounded-md border px-2 py-1 text-foreground hover:bg-muted', pending && 'pointer-events-none opacity-50')}
-                  data-testid="draft-task-completion-judge"
-                  onClick={() => void send(DRAFT_TASK_COMPLETION_JUDGE_MESSAGE, 'card', 'draft_task_completion_judge')}
-                >Create task-completion evaluator</button>
+              {offerTaskCompletionEvaluators && (
+                <AddTaskCompletionEvaluatorsButton
+                  testId="draft-task-completion-evaluators"
+                  alreadyAdded={hasTaskCompletionEvaluators}
+                  pending={pending}
+                  onClick={draftTaskCompletionEvaluators}
+                />
               )}
               {offerDeterministicPresets && (
                 <button
@@ -366,9 +371,9 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
                 if (proposal.tool === 'propose_diagnosis') {
                   return <DiagnosisCard key={proposalIndex} diagnosis={proposal.arguments} />;
                 }
-                if (proposal.tool === 'propose_task_completion_judge') {
+                if (proposal.tool === 'propose_task_completion_evaluators') {
                   return (
-                    <TaskCompletionJudgeCard
+                    <TaskCompletionEvaluatorsCard
                       key={proposalIndex}
                       step={step}
                       state={{ proposal, status: state.status }}
@@ -428,15 +433,15 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
         )}
         {error !== null && <p className="text-xs text-destructive">{error}</p>}
       </div>
-      {(offerTaskCompletionJudge || offerDeterministicPresets) && messages.length > 0 && (
+      {(offerTaskCompletionEvaluators || offerDeterministicPresets) && messages.length > 0 && (
         <div className="flex flex-wrap gap-2 shrink-0 border-t px-2 pt-2">
-          {offerTaskCompletionJudge && (
-            <button
-              type="button"
-              className={cn('rounded-full border px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted', pending && 'pointer-events-none opacity-50')}
-              data-testid="draft-task-completion-judge-chip"
-              onClick={() => void send(DRAFT_TASK_COMPLETION_JUDGE_MESSAGE, 'card', 'draft_task_completion_judge')}
-            >Create task-completion evaluator</button>
+          {offerTaskCompletionEvaluators && (
+            <AddTaskCompletionEvaluatorsButton
+              testId="draft-task-completion-evaluators-chip"
+              alreadyAdded={hasTaskCompletionEvaluators}
+              pending={pending}
+              onClick={draftTaskCompletionEvaluators}
+            />
           )}
           {offerDeterministicPresets && (
             <button
@@ -468,5 +473,27 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
         </button>
       </div>
     </aside>
+  );
+}
+
+/** Greyed out, with the reason on hover, while the step already has a live task-completion Evaluator. */
+function AddTaskCompletionEvaluatorsButton({ testId, alreadyAdded, pending, onClick }: {
+  testId: string;
+  alreadyAdded: boolean;
+  pending: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <InstantTooltip label={alreadyAdded ? TASK_COMPLETION_EVALUATORS_ALREADY_ADDED : undefined}>
+      <span className="inline-flex">
+        <button
+          type="button"
+          className={cn(ADD_TASK_COMPLETION_EVALUATORS_BUTTON, pending && 'pointer-events-none opacity-50')}
+          data-testid={testId}
+          disabled={alreadyAdded}
+          onClick={onClick}
+        >Add task-completion evaluators</button>
+      </span>
+    </InstantTooltip>
   );
 }

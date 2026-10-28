@@ -4,7 +4,7 @@ import { SUBJECT_ARGS, subjectFrom } from './eval-step-args';
 
 /** `--action` values, by the fixed instruction each restricts the turn to. */
 const DRAFT_ACTIONS = {
-  'draft-task-completion-judge': 'draft_task_completion_judge',
+  'draft-task-completion-evaluators': 'draft_task_completion_evaluators',
   'draft-deterministic-presets': 'draft_deterministic_presets',
 } as const;
 
@@ -17,7 +17,7 @@ export const evalAskCommand = defineCommand({
     version: { type: 'string', description: 'Workflow Definition version whose step the assistant reads and runs (default: the runnable one)' },
     model: { type: 'string', description: 'OpenRouter model id' },
     'unattended-budget': { type: 'string', description: 'USD the assistant may spend starting prepared Eval Runs during this request, without asking (default: none — starting a run is refused)' },
-    action: { type: 'string', description: 'Restrict this turn to a fixed task, with its own narrow tool set: "draft-task-completion-judge" drafts the step\'s task-completion judge from its instructions (F1); "draft-deterministic-presets" suggests extraction/file-producing code checks where the step\'s shape fits (F2)' },
+    action: { type: 'string', description: 'Restrict this turn to a fixed task, with its own narrow tool set: "draft-task-completion-evaluators" drafts the step\'s task-completion Evaluators — one per requirement of its instructions (F1); "draft-deterministic-presets" suggests extraction/file-producing code checks where the step\'s shape fits (F2)' },
   },
   async run({ args, output, mediforce, jsonMode }) {
     const version = parsePositiveIntArg(args.version);

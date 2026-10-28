@@ -1,7 +1,7 @@
 import {
   DEFAULT_MODEL,
   DRAFT_DETERMINISTIC_PRESETS_TOOLSET,
-  DRAFT_TASK_COMPLETION_JUDGE_TOOLSET,
+  DRAFT_TASK_COMPLETION_EVALUATORS_TOOLSET,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   EVALUATION_ASSISTANT_TOOLSETS,
@@ -27,7 +27,7 @@ import {
   EVALUATION_ASSISTANT_SYSTEM_PROMPTS,
   briefMessage,
   deterministicPresetsDraftMessage,
-  taskCompletionJudgeDraftMessage,
+  taskCompletionEvaluatorsDraftMessage,
   unattendedBudgetMessage,
 } from './_lib/system-prompt';
 import { executeEvaluationTool, type UnattendedGrant } from './_lib/run-evaluation-tool';
@@ -40,7 +40,7 @@ const TRUNCATED_RESPONSE_NOTICE = 'Your last response was cut off at the output-
 
 /** A request's `action` (D14): a dedicated, narrow toolset and a fixed instruction, in place of the subject's ordinary ones. A Step only. */
 const DRAFT_ACTIONS = {
-  draft_task_completion_judge: { toolset: DRAFT_TASK_COMPLETION_JUDGE_TOOLSET, message: taskCompletionJudgeDraftMessage },
+  draft_task_completion_evaluators: { toolset: DRAFT_TASK_COMPLETION_EVALUATORS_TOOLSET, message: taskCompletionEvaluatorsDraftMessage },
   draft_deterministic_presets: { toolset: DRAFT_DETERMINISTIC_PRESETS_TOOLSET, message: deterministicPresetsDraftMessage },
 } as const;
 

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import {
   DRAFT_DETERMINISTIC_PRESETS_TOOLSET,
-  DRAFT_TASK_COMPLETION_JUDGE_TOOLSET,
+  DRAFT_TASK_COMPLETION_EVALUATORS_TOOLSET,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   EVALUATION_ASSISTANT_TOOLSETS,
@@ -13,6 +13,7 @@ import {
   ProposeEvalCaseToolSchema,
   ProposeEvaluatorToolSchema,
   ProposePerturbedCaseToolSchema,
+  ProposeTaskCompletionEvaluatorsToolSchema,
   pickTools,
 } from '../evaluation-assistant-tools';
 
@@ -20,12 +21,12 @@ describe('Evaluation Assistant toolsets', () => {
   const toolsets = Object.values(EVALUATION_ASSISTANT_TOOLSETS);
 
   it('offers every catalog tool to at least one subject, or reserves it for a dedicated draft action (F1, F2), and names only catalog tools', () => {
-    const allToolsets = [...toolsets, DRAFT_TASK_COMPLETION_JUDGE_TOOLSET, DRAFT_DETERMINISTIC_PRESETS_TOOLSET];
+    const allToolsets = [...toolsets, DRAFT_TASK_COMPLETION_EVALUATORS_TOOLSET, DRAFT_DETERMINISTIC_PRESETS_TOOLSET];
     expect(new Set(allToolsets.flatMap((toolset) => toolset.platform))).toEqual(new Set(Object.keys(EVALUATION_ASSISTANT_PLATFORM_TOOLS)));
     expect(new Set(allToolsets.flatMap((toolset) => toolset.proposals))).toEqual(new Set(Object.keys(EVALUATION_ASSISTANT_PROPOSAL_TOOLS)));
     // Held back from ordinary conversation: offered only behind the dedicated action, never as a free-form proposal.
     expect(toolsets.flatMap((toolset) => toolset.platform)).not.toContain('get_step_instructions');
-    expect(toolsets.flatMap((toolset) => toolset.proposals)).not.toContain('propose_task_completion_judge');
+    expect(toolsets.flatMap((toolset) => toolset.proposals)).not.toContain('propose_task_completion_evaluators');
     expect(toolsets.flatMap((toolset) => toolset.proposals)).not.toContain('propose_preset_evaluator');
   });
 
@@ -117,6 +118,30 @@ describe('propose_perturbed_case', () => {
     expect(ProposePerturbedCaseToolSchema.safeParse(withoutCanary).success).toBe(true);
     expect(ProposePerturbedCaseToolSchema.safeParse({ ...withoutCanary, perturbation: { ...withoutCanary.perturbation, canary: 'CANARY-1234' } }).success).toBe(true);
     expect(ProposePerturbedCaseToolSchema.safeParse({ ...perturbed, perturbation: { kind: 'edge_values', description: 'An empty note.' } }).success).toBe(true);
+  });
+});
+
+describe('propose_task_completion_evaluators (F1)', () => {
+  const evaluator = { name: 'Findings Present', requirement: '`findings` is present.', source: 'output_schema', check: { kind: 'schema', schema: { required: ['findings'] } } };
+
+  it('drafts one Evaluator per requirement, each of its own kind, and a judge without a rubric of its own', () => {
+    const parsed = ProposeTaskCompletionEvaluatorsToolSchema.parse({
+      evaluators: [
+        evaluator,
+        { name: 'ids-in-input', requirement: 'Every id is in the input.', source: 'prompt', check: { kind: 'code', runtime: 'python', source: 'print(1)' } },
+        { name: 'grades-justified', requirement: 'Each grade is justified.', source: 'skill', priority: 'high', check: { kind: 'llm_judge' } },
+      ],
+    });
+    expect(parsed.evaluators.map((drafted) => [drafted.name, drafted.check.kind])).toEqual([
+      ['findings-present', 'schema'], ['ids-in-input', 'code'], ['grades-justified', 'llm_judge'],
+    ]);
+    expect(parsed.vagueInstructions).toEqual([]);
+    expect(parsed.evaluators[2]!.check).toEqual({ kind: 'llm_judge' });
+  });
+
+  it('refuses two evaluators with the same name, and an expected-output check', () => {
+    expect(ProposeTaskCompletionEvaluatorsToolSchema.safeParse({ evaluators: [evaluator, { ...evaluator, name: 'findings-present' }] }).success).toBe(false);
+    expect(ProposeTaskCompletionEvaluatorsToolSchema.safeParse({ evaluators: [{ ...evaluator, check: { kind: 'expected_output', model: 'x' } }] }).success).toBe(false);
   });
 });
 

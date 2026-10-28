@@ -3,19 +3,18 @@
 import * as React from 'react';
 import { Check, X } from 'lucide-react';
 import {
-  DEFAULT_JUDGE_MIN_CONFIDENCE,
   EXTRACTION_EVALUATOR_NAME,
   EXTRACTION_EVALUATOR_RULE,
-  FALLBACK_PINNED_MODEL,
-  TASK_COMPLETION_EVALUATOR_NAME,
-  TASK_COMPLETION_EVALUATOR_RULE,
+  TASK_COMPLETION_SOURCE_LABELS,
   describeAcceptanceCriteria,
   extractionCheckSource,
   filePresetCheckSource,
   filePresetEvaluatorName,
   filePresetEvaluatorRule,
-  taskCompletionRubric,
+  taskCompletionEvaluator,
   type EvaluationSubject,
+  type EvaluatorCheck,
+  type TaskCompletionEvaluator,
 } from '@mediforce/platform-core';
 import type { EvaluatorSelfTest, ProposalView } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
@@ -32,16 +31,16 @@ type Proposal<Tool extends ProposalView['tool']> = Extract<ProposalView, { tool:
 /**
  * The proposals a person accepts or rejects as they stand. A plan is worked
  * through instead; a routing recommendation is applied in the workflow
- * editor; a task-completion judge (F1) and a deterministic preset (F2) each
- * get their own card.
+ * editor; drafted task-completion Evaluators (F1) and a deterministic preset
+ * (F2) each get their own card.
  */
-type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_control_settings' | 'propose_diagnosis' | 'propose_task_completion_judge' | 'propose_preset_evaluator' }>;
+type DecidableProposal = Exclude<ProposalView, { tool: 'propose_evaluation_plan' | 'propose_control_settings' | 'propose_diagnosis' | 'propose_task_completion_evaluators' | 'propose_preset_evaluator' }>;
 
 export function isDecidable(proposal: ProposalView): proposal is DecidableProposal {
   return proposal.tool !== 'propose_evaluation_plan'
     && proposal.tool !== 'propose_control_settings'
     && proposal.tool !== 'propose_diagnosis'
-    && proposal.tool !== 'propose_task_completion_judge'
+    && proposal.tool !== 'propose_task_completion_evaluators'
     && proposal.tool !== 'propose_preset_evaluator';
 }
 
@@ -313,38 +312,35 @@ export function ControlSettingsCard({ proposal }: { proposal: Proposal<'propose_
   );
 }
 
-const REQUIREMENT_SOURCE_LABELS = {
-  preamble: 'preamble',
-  prompt: 'prompt',
-  output_schema: 'output schema',
-  skill: 'skill',
-  brief: 'brief',
-} as const;
+const CHECK_KIND_LABELS: Record<TaskCompletionEvaluator['check']['kind'], string> = {
+  schema: 'schema',
+  code: 'code',
+  llm_judge: 'LLM judge',
+};
 
-/**
- * The step's task-completion judge (epic #1516 F1): the requirements the
- * assistant read off the step's instructions, any it could not turn into a
- * testable rule, and the rubric they render into. Accepting creates the
- * fixed `task-completion` llm_judge Evaluator with production left opt-in.
- */
-export function TaskCompletionJudgeCard({ step, state, mayEdit, editReason, onDecided }: {
+function checkDetail(check: EvaluatorCheck): string {
+  switch (check.kind) {
+    case 'schema': return JSON.stringify(check.schema, null, 2);
+    case 'code': return check.source;
+    case 'llm_judge': return check.rubric;
+    case 'expected_output': return check.instructions ?? '';
+  }
+}
+
+/** One drafted task-completion Evaluator: its requirement, its check, what its self-test showed, and its own decision. */
+function TaskCompletionEvaluatorRow({ step, drafted, selfTest, status, open, mayEdit, editReason, onDecided }: {
   step: EvaluationSubject;
-  state: { proposal: Proposal<'propose_task_completion_judge'>; status: ProposalStatus };
+  drafted: TaskCompletionEvaluator;
+  selfTest: EvaluatorSelfTest | undefined;
+  status: ProposalStatus;
+  open: boolean;
   mayEdit: boolean;
   editReason: string | undefined;
   onDecided: (status: ProposalStatus) => void;
 }) {
   const [error, setError] = React.useState<string | null>(null);
-  const { proposal } = state;
-  const { requirements, vagueInstructions, rationale } = proposal.arguments;
-  const rubric = taskCompletionRubric(requirements);
-  const accept = useStepEvaluationMutation(step, () => mediforce.evaluation.createEvaluator({
-    ...step,
-    name: TASK_COMPLETION_EVALUATOR_NAME,
-    rule: TASK_COMPLETION_EVALUATOR_RULE,
-    check: { kind: 'llm_judge', model: FALLBACK_PINNED_MODEL, rubric, minConfidence: DEFAULT_JUDGE_MIN_CONFIDENCE },
-    origin: 'assistant',
-  }));
+  const evaluator = taskCompletionEvaluator(drafted);
+  const accept = useStepEvaluationMutation(step, () => mediforce.evaluation.createEvaluator({ ...step, ...evaluator, origin: 'assistant' }));
 
   const onAccept = () => {
     setError(null);
@@ -352,31 +348,103 @@ export function TaskCompletionJudgeCard({ step, state, mayEdit, editReason, onDe
   };
 
   return (
-    <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="task-completion-judge-card">
-      <div className="mb-1 font-medium">Proposed task-completion judge</div>
+    <li className="border-t pt-1.5 first:border-t-0 first:pt-0" data-testid="task-completion-evaluator">
+      <div className="flex flex-wrap items-baseline gap-1">
+        <span className="font-mono">{evaluator.name}</span>
+        <span className="rounded bg-muted px-1 text-muted-foreground">{CHECK_KIND_LABELS[drafted.check.kind]}</span>
+        <span className="text-muted-foreground">from the {TASK_COMPLETION_SOURCE_LABELS[drafted.source]}</span>
+        {drafted.priority === 'high' && <span className="text-amber-700 dark:text-amber-300">— matters most</span>}
+      </div>
+      <p className="mt-0.5">{drafted.requirement}</p>
+      <details className="mt-0.5">
+        <summary className="cursor-pointer text-muted-foreground">{drafted.check.kind === 'llm_judge' ? 'Rubric' : 'Check'}</summary>
+        <pre className="mt-1 max-h-64 overflow-auto rounded bg-muted p-2 font-mono whitespace-pre-wrap">{checkDetail(evaluator.check)}</pre>
+      </details>
+      {drafted.check.kind === 'code' && <p className="mt-0.5 text-muted-foreground">Counts only once a person approves its source.</p>}
+      {selfTest !== undefined && <SelfTestSummary selfTest={selfTest} />}
+      {error !== null && <p className="mt-1 text-destructive">{error}</p>}
+      {status === 'open' && open ? (
+        <div className="mt-1 flex gap-1.5">
+          <InstantTooltip label={editReason}>
+            <span className="inline-flex">
+              <button type="button" data-testid="proposal-accept" className={primaryButtonClass} disabled={mayEdit === false || accept.isPending} onClick={onAccept}>
+                <Check className="h-3 w-3" />Accept
+              </button>
+            </span>
+          </InstantTooltip>
+          <button type="button" className={buttonClass} onClick={() => onDecided('rejected')}>
+            <X className="h-3 w-3" />Reject
+          </button>
+        </div>
+      ) : status !== 'open' && (
+        <p className={cn('mt-1 font-medium', status === 'accepted' ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground')}>
+          {status === 'accepted' ? 'Accepted' : 'Rejected'}
+        </p>
+      )}
+    </li>
+  );
+}
+
+/**
+ * The step's drafted task-completion Evaluators (epic #1516 F1): one per
+ * requirement the assistant read off the step's instructions, each of its own
+ * kind, so a failure names the requirement missed — plus any instruction it
+ * could not turn into a testable rule. Each is accepted or rejected on its
+ * own; accepting creates that Evaluator with production left opt-in.
+ */
+export function TaskCompletionEvaluatorsCard({ step, state, mayEdit, editReason, onDecided }: {
+  step: EvaluationSubject;
+  state: { proposal: Proposal<'propose_task_completion_evaluators'>; status: ProposalStatus };
+  mayEdit: boolean;
+  editReason: string | undefined;
+  onDecided: (status: ProposalStatus) => void;
+}) {
+  const { proposal } = state;
+  const { evaluators, vagueInstructions, rationale } = proposal.arguments;
+  const [statuses, setStatuses] = React.useState<ProposalStatus[]>(() => evaluators.map(() => 'open'));
+
+  // An accept resolves after other rows may have been decided, so each decision updates the latest statuses.
+  const decideOne = (index: number, status: ProposalStatus) => {
+    setStatuses((previous) => previous.map((current, position) => (position === index ? status : current)));
+  };
+  const allDecided = statuses.every((status) => status !== 'open');
+  const anyAccepted = statuses.includes('accepted');
+  React.useEffect(() => {
+    if (allDecided && state.status === 'open') onDecided(anyAccepted ? 'accepted' : 'rejected');
+  }, [allDecided, anyAccepted, state.status, onDecided]);
+
+  return (
+    <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="task-completion-evaluators-card">
+      <div className="mb-1 font-medium">Proposed task-completion Evaluators ({evaluators.length})</div>
       {rationale !== undefined && <p className="text-muted-foreground">{rationale}</p>}
-      <ol className="mt-1.5 space-y-1">
-        {requirements.map((requirement, index) => (
-          <li key={index} data-testid="task-completion-requirement">
-            <span className="text-muted-foreground">R{index + 1} ({REQUIREMENT_SOURCE_LABELS[requirement.source]}):</span> {requirement.text}
-            {requirement.priority === 'high' && <span className="ml-1 text-amber-700 dark:text-amber-300">— matters most</span>}
-          </li>
+      <ol className="mt-1.5 space-y-1.5">
+        {evaluators.map((drafted, index) => (
+          <TaskCompletionEvaluatorRow
+            key={drafted.name}
+            step={step}
+            drafted={drafted}
+            selfTest={proposal.selfTests?.[index]}
+            status={statuses[index]!}
+            open={state.status === 'open'}
+            mayEdit={mayEdit}
+            editReason={editReason}
+            onDecided={(status) => decideOne(index, status)}
+          />
         ))}
       </ol>
       {vagueInstructions.length > 0 && (
         <div className="mt-1.5 rounded bg-amber-500/10 p-1.5 text-amber-700 dark:text-amber-300" data-testid="task-completion-vague-instructions">
-          The judge will be inconsistent on these — sharpen the step&apos;s instructions:
+          No check can decide these consistently — sharpen the step&apos;s instructions:
           <ul className="mt-0.5 list-disc pl-4">
             {vagueInstructions.map((vague, index) => <li key={index}>&ldquo;{vague.quote}&rdquo; — {vague.why}</li>)}
           </ul>
         </div>
       )}
-      <details className="mt-1.5">
-        <summary className="cursor-pointer text-muted-foreground">Rubric</summary>
-        <pre className="mt-1 max-h-64 overflow-auto rounded bg-muted p-2 font-mono whitespace-pre-wrap">{rubric}</pre>
-      </details>
-      {proposal.selfTest !== undefined && <SelfTestSummary selfTest={proposal.selfTest} />}
-      <DecisionFooter status={state.status} mayEdit={mayEdit} editReason={editReason} pending={accept.isPending} error={error} onAccept={onAccept} onDecided={onDecided} />
+      {state.status !== 'open' && statuses.every((status) => status === 'open') && (
+        <p className={cn('mt-1.5 font-medium', state.status === 'accepted' ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground')}>
+          {state.status === 'accepted' ? 'Accepted' : 'Rejected'}
+        </p>
+      )}
     </div>
   );
 }
