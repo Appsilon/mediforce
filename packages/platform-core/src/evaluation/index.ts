@@ -15,3 +15,4 @@ export { wilsonInterval, caseReliability, cohensKappa, type CaseReliability } fr
 export { DEFAULT_ACCEPTANCE_CRITERIA, describeAcceptanceCriteria, evalRunAcceptance, judgeAcceptanceCriteria } from './acceptance';
 export { calibrateConfidence, recommendControl, type ConfidenceOutcome } from './confidence-calibration';
 export { DEFAULT_DRIFT_SETTINGS, detectDrift, parseDriftSettings, type DriftSettings, type DriftWindows } from './drift';
+export { TASK_COMPLETION_EVALUATOR_PREFIX, TASK_COMPLETION_SOURCE_LABELS, isTaskCompletionEvaluatorName, taskCompletionEvaluator } from './task-completion-evaluators';

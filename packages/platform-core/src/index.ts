@@ -366,11 +366,15 @@ export {
   ProposeAcceptanceCriteriaToolSchema,
   ProposeControlSettingsToolSchema,
   ProposeDiagnosisToolSchema,
+  ProposeTaskCompletionEvaluatorsToolSchema,
+  TaskCompletionEvaluatorSchema,
+  TaskCompletionRequirementSourceSchema,
   FailureRootCauseSchema,
   FixKindSchema,
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EVALUATION_ASSISTANT_TOOLSETS,
+  DRAFT_TASK_COMPLETION_EVALUATORS_TOOLSET,
   pickTools,
   EvaluationAssistantProposalSchema,
   type EvaluationAssistantProposalToolName,
@@ -378,6 +382,7 @@ export {
   type EvaluationAssistantProposal,
   type FailureRootCause,
   type FixKind,
+  type TaskCompletionEvaluator,
 } from './schemas/evaluation-assistant-tools';
 export {
   evaluatorTrust,
@@ -410,6 +415,10 @@ export {
   parseDriftSettings,
   type DriftSettings,
   type DriftWindows,
+  TASK_COMPLETION_EVALUATOR_PREFIX,
+  TASK_COMPLETION_SOURCE_LABELS,
+  isTaskCompletionEvaluatorName,
+  taskCompletionEvaluator,
 } from './evaluation/index';
 
 // Types (re-exported from schemas for convenience)

@@ -39,7 +39,7 @@ function assertPinnedJudgeModel(check: EvaluatorCheck): void {
 }
 
 /** A step has one output-schema check: the step's output either matches its JSON Schema or does not. */
-async function liveSchemaEvaluatorName(scope: CallerScope, step: ReturnType<typeof subjectRef>, except?: string): Promise<string | null> {
+export async function liveSchemaEvaluatorName(scope: CallerScope, step: ReturnType<typeof subjectRef>, except?: string): Promise<string | null> {
   const evaluators = await scope.evaluation.listEvaluators(step);
   for (const evaluator of evaluators) {
     if (evaluator.archived || evaluator.id === except) continue;
@@ -56,7 +56,7 @@ async function assertSingleSchemaEvaluator(scope: CallerScope, step: ReturnType<
 const NOT_IN_PRODUCTION = 'An expected-output check never runs in production: a production run has no expected output to compare with';
 const AGENT_NOT_IN_PRODUCTION = 'An agent\'s Evaluator never runs in production: production runs belong to the workflow steps that use the agent (ADR-0029)';
 
-/** An Evaluator starts at version 1. A `schema` check counts at once; the others wait for the trust gate (D9). */
+/** An Evaluator starts at version 1. A `code` check counts once a person approves its source; the others at once (D9). */
 export async function createEvaluator(
   input: z.output<typeof CreateEvaluatorInputSchema>,
   scope: CallerScope,

@@ -16,7 +16,8 @@ import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
  * the verdict it was unsure of, so it counts. The steps the assistant took stay listed under its reply, and the
  * panel widens from its left edge. Acceptance Criteria the assistant proposes
  * are set on accepting them, and a person confirms or overwrites a run's verdict from a
- * finished run's report. The model is the scripted mock OpenRouter.
+ * finished run's report. The task-completion Evaluators are added one by one,
+ * and the button stays greyed out until every one is archived. The model is the scripted mock OpenRouter.
  */
 test.describe('Step Evaluation tab', () => {
   // Each worker seeding the workspace's model key at once races on its insert, so the tab's journeys share one worker.
@@ -137,6 +138,81 @@ test.describe('Step Evaluation tab', () => {
     await expect(plan.getByTestId('plan-risk')).toHaveCount(1);
     await plan.getByRole('button', { name: 'Draft this check' }).click();
     await expect(page.getByText('Drafting the fatal-outcome check now.')).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('a person adds the task-completion Evaluators one by one, and can add them again only once every one is archived', async ({ page, request }) => {
+    test.setTimeout(90_000);
+    trackPageErrors(page);
+    // No production runs: each drafted check's self-test finds nothing to try, so no judge is called on one.
+    const workflowName = `e2e-eval-task-completion-${randomUUID().slice(0, 8)}`;
+    const created = await request.post(`/api/workflow-definitions?namespace=${EVALUATION_WORKSPACE}`, {
+      headers: JSON_HEADERS,
+      data: agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }),
+    });
+    expect(created.status(), await created.text()).toBe(201);
+
+    // The button sends a fixed message, so the turn is scripted under the workflow's name, which its context names.
+    await scriptOpenRouter(workflowName, [
+      { toolCalls: [{ name: 'get_step_instructions', arguments: {} }] },
+      {
+        toolCalls: [{
+          name: 'propose_task_completion_evaluators',
+          arguments: {
+            evaluators: [
+              { name: 'summary-present', requirement: 'The result carries a summary.', source: 'output_schema', check: { kind: 'schema', schema: { required: ['summary'] } } },
+              { name: 'every-ae-kept', requirement: 'Every adverse event in the input appears in the output.', source: 'prompt', check: { kind: 'code', runtime: 'python', source: 'print(1)' } },
+              { name: 'grades-justified', requirement: 'Each grade is justified by the event\'s description.', source: 'prompt', priority: 'high', check: { kind: 'llm_judge' } },
+            ],
+            vagueInstructions: [{ quote: 'Be thorough.', why: 'Nothing says what thorough covers.' }],
+          },
+        }],
+      },
+      { content: 'Drafted three task-completion Evaluators.' },
+    ]);
+
+    await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
+    await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await page.getByRole('button', { name: 'Add task-completion evaluators' }).click();
+    await expect(page.getByText('Drafted three task-completion Evaluators.')).toBeVisible({ timeout: 20_000 });
+
+    const card = page.getByTestId('task-completion-evaluators-card');
+    await expect(card.getByText('Proposed task-completion Evaluators (3)')).toBeVisible();
+    await expect(card.getByTestId('task-completion-vague-instructions')).toContainText('Be thorough.');
+    const rows = card.getByTestId('task-completion-evaluator');
+    const summary = rows.filter({ hasText: 'task-completion-summary-present' });
+    const kept = rows.filter({ hasText: 'task-completion-every-ae-kept' });
+    const judge = rows.filter({ hasText: 'task-completion-grades-justified' });
+    await expect(summary.getByText('schema', { exact: true })).toBeVisible();
+    await expect(kept.getByText('Counts only once a person approves its source.')).toBeVisible();
+    await expect(judge.getByText('— matters most')).toBeVisible();
+    await judge.getByText('Rubric').click();
+    await expect(judge.getByText(/Judge this one requirement only/)).toBeVisible();
+
+    // Each row is decided on its own; the rest stay open.
+    await summary.getByTestId('proposal-accept').click();
+    await expect(summary.getByText('Accepted')).toBeVisible({ timeout: 10_000 });
+    await kept.getByRole('button', { name: 'Reject' }).click();
+    await expect(kept.getByText('Rejected')).toBeVisible();
+    await expect(judge.getByTestId('proposal-accept')).toBeEnabled();
+    await judge.getByTestId('proposal-accept').click();
+    await expect(judge.getByText('Accepted')).toBeVisible({ timeout: 10_000 });
+
+    const evaluatorRows = page.getByTestId('evaluator-row');
+    await expect(evaluatorRows.filter({ hasText: 'task-completion-summary-present' })).toBeVisible({ timeout: 10_000 });
+    await expect(evaluatorRows.filter({ hasText: 'task-completion-grades-justified' })).toBeVisible();
+    await expect(evaluatorRows.filter({ hasText: 'task-completion-every-ae-kept' })).toHaveCount(0);
+    // A live task-completion Evaluator: the button stays, greyed out, and says why on hover.
+    const addButton = page.getByRole('button', { name: 'Add task-completion evaluators' });
+    await expect(addButton).toBeDisabled();
+    await addButton.locator('..').hover();
+    await expect(page.getByRole('tooltip')).toContainText('Task-completion Evaluators are already added');
+
+    // Archiving one still leaves a live one; archiving the last offers them again.
+    await evaluatorRows.filter({ hasText: 'task-completion-summary-present' }).getByRole('button', { name: 'Archive' }).click();
+    await expect(evaluatorRows.filter({ hasText: 'task-completion-summary-present' })).toHaveCount(0, { timeout: 10_000 });
+    await expect(addButton).toBeDisabled();
+    await evaluatorRows.filter({ hasText: 'task-completion-grades-justified' }).getByRole('button', { name: 'Archive' }).click();
+    await expect(addButton).toBeEnabled({ timeout: 10_000 });
   });
 
   test('a person reads a judge\'s rationale in the report and accepts a verdict it was unsure of, so it counts', async ({ page, request }) => {
