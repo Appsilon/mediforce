@@ -27,7 +27,10 @@ Notes:
   [`scripts/dev-infra.py`](../../scripts/dev-infra.py) (`docker-compose.yml` +
   `docker-compose.dev.yml`, project `mediforce-dev`, volume
   `mediforce-dev-pgdata` — same data across all worktrees), then run
-  `pnpm db:migrate`.
+  `pnpm db:migrate`. `dev` and `dev:queue` first run
+  [`scripts/dev-db-journal.py`](../../scripts/dev-db-journal.py), which
+  realigns already-applied migrations whose `_journal.json` `when` changed
+  (rebase, another branch's `db:generate`) so drizzle doesn't replay them.
 - `dev:no-docker` defaults `DATABASE_URL` to the same `localhost:5432` URL but
   does **not** start Postgres — run `pnpm dev` once first, or bring your own DB.
 - `dev:queue` starts Postgres + Redis only. The queue consumer and its UI are
@@ -193,6 +196,7 @@ Run a workflow with an agent step, then open http://localhost:6006 — spans
 | `docker compose` hangs                   | Docker Desktop isn't running — start it.                         |
 | `pnpm dev`: "Docker Compose v2 is not installed" | Engine-only `docker.io` lacks Compose — `sudo apt install docker-compose-v2` (Ubuntu); Docker Desktop bundles it. |
 | `relation "..." does not exist`          | `pnpm db:migrate`.                                               |
+| `pnpm dev`: `applying migrations...undefined` / `already exists` | A migration's journal `when` drifted from the shared dev DB. `pnpm dev` / `dev:queue` now fix this via `scripts/dev-db-journal.py`; with `dev:no-docker` run `python3 scripts/dev-db-journal.py` before `pnpm db:migrate`. |
 | Stale / corrupt local data               | `docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v && pnpm dev` (wipes the pg volume). |
 | `mediforce: missing API key`             | Set `MEDIFORCE_API_KEY` (see [GETTING-STARTED §3](../../GETTING-STARTED.md#3-run-the-cli)). |
 | `Unable to find image '...' locally` (script step) | Build local agent images: `./scripts/rebuild-docker-images.sh` ([GETTING-STARTED](../../GETTING-STARTED.md#build-images-for-script-executor-steps)). |
