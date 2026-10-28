@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   buildWorkflowDefinition,
+  InMemoryAgentDefinitionRepository,
   InMemoryAuditRepository,
   InMemoryProcessRepository,
 } from '@mediforce/platform-core/testing';
-import type { WorkflowDefinition } from '@mediforce/platform-core';
+import type { CreateAgentDefinitionInput, WorkflowDefinition } from '@mediforce/platform-core';
 import { ConflictError, ForbiddenError, PreconditionFailedError } from '../../../errors';
 import {
   createTestScope,
@@ -77,6 +78,34 @@ describe('deleteDockerImage handler', () => {
       transitions: [{ from: 'analyse', to: 'done' }],
       ...overrides,
     });
+
+  /** An Agent (ADR-0029) whose own `image` pins it, in namespace `alpha` by
+   *  default — same foreign workspace `pinning` uses, so the two block the
+   *  same way. */
+  const agentPinning = (
+    image: string,
+    overrides: Partial<CreateAgentDefinitionInput> = {},
+  ): CreateAgentDefinitionInput => ({
+    kind: 'plugin',
+    image,
+    name: 'Analyst',
+    iconName: 'Bot',
+    description: '',
+    foundationModel: 'anthropic/claude-sonnet-4',
+    systemPrompt: '',
+    inputDescription: '',
+    outputDescription: '',
+    namespace: 'alpha',
+    visibility: 'private',
+    ...overrides,
+  });
+
+  /** A scope for `caller` with this Agent already on the platform. */
+  const scopeWithAgent = async (caller: CallerIdentity, agent: CreateAgentDefinitionInput) => {
+    const agentDefinitionRepo = new InMemoryAgentDefinitionRepository();
+    await agentDefinitionRepo.create(agent);
+    return createTestScope({ auditRepo, agentDefinitionRepo, dockerImages: deleter, caller });
+  };
 
   /** A scope for `caller` with these definitions already on the platform. */
   const scopeWith = async (caller: CallerIdentity, definitions: WorkflowDefinition[]) => {
@@ -233,6 +262,48 @@ describe('deleteDockerImage handler', () => {
     await expect(deleteDockerImage({ imageId: 'shared-r:4.4' }, scope)).rejects.toThrow(
       /alpha\/sdtm-qc v4 \(analyse\)/,
     );
+  });
+
+  it('[PINS] refuses an image an agent in another namespace names (#1592)', async () => {
+    const scope = await scopeWithAgent(personalWorkspaceCaller, agentPinning('shared-r:4.4'));
+
+    await expect(
+      deleteDockerImage({ imageId: 'shared-r:4.4' }, scope),
+    ).rejects.toBeInstanceOf(ConflictError);
+    expect(deleter.calls).toEqual([]);
+  });
+
+  it('[PINS] redacts an agent the caller cannot see, and still counts it', async () => {
+    const scope = await scopeWithAgent(personalWorkspaceCaller, agentPinning('shared-r:4.4'));
+
+    await expect(deleteDockerImage({ imageId: 'shared-r:4.4' }, scope)).rejects.toThrow(
+      /1 more in a workspace you cannot see/,
+    );
+    await expect(deleteDockerImage({ imageId: 'shared-r:4.4' }, scope)).rejects.not.toThrow(
+      /Analyst/,
+    );
+  });
+
+  it('[PINS] names the agent for a caller who is a member of its workspace', async () => {
+    const scope = await scopeWithAgent(
+      userCaller('u-admin', ['alpha'], new Map([['alpha', 'admin']])),
+      agentPinning('shared-r:4.4'),
+    );
+
+    await expect(deleteDockerImage({ imageId: 'shared-r:4.4' }, scope)).rejects.toThrow(
+      /agent 'Analyst' \(alpha\)/,
+    );
+  });
+
+  it('[PINS] an agent naming no image never blocks, since it runs the golden image', async () => {
+    const scope = await scopeWithAgent(personalWorkspaceCaller, {
+      ...agentPinning('shared-r:4.4'),
+      image: undefined,
+    });
+
+    await expect(
+      deleteDockerImage({ imageId: 'shared-r:4.4' }, scope),
+    ).resolves.toBeTruthy();
   });
 
   it('[PINS] treats `repo` and `repo:latest` as the same image', async () => {

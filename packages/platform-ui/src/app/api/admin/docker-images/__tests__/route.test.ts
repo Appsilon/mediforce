@@ -18,6 +18,8 @@ vi.mock('@/lib/platform-services', () => ({
     // The handler scans every definition for a live pin on the image before it
     // destroys anything (#1375), so the route needs a repository to scan.
     processRepo: { listAllWorkflowDefinitions: async () => ({ definitions: [] }) },
+    // Same scan also checks Agents naming the image as their own (#1592).
+    agentDefinitionRepo: { listAll: async () => [] },
   }),
   getAppBaseUrl: () => 'http://localhost:3000',
 }));

@@ -1,8 +1,27 @@
 import { describe, it, expect } from 'vitest';
 import { buildWorkflowDefinition } from '@mediforce/platform-core/testing';
-import type { WorkflowDefinitionGroup } from '@mediforce/platform-core';
+import type { AgentDefinition, WorkflowDefinitionGroup } from '@mediforce/platform-core';
 import { deriveBuildTag, resolveCarriedBuild } from '@mediforce/agent-runtime';
-import { findWorkflowImagePins } from '../_image-pins';
+import { findAgentImagePins, findWorkflowImagePins } from '../_image-pins';
+
+/** An Agent naming `image`, or the golden image when omitted. */
+function agent(overrides: Partial<AgentDefinition> & { image?: string } = {}): AgentDefinition {
+  return {
+    id: 'agent-1',
+    kind: 'plugin',
+    name: 'Analyst',
+    iconName: 'Bot',
+    description: '',
+    foundationModel: 'anthropic/claude-sonnet-4',
+    systemPrompt: '',
+    inputDescription: '',
+    outputDescription: '',
+    visibility: 'private',
+    createdAt: '2026-01-15T10:00:00Z',
+    updatedAt: '2026-01-15T10:00:00Z',
+    ...overrides,
+  };
+}
 
 /** One group, with the versions given and the liveness metadata a scan reads. */
 function group(
@@ -248,5 +267,31 @@ describe('findWorkflowImagePins', () => {
 
     expect(pins).toHaveLength(1);
     expect(pins[0]).toMatchObject({ live: true, steps: ['build'] });
+  });
+});
+
+describe('findAgentImagePins', () => {
+  it('finds an agent whose own image matches one of the images asked about', () => {
+    const pins = findAgentImagePins(
+      [agent({ id: 'a1', image: 'tealflow:v2' }), agent({ id: 'a2', image: 'unrelated:v1' })],
+      ['tealflow:v2'],
+    );
+
+    expect(pins.map((pin) => pin.id)).toEqual(['a1']);
+  });
+
+  it('ignores an agent naming no image, since it runs the golden image', () => {
+    const pins = findAgentImagePins([agent({ id: 'a1' })], ['tealflow:v2']);
+
+    expect(pins).toEqual([]);
+  });
+
+  it('matches a bare repository against its implicit latest tag, like a workflow pin does', () => {
+    const pins = findAgentImagePins(
+      [agent({ id: 'a1', image: 'tealflow:latest' })],
+      ['tealflow'],
+    );
+
+    expect(pins.map((pin) => pin.id)).toEqual(['a1']);
   });
 });

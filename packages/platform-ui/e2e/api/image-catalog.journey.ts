@@ -939,6 +939,97 @@ test.describe('image catalog API journey', () => {
     }
   });
 
+  test('a delete stays blocked while an agent names the image, and clears once that agent does not (#1592)', async ({
+    request,
+  }) => {
+    test.skip(!dockerAvailable(), 'Docker daemon not available');
+    const stamp = Date.now();
+    const reference = `mediforce-e2e-agent-pin-${stamp}`;
+    const tag = `${reference}:v1`;
+    const agentName = `E2E agent pin ${stamp}`;
+    let entryId = '';
+    let agentId = '';
+
+    try {
+      docker('image', 'inspect', PROBE_BASE_IMAGE);
+    } catch {
+      docker('pull', PROBE_BASE_IMAGE);
+    }
+    deriveImage(tag, PROBE_BASE_IMAGE, 'mkdir /e2e-agent-pin-marker');
+
+    try {
+      const createRes = await request.post(catalogUrl(), {
+        headers: apiKeyHeaders(),
+        data: {
+          name: agentName,
+          intent: 'Proves an Agent naming the image blocks the composite delete.',
+          source: { kind: 'referenced', reference },
+        },
+      });
+      expect(createRes.status(), await createRes.text()).toBe(201);
+      entryId = ((await createRes.json()) as { entry: EntryView }).entry.id;
+
+      const agentRes = await request.post('/api/agents', {
+        headers: apiKeyHeaders(),
+        data: {
+          name: agentName,
+          iconName: 'Bot',
+          description: '',
+          foundationModel: 'anthropic/claude-sonnet-4',
+          systemPrompt: '',
+          inputDescription: '',
+          outputDescription: '',
+          namespace: TEST_ORG_HANDLE,
+          image: tag,
+        },
+      });
+      expect(agentRes.status(), await agentRes.text()).toBe(201);
+      agentId = ((await agentRes.json()) as { agent: { id: string } }).agent.id;
+
+      const blocked = await request.delete(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
+        { headers: apiKeyHeaders() },
+      );
+      // The old scan here saw only workflow steps, so an agent naming the image
+      // as its own (ADR-0029 decision 9) could be deleted out from under it,
+      // breaking the agent's next eval trial at container start.
+      expect(blocked.status(), await blocked.text()).toBe(409);
+      expect(await blocked.text()).toContain(agentName);
+
+      // Nothing destroyed: the image is still on the daemon and the entry with it.
+      docker('image', 'inspect', tag);
+
+      const agentDeleted = await request.delete(`/api/agents/${agentId}`, {
+        headers: apiKeyHeaders(),
+      });
+      expect(agentDeleted.ok(), await agentDeleted.text()).toBe(true);
+      agentId = '';
+
+      const allowed = await request.delete(
+        `/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}&withImages=true`,
+        { headers: apiKeyHeaders() },
+      );
+      expect(allowed.ok(), await allowed.text()).toBe(true);
+      expect(((await allowed.json()) as { deletedImages: string[] }).deletedImages).toEqual([tag]);
+      entryId = '';
+      expect(() => docker('image', 'inspect', tag)).toThrow();
+    } finally {
+      if (agentId !== '') {
+        await request.delete(`/api/agents/${agentId}`, { headers: apiKeyHeaders() });
+      }
+      if (entryId !== '') {
+        await request.delete(`/api/image-catalog/${entryId}?namespace=${TEST_ORG_HANDLE}`, {
+          headers: apiKeyHeaders(),
+        });
+      }
+      try {
+        docker('rmi', '-f', tag);
+      } catch {
+        /* the delete under test removed it */
+      }
+    }
+  });
+
   test('deleting with the images removes them from the daemon', async ({ request }) => {
     test.skip(!dockerAvailable(), 'Docker daemon not available');
     // A `docker commit` of its own, never a shared tag: this test destroys the

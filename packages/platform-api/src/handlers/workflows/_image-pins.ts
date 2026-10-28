@@ -5,6 +5,7 @@ import type { CallerScope } from '../../repositories/index';
 import {
   normalizeImageRef,
   pickRunnableVersion,
+  type AgentDefinition,
   type WorkflowDefinition,
   type WorkflowDefinitionGroup,
 } from '@mediforce/platform-core';
@@ -129,15 +130,31 @@ export function findWorkflowImagePins(
 }
 
 /**
- * Refuse to destroy images a live workflow version still runs on.
+ * Agents (ADR-0029 decision 9) whose own `image` names one of the images
+ * asked about. An agent naming no image runs the golden image and is never a
+ * pin — only an explicit `image` can be orphaned by a delete.
+ */
+export function findAgentImagePins(
+  agents: readonly AgentDefinition[],
+  images: readonly string[],
+): AgentDefinition[] {
+  const needles = new Set(images.map(normalizeImageRef));
+  return agents.filter(
+    (agent) => agent.image !== undefined && needles.has(normalizeImageRef(agent.image)),
+  );
+}
+
+/**
+ * Refuse to destroy images a live workflow version, or an agent, still runs on.
  *
  * Shared by both doors onto that act — Admin → Infrastructure's
  * `deleteDockerImage` and the Image Catalog's composite delete — so the rule
  * and the message it refuses with cannot drift between them (#1375).
  *
- * Judged deployment-wide, because the daemon is: a step in a namespace this
- * caller cannot read breaks just the same. Superseded and archived versions do
- * not block, for the reason `WorkflowImagePin.live` states.
+ * Judged deployment-wide, because the daemon is: a step or agent in a
+ * namespace this caller cannot read breaks just the same. Superseded and
+ * archived workflow versions do not block, for the reason `WorkflowImagePin.live`
+ * states — an agent carries no such history, so every pin on it blocks.
  */
 export async function assertNoLiveImagePins(
   tags: readonly string[],
@@ -147,39 +164,62 @@ export async function assertNoLiveImagePins(
     await scope.workflowDefinitions.listGroupsForImageAudit(),
     tags,
   ).filter((pin) => pin.live);
-  if (live.length > 0) {
-    throw new ConflictError(describeLivePins(live, scope.caller));
+  const agentPins = findAgentImagePins(
+    await scope.agentDefinitions.listAllForImageAudit(),
+    tags,
+  );
+  if (live.length > 0 || agentPins.length > 0) {
+    throw new ConflictError(describeLivePins(live, agentPins, scope.caller));
   }
 }
 
 /**
  * Why a delete was refused, in terms the caller can act on.
  *
- * Redacted, because the scan behind it is deployment-wide while workflow names
- * are not: a private workflow in a namespace this caller has not joined is
- * counted, never named. The count still has to be there — a block with no
- * reason is indistinguishable from a bug.
+ * Redacted, because the scan behind it is deployment-wide while workflow and
+ * agent names are not: a private workflow or agent in a namespace this caller
+ * has not joined is counted, never named. The count still has to be there — a
+ * block with no reason is indistinguishable from a bug.
  */
-function describeLivePins(live: readonly WorkflowImagePin[], caller: CallerIdentity): string {
-  const visible = live.filter(
+function describeLivePins(
+  live: readonly WorkflowImagePin[],
+  agentPins: readonly AgentDefinition[],
+  caller: CallerIdentity,
+): string {
+  const visibleWorkflows = live.filter(
     (pin) =>
       caller.isSystemActor || caller.namespaces.has(pin.namespace) || pin.visibility === 'public',
   );
-  const hidden = live.length - visible.length;
-
-  const named = visible.map(
-    (pin) => `${pin.namespace}/${pin.name} v${String(pin.version)} (${pin.steps.join(', ')})`,
+  const visibleAgents = agentPins.filter(
+    (agent) =>
+      caller.isSystemActor ||
+      agent.visibility === 'public' ||
+      (typeof agent.namespace === 'string' && caller.namespaces.has(agent.namespace)),
   );
+  const hidden = live.length - visibleWorkflows.length + (agentPins.length - visibleAgents.length);
+
+  const named = [
+    ...visibleWorkflows.map(
+      (pin) => `${pin.namespace}/${pin.name} v${String(pin.version)} (${pin.steps.join(', ')})`,
+    ),
+    ...visibleAgents.map((agent) => `agent '${agent.name}' (${agent.namespace ?? 'built-in'})`),
+  ];
   if (hidden > 0) {
     named.push(
       `${String(hidden)} more in ${hidden === 1 ? 'a workspace' : 'workspaces'} you cannot see`,
     );
   }
 
+  const subject = [
+    live.length > 0 ? `${String(live.length)} workflow version${live.length === 1 ? '' : 's'}` : null,
+    agentPins.length > 0 ? `${String(agentPins.length)} agent${agentPins.length === 1 ? '' : 's'}` : null,
+  ]
+    .filter((part) => part !== null)
+    .join(' and ');
+  const total = live.length + agentPins.length;
   return (
-    `Cannot delete these images: ${String(live.length)} workflow ${live.length === 1 ? 'version' : 'versions'} ` +
-    `still ${live.length === 1 ? 'runs' : 'run'} on ${live.length === 1 ? 'it' : 'them'} — ${named.join('; ')}. ` +
-    'Point those steps at another image, or archive the version, then delete again. ' +
-    'Superseded and archived versions do not block, since a registered version cannot be re-pointed.'
+    `Cannot delete these images: ${subject} still use${total === 1 ? 's' : ''} ${total === 1 ? 'it' : 'them'} — ${named.join('; ')}. ` +
+    'Point those steps or agents at another image, or archive the workflow version, then delete again. ' +
+    'Superseded and archived workflow versions do not block, since a registered version cannot be re-pointed.'
   );
 }
