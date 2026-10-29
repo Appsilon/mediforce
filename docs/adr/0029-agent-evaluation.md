@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-10-16
+last_reviewed: 2026-10-29
 ---
 
 # ADR-0029: An Agent can own an Evaluation, and an Eval Run assesses one Agent version
@@ -156,6 +156,23 @@ point at.
    gave it — its image now or in any of its versions — so the next save gives
    it the new Agent's.
 
+10. **A Step that changes its Agent can run the Agent's suite.** _Added
+    2026-10-29; narrows "reusing it from a Step is not part of this decision"
+    in decision 1 to a Step the Agent still runs unmodified but for the change
+    that lost it decision 8 — never an Agent on its own._ From the Step's
+    Evaluation tab (`prepareEvalRun`, `useAgentSuite`), a person can prepare
+    the Step's Eval Run with the Agent's Evaluators, Eval Cases and Acceptance
+    Criteria instead of the Step's own, frozen onto it exactly as the Step's
+    own would be. The run stays owned by the Step — its verdict, once it
+    finishes, is the Step's own and reads under decision 8 like any other,
+    replacing whatever the Step inherited from the Agent. Only the workflow's
+    first step may: an Agent's Eval Case carries no `previousStepOutputs`
+    (decision 4), so a later step has nothing to give it from earlier steps.
+    The run records which Agent its suite came from
+    (`eval_runs.suite_agent_id`); a Step's staleness check (ADR-0023 D7) reads
+    that Agent's live Evaluators, Eval Cases and Acceptance Criteria for such a
+    run, not the Step's own.
+
 ## Considered options
 
 - **A reserved pseudo-workflow per Agent (`workflowName = "agent:<id>"`).** No
@@ -184,3 +201,7 @@ point at.
   `/agents/definitions/:id/eval-runs/:evalRunId`. The CLI's `mediforce eval`
   commands take `--agent` in place of `--workflow` and `--step` where an Agent
   can be the subject.
+- Migration `0087_eval_run_suite_agent` adds `eval_runs.suite_agent_id`
+  (decision 10). `mediforce eval run-estimate`/`run-prepare` and the Step's
+  Evaluation tab take `--use-agent-suite`/a checkbox, shown only on a
+  workflow's first step that names an Agent.

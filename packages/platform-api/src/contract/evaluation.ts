@@ -336,6 +336,8 @@ export const PrepareEvalRunInputSchema = EvaluationSubjectRefSchema.extend({
   /** The Workflow Definition version whose step runs; its runnable version when absent. */
   definitionVersion: z.number().int().positive().optional(),
   datasetVersionId: z.uuid().optional(),
+  /** Read Evaluators, Eval Cases and Acceptance Criteria from the step's own Agent instead of the step's (ADR-0029 D10, #1552). */
+  useAgentSuite: z.boolean().optional(),
   trialsPerCase: z.number().int().min(1).max(10).default(3),
   concurrency: z.number().int().min(1).max(8).default(2),
   /** Spend cap; defaults to 1.5× the estimate, and is required when there is no estimate. */

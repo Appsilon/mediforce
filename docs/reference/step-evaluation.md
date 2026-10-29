@@ -819,6 +819,14 @@ person's sign-off on it:
   says which step leans on which Agent.
   Once the Agent changes, the step is not verified until the Agent's new
   version passes.
+- **Run the Agent's suite on this step** (ADR-0029 D10) — a step that changes
+  its Agent gets no use of decision D8 above, but on the workflow's first
+  step a person can prepare its Eval Run with the Agent's Evaluators, Eval
+  Cases and Acceptance Criteria instead of rebuilding the Step's own
+  (`useAgentSuite` on `run-prepare`/`run-estimate`, or the checkbox on the
+  Evaluation tab). The run is still the Step's own — its verdict replaces
+  whatever D8 inherited — but its staleness is judged against the Agent's
+  live suite, not the Step's.
 
 It comes with `GET /api/evaluation/qualification` as `validation: { status,
 evalRunId, reason, runInProgress }`, as the first line of `mediforce eval

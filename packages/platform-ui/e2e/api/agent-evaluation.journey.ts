@@ -11,7 +11,7 @@ import {
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { pollUntil } from '../helpers/poll-until';
-import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow } from '../helpers/agent-step-runs';
+import { AUTH_HEADERS, JSON_HEADERS, agentStepAfterExtractWorkflow, agentStepWorkflow } from '../helpers/agent-step-runs';
 import { OUTSIDER_NAMESPACE, sessionCookieHeaders, setupMultiNamespaceCallers } from '../helpers/multi-namespace';
 
 /**
@@ -195,6 +195,59 @@ test.describe('Agent Evaluation — API E2E', () => {
       reason: expect.stringContaining('as it was validated'),
       inheritedFromAgent: { agentId, version: 1 },
     });
+  });
+
+  test('a step that changes its Agent can run the Agent\'s suite instead of rebuilding it (#1552, ADR-0029 D10)', async ({ request }) => {
+    test.setTimeout(120_000);
+    const { member } = await setupMultiNamespaceCallers();
+    const agentId = await createAgent(request, `AE grader ${randomUUID().slice(0, 8)}`);
+    const subject = { namespace: TEST_ORG_HANDLE, agentId };
+    await seedSuite(request, subject, { events: [{ term: 'Neutropenia', anc: 0.4 }] });
+
+    // Validate the Agent itself first (D8 baseline).
+    const agentRun = EvalRunOutputSchema.parse(await post(request, '/api/evaluation/runs', { ...subject, trialsPerCase: 1, budgetUsd: 1 }, 201));
+    await post(request, `/api/evaluation/runs/${agentRun.evalRun.id}/start`, { confirmedBudgetUsd: 1 });
+    await pollUntil(
+      async () => EvalRunOutputSchema.parse(await getJson(request, `/api/evaluation/runs/${agentRun.evalRun.id}`)).evalRun.status === 'completed' || null,
+      { description: `Agent Eval Run ${agentRun.evalRun.id} to complete`, timeoutMs: 90_000 },
+    );
+    await request.post('/api/evaluation/qualification', { headers: sessionCookieHeaders(member), data: { evalRunId: agentRun.evalRun.id, decision: 'confirmed' } });
+
+    // Its first step changes the Agent (adds a prompt), so it gets no use of D8.
+    const workflowName = `e2e-agent-suite-${agentId.slice(0, 8)}`;
+    const registered = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
+      headers: JSON_HEADERS,
+      data: agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agentId, plugin: 'claude-code-agent', agent: { prompt: 'Grade each AE.' } }),
+    });
+    expect(registered.status(), await registered.text()).toBe(201);
+    const validationUrl = `/api/evaluation/workflow-validation?${new URLSearchParams({ namespace: TEST_ORG_HANDLE, workflowName }).toString()}`;
+    const unverified = GetWorkflowValidationOutputSchema.parse(await getJson(request, validationUrl));
+    expect(unverified.versions[0]).toMatchObject({ status: 'not_verified', steps: [{ stepId: 'grade-aes', validation: { status: 'not_verified' } }] });
+
+    // Borrow the Agent's suite instead of rebuilding it: the run is the Step's own, with the Agent's Evaluators.
+    const step = { namespace: TEST_ORG_HANDLE, workflowName, stepId: 'grade-aes' };
+    const stepPrepared = EvalRunOutputSchema.parse(await post(request, '/api/evaluation/runs', { ...step, trialsPerCase: 1, budgetUsd: 1, useAgentSuite: true }, 201));
+    expect(stepPrepared.evalRun).toMatchObject({ agentId: null, workflowName, stepId: 'grade-aes', suiteAgentId: agentId, definitionVersion: 1, agentVersion: null });
+    expect(stepPrepared.evalRun.evaluators.map((evaluator) => evaluator.name)).toEqual(['summary-present']);
+    await post(request, `/api/evaluation/runs/${stepPrepared.evalRun.id}/start`, { confirmedBudgetUsd: 1 });
+    await pollUntil(
+      async () => EvalRunOutputSchema.parse(await getJson(request, `/api/evaluation/runs/${stepPrepared.evalRun.id}`)).evalRun.status === 'completed' || null,
+      { description: `Step Eval Run ${stepPrepared.evalRun.id} to complete`, timeoutMs: 90_000 },
+    );
+    const signed = await request.post('/api/evaluation/qualification', { headers: sessionCookieHeaders(member), data: { evalRunId: stepPrepared.evalRun.id, decision: 'confirmed' } });
+    expect(signed.status(), await signed.text()).toBe(201);
+
+    const verified = GetWorkflowValidationOutputSchema.parse(await getJson(request, validationUrl));
+    expect(verified.versions[0]).toMatchObject({ status: 'passed', steps: [{ stepId: 'grade-aes', validation: { status: 'passed', evalRunId: stepPrepared.evalRun.id } }] });
+
+    // Refuses a step that is not its workflow's first: an Agent's Eval Cases carry no previousStepOutputs to give it.
+    const secondWorkflow = `e2e-agent-suite-second-${agentId.slice(0, 8)}`;
+    await post(request, `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, agentStepAfterExtractWorkflow(secondWorkflow, { autonomyLevel: 'L4', agentId, plugin: 'claude-code-agent', agent: { prompt: 'Grade each AE.' } }), 201);
+    const refused = await request.post('/api/evaluation/runs', {
+      headers: JSON_HEADERS, data: { namespace: TEST_ORG_HANDLE, workflowName: secondWorkflow, stepId: 'grade-aes', trialsPerCase: 1, budgetUsd: 1, useAgentSuite: true },
+    });
+    expect(refused.status()).toBe(400);
+    expect(await refused.text()).toContain("is not");
   });
 
   test('an MCP binding change is a new version; a moving model alias and a cowork agent are refused', async ({ request }) => {

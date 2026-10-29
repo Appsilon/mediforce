@@ -1768,7 +1768,7 @@ function AgentTrialEnv({ step, mayEdit }: { step: Extract<EvaluationSubject, { k
  * the workflow's `run` verb; signing a qualification from a report is its
  * `edit` verb.
  */
-export function EvalRunsSection({ step, definitionVersion, data, datasets, cases, mayRun, runReason }: {
+export function EvalRunsSection({ step, definitionVersion, data, datasets, cases, mayRun, runReason, canUseAgentSuite = false }: {
   step: EvaluationSubject;
   /**
    * The workflow version whose step a new run runs. Its finished runs are
@@ -1784,16 +1784,20 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
   cases: readonly EvalCase[];
   mayRun: boolean;
   runReason: string | undefined;
+  /** Whether this step names an Agent and is its workflow's first step, so it can borrow the Agent's suite (ADR-0029 D10, #1552). */
+  canUseAgentSuite?: boolean;
 }) {
   const [trialsText, setTrialsText] = React.useState('3');
   const [budgetText, setBudgetText] = React.useState('');
   const [confirming, setConfirming] = React.useState(false);
+  const [useAgentSuite, setUseAgentSuite] = React.useState(false);
   const trials = parseTrialsPerCase(trialsText);
   const budgetUsd = parseBudgetUsd(budgetText);
   const versions = datasets.data?.datasets ?? [];
   const [nextDataset] = versions;
   const casesUnsaved = hasUnsavedCases(cases, nextDataset);
-  const estimate = useEvalRunEstimate(step, definitionVersion, mayRun && nextDataset !== undefined && casesUnsaved === false ? trials : null);
+  const readyToRun = useAgentSuite || (nextDataset !== undefined && casesUnsaved === false);
+  const estimate = useEvalRunEstimate(step, definitionVersion, mayRun && readyToRun ? trials : null, useAgentSuite);
   const budget: BudgetChoice = budgetUsd === null
     ? { kind: 'auto', suggestedUsd: estimate.data?.suggestedBudgetUsd ?? null }
     : { kind: 'set', budgetUsd };
@@ -1804,6 +1808,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
       ...(definitionVersion === null ? {} : { definitionVersion }),
       trialsPerCase: trials ?? undefined,
       ...(budgetUsd === null ? {} : { budgetUsd }),
+      ...(useAgentSuite ? { useAgentSuite: true } : {}),
     });
     const confirmedBudgetUsd = budget.kind === 'set' ? budget.budgetUsd : budget.suggestedUsd ?? undefined;
     return mediforce.evaluation.startRun({ evalRunId: prepared.evalRun.id, confirmedBudgetUsd });
@@ -1843,18 +1848,26 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
           <label className="flex items-center gap-1">Budget $
             <input type="number" min={0} step={0.01} className={cn(inputClass, 'w-24')} placeholder="auto" value={budgetText} onChange={(event) => setBudgetText(event.target.value)} />
           </label>
+          {canUseAgentSuite && (
+            <label className="flex items-center gap-1" data-testid="eval-run-use-agent-suite">
+              <input type="checkbox" checked={useAgentSuite} onChange={(event) => setUseAgentSuite(event.target.checked)} />
+              Run the agent's suite on this step
+            </label>
+          )}
           {estimateLabel !== null && (
             <span className="tabular-nums text-muted-foreground" data-testid="eval-run-estimate">{estimateLabel}</span>
           )}
           <button
             type="button"
             className={primaryButtonClass}
-            disabled={trials === null || casesUnsaved || nextDataset === undefined || start.isPending || (budgetUsd === null && estimate.isPlaceholderData)}
+            disabled={trials === null || readyToRun === false || start.isPending || (budgetUsd === null && estimate.isPlaceholderData)}
             onClick={() => { start.reset(); setConfirming(true); }}
           >Start</button>
-          <span className={nextDataset === undefined || casesUnsaved ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'} data-testid="eval-run-dataset">
-            {nextDataset === undefined ? 'Save your cases to run.' : casesUnsaved ? `Save your cases to run: Dataset v${nextDataset.version} is behind the list.` : `Runs Dataset v${nextDataset.version} (${nextDataset.caseIds.length} case(s)).`}
-          </span>
+          {useAgentSuite === false && (
+            <span className={nextDataset === undefined || casesUnsaved ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'} data-testid="eval-run-dataset">
+              {nextDataset === undefined ? 'Save your cases to run.' : casesUnsaved ? `Save your cases to run: Dataset v${nextDataset.version} is behind the list.` : `Runs Dataset v${nextDataset.version} (${nextDataset.caseIds.length} case(s)).`}
+            </span>
+          )}
           {trials === null && <span className="text-destructive">Trials per case must be a whole number from 1 to 10.</span>}
           {estimate.error instanceof Error && <span className="text-destructive" data-testid="eval-run-estimate-error">{estimate.error.message}</span>}
         </div>

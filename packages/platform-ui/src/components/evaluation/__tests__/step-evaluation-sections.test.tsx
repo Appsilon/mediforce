@@ -765,4 +765,29 @@ describe('Starting an Eval Run', () => {
 
     expect(startButton().disabled).toBe(false);
   });
+
+  it('offers no agent-suite checkbox unless the step can use one', () => {
+    renderRuns([], []);
+
+    expect(screen.queryByTestId('eval-run-use-agent-suite')).toBeNull();
+  });
+
+  it('unlocks Start through the agent-suite checkbox, without a saved Dataset (#1552)', () => {
+    render(
+      <EvalRunsSection
+        step={step}
+        definitionVersion={1}
+        data={{ isLoading: false, data: { evalRuns: [] } } as never}
+        datasets={{ data: { datasets: [] } } as never}
+        cases={[] as never}
+        mayRun={true}
+        runReason={undefined}
+        canUseAgentSuite={true}
+      />,
+    );
+    expect(startButton().disabled).toBe(true);
+    fireEvent.click(within(screen.getByTestId('eval-run-use-agent-suite')).getByRole('checkbox'));
+
+    expect(startButton().disabled).toBe(false);
+  });
 });

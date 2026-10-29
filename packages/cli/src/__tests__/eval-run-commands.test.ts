@@ -76,6 +76,13 @@ describe('mediforce eval runs', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('run-prepare --use-agent-suite asks to run the step\'s Agent\'s suite instead of its own', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(OUTPUT, 201));
+    const output = captureOutput();
+    expect(await evalRunPrepareCommand({ argv: [...STEP_ARGV, '--use-agent-suite', ...BASE], env: ENV, output })).toBe(0);
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body))).toMatchObject({ stepId: 'grade-aes', useAgentSuite: true });
+  });
+
   it('run-start sends the confirmed budget', async () => {
     const running = { ...OUTPUT.evalRun, status: 'running' };
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ ...OUTPUT, evalRun: running }));

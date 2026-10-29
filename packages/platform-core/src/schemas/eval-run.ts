@@ -90,6 +90,8 @@ export const EvalRunSchema = EvaluationOwnerSchema.extend({
   definitionVersion: z.number().int().positive().nullable(),
   /** The Agent version an Agent's run assessed (ADR-0029); null on a Step's. */
   agentVersion: z.number().int().positive().nullable().default(null),
+  /** A Step's run whose Evaluators, Eval Cases and Acceptance Criteria came from this Agent (ADR-0029 D10, #1552), not the Step's own; null otherwise. */
+  suiteAgentId: z.string().min(1).nullable().default(null),
   datasetVersionId: z.uuid(),
   caseIds: z.array(z.uuid()).min(1),
   trialsPerCase: z.number().int().min(1).max(10),

@@ -208,6 +208,7 @@ export const evalRuns = pgTable(
     agentId: agentIdColumn(),
     definitionVersion: integer('definition_version'),
     agentVersion: integer('agent_version'),
+    suiteAgentId: text('suite_agent_id'),
     datasetVersionId: uuid('dataset_version_id').notNull().references(() => evalDatasetVersions.id),
     caseIds: jsonb('case_ids').notNull(),
     trialsPerCase: integer('trials_per_case').notNull(),

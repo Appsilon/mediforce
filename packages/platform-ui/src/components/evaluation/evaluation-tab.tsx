@@ -101,7 +101,7 @@ function AssistantResizeHandle({ width, resize, persist, commit }: ReturnType<ty
  * One subject's Evaluation beside its assistant: an agent Step in one workflow
  * version, or an Agent on its own (ADR-0029), with no version to pick.
  */
-export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit, editReason, mayRun, runReason }: {
+export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit, editReason, mayRun, runReason, canUseAgentSuite = false }: {
   step: EvaluationSubject;
   definitionVersion: number | null;
   outputSchema: AgentOutputSchema | undefined;
@@ -109,6 +109,8 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
   editReason: string | undefined;
   mayRun: boolean;
   runReason: string | undefined;
+  /** Whether this step names an Agent and is its workflow's first step, so it can borrow the Agent's suite (ADR-0029 D10, #1552). */
+  canUseAgentSuite?: boolean;
 }) {
   const evaluation = useStepEvaluation(step, definitionVersion);
   const layoutRef = React.useRef<HTMLDivElement>(null);
@@ -132,7 +134,7 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
           stepOutputSchema={outputSchema}
         />
         <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />
-        <EvalRunsSection step={step} definitionVersion={definitionVersion} data={evaluation.runs} datasets={evaluation.datasets} cases={evaluation.cases.data?.cases ?? []} mayRun={mayRun} runReason={runReason} />
+        <EvalRunsSection step={step} definitionVersion={definitionVersion} data={evaluation.runs} datasets={evaluation.datasets} cases={evaluation.cases.data?.cases ?? []} mayRun={mayRun} runReason={runReason} canUseAgentSuite={canUseAgentSuite} />
       </div>
       <div className="relative lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
         <AssistantResizeHandle {...assistantWidth} />
@@ -250,6 +252,7 @@ export function EvaluationTab({ handle, workflowName, runnableVersion, mayEdit, 
           editReason={editReason}
           mayRun={mayRun}
           runReason={runReason}
+          canUseAgentSuite={selected.agentId !== undefined && definition.steps[0]?.id === selected.id}
         />
       )}
     </div>

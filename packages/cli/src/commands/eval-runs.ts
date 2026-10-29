@@ -45,6 +45,7 @@ export const evalRunEstimateCommand = defineCommand({
     version: { type: 'string', description: 'Workflow Definition version whose step runs (default: the runnable one)' },
     dataset: { type: 'string', description: 'Eval Dataset version id (default: the newest)' },
     trials: { type: 'string', description: 'Trials per case (default: 3)' },
+    'use-agent-suite': { type: 'boolean', description: "Read Evaluators, Eval Cases and Acceptance Criteria from the step's own Agent instead of the step's (#1552)" },
   },
   async run({ args, output, mediforce, jsonMode }) {
     const trials = parsePositiveIntArg(args.trials);
@@ -58,6 +59,7 @@ export const evalRunEstimateCommand = defineCommand({
       ...(version !== undefined ? { definitionVersion: version } : {}),
       ...(args.dataset !== undefined ? { datasetVersionId: args.dataset } : {}),
       ...(trials !== undefined ? { trialsPerCase: trials } : {}),
+      ...(args['use-agent-suite'] === true ? { useAgentSuite: true } : {}),
     });
     if (jsonMode) {
       printJson(output, result);
@@ -80,6 +82,7 @@ export const evalRunPrepareCommand = defineCommand({
     trials: { type: 'string', description: 'Trials per case (default: 3)' },
     concurrency: { type: 'string', description: 'Trials at once (default: 2)' },
     budget: { type: 'string', description: 'Spend cap in USD (default: 1.5× the estimate)' },
+    'use-agent-suite': { type: 'boolean', description: "Read Evaluators, Eval Cases and Acceptance Criteria from the step's own Agent instead of the step's (#1552)" },
   },
   async run({ args, output, mediforce, jsonMode }) {
     const trials = parsePositiveIntArg(args.trials);
@@ -96,6 +99,7 @@ export const evalRunPrepareCommand = defineCommand({
       ...(trials !== undefined ? { trialsPerCase: trials } : {}),
       ...(concurrency !== undefined ? { concurrency } : {}),
       ...(args.budget !== undefined ? { budgetUsd: Number(args.budget) } : {}),
+      ...(args['use-agent-suite'] === true ? { useAgentSuite: true } : {}),
     });
     if (jsonMode) {
       printJson(output, result);

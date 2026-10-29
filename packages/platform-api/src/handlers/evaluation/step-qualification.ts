@@ -61,6 +61,15 @@ function once<Value>(read: () => Promise<Value>): () => Promise<Value> {
   return () => (pending ??= read());
 }
 
+/** The Agent's own Evaluation rows a run that borrowed its suite (#1552) is judged against, one Agent read at most once. */
+function agentSuiteRows(scope: CallerScope, namespace: string): (agentId: string) => SubjectRows {
+  const cache = new Map<string, SubjectRows>();
+  return (agentId) => {
+    if (cache.has(agentId) === false) cache.set(agentId, subjectRows(scope, { kind: 'agent', namespace, agentId }));
+    return cache.get(agentId)!;
+  };
+}
+
 function subjectRows(scope: CallerScope, step: EvaluationSubject): SubjectRows {
   return {
     runs: once(() => scope.evaluation.listEvalRuns(step)),
@@ -123,6 +132,7 @@ async function stepValidation(
   workflowStep: WorkflowStep,
   version: ValidatedVersion,
   stepFingerprint: () => Promise<StepFingerprint>,
+  suiteRowsOf: (agentId: string) => SubjectRows,
 ): Promise<StepValidation> {
   const inlineServers = inlineMcpServerNames(workflowStep);
   if (inlineServers.length > 0) {
@@ -134,6 +144,8 @@ async function stepValidation(
   if (run === undefined) {
     return { status: 'not_verified', evalRunId: null, reason: `No Eval Run of ${version.label} has finished yet.`, runInProgress };
   }
+  // A Step's run that borrowed its Agent's suite (#1552) is judged stale against the Agent's live rows, not the Step's own.
+  const suite = run.suiteAgentId === null ? rows : suiteRowsOf(run.suiteAgentId);
   const notVerified = (reason: string): StepValidation => ({ status: 'not_verified', evalRunId: run.id, reason, runInProgress });
   const since = `since Eval Run ${run.id.slice(0, 8)}`;
   const fingerprint = await stepFingerprint();
@@ -143,14 +155,14 @@ async function stepValidation(
       .map((component) => (version.subject === 'agent' && component === 'step' ? 'trial env' : component));
     return notVerified(`The ${version.subject} changed ${since}${changed.length === 0 ? '' : `: ${changed.join(', ')}`}.`);
   }
-  const evaluatorsChanged = evaluatorChanges(await rows.evaluators(), run.evaluators, 'run with');
+  const evaluatorsChanged = evaluatorChanges(await suite.evaluators(), run.evaluators, 'run with');
   if (evaluatorsChanged.length > 0) return notVerified(`Evaluators changed ${since}: ${evaluatorsChanged.join('; ')}.`);
-  const live = await rows.liveCaseIds();
+  const live = await suite.liveCaseIds();
   const ran = new Set(run.caseIds);
   if (live.length !== ran.size || live.some((caseId) => ran.has(caseId) === false)) {
     return notVerified(`Eval Cases were added, edited or archived ${since}.`);
   }
-  if (run.acceptanceCriteria === null || JSON.stringify(await rows.criteria()) !== JSON.stringify(run.acceptanceCriteria)) {
+  if (run.acceptanceCriteria === null || JSON.stringify(await suite.criteria()) !== JSON.stringify(run.acceptanceCriteria)) {
     return notVerified(run.acceptanceCriteria === null ? `Eval Run ${run.id.slice(0, 8)} had no Acceptance Criteria to judge.` : `Acceptance Criteria changed ${since}.`);
   }
 
@@ -260,7 +272,7 @@ export async function getStepQualification(
   const approvals = history.filter((qualification) => qualificationOutcome(qualification) === 'passed');
   const matching = approvals.find((qualification) => qualification.fingerprint.hash === fingerprint.hash);
   const shown = matching ?? approvals[0] ?? history[0];
-  const ownValidation = await stepValidation(scope, rows, workflowStep, version, async () => fingerprint);
+  const ownValidation = await stepValidation(scope, rows, workflowStep, version, async () => fingerprint, agentSuiteRows(scope, step.namespace));
   const validation = agent === null ? await withAgentValidation(agentValidations(scope), definition, workflowStep, ownValidation) : ownValidation;
   if (shown === undefined || approvals.length === 0) {
     return { status: 'not_qualified', validation, qualification: shown ?? null, ...versions, fingerprint, changed: [], evaluatorsChanged: [], history };
@@ -292,6 +304,7 @@ export async function getWorkflowValidation(
   const definitions = await scope.workflowDefinitions.listVersions(input.namespace, input.workflowName);
   if (definitions.length === 0) throw new NotFoundError(`Workflow '${input.workflowName}' not found`);
   const validations = agentValidations(scope);
+  const suiteRowsOf = agentSuiteRows(scope, input.namespace);
   const rowsByStep = new Map<string, SubjectRows>();
   const rowsOf = (stepId: string): SubjectRows => {
     if (rowsByStep.has(stepId) === false) rowsByStep.set(stepId, subjectRows(scope, { kind: 'step', namespace: input.namespace, workflowName: input.workflowName, stepId }));
@@ -307,7 +320,7 @@ export async function getWorkflowValidation(
         validations,
         definition,
         workflowStep,
-        await stepValidation(scope, rowsOf(workflowStep.id), workflowStep, definitionVersionOf(definition.version), () => computeStepFingerprint(scope, definition, workflowStep)),
+        await stepValidation(scope, rowsOf(workflowStep.id), workflowStep, definitionVersionOf(definition.version), () => computeStepFingerprint(scope, definition, workflowStep), suiteRowsOf),
       ),
     })));
     const statuses = steps.map((entry) => entry.validation.status);

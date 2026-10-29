@@ -18,7 +18,7 @@ type Section =
   | 'mcp-policy'
   | 'drift'
   | `qualification:${number | 'runnable'}`
-  | `estimate:${number}:${number}`;
+  | `estimate:${number}:${number}:${boolean}`;
 
 const STEP_AGENT_RUNS_PAGE = 20;
 
@@ -126,13 +126,14 @@ export function useWorkflowValidation(namespace: string, workflowName: string) {
  * while the trial count is not valid; the last estimate stays shown while the
  * next one loads.
  */
-export function useEvalRunEstimate(step: EvaluationSubject, definitionVersion: number | null, trialsPerCase: number | null) {
+export function useEvalRunEstimate(step: EvaluationSubject, definitionVersion: number | null, trialsPerCase: number | null, useAgentSuite = false) {
   return useQuery({
-    queryKey: sectionKey(step, `estimate:${definitionVersion ?? 0}:${trialsPerCase ?? 0}`),
+    queryKey: sectionKey(step, `estimate:${definitionVersion ?? 0}:${trialsPerCase ?? 0}:${useAgentSuite}`),
     queryFn: () => mediforce.evaluation.estimateRun({
       ...step,
       ...(definitionVersion === null ? {} : { definitionVersion }),
       trialsPerCase: trialsPerCase!,
+      ...(useAgentSuite ? { useAgentSuite: true } : {}),
     }),
     enabled: trialsPerCase !== null,
     placeholderData: keepPreviousData,

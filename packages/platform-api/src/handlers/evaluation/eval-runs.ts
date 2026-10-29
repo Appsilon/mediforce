@@ -12,8 +12,10 @@ import {
   type EvalRunEvaluator,
   type EvalTrial,
   type EvaluatedStep,
+  type EvaluationSubject,
   type McpEvalServerPolicy,
   type WorkflowDefinition,
+  type WorkflowStep,
 } from '@mediforce/platform-core';
 import type {
   CancelEvalRunInput,
@@ -63,6 +65,20 @@ async function assertModelsRunnable(scope: CallerScope, definition: WorkflowDefi
   if (problem !== null) throw new ValidationError(`The step cannot run — ${problem.message}`);
 }
 
+/**
+ * The Agent whose suite a Step borrows instead of its own (ADR-0029 D10,
+ * #1552): only a first step (an Agent's Eval Cases carry no
+ * `previousStepOutputs` to give a later one) that names an Agent.
+ */
+function agentSuiteSubjectOf(step: EvaluationSubject, definition: WorkflowDefinition, workflowStep: WorkflowStep): EvaluationSubject {
+  if (step.kind === 'agent') throw new ValidationError('An Agent runs its own Evaluation; useAgentSuite is for a step that changed it');
+  if (workflowStep.agentId === undefined) throw new ValidationError(`Step '${step.stepId}' names no Agent whose suite to run`);
+  if (definition.steps[0]!.id !== workflowStep.id) {
+    throw new ValidationError(`Step '${step.stepId}' is not '${step.workflowName}''s first step; an Agent's Eval Cases carry no previousStepOutputs to give it`);
+  }
+  return { kind: 'agent', namespace: step.namespace, agentId: workflowStep.agentId };
+}
+
 /** A budget cap with headroom over the estimate, in whole cents. */
 function defaultBudget(totalUsd: number): number {
   return Math.max(0.01, Math.ceil(totalUsd * 1.5 * 100) / 100);
@@ -85,19 +101,20 @@ async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, s
   if (step.kind === 'step' && definition.archived === true) {
     throw new ValidationError(`'${step.workflowName}' v${definition.version} is archived; evaluate a version still in use`);
   }
+  const suite = input.useAgentSuite === true ? agentSuiteSubjectOf(step, definition, workflowStep) : step;
 
   const dataset = input.datasetVersionId === undefined
-    ? (await scope.evaluation.listDatasetVersions(step))[0]
+    ? (await scope.evaluation.listDatasetVersions(suite))[0]
     : await scope.evaluation.getDatasetVersion(input.datasetVersionId);
   if (dataset === undefined || dataset === null) {
-    throw new ValidationError(`${subjectName(step)} has no saved Eval Dataset — save its cases first`);
+    throw new ValidationError(`${subjectName(suite)} has no saved Eval Dataset — save its cases first`);
   }
-  if (isOwnedBy(dataset, step) === false) {
-    throw new ValidationError(`Eval Dataset '${dataset.id}' belongs to another ${step.kind}`);
+  if (isOwnedBy(dataset, suite) === false) {
+    throw new ValidationError(`Eval Dataset '${dataset.id}' belongs to another ${suite.kind}`);
   }
 
   const frozenEvaluators = [];
-  for (const evaluator of await scope.evaluation.listEvaluators(step)) {
+  for (const evaluator of await scope.evaluation.listEvaluators(suite)) {
     if (evaluator.archived) continue;
     const versions = await scope.evaluation.listEvaluatorVersions(evaluator.id);
     const version = versions[versions.length - 1]!;
@@ -112,7 +129,7 @@ async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, s
     };
     frozenEvaluators.push({ frozen, version });
   }
-  if (frozenEvaluators.length === 0) throw new ValidationError(`${subjectName(step)} has no Evaluators to run`);
+  if (frozenEvaluators.length === 0) throw new ValidationError(`${subjectName(suite)} has no Evaluators to run`);
 
   const agent = workflowStep.agentId === undefined ? null : await scope.agentDefinitions.getById(workflowStep.agentId);
   const model = applyAgentModel(workflowStep, agent?.foundationModel || undefined).agent?.model;
@@ -130,7 +147,7 @@ async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, s
   const caseIds = dataset.caseIds;
   const estimate = await estimateEvalRun(scope, step, workflowStep, frozenEvaluators, caseIds.length * input.trialsPerCase);
   const suggestedBudgetUsd = estimate.totalUsd === null ? null : defaultBudget(estimate.totalUsd);
-  return { step, definition, evaluatedAgent, dataset, frozenEvaluators, mcpPolicy, env: policy?.env ?? {}, fingerprint, caseIds, estimate, suggestedBudgetUsd };
+  return { step, suite, definition, evaluatedAgent, dataset, frozenEvaluators, mcpPolicy, env: policy?.env ?? {}, fingerprint, caseIds, estimate, suggestedBudgetUsd };
 }
 
 /**
@@ -159,8 +176,8 @@ export async function prepareEvalRun(
   input: z.output<typeof PrepareEvalRunInputSchema>,
   scope: CallerScope,
 ): Promise<EvalRunOutput> {
-  const { step, definition, evaluatedAgent, dataset, frozenEvaluators, mcpPolicy, env, fingerprint, caseIds, estimate, suggestedBudgetUsd } = await planEvalRun(input, scope);
-  const [criteria] = await scope.evaluation.listAcceptanceCriteria(step);
+  const { step, suite, definition, evaluatedAgent, dataset, frozenEvaluators, mcpPolicy, env, fingerprint, caseIds, estimate, suggestedBudgetUsd } = await planEvalRun(input, scope);
+  const [criteria] = await scope.evaluation.listAcceptanceCriteria(suite);
   const trialCount = caseIds.length * input.trialsPerCase;
   const budgetUsd = input.budgetUsd ?? suggestedBudgetUsd;
   if (budgetUsd === null) {
@@ -176,6 +193,7 @@ export async function prepareEvalRun(
     id: randomUUID(),
     definitionVersion: agentVersion === null ? definition.version : null,
     agentVersion: agentVersion?.version ?? null,
+    suiteAgentId: suite.kind === 'agent' && step.kind === 'step' ? suite.agentId : null,
     datasetVersionId: dataset.id,
     caseIds,
     trialsPerCase: input.trialsPerCase,
@@ -220,11 +238,11 @@ export async function prepareEvalRun(
   await scope.evaluation.createEvalRun(run, trials);
   await appendEvaluationAudit(scope, {
     action: 'eval_run.prepared',
-    description: `Eval Run prepared for ${subjectName(step, false)}: ${trialCount} trial(s), budget $${budgetUsd}`,
+    description: `Eval Run prepared for ${subjectName(step, false)}${run.suiteAgentId === null ? '' : ` from agent '${run.suiteAgentId}''s suite`}: ${trialCount} trial(s), budget $${budgetUsd}`,
     namespace: step.namespace,
     entityType: 'eval_run',
     entityId: run.id,
-    inputSnapshot: { ...step, definitionVersion: run.definitionVersion, agentVersion: run.agentVersion, datasetVersionId: dataset.id, trialsPerCase: input.trialsPerCase },
+    inputSnapshot: { ...step, definitionVersion: run.definitionVersion, agentVersion: run.agentVersion, suiteAgentId: run.suiteAgentId, datasetVersionId: dataset.id, trialsPerCase: input.trialsPerCase },
     outputSnapshot: {
       evaluators: run.evaluators,
       fingerprint,
