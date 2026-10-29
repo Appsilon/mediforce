@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-16
+last_reviewed: 2026-10-29
 ---
 
 # Step Evaluation
@@ -31,12 +31,18 @@ The **Evaluation** tab of a workflow shows one agent step of one workflow
 version at a time — picked with the **Version** selector (the runnable version
 unless `?version=` names another live one; archived versions are not offered)
 and then the **Step** selector (`?step=`), each option marked with its
-validation (see Validation below) — its Acceptance Criteria with whether it is
-validated against them, Evaluators, Eval Cases and that version's finished Eval
-Runs, plus any prepared or running run of another version, tagged with it —
-beside the Evaluation Assistant (`mediforce eval ask`,
-`POST /api/evaluation/assistant`), whose header holds the step's Brief. The
-assistant reads and prepares runs of the step as the selected version has it
+validation (see Validation below). A status strip names the step's validation,
+its Acceptance Criteria and the Dataset the next Eval Run takes; under it three
+tabs (`?section=runs|cases|evaluators`) hold that version's finished Eval Runs,
+plus any prepared or running run of another version, tagged with it; the Eval
+Cases; and the Evaluators. A step with Eval Runs opens on them, one without on
+its cases. A banner over the tabs counts `code` Evaluators whose source nobody
+approved. Beside the tabs is the Evaluation Assistant (`mediforce eval ask`,
+`POST /api/evaluation/assistant`), whose header holds the step's Brief;
+**Hide assistant** in the strip gives the tabs the full width, remembered per
+browser; the conversation, a typed draft and a reply still on its way are kept
+for when it is shown again. The assistant reads and prepares runs of the step as
+the selected version has it
 (`definitionVersion`, `mediforce eval ask --version N`; the runnable version
 when absent). A step's Evaluators, cases, Brief and criteria are the step's,
 not a version's: they stay readable and editable from an older version even
@@ -270,9 +276,22 @@ In the Evaluation tab, **Evaluators → Add** picks the kind from a dropdown and
 shows its fields — a JSON Schema (started from the step's `agent.outputSchema`,
 or an Agent's `outputSchema`, when it declares one), a language and source, a judge model with the question
 it answers and its minimum confidence — never the check's JSON.
-Each Evaluator's **Details** show the whole check and its versions; **Edit**
-saves a new version with what changed (`POST
-/api/evaluation/evaluators/:id/versions`), keeping its name and kind.
+The Evaluators are a table, one row per Evaluator: **Evaluator** — its name
+and rule, with a bot icon when its latest version is from the assistant —
+**Type**, **Version**, **Status** (*Counts* or *Not counted — reason*) and
+**In production** — the "Also run in production" checkbox with whether it is
+scoring live runs, and *When it cannot run* for a production `schema` or `code`
+check; *never* for an `expected_output` check or an Agent's Evaluators — then
+**Details**, **Approve source** (an unapproved `code` check), **Edit** and
+**Archive**. On narrow screens Version is hidden; Details still lists the
+versions. **Details** opens under the row with the thresholds, the whole check
+and its versions; **Edit** opens the form under the row and saves a new version
+with what changed (`POST /api/evaluation/evaluators/:id/versions`), keeping its
+name and kind. A click on **Evaluator**, **Type**, **Version**, **Status** or
+**In production** sorts by it (ascending, descending, then as listed); the
+funnel by **Type**, **Status** and **In production** (*Yes*, *No*, *Never*)
+filters to the values left ticked; a value that turns up later shows until it
+is unticked too. Both are client-side and reset on reload.
 
 `evaluator-preview` (`POST /api/evaluation/evaluators/preview`) runs a draft
 check against the Step's recent production outputs (dry runs left out) and
@@ -438,11 +457,20 @@ expected output that is not JSON, an input missing `triggerPayload` or
 `previousStepOutputs` — is said in plain words under the field it is about,
 and cleared once that field is edited.
 
-Each case in the list shows its labels (positive or negative, split, source),
-for a case made from a run whether it is **as run** or **edited** — its input
-differs from what the run was given, or its expected output (none included)
-from what the run returned — and **Edit** and **Archive** beside them. Its
-**Details** show only what the case gives the step and what it expects: its
+The cases are a table, one row per case: **Case** — its name and, for a case
+made from a run, whether it is **from run** or **edited from run** (its input
+differs from what the run was given, or its expected output, none included,
+from what the run returned) — **Type** (positive, negative, or input only
+without an expected output; Details shows the expected output), **Comparison**
+(Exact match or By meaning), and **Graded by** — *All N* or a count (*All* while the step has no Evaluators), which opens into the
+Evaluators' names — then **Details**, **Edit** and **Remove** (archives the
+case). On narrow screens Comparison is hidden; Details still has it. Every
+data column sorts (ascending, descending, then as listed); **Type**,
+**Comparison** (*None* without an expected output) and **Graded by** (*All* /
+*Selected*) also filter, to the values left ticked — a value that turns up
+later shows until it is unticked too. A case a filter hides is deselected.
+Sorting and filters are client-side and reset on reload. **Details** opens under the row and shows only what the
+case gives the step and what it expects: its
 input, its expected output and how it is compared, and the Evaluators that grade
 it — plus **Source run log** for a case made from a run, synthesized ones
 included. **Edit** opens the same dialog to
@@ -450,7 +478,7 @@ change its name, split, input, expected output and how it is compared, or the
 Evaluators that grade it (`case-edit <caseId> --file`, `PATCH
 /api/evaluation/cases/:caseId`). Ticking cases in the list and **Set
 evaluators…** sets the Evaluators of all of them at once, one edit per case that
-changes; **Archive** takes it out of the next save (`case-archive`). An edit
+changes; **Remove** takes it out of the next save (`case-archive`). An edit
 is a new case that replaces the old one, which is archived, so a Dataset version
 saved with the old case keeps exactly what it ran. A production case whose input is edited becomes `manual` — production never
 saw that input — and keeps the run it came from. MCP recordings are kept per
@@ -722,9 +750,10 @@ version in force when it is prepared, so changing them never rejudges a run.
 `mediforce eval criteria-get|criteria-set --file`,
 `GET|POST /api/evaluation/acceptance-criteria`.
 
-In the Evaluation tab, the top row is the step's validation status (see
-Validation below) and **Set the threshold**, whose tooltip lists the floors in
-force. The button opens a dialog with one slider, from 0% to 100%. Nothing is
+In the Evaluation tab, the status strip shows the step's validation status (see
+Validation below) and the floors in force in one line (*Each counted Evaluator
+≥ 90%*), with **Edit** (labelled *Edit Acceptance Criteria* for assistive tech) beside
+them. Edit opens a dialog with one slider, from 0% to 100%. Nothing is
 saved until **Save**, which writes one new version and keeps `minPassHatK`,
 which only the CLI, the API and the assistant set. The tab shows no version.
 

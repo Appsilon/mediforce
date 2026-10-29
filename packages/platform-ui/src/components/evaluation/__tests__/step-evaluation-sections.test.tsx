@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { AcceptanceCriteriaSection, CasesSection, EvalRunsSection, DriftAlert, EvaluatorsSection, caseFromFile, datasetDrift, toEvaluatorName } from '../step-evaluation-sections';
+import { EvaluationStatusStrip, CasesSection, EvalRunsSection, DriftAlert, EvaluatorsSection, caseFromFile, datasetDrift, toEvaluatorName } from '../step-evaluation-sections';
 
 const verdicts = vi.hoisted((): Record<string, 'positive' | 'negative'> => ({}));
 
@@ -251,14 +251,29 @@ describe('Evaluator view and edit', () => {
   };
   const renderRow = () => render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [evaluator] } } as never} mayEdit={true} />);
 
+  it('lists an Evaluator in a row with its type, version, whether it counts and runs in production', () => {
+    renderRow();
+
+    const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
+    expect(headers).toEqual(['Evaluator', 'Type', 'Version', 'Status', 'In production', 'Actions']);
+    expect(screen.getByTestId('evaluator-row').textContent).toContain('Every grade is justified.');
+    expect(screen.getByTestId('evaluator-kind').textContent).toBe('LLM judge');
+    expect(screen.getByTestId('evaluator-version').textContent).toBe('v1');
+    expect(screen.getByTestId('evaluator-trust').textContent).toBe('Counts');
+    expect((screen.getByLabelText('Also run in production') as HTMLInputElement).checked).toBe(false);
+    expect(screen.queryByTestId('evaluator-details')).toBeNull();
+  });
+
   it('shows what the check does', () => {
     renderRow();
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }));
 
     const details = screen.getByTestId('evaluator-details');
     expect(details.textContent).toContain('Is every grade justified?');
     expect(details.textContent).toContain('anthropic/claude-sonnet-4');
     expect(details.textContent).toContain('Minimum confidence0.75');
-    expect(screen.getByTestId('evaluator-row').textContent).toContain('min confidence 0.75');
+    expect(details.textContent).toContain('min confidence 0.75');
+    expect(details.textContent).toContain('v1 · 2026-09-24 08:00 · author-1');
     expect(screen.queryByRole('button', { name: 'Label outputs' })).toBeNull();
   });
 
@@ -381,8 +396,47 @@ describe('Eval Case view and edit', () => {
     evaluators: { data: { evaluators } },
   }) as never;
 
+  it('lists a case in a row with its type, comparison and Evaluators, without a split', () => {
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ expectation: 'negative', comparison: 'agreement' }))} mayEdit={true} />);
+
+    const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
+    expect(headers).toEqual(['Select', 'Case', 'Type', 'Comparison', 'Graded by', 'Actions']);
+    expect(screen.getByTestId('eval-case-expectation').textContent).toBe('negative');
+    expect(screen.getByTestId('eval-case-comparison').textContent).toBe('By meaning');
+    expect(screen.queryByTestId('eval-case-details')).toBeNull();
+  });
+
+  it('marks a case without an expected output input only, compared by nothing', () => {
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ expectedOutput: null }))} mayEdit={false} />);
+
+    expect(screen.getByTestId('eval-case-row').textContent).toContain('input only');
+    expect(screen.getByTestId('eval-case-comparison').textContent).toBe('—');
+  });
+
+  it('opens the names of the Evaluators grading a case from their count', () => {
+    const { unmount } = render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={false} />);
+    const all = screen.getByTestId('eval-case-evaluators');
+    expect(all.textContent).toBe('All 2');
+    expect(screen.queryByTestId('eval-case-evaluator-names')).toBeNull();
+    fireEvent.click(all);
+    expect(all.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByTestId('eval-case-evaluator-names').textContent).toBe('matches-expectedfindings-present');
+    unmount();
+
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ evaluatorIds: ['e-schema'] }))} mayEdit={false} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Graded by 1 evaluator' }));
+    expect(screen.getByTestId('eval-case-evaluator-names').textContent).toBe('findings-present');
+  });
+
+  it('says All, with nothing to open, while the step has no Evaluators', () => {
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}), [])} mayEdit={false} />);
+    expect(screen.getByTestId('eval-case-evaluators').textContent).toBe('All');
+    expect(screen.queryByRole('button', { name: /^Graded by (all )?\d/ })).toBeNull();
+  });
+
   it('shows only what a case gives the step and what it expects, with Edit beside its labels', () => {
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={true} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }));
 
     const details = screen.getByTestId('eval-case-details');
     expect(screen.getByTestId('eval-case-expected-output').textContent).toContain('The output must match this, exactly');
@@ -415,6 +469,7 @@ describe('Eval Case view and edit', () => {
 
   it('opens the source run\'s log from the details, for a person who cannot edit too', () => {
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ source: 'synthesized' }))} mayEdit={false} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }));
     const log = screen.getByTestId('source-run-log') as HTMLDetailsElement;
     log.open = true;
     fireEvent(log, new Event('toggle'));
@@ -637,9 +692,10 @@ describe('Saving a Dataset', () => {
   });
 });
 
-describe('AcceptanceCriteriaSection', () => {
+describe('EvaluationStatusStrip', () => {
   const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
   const criteriaOf = (criteria: unknown) => ({ isLoading: false, data: { criteria: criteria === null ? null : { version: 2, criteria, origin: 'user', createdBy: 'author-1' } } }) as never;
+  const datasetsOf = (datasets: unknown[]) => ({ isLoading: false, data: { datasets } }) as never;
   const qualificationOf = (status: string, changed: string[] = [], validation: Record<string, unknown> = { status: 'not_verified', evalRunId: null, reason: 'No Eval Run of version 1 has finished yet.', runInProgress: false }) => ({
     isLoading: false,
     data: {
@@ -659,7 +715,7 @@ describe('AcceptanceCriteriaSection', () => {
     ['not_verified', 'Not verified'],
   ])('shows the validation from the newest Eval Run as one status icon with why beside it — %s: %s, whether signed or not', (status, label) => {
     const validation = { status, evalRunId: 'run-0000aaaa-0000-0000-0000-000000000000', reason: 'Eval Run run-0000: findings-present passed 8 of 10 trials (80%, needs 90%).', runInProgress: false };
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
+    render(<EvaluationStatusStrip step={step} criteria={criteriaOf({ minPassRate: 0.9 })} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
 
     expect(screen.getByTestId('validation-status').textContent).toBe(label);
     expect(screen.getByTestId('validation-reason').textContent).toContain('passed 8 of 10 trials (80%, needs 90%)');
@@ -673,7 +729,7 @@ describe('AcceptanceCriteriaSection', () => {
       reason: "Runs agent 'AE grader' v3 as it was validated: Eval Run run-0000 met its Acceptance Criteria.",
       inheritedFromAgent: { agentId: 'ae-grader', name: 'AE grader', version: 3 },
     };
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
+    render(<EvaluationStatusStrip step={step} criteria={criteriaOf({ minPassRate: 0.9 })} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
 
     expect(screen.getByTestId('view-agent-evaluation')).toHaveAttribute('href', '/acme/agents/definitions/ae-grader?tab=evaluation');
   });
@@ -683,7 +739,7 @@ describe('AcceptanceCriteriaSection', () => {
     ['missed', 'red'],
   ])('colours how the run waiting for approval fared — %s is %s', (runVerdict, colour) => {
     const validation = { status: 'awaiting_approval', evalRunId: 'run-0000aaaa-0000-0000-0000-000000000000', runVerdict, reason: `Eval Run run-0000 ${runVerdict}: because. Waiting for a person.`, runInProgress: false };
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
+    render(<EvaluationStatusStrip step={step} criteria={criteriaOf({ minPassRate: 0.9 })} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
 
     const word = screen.getByTestId('validation-run-verdict');
     expect(word.textContent).toBe(runVerdict);
@@ -692,7 +748,7 @@ describe('AcceptanceCriteriaSection', () => {
   });
 
   it('opens what the qualification rests on — its Eval Run, not a Brief — from the icon', () => {
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} qualification={qualificationOf('stale', ['model'])} mayEdit={false} />);
+    render(<EvaluationStatusStrip step={step} criteria={criteriaOf({ minPassRate: 0.9 })} datasets={datasetsOf([])} qualification={qualificationOf('stale', ['model'])} mayEdit={false} />);
     fireEvent.click(screen.getByTestId('validation-status'));
 
     expect(screen.getByTestId('step-qualification').textContent).toContain('Eval Run run-0000');
@@ -700,18 +756,26 @@ describe('AcceptanceCriteriaSection', () => {
     expect(screen.getByTestId('qualification-changed').textContent).toContain('model');
   });
 
-  it('keeps the thresholds out of sight until Set the threshold opens them', () => {
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+  it('states the threshold in one line and keeps its sliders out of sight until Edit Acceptance Criteria opens them', () => {
+    render(<EvaluationStatusStrip step={step} criteria={criteriaOf({ minPassRate: 0.9 })} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
 
-    expect(screen.queryByText('Acceptance Criteria')).toBeNull();
+    expect(screen.getByTestId('acceptance-criteria-summary').textContent).toBe('Each counted Evaluator ≥ 90%');
     expect(screen.queryByText(/v2/)).toBeNull();
     expect(screen.queryByRole('slider')).toBeNull();
     fireEvent.click(screen.getByTestId('set-threshold'));
     expect(screen.getAllByRole('slider')).toHaveLength(1);
   });
 
+  it('names the Dataset the next Eval Run takes, or that none is saved', () => {
+    const { rerender } = render(<EvaluationStatusStrip step={step} criteria={criteriaOf(null)} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+    expect(screen.getByTestId('dataset-summary').textContent).toBe('Not saved yet');
+
+    rerender(<EvaluationStatusStrip step={step} criteria={criteriaOf(null)} datasets={datasetsOf([{ id: 'ds-3', version: 3, caseIds: ['a', 'b', 'c', 'd'] }, { id: 'ds-2', version: 2, caseIds: ['a'] }])} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+    expect(screen.getByTestId('dataset-summary').textContent).toBe('v3 · 4 cases');
+  });
+
   it('starts the threshold at 100% until criteria are set', () => {
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf(null)} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+    render(<EvaluationStatusStrip step={step} criteria={criteriaOf(null)} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
     fireEvent.click(screen.getByTestId('set-threshold'));
 
     expect((screen.getByLabelText('Minimum pass rate') as HTMLInputElement).value).toBe('100');
@@ -719,7 +783,7 @@ describe('AcceptanceCriteriaSection', () => {
 
   it('saves the tuned threshold once, on Save, keeping its pass^k', () => {
     evaluation.setAcceptanceCriteria.mockClear();
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9, minPassHatK: 1 })} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+    render(<EvaluationStatusStrip step={step} criteria={criteriaOf({ minPassRate: 0.9, minPassHatK: 1 })} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
     fireEvent.click(screen.getByTestId('set-threshold'));
 
     fireEvent.change(screen.getByLabelText('Minimum pass rate'), { target: { value: '95' } });
@@ -764,5 +828,82 @@ describe('Starting an Eval Run', () => {
     renderRuns([evalCaseOf({ id: 'c-1' })], [dataset]);
 
     expect(startButton().disabled).toBe(false);
+  });
+});
+
+describe('Sorting and filtering the tables', () => {
+  const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
+  const withCases = (cases: unknown[]) => ({
+    cases: { isLoading: false, data: { cases } },
+    agentRuns: { data: { pages: [] }, hasNextPage: false },
+    datasets: { data: { datasets: [] } },
+    evaluators: { data: { evaluators: [EXPECTED_OUTPUT_CHECK, SCHEMA_CHECK] } },
+  }) as never;
+  const caseNames = () => screen.getAllByTestId('eval-case-row').map((row) => within(row).getAllByText(/^Case /)[0].textContent);
+  const cases = [
+    evalCaseOf({ id: 'c-1', name: 'Case 2', expectation: 'negative' }),
+    evalCaseOf({ id: 'c-2', name: 'Case 10', expectedOutput: null }),
+    evalCaseOf({ id: 'c-3', name: 'Case 1' }),
+  ];
+
+  it('sorts cases by a column ascending, then descending, then back to as given', () => {
+    render(<CasesSection step={step} evaluation={withCases(cases)} mayEdit={false} />);
+
+    fireEvent.click(screen.getByTestId('sort-case'));
+    expect(caseNames()).toEqual(['Case 1', 'Case 2', 'Case 10']);
+    expect(screen.getByTestId('sort-case').closest('th')?.getAttribute('aria-sort')).toBe('ascending');
+    fireEvent.click(screen.getByTestId('sort-case'));
+    expect(caseNames()).toEqual(['Case 10', 'Case 2', 'Case 1']);
+    fireEvent.click(screen.getByTestId('sort-case'));
+    expect(caseNames()).toEqual(['Case 2', 'Case 10', 'Case 1']);
+  });
+
+  it('filters cases to the values ticked in a column, and clears the filters when nothing matches', () => {
+    render(<CasesSection step={step} evaluation={withCases(cases)} mayEdit={false} />);
+
+    fireEvent.click(screen.getByTestId('filter-type'));
+    expect(screen.getAllByRole('checkbox').map((box) => box.parentElement?.textContent)).toEqual(['Input only', 'Negative', 'Positive']);
+    fireEvent.click(screen.getByLabelText('Input only'));
+    fireEvent.click(screen.getByLabelText('Negative'));
+    expect(caseNames()).toEqual(['Case 1']);
+    fireEvent.click(screen.getByLabelText('Positive'));
+    expect(screen.queryAllByTestId('eval-case-row')).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(caseNames()).toEqual(['Case 2', 'Case 10', 'Case 1']);
+  });
+
+  it('shows a case whose value turned up after the filter was set', () => {
+    const { rerender } = render(<CasesSection step={step} evaluation={withCases([cases[0], cases[2]])} mayEdit={false} />);
+    fireEvent.click(screen.getByTestId('filter-type'));
+    fireEvent.click(screen.getByLabelText('Negative'));
+    expect(caseNames()).toEqual(['Case 1']);
+
+    rerender(<CasesSection step={step} evaluation={withCases(cases)} mayEdit={false} />);
+    expect(caseNames()).toEqual(['Case 10', 'Case 1']);
+  });
+
+  it('deselects a case once a filter hides it', () => {
+    render(<CasesSection step={step} evaluation={withCases(cases)} mayEdit={true} />);
+    fireEvent.click(screen.getByLabelText('Select Case 2'));
+    fireEvent.click(screen.getByLabelText('Select Case 1'));
+    fireEvent.click(screen.getByTestId('filter-type'));
+    fireEvent.click(screen.getByLabelText('Negative'));
+    expect(screen.getByText('1 selected')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show all' }));
+    expect((screen.getByLabelText('Select Case 2') as HTMLInputElement).checked).toBe(false);
+  });
+
+  it('filters Evaluators by whether they count', () => {
+    const evaluatorNamed = (id: string, name: string, trusted: boolean) => ({
+      ...step, id, name, archived: false, runInProduction: false, onError: 'ignore',
+      latest: { version: 1, rule: `${name} rule`, check: { kind: 'schema', schema: {} }, origin: 'user', sourceApproval: null },
+      versions: [], trust: trusted ? { trusted: true } : { trusted: false, reason: 'no source approval' }, production: { active: false },
+    });
+    render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [evaluatorNamed('e-1', 'counted', true), evaluatorNamed('e-2', 'uncounted', false)] } } as never} mayEdit={false} />);
+
+    fireEvent.click(screen.getByTestId('filter-status'));
+    fireEvent.click(screen.getByLabelText('Counts'));
+    expect(screen.getAllByTestId('evaluator-row').map((row) => row.textContent)).toEqual([expect.stringContaining('uncounted')]);
   });
 });

@@ -16,7 +16,10 @@ import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
  * the verdict it was unsure of, so it counts. The steps the assistant took stay listed under its reply, and the
  * panel widens from its left edge. Acceptance Criteria the assistant proposes
  * are set on accepting them, and a person confirms or overwrites a run's verdict from a
- * finished run's report. The model is the scripted mock OpenRouter.
+ * finished run's report. A step opens on its Eval Runs once it has any, else
+ * on its cases; a banner over the tabs leads to Code Evaluators nobody
+ * approved; `?section=` and a hidden assistant survive a reload. The model is
+ * the scripted mock OpenRouter.
  */
 test.describe('Step Evaluation tab', () => {
   // Each worker seeding the workspace's model key at once races on its insert, so the tab's journeys share one worker.
@@ -49,6 +52,8 @@ test.describe('Step Evaluation tab', () => {
     await page.getByRole('tab', { name: /evaluation/i }).click();
     await expect(page).toHaveURL(/tab=evaluation/);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await page.getByTestId('evaluation-tab-evaluators').click();
+    await expect(page).toHaveURL(/section=evaluators/);
     await expect(page.getByText('No Evaluators yet.')).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Show the step brief' }).click();
     const briefField = page.getByTestId('evaluation-brief');
@@ -87,7 +92,7 @@ test.describe('Step Evaluation tab', () => {
     const row = page.getByTestId('evaluator-row').filter({ hasText: 'summary-present' });
     await expect(row).toBeVisible({ timeout: 10_000 });
     await expect(row.getByText('Counts')).toBeVisible();
-    await expect(row.getByText(/from the assistant/)).toBeVisible();
+    await expect(row.getByLabel('From the assistant')).toBeVisible();
     await expect(page.getByTestId('evaluation-brief').getByText(/No Brief yet/)).toBeVisible();
     await expect(page.getByTestId('brief-indicator')).toHaveCount(0);
 
@@ -175,6 +180,8 @@ test.describe('Step Evaluation tab', () => {
 
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    // A step with Eval Runs opens on them.
+    await expect(page.getByTestId('evaluation-tab-runs')).toHaveAttribute('data-state', 'active');
     // Below its minimum confidence, the judge's only verdict is left out: the criteria cannot be judged.
     const row = page.getByTestId('eval-run-row').filter({ hasText: prepared.evalRun.id.slice(0, 8) });
     await expect(row.getByTestId('eval-run-acceptance')).toHaveText('Not judged');
@@ -318,6 +325,49 @@ test.describe('Step Evaluation tab', () => {
     await expect(startCard).toContainText('on v1', { timeout: 15_000 });
   });
 
+  test('a step without runs opens on its cases, an unapproved Code Evaluator is flagged over the tabs, and ?section= and the hidden assistant survive a reload', async ({ page, request }) => {
+    test.setTimeout(60_000);
+    trackPageErrors(page);
+    const workflowName = `e2e-eval-tabs-${randomUUID().slice(0, 8)}`;
+    await startRun(request, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }), {}, EVALUATION_WORKSPACE);
+    const created = await request.post('/api/evaluation/evaluators', {
+      headers: JSON_HEADERS,
+      data: {
+        namespace: EVALUATION_WORKSPACE, workflowName, stepId: 'grade-aes', name: 'grade-5-flagged',
+        rule: 'A fatal AE is graded 5.', check: { kind: 'code', runtime: 'python', source: 'print(1)' },
+      },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+
+    await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
+    await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await expect(page.getByTestId('evaluation-tab-cases')).toHaveAttribute('data-state', 'active');
+    await expect(page.getByTestId('unapproved-evaluators')).toContainText('1 Code Evaluator does not count until a person approves its source.');
+
+    await page.getByTestId('review-unapproved-evaluators').click();
+    await expect(page).toHaveURL(/section=evaluators/);
+    await expect(page.getByTestId('evaluation-tab-evaluators')).toHaveAttribute('data-state', 'active');
+    await expect(page.getByTestId('evaluator-row').filter({ hasText: 'grade-5-flagged' })).toContainText('Not counted');
+    await expect(page.getByTestId('review-unapproved-evaluators')).toHaveCount(0);
+
+    await expect(page.getByTestId('evaluation-assistant')).toBeVisible();
+    await page.getByTestId('evaluation-assistant-input').fill('Which grades are risky?');
+    await page.getByTestId('evaluation-assistant-toggle').click();
+    await expect(page.getByTestId('evaluation-assistant')).toBeHidden();
+    await page.getByTestId('evaluation-assistant-toggle').click();
+    await expect(page.getByTestId('evaluation-assistant-input')).toHaveValue('Which grades are risky?');
+    await page.getByTestId('evaluation-assistant-toggle').click();
+    await expect(page.getByTestId('evaluation-assistant')).toBeHidden();
+
+    await page.reload();
+    await expect(page.getByTestId('evaluation-tab-evaluators')).toHaveAttribute('data-state', 'active', { timeout: 15_000 });
+    await expect(page.getByTestId('evaluation-assistant-toggle')).toHaveText('Assistant');
+    await expect(page.getByTestId('evaluation-assistant')).toBeHidden();
+
+    await page.getByTestId('evaluation-assistant-toggle').click();
+    await expect(page.getByTestId('evaluation-assistant')).toBeVisible();
+  });
+
   test('an Evaluator is added through its type\'s fields, read in full, and edited into a new version', async ({ page, request }) => {
     test.setTimeout(60_000);
     trackPageErrors(page);
@@ -326,6 +376,8 @@ test.describe('Step Evaluation tab', () => {
 
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await page.getByTestId('evaluation-tab-evaluators').click();
+    await expect(page).toHaveURL(/section=evaluators/);
     await expect(page.getByText('No Evaluators yet.')).toBeVisible({ timeout: 10_000 });
 
     await page.getByRole('button', { name: 'Add', exact: true }).click();
@@ -338,9 +390,10 @@ test.describe('Step Evaluation tab', () => {
     await form.getByRole('button', { name: 'Create' }).click();
 
     const row = page.getByTestId('evaluator-row').filter({ hasText: 'output-schema' });
-    await expect(row).toContainText('v1 · Output schema', { timeout: 10_000 });
+    await expect(row.getByTestId('evaluator-version')).toHaveText('v1', { timeout: 10_000 });
+    await expect(row.getByTestId('evaluator-kind')).toHaveText('Output schema');
     await expect(row.getByText('Counts')).toBeVisible();
-    await row.getByText('Details', { exact: true }).click();
+    await row.getByRole('button', { name: 'Details' }).click();
     await expect(row.getByTestId('evaluator-details')).toContainText('"summary"');
 
     await row.getByRole('button', { name: 'Edit' }).click();
@@ -349,8 +402,7 @@ test.describe('Step Evaluation tab', () => {
     await editForm.getByLabel('JSON Schema').fill('{"required": ["summary", "findings"]}');
     await editForm.getByRole('button', { name: 'Save as v2' }).click();
 
-    await expect(row).toContainText('v2 · Output schema', { timeout: 10_000 });
-    await row.getByText('Details', { exact: true }).click();
+    await expect(row.getByTestId('evaluator-version')).toHaveText('v2', { timeout: 10_000 });
     await expect(row.getByTestId('evaluator-details')).toContainText('v1 ·');
   });
 
@@ -373,8 +425,10 @@ test.describe('Step Evaluation tab', () => {
 
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
-    await expect(page.getByTestId('evaluator-row').filter({ hasText: 'matches-expected' })).toContainText('Only checks cases that have an expected output', { timeout: 10_000 });
+    await page.getByTestId('evaluation-tab-evaluators').click();
+    await expect(page.getByTestId('evaluator-row').filter({ hasText: 'matches-expected' }).getByTestId('evaluator-production')).toHaveText('never', { timeout: 10_000 });
 
+    await page.getByTestId('evaluation-tab-cases').click();
     await page.getByRole('button', { name: 'Add case' }).click();
     const form = page.getByTestId('case-dialog').getByTestId('case-form');
     await expect(form.getByLabel('Notes')).toHaveCount(0);
@@ -391,8 +445,10 @@ test.describe('Step Evaluation tab', () => {
     const row = page.getByTestId('eval-case-row').filter({ hasText: 'Fatal sepsis graded 4' });
     await expect(row.getByTestId('eval-case-expectation')).toHaveText('negative', { timeout: 10_000 });
     await expect(row.getByTestId('eval-case-comparison')).toContainText('By meaning');
-    await expect(row.getByTestId('eval-case-evaluators')).toHaveText('1 selected evaluator');
-    await row.getByText('Details', { exact: true }).click();
+    await expect(row.getByTestId('eval-case-evaluators')).toHaveText('1');
+    await row.getByTestId('eval-case-evaluators').click();
+    await expect(row.getByTestId('eval-case-evaluator-names')).toHaveText('matches-expected');
+    await row.getByRole('button', { name: 'Details' }).click();
     await expect(row.getByTestId('eval-case-expected-output')).toContainText('The output must not match this, by meaning');
     await expect(row.getByTestId('eval-case-expected-output')).toContainText('"grade": 4');
     await expect(row.getByTestId('eval-case-expected-output')).toContainText('Narrative wording is trivial; the grade decides.');

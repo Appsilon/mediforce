@@ -28,7 +28,8 @@ import { EvalRunSummary, percent } from './eval-run-report';
 import { JudgeVerdicts } from './judge-verdicts';
 import { CHECK_KINDS, CheckDetails } from './evaluator-check-editor';
 import { StartEvalRunCard } from './step-evaluation-sections';
-import { buttonClass } from './evaluation-styles';
+import { buttonClass, tabTriggerClass } from './evaluation-styles';
+import { tableHeaderRowClass, tableWrapperClass } from './evaluation-table';
 import { AssessedAgentConfiguration } from './assessed-agent-configuration';
 import { EvaluatorOutageAlert, EvaluatorOutageSummary } from './evaluator-outages';
 
@@ -122,10 +123,10 @@ function TrialsTab({ output, trialHref }: RunContext) {
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No trials match.</p>
       ) : (
-        <div className="overflow-x-auto rounded-md border">
+        <div className={tableWrapperClass}>
           <table className="w-full text-sm" data-testid="eval-trials-table">
             <thead>
-              <tr className="border-b bg-muted text-left text-xs text-muted-foreground">
+              <tr className={tableHeaderRowClass}>
                 <th className="px-3 py-2 font-medium">Case</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">
@@ -357,8 +358,6 @@ function RunHeader({ handle, output, step, mayRun, runReason }: {
     </div>
   );
 }
-
-const tabTriggerClass = 'border-b-2 border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:font-medium data-[state=active]:text-foreground';
 
 /**
  * One Eval Run (ADR-0023): its header — status, how it fared on the
