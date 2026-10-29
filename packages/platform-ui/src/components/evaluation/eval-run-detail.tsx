@@ -29,6 +29,7 @@ import { JudgeVerdicts } from './judge-verdicts';
 import { CHECK_KINDS, CheckDetails } from './evaluator-check-editor';
 import { StartEvalRunCard } from './step-evaluation-sections';
 import { buttonClass, tabTriggerClass } from './evaluation-styles';
+import { tableHeaderRowClass, tableWrapperClass } from './evaluation-table';
 import { AssessedAgentConfiguration } from './assessed-agent-configuration';
 import { EvaluatorOutageAlert, EvaluatorOutageSummary } from './evaluator-outages';
 
@@ -122,10 +123,10 @@ function TrialsTab({ output, trialHref }: RunContext) {
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No trials match.</p>
       ) : (
-        <div className="overflow-x-auto rounded-md border">
+        <div className={tableWrapperClass}>
           <table className="w-full text-sm" data-testid="eval-trials-table">
             <thead>
-              <tr className="border-b bg-muted text-left text-xs text-muted-foreground">
+              <tr className={tableHeaderRowClass}>
                 <th className="px-3 py-2 font-medium">Case</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">

@@ -251,14 +251,29 @@ describe('Evaluator view and edit', () => {
   };
   const renderRow = () => render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [evaluator] } } as never} mayEdit={true} />);
 
+  it('lists an Evaluator in a row with its type, version, whether it counts and runs in production', () => {
+    renderRow();
+
+    const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
+    expect(headers).toEqual(['Evaluator', 'Type', 'Version', 'Status', 'In production', 'Actions']);
+    expect(screen.getByTestId('evaluator-row').textContent).toContain('Every grade is justified.');
+    expect(screen.getByTestId('evaluator-kind').textContent).toBe('LLM judge');
+    expect(screen.getByTestId('evaluator-version').textContent).toBe('v1');
+    expect(screen.getByTestId('evaluator-trust').textContent).toBe('Counts');
+    expect((screen.getByLabelText('Also run in production') as HTMLInputElement).checked).toBe(false);
+    expect(screen.queryByTestId('evaluator-details')).toBeNull();
+  });
+
   it('shows what the check does', () => {
     renderRow();
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }));
 
     const details = screen.getByTestId('evaluator-details');
     expect(details.textContent).toContain('Is every grade justified?');
     expect(details.textContent).toContain('anthropic/claude-sonnet-4');
     expect(details.textContent).toContain('Minimum confidence0.75');
-    expect(screen.getByTestId('evaluator-row').textContent).toContain('min confidence 0.75');
+    expect(details.textContent).toContain('min confidence 0.75');
+    expect(details.textContent).toContain('v1 · 2026-09-24 08:00 · author-1');
     expect(screen.queryByRole('button', { name: 'Label outputs' })).toBeNull();
   });
 
