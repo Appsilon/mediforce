@@ -65,13 +65,12 @@ import {
 
 type StepEvaluation = ReturnType<typeof useStepEvaluation>;
 
-function Section({ title, children, action, 'data-tour': tourAnchor }: { title: string; children: React.ReactNode; action?: React.ReactNode; 'data-tour'?: string }) {
+/** One tab of the Evaluation: the tab names it, so its heading is for screen readers only. */
+function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <section className="rounded-lg border p-4 space-y-3" data-tour={tourAnchor}>
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        {action}
-      </div>
+    <section className="space-y-3">
+      <h3 className="sr-only">{title}</h3>
+      {action && <div className="flex justify-end gap-2">{action}</div>}
       {children}
     </section>
   );
@@ -352,7 +351,7 @@ export function EvaluatorsSection({ step, data, mayEdit, editReason, stepOutputS
   const evaluators = data.data?.evaluators ?? [];
   const schemaTaken = evaluators.some((evaluator) => evaluator.latest.check.kind === 'schema');
   return (
-    <Section title="Evaluators" data-tour="eval-evaluators" action={mayEdit && !adding && <button type="button" className={buttonClass} onClick={() => setAdding(true)}>Add</button>}>
+    <Section title="Evaluators" action={mayEdit && !adding && <button type="button" className={buttonClass} onClick={() => setAdding(true)}>Add</button>}>
       {data.isLoading ? <Loading /> : evaluators.length === 0 && !adding ? (
         <p className="text-sm text-muted-foreground">No Evaluators yet. Ask the assistant what to check, or add one.</p>
       ) : (
@@ -1206,7 +1205,6 @@ export function CasesSection({ step, evaluation, mayEdit }: {
   return (
     <Section
       title="Eval Cases"
-      data-tour="eval-cases"
       action={mayEdit && (
         <div className="flex gap-1.5">
           <button type="button" className={buttonClass} onClick={() => setAdding(true)}>Add case</button>
@@ -1316,6 +1314,12 @@ export function DriftAlert({ data }: { data: StepEvaluation['drift'] }) {
 
 function percent(rate: number): string {
   return `${Math.round(rate * 1000) / 10}%`;
+}
+
+/** The floor every counted Evaluator must reach, in a few words for the status strip. */
+function summarizeThreshold(criteria: AcceptanceCriteria): string {
+  const passHatK = criteria.minPassHatK === undefined ? '' : `, pass^k ≥ ${percent(criteria.minPassHatK)}`;
+  return `Each counted Evaluator ≥ ${percent(criteria.minPassRate)}${passHatK}`;
 }
 
 /** The floor every counted Evaluator must reach, in words. */
@@ -1442,11 +1446,18 @@ function ValidationReason({ validation }: { validation: StepValidation }) {
  * opens from the same status. The threshold — 100% until set — is tuned in
  * a dialog; the next Eval Run takes the one in force.
  */
-export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEdit }: {
+/**
+ * The Step's status strip: its validation, the Acceptance Criteria every run
+ * is judged against, and the Dataset the next Eval Run takes. `action` sits at
+ * its end — the tab's own controls, such as showing the assistant.
+ */
+export function AcceptanceCriteriaSection({ step, criteria, qualification, datasets, mayEdit, action }: {
   step: EvaluationSubject;
   criteria: StepEvaluation['criteria'];
   qualification: StepEvaluation['qualification'];
+  datasets: StepEvaluation['datasets'];
   mayEdit: boolean;
+  action?: React.ReactNode;
 }) {
   const [showDetails, setShowDetails] = React.useState(false);
   const [editing, setEditing] = React.useState(false);
@@ -1455,9 +1466,10 @@ export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEd
   const status = qualification.data;
   const validation = status === undefined ? null : VALIDATION_STATUS[status.validation.status];
   const saveThresholds = (next: AcceptanceCriteria) => save.mutate(next, { onSuccess: () => setEditing(false) });
+  const [dataset] = datasets.data?.datasets ?? [];
   return (
     <section className="rounded-lg border p-3 space-y-3" data-testid="acceptance-criteria" data-tour="eval-status">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         {status === undefined || validation === null ? <Loading /> : (
           <InstantTooltip label="Show the step's qualification">
             <button
@@ -1473,17 +1485,29 @@ export function AcceptanceCriteriaSection({ step, criteria, qualification, mayEd
             </button>
           </InstantTooltip>
         )}
-        <InstantTooltip label={`${describeThreshold(effective)}.`}>
-          <span>
+        <div className="text-xs">
+          <div className="text-muted-foreground">Acceptance Criteria</div>
+          <div className="flex items-center gap-2">
+            <InstantTooltip label={`${describeThreshold(effective)}.`}>
+              <span className="font-medium" data-testid="acceptance-criteria-summary">{summarizeThreshold(effective)}</span>
+            </InstantTooltip>
             <button
               type="button"
               className={buttonClass}
               disabled={mayEdit === false || criteria.isLoading}
+              aria-label="Set the threshold"
               data-testid="set-threshold"
               onClick={() => { save.reset(); setEditing(true); }}
-            >Set the threshold</button>
-          </span>
-        </InstantTooltip>
+            >Edit</button>
+          </div>
+        </div>
+        <div className="text-xs">
+          <div className="text-muted-foreground">Dataset</div>
+          <div className="font-medium" data-testid="dataset-summary">
+            {datasets.isLoading ? '…' : dataset === undefined ? 'Not saved yet' : `v${dataset.version} · ${pluralCases(dataset.caseIds.length)}`}
+          </div>
+        </div>
+        {action !== undefined && <div className="ml-auto flex items-center gap-2">{action}</div>}
       </div>
       {status !== undefined && (
         <p className={cn('text-xs', status.validation.status === 'failed' ? validation?.textClassName : 'text-muted-foreground')} data-testid="validation-reason">
@@ -1833,7 +1857,7 @@ export function EvalRunsSection({ step, definitionVersion, data, datasets, cases
   }));
 
   return (
-    <Section title="Eval Runs" data-tour="eval-runs">
+    <Section title="Eval Runs">
       {step.kind === 'agent' && <AgentTrialEnv step={step} mayEdit={mayRun} />}
       {mayRun && (
         <div className="flex flex-wrap items-center gap-2 text-xs">

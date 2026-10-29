@@ -28,7 +28,7 @@ import { EvalRunSummary, percent } from './eval-run-report';
 import { JudgeVerdicts } from './judge-verdicts';
 import { CHECK_KINDS, CheckDetails } from './evaluator-check-editor';
 import { StartEvalRunCard } from './step-evaluation-sections';
-import { buttonClass } from './evaluation-styles';
+import { buttonClass, tabTriggerClass } from './evaluation-styles';
 import { AssessedAgentConfiguration } from './assessed-agent-configuration';
 import { EvaluatorOutageAlert, EvaluatorOutageSummary } from './evaluator-outages';
 
@@ -358,7 +358,6 @@ function RunHeader({ handle, output, step, mayRun, runReason }: {
   );
 }
 
-const tabTriggerClass = 'border-b-2 border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:font-medium data-[state=active]:text-foreground';
 
 /**
  * One Eval Run (ADR-0023): its header — status, how it fared on the

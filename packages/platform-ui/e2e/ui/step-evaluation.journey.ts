@@ -49,6 +49,8 @@ test.describe('Step Evaluation tab', () => {
     await page.getByRole('tab', { name: /evaluation/i }).click();
     await expect(page).toHaveURL(/tab=evaluation/);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await page.getByTestId('evaluation-tab-evaluators').click();
+    await expect(page).toHaveURL(/section=evaluators/);
     await expect(page.getByText('No Evaluators yet.')).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Show the step brief' }).click();
     const briefField = page.getByTestId('evaluation-brief');
@@ -326,6 +328,8 @@ test.describe('Step Evaluation tab', () => {
 
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await page.getByTestId('evaluation-tab-evaluators').click();
+    await expect(page).toHaveURL(/section=evaluators/);
     await expect(page.getByText('No Evaluators yet.')).toBeVisible({ timeout: 10_000 });
 
     await page.getByRole('button', { name: 'Add', exact: true }).click();
@@ -373,8 +377,10 @@ test.describe('Step Evaluation tab', () => {
 
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await page.getByTestId('evaluation-tab-evaluators').click();
     await expect(page.getByTestId('evaluator-row').filter({ hasText: 'matches-expected' })).toContainText('Only checks cases that have an expected output', { timeout: 10_000 });
 
+    await page.getByTestId('evaluation-tab-cases').click();
     await page.getByRole('button', { name: 'Add case' }).click();
     const form = page.getByTestId('case-dialog').getByTestId('case-form');
     await expect(form.getByLabel('Notes')).toHaveCount(0);

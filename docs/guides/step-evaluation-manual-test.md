@@ -1,7 +1,7 @@
 ---
 status: living
 audience: engineers
-last_reviewed: 2026-10-16
+last_reviewed: 2026-10-29
 ---
 
 # Step Evaluation — manual test guide
@@ -128,23 +128,26 @@ Legend: ✅ expected · 🔍 try to break it · 🧪 in the sandbox workflow
 
 ## 1. The Evaluation tab at a glance
 
-Top to bottom, left column; the **Evaluation Assistant** is the right-hand panel.
+A status strip on top, three tabs under it; the **Evaluation Assistant** is the right-hand panel,
+which **Hide assistant** in the strip folds away.
 
-| Section | What it is for |
+| Part | What it is for |
 |---|---|
 | Drift banner | Amber warning when production quality drops (only shown while an Evaluator drifts) |
-| Validation status | **Validation passed** / **failed** / **Waiting for human approval** / **Not verified**, read from the newest finished Eval Run and its sign-off; click for the signed Step Qualification |
-| Set the threshold | The Acceptance Criteria floor, one slider |
-| Evaluators | The checks that grade an output (schema / code / LLM judge / expected output) |
-| Eval Cases | Test inputs, saved into numbered Datasets |
-| Eval Runs | Run the step on a Dataset, read the report, sign |
+| Validation status (strip) | **Validation passed** / **failed** / **Waiting for human approval** / **Not verified**, read from the newest finished Eval Run and its sign-off; click for the signed Step Qualification |
+| Acceptance Criteria (strip) | The floor in one line; **Edit** opens one slider |
+| Dataset (strip) | The saved Dataset the next Eval Run takes |
+| Unapproved banner | How many Code Evaluators do not count yet; **Review** opens the Evaluators tab |
+| Eval Runs tab | Run the step on a Dataset, read the report, sign — open by default once a run exists |
+| Eval Cases tab | Test inputs, saved into numbered Datasets — open by default before any run |
+| Evaluators tab | The checks that grade an output (schema / code / LLM judge / expected output) |
 
 The Evaluation Brief is behind the file icon in the assistant's header. The natural order is
 **Evaluators → Cases → MCP → Eval Run → Report → Criteria → Qualification → Production**, which is
 the order below.
 
 **Permissions (test once for the whole tab).** 🔍 As the **view-only** user: no *Add / Edit /
-Approve source / Save / Set the threshold / Start / Confirm that evaluation passed·failed / Overwrite the evaluation verdict* controls; assistant
+Approve source / Save / Edit (Acceptance Criteria) / Start / Confirm that evaluation passed·failed / Overwrite the evaluation verdict* controls; assistant
 card *Accept* buttons are disabled with a tooltip.
 
 ---
@@ -376,12 +379,12 @@ Open a run with **Details**: **Summary**, **Trials**, **Evaluators**, **Model ve
 graded trials (8 of 10 meets 0.8), and optionally a minimum pass^k. Versioned; an Eval Run
 freezes the version in force when it is prepared. With none set, the default is 100%.
 
-**How.** **Set the threshold** → one slider from 0 to 100% → **Save** (a new version; the slider
+**How.** **Edit** beside Acceptance Criteria in the status strip → one slider from 0 to 100% → **Save** (a new version; the slider
 keeps an existing pass^k, which only the CLI, API and assistant set). Or the assistant: *"Propose
 acceptance criteria"*, or *Use as Acceptance Criteria* on a plan card.
 
 **Test**
-- ✅ The button's tooltip lists the floors in force.
+- ✅ The strip states the floor in force; its tooltip spells it out.
 - ✅ The report says *met*, *missed* or *not judged* and how many counted Evaluators fell below.
 
 > 🧪 Set 0.9. ✅ Even 18/18 passes can read below the floor for *what the sample proves*: the
@@ -390,7 +393,7 @@ acceptance criteria"*, or *Use as Acceptance Criteria* on a plan card.
 
 ## 8. Step Qualification and validation
 
-**What.** **Validation** is the status at the top of the tab. It comes from the newest finished
+**What.** **Validation** is the status at the start of the tab's status strip. It comes from the newest finished
 Eval Run of the version and a person's sign-off on it. **Not verified** when no run has finished or
 something the run rested on changed (Fingerprint, an Evaluator, the live cases, the criteria);
 **Waiting for human approval** once a run finished and nobody signed it (with a link to the run, and *Eval Run xxxx passed* / *missed* — green / red — in the reason);

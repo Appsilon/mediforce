@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-16
+last_reviewed: 2026-10-29
 ---
 
 # Step Evaluation
@@ -31,11 +31,16 @@ The **Evaluation** tab of a workflow shows one agent step of one workflow
 version at a time — picked with the **Version** selector (the runnable version
 unless `?version=` names another live one; archived versions are not offered)
 and then the **Step** selector (`?step=`), each option marked with its
-validation (see Validation below) — its Acceptance Criteria with whether it is
-validated against them, Evaluators, Eval Cases and that version's finished Eval
-Runs, plus any prepared or running run of another version, tagged with it —
-beside the Evaluation Assistant (`mediforce eval ask`,
-`POST /api/evaluation/assistant`), whose header holds the step's Brief. The
+validation (see Validation below). A status strip names the step's validation,
+its Acceptance Criteria and the Dataset the next Eval Run takes; under it three
+tabs (`?section=runs|cases|evaluators`) hold that version's finished Eval Runs,
+plus any prepared or running run of another version, tagged with it; the Eval
+Cases; and the Evaluators. A step with Eval Runs opens on them, one without on
+its cases. A banner over the tabs counts `code` Evaluators whose source nobody
+approved. Beside the tabs is the Evaluation Assistant (`mediforce eval ask`,
+`POST /api/evaluation/assistant`), whose header holds the step's Brief;
+**Hide assistant** in the strip gives the tabs the full width, remembered per
+browser. The
 assistant reads and prepares runs of the step as the selected version has it
 (`definitionVersion`, `mediforce eval ask --version N`; the runnable version
 when absent). A step's Evaluators, cases, Brief and criteria are the step's,
@@ -722,9 +727,10 @@ version in force when it is prepared, so changing them never rejudges a run.
 `mediforce eval criteria-get|criteria-set --file`,
 `GET|POST /api/evaluation/acceptance-criteria`.
 
-In the Evaluation tab, the top row is the step's validation status (see
-Validation below) and **Set the threshold**, whose tooltip lists the floors in
-force. The button opens a dialog with one slider, from 0% to 100%. Nothing is
+In the Evaluation tab, the status strip shows the step's validation status (see
+Validation below) and the floors in force in one line (*Each counted Evaluator
+≥ 90%*), with **Edit** (labelled *Set the threshold* for assistive tech) beside
+them. Edit opens a dialog with one slider, from 0% to 100%. Nothing is
 saved until **Save**, which writes one new version and keeps `minPassHatK`,
 which only the CLI, the API and the assistant set. The tab shows no version.
 
