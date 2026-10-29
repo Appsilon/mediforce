@@ -59,7 +59,8 @@ Cases** — *Do you know the correct outputs?* **Yes** or **For some** adds one
 `expected_output` Evaluator, `matches-expected-output`, unless the step has one
 — **Evaluators**, and **Review**. For each of the first three the assistant's
 panel offers a button that asks it to draft that stage (the Brief; cases from
-runs, or edge cases and planted errors; an evaluation plan); its proposals arrive as
+runs, or edge cases and planted errors; the checks themselves — up to five
+Evaluators, each previewed, with no plan to pick from first); its proposals arrive as
 cards, as on the tabs. **Cases from runs** follows the answer to *Do you know
 the correct outputs?*: on **No** each run gives a case without an expected
 output; otherwise a reviewed run's decisions label its cases — every review

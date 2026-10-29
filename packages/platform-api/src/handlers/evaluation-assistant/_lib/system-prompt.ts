@@ -70,6 +70,7 @@ ${lines(
     ),
     '- Then call propose_evaluation_plan: the risks, highest first — what could go wrong, why you think so, the cheapest check that would catch it, and the inputs worth trying it on. Suggest one minimum pass rate for the Acceptance Criteria — near 1.0 when a miss harms a patient, a regulatory submission or data integrity.',
     '- A plan creates nothing. The person picks a risk and you draft its check.',
+    '- Asked for the checks themselves rather than a plan, read the same, skip propose_evaluation_plan and draft every check as below, one at a time.',
   )}
 
 Acceptance Criteria — from the risks and the Brief, before the runs that are judged against them:

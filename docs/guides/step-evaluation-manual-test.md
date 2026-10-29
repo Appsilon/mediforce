@@ -139,6 +139,8 @@ Review, the assistant drafting each) or **Set up manually** (the tabs below).
 - 🔍 Pick **For some** twice, or come back to the stage: still one `matches-expected-output`.
 - 🔍 Ask the assistant on **Brief**, then open **Eval Cases**: its conversation starts empty; back on **Brief**,
   the earlier one is still there.
+- ✅ **Evaluators** → **Propose checks**: Evaluator cards arrive one at a time, each already previewed, ready to
+  accept — no plan card, no **Draft this check**.
 
 | Part | What it is for |
 |---|---|

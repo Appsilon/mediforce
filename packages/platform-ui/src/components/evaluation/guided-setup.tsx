@@ -38,7 +38,7 @@ const PROMPTS = {
   casesFromRunsUnlabelled: 'Propose an Eval Case from each recent production run, without an expected output: the Evaluators\' rules grade them.',
   edgeCases: 'Suggest edge-case Eval Cases for inputs production has not sent yet, and negative cases from real outputs with one obvious error planted, the riskiest by the Brief first.',
   edgeCasesUnlabelled: 'Suggest edge-case Eval Cases for inputs production has not sent yet, the riskiest by the Brief first.',
-  checks: 'Propose an evaluation plan for this step: the checks it needs, cheapest first — the output schema, then Code, then an LLM judge.',
+  checks: 'Draft the checks this step needs as Evaluators I can accept — no plan. Riskiest by the Brief first, each the cheapest kind that catches it: the output schema, then Code, then an LLM judge. At most five; then name the risks left unchecked.',
 } as const;
 
 /**
