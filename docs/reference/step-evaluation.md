@@ -729,7 +729,7 @@ version in force when it is prepared, so changing them never rejudges a run.
 
 In the Evaluation tab, the status strip shows the step's validation status (see
 Validation below) and the floors in force in one line (*Each counted Evaluator
-≥ 90%*), with **Edit** (labelled *Set the threshold* for assistive tech) beside
+≥ 90%*), with **Edit** (labelled *Edit Acceptance Criteria* for assistive tech) beside
 them. Edit opens a dialog with one slider, from 0% to 100%. Nothing is
 saved until **Save**, which writes one new version and keeps `minPassHatK`,
 which only the CLI, the API and the assistant set. The tab shows no version.

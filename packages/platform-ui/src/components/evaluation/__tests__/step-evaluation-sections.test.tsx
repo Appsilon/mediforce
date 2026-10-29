@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { AcceptanceCriteriaSection, CasesSection, EvalRunsSection, DriftAlert, EvaluatorsSection, caseFromFile, datasetDrift, toEvaluatorName } from '../step-evaluation-sections';
+import { EvaluationStatusStrip, CasesSection, EvalRunsSection, DriftAlert, EvaluatorsSection, caseFromFile, datasetDrift, toEvaluatorName } from '../step-evaluation-sections';
 
 const verdicts = vi.hoisted((): Record<string, 'positive' | 'negative'> => ({}));
 
@@ -637,7 +637,7 @@ describe('Saving a Dataset', () => {
   });
 });
 
-describe('AcceptanceCriteriaSection', () => {
+describe('EvaluationStatusStrip', () => {
   const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
   const criteriaOf = (criteria: unknown) => ({ isLoading: false, data: { criteria: criteria === null ? null : { version: 2, criteria, origin: 'user', createdBy: 'author-1' } } }) as never;
   const datasetsOf = (datasets: unknown[]) => ({ isLoading: false, data: { datasets } }) as never;
@@ -660,7 +660,7 @@ describe('AcceptanceCriteriaSection', () => {
     ['not_verified', 'Not verified'],
   ])('shows the validation from the newest Eval Run as one status icon with why beside it — %s: %s, whether signed or not', (status, label) => {
     const validation = { status, evalRunId: 'run-0000aaaa-0000-0000-0000-000000000000', reason: 'Eval Run run-0000: findings-present passed 8 of 10 trials (80%, needs 90%).', runInProgress: false };
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
+    render(<EvaluationStatusStrip step={step} criteria={criteriaOf({ minPassRate: 0.9 })} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
 
     expect(screen.getByTestId('validation-status').textContent).toBe(label);
     expect(screen.getByTestId('validation-reason').textContent).toContain('passed 8 of 10 trials (80%, needs 90%)');
@@ -674,7 +674,7 @@ describe('AcceptanceCriteriaSection', () => {
       reason: "Runs agent 'AE grader' v3 as it was validated: Eval Run run-0000 met its Acceptance Criteria.",
       inheritedFromAgent: { agentId: 'ae-grader', name: 'AE grader', version: 3 },
     };
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
+    render(<EvaluationStatusStrip step={step} criteria={criteriaOf({ minPassRate: 0.9 })} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
 
     expect(screen.getByTestId('view-agent-evaluation')).toHaveAttribute('href', '/acme/agents/definitions/ae-grader?tab=evaluation');
   });
@@ -684,7 +684,7 @@ describe('AcceptanceCriteriaSection', () => {
     ['missed', 'red'],
   ])('colours how the run waiting for approval fared — %s is %s', (runVerdict, colour) => {
     const validation = { status: 'awaiting_approval', evalRunId: 'run-0000aaaa-0000-0000-0000-000000000000', runVerdict, reason: `Eval Run run-0000 ${runVerdict}: because. Waiting for a person.`, runInProgress: false };
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
+    render(<EvaluationStatusStrip step={step} criteria={criteriaOf({ minPassRate: 0.9 })} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified', [], validation)} mayEdit={false} />);
 
     const word = screen.getByTestId('validation-run-verdict');
     expect(word.textContent).toBe(runVerdict);
@@ -693,7 +693,7 @@ describe('AcceptanceCriteriaSection', () => {
   });
 
   it('opens what the qualification rests on — its Eval Run, not a Brief — from the icon', () => {
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} datasets={datasetsOf([])} qualification={qualificationOf('stale', ['model'])} mayEdit={false} />);
+    render(<EvaluationStatusStrip step={step} criteria={criteriaOf({ minPassRate: 0.9 })} datasets={datasetsOf([])} qualification={qualificationOf('stale', ['model'])} mayEdit={false} />);
     fireEvent.click(screen.getByTestId('validation-status'));
 
     expect(screen.getByTestId('step-qualification').textContent).toContain('Eval Run run-0000');
@@ -701,8 +701,8 @@ describe('AcceptanceCriteriaSection', () => {
     expect(screen.getByTestId('qualification-changed').textContent).toContain('model');
   });
 
-  it('states the threshold in one line and keeps its sliders out of sight until Set the threshold opens them', () => {
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9 })} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+  it('states the threshold in one line and keeps its sliders out of sight until Edit Acceptance Criteria opens them', () => {
+    render(<EvaluationStatusStrip step={step} criteria={criteriaOf({ minPassRate: 0.9 })} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
 
     expect(screen.getByTestId('acceptance-criteria-summary').textContent).toBe('Each counted Evaluator ≥ 90%');
     expect(screen.queryByText(/v2/)).toBeNull();
@@ -712,15 +712,15 @@ describe('AcceptanceCriteriaSection', () => {
   });
 
   it('names the Dataset the next Eval Run takes, or that none is saved', () => {
-    const { rerender } = render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf(null)} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+    const { rerender } = render(<EvaluationStatusStrip step={step} criteria={criteriaOf(null)} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
     expect(screen.getByTestId('dataset-summary').textContent).toBe('Not saved yet');
 
-    rerender(<AcceptanceCriteriaSection step={step} criteria={criteriaOf(null)} datasets={datasetsOf([{ id: 'ds-3', version: 3, caseIds: ['a', 'b', 'c', 'd'] }, { id: 'ds-2', version: 2, caseIds: ['a'] }])} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+    rerender(<EvaluationStatusStrip step={step} criteria={criteriaOf(null)} datasets={datasetsOf([{ id: 'ds-3', version: 3, caseIds: ['a', 'b', 'c', 'd'] }, { id: 'ds-2', version: 2, caseIds: ['a'] }])} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
     expect(screen.getByTestId('dataset-summary').textContent).toBe('v3 · 4 cases');
   });
 
   it('starts the threshold at 100% until criteria are set', () => {
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf(null)} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+    render(<EvaluationStatusStrip step={step} criteria={criteriaOf(null)} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
     fireEvent.click(screen.getByTestId('set-threshold'));
 
     expect((screen.getByLabelText('Minimum pass rate') as HTMLInputElement).value).toBe('100');
@@ -728,7 +728,7 @@ describe('AcceptanceCriteriaSection', () => {
 
   it('saves the tuned threshold once, on Save, keeping its pass^k', () => {
     evaluation.setAcceptanceCriteria.mockClear();
-    render(<AcceptanceCriteriaSection step={step} criteria={criteriaOf({ minPassRate: 0.9, minPassHatK: 1 })} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
+    render(<EvaluationStatusStrip step={step} criteria={criteriaOf({ minPassRate: 0.9, minPassHatK: 1 })} datasets={datasetsOf([])} qualification={qualificationOf('not_qualified')} mayEdit={true} />);
     fireEvent.click(screen.getByTestId('set-threshold'));
 
     fireEvent.change(screen.getByLabelText('Minimum pass rate'), { target: { value: '95' } });

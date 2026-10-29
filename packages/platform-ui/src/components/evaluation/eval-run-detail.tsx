@@ -358,7 +358,6 @@ function RunHeader({ handle, output, step, mayRun, runReason }: {
   );
 }
 
-
 /**
  * One Eval Run (ADR-0023): its header — status, how it fared on the
  * Acceptance Criteria, dataset, cost — and five views from overall to one

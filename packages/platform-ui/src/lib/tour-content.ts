@@ -327,13 +327,13 @@ export const GUIDE_CHAPTERS: readonly TourChapter[] = [
       {
         id: 'cases',
         title: 'A case\u2019s trigger payload is the agent\u2019s whole input',
-        body: 'It is given nothing else: no earlier step outputs, and an empty workspace. Write cases by hand or with the assistant, from what the steps that use the agent were given.',
+        body: 'It is given nothing else: no earlier step outputs, and an empty workspace. On the Eval Cases tab, write cases by hand or with the assistant, from what the steps that use the agent were given.',
         target: 'eval-cases',
       },
       {
         id: 'run',
         title: 'An Eval Run runs the agent as a one-step workflow',
-        body: 'Each trial is a real run on the production path, so its cost, trajectory and audit read like any other. Open a run to see the exact configuration it assessed.',
+        body: 'Each trial is a real run on the production path, so its cost, trajectory and audit read like any other. On the Eval Runs tab, open a run to see the exact configuration it assessed.',
         target: 'eval-runs',
       },
       {
@@ -364,25 +364,25 @@ export const GUIDE_CHAPTERS: readonly TourChapter[] = [
       {
         id: 'evaluators',
         title: 'An Evaluator is one pass-or-fail check on an output',
-        body: 'Pick the cheapest type that can decide the rule: Output schema is free and instant, Code is a short script, LLM judge is for rules that need judgment, Expected output compares to a known answer.',
+        body: 'On the Evaluators tab, pick the cheapest type that can decide the rule: Output schema is free and instant, Code is a short script, LLM judge is for rules that need judgment, Expected output compares to a known answer.',
         target: 'eval-evaluators',
       },
       {
         id: 'approval',
         title: 'A Code Evaluator does not count until a person approves it',
-        body: 'It still grades, but is tagged Not counted. Read the script and click Approve source. Editing the script makes a new version that needs approving again.',
+        body: 'It still grades, but is tagged Not counted. Open the Evaluators tab, read the script and click Approve source. Editing the script makes a new version that needs approving again.',
         target: 'eval-evaluators',
       },
       {
         id: 'cases',
         title: 'An Eval Case is one input to run the step on',
-        body: 'Start from a production run to get exactly what the step received, with its output as the expected output. An approved run expects a match, a rejected one expects not to match.',
+        body: 'On the Eval Cases tab, start from a production run to get exactly what the step received, with its output as the expected output. An approved run expects a match, a rejected one expects not to match.',
         target: 'eval-cases',
       },
       {
         id: 'save',
         title: 'Save, or the next Eval Run will not see your cases',
-        body: 'Save writes the list as a new Dataset version. An Eval Run always uses the last saved Dataset, so a case marked unsaved is left out until you save again.',
+        body: 'Save, on the Eval Cases tab, writes the list as a new Dataset version. An Eval Run always uses the last saved Dataset, so a case marked unsaved is left out until you save again.',
         target: 'eval-cases',
       },
       {
@@ -394,13 +394,13 @@ export const GUIDE_CHAPTERS: readonly TourChapter[] = [
       {
         id: 'run',
         title: 'An Eval Run re-runs the step on every case, several times',
-        body: 'Trials per case runs from 1 to 10. The budget stops new trials, though ones already running finish, so the cost can end slightly over it. Keep a first run small.',
+        body: 'Start one from the Eval Runs tab. Trials per case runs from 1 to 10. The budget stops new trials, though ones already running finish, so the cost can end slightly over it. Keep a first run small.',
         target: 'eval-runs',
       },
       {
         id: 'report',
         title: 'Open Details to read the pass rate and review the judges',
-        body: 'The Summary says whether the acceptance criteria were met, missed or not judged. Model verdicts is where you Accept or Deny each LLM judge verdict it was unsure of.',
+        body: 'Each run on the Eval Runs tab has Details. Its Summary says whether the acceptance criteria were met, missed or not judged. Model verdicts is where you Accept or Deny each LLM judge verdict it was unsure of.',
         target: 'eval-runs',
       },
       {

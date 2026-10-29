@@ -1440,18 +1440,15 @@ function ValidationReason({ validation }: { validation: StepValidation }) {
 }
 
 /**
- * Whether the step is validated (D10): the newest finished Eval Run of the
- * workflow version, passed or failed on its Acceptance Criteria, not verified
- * once anything it rested on changed. The signed Step Qualification, if any,
- * opens from the same status. The threshold — 100% until set — is tuned in
- * a dialog; the next Eval Run takes the one in force.
+ * The Step's status strip: its validation (D10) — the newest finished Eval Run
+ * of the workflow version, passed or failed on its Acceptance Criteria, not
+ * verified once anything it rested on changed — with the signed Step
+ * Qualification, if any, opening from the same status; the Acceptance Criteria
+ * every run is judged against, 100% until set and tuned in a dialog; and the
+ * Dataset the next Eval Run takes. `action` sits at its end — the tab's own
+ * controls, such as showing the assistant.
  */
-/**
- * The Step's status strip: its validation, the Acceptance Criteria every run
- * is judged against, and the Dataset the next Eval Run takes. `action` sits at
- * its end — the tab's own controls, such as showing the assistant.
- */
-export function AcceptanceCriteriaSection({ step, criteria, qualification, datasets, mayEdit, action }: {
+export function EvaluationStatusStrip({ step, criteria, qualification, datasets, mayEdit, action }: {
   step: EvaluationSubject;
   criteria: StepEvaluation['criteria'];
   qualification: StepEvaluation['qualification'];
@@ -1495,7 +1492,7 @@ export function AcceptanceCriteriaSection({ step, criteria, qualification, datas
               type="button"
               className={buttonClass}
               disabled={mayEdit === false || criteria.isLoading}
-              aria-label="Set the threshold"
+              aria-label="Edit Acceptance Criteria"
               data-testid="set-threshold"
               onClick={() => { save.reset(); setEditing(true); }}
             >Edit</button>

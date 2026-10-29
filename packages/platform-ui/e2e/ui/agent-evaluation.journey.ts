@@ -96,6 +96,8 @@ test.describe('Agent Evaluation tab', () => {
       await expect(page).not.toHaveURL(/tab=evaluation/);
       await expect(page.getByPlaceholder('e.g. Risk Analysis Agent')).toBeVisible();
     } finally {
+      // Leave the page first: a refetch of the deleted agent would log a 404 as a page error.
+      await page.goto('about:blank');
       await request.delete(`/api/agents/${agent.id}`, { headers: AUTH_HEADERS });
     }
   });
