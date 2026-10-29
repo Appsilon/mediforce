@@ -444,11 +444,16 @@ expected output that is not JSON, an input missing `triggerPayload` or
 `previousStepOutputs` — is said in plain words under the field it is about,
 and cleared once that field is edited.
 
-Each case in the list shows its labels (positive or negative, split, source),
-for a case made from a run whether it is **as run** or **edited** — its input
-differs from what the run was given, or its expected output (none included)
-from what the run returned — and **Edit** and **Archive** beside them. Its
-**Details** show only what the case gives the step and what it expects: its
+The cases are a table, one row per case: **Case** — its name and, for a case
+made from a run, whether it is **from run** or **edited from run** (its input
+differs from what the run was given, or its expected output, none included,
+from what the run returned) — **Type** (positive, negative, or input only
+without an expected output), a one-line **Expected output**, **Comparison**
+(Exact match or By meaning), and **Graded by** — *All N* or a count, which
+opens into the Evaluators' names — then **Details**, **Edit** and **Remove**
+(archives the case). On narrow screens Expected output and Comparison are
+hidden; Details still has both. **Details** opens under the row and shows only what the
+case gives the step and what it expects: its
 input, its expected output and how it is compared, and the Evaluators that grade
 it — plus **Source run log** for a case made from a run, synthesized ones
 included. **Edit** opens the same dialog to
