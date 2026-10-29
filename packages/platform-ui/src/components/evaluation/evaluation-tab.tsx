@@ -153,8 +153,9 @@ function useAssistantOpen() {
  * One subject's Evaluation: a status strip over its Eval Runs, Eval Cases and
  * Evaluators, one tab at a time, beside the assistant, which can be hidden.
  * The subject is an agent Step in one workflow version, or an Agent on its own
- * (ADR-0029), with no version to pick. Every tab stays mounted, so a half-filled
- * form or the unsaved-cases guard survives switching tabs.
+ * (ADR-0029), with no version to pick. Every tab and the hidden assistant stay
+ * mounted, so a half-filled form, the unsaved-cases guard, or an assistant
+ * conversation survives switching tabs or hiding the assistant.
  */
 export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit, editReason, mayRun, runReason }: {
   step: EvaluationSubject;
@@ -235,12 +236,10 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
             />
           </Tabs.Content>
         </Tabs.Root>
-        {assistant.open && (
-          <div className="relative lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
-            <AssistantResizeHandle {...assistantWidth} />
-            <EvaluationAssistantPanel step={step} definitionVersion={definitionVersion} brief={evaluation.brief} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
-          </div>
-        )}
+        <div hidden={assistant.open === false} className="relative lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
+          <AssistantResizeHandle {...assistantWidth} />
+          <EvaluationAssistantPanel step={step} definitionVersion={definitionVersion} brief={evaluation.brief} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
+        </div>
       </div>
     </div>
   );
