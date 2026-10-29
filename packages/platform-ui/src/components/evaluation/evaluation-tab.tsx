@@ -10,6 +10,7 @@ import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-ve
 import { VALIDATION_STATUS } from './validation-status';
 import { buttonClass, tabTriggerClass } from './evaluation-styles';
 import { EvaluationAssistantPanel } from './evaluation-assistant-panel';
+import { AssistantResizeHandle, assistantColumns, useAssistantHeight, useAssistantWidth } from './assistant-width';
 import { GuidedSetup, SETUP_STAGES, SetupChoice, type SetupStage } from './guided-setup';
 import {
   EvaluationStatusStrip,
@@ -19,87 +20,7 @@ import {
   DriftAlert,
 } from './step-evaluation-sections';
 
-const ASSISTANT_WIDTH_KEY = 'mediforce.evaluation-assistant.width';
 const ASSISTANT_OPEN_KEY = 'mediforce.evaluation-assistant.open';
-const DEFAULT_ASSISTANT_WIDTH = 380;
-const MIN_ASSISTANT_WIDTH = 320;
-// The evaluation sections keep at least this much room, plus the 1rem column gap.
-const MIN_SECTIONS_WIDTH = 360;
-const COLUMN_GAP = 16;
-const KEYBOARD_RESIZE_STEP = 32;
-
-/** The assistant column's width: dragged or arrow-keyed from its left edge, remembered per browser. */
-function useAssistantWidth(layoutRef: React.RefObject<HTMLDivElement | null>) {
-  const [width, setWidth] = React.useState(DEFAULT_ASSISTANT_WIDTH);
-
-  React.useEffect(() => {
-    try {
-      const stored = Number(localStorage.getItem(ASSISTANT_WIDTH_KEY));
-      if (Number.isFinite(stored) && stored >= MIN_ASSISTANT_WIDTH) setWidth(stored);
-    } catch {
-      // Storage unavailable (private window, blocked site data): keep the default.
-    }
-  }, []);
-
-  const clamp = (next: number) => {
-    const available = (layoutRef.current?.clientWidth ?? Number.POSITIVE_INFINITY) - MIN_SECTIONS_WIDTH - COLUMN_GAP;
-    return Math.round(Math.max(MIN_ASSISTANT_WIDTH, Math.min(next, available)));
-  };
-  const resize = (next: number) => setWidth(clamp(next));
-  const persist = (next: number) => {
-    try {
-      localStorage.setItem(ASSISTANT_WIDTH_KEY, String(next));
-    } catch {
-      // Not remembered; the width still applies for this visit.
-    }
-  };
-  const commit = (next: number) => {
-    const clamped = clamp(next);
-    setWidth(clamped);
-    persist(clamped);
-  };
-  return { width, resize, persist, commit };
-}
-
-function AssistantResizeHandle({ width, resize, persist, commit }: ReturnType<typeof useAssistantWidth>) {
-  const drag = React.useRef<{ startX: number; startWidth: number } | null>(null);
-  return (
-    <div
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize Evaluation Assistant"
-      aria-valuenow={width}
-      aria-valuemin={MIN_ASSISTANT_WIDTH}
-      tabIndex={0}
-      title="Drag to resize · double-click to reset"
-      data-testid="evaluation-assistant-resize"
-      className="group absolute -left-4 top-0 z-10 hidden h-full w-4 cursor-col-resize touch-none items-center justify-center focus-visible:outline-none lg:flex"
-      onPointerDown={(event) => {
-        event.preventDefault();
-        event.currentTarget.setPointerCapture(event.pointerId);
-        drag.current = { startX: event.clientX, startWidth: width };
-      }}
-      onPointerMove={(event) => {
-        if (drag.current === null) return;
-        resize(drag.current.startWidth + drag.current.startX - event.clientX);
-      }}
-      onPointerUp={() => {
-        if (drag.current === null) return;
-        drag.current = null;
-        persist(width);
-      }}
-      onDoubleClick={() => commit(DEFAULT_ASSISTANT_WIDTH)}
-      onKeyDown={(event) => {
-        if (event.key === 'ArrowLeft') commit(width + KEYBOARD_RESIZE_STEP);
-        else if (event.key === 'ArrowRight') commit(width - KEYBOARD_RESIZE_STEP);
-        else return;
-        event.preventDefault();
-      }}
-    >
-      <div className="h-12 w-1 rounded-full bg-border transition-colors group-hover:bg-primary/60 group-focus-visible:bg-primary" />
-    </div>
-  );
-}
 
 const SECTIONS = ['runs', 'cases', 'evaluators'] as const;
 type SectionTab = (typeof SECTIONS)[number];
@@ -218,15 +139,13 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
   const empty = isEmptySubject(evaluation);
   const layoutRef = React.useRef<HTMLDivElement>(null);
   const assistantWidth = useAssistantWidth(layoutRef);
+  const assistantHeight = useAssistantHeight();
   const assistant = useAssistantOpen();
   const { section, select } = useSectionTab(evaluation.runs.isLoading ? undefined : (evaluation.runs.data?.evalRuns.length ?? 0) > 0);
   const evaluators = evaluation.evaluators.data?.evaluators ?? [];
   const caseCount = evaluation.cases.data?.cases.length;
   const unapproved = evaluators.filter((evaluator) => evaluator.trust.trusted === false).length;
-  // min() keeps a remembered width from squeezing the sections on a narrower window.
-  const columns = assistant.open
-    ? `minmax(0,1fr) min(${assistantWidth.width}px, calc(100% - ${MIN_SECTIONS_WIDTH + COLUMN_GAP}px))`
-    : 'minmax(0,1fr)';
+  const columns = assistant.open ? assistantColumns(assistantWidth.width) : 'minmax(0,1fr)';
   const tabs: { value: SectionTab; label: string; count: number | undefined; tour: string }[] = [
     { value: 'runs', label: 'Eval Runs', count: undefined, tour: 'eval-runs' },
     { value: 'cases', label: 'Eval Cases', count: caseCount, tour: 'eval-cases' },
@@ -313,7 +232,7 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
             />
           </Tabs.Content>
         </Tabs.Root>
-        <div hidden={assistant.open === false} className="relative lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
+        <div ref={assistantHeight.ref} hidden={assistant.open === false} className="relative lg:sticky lg:top-6 lg:h-[var(--assistant-height,calc(100dvh-10rem))]" style={{ '--assistant-height': assistantHeight.height === undefined ? undefined : `${assistantHeight.height}px` } as React.CSSProperties}>
           <AssistantResizeHandle {...assistantWidth} />
           <EvaluationAssistantPanel step={step} definitionVersion={definitionVersion} brief={evaluation.brief} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
         </div>

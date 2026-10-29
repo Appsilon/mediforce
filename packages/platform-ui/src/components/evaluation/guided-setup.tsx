@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { useStepEvaluationMutation, type useStepEvaluation } from '@/hooks/use-step-evaluation';
 import { EvaluationAssistantPanel, type EvaluationAssistantStarter } from './evaluation-assistant-panel';
+import { AssistantResizeHandle, assistantColumns, useAssistantHeight, useAssistantWidth } from './assistant-width';
 import type { BriefQuery } from './evaluation-brief-field';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 import { CasesSection, EvaluatorsSection, StartEvalRunControls, hasUnsavedCases, loadedAgentRuns } from './step-evaluation-sections';
@@ -418,15 +419,15 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
     evaluators: (evaluation.evaluators.data?.evaluators.length ?? 0) > 0,
     review: false,
   };
+  const layoutRef = React.useRef<HTMLDivElement>(null);
+  const assistantWidth = useAssistantWidth(layoutRef);
+  const assistantHeight = useAssistantHeight();
   const backLink = (to: SetupStage) => <button type="button" className={buttonClass} onClick={() => onStage(to)}>← {STAGE_LABELS[to]}</button>;
 
   return (
     <div className="space-y-4" data-testid="guided-setup" data-stage={stage}>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-2.5">
-        <span className="text-sm font-semibold">
-          {step.kind === 'step' ? step.stepId : step.agentId} <span className="font-normal text-muted-foreground">· guided setup</span>
-        </span>
-        <nav aria-label="Setup progress" className="flex flex-wrap items-center gap-1.5">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-lg border px-4 py-2.5">
+        <nav aria-label="Setup progress" className="col-start-2 flex flex-wrap items-center justify-center gap-1.5">
           {SETUP_STAGES.map((candidate, index) => (
             <button
               key={candidate}
@@ -450,7 +451,7 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
             </button>
           ))}
         </nav>
-        <button type="button" className="text-xs text-primary hover:underline" data-testid="guided-setup-exit" onClick={() => onExit(null)}>Exit setup</button>
+        <button type="button" className="justify-self-end text-xs text-primary hover:underline" data-testid="guided-setup-exit" onClick={() => onExit(null)}>Exit setup</button>
       </div>
       {stage === 'brief' && (
         <StageHeading
@@ -475,7 +476,11 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
         />
       )}
       {stage === 'review' && <StageHeading title="Review" purpose="Save the setup, or save it and start an Eval Run." />}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+      <div
+        ref={layoutRef}
+        className="grid gap-4 lg:grid-cols-(--guided-setup-columns) lg:items-start"
+        style={{ '--guided-setup-columns': assistantColumns(assistantWidth.width) } as React.CSSProperties}
+      >
         <div className="min-w-0 space-y-4">
           {stage === 'brief' && (
             <BriefCard step={step} brief={evaluation.brief} mayEdit={mayEdit} />
@@ -498,8 +503,12 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
               <ReviewStage step={step} definitionVersion={definitionVersion} evaluation={evaluation} mayEdit={mayEdit} mayRun={mayRun} onStage={onStage} onDone={onExit} />
             </div>
           )}
+          {stage === 'brief' && <StageFooter back={<span />} skip={() => onStage('cases')} next={{ label: 'Next: Eval Cases →', onClick: () => onStage('cases') }} />}
+          {stage === 'cases' && <StageFooter back={backLink('brief')} next={{ label: 'Next: Evaluators →', onClick: () => onStage('evaluators') }} />}
+          {stage === 'evaluators' && <StageFooter back={backLink('cases')} next={{ label: 'Next: Review →', onClick: () => onStage('review') }} />}
         </div>
-        <div className="lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
+        <div ref={assistantHeight.ref} className="relative lg:sticky lg:top-6 lg:h-[var(--assistant-height,calc(100dvh-10rem))]" style={{ '--assistant-height': assistantHeight.height === undefined ? undefined : `${assistantHeight.height}px` } as React.CSSProperties}>
+          <AssistantResizeHandle {...assistantWidth} />
           <EvaluationAssistantPanel
             step={step}
             definitionVersion={definitionVersion}
@@ -512,9 +521,6 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
           />
         </div>
       </div>
-      {stage === 'brief' && <StageFooter back={<span />} skip={() => onStage('cases')} next={{ label: 'Next: Eval Cases →', onClick: () => onStage('cases') }} />}
-      {stage === 'cases' && <StageFooter back={backLink('brief')} next={{ label: 'Next: Evaluators →', onClick: () => onStage('evaluators') }} />}
-      {stage === 'evaluators' && <StageFooter back={backLink('cases')} next={{ label: 'Next: Review →', onClick: () => onStage('review') }} />}
     </div>
   );
 }
