@@ -351,13 +351,18 @@ test.describe('Step Evaluation tab', () => {
     await expect(page.getByTestId('review-unapproved-evaluators')).toHaveCount(0);
 
     await expect(page.getByTestId('evaluation-assistant')).toBeVisible();
+    await page.getByTestId('evaluation-assistant-input').fill('Which grades are risky?');
     await page.getByTestId('evaluation-assistant-toggle').click();
-    await expect(page.getByTestId('evaluation-assistant')).toHaveCount(0);
+    await expect(page.getByTestId('evaluation-assistant')).toBeHidden();
+    await page.getByTestId('evaluation-assistant-toggle').click();
+    await expect(page.getByTestId('evaluation-assistant-input')).toHaveValue('Which grades are risky?');
+    await page.getByTestId('evaluation-assistant-toggle').click();
+    await expect(page.getByTestId('evaluation-assistant')).toBeHidden();
 
     await page.reload();
     await expect(page.getByTestId('evaluation-tab-evaluators')).toHaveAttribute('data-state', 'active', { timeout: 15_000 });
     await expect(page.getByTestId('evaluation-assistant-toggle')).toHaveText('Assistant');
-    await expect(page.getByTestId('evaluation-assistant')).toHaveCount(0);
+    await expect(page.getByTestId('evaluation-assistant')).toBeHidden();
 
     await page.getByTestId('evaluation-assistant-toggle').click();
     await expect(page.getByTestId('evaluation-assistant')).toBeVisible();

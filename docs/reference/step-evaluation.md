@@ -40,8 +40,9 @@ its cases. A banner over the tabs counts `code` Evaluators whose source nobody
 approved. Beside the tabs is the Evaluation Assistant (`mediforce eval ask`,
 `POST /api/evaluation/assistant`), whose header holds the step's Brief;
 **Hide assistant** in the strip gives the tabs the full width, remembered per
-browser. The
-assistant reads and prepares runs of the step as the selected version has it
+browser; the conversation, a typed draft and a reply still on its way are kept
+for when it is shown again. The assistant reads and prepares runs of the step as
+the selected version has it
 (`definitionVersion`, `mediforce eval ask --version N`; the runnable version
 when absent). A step's Evaluators, cases, Brief and criteria are the step's,
 not a version's: they stay readable and editable from an older version even
