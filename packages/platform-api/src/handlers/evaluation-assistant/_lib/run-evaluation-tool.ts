@@ -158,6 +158,25 @@ async function reviewVerdict(scope: CallerScope, agentRunId: string) {
   return verdict === undefined ? null : { verdict: verdict.label, comment: verdict.comment };
 }
 
+/**
+ * The step's finished Agent Runs in one Workflow Run, oldest first: a reviewer
+ * who requests changes sends the step back to run again, so each run is one
+ * review round and the last is the one approved, or still waiting.
+ */
+async function reviewRounds(scope: CallerScope, workflowRunId: string, stepId: string) {
+  const runs = (await scope.agentRuns.getByInstanceId(workflowRunId))
+    .filter((run) => run.stepId === stepId && run.status !== 'running')
+    .sort((left, right) => left.startedAt.localeCompare(right.startedAt));
+  return Promise.all(runs.map(async (run) => ({
+    agentRunId: run.id,
+    status: run.status,
+    fallbackReason: run.fallbackReason,
+    startedAt: run.startedAt,
+    reviewVerdict: await reviewVerdict(scope, run.id),
+    result: clip(run.envelope?.result ?? null, 600),
+  })));
+}
+
 const MAX_LISTED_FILES = 300;
 
 /**
@@ -263,15 +282,13 @@ export async function executeEvaluationTool(
     }
     case 'list_step_runs': {
       const { limit } = args as Args<'list_step_runs'>;
-      const { runs } = await listStepAgentRuns({ ...stepOnly(step, 'Listing production runs'), limit: limit ?? 10 }, scope);
+      const evaluatedStep = stepOnly(step, 'Listing production runs');
+      const { runs } = await listStepAgentRuns({ ...evaluatedStep, limit: limit ?? 10 }, scope);
+      const workflowRunIds = [...new Set(runs.map((run) => run.processInstanceId))];
       return {
-        runs: await Promise.all(runs.map(async (run) => ({
-          agentRunId: run.id,
-          status: run.status,
-          fallbackReason: run.fallbackReason,
-          startedAt: run.startedAt,
-          reviewVerdict: await reviewVerdict(scope, run.id),
-          result: clip(run.envelope?.result ?? null, 600),
+        workflowRuns: await Promise.all(workflowRunIds.map(async (workflowRunId) => ({
+          workflowRunId,
+          rounds: await reviewRounds(scope, workflowRunId, evaluatedStep.stepId),
         }))),
       };
     }

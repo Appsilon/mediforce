@@ -19,6 +19,14 @@ describe('Evaluation Assistant prompt', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toContain('notes');
   });
 
+  it('derives cases from review rounds: each round sent back is negative, the approved output positive, on the input production sent', () => {
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('the rounds of one Workflow Run are one review');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('every case of a Workflow Run on its first round');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('each round sent back is a negative case');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('mark it Positive or Negative on its card');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toMatch(/rejected (run|one)|reviewers rejected/);
+  });
+
   it('covers Acceptance Criteria set before a run, validation from the newest run of the version, and routing', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Propose them with propose_acceptance_criteria');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('newest finished Eval Run of its workflow version');

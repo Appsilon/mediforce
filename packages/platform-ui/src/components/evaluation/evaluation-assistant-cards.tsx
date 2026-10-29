@@ -152,6 +152,27 @@ function ProposalSummary({ step, proposal }: { step: EvaluationSubject; proposal
   }
 }
 
+const CASE_LABELS = [
+  { id: 'positive', label: 'Positive' },
+  { id: 'negative', label: 'Negative' },
+  { id: 'none', label: 'No expected output' },
+] as const;
+type CaseLabel = (typeof CASE_LABELS)[number]['id'];
+
+/** How a proposed Eval Case's expected output is meant, when it has one: to match, to avoid. */
+function proposedCaseLabel(proposal: DecidableProposal): CaseLabel | null {
+  if (proposal.tool !== 'propose_eval_case') return null;
+  const { expectedOutput, expectation } = proposal.arguments;
+  return expectedOutput === undefined || expectedOutput === null ? null : expectation ?? 'positive';
+}
+
+/** The proposal as the person labelled it: its expected output to match, to avoid, or dropped. */
+function relabelled(proposal: DecidableProposal, label: CaseLabel | null): DecidableProposal {
+  if (proposal.tool !== 'propose_eval_case' || label === null) return proposal;
+  const { expectation: _expectation, ...args } = proposal.arguments;
+  return { ...proposal, arguments: label === 'none' ? { ...args, expectedOutput: null } : { ...args, expectation: label } };
+}
+
 export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
   step: EvaluationSubject;
   state: { proposal: DecidableProposal; status: ProposalStatus };
@@ -161,7 +182,8 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
 }) {
   const [error, setError] = React.useState<string | null>(null);
   const accept = useStepEvaluationMutation(step, (proposal: DecidableProposal) => acceptProposal(step, proposal));
-  const { proposal } = state;
+  const [caseLabel, setCaseLabel] = React.useState(() => proposedCaseLabel(state.proposal));
+  const proposal = relabelled(state.proposal, caseLabel);
 
   const onAccept = () => {
     setError(null);
@@ -178,6 +200,19 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
         ? <MarkdownPresentation content={proposal.arguments.text} />
         : <p className="whitespace-pre-wrap text-muted-foreground"><ProposalSummary step={step} proposal={proposal} /></p>}
       {proposal.selfTest !== undefined && <SelfTestSummary selfTest={proposal.selfTest} />}
+      {caseLabel !== null && state.status === 'open' && (
+        <div role="group" aria-label="Expected output" className="mt-2 inline-flex overflow-hidden rounded border">
+          {CASE_LABELS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={caseLabel === option.id}
+              className={cn('px-2 py-0.5', caseLabel === option.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}
+              onClick={() => setCaseLabel(option.id)}
+            >{option.label}</button>
+          ))}
+        </div>
+      )}
       {error !== null && <p className="mt-1 text-destructive">{error}</p>}
       {state.status === 'open' ? (
         <div className="mt-2 flex gap-1.5">

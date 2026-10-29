@@ -59,8 +59,16 @@ Cases** — *Do you know the correct outputs?* **Yes** or **For some** adds one
 `expected_output` Evaluator, `matches-expected-output`, unless the step has one
 — **Evaluators**, and **Review**. For each of the first three the assistant's
 panel offers a button that asks it to draft that stage (the Brief; cases from
-reviewed runs or edge cases; an evaluation plan); its proposals arrive as
-cards, as on the tabs. Review sums
+runs or edge cases; an evaluation plan); its proposals arrive as
+cards, as on the tabs. **Cases from runs** follows the answer to *Do you know
+the correct outputs?*: on **No** each run gives a case without an expected
+output; otherwise a reviewed run's decisions label its cases — every review
+round sent back with **Request changes** is a negative case (that round's
+output to avoid, the reviewer's comment as its agreement instructions), the
+output finally approved a positive one, all on the first round's input — and an
+unreviewed run's output comes as an expected output for the person to mark.
+`list_step_runs` lists runs grouped by Workflow Run, each with the step's
+rounds oldest first, so a review reads as one chain. Review sums
 up the stages, sets the Acceptance Criteria (minimum pass rate, optionally
 pass^k) and, on **Save**, writes them if changed and saves the cases as a new
 Dataset version if unsaved, then opens the tabs; **Save and start Eval Run**
@@ -83,7 +91,9 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   tries a check on real outputs before proposing it.
 - **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
   written or synthesized), Brief drafts and Acceptance Criteria come back as
-  cards to accept or reject. Accepting one is the same write the forms
+  cards to accept or reject. An Eval Case card with an expected output lets
+  the person mark it **Positive** or **Negative**, or drop it (**No expected
+  output**), before accepting. Accepting one is the same write the forms
   make, recorded with `origin: assistant`. A routing recommendation (a Control
   Mode) comes back as a card to apply in the workflow editor. So does a **diagnosis** of an Eval Run's failures
   (`propose_diagnosis`) — see below. Nothing is applied to the step by the

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { z } from 'zod';
 import type { CallerScope } from '../../../../repositories/index';
 import { EVALUATION_ASSISTANT_PLATFORM_TOOLS, type StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
-import { InMemoryAgentTrajectoryRepository, buildAgentRun, buildProcessInstance, buildWorkflowDefinition } from '@mediforce/platform-core/testing';
+import { InMemoryAgentTrajectoryRepository, buildAgentOutputEnvelope, buildAgentRun, buildProcessInstance, buildWorkflowDefinition } from '@mediforce/platform-core/testing';
 import { createTestScope } from '../../../../repositories/__tests__/create-test-scope';
 import { loadEvaluationSubject } from '../../../evaluation/_lib/evaluation-subject';
 import { createEvalCase } from '../../../evaluation/eval-cases';
@@ -17,6 +17,10 @@ import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RU
 import { gitWorkspace } from '../../../evaluation/__tests__/git-workspace';
 import { evalScenario, finishEvalRun } from '../../../evaluation/__tests__/finished-eval-run';
 import { userCaller } from '../../../../repositories/__tests__/create-test-scope';
+
+type ListedWorkflowRuns = {
+  workflowRuns: Array<{ workflowRunId: string; rounds: Array<{ agentRunId: string; reviewVerdict: unknown }> }>;
+};
 
 async function setup(entries?: StoredAgentTrajectoryEntry[]) {
   const fixture = await evaluationFixture();
@@ -161,11 +165,39 @@ describe('executeEvaluationTool', () => {
       source: 'human', createdBy: 'reviewer-1', metadata: null, namespace: NAMESPACE, processInstanceId: null,
       stepId: 'grade-aes', evaluatorId: null, supersedes: null, basis: 'test',
     }, scope);
-    const { runs } = await executeEvaluationTool('list_step_runs', {}, scope, context) as { runs: Array<{ agentRunId: string; reviewVerdict: unknown }> };
-    expect(runs.map((run) => [run.agentRunId, run.reviewVerdict])).toEqual([
-      [UNGRADED_RUN, { verdict: 'reject', comment: 'No grades.' }],
-      [GRADED_RUN, null],
+    const { workflowRuns } = await executeEvaluationTool('list_step_runs', {}, scope, context) as ListedWorkflowRuns;
+    expect(workflowRuns.map(({ rounds }) => rounds.map((round) => [round.agentRunId, round.reviewVerdict]))).toEqual([
+      [[UNGRADED_RUN, { verdict: 'reject', comment: 'No grades.' }]],
+      [[GRADED_RUN, null]],
     ]);
+  });
+
+  it('lists every review round of a Workflow Run oldest first, so a request for changes and the output approved after it read together', async () => {
+    const { fixture, scope, context } = await setup();
+    await addStepRun(fixture, { instanceId: 'run-revised', agentRunId: 'agent-run-round-1', result: { findings: [] }, at: '2026-09-23T09:00:00.000Z' });
+    await fixture.agentRunRepo.create(buildAgentRun({
+      id: 'agent-run-round-2',
+      processInstanceId: 'run-revised',
+      stepId: 'grade-aes',
+      startedAt: '2026-09-23T10:00:00.000Z',
+      envelope: buildAgentOutputEnvelope({ result: { findings: [{ term: 'Sepsis', grade: 5 }] } }),
+    }));
+    const verdict = (agentRunId: string, label: string, value: number, comment: string | null) => recordScore({
+      subject: { type: 'agent_run', id: agentRunId }, name: 'human_verdict', value, label, comment,
+      source: 'human', createdBy: 'reviewer-1', metadata: null, namespace: NAMESPACE, processInstanceId: 'run-revised',
+      stepId: 'grade-aes', evaluatorId: null, supersedes: null, basis: 'test',
+    }, scope);
+    await verdict('agent-run-round-1', 'revise', 0.5, 'Sepsis with a fatal outcome is Grade 5.');
+    await verdict('agent-run-round-2', 'approve', 1, null);
+
+    const { workflowRuns } = await executeEvaluationTool('list_step_runs', { limit: 1 }, scope, context) as ListedWorkflowRuns;
+    expect(workflowRuns).toEqual([{
+      workflowRunId: 'run-revised',
+      rounds: [
+        expect.objectContaining({ agentRunId: 'agent-run-round-1', reviewVerdict: { verdict: 'revise', comment: 'Sepsis with a fatal outcome is Grade 5.' }, result: { findings: [] } }),
+        expect.objectContaining({ agentRunId: 'agent-run-round-2', reviewVerdict: { verdict: 'approve', comment: null } }),
+      ],
+    }]);
   });
 
   it('lists and reads the workspace a run started from', async () => {

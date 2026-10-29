@@ -222,8 +222,11 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
    * reviewer's verdict — to write the Agent's cases from.
    */
   list_agent_production_runs: z.object({ limit: z.number().int().min(1).max(50).optional() }),
-  /** Recent finished production Agent Runs of the step, with the reviewer's verdict where there was one. */
-  list_step_runs: z.object({ limit: z.number().int().min(1).max(50).optional() }),
+  /** Recent Workflow Runs of the step, each with the step's finished Agent Runs oldest first — one per review round — and the reviewer's verdict on each. */
+  list_step_runs: z.object({
+    limit: z.number().int().min(1).max(50).optional()
+      .describe('How many of the step\'s recent Agent Runs to sample (default 10); each brings every review round of its Workflow Run, so fewer Workflow Runs may come back.'),
+  }),
   /** One Agent Run: status, fallback, input it was given and the result it produced. */
   get_agent_run: z.object({ agentRunId: z.string().min(1) }),
   /** The tool calls and results of one Agent Run. */

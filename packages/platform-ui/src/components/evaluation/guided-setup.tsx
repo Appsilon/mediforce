@@ -34,7 +34,8 @@ export const EXPECTED_OUTPUT_EVALUATOR = 'matches-expected-output';
 
 const PROMPTS = {
   brief: 'Draft this step\'s Evaluation Brief: what it is for, who relies on its output and which failures matter most. Read its prompt, output schema and a few recent runs first.',
-  reviewedRuns: 'Propose an Eval Case from each recent production run a person approved or rejected: an approved run is a positive case, a rejected one a negative case.',
+  casesFromRuns: 'Propose Eval Cases from recent production runs. I know the correct outputs: take them from the reviewers\' decisions where a person reviewed a run, and ask me to mark the rest Positive or Negative.',
+  casesFromRunsUnlabelled: 'Propose an Eval Case from each recent production run, without an expected output: the Evaluators\' rules grade them.',
   edgeCases: 'Suggest edge-case Eval Cases for inputs production has not sent yet, the riskiest by the Brief first.',
   checks: 'Propose an evaluation plan for this step: the checks it needs, cheapest first — the output schema, then Code, then an LLM judge.',
 } as const;
@@ -103,7 +104,7 @@ function StageHeading({ title, optional, purpose, why }: { title: string; option
 }
 
 /** What each stage hands the assistant: the job is the assistant's, so its buttons sit in the panel. */
-function stageStarter(stage: SetupStage, step: EvaluationSubject): EvaluationAssistantStarter | undefined {
+function stageStarter(stage: SetupStage, step: EvaluationSubject, expectation: ExpectationChoice | null): EvaluationAssistantStarter | undefined {
   if (stage === 'brief') {
     return { actions: [{ label: 'Draft the Brief', prompt: PROMPTS.brief, testId: 'guided-setup-draft-brief' }] };
   }
@@ -111,7 +112,11 @@ function stageStarter(stage: SetupStage, step: EvaluationSubject): EvaluationAss
     return {
       intro: 'Cover inputs production hasn\'t sent yet.',
       actions: [
-        ...(step.kind === 'step' ? [{ label: 'Cases from reviewed runs', prompt: PROMPTS.reviewedRuns, testId: 'guided-setup-reviewed-runs' }] : []),
+        ...(step.kind === 'step' ? [{
+          label: 'Cases from runs',
+          prompt: expectation === 'no' ? PROMPTS.casesFromRunsUnlabelled : PROMPTS.casesFromRuns,
+          testId: 'guided-setup-cases-from-runs',
+        }] : []),
         { label: 'Suggest edge cases', prompt: PROMPTS.edgeCases, testId: 'guided-setup-edge-cases' },
       ],
     };
@@ -161,12 +166,19 @@ const EXPECTATION_CHOICES = [
 ] as const;
 type ExpectationChoice = (typeof EXPECTATION_CHOICES)[number]['id'];
 
+function hasComparisonEvaluator(evaluation: StepEvaluation): boolean {
+  return (evaluation.evaluators.data?.evaluators ?? []).some((evaluator) => evaluator.latest.check.kind === 'expected_output');
+}
+
 /** Whether the person knows the correct outputs: knowing some adds the check that compares them, once. */
-function ExpectedOutputsQuestion({ step, evaluation, mayEdit }: { step: EvaluationSubject; evaluation: StepEvaluation; mayEdit: boolean }) {
-  const evaluators = evaluation.evaluators.data?.evaluators ?? [];
-  const hasComparison = evaluators.some((evaluator) => evaluator.latest.check.kind === 'expected_output');
-  const [choice, setChoice] = React.useState<ExpectationChoice | null>(null);
-  const shown = choice ?? (hasComparison ? 'some' : null);
+function ExpectedOutputsQuestion({ step, evaluation, mayEdit, shown, onChoice }: {
+  step: EvaluationSubject;
+  evaluation: StepEvaluation;
+  mayEdit: boolean;
+  shown: ExpectationChoice | null;
+  onChoice: (choice: ExpectationChoice) => void;
+}) {
+  const hasComparison = hasComparisonEvaluator(evaluation);
   const model = usePinnedDefaultModel();
   const addComparison = useStepEvaluationMutation(step, () => mediforce.evaluation.createEvaluator({
     ...step,
@@ -175,7 +187,7 @@ function ExpectedOutputsQuestion({ step, evaluation, mayEdit }: { step: Evaluati
     check: { kind: 'expected_output', model },
   }));
   const pick = (next: ExpectationChoice) => {
-    setChoice(next);
+    onChoice(next);
     if (next !== 'no' && hasComparison === false && addComparison.isPending === false) addComparison.mutate(undefined);
   };
   return (
@@ -419,6 +431,8 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
     evaluators: (evaluation.evaluators.data?.evaluators.length ?? 0) > 0,
     review: false,
   };
+  const [expectationChoice, setExpectationChoice] = React.useState<ExpectationChoice | null>(null);
+  const expectation = expectationChoice ?? (hasComparisonEvaluator(evaluation) ? 'some' : null);
   const layoutRef = React.useRef<HTMLDivElement>(null);
   const assistantWidth = useAssistantWidth(layoutRef);
   const assistantHeight = useAssistantHeight();
@@ -465,7 +479,7 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
         <StageHeading
           title="Eval Cases"
           purpose="Inputs the step is re-run on, optionally with the output you expect."
-          why="Approved runs become positive cases (the output must match), rejected runs negative ones (it must not). Cases without an expected output are graded by the Evaluators' rules only."
+          why="Where a person reviewed a run, the output they approved becomes a positive case (the output must match), and each round they sent back for changes a negative one (it must not). Cases without an expected output are graded by the Evaluators' rules only."
         />
       )}
       {stage === 'evaluators' && (
@@ -487,7 +501,7 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
           )}
           {stage === 'cases' && (
             <>
-              <ExpectedOutputsQuestion step={step} evaluation={evaluation} mayEdit={mayEdit} />
+              <ExpectedOutputsQuestion step={step} evaluation={evaluation} mayEdit={mayEdit} shown={expectation} onChoice={setExpectationChoice} />
               <div className="rounded-lg border p-4">
                 <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />
               </div>
@@ -517,7 +531,7 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
             editReason={editReason}
             mayRun={mayRun}
             runReason={runReason}
-            starter={mayEdit ? stageStarter(stage, step) : undefined}
+            starter={mayEdit ? stageStarter(stage, step, expectation) : undefined}
           />
         </div>
       </div>

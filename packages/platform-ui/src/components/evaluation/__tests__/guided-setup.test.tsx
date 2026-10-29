@@ -150,10 +150,25 @@ describe('GuidedSetup', () => {
     expect(evaluation.setBrief).not.toHaveBeenCalled();
   });
 
-  it('offers cases from reviewed runs only for a step, which has production runs', () => {
+  it('offers cases from runs only for a step, which has production runs', () => {
     renderSetup('cases', evaluationOf(), { step: { kind: 'agent', namespace: 'acme', agentId: 'grader' } });
-    expect(screen.queryByTestId('guided-setup-reviewed-runs')).toBeNull();
+    expect(screen.queryByTestId('guided-setup-cases-from-runs')).toBeNull();
     expect(screen.getByTestId('guided-setup-edge-cases')).toBeVisible();
+  });
+
+  it('asks for cases from runs with the outputs the person knows, from the reviewer where there was one', () => {
+    renderSetup('cases', evaluationOf());
+    fireEvent.click(screen.getByRole('button', { name: 'Yes' }));
+    fireEvent.click(screen.getByTestId('guided-setup-cases-from-runs'));
+    expect(asked).toHaveBeenLastCalledWith(expect.stringContaining('take them from the reviewers\' decisions'));
+    expect(asked).toHaveBeenLastCalledWith(expect.stringContaining('mark the rest Positive or Negative'));
+  });
+
+  it('asks for cases from runs without expected outputs when the person knows none', () => {
+    renderSetup('cases', evaluationOf());
+    fireEvent.click(screen.getByRole('button', { name: 'No' }));
+    fireEvent.click(screen.getByTestId('guided-setup-cases-from-runs'));
+    expect(asked).toHaveBeenLastCalledWith(expect.stringContaining('without an expected output'));
   });
 
   it('adds the check that compares expected outputs once the person knows some', async () => {
