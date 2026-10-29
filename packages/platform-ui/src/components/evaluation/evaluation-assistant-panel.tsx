@@ -17,6 +17,7 @@ import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { selectBase } from '@/components/workflows/workflow-editor/step-editor-fields';
 import { StartEvalRunCard } from './step-evaluation-sections';
+import { primaryButtonClass } from './evaluation-styles';
 import { EvaluationBriefField, EvaluationBriefToggle, type BriefQuery } from './evaluation-brief-field';
 import {
   ControlSettingsCard,
@@ -129,9 +130,10 @@ function StepsSummary({ steps }: { steps: ActivityStep[] }) {
   );
 }
 
-/** Lets the page around the assistant ask it something, as a card does. */
-export interface EvaluationAssistantHandle {
-  ask: (message: string) => void;
+/** The jobs a page hands the assistant, each asked with one button in the panel. */
+export interface EvaluationAssistantStarter {
+  intro: string;
+  actions: { label: string; prompt: string; testId: string }[];
 }
 
 /**
@@ -141,8 +143,7 @@ export interface EvaluationAssistantHandle {
  * person confirms the budget on the card. The Step's Brief, which it reads on
  * every turn, opens from the header.
  */
-export function EvaluationAssistantPanel({ ref, step, definitionVersion, brief, mayEdit, editReason, mayRun, runReason }: {
-  ref?: React.Ref<EvaluationAssistantHandle>;
+export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEdit, editReason, mayRun, runReason, starter }: {
   step: EvaluationSubject;
   /** The workflow version whose step the assistant reads and runs. */
   /** Null for an Agent evaluated on its own (ADR-0029), which runs as it is now. */
@@ -152,6 +153,8 @@ export function EvaluationAssistantPanel({ ref, step, definitionVersion, brief, 
   editReason: string | undefined;
   mayRun: boolean;
   runReason: string | undefined;
+  /** Shown above the conversation for as long as the page offers it. */
+  starter?: EvaluationAssistantStarter;
 }) {
   const [messages, setMessages] = React.useState<PanelMessage[]>([]);
   const [input, setInput] = React.useState('');
@@ -227,8 +230,6 @@ export function EvaluationAssistantPanel({ ref, step, definitionVersion, brief, 
     }
   };
 
-  React.useImperativeHandle(ref, () => ({ ask: (message) => void send(message, 'card') }));
-
   return (
     <aside className="flex h-full min-h-0 flex-col rounded-xl border bg-white shadow-lg dark:bg-background" data-testid="evaluation-assistant" data-tour="eval-assistant">
       <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3">
@@ -285,6 +286,23 @@ export function EvaluationAssistantPanel({ ref, step, definitionVersion, brief, 
               </span>
             </label>
           </details>
+        </div>
+      )}
+      {starter !== undefined && starter.actions.length > 0 && (
+        <div className="shrink-0 space-y-2 border-b px-4 py-3" data-testid="evaluation-assistant-starter">
+          <p className="text-xs text-muted-foreground">{starter.intro}</p>
+          <div className="flex flex-wrap gap-2">
+            {starter.actions.map((action) => (
+              <button
+                key={action.testId}
+                type="button"
+                className={primaryButtonClass}
+                data-testid={action.testId}
+                disabled={pending}
+                onClick={() => void send(action.prompt, 'card')}
+              >{action.label}</button>
+            ))}
+          </div>
         </div>
       )}
       <div

@@ -30,10 +30,13 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
   },
 }));
 vi.mock('../evaluation-assistant-panel', () => ({
-  EvaluationAssistantPanel: ({ ref }: { ref: React.Ref<{ ask: (message: string) => void }> }) => {
-    React.useImperativeHandle(ref, () => ({ ask: asked }));
-    return <div data-testid="evaluation-assistant" />;
-  },
+  EvaluationAssistantPanel: ({ starter }: { starter?: { actions: { label: string; prompt: string; testId: string }[] } }) => (
+    <div data-testid="evaluation-assistant">
+      {starter?.actions.map((action) => (
+        <button key={action.testId} type="button" data-testid={action.testId} onClick={() => asked(action.prompt)}>{action.label}</button>
+      ))}
+    </div>
+  ),
 }));
 vi.mock('../evaluation-brief-field', () => ({ EvaluationBriefField: () => <div data-testid="evaluation-brief" /> }));
 vi.mock('../step-evaluation-sections', async (importOriginal) => ({
@@ -123,7 +126,7 @@ describe('GuidedSetup', () => {
     expect(onStage).toHaveBeenCalledWith('evaluators');
   });
 
-  it('asks the assistant beside it to draft each stage', () => {
+  it('hands each stage\'s drafting job to the assistant, as a button in its panel', () => {
     renderSetup('brief', evaluationOf());
     fireEvent.click(screen.getByTestId('guided-setup-draft-brief'));
     expect(asked).toHaveBeenCalledWith(expect.stringContaining('Evaluation Brief'));

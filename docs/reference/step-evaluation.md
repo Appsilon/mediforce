@@ -56,9 +56,10 @@ walks four stages beside the same assistant, whose conversation carries from
 stage to stage: **Brief** (optional), **Eval
 Cases** — *Do you know the correct outputs?* **Yes** or **For some** adds one
 `expected_output` Evaluator, `matches-expected-output`, unless the step has one
-— **Evaluators**, and **Review**. Each of the first three has a button that asks
-the assistant to draft it (the Brief; cases from reviewed runs or edge cases;
-an evaluation plan); its proposals arrive as cards, as on the tabs. Review sums
+— **Evaluators**, and **Review**. For each of the first three the assistant's
+panel offers a button that asks it to draft that stage (the Brief; cases from
+reviewed runs or edge cases; an evaluation plan); its proposals arrive as
+cards, as on the tabs. Review sums
 up the stages, sets the Acceptance Criteria (minimum pass rate, optionally
 pass^k) and, on **Save**, writes them if changed and saves the cases as a new
 Dataset version if unsaved, then opens the tabs; **Save and start Eval Run**

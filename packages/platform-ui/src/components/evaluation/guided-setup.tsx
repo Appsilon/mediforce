@@ -12,7 +12,7 @@ import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { useStepEvaluationMutation, type useStepEvaluation } from '@/hooks/use-step-evaluation';
-import { EvaluationAssistantPanel, type EvaluationAssistantHandle } from './evaluation-assistant-panel';
+import { EvaluationAssistantPanel, type EvaluationAssistantStarter } from './evaluation-assistant-panel';
 import { EvaluationBriefField } from './evaluation-brief-field';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 import { CasesSection, EvaluatorsSection, StartEvalRunControls, hasUnsavedCases, loadedAgentRuns } from './step-evaluation-sections';
@@ -101,18 +101,24 @@ function StageHeading({ title, optional, purpose, why }: { title: string; option
   );
 }
 
-/** A button that hands the stage's job to the assistant beside it. */
-function AskButton({ label, prompt, assistant, testId }: {
-  label: string;
-  prompt: string;
-  assistant: React.RefObject<EvaluationAssistantHandle | null>;
-  testId: string;
-}) {
-  return (
-    <button type="button" className={primaryButtonClass} data-testid={testId} onClick={() => assistant.current?.ask(prompt)}>
-      {label}
-    </button>
-  );
+/** What each stage hands the assistant: the job is the assistant's, so its buttons sit in the panel. */
+function stageStarter(stage: SetupStage, step: EvaluationSubject): EvaluationAssistantStarter | undefined {
+  if (stage === 'brief') {
+    return { intro: 'Drafts it from the step\'s prompt, output schema and a few recent runs.', actions: [{ label: 'Draft the Brief', prompt: PROMPTS.brief, testId: 'guided-setup-draft-brief' }] };
+  }
+  if (stage === 'cases') {
+    return {
+      intro: step.kind === 'step' ? 'Turns reviewed runs into cases, and covers inputs production hasn\'t sent yet.' : 'Covers inputs production hasn\'t sent yet.',
+      actions: [
+        ...(step.kind === 'step' ? [{ label: 'Cases from reviewed runs', prompt: PROMPTS.reviewedRuns, testId: 'guided-setup-reviewed-runs' }] : []),
+        { label: 'Suggest edge cases', prompt: PROMPTS.edgeCases, testId: 'guided-setup-edge-cases' },
+      ],
+    };
+  }
+  if (stage === 'evaluators') {
+    return { intro: 'Picks checks from the step\'s output and the Brief.', actions: [{ label: 'Propose checks', prompt: PROMPTS.checks, testId: 'guided-setup-propose-checks' }] };
+  }
+  return undefined;
 }
 
 const EXPECTATION_CHOICES = [
@@ -235,7 +241,6 @@ function ReviewStage({ step, definitionVersion, evaluation, mayEdit, mayRun, onS
 
   return (
     <div className="space-y-4">
-      <StageHeading title="Review" purpose="Save the setup, or save it and start an Eval Run." />
       <div className="grid gap-3 sm:grid-cols-3">
         <SummaryCard label="Brief" value={brief === null ? 'Not written' : '✓ Written'} detail="Edit" warn={false} onEdit={() => onStage('brief')} />
         <SummaryCard
@@ -356,9 +361,9 @@ function StageFooter({ back, next, skip }: { back: React.ReactNode; next: { labe
 
 /**
  * Guided setup of a subject's Evaluation: Brief, Eval Cases, Evaluators and
- * Review, one stage at a time, beside the Evaluation Assistant, which each
- * stage asks to draft its part and which keeps its conversation from stage to
- * stage. Every stage writes as the tabs do; only Review saves the cases as a
+ * Review, one stage at a time, beside the Evaluation Assistant, which offers
+ * each stage's drafting job as a button and keeps its conversation from stage
+ * to stage. Every stage writes as the tabs do; only Review saves the cases as a
  * Dataset version and sets the Acceptance Criteria.
  */
 export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema, mayEdit, editReason, mayRun, runReason, stage, onStage, onExit }: {
@@ -375,7 +380,6 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
   /** Leaves the setup for the tabs, on the named one. */
   onExit: (section: 'runs' | null) => void;
 }) {
-  const assistant = React.useRef<EvaluationAssistantHandle>(null);
   const filled: Record<SetupStage, boolean> = {
     brief: (evaluation.brief.data?.brief ?? null) !== null,
     cases: (evaluation.cases.data?.cases.length ?? 0) > 0,
@@ -414,58 +418,57 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
         </nav>
         <button type="button" className="text-xs text-primary hover:underline" data-testid="guided-setup-exit" onClick={() => onExit(null)}>Exit setup</button>
       </div>
+      {stage === 'brief' && (
+        <StageHeading
+          title="Brief"
+          optional
+          purpose="What the step is for, and which failures matter most."
+          why="The assistant ranks every proposal by it, and whoever signs the qualification reads it. The assistant drafts it from the step's prompt, output schema and a few recent runs."
+        />
+      )}
+      {stage === 'cases' && (
+        <StageHeading
+          title="Eval Cases"
+          purpose="Inputs the step is re-run on, optionally with the output you expect."
+          why="Approved runs become positive cases (the output must match), rejected runs negative ones (it must not). Cases without an expected output are graded by the Evaluators' rules only."
+        />
+      )}
+      {stage === 'evaluators' && (
+        <StageHeading
+          title="Evaluators"
+          purpose="Rules every output must satisfy."
+          why="Cheapest check first: the output schema, then Code, then an LLM judge. A Code check counts toward the result only after a person approves its source."
+        />
+      )}
+      {stage === 'review' && <StageHeading title="Review" purpose="Save the setup, or save it and start an Eval Run." />}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
-        <div className="min-w-0 space-y-4 rounded-lg border p-4">
+        <div className="min-w-0 space-y-4">
           {stage === 'brief' && (
-            <>
-              <StageHeading
-                title="Brief"
-                optional
-                purpose="What the step is for, and which failures matter most."
-                why="The assistant ranks every proposal by it, and whoever signs the qualification reads it. The assistant drafts it from the step's prompt, output schema and a few recent runs."
-              />
-              {mayEdit && <AskButton label="Draft the Brief" prompt={PROMPTS.brief} assistant={assistant} testId="guided-setup-draft-brief" />}
+            <section aria-label="Evaluation Brief" className="rounded-lg border p-4">
               <EvaluationBriefField step={step} brief={evaluation.brief} mayEdit={mayEdit} />
-              <StageFooter back={<span />} skip={() => onStage('cases')} next={{ label: 'Next: Eval Cases →', onClick: () => onStage('cases') }} />
-            </>
+            </section>
           )}
           {stage === 'cases' && (
             <>
-              <StageHeading
-                title="Eval Cases"
-                purpose="Inputs the step is re-run on, optionally with the output you expect."
-                why="Approved runs become positive cases (the output must match), rejected runs negative ones (it must not). Cases without an expected output are graded by the Evaluators' rules only."
-              />
               <ExpectedOutputsQuestion step={step} evaluation={evaluation} mayEdit={mayEdit} />
-              {mayEdit && (
-                <div className="flex flex-wrap gap-2">
-                  {step.kind === 'step' && <AskButton label="Cases from reviewed runs" prompt={PROMPTS.reviewedRuns} assistant={assistant} testId="guided-setup-reviewed-runs" />}
-                  <AskButton label="Suggest edge cases" prompt={PROMPTS.edgeCases} assistant={assistant} testId="guided-setup-edge-cases" />
-                </div>
-              )}
-              <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />
-              <StageFooter back={backLink('brief')} next={{ label: 'Next: Evaluators →', onClick: () => onStage('evaluators') }} />
+              <div className="rounded-lg border p-4">
+                <CasesSection step={step} evaluation={evaluation} mayEdit={mayEdit} />
+              </div>
             </>
           )}
           {stage === 'evaluators' && (
-            <>
-              <StageHeading
-                title="Evaluators"
-                purpose="Rules every output must satisfy."
-                why="Cheapest check first: the output schema, then Code, then an LLM judge. A Code check counts toward the result only after a person approves its source."
-              />
-              {mayEdit && <AskButton label="Propose checks" prompt={PROMPTS.checks} assistant={assistant} testId="guided-setup-propose-checks" />}
+            <div className="rounded-lg border p-4">
               <EvaluatorsSection step={step} data={evaluation.evaluators} mayEdit={mayEdit} editReason={editReason} stepOutputSchema={outputSchema} />
-              <StageFooter back={backLink('cases')} next={{ label: 'Next: Review →', onClick: () => onStage('review') }} />
-            </>
+            </div>
           )}
           {stage === 'review' && (
-            <ReviewStage step={step} definitionVersion={definitionVersion} evaluation={evaluation} mayEdit={mayEdit} mayRun={mayRun} onStage={onStage} onDone={onExit} />
+            <div className="rounded-lg border p-4">
+              <ReviewStage step={step} definitionVersion={definitionVersion} evaluation={evaluation} mayEdit={mayEdit} mayRun={mayRun} onStage={onStage} onDone={onExit} />
+            </div>
           )}
         </div>
         <div className="lg:sticky lg:top-6 lg:h-[calc(100dvh-10rem)] lg:min-h-[480px]">
           <EvaluationAssistantPanel
-            ref={assistant}
             step={step}
             definitionVersion={definitionVersion}
             brief={evaluation.brief}
@@ -473,9 +476,13 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
             editReason={editReason}
             mayRun={mayRun}
             runReason={runReason}
+            starter={mayEdit ? stageStarter(stage, step) : undefined}
           />
         </div>
       </div>
+      {stage === 'brief' && <StageFooter back={<span />} skip={() => onStage('cases')} next={{ label: 'Next: Eval Cases →', onClick: () => onStage('cases') }} />}
+      {stage === 'cases' && <StageFooter back={backLink('brief')} next={{ label: 'Next: Evaluators →', onClick: () => onStage('evaluators') }} />}
+      {stage === 'evaluators' && <StageFooter back={backLink('cases')} next={{ label: 'Next: Review →', onClick: () => onStage('review') }} />}
     </div>
   );
 }
