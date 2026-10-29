@@ -27,6 +27,7 @@ import {
   type EvaluationSubject,
   type EvaluatorCheck,
   type StepFingerprintComponent,
+  evaluatorAppliesToCase,
 } from '@mediforce/platform-core';
 import {
   type AddEvaluatorVersionInput,
@@ -853,18 +854,25 @@ function CaseExpectationMark({ evalCase }: { evalCase: EvalCase }) {
   );
 }
 
-/** The names of the Evaluators that grade a case: every Evaluator of the step, or the ones it selects. */
+/** The names of the Evaluators that grade a case: every Evaluator of the step, or the ones it selects — expected-output checks only when it has an expected output. */
 function gradedBy(evalCase: EvalCase, evaluators: readonly EvaluatorView[]): Array<{ id: string; name: string }> {
+  const applies = (evaluator: EvaluatorView) => evaluatorAppliesToCase({ evaluatorId: evaluator.id, kind: evaluator.latest.check.kind }, evalCase);
   return evalCase.evaluatorIds === null
-    ? evaluators.map(({ id, name }) => ({ id, name }))
-    : evalCase.evaluatorIds.map((evaluatorId) => ({ id: evaluatorId, name: evaluators.find((evaluator) => evaluator.id === evaluatorId)?.name ?? evaluatorId.slice(0, 8) }));
+    ? evaluators.filter(applies).map(({ id, name }) => ({ id, name }))
+    : evalCase.evaluatorIds.flatMap((evaluatorId) => {
+      const evaluator = evaluators.find((candidate) => candidate.id === evaluatorId);
+      if (evaluator === undefined) return [{ id: evaluatorId, name: evaluatorId.slice(0, 8) }];
+      return applies(evaluator) === true ? [{ id: evaluator.id, name: evaluator.name }] : [];
+    });
 }
 
 /** Which Evaluators grade a case: a count that opens into their names. */
 function CaseGradedBy({ evalCase, evaluators }: { evalCase: EvalCase; evaluators: readonly EvaluatorView[] }) {
   const [open, setOpen] = React.useState(false);
   const names = gradedBy(evalCase, evaluators);
-  if (names.length === 0) return <span className="text-xs text-muted-foreground" data-testid="eval-case-evaluators">All</span>;
+  if (names.length === 0) {
+    return <span className="text-xs text-muted-foreground" data-testid="eval-case-evaluators">{evaluators.length === 0 && evalCase.evaluatorIds === null ? 'All' : 'None'}</span>;
+  }
   return (
     <div>
       <DisclosureButton
@@ -906,7 +914,10 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSel
     setEditing(false);
     edit.reset();
   };
-  const checkedBy = evalCase.evaluatorIds === null ? 'all evaluators' : gradedBy(evalCase, evaluators).map(({ name }) => name).join(', ');
+  const graders = gradedBy(evalCase, evaluators);
+  const checkedBy = evalCase.evaluatorIds === null && graders.length === evaluators.length
+    ? 'all evaluators'
+    : graders.length === 0 ? 'no evaluators' : graders.map(({ name }) => name).join(', ');
   return (
     <tbody className="border-b last:border-0" data-testid="eval-case-row">
       <tr className="align-top hover:bg-muted/30">

@@ -428,6 +428,18 @@ describe('Eval Case view and edit', () => {
     expect(screen.getByTestId('eval-case-evaluator-names').textContent).toBe('findings-present');
   });
 
+  it('leaves expected-output Evaluators out of what grades a case without an expected output', () => {
+    const { unmount } = render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ expectedOutput: null }))} mayEdit={false} />);
+    const all = screen.getByTestId('eval-case-evaluators');
+    expect(all.textContent).toBe('All 1');
+    fireEvent.click(all);
+    expect(screen.getByTestId('eval-case-evaluator-names').textContent).toBe('findings-present');
+    unmount();
+
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ expectedOutput: null, evaluatorIds: ['e-expected'] }))} mayEdit={false} />);
+    expect(screen.getByTestId('eval-case-evaluators').textContent).toBe('None');
+  });
+
   it('says All, with nothing to open, while the step has no Evaluators', () => {
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}), [])} mayEdit={false} />);
     expect(screen.getByTestId('eval-case-evaluators').textContent).toBe('All');
