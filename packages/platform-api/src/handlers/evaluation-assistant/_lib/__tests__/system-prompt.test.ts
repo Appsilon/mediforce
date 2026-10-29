@@ -27,6 +27,22 @@ describe('Evaluation Assistant prompt', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toMatch(/rejected (run|one)|reviewers rejected/);
   });
 
+  it('red-teams the cases with negative ones: a real output with one obvious error planted, the error what decides', () => {
+    for (const prompt of Object.values(EVALUATION_ASSISTANT_SYSTEM_PROMPTS)) {
+      expect(prompt).toContain('A wrong output is a negative case too');
+      expect(prompt).toContain('Plant in it one error a reviewer would catch at once');
+      expect(prompt).toContain('naming the planted error as the one difference that decides');
+    }
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('propose_eval_case with only the run\'s agentRunId and, as expectedOutput, that output with the error planted — no input');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPTS.agent).toContain('propose_eval_case with a real run\'s input written out');
+  });
+
+  it('keeps planted errors apart from perturbed cases: an error planted in the output is not a change to the input', () => {
+    const synthesis = EVALUATION_ASSISTANT_SYSTEM_PROMPT.split('Case synthesis')[1].split('\n\n')[0];
+    expect(synthesis).not.toContain('A wrong output is a negative case too');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('not propose_perturbed_case');
+  });
+
   it('covers Acceptance Criteria set before a run, validation from the newest run of the version, and routing', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Propose them with propose_acceptance_criteria');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('newest finished Eval Run of its workflow version');

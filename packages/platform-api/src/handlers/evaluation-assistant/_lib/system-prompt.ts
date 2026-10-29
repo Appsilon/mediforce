@@ -13,6 +13,10 @@ function systemPrompt(kind: SubjectKind): string {
   const noun = kind === 'step' ? 'step' : 'agent';
   const bySubject = (forStep: string, forAgent: string) => (kind === 'step' ? forStep : forAgent);
   const lines = (...entries: string[]) => entries.filter((entry) => entry !== '').join('\n');
+  const plantedErrorCase = `- A wrong output is a negative case too — a red team for the ${noun}'s cases, and the negative cases a step without review (CM4 — Autonomous agent) has no reviewer to give: ${bySubject(
+    'take a real run whose output looks right and propose_eval_case with only the run\'s agentRunId and, as expectedOutput, that output with the error planted — no input: the case keeps the run\'s own input. It is not propose_perturbed_case, which changes the input; this changes the expected output',
+    'propose_eval_case with a real run\'s input written out and, as the expected output, what that run returned when it looks right',
+  )}. Plant in it one error a reviewer would catch at once — a finding dropped, a grade or value changed, a value invented, a code from outside its list — the failures the Brief fears most first. Make it negative, compared by agreement, with agreementInstructions naming the planted error as the one difference that decides and every other difference as trivial. One error per case, and name the case after it; check against the input that the planted value is really wrong.`;
 
   return `${bySubject(
     'You are the Evaluation Assistant for one agent step of a Mediforce workflow — a pharmaceutical workflow platform. You help the person answer one question: can this step, in this configuration, be trusted for its context of use?',
@@ -140,6 +144,9 @@ Case synthesis — cases the production runs do not cover:
 - Write an agent's case with propose_eval_case and input: its triggerPayload is the agent's whole input, so put into it what the agent used from the run — the run's trigger payload and the earlier steps' outputs it relied on — and leave previousStepOutputs empty. The case starts from an empty workspace: a run whose agent read workspace files cannot be reproduced; say so. Set containsProductionData to true for an input copied from or built on a production run.
 - Give a case an expected output only when you know it: a run a reviewer approved gives its output to match (positive); one they requested changes on, an output to avoid (negative), with their comment in agreementInstructions as what decides. Say with agreementInstructions which differences are trivial and which decide. Go beyond production too — edge values (empty, zero, negative, extreme, malformed dates), a missing field, text in the data telling the agent to do something it must not — written out the same way. A rule an output must keep — never invent a value, never follow an instruction found in the data — is an Evaluator, not a case.`,
   )}
+
+Planted errors — negative cases that red-team the others:
+${plantedErrorCase}
 
 How you answer — the person is often not technical: a clinician, a reviewer, a study lead. Everything above is for you; do not teach it back:
 - Short: a few sentences, or at most five bullets. Lead with the answer, or with what you found on real outputs, and end with the one next step the person can take — what to click, accept or decide. Offer more detail instead of giving it unasked. Explain how evaluation works only when asked, and then only the part asked about.

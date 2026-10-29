@@ -59,7 +59,7 @@ Cases** — *Do you know the correct outputs?* **Yes** or **For some** adds one
 `expected_output` Evaluator, `matches-expected-output`, unless the step has one
 — **Evaluators**, and **Review**. For each of the first three the assistant's
 panel offers a button that asks it to draft that stage (the Brief; cases from
-runs or edge cases; an evaluation plan); its proposals arrive as
+runs, or edge cases and planted errors; an evaluation plan); its proposals arrive as
 cards, as on the tabs. **Cases from runs** follows the answer to *Do you know
 the correct outputs?*: on **No** each run gives a case without an expected
 output; otherwise a reviewed run's decisions label its cases — every review
@@ -174,6 +174,15 @@ The step's Brief is sent to the assistant on every turn. What it can help with:
   knows one: the source run's for a change that keeps the meaning, or a
   negative case's output the agent must not return. A change that does not
   apply to that run goes back to the assistant instead of to the person.
+- **Planted errors.** It red-teams the cases with negative ones, those a step
+  under CM4 has no reviewer to give: a real run's output that looks right,
+  with one obvious error planted in it (a finding dropped, a grade or value
+  changed, a value invented), on that run's own input — the output changes,
+  not the input, so it is not a perturbed case — compared by agreement, its agreement
+  instructions naming the planted error as the one difference that decides.
+  One error per case, named after it. **Suggest edge cases** asks for these
+  along with the edge-case inputs, unless the person answered **No** to *Do you
+  know the correct outputs?*: then nothing compares an expected output.
 
 Every proposal is checked against the platform before it is shown: an Evaluator
 name already taken, or an Evaluator or run of another step, is refused the same

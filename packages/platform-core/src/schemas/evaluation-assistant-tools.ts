@@ -61,8 +61,12 @@ export const ProposeEvaluatorToolSchema = z.object({
 /** Propose an Eval Case: from a production Agent Run, or written out. */
 export const ProposeEvalCaseToolSchema = z.object({
   name: z.string().min(1).max(200),
-  agentRunId: z.string().min(1).optional(),
-  input: EvalCaseInputSchema.optional(),
+  agentRunId: z.string().min(1)
+    .describe('Harvest this production run: the case takes the run\'s own input — do not also send input. Override its expected output with expectedOutput.')
+    .optional(),
+  input: EvalCaseInputSchema
+    .describe('A written input, instead of agentRunId.')
+    .optional(),
   /** The output the step should return — or, for a negative case, must not return. */
   expectedOutput: EvalCaseLabelSchema.shape.expectedOutput.optional(),
   expectation: EvalCaseExpectationSchema.optional(),
@@ -74,7 +78,7 @@ export const ProposeEvalCaseToolSchema = z.object({
     .describe('true when the written input is copied from, or built on, a production run\'s data'),
   rationale: z.string().max(1000).optional(),
 }).refine((value) => (value.agentRunId === undefined) !== (value.input === undefined), {
-  message: 'give exactly one of agentRunId (harvest a production run) or input (a written case)',
+  message: 'give exactly one of agentRunId (harvest a production run) or input (a written case) — to keep a run\'s own input, send its agentRunId and drop input',
 });
 
 /** Propose a new version of the step's Evaluation Brief. */
@@ -118,7 +122,9 @@ export const ProposeEvaluatorVersionToolSchema = z.object({
 /** Propose a case synthesized from a production run by changing its input or workspace. */
 export const ProposePerturbedCaseToolSchema = PerturbedEvalCaseSpecSchema.extend({
   rationale: z.string().max(1000).optional(),
-}).refine(hasPerturbationChange, { message: 'give at least one inputChanges or fileChanges entry' });
+}).refine(hasPerturbationChange, {
+  message: 'give at least one inputChanges or fileChanges entry — to change only the expected output (an error planted in a run\'s output), use propose_eval_case with agentRunId and expectedOutput',
+});
 
 /**
  * Propose the step's Acceptance Criteria (D10): the minimum pass rate every

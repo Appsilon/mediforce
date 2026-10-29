@@ -36,7 +36,8 @@ const PROMPTS = {
   brief: 'Draft this step\'s Evaluation Brief: what it is for, who relies on its output and which failures matter most. Read its prompt, output schema and a few recent runs first.',
   casesFromRuns: 'Propose Eval Cases from recent production runs. I know the correct outputs: take them from the reviewers\' decisions where a person reviewed a run, and ask me to mark the rest Positive or Negative.',
   casesFromRunsUnlabelled: 'Propose an Eval Case from each recent production run, without an expected output: the Evaluators\' rules grade them.',
-  edgeCases: 'Suggest edge-case Eval Cases for inputs production has not sent yet, the riskiest by the Brief first.',
+  edgeCases: 'Suggest edge-case Eval Cases for inputs production has not sent yet, and negative cases from real outputs with one obvious error planted, the riskiest by the Brief first.',
+  edgeCasesUnlabelled: 'Suggest edge-case Eval Cases for inputs production has not sent yet, the riskiest by the Brief first.',
   checks: 'Propose an evaluation plan for this step: the checks it needs, cheapest first — the output schema, then Code, then an LLM judge.',
 } as const;
 
@@ -110,14 +111,14 @@ function stageStarter(stage: SetupStage, step: EvaluationSubject, expectation: E
   }
   if (stage === 'cases') {
     return {
-      intro: 'Cover inputs production hasn\'t sent yet.',
+      intro: 'Cover inputs production hasn\'t sent yet, and wrong outputs to catch.',
       actions: [
         ...(step.kind === 'step' ? [{
           label: 'Cases from runs',
           prompt: expectation === 'no' ? PROMPTS.casesFromRunsUnlabelled : PROMPTS.casesFromRuns,
           testId: 'guided-setup-cases-from-runs',
         }] : []),
-        { label: 'Suggest edge cases', prompt: PROMPTS.edgeCases, testId: 'guided-setup-edge-cases' },
+        { label: 'Suggest edge cases', prompt: expectation === 'no' ? PROMPTS.edgeCasesUnlabelled : PROMPTS.edgeCases, testId: 'guided-setup-edge-cases' },
       ],
     };
   }

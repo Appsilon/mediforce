@@ -156,6 +156,21 @@ describe('GuidedSetup', () => {
     expect(screen.getByTestId('guided-setup-edge-cases')).toBeVisible();
   });
 
+  it('asks for edge cases and negative ones: real outputs with one obvious error planted', () => {
+    renderSetup('cases', evaluationOf());
+    fireEvent.click(screen.getByTestId('guided-setup-edge-cases'));
+    expect(asked).toHaveBeenLastCalledWith(expect.stringContaining('inputs production has not sent yet'));
+    expect(asked).toHaveBeenLastCalledWith(expect.stringContaining('negative cases from real outputs with one obvious error planted'));
+  });
+
+  it('asks for no planted errors when the person does not know the correct outputs: nothing would compare them', () => {
+    renderSetup('cases', evaluationOf());
+    fireEvent.click(screen.getByRole('button', { name: 'No' }));
+    fireEvent.click(screen.getByTestId('guided-setup-edge-cases'));
+    expect(asked).toHaveBeenLastCalledWith(expect.stringContaining('inputs production has not sent yet'));
+    expect(asked).not.toHaveBeenLastCalledWith(expect.stringContaining('error planted'));
+  });
+
   it('asks for cases from runs with the outputs the person knows, from the reviewer where there was one', () => {
     renderSetup('cases', evaluationOf());
     fireEvent.click(screen.getByRole('button', { name: 'Yes' }));
