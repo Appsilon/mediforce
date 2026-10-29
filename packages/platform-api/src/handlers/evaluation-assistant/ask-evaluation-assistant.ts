@@ -90,7 +90,7 @@ export async function askEvaluationAssistant(
   const executePlatformTool = async (toolName: EvaluationAssistantPlatformToolName, args: unknown) => {
     const toolResult = await executeEvaluationTool(toolName, args, scope, { step, definition, workflowStep, agent, ...(unattended === undefined ? {} : { unattended }) });
     if (toolName === 'preview_evaluator') {
-      previewed.push({ check: (args as { check: EvaluatorCheck }).check, results: (toolResult as PreviewEvaluatorOutput).results });
+      previewed.push({ check: (args as { check: EvaluatorCheck }).check, preview: toolResult as PreviewEvaluatorOutput });
     }
     return toolResult;
   };

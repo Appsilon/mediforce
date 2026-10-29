@@ -258,10 +258,11 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
    * case and the Evaluators that failed or errored on it.
    */
   get_failures: z.object({ evalRunId: z.uuid() }),
-  /** Run a draft check against existing outputs; writes nothing. */
+  /** Run a draft check against the step's Eval Cases, then its recent outputs; writes nothing. */
   preview_evaluator: z.object({
     check: AssistantCheckSchema,
-    agentRunIds: z.array(z.string().min(1)).min(1).max(10).optional(),
+    agentRunIds: z.array(z.string().min(1)).min(1).max(10).optional()
+      .describe('Only these production runs, and no Eval Case'),
   }),
   /**
    * Prepare an Eval Run of the step as it is over the newest Dataset version,

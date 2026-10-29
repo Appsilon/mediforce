@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { buildAgentRun } from '@mediforce/platform-core/testing';
+import { CreateEvalCaseFromAgentRunInputSchema, CreateEvalCaseInputSchema } from '../../../contract/evaluation';
 import { ForbiddenError, NotFoundError } from '../../../errors';
 import { userCaller } from '../../../repositories/__tests__/create-test-scope';
+import { createEvalCase, createEvalCaseFromAgentRun } from '../eval-cases';
 import { previewEvaluator } from '../preview-evaluator';
 import { evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN } from './fixture';
 
@@ -17,6 +20,43 @@ describe('previewEvaluator', () => {
     ]));
     expect(await fixture.scoreRepo.list({ limit: 10 })).toEqual([]);
     expect(await fixture.evaluationRepo.listEvaluators(STEP)).toEqual([]);
+  });
+
+  it('tries the check first on the Eval Cases taken from a run, grading each case\'s expected output in place of the run\'s', async () => {
+    const fixture = await evaluationFixture();
+    const planted = (await createEvalCaseFromAgentRun(CreateEvalCaseFromAgentRunInputSchema.parse({
+      agentRunId: UNGRADED_RUN, name: 'Grade dropped', expectedOutput: { findings: [] }, expectation: 'negative',
+    }), fixture.scope())).evalCase;
+    await createEvalCase(CreateEvalCaseInputSchema.parse({
+      ...STEP, name: 'Written input', input: { triggerPayload: {}, previousStepOutputs: {} }, expectedOutput: { summary: 'none' },
+    }), fixture.scope());
+    await createEvalCaseFromAgentRun(CreateEvalCaseFromAgentRunInputSchema.parse({ agentRunId: GRADED_RUN, name: 'Unlabelled' }), fixture.scope());
+
+    const { cases, results } = await previewEvaluator({ ...STEP, check: findingsSchema, limit: 5 }, fixture.scope());
+
+    expect(cases).toEqual([expect.objectContaining({ caseId: planted.id, caseName: 'Grade dropped', agentRunId: UNGRADED_RUN, passed: true })]);
+    expect(results.map((outcome) => outcome.agentRunId)).toEqual([GRADED_RUN]);
+  });
+
+  it('leaves out production runs that produced no result — they say nothing about the check', async () => {
+    const fixture = await evaluationFixture();
+    await fixture.agentRunRepo.create(buildAgentRun({
+      id: 'agent-run-escalated', processInstanceId: 'run-graded', stepId: STEP.stepId, status: 'escalated', envelope: null, startedAt: '2026-09-22T11:00:00.000Z',
+    }));
+
+    const { results } = await previewEvaluator({ ...STEP, check: findingsSchema, limit: 5 }, fixture.scope());
+
+    expect(results.map((outcome) => outcome.agentRunId)).toEqual([UNGRADED_RUN, GRADED_RUN]);
+  });
+
+  it('tries the check only on the runs named, never on cases', async () => {
+    const fixture = await evaluationFixture();
+    await createEvalCaseFromAgentRun(CreateEvalCaseFromAgentRunInputSchema.parse({ agentRunId: UNGRADED_RUN, expectedOutput: { findings: [] } }), fixture.scope());
+
+    const { cases, results } = await previewEvaluator({ ...STEP, check: findingsSchema, agentRunIds: [GRADED_RUN], limit: 5 }, fixture.scope());
+
+    expect(cases).toEqual([]);
+    expect(results.map((outcome) => outcome.agentRunId)).toEqual([GRADED_RUN]);
   });
 
   it('refuses an expected-output check: a production output has no expected output to compare with', async () => {

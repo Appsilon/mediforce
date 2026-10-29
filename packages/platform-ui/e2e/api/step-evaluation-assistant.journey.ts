@@ -67,6 +67,7 @@ test.describe('Evaluation Assistant — API E2E', () => {
     expect(answer.reply).toBe('The recent run has no findings key; I proposed a schema check for it.');
     // The preview ran on the production output before the proposal, and the card carries it.
     const preview = {
+      cases: [],
       results: [{ agentRunId, passed: false, value: 0, label: 'fail', confidence: null, agreement: null, comment: 'missing required keys: findings', error: null }],
     };
     const requests = await openRouterRequests(question);

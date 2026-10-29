@@ -47,9 +47,16 @@ export const evalAskCommand = defineCommand({
         output.stdout(`not tried on real outputs: ${proposal.selfTest.unavailable}`);
         continue;
       }
-      const { results } = proposal.selfTest;
-      const count = (predicate: (passed: boolean | null) => boolean) => results.filter((outcome) => predicate(outcome.passed)).length;
-      output.stdout(`tried on ${results.length} recent output(s): ${count((passed) => passed === true)} pass, ${count((passed) => passed === false)} fail, ${count((passed) => passed === null)} error`);
+      const { cases, results } = proposal.selfTest;
+      const tally = (outcomes: ReadonlyArray<{ passed: boolean | null }>) => {
+        const count = (passed: boolean | null) => outcomes.filter((outcome) => outcome.passed === passed).length;
+        return `${count(true)} pass, ${count(false)} fail, ${count(null)} error`;
+      };
+      const tried = [
+        ...(cases.length === 0 ? [] : [`${cases.length} Eval Case(s): ${tally(cases)}`]),
+        ...(results.length === 0 ? [] : [`${results.length} recent output(s): ${tally(results)}`]),
+      ];
+      output.stdout(tried.length === 0 ? 'nothing to try it on yet' : `tried on ${tried.join('; ')}`);
     }
     for (const run of result.preparedEvalRuns) {
       output.stdout(`\nprepared Eval Run ${run.evalRunId}: ${run.trials} trial(s), budget $${run.budgetUsd}. Start it with: mediforce eval run-start ${run.evalRunId} --confirm-budget ${run.budgetUsd}`);

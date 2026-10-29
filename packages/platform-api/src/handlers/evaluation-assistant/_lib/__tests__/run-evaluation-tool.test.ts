@@ -233,7 +233,7 @@ describe('executeEvaluationTool', () => {
       check: { kind: 'schema', schema: { required: ['findings'] } },
       agentRunIds: [GRADED_RUN],
     }, scope, context);
-    expect(result).toEqual({ results: [{ agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', confidence: null, agreement: null, comment: null, error: null }] });
+    expect(result).toEqual({ cases: [], results: [{ agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', confidence: null, agreement: null, comment: null, error: null }] });
   });
 
   it('lists the catalog Skills the step is offered with their SKILL.md, and none for a step offered none', async () => {

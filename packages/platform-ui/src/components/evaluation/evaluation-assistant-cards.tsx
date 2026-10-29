@@ -75,29 +75,44 @@ async function acceptProposal(step: EvaluationSubject, proposal: DecidablePropos
   }
 }
 
-/** What trying a proposed check on the step's real outputs showed. */
+type PreviewOutcome = Extract<EvaluatorSelfTest, { results: unknown }>['results'][number];
+
+/** One output a proposed check was tried on, by the name it goes by. */
+function OutcomeLine({ name, outcome }: { name: string; outcome: PreviewOutcome }) {
+  return (
+    <li>
+      <span className="font-mono">{name}</span>{' '}
+      <span className={cn(outcome.passed === true ? 'text-green-700 dark:text-green-400' : outcome.passed === false ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-300')}>
+        {outcome.passed === null ? 'error' : outcome.passed ? 'pass' : 'fail'}
+      </span>
+      {(outcome.error ?? outcome.comment) !== null && <span className="text-muted-foreground"> — {outcome.error ?? outcome.comment}</span>}
+    </li>
+  );
+}
+
+function tally(outcomes: readonly PreviewOutcome[]): string {
+  const count = (passed: boolean | null) => outcomes.filter((outcome) => outcome.passed === passed).length;
+  return `${count(true)} pass · ${count(false)} fail · ${count(null)} error`;
+}
+
+/** What trying a proposed check on the step's Eval Cases and real outputs showed. */
 function SelfTestSummary({ selfTest }: { selfTest: EvaluatorSelfTest }) {
   if ('unavailable' in selfTest) {
     return <p className="mt-1 text-amber-700 dark:text-amber-300">Not tried on real outputs — {selfTest.unavailable}</p>;
   }
-  const { results } = selfTest;
-  if (results.length === 0) return <p className="mt-1 text-muted-foreground">No production outputs yet to try it on.</p>;
-  const count = (passed: boolean | null) => results.filter((outcome) => outcome.passed === passed).length;
+  const { cases, results } = selfTest;
+  if (cases.length + results.length === 0) return <p className="mt-1 text-muted-foreground">No Eval Cases or production outputs yet to try it on.</p>;
   return (
     <details className="mt-1" data-testid="proposal-self-test">
       <summary className="cursor-pointer text-muted-foreground">
-        Tried on {results.length} recent output(s): {count(true)} pass · {count(false)} fail · {count(null)} error
+        Tried on {[
+          ...(cases.length === 0 ? [] : [`${cases.length} Eval Case(s): ${tally(cases)}`]),
+          ...(results.length === 0 ? [] : [`${results.length} recent output(s): ${tally(results)}`]),
+        ].join('; ')}
       </summary>
       <ul className="mt-1 space-y-0.5">
-        {results.map((outcome) => (
-          <li key={outcome.agentRunId}>
-            <span className="font-mono">{outcome.agentRunId.slice(0, 8)}</span>{' '}
-            <span className={cn(outcome.passed === true ? 'text-green-700 dark:text-green-400' : outcome.passed === false ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-300')}>
-              {outcome.passed === null ? 'error' : outcome.passed ? 'pass' : 'fail'}
-            </span>
-            {(outcome.error ?? outcome.comment) !== null && <span className="text-muted-foreground"> — {outcome.error ?? outcome.comment}</span>}
-          </li>
-        ))}
+        {cases.map((outcome) => <OutcomeLine key={outcome.caseId} name={outcome.caseName} outcome={outcome} />)}
+        {results.map((outcome) => <OutcomeLine key={outcome.agentRunId} name={outcome.agentRunId.slice(0, 8)} outcome={outcome} />)}
       </ul>
     </details>
   );

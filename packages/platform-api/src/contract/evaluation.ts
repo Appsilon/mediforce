@@ -157,14 +157,25 @@ export const EvaluatorOutcomeSchema = z.object({
   error: z.string().nullable(),
 });
 
-/** Runs a draft check against existing outputs of the Step, writing nothing (D14 `preview_evaluator`). */
+/**
+ * Runs a draft check against existing outputs of the Step, writing nothing (D14 `preview_evaluator`):
+ * up to `limit` of them — the Step's Eval Cases first, then its latest production runs that gave a result.
+ */
 export const PreviewEvaluatorInputSchema = EvaluatedStepSchema.extend({
   check: EvaluatorCheckSchema,
-  /** Which outputs; defaults to the Step's latest finished production runs. */
+  /** Only these production outputs, and no Eval Case. */
   agentRunIds: z.array(z.string().min(1)).min(1).max(20).optional(),
   limit: z.number().int().min(1).max(20).default(5),
 });
-export const PreviewEvaluatorOutputSchema = z.object({ results: z.array(EvaluatorOutcomeSchema) });
+/** The check on an Eval Case taken from a run: the run, with the case's expected output as its result. */
+export const CaseEvaluatorOutcomeSchema = EvaluatorOutcomeSchema.extend({
+  caseId: z.string(),
+  caseName: z.string(),
+});
+export const PreviewEvaluatorOutputSchema = z.object({
+  cases: z.array(CaseEvaluatorOutcomeSchema),
+  results: z.array(EvaluatorOutcomeSchema),
+});
 
 /** The Step's finished production Agent Runs, newest first — dry runs excluded. */
 export const ListStepAgentRunsInputSchema = EvaluatedStepSchema.extend({

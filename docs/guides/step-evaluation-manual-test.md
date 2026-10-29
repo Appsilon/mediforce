@@ -213,9 +213,10 @@ version. *Archive* removes one.
 
 ### 3.1 Evaluators from the assistant (previewed)
 
-**What.** The assistant proposes checks; each one is **tried on recent real outputs** (up to 5)
-before you see it, so the card shows how many passed / failed / errored. A check that errors on
-every output goes back to the assistant instead of to you.
+**What.** The assistant proposes checks; each one is **tried on up to 5 outputs** before you see
+it — the step's Eval Cases first (each case's expected output, graded as its source run's), then
+recent production outputs that gave a result — so the card shows how many passed / failed /
+errored on each. A check that errors on every output goes back to the assistant instead of to you.
 
 **Test**
 - *"Make an evaluation plan for this step"* → ✅ progress lines ("Reading the step", "Previewing a
@@ -224,6 +225,8 @@ every output goes back to the assistant instead of to you.
   sets the suggested floor.
 - *Accept* → ✅ listed with `· from the assistant`. *Edit* the JSON, then *Accept* → ✅ your edited
   version is saved.
+- With Eval Cases taken from runs → ✅ the summary reads *Tried on N Eval Case(s): … ; M recent
+  output(s): …*, each case by name; a run that escalated or was cancelled is never among them.
 - *"Refine the <name> evaluator"* → ✅ **Proposed Evaluator version** card; accepting bumps to v2.
 - 🔍 As a user without the `run` verb: the card says the check was not tried.
 

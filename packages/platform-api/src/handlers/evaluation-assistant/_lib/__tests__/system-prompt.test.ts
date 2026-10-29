@@ -7,7 +7,7 @@ describe('Evaluation Assistant prompt', () => {
   it('states the authority tiers of ADR-0023 D15', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Never approve a code check\'s source, accept or deny a judge\'s verdict, or sign a Step Qualification');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('start_eval_run is refused without the person\'s confirmation');
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('run it with preview_evaluator on real outputs');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('run it with preview_evaluator and say what it did');
   });
 
   it('covers the plan, the cheapest reliable check, judge verdicts and case expectations only the person reviews', () => {

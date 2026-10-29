@@ -30,6 +30,7 @@ describe('reviewEvaluationProposal', () => {
       ok: true,
       evidence: {
         selfTest: {
+          cases: [],
           results: expect.arrayContaining([
             expect.objectContaining({ agentRunId: GRADED_RUN, passed: true }),
             expect.objectContaining({ agentRunId: UNGRADED_RUN, passed: false }),
@@ -42,10 +43,10 @@ describe('reviewEvaluationProposal', () => {
   it('reuses the assistant\'s own preview of the same check this turn', async () => {
     const results = [{ agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', confidence: null, agreement: null, comment: 'from the turn', error: null }];
     const review = await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(findings), fixture.scope(), STEP, [
-      { check: { kind: 'schema', schema: { required: ['summary'] } }, results: [] },
-      { check: findings, results },
+      { check: { kind: 'schema', schema: { required: ['summary'] } }, preview: { cases: [], results: [] } },
+      { check: findings, preview: { cases: [], results } },
     ]);
-    expect(review).toEqual({ ok: true, evidence: { selfTest: { results } } });
+    expect(review).toEqual({ ok: true, evidence: { selfTest: { cases: [], results } } });
   });
 
   it('sends back a check that errors on every output, and a name the step already uses', async () => {

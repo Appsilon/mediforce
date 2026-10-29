@@ -89,7 +89,7 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   reports — with every judge verdict's rationale and review — a run's failing trials
   (`get_failures`), the step's qualification and Acceptance
   Criteria (`get_qualification`), and `preview_evaluator` — it
-  tries a check on real outputs before proposing it.
+  tries a check on the step's Eval Cases and real outputs before proposing it.
 - **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
   written or synthesized), Brief drafts and Acceptance Criteria come back as
   cards to accept or reject. An Eval Case card shows the case as it would be
@@ -341,8 +341,15 @@ filters to the values left ticked; a value that turns up later shows until it
 is unticked too. Both are client-side and reset on reload.
 
 `evaluator-preview` (`POST /api/evaluation/evaluators/preview`) runs a draft
-check against the Step's recent production outputs (dry runs left out) and
-writes nothing — try a check on real outputs before saving it. It runs check
+check on up to `limit` (default 5) outputs and writes nothing — try a check on
+real outputs before saving it. The Step's Eval Cases come first: each case taken
+from a run on its own input, with an expected output, is graded as that run
+with the case's expected output as its result (`cases`) — only the result is
+swapped: the input, log and workspace files stay the run's. The case's expectation
+is not consulted — it only labels the case for `expected_output` checks. The
+Step's latest production runs that gave a result fill the rest (`results`),
+leaving out dry runs, runs that ended without one (escalated, cancelled) and
+the runs those cases came from. `--agent-run` tries only the runs named. It runs check
 code and spends the workspace's model key, so it needs the workflow's `run`
 verb.
 

@@ -90,11 +90,11 @@ export const evalEvaluatorApproveCommand = defineCommand({
 
 export const evalEvaluatorPreviewCommand = defineCommand({
   name: 'mediforce eval evaluator-preview',
-  description: 'Run a draft check (JSON file) against the step\'s recent outputs. Writes nothing.',
+  description: 'Run a draft check (JSON file) against the step\'s Eval Cases, then its recent outputs. Writes nothing.',
   args: {
     ...STEP_ARGS,
     file: { type: 'string', required: true, description: 'JSON file with the check: { kind, ... }' },
-    'agent-run': { type: 'string', description: 'Comma-separated Agent Run ids (default: recent production runs)' },
+    'agent-run': { type: 'string', description: 'Comma-separated Agent Run ids, tried instead of Eval Cases and recent production runs' },
   },
   async run({ args, output, mediforce, jsonMode }) {
     const result = await mediforce.evaluation.previewEvaluator({
@@ -106,11 +106,12 @@ export const evalEvaluatorPreviewCommand = defineCommand({
       printJson(output, result);
       return 0;
     }
-    for (const outcome of result.results) {
+    const verdictOf = (outcome: (typeof result.results)[number]) => {
       const confidence = outcome.confidence === null ? '' : ` (confidence ${outcome.confidence.toFixed(2)})`;
-      const verdict = outcome.error !== null ? `error: ${outcome.error}` : `${outcome.label ?? ''}${confidence} ${outcome.comment ?? ''}`;
-      output.stdout(`${outcome.agentRunId}  ${verdict}`);
-    }
+      return outcome.error !== null ? `error: ${outcome.error}` : `${outcome.label ?? ''}${confidence} ${outcome.comment ?? ''}`;
+    };
+    for (const outcome of result.cases) output.stdout(`case ${outcome.caseName}  ${verdictOf(outcome)}`);
+    for (const outcome of result.results) output.stdout(`${outcome.agentRunId}  ${verdictOf(outcome)}`);
     return 0;
   },
 });

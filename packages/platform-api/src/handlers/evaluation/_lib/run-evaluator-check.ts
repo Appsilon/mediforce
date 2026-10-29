@@ -1,4 +1,4 @@
-import { outputDifferences, type EvalCase, type EvaluatorCheck, type JudgeCall } from '@mediforce/platform-core';
+import { outputDifferences, type AgentRun, type EvalCase, type EvaluatorCheck, type JudgeCall } from '@mediforce/platform-core';
 import {
   LlmJudgeReviewPlugin,
   judgeOutputAgreement,
@@ -108,6 +108,12 @@ async function runExpectedOutputCheck(
   const passed = negative ? agreement <= check.maxAgreement : agreement >= check.minAgreement;
   const threshold = negative ? `a negative case passes at ${check.maxAgreement} or below` : `passes at ${check.minAgreement} or above`;
   return { ...binary(agentRun.id, passed, `Agreement ${agreement} (${threshold}). ${rationale}`), agreement };
+}
+
+/** Whether a run gave a result for a check to grade. */
+export function producedResult(agentRun: AgentRun): boolean {
+  const result = agentRun.envelope?.result;
+  return result !== null && result !== undefined;
 }
 
 /**

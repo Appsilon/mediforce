@@ -8,7 +8,7 @@ import {
   type EvaluatorCheck,
 } from '@mediforce/platform-core';
 import type { ProposalReview } from '../../../assistant-core';
-import type { EvaluatorOutcome } from '../../../contract/evaluation';
+import type { PreviewEvaluatorOutput } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { HandlerError } from '../../../errors';
 import { AGENT_NOT_PREVIEWED, EXPECTED_OUTPUT_NOT_PREVIEWED, previewEvaluator } from '../../evaluation/preview-evaluator';
@@ -22,15 +22,15 @@ type Args<Name extends EvaluationAssistantProposalToolName> = z.infer<(typeof EV
 /** A check the assistant already previewed this turn, and what it did. */
 export interface PreviewedCheck {
   readonly check: EvaluatorCheck;
-  readonly results: readonly EvaluatorOutcome[];
+  readonly preview: PreviewEvaluatorOutput;
 }
 
 /**
- * A proposed check is tried on the step's real outputs before the person sees
- * it (ADR-0023 D14): the assistant's own preview of that exact check this
- * turn, or a fresh one. A check that errors on every output it is tried on
- * does not run at all, so it goes back to the model instead of to the person.
- * A caller who may not run checks still gets the proposal, marked untested.
+ * A proposed check is tried on the step's Eval Cases and real outputs before
+ * the person sees it (ADR-0023 D14): the assistant's own preview of that exact
+ * check this turn, or a fresh one. A check that errors on every output it is
+ * tried on does not run at all, so it goes back to the model instead of to the
+ * person. A caller who may not run checks still gets the proposal, marked untested.
  */
 async function selfTest(
   scope: CallerScope,
@@ -44,10 +44,10 @@ async function selfTest(
   if (step.kind === 'agent') {
     return { ok: true, evidence: { selfTest: { unavailable: AGENT_NOT_PREVIEWED } } };
   }
-  let results = previewed.find((preview) => isDeepStrictEqual(preview.check, check))?.results;
-  if (results === undefined) {
+  let preview = previewed.find((candidate) => isDeepStrictEqual(candidate.check, check))?.preview;
+  if (preview === undefined) {
     try {
-      results = (await previewEvaluator({ ...step, check, limit: 5 }, scope)).results;
+      preview = await previewEvaluator({ ...step, check, limit: 5 }, scope);
     } catch (err) {
       if (err instanceof HandlerError && err.code === 'forbidden') {
         return { ok: true, evidence: { selfTest: { unavailable: err.message } } };
@@ -55,13 +55,14 @@ async function selfTest(
       throw err;
     }
   }
-  if (results.length > 0 && results.every((outcome) => outcome.error !== null)) {
+  const outcomes = [...preview.cases, ...preview.results];
+  if (outcomes.length > 0 && outcomes.every((outcome) => outcome.error !== null)) {
     return {
       ok: false,
-      error: `The check errored on every output it was tried on (${results.length}) — fix it before proposing it. First error: ${results[0]!.error}`,
+      error: `The check errored on every output it was tried on (${outcomes.length}) — fix it before proposing it. First error: ${outcomes[0]!.error}`,
     };
   }
-  return { ok: true, evidence: { selfTest: { results } } };
+  return { ok: true, evidence: { selfTest: preview } };
 }
 
 /**
