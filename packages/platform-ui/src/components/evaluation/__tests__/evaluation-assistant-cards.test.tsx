@@ -1,13 +1,17 @@
 import * as React from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ProposalCard } from '../evaluation-assistant-cards';
 
-const evaluation = vi.hoisted(() => ({ createCaseFromAgentRun: vi.fn() }));
+const evaluation = vi.hoisted(() => ({ createCaseFromAgentRun: vi.fn(), createCase: vi.fn() }));
+const runIo = vi.hoisted(() => ({ current: undefined as unknown, error: null as Error | null }));
 
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
 vi.mock('@/hooks/use-step-evaluation', () => ({
   useStepEvaluators: () => ({ data: { evaluators: [] } }),
+  useAgentRunIo: (agentRunId: string | null) => (agentRunId !== null && runIo.error !== null
+    ? { data: undefined, isError: true, error: runIo.error }
+    : { data: agentRunId === null ? undefined : runIo.current, isError: false, error: null }),
   useStepEvaluationMutation: (_step: unknown, mutationFn: (value: unknown) => Promise<unknown>) => ({
     mutate: (value: unknown, options?: { onSuccess?: () => void }) => {
       void mutationFn(value).then(() => options?.onSuccess?.());
@@ -17,6 +21,22 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
 }));
 
 const step = { kind: 'step' as const, namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' };
+
+const sourceRun = {
+  agentRunId: 'agent-run-1',
+  status: 'completed',
+  stepInput: null,
+  caseInput: { triggerPayload: { narrative: 'Patient died of sepsis' }, previousStepOutputs: {} },
+  result: { grade: 4 },
+  reasoningSummary: null,
+  confidence: null,
+  verdictExpectation: 'negative',
+};
+
+function renderProposal(proposal: React.ComponentProps<typeof ProposalCard>['state']['proposal'], onDecided = vi.fn()) {
+  render(<ProposalCard step={step} mayEdit editReason={undefined} onDecided={onDecided} state={{ status: 'open', proposal }} />);
+  return onDecided;
+}
 
 function renderCaseCard(onDecided = vi.fn()) {
   render(
@@ -40,6 +60,9 @@ function renderCaseCard(onDecided = vi.fn()) {
 beforeEach(() => {
   vi.clearAllMocks();
   evaluation.createCaseFromAgentRun.mockResolvedValue({});
+  evaluation.createCase.mockResolvedValue({});
+  runIo.current = sourceRun;
+  runIo.error = null;
 });
 
 describe('ProposalCard for an Eval Case', () => {
@@ -67,5 +90,73 @@ describe('ProposalCard for an Eval Case', () => {
     const [created] = evaluation.createCaseFromAgentRun.mock.calls[0];
     expect(created).toMatchObject({ agentRunId: 'agent-run-1', expectedOutput: null });
     expect(created).not.toHaveProperty('expectation');
+  });
+});
+
+describe('ProposalCard shows what an Eval Case holds', () => {
+  it('shows a written case\'s input and expected output apart, with why it was proposed', () => {
+    renderProposal({
+      tool: 'propose_eval_case',
+      arguments: {
+        name: 'Grade 5 sepsis',
+        input: { triggerPayload: { narrative: 'Fatal sepsis on day 3' }, previousStepOutputs: {} },
+        expectedOutput: { grade: 5 },
+        rationale: 'Death must be graded 5',
+      },
+    });
+    expect(screen.getByText('Written input')).toBeVisible();
+    expect(screen.getByText('Death must be graded 5')).toBeVisible();
+    expect(screen.getByTestId('proposed-case-input')).toHaveTextContent('Fatal sepsis on day 3');
+    expect(screen.getByTestId('proposed-case-output')).toHaveTextContent('"grade": 5');
+    expect(screen.getByText(/Must match, exactly/)).toBeVisible();
+  });
+
+  it('shows a case from a run as the run gives it: its input and its reviewed output', () => {
+    renderProposal({ tool: 'propose_eval_case', arguments: { name: 'Rejected grading', agentRunId: 'agent-run-1' } });
+    expect(screen.getByText('From run agent-ru')).toBeVisible();
+    expect(screen.getByTestId('proposed-case-input')).toHaveTextContent('Patient died of sepsis');
+    expect(screen.getByTestId('proposed-case-output')).toHaveTextContent('"grade": 4');
+    expect(screen.getByRole('button', { name: 'Negative' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('says a case from an unreviewed run has no expected output', () => {
+    runIo.current = { ...sourceRun, verdictExpectation: null };
+    renderProposal({ tool: 'propose_eval_case', arguments: { name: 'Unreviewed', agentRunId: 'agent-run-1' } });
+    expect(screen.getByTestId('proposed-case-output')).toHaveTextContent('None — only the Evaluators grade it');
+    expect(screen.queryByRole('button', { name: 'Positive' })).toBeNull();
+  });
+
+  it('says why a run\'s case cannot be shown when the run fails to load, and offers no Review', () => {
+    runIo.error = new Error('Agent run not found');
+    renderProposal({ tool: 'propose_eval_case', arguments: { name: 'Gone', agentRunId: 'agent-run-1' } });
+    expect(screen.getByTestId('proposed-case-load-error')).toHaveTextContent('Agent run not found');
+    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull();
+  });
+
+  it('opens the case in the Add case form to review, and accepts it as edited there', async () => {
+    const onDecided = renderProposal({
+      tool: 'propose_eval_case',
+      arguments: {
+        name: 'Grade 5 sepsis',
+        input: { triggerPayload: { narrative: 'Fatal sepsis on day 3' }, previousStepOutputs: {} },
+        expectedOutput: { grade: 5 },
+        containsProductionData: true,
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    const dialog = await screen.findByTestId('case-dialog');
+    expect(within(dialog).getByRole('textbox', { name: 'Expected output' })).toHaveValue(JSON.stringify({ grade: 5 }, null, 2));
+    fireEvent.change(within(dialog).getByLabelText('Case name'), { target: { value: 'Grade 5 sepsis, renamed' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Accept' }));
+    await waitFor(() => expect(onDecided).toHaveBeenCalledWith('accepted'));
+    expect(evaluation.createCase).toHaveBeenCalledWith(expect.objectContaining({
+      ...step,
+      name: 'Grade 5 sepsis, renamed',
+      input: { triggerPayload: { narrative: 'Fatal sepsis on day 3' }, previousStepOutputs: {} },
+      expectedOutput: { grade: 5 },
+      expectation: 'positive',
+      containsProductionData: true,
+      origin: 'assistant',
+    }));
   });
 });

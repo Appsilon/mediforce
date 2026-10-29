@@ -546,7 +546,7 @@ function ExpectedOutputCheckHint({ evaluators, evaluatorIds }: { evaluators: rea
 }
 
 /** A run's output as expected-output text: empty when it returned nothing. */
-function outputText(result: unknown): string {
+export function outputText(result: unknown): string {
   return result === null || result === undefined ? '' : JSON.stringify(result, null, 2);
 }
 
@@ -603,7 +603,7 @@ interface FieldErrors {
  * edited. A case from a run marks each side edited or as the run had it, and
  * opens the run's log.
  */
-function CaseForm({ initial, inputHelp, evaluators, sourceAgentRunId, submitLabel, pending, error, onSubmit, onCancel }: {
+export function CaseForm({ initial, inputHelp, evaluators, sourceAgentRunId, submitLabel, pending, error, onSubmit, onCancel }: {
   initial: CaseFormValues;
   inputHelp: React.ReactNode;
   evaluators: readonly EvaluatorView[];
@@ -764,7 +764,7 @@ function CaseForm({ initial, inputHelp, evaluators, sourceAgentRunId, submitLabe
 }
 
 /** A wide dialog holding a case form. */
-function CaseDialog({ title, description, onClose, children }: { title: string; description: React.ReactNode; onClose: () => void; children: React.ReactNode }) {
+export function CaseDialog({ title, description, onClose, children }: { title: string; description: React.ReactNode; onClose: () => void; children: React.ReactNode }) {
   return (
     <Dialog.Root open onOpenChange={(open) => { if (open === false) onClose(); }}>
       <Dialog.Portal>

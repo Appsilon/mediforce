@@ -1,18 +1,21 @@
 'use client';
 
 import * as React from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, Eye, X } from 'lucide-react';
 import {
   describeAcceptanceCriteria,
+  type EvalCaseExpectation,
+  type EvalCaseInput,
   type EvaluationSubject,
 } from '@mediforce/platform-core';
-import type { EvaluatorSelfTest, ProposalView } from '@mediforce/platform-api/contract';
+import type { EvaluatorSelfTest, GetAgentRunIoOutput, ProposalView } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
-import { useStepEvaluationMutation, useStepEvaluators } from '@/hooks/use-step-evaluation';
+import { useAgentRunIo, useStepEvaluationMutation, useStepEvaluators } from '@/hooks/use-step-evaluation';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
+import { CaseDialog, CaseForm, outputText, type CaseFormResult } from './step-evaluation-sections';
 
 export type ProposalStatus = 'open' | 'accepted' | 'rejected';
 
@@ -100,11 +103,150 @@ function SelfTestSummary({ selfTest }: { selfTest: EvaluatorSelfTest }) {
   );
 }
 
+/** How a case's output is held to its expected output, e.g. "Must match, exactly". */
+function expectationPhrase(proposal: { expectation?: string; comparison?: string }): string {
+  const how = proposal.comparison === 'agreement' ? 'by agreement score' : 'exactly';
+  return `${proposal.expectation === 'negative' ? 'Must not match' : 'Must match'}, ${how}`;
+}
+
 /** What a proposed case expects of the output, in a line; null when it gives no expected output. */
 function expectedOutputSummary(proposal: { expectedOutput?: unknown; expectation?: string; comparison?: string }): string | null {
   if (proposal.expectedOutput === undefined || proposal.expectedOutput === null) return null;
-  const how = proposal.comparison === 'agreement' ? 'by agreement score' : 'exactly';
-  return `${proposal.expectation === 'negative' ? 'Must not match' : 'Must match'}, ${how}: ${JSON.stringify(proposal.expectedOutput)}`;
+  return `${expectationPhrase(proposal)}: ${JSON.stringify(proposal.expectedOutput)}`;
+}
+
+interface ProposedCaseContent {
+  input: EvalCaseInput;
+  /** Null: no expected output, only the Evaluators grade the case. */
+  expectedOutput: unknown;
+  expectation: EvalCaseExpectation;
+}
+
+/**
+ * The input and expected output a proposed case is stored with — for a case
+ * from a run, the run's input and, once a person reviewed it, its output, as
+ * creating the case from the run takes them. Null while the run loads.
+ */
+function proposedCaseContent(
+  proposal: Proposal<'propose_eval_case'>['arguments'],
+  sourceRun: GetAgentRunIoOutput | undefined,
+): ProposedCaseContent | null {
+  if (proposal.agentRunId === undefined) {
+    return { input: proposal.input!, expectedOutput: proposal.expectedOutput ?? null, expectation: proposal.expectation ?? 'positive' };
+  }
+  if (sourceRun === undefined) return null;
+  const fromRun = proposal.expectedOutput === undefined;
+  return {
+    input: proposal.input ?? sourceRun.caseInput,
+    expectedOutput: fromRun ? (sourceRun.verdictExpectation === null ? null : sourceRun.result ?? null) : proposal.expectedOutput,
+    expectation: proposal.expectation ?? (fromRun ? sourceRun.verdictExpectation : null) ?? 'positive',
+  };
+}
+
+/** JSON cut to a few lines, fading out where it runs on; Review shows it whole. */
+function JsonPreview({ value, testId }: { value: unknown; testId: string }) {
+  const ref = React.useRef<HTMLPreElement>(null);
+  const [overflows, setOverflows] = React.useState(false);
+  const text = JSON.stringify(value, null, 2);
+  React.useLayoutEffect(() => {
+    if (ref.current !== null) setOverflows(ref.current.scrollHeight > ref.current.clientHeight);
+  }, [text]);
+  return (
+    <pre
+      ref={ref}
+      data-testid={testId}
+      className={cn(
+        'max-h-28 overflow-hidden whitespace-pre-wrap break-all rounded bg-muted/50 p-1.5 font-mono text-[11px]',
+        overflows && '[mask-image:linear-gradient(to_bottom,black_65%,transparent)]',
+      )}
+    >{text}</pre>
+  );
+}
+
+/** A proposed Eval Case as it would be stored: where it comes from, why, its input and its expected output. */
+function ProposedCaseBody({ proposal, content, loadError }: {
+  proposal: Proposal<'propose_eval_case'>['arguments'];
+  content: ProposedCaseContent | null;
+  /** Why the source run's input and output could not be loaded. */
+  loadError: string | null;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="font-medium">{proposal.name}</span>
+        <span className="rounded bg-muted px-1.5 text-[11px] text-muted-foreground">
+          {proposal.agentRunId === undefined ? 'Written input' : `From run ${proposal.agentRunId.slice(0, 8)}`}
+        </span>
+        {proposal.split !== undefined && <span className="rounded bg-muted px-1.5 text-[11px] text-muted-foreground">{proposal.split}</span>}
+      </div>
+      {proposal.rationale !== undefined && <p className="whitespace-pre-wrap text-muted-foreground">{proposal.rationale}</p>}
+      {content === null ? (
+        loadError === null
+          ? <p className="text-muted-foreground">Loading the run&apos;s input and output…</p>
+          : <p className="text-destructive" data-testid="proposed-case-load-error">{loadError}</p>
+      ) : (
+        <>
+          <div className="space-y-0.5">
+            <div className="font-medium">Input</div>
+            <JsonPreview value={content.input} testId="proposed-case-input" />
+          </div>
+          <div className="space-y-0.5">
+            <div className="font-medium">
+              Expected output
+              {content.expectedOutput !== null && <span className="font-normal text-muted-foreground"> · {expectationPhrase({ ...proposal, expectation: content.expectation })}</span>}
+            </div>
+            {content.expectedOutput === null
+              ? <p className="text-muted-foreground" data-testid="proposed-case-output">None — only the Evaluators grade it</p>
+              : <JsonPreview value={content.expectedOutput} testId="proposed-case-output" />}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** The proposed case in the form a person adds cases with; accepting it there adds it as edited, still the assistant's. */
+function ReviewProposedCase({ step, proposal, content, mayEdit, onAccepted, onClose }: {
+  step: EvaluationSubject;
+  proposal: Proposal<'propose_eval_case'>['arguments'];
+  content: ProposedCaseContent;
+  mayEdit: boolean;
+  onAccepted: () => void;
+  onClose: () => void;
+}) {
+  const evaluators = useStepEvaluators(step).data?.evaluators ?? [];
+  const accept = useStepEvaluationMutation(step, (values: CaseFormResult) => proposal.agentRunId !== undefined
+    ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId: proposal.agentRunId, ...(step.kind === 'step' ? { step } : {}), ...values, origin: 'assistant' })
+    : mediforce.evaluation.createCase({
+      ...step,
+      ...values,
+      ...(proposal.containsProductionData === undefined ? {} : { containsProductionData: proposal.containsProductionData }),
+      origin: 'assistant',
+    }));
+  return (
+    <CaseDialog title="Review the proposed Eval Case" description="Edit it if it needs it; Accept adds it as it stands here." onClose={onClose}>
+      <CaseForm
+        initial={{
+          name: proposal.name,
+          split: proposal.split ?? 'dev',
+          input: JSON.stringify(content.input, null, 2),
+          expectedOutput: outputText(content.expectedOutput),
+          expectation: content.expectation,
+          comparison: proposal.comparison ?? 'exact',
+          agreementInstructions: proposal.agreementInstructions ?? '',
+          evaluatorIds: null,
+        }}
+        inputHelp={proposal.agentRunId === undefined ? 'The input the assistant wrote.' : 'What the step received in this run.'}
+        evaluators={evaluators}
+        sourceAgentRunId={proposal.agentRunId ?? null}
+        submitLabel="Accept"
+        pending={mayEdit === false || accept.isPending}
+        error={accept.error?.message ?? null}
+        onSubmit={(values) => accept.mutate(values, { onSuccess: onAccepted })}
+        onCancel={onClose}
+      />
+    </CaseDialog>
+  );
 }
 
 function perturbedCaseSummary(proposal: Proposal<'propose_perturbed_case'>['arguments']): string {
@@ -143,8 +285,6 @@ function ProposalSummary({ step, proposal }: { step: EvaluationSubject; proposal
         </>
       );
     }
-    case 'propose_eval_case':
-      return <>{[proposal.arguments.name, expectedOutputSummary(proposal.arguments)].filter((line) => line !== null).join('\n')}</>;
     case 'propose_perturbed_case':
       return <>{perturbedCaseSummary(proposal.arguments)}</>;
     case 'propose_acceptance_criteria':
@@ -159,14 +299,7 @@ const CASE_LABELS = [
 ] as const;
 type CaseLabel = (typeof CASE_LABELS)[number]['id'];
 
-/** How a proposed Eval Case's expected output is meant, when it has one: to match, to avoid. */
-function proposedCaseLabel(proposal: DecidableProposal): CaseLabel | null {
-  if (proposal.tool !== 'propose_eval_case') return null;
-  const { expectedOutput, expectation } = proposal.arguments;
-  return expectedOutput === undefined || expectedOutput === null ? null : expectation ?? 'positive';
-}
-
-/** The proposal as the person labelled it: its expected output to match, to avoid, or dropped. */
+/** The proposal as the person labelled it: its expected output to match, to avoid, or dropped; null leaves it as proposed. */
 function relabelled(proposal: DecidableProposal, label: CaseLabel | null): DecidableProposal {
   if (proposal.tool !== 'propose_eval_case' || label === null) return proposal;
   const { expectation: _expectation, ...args } = proposal.arguments;
@@ -182,8 +315,14 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
 }) {
   const [error, setError] = React.useState<string | null>(null);
   const accept = useStepEvaluationMutation(step, (proposal: DecidableProposal) => acceptProposal(step, proposal));
-  const [caseLabel, setCaseLabel] = React.useState(() => proposedCaseLabel(state.proposal));
+  const [caseLabel, setCaseLabel] = React.useState<CaseLabel | null>(null);
+  const [reviewing, setReviewing] = React.useState(false);
   const proposal = relabelled(state.proposal, caseLabel);
+  const sourceRun = useAgentRunIo(state.proposal.tool === 'propose_eval_case' ? state.proposal.arguments.agentRunId ?? null : null);
+  const proposedCase = state.proposal.tool === 'propose_eval_case' ? proposedCaseContent(state.proposal.arguments, sourceRun.data) : null;
+  const caseContent = proposal.tool === 'propose_eval_case' ? proposedCaseContent(proposal.arguments, sourceRun.data) : null;
+  const proposedLabel = proposedCase === null || proposedCase.expectedOutput === null ? null : proposedCase.expectation;
+  const shownLabel = caseLabel ?? proposedLabel;
 
   const onAccept = () => {
     setError(null);
@@ -196,18 +335,24 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
   return (
     <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="proposal-card">
       <div className="mb-1 font-medium">Proposed {TITLES[proposal.tool]}</div>
-      {proposal.tool === 'propose_brief'
-        ? <MarkdownPresentation content={proposal.arguments.text} />
-        : <p className="whitespace-pre-wrap text-muted-foreground"><ProposalSummary step={step} proposal={proposal} /></p>}
+      {proposal.tool === 'propose_brief' && <MarkdownPresentation content={proposal.arguments.text} />}
+      {proposal.tool === 'propose_eval_case' && <ProposedCaseBody
+          proposal={proposal.arguments}
+          content={caseContent}
+          loadError={sourceRun.isError ? (sourceRun.error instanceof Error ? sourceRun.error.message : 'The run\'s input and output could not be loaded.') : null}
+        />}
+      {proposal.tool !== 'propose_brief' && proposal.tool !== 'propose_eval_case' && (
+        <p className="whitespace-pre-wrap text-muted-foreground"><ProposalSummary step={step} proposal={proposal} /></p>
+      )}
       {proposal.selfTest !== undefined && <SelfTestSummary selfTest={proposal.selfTest} />}
-      {caseLabel !== null && state.status === 'open' && (
+      {proposedLabel !== null && state.status === 'open' && (
         <div role="group" aria-label="Expected output" className="mt-2 inline-flex overflow-hidden rounded border">
           {CASE_LABELS.map((option) => (
             <button
               key={option.id}
               type="button"
-              aria-pressed={caseLabel === option.id}
-              className={cn('px-2 py-0.5', caseLabel === option.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}
+              aria-pressed={shownLabel === option.id}
+              className={cn('px-2 py-0.5', shownLabel === option.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}
               onClick={() => setCaseLabel(option.id)}
             >{option.label}</button>
           ))}
@@ -223,6 +368,11 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
               </button>
             </span>
           </InstantTooltip>
+          {proposal.tool === 'propose_eval_case' && caseContent !== null && (
+            <button type="button" className={buttonClass} onClick={() => setReviewing(true)}>
+              <Eye className="h-3 w-3" />Review
+            </button>
+          )}
           <button type="button" className={buttonClass} onClick={() => onDecided('rejected')}>
             <X className="h-3 w-3" />Reject
           </button>
@@ -231,6 +381,19 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
         <p className={cn('mt-1.5 font-medium', state.status === 'accepted' ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground')}>
           {state.status === 'accepted' ? 'Accepted' : 'Rejected'}
         </p>
+      )}
+      {reviewing && proposal.tool === 'propose_eval_case' && caseContent !== null && (
+        <ReviewProposedCase
+          step={step}
+          proposal={proposal.arguments}
+          content={caseContent}
+          mayEdit={mayEdit}
+          onAccepted={() => {
+            setReviewing(false);
+            onDecided('accepted');
+          }}
+          onClose={() => setReviewing(false)}
+        />
       )}
     </div>
   );
