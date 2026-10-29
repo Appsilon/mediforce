@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EvaluationAssistantProposalSchema, EvaluationSubjectRefSchema } from '@mediforce/platform-core';
+import { EvalCaseInputSchema, EvaluationAssistantProposalSchema, EvaluationSubjectRefSchema } from '@mediforce/platform-core';
 import { PreviewEvaluatorOutputSchema } from './evaluation';
 
 /**
@@ -46,9 +46,13 @@ export const EvaluatorSelfTestSchema = z.union([
   z.object({ unavailable: z.string() }),
 ]);
 
-/** A proposal as the person sees it; a proposed check carries its self-test. */
+/**
+ * A proposal as the person sees it; a proposed check carries its self-test,
+ * a synthesized case the input its changes make of its run's.
+ */
 export const ProposalViewSchema = EvaluationAssistantProposalSchema.and(z.object({
   selfTest: EvaluatorSelfTestSchema.optional(),
+  caseInput: EvalCaseInputSchema.optional(),
 }));
 
 export const AskEvaluationAssistantOutputSchema = z.object({

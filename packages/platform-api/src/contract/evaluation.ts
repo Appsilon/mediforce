@@ -250,6 +250,8 @@ export const CreatePerturbedEvalCaseInputSchema = EvaluatedStepSchema
     agreementInstructions: z.string().trim().max(4000).nullable().default(null),
     evaluatorIds: EvalCaseSchema.shape.evaluatorIds.default(null),
     inputChanges: PerturbedEvalCaseSpecSchema.shape.inputChanges.unwrap().default([]),
+    /** The input as a person edited it on review, stored in place of what the input changes make. */
+    input: EvalCaseInputSchema.optional(),
     fileChanges: PerturbedEvalCaseSpecSchema.shape.fileChanges.unwrap().default([]),
     split: EvalCaseSplitSchema.default('dev'),
     origin: EvaluationOriginSchema.default('user'),

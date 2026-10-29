@@ -185,7 +185,7 @@ export async function createPerturbedEvalCase(
     ...evaluationOwnerOf(step),
     id,
     name: input.name,
-    input: perturbed.input,
+    input: input.input ?? perturbed.input,
     workspaceSeedCommit,
     ...labelOf(input),
     source: 'synthesized',

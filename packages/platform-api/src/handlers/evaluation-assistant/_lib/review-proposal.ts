@@ -141,8 +141,8 @@ export async function reviewEvaluationProposal(
     }
     case 'propose_perturbed_case': {
       const proposal = args as Args<'propose_perturbed_case'>;
-      await perturbCase(await loadCaseSource(scope, proposal.baseAgentRunId, stepOnly(step, 'A perturbed case'), 'read'), proposal);
-      return { ok: true };
+      const perturbed = await perturbCase(await loadCaseSource(scope, proposal.baseAgentRunId, stepOnly(step, 'A perturbed case'), 'read'), proposal);
+      return { ok: true, evidence: { caseInput: perturbed.input } };
     }
     case 'propose_control_settings': {
       const { evalRunId } = args as Args<'propose_control_settings'>;

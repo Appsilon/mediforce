@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ProposalCard } from '../evaluation-assistant-cards';
 
-const evaluation = vi.hoisted(() => ({ createCaseFromAgentRun: vi.fn(), createCase: vi.fn() }));
+const evaluation = vi.hoisted(() => ({ createCaseFromAgentRun: vi.fn(), createCase: vi.fn(), createPerturbedCase: vi.fn() }));
 const runIo = vi.hoisted(() => ({ current: undefined as unknown, error: null as Error | null }));
 
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
@@ -61,6 +61,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   evaluation.createCaseFromAgentRun.mockResolvedValue({});
   evaluation.createCase.mockResolvedValue({});
+  evaluation.createPerturbedCase.mockResolvedValue({});
   runIo.current = sourceRun;
   runIo.error = null;
 });
@@ -156,6 +157,61 @@ describe('ProposalCard shows what an Eval Case holds', () => {
       expectedOutput: { grade: 5 },
       expectation: 'positive',
       containsProductionData: true,
+      origin: 'assistant',
+    }));
+  });
+});
+
+describe('ProposalCard for an edge case', () => {
+  const edgeCase = {
+    tool: 'propose_perturbed_case' as const,
+    arguments: {
+      name: 'Narrative missing',
+      baseAgentRunId: 'agent-run-1',
+      perturbation: { kind: 'edge_values' as const, description: 'The narrative is gone' },
+      inputChanges: [{ op: 'remove' as const, part: 'triggerPayload' as const, path: ['narrative'] }],
+      fileChanges: [{ op: 'delete' as const, path: 'data/ae.csv' }],
+      expectedOutput: { grade: null },
+      expectation: 'positive' as const,
+      rationale: 'Grading must not guess',
+    },
+    caseInput: { triggerPayload: {}, previousStepOutputs: { extract: { term: 'Sepsis' } } },
+  };
+
+  it('is laid out as a case from a run is: where it comes from, why, the input it goes in with and its expected output', () => {
+    renderProposal(edgeCase);
+    expect(screen.getByText('Edge case of run agent-ru')).toBeVisible();
+    expect(screen.getByText('edge values')).toBeVisible();
+    expect(screen.getByText('The narrative is gone')).toBeVisible();
+    expect(screen.getByText('Grading must not guess')).toBeVisible();
+    expect(screen.getByTestId('proposed-case-input')).toHaveTextContent('"term": "Sepsis"');
+    expect(screen.getByTestId('proposed-case-output')).toHaveTextContent('"grade": null');
+    expect(screen.getByRole('button', { name: 'Positive' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('lets the person relabel its expected output before accepting', async () => {
+    const onDecided = renderProposal(edgeCase);
+    fireEvent.click(screen.getByRole('button', { name: 'Negative' }));
+    fireEvent.click(screen.getByTestId('proposal-accept'));
+    await waitFor(() => expect(onDecided).toHaveBeenCalledWith('accepted'));
+    expect(evaluation.createPerturbedCase).toHaveBeenCalledWith(expect.objectContaining({
+      baseAgentRunId: 'agent-run-1', expectedOutput: { grade: null }, expectation: 'negative',
+    }));
+  });
+
+  it('opens in the Add case form to review, and accepts it with its changes and the input as edited there', async () => {
+    const onDecided = renderProposal(edgeCase);
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    const dialog = await screen.findByTestId('case-dialog');
+    const edited = { triggerPayload: { narrative: '' }, previousStepOutputs: { extract: { term: 'Sepsis' } } };
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Case input' }), { target: { value: JSON.stringify(edited) } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Accept' }));
+    await waitFor(() => expect(onDecided).toHaveBeenCalledWith('accepted'));
+    expect(evaluation.createPerturbedCase).toHaveBeenCalledWith(expect.objectContaining({
+      ...step,
+      baseAgentRunId: 'agent-run-1',
+      fileChanges: [{ op: 'delete', path: 'data/ae.csv' }],
+      input: edited,
       origin: 'assistant',
     }));
   });

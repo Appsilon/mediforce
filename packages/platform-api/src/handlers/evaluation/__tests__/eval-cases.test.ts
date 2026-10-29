@@ -222,6 +222,18 @@ describe('Eval Cases', () => {
     expect(event?.inputSnapshot).toMatchObject({ perturbation: { kind: 'injected_instruction' }, origin: 'assistant' });
   });
 
+  it('stores a synthesized case with the input a person edited on review in place of its changes\' result', async () => {
+    const edited = { triggerPayload: { studyId: 'CDISCPILOT02' }, previousStepOutputs: {} };
+    const { evalCase } = await synthesize({
+      name: 'Study id edited on review',
+      baseAgentRunId: GRADED_RUN,
+      perturbation: { kind: 'edge_values', description: 'Another study' },
+      inputChanges: [{ op: 'set', part: 'triggerPayload', path: ['studyId'], value: 'CDISCPILOT99' }],
+      input: edited,
+    });
+    expect(evalCase).toMatchObject({ source: 'synthesized', sourceAgentRunId: GRADED_RUN, input: edited });
+  });
+
   it('writes a synthesized case\'s file changes as a commit on the run\'s workspace', async () => {
     const workspace = gitWorkspace({ 'data/ae.csv': 'AETERM,AETOXGR\nSepsis,5\n', 'data/dm.csv': 'USUBJID\n01-001\n' });
     try {

@@ -94,10 +94,11 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   cards to accept or reject. An Eval Case card shows the case as it would be
   stored — its source, the assistant's rationale, and previews of its input and
   expected output (a harvested case's are the run's own, the output only once
-  a person reviewed the run). One with an expected output lets
+  a person reviewed the run; a synthesized case's is its run's input with the
+  changes applied, which its description sums up). One with an expected output lets
   the person mark it **Positive** or **Negative**, or drop it (**No expected
   output**), before accepting. **Review** opens it whole in the Add case form,
-  to edit before accepting. Accepting one is the same write the forms
+  to edit before accepting; a synthesized case accepted there keeps its file changes. Accepting one is the same write the forms
   make, recorded with `origin: assistant`. A routing recommendation (a Control
   Mode) comes back as a card to apply in the workflow editor. So does a **diagnosis** of an Eval Run's failures
   (`propose_diagnosis`) — see below. Nothing is applied to the step by the
@@ -530,7 +531,8 @@ files of the workspace the run started from, and are written as a new commit on
 the workflow's bare repo, kept by the ref `refs/mediforce/eval-seeds/<caseId>`,
 which the case starts from. A change that does not apply — removing what is not
 there, editing a file that is missing or binary, file changes on a run with no
-workspace — is refused. It is built from production data, so it is flagged as
+workspace — is refused. An `input` given with the changes (a person's edit on
+review) is stored in place of what `inputChanges` make. It is built from production data, so it is flagged as
 containing it. It takes the same expected output, expectation, comparison and
 Evaluators as a written case.
 
