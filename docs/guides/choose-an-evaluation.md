@@ -135,8 +135,8 @@ guarded in production needs steps 2 and 7, not a qualification.
 1. **Brief** (optional). Write the Evaluation Brief.
 2. **Evaluators.** Ask the assistant for an evaluation plan and draft a check
    for each risk, cheapest kind first. Approve `code` sources.
-3. **Criteria.** Accept the suggested floor, or set your own with **Set the
-   threshold**.
+3. **Criteria.** Accept the suggested floor, or set your own with **Edit**
+   beside Acceptance Criteria in the status strip.
 4. **Cases.** Harvest from production, add negatives and synthesized cases;
    split dev / holdout; **Save** to save a Dataset.
 5. **Eval Run.** Check the cost estimate, start, confirm the budget. Read the

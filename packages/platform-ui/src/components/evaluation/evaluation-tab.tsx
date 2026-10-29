@@ -11,7 +11,7 @@ import { VALIDATION_STATUS } from './validation-status';
 import { buttonClass, tabTriggerClass } from './evaluation-styles';
 import { EvaluationAssistantPanel } from './evaluation-assistant-panel';
 import {
-  AcceptanceCriteriaSection,
+  EvaluationStatusStrip,
   CasesSection,
   EvalRunsSection,
   EvaluatorsSection,
@@ -110,14 +110,15 @@ function isSectionTab(value: string | null): value is SectionTab {
 /**
  * Which tab of the Evaluation is open, kept in `?section=` so a link or a
  * reload lands on it. Unnamed, a subject with Eval Runs opens on them and one
- * without opens on its cases.
+ * without opens on its cases; until its runs load, no tab is picked, so the
+ * page does not open on cases and then jump to runs.
  */
-function useSectionTab(hasRuns: boolean) {
+function useSectionTab(hasRuns: boolean | undefined) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const requested = searchParams.get('section');
-  const section: SectionTab = isSectionTab(requested) ? requested : hasRuns ? 'runs' : 'cases';
+  const section: SectionTab | null = isSectionTab(requested) ? requested : hasRuns === undefined ? null : hasRuns ? 'runs' : 'cases';
   const select = (next: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('section', next);
@@ -168,10 +169,10 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
   const layoutRef = React.useRef<HTMLDivElement>(null);
   const assistantWidth = useAssistantWidth(layoutRef);
   const assistant = useAssistantOpen();
-  const { section, select } = useSectionTab((evaluation.runs.data?.evalRuns.length ?? 0) > 0);
+  const { section, select } = useSectionTab(evaluation.runs.isLoading ? undefined : (evaluation.runs.data?.evalRuns.length ?? 0) > 0);
   const evaluators = evaluation.evaluators.data?.evaluators ?? [];
   const caseCount = evaluation.cases.data?.cases.length;
-  const unapproved = evaluators.filter((evaluator) => evaluator.latest.check.kind === 'code' && evaluator.latest.sourceApproval === null).length;
+  const unapproved = evaluators.filter((evaluator) => evaluator.trust.trusted === false).length;
   // min() keeps a remembered width from squeezing the sections on a narrower window.
   const columns = assistant.open
     ? `minmax(0,1fr) min(${assistantWidth.width}px, calc(100% - ${MIN_SECTIONS_WIDTH + COLUMN_GAP}px))`
@@ -184,7 +185,7 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
   return (
     <div className="space-y-4">
       <DriftAlert data={evaluation.drift} />
-      <AcceptanceCriteriaSection
+      <EvaluationStatusStrip
         step={step}
         criteria={evaluation.criteria}
         qualification={evaluation.qualification}
@@ -198,9 +199,9 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
       />
       {unapproved > 0 && (
         <div role="status" className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200" data-testid="unapproved-evaluators">
-          <span>{unapproved === 1 ? '1 Code Evaluator does' : `${unapproved} Code Evaluators do`} not count until a person approves its source.</span>
+          <span>{unapproved === 1 ? '1 Code Evaluator does not count until a person approves its source.' : `${unapproved} Code Evaluators do not count until a person approves their source.`}</span>
           {section !== 'evaluators' && (
-            <button type="button" className="font-medium underline underline-offset-2" onClick={() => select('evaluators')}>Review</button>
+            <button type="button" className="font-medium underline underline-offset-2" data-testid="review-unapproved-evaluators" onClick={() => select('evaluators')}>Review</button>
           )}
         </div>
       )}
@@ -209,12 +210,12 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
         className="grid min-h-0 gap-4 lg:grid-cols-(--evaluation-columns) lg:items-start"
         style={{ '--evaluation-columns': columns } as React.CSSProperties}
       >
-        <Tabs.Root value={section} onValueChange={select} className="min-w-0 rounded-lg border">
+        <Tabs.Root value={section ?? ''} onValueChange={select} className="min-w-0 rounded-lg border">
           <Tabs.List className="flex flex-wrap gap-0 border-b px-2" aria-label="Evaluation">
             {tabs.map((tab) => (
               <Tabs.Trigger key={tab.value} value={tab.value} className={tabTriggerClass} data-testid={`evaluation-tab-${tab.value}`} data-tour={tab.tour}>
                 {tab.label}
-                {tab.count !== undefined && <span className="ml-1.5 text-xs tabular-nums text-muted-foreground">{tab.count}</span>}
+                {tab.count !== undefined && <span className="ml-1.5 text-xs tabular-nums text-muted-foreground"><span className="sr-only">: </span>{tab.count}</span>}
               </Tabs.Trigger>
             ))}
           </Tabs.List>
