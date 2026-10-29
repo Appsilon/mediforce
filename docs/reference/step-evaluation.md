@@ -62,7 +62,8 @@ up the stages, sets the Acceptance Criteria (minimum pass rate, optionally
 pass^k) and, on **Save**, writes them if changed and saves the cases as a new
 Dataset version if unsaved, then opens the tabs; **Save and start Eval Run**
 saves, then asks for trials and a budget as the Eval Runs tab does. **Exit
-setup** opens the tabs without saving anything more.
+setup** opens the tabs without saving anything more. **Guided setup** in the
+status strip reopens it at any time, whatever the step already has.
 
 Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
 

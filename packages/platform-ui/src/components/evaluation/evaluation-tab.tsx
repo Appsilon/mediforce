@@ -259,9 +259,16 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
         datasets={evaluation.datasets}
         mayEdit={mayEdit}
         action={(
-          <button type="button" className={buttonClass} aria-pressed={assistant.open} data-testid="evaluation-assistant-toggle" onClick={assistant.toggle}>
-            {assistant.open ? 'Hide assistant' : 'Assistant'}
-          </button>
+          <>
+            {mayEdit && (
+              <button type="button" className={buttonClass} data-testid="evaluation-open-guided-setup" onClick={() => setupMode.go('brief')}>
+                Guided setup
+              </button>
+            )}
+            <button type="button" className={buttonClass} aria-pressed={assistant.open} data-testid="evaluation-assistant-toggle" onClick={assistant.toggle}>
+              {assistant.open ? 'Hide assistant' : 'Assistant'}
+            </button>
+          </>
         )}
       />
       {unapproved > 0 && (

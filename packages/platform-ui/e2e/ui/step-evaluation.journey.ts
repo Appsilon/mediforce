@@ -495,5 +495,10 @@ test.describe('Step Evaluation tab', () => {
     await expect(page.getByTestId('acceptance-criteria-summary')).toHaveText('Each counted Evaluator ≥ 90%', { timeout: 10_000 });
     await expect(page.getByTestId('dataset-summary')).toHaveText('v1 · 1 case');
     await expect(page.getByTestId('evaluation-tab-cases')).toHaveAttribute('data-state', 'active');
+
+    // A step already set up reopens the guided setup from the status strip, its stages marked filled.
+    await page.getByTestId('evaluation-open-guided-setup').click();
+    await expect(page).toHaveURL(/setup=guided&stage=brief/);
+    await expect(page.getByTestId('guided-setup-stage-cases')).toHaveAttribute('data-filled', 'true');
   });
 });
