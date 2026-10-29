@@ -396,13 +396,12 @@ describe('Eval Case view and edit', () => {
     evaluators: { data: { evaluators } },
   }) as never;
 
-  it('lists a case in a row with its type, expected output, comparison and Evaluators, without a split', () => {
+  it('lists a case in a row with its type, comparison and Evaluators, without a split', () => {
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ expectation: 'negative', comparison: 'agreement' }))} mayEdit={true} />);
 
     const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
-    expect(headers).toEqual(['Select', 'Case', 'Type', 'Expected output', 'Comparison', 'Graded by', 'Actions']);
+    expect(headers).toEqual(['Select', 'Case', 'Type', 'Comparison', 'Graded by', 'Actions']);
     expect(screen.getByTestId('eval-case-expectation').textContent).toBe('negative');
-    expect(screen.getByTestId('eval-case-has-expected-output').querySelector('[aria-label="Has an expected output"]')).not.toBeNull();
     expect(screen.getByTestId('eval-case-comparison').textContent).toBe('By meaning');
     expect(screen.queryByTestId('eval-case-details')).toBeNull();
   });
@@ -411,7 +410,6 @@ describe('Eval Case view and edit', () => {
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ expectedOutput: null }))} mayEdit={false} />);
 
     expect(screen.getByTestId('eval-case-row').textContent).toContain('input only');
-    expect(screen.getByTestId('eval-case-has-expected-output').textContent).toBe('missing');
     expect(screen.getByTestId('eval-case-comparison').textContent).toBe('—');
   });
 
@@ -433,7 +431,7 @@ describe('Eval Case view and edit', () => {
   it('says All, with nothing to open, while the step has no Evaluators', () => {
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}), [])} mayEdit={false} />);
     expect(screen.getByTestId('eval-case-evaluators').textContent).toBe('All');
-    expect(screen.queryByRole('button', { name: /Graded by/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Graded by (all )?\d/ })).toBeNull();
   });
 
   it('shows only what a case gives the step and what it expects, with Edit beside its labels', () => {
@@ -830,5 +828,82 @@ describe('Starting an Eval Run', () => {
     renderRuns([evalCaseOf({ id: 'c-1' })], [dataset]);
 
     expect(startButton().disabled).toBe(false);
+  });
+});
+
+describe('Sorting and filtering the tables', () => {
+  const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
+  const withCases = (cases: unknown[]) => ({
+    cases: { isLoading: false, data: { cases } },
+    agentRuns: { data: { pages: [] }, hasNextPage: false },
+    datasets: { data: { datasets: [] } },
+    evaluators: { data: { evaluators: [EXPECTED_OUTPUT_CHECK, SCHEMA_CHECK] } },
+  }) as never;
+  const caseNames = () => screen.getAllByTestId('eval-case-row').map((row) => within(row).getAllByText(/^Case /)[0].textContent);
+  const cases = [
+    evalCaseOf({ id: 'c-1', name: 'Case 2', expectation: 'negative' }),
+    evalCaseOf({ id: 'c-2', name: 'Case 10', expectedOutput: null }),
+    evalCaseOf({ id: 'c-3', name: 'Case 1' }),
+  ];
+
+  it('sorts cases by a column ascending, then descending, then back to as given', () => {
+    render(<CasesSection step={step} evaluation={withCases(cases)} mayEdit={false} />);
+
+    fireEvent.click(screen.getByTestId('sort-case'));
+    expect(caseNames()).toEqual(['Case 1', 'Case 2', 'Case 10']);
+    expect(screen.getByTestId('sort-case').closest('th')?.getAttribute('aria-sort')).toBe('ascending');
+    fireEvent.click(screen.getByTestId('sort-case'));
+    expect(caseNames()).toEqual(['Case 10', 'Case 2', 'Case 1']);
+    fireEvent.click(screen.getByTestId('sort-case'));
+    expect(caseNames()).toEqual(['Case 2', 'Case 10', 'Case 1']);
+  });
+
+  it('filters cases to the values ticked in a column, and clears the filters when nothing matches', () => {
+    render(<CasesSection step={step} evaluation={withCases(cases)} mayEdit={false} />);
+
+    fireEvent.click(screen.getByTestId('filter-type'));
+    expect(screen.getAllByRole('checkbox').map((box) => box.parentElement?.textContent)).toEqual(['Input only', 'Negative', 'Positive']);
+    fireEvent.click(screen.getByLabelText('Input only'));
+    fireEvent.click(screen.getByLabelText('Negative'));
+    expect(caseNames()).toEqual(['Case 1']);
+    fireEvent.click(screen.getByLabelText('Positive'));
+    expect(screen.queryAllByTestId('eval-case-row')).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(caseNames()).toEqual(['Case 2', 'Case 10', 'Case 1']);
+  });
+
+  it('shows a case whose value turned up after the filter was set', () => {
+    const { rerender } = render(<CasesSection step={step} evaluation={withCases([cases[0], cases[2]])} mayEdit={false} />);
+    fireEvent.click(screen.getByTestId('filter-type'));
+    fireEvent.click(screen.getByLabelText('Negative'));
+    expect(caseNames()).toEqual(['Case 1']);
+
+    rerender(<CasesSection step={step} evaluation={withCases(cases)} mayEdit={false} />);
+    expect(caseNames()).toEqual(['Case 10', 'Case 1']);
+  });
+
+  it('deselects a case once a filter hides it', () => {
+    render(<CasesSection step={step} evaluation={withCases(cases)} mayEdit={true} />);
+    fireEvent.click(screen.getByLabelText('Select Case 2'));
+    fireEvent.click(screen.getByLabelText('Select Case 1'));
+    fireEvent.click(screen.getByTestId('filter-type'));
+    fireEvent.click(screen.getByLabelText('Negative'));
+    expect(screen.getByText('1 selected')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show all' }));
+    expect((screen.getByLabelText('Select Case 2') as HTMLInputElement).checked).toBe(false);
+  });
+
+  it('filters Evaluators by whether they count', () => {
+    const evaluatorNamed = (id: string, name: string, trusted: boolean) => ({
+      ...step, id, name, archived: false, runInProduction: false, onError: 'ignore',
+      latest: { version: 1, rule: `${name} rule`, check: { kind: 'schema', schema: {} }, origin: 'user', sourceApproval: null },
+      versions: [], trust: trusted ? { trusted: true } : { trusted: false, reason: 'no source approval' }, production: { active: false },
+    });
+    render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [evaluatorNamed('e-1', 'counted', true), evaluatorNamed('e-2', 'uncounted', false)] } } as never} mayEdit={false} />);
+
+    fireEvent.click(screen.getByTestId('filter-status'));
+    fireEvent.click(screen.getByLabelText('Counts'));
+    expect(screen.getAllByTestId('evaluator-row').map((row) => row.textContent)).toEqual([expect.stringContaining('uncounted')]);
   });
 });

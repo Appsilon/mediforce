@@ -287,7 +287,11 @@ check; *never* for an `expected_output` check or an Agent's Evaluators — then
 versions. **Details** opens under the row with the thresholds, the whole check
 and its versions; **Edit** opens the form under the row and saves a new version
 with what changed (`POST /api/evaluation/evaluators/:id/versions`), keeping its
-name and kind.
+name and kind. A click on **Evaluator**, **Type**, **Version**, **Status** or
+**In production** sorts by it (ascending, descending, then as listed); the
+funnel by **Type**, **Status** and **In production** (*Yes*, *No*, *Never*)
+filters to the values left ticked; a value that turns up later shows until it
+is unticked too. Both are client-side and reset on reload.
 
 `evaluator-preview` (`POST /api/evaluation/evaluators/preview`) runs a draft
 check against the Step's recent production outputs (dry runs left out) and
@@ -457,11 +461,15 @@ The cases are a table, one row per case: **Case** — its name and, for a case
 made from a run, whether it is **from run** or **edited from run** (its input
 differs from what the run was given, or its expected output, none included,
 from what the run returned) — **Type** (positive, negative, or input only
-without an expected output), **Expected output** — a checkmark when the case
-has one, *missing* when not; Details shows it — **Comparison** (Exact match or
-By meaning), and **Graded by** — *All N* or a count (*All* while the step has no Evaluators), which opens into the
+without an expected output; Details shows the expected output), **Comparison**
+(Exact match or By meaning), and **Graded by** — *All N* or a count (*All* while the step has no Evaluators), which opens into the
 Evaluators' names — then **Details**, **Edit** and **Remove** (archives the
-case). On narrow screens Comparison is hidden; Details still has it. **Details** opens under the row and shows only what the
+case). On narrow screens Comparison is hidden; Details still has it. Every
+data column sorts (ascending, descending, then as listed); **Type**,
+**Comparison** (*None* without an expected output) and **Graded by** (*All* /
+*Selected*) also filter, to the values left ticked — a value that turns up
+later shows until it is unticked too. A case a filter hides is deselected.
+Sorting and filters are client-side and reset on reload. **Details** opens under the row and shows only what the
 case gives the step and what it expects: its
 input, its expected output and how it is compared, and the Evaluators that grade
 it — plus **Source run log** for a case made from a run, synthesized ones

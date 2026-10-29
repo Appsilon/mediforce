@@ -5,7 +5,7 @@ import { z } from 'zod';
 import * as Dialog from '@radix-ui/react-dialog';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
-import { Bot, Check, ChevronRight, Info, Loader2, X } from 'lucide-react';
+import { Bot, ChevronRight, Info, Loader2, X } from 'lucide-react';
 import {
   DEFAULT_ACCEPTANCE_CRITERIA,
   EvalCaseComparisonSchema,
@@ -48,7 +48,7 @@ import { routes } from '@/lib/routes';
 import { evalRunHref } from '@/lib/evaluation-subject';
 import { AcceptanceBadge, EvalRunStatusBadge } from './eval-run-badges';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
-import { DetailsRow, DisclosureButton, TableHead, tableHeaderRowClass, tableWrapperClass, type TableColumn } from './evaluation-table';
+import { DetailsRow, DisclosureButton, NoMatchingRows, TableHead, tableHeaderRowClass, tableWrapperClass, useTableView, type TableColumn } from './evaluation-table';
 import { OnErrorChoice, mayEscalate } from './evaluator-outages';
 import { VALIDATION_STATUS } from './validation-status';
 import { VERDICT_CLASSES } from './eval-run-report';
@@ -365,14 +365,22 @@ function EvaluatorForm({ initial, editing = false, schemaTaken = false, stepOutp
   );
 }
 
-const EVALUATOR_COLUMNS: readonly TableColumn[] = [
-  { key: 'evaluator', label: 'Evaluator' },
-  { key: 'type', label: 'Type' },
-  { key: 'version', label: 'Version', className: 'hidden md:table-cell' },
-  { key: 'status', label: 'Status', help: 'Only counted Evaluators grade Eval Runs toward the verdict.' },
-  { key: 'production', label: 'In production', help: 'Also scores the step\'s live runs.' },
-  { key: 'actions', label: <span className="sr-only">Actions</span> },
-];
+function evaluatorColumns(step: EvaluationSubject): readonly TableColumn<EvaluatorView>[] {
+  return [
+    { key: 'evaluator', label: 'Evaluator', value: (evaluator) => evaluator.name },
+    { key: 'type', label: 'Type', value: (evaluator) => CHECK_KINDS[evaluator.latest.check.kind].label, filter: true },
+    { key: 'version', label: 'Version', className: 'hidden md:table-cell', value: (evaluator) => evaluator.latest.version },
+    { key: 'status', label: 'Status', help: 'Only counted Evaluators grade Eval Runs toward the verdict.', value: (evaluator) => evaluator.trust.trusted ? 'Counts' : 'Not counted', filter: true },
+    {
+      key: 'production',
+      label: 'In production',
+      help: 'Also scores the step\'s live runs.',
+      value: (evaluator) => step.kind === 'agent' || evaluator.latest.check.kind === 'expected_output' ? 'Never' : evaluator.runInProduction ? 'Yes' : 'No',
+      filter: true,
+    },
+    { key: 'actions', label: <span className="sr-only">Actions</span> },
+  ];
+}
 
 /** The Step's Evaluators with whether each counts (D9); code source is approved here, by a person. */
 export function EvaluatorsSection({ step, data, mayEdit, editReason, stepOutputSchema }: {
@@ -388,6 +396,8 @@ export function EvaluatorsSection({ step, data, mayEdit, editReason, stepOutputS
     mediforce.evaluation.createEvaluator({ ...step, ...values }));
 
   const evaluators = data.data?.evaluators ?? [];
+  const columns = React.useMemo(() => evaluatorColumns(step), [step]);
+  const view = useTableView(evaluators, columns);
   const schemaTaken = evaluators.some((evaluator) => evaluator.latest.check.kind === 'schema');
   return (
     <Section title="Evaluators" action={mayEdit === true && adding === false ? <button type="button" className={buttonClass} onClick={() => setAdding(true)}>Add</button> : undefined}>
@@ -398,10 +408,11 @@ export function EvaluatorsSection({ step, data, mayEdit, editReason, stepOutputS
       {data.isLoading === false && evaluators.length > 0 && (
         <div className={tableWrapperClass}>
           <table className="w-full text-sm" data-testid="evaluators-table">
-            <TableHead columns={EVALUATOR_COLUMNS} />
-            {evaluators.map((evaluator) => (
-              <EvaluatorRow key={evaluator.id} step={step} evaluator={evaluator} mayEdit={mayEdit} editReason={editReason} stepOutputSchema={stepOutputSchema} columns={EVALUATOR_COLUMNS.length} />
+            <TableHead columns={columns} view={view} />
+            {view.rows.map((evaluator) => (
+              <EvaluatorRow key={evaluator.id} step={step} evaluator={evaluator} mayEdit={mayEdit} editReason={editReason} stepOutputSchema={stepOutputSchema} columns={columns.length} />
             ))}
+            {view.rows.length === 0 && <NoMatchingRows columns={columns.length} onClear={view.clearFilters} />}
           </table>
         </div>
       )}
@@ -929,11 +940,6 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSel
         <td className="px-3 py-2">
           {evalCase.expectedOutput === null ? <span className="text-xs text-muted-foreground">input only</span> : <CaseExpectationMark evalCase={evalCase} />}
         </td>
-        <td className="px-3 py-2 text-xs" data-testid="eval-case-has-expected-output">
-          {evalCase.expectedOutput === null
-            ? <span className="text-muted-foreground">missing</span>
-            : <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-label="Has an expected output" />}
-        </td>
         <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell" data-testid="eval-case-comparison">
           {evalCase.expectedOutput === null ? <span className="text-muted-foreground">—</span> : evalCase.comparison === 'exact' ? 'Exact match' : 'By meaning'}
         </td>
@@ -1279,13 +1285,24 @@ function SetCaseEvaluators({ step, cases, evaluators, onDone }: {
   );
 }
 
-const CASE_COLUMNS: readonly TableColumn[] = [
+const CASE_COLUMNS: readonly TableColumn<EvalCase>[] = [
   { key: 'select', label: <span className="sr-only">Select</span>, className: 'w-0 pl-3 pr-0' },
-  { key: 'case', label: 'Case' },
-  { key: 'type', label: 'Type', help: 'Positive: the output must match the expected output. Negative: it must not. Input only: no expected output; only the Evaluators grade it.' },
-  { key: 'expected-output', label: 'Expected output' },
-  { key: 'comparison', label: 'Comparison', className: 'hidden md:table-cell' },
-  { key: 'graded-by', label: 'Graded by' },
+  { key: 'case', label: 'Case', value: (evalCase) => evalCase.name },
+  {
+    key: 'type',
+    label: 'Type',
+    help: 'Positive: the output must match the expected output. Negative: it must not. Input only: no expected output; only the Evaluators grade it.',
+    value: (evalCase) => evalCase.expectedOutput === null ? 'Input only' : evalCase.expectation === 'positive' ? 'Positive' : 'Negative',
+    filter: true,
+  },
+  {
+    key: 'comparison',
+    label: 'Comparison',
+    className: 'hidden md:table-cell',
+    value: (evalCase) => evalCase.expectedOutput === null ? 'None' : evalCase.comparison === 'exact' ? 'Exact match' : 'By meaning',
+    filter: true,
+  },
+  { key: 'graded-by', label: 'Graded by', value: (evalCase) => evalCase.evaluatorIds === null ? 'All' : 'Selected', filter: true },
   { key: 'actions', label: <span className="sr-only">Actions</span> },
 ];
 
@@ -1303,10 +1320,16 @@ export function CasesSection({ step, evaluation, mayEdit }: {
   const hasUnsavedChanges = hasUnsavedCases(cases, latest);
   const [adding, setAdding] = React.useState(false);
   const evaluators = evaluation.evaluators.data?.evaluators ?? [];
+  const columns = React.useMemo(() => mayEdit === true ? CASE_COLUMNS : CASE_COLUMNS.filter((column) => column.key !== 'select'), [mayEdit]);
+  const view = useTableView(cases, columns);
   const [selectedIds, setSelectedIds] = React.useState<ReadonlySet<string>>(new Set());
-  const selectedCases = cases.filter((evalCase) => selectedIds.has(evalCase.id));
+  const selectedCases = view.rows.filter((evalCase) => selectedIds.has(evalCase.id));
   const [settingEvaluators, setSettingEvaluators] = React.useState(false);
-  const columns = mayEdit === true ? CASE_COLUMNS : CASE_COLUMNS.filter((column) => column.key !== 'select');
+  // A case a filter hides is no longer selected, so it never comes back ticked.
+  React.useEffect(() => setSelectedIds((current) => {
+    const shown = new Set(view.rows.map((evalCase) => evalCase.id));
+    return [...current].every((caseId) => shown.has(caseId)) ? current : new Set([...current].filter((caseId) => shown.has(caseId)));
+  }), [view.rows]);
 
   return (
     <Section
@@ -1362,8 +1385,8 @@ export function CasesSection({ step, evaluation, mayEdit }: {
       ) : (
         <div className={tableWrapperClass}>
           <table className="w-full text-sm" data-testid="eval-cases-table">
-            <TableHead columns={columns} />
-            {cases.map((evalCase) => (
+            <TableHead columns={columns} view={view} />
+            {view.rows.map((evalCase) => (
               <CaseRow
                 key={evalCase.id}
                 step={step}
@@ -1381,6 +1404,7 @@ export function CasesSection({ step, evaluation, mayEdit }: {
                 columns={columns.length}
               />
             ))}
+            {view.rows.length === 0 && <NoMatchingRows columns={columns.length} onClear={view.clearFilters} />}
           </table>
         </div>
       )}
