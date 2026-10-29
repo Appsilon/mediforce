@@ -358,7 +358,7 @@ export const GUIDE_CHAPTERS: readonly TourChapter[] = [
       {
         id: 'assistant',
         title: 'The assistant proposes; nothing exists until you Accept',
-        body: 'Ask it what to check on this step and it returns a plan of risks, each with a Draft this check button. Its step brief, kept in the header, tells it what the step is for.',
+        body: 'Ask it what to check on this step and it returns a plan of risks, each with a Draft this check button. Its step brief, kept in the header, tells it what the step is for. Hide assistant in the status strip gives the tabs the full width.',
         target: 'eval-assistant',
       },
       {
@@ -388,7 +388,7 @@ export const GUIDE_CHAPTERS: readonly TourChapter[] = [
       {
         id: 'threshold',
         title: 'The status is the verdict, the threshold is the bar',
-        body: 'Set the threshold chooses the minimum pass rate every counting Evaluator must reach; the default is 100%. Changing the step, an Evaluator, the cases or the threshold sets the status back to Not verified.',
+        body: 'Edit beside Acceptance Criteria sets the minimum pass rate every counting Evaluator must reach on its own; the default is 100%. Changing the step, an Evaluator, the cases or the threshold sets the status back to Not verified.',
         target: 'eval-status',
       },
       {

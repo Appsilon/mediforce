@@ -55,7 +55,9 @@ test.describe('Agent Evaluation tab', () => {
       await page.getByRole('tab', { name: 'Evaluation' }).click();
       await expect(page).toHaveURL(/tab=evaluation/);
       await expect(page.getByTestId('agent-version')).toContainText('assesses agent version 1', { timeout: 15_000 });
+      await page.getByTestId('evaluation-tab-evaluators').click();
       await expect(page.getByTestId('evaluator-row').filter({ hasText: 'summary-present' })).toBeVisible();
+      await page.getByTestId('evaluation-tab-runs').click();
       await expect(page.getByTestId('eval-run-dataset')).toHaveText('Runs Dataset v1 (1 case(s)).');
 
       await page.getByLabel('Budget $').fill('1');

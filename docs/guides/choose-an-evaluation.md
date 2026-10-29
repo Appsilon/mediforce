@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-14
+last_reviewed: 2026-10-29
 ---
 
 # Choosing an evaluation
@@ -70,7 +70,7 @@ flowchart TD
 | The output matches a known answer | a case with an expected output | `expected_output` Evaluator — exact match, or an agreement score | **Evaluators → Add**; set the expected output on the case |
 | The step behaves on inputs production never sent (missing file, edge values, renamed columns, an injected instruction) | a production run to start from | synthesized case | the assistant's case synthesis, or `mediforce eval case-perturb` |
 | How often the step passes, with a confidence interval | Evaluators and a saved Dataset | Eval Run + report | **Eval Runs**, `mediforce eval run-prepare` |
-| Whether the step is good enough to ship | the above plus a floor | **Acceptance Criteria** judged in the Eval Run report | **Set the threshold**; the assistant proposes a floor; `mediforce eval criteria-set` |
+| Whether the step is good enough to ship | the above plus a floor | **Acceptance Criteria** judged in the Eval Run report | **Edit** beside Acceptance Criteria in the status strip; the assistant proposes a floor; `mediforce eval criteria-set` |
 | Why a run failed | a finished Eval Run with failures | **diagnosis** card | ask the assistant; `mediforce eval failures <evalRunId>` |
 | Whether the step can drop its reviewer | a finished Eval Run | routing recommendation (Control Mode 4 when the criteria were met) | the report; apply it in the workflow editor |
 | Bad outputs stopped in live runs | a `schema` or `code` Evaluator | **Also run in production**; **Escalate** so an outage of the check stops the run too | Evaluator toggle, `mediforce eval evaluator-production` (`--on-error`) |
