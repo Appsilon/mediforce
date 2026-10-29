@@ -191,6 +191,8 @@ version. *Archive* removes one.
 - ✅ Evaluators are a table: **Evaluator** (name and rule), **Type**, **Version**, **Status**
   (*Counts* / *Not counted — …*) and **In production** (checkbox, or *never* for
   `expected_output` and for an Agent's Evaluators).
+- ✅ Clicking a header sorts by it (asc → desc → as listed); the funnel on **Type**, **Status** or
+  **In production** filters the rows, and **Clear filters** brings them back when none match.
 - ✅ schema → **Counts** immediately.
 - ✅ code → *Not counted — …* + **Approve source**; expand *Source*, approve → **Counts**.
 - ✅ llm_judge → **Counts**; the minimum confidence defaults to 0.8.
@@ -241,8 +243,11 @@ with a new one; **Remove** takes it out of the next save. Ticking cases and **Se
 
 **Test**
 - ✅ Cases are a table: **Case** (with *from run* / *edited from run*), **Type** (positive /
-  negative / input only), **Expected output** (a checkmark, or *missing*), **Comparison** (Exact match / By meaning) and
+  negative / input only), **Comparison** (Exact match / By meaning) and
   **Graded by** (*All N* or a count).
+- ✅ Clicking **Case** sorts by name (asc → desc → as listed); the funnel on **Type** filters, e.g.
+  untick *Positive* → only negative and input-only cases remain; add a positive case → it is
+  still hidden, add an input-only one → it shows.
 - ✅ Clicking **Graded by** opens the Evaluators' names; **Details** opens the input, expected
   output and source run log under the row.
 - ✅ Editing a production case's input turns it `manual` and keeps its source run.
