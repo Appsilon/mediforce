@@ -92,7 +92,7 @@ test.describe('Step Evaluation tab', () => {
     const row = page.getByTestId('evaluator-row').filter({ hasText: 'summary-present' });
     await expect(row).toBeVisible({ timeout: 10_000 });
     await expect(row.getByText('Counts')).toBeVisible();
-    await expect(row.getByText(/from the assistant/)).toBeVisible();
+    await expect(row.getByLabel('From the assistant')).toBeVisible();
     await expect(page.getByTestId('evaluation-brief').getByText(/No Brief yet/)).toBeVisible();
     await expect(page.getByTestId('brief-indicator')).toHaveCount(0);
 
@@ -390,9 +390,10 @@ test.describe('Step Evaluation tab', () => {
     await form.getByRole('button', { name: 'Create' }).click();
 
     const row = page.getByTestId('evaluator-row').filter({ hasText: 'output-schema' });
-    await expect(row).toContainText('v1 · Output schema', { timeout: 10_000 });
+    await expect(row.getByTestId('evaluator-version')).toHaveText('v1', { timeout: 10_000 });
+    await expect(row.getByTestId('evaluator-kind')).toHaveText('Output schema');
     await expect(row.getByText('Counts')).toBeVisible();
-    await row.getByText('Details', { exact: true }).click();
+    await row.getByRole('button', { name: 'Details' }).click();
     await expect(row.getByTestId('evaluator-details')).toContainText('"summary"');
 
     await row.getByRole('button', { name: 'Edit' }).click();
@@ -401,8 +402,7 @@ test.describe('Step Evaluation tab', () => {
     await editForm.getByLabel('JSON Schema').fill('{"required": ["summary", "findings"]}');
     await editForm.getByRole('button', { name: 'Save as v2' }).click();
 
-    await expect(row).toContainText('v2 · Output schema', { timeout: 10_000 });
-    await row.getByText('Details', { exact: true }).click();
+    await expect(row.getByTestId('evaluator-version')).toHaveText('v2', { timeout: 10_000 });
     await expect(row.getByTestId('evaluator-details')).toContainText('v1 ·');
   });
 
@@ -426,7 +426,7 @@ test.describe('Step Evaluation tab', () => {
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
     await page.getByTestId('evaluation-tab-evaluators').click();
-    await expect(page.getByTestId('evaluator-row').filter({ hasText: 'matches-expected' })).toContainText('Only checks cases that have an expected output', { timeout: 10_000 });
+    await expect(page.getByTestId('evaluator-row').filter({ hasText: 'matches-expected' }).getByTestId('evaluator-production')).toHaveText('never', { timeout: 10_000 });
 
     await page.getByTestId('evaluation-tab-cases').click();
     await page.getByRole('button', { name: 'Add case' }).click();

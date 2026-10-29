@@ -276,9 +276,18 @@ In the Evaluation tab, **Evaluators → Add** picks the kind from a dropdown and
 shows its fields — a JSON Schema (started from the step's `agent.outputSchema`,
 or an Agent's `outputSchema`, when it declares one), a language and source, a judge model with the question
 it answers and its minimum confidence — never the check's JSON.
-Each Evaluator's **Details** show the whole check and its versions; **Edit**
-saves a new version with what changed (`POST
-/api/evaluation/evaluators/:id/versions`), keeping its name and kind.
+The Evaluators are a table, one row per Evaluator: **Evaluator** — its name
+and rule, with a bot icon when its latest version is from the assistant —
+**Type**, **Version**, **Status** (*Counts* or *Not counted — reason*) and
+**In production** — the "Also run in production" checkbox with whether it is
+scoring live runs, and *When it cannot run* for a production `schema` or `code`
+check; *never* for an `expected_output` check or an Agent's Evaluators — then
+**Details**, **Approve source** (an unapproved `code` check), **Edit** and
+**Archive**. On narrow screens Version is hidden; Details still lists the
+versions. **Details** opens under the row with the thresholds, the whole check
+and its versions; **Edit** opens the form under the row and saves a new version
+with what changed (`POST /api/evaluation/evaluators/:id/versions`), keeping its
+name and kind.
 
 `evaluator-preview` (`POST /api/evaluation/evaluators/preview`) runs a draft
 check against the Step's recent production outputs (dry runs left out) and
@@ -450,7 +459,7 @@ differs from what the run was given, or its expected output, none included,
 from what the run returned) — **Type** (positive, negative, or input only
 without an expected output), **Expected output** — a checkmark when the case
 has one, *missing* when not; Details shows it — **Comparison** (Exact match or
-By meaning), and **Graded by** — *All N* or a count, which opens into the
+By meaning), and **Graded by** — *All N* or a count (*All* while the step has no Evaluators), which opens into the
 Evaluators' names — then **Details**, **Edit** and **Remove** (archives the
 case). On narrow screens Comparison is hidden; Details still has it. **Details** opens under the row and shows only what the
 case gives the step and what it expects: its
@@ -461,7 +470,7 @@ change its name, split, input, expected output and how it is compared, or the
 Evaluators that grade it (`case-edit <caseId> --file`, `PATCH
 /api/evaluation/cases/:caseId`). Ticking cases in the list and **Set
 evaluators…** sets the Evaluators of all of them at once, one edit per case that
-changes; **Archive** takes it out of the next save (`case-archive`). An edit
+changes; **Remove** takes it out of the next save (`case-archive`). An edit
 is a new case that replaces the old one, which is archived, so a Dataset version
 saved with the old case keeps exactly what it ran. A production case whose input is edited becomes `manual` — production never
 saw that input — and keeps the run it came from. MCP recordings are kept per

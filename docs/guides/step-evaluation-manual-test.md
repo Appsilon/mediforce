@@ -183,10 +183,14 @@ save. Every save is a new version. **CLI** `mediforce eval brief-get|brief-set`.
 clicks *Approve source*. An `llm_judge` verdict below its minimum confidence is left out of the
 pass rate until a person accepts it (§6.1).
 
-**How.** **Evaluators → Add** → kind, name, rule, and the kind's fields. **Details** shows the
-whole check and its versions; **Edit** saves a new version. *Archive* removes one.
+**How.** **Evaluators → Add** → kind, name, rule, and the kind's fields. The Evaluators are a
+table; **Details** opens the whole check and its versions under the row; **Edit** saves a new
+version. *Archive* removes one.
 
 **Test**
+- ✅ Evaluators are a table: **Evaluator** (name and rule), **Type**, **Version**, **Status**
+  (*Counts* / *Not counted — …*) and **In production** (checkbox, or *never* for
+  `expected_output` and for an Agent's Evaluators).
 - ✅ schema → **Counts** immediately.
 - ✅ code → *Not counted — …* + **Approve source**; expand *Source*, approve → **Counts**.
 - ✅ llm_judge → **Counts**; the minimum confidence defaults to 0.8.
@@ -468,7 +472,7 @@ before; a drop of ≥ 0.15 shows the amber **"Production Scores are drifting"** 
 Scores are exported to Phoenix / Langfuse.
 
 **Test**
-- ✅ Ticked → the Evaluator view says `production: active` ("in production once it counts" for an
+- ✅ Ticked → the **In production** column says *scoring live runs* ("in production once it counts" for an
   unapproved `code` check). A violating live run → paused for a person with reason *production
   evaluator*, Score recorded. Dry runs and eval trials are never blocked.
 - ✅ Drift banner: it blocks nothing. For a manual test, restart with
