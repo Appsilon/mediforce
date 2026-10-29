@@ -794,8 +794,42 @@ function CaseExpectationMark({ evalCase }: { evalCase: EvalCase }) {
   );
 }
 
-/** One Eval Case: what it expects, which Evaluators grade it, editing and removing it, and in its details what it gives the step and expects. */
-function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSelect }: {
+/** The names of the Evaluators that grade a case: every Evaluator of the step, or the ones it selects. */
+function gradedBy(evalCase: EvalCase, evaluators: readonly EvaluatorView[]): Array<{ id: string; name: string }> {
+  return evalCase.evaluatorIds === null
+    ? evaluators.map(({ id, name }) => ({ id, name }))
+    : evalCase.evaluatorIds.map((evaluatorId) => ({ id: evaluatorId, name: evaluators.find((evaluator) => evaluator.id === evaluatorId)?.name ?? evaluatorId.slice(0, 8) }));
+}
+
+/** Which Evaluators grade a case: a count that opens into their names. */
+function CaseGradedBy({ evalCase, evaluators }: { evalCase: EvalCase; evaluators: readonly EvaluatorView[] }) {
+  const [open, setOpen] = React.useState(false);
+  const names = gradedBy(evalCase, evaluators);
+  if (names.length === 0) return <span className="text-xs text-muted-foreground" data-testid="eval-case-evaluators">All</span>;
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={`Graded by ${evalCase.evaluatorIds === null ? 'all ' : ''}${names.length} evaluator${names.length === 1 ? '' : 's'}`}
+        className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline"
+        onClick={() => setOpen((current) => current === false)}
+        data-testid="eval-case-evaluators"
+      >
+        {evalCase.evaluatorIds === null ? `All ${names.length}` : names.length}
+        <ChevronRight className={cn('h-3 w-3 transition-transform', open && 'rotate-90')} />
+      </button>
+      {open && (
+        <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground" data-testid="eval-case-evaluator-names">
+          {names.map(({ id, name }) => <li key={id}>{name}</li>)}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** One Eval Case as a table row: what it expects, how it is compared, which Evaluators grade it, editing and removing it, and in its details what it gives the step and expects. */
+function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSelect, columns }: {
   step: EvaluationSubject;
   evalCase: EvalCase;
   evaluators: readonly EvaluatorView[];
@@ -804,8 +838,11 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSel
   unsaved: boolean;
   selected: boolean;
   onSelect: (selected: boolean) => void;
+  /** How many columns the table has, for the full-width details row. */
+  columns: number;
 }) {
   const [editing, setEditing] = React.useState(false);
+  const [showDetails, setShowDetails] = React.useState(false);
   const edit = useStepEvaluationMutation(step, (values: CaseFormResult) =>
     mediforce.evaluation.updateCase({ caseId: evalCase.id, ...caseChanges(evalCase, values) }));
   const remove = useStepEvaluationMutation(step, () => mediforce.evaluation.archiveCase({ caseId: evalCase.id, archived: true }));
@@ -813,61 +850,84 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSel
     setEditing(false);
     edit.reset();
   };
-  const checkedBy = evalCase.evaluatorIds === null
-    ? 'all evaluators'
-    : evalCase.evaluatorIds.map((evaluatorId) => evaluators.find((evaluator) => evaluator.id === evaluatorId)?.name ?? evaluatorId.slice(0, 8)).join(', ');
+  const checkedBy = evalCase.evaluatorIds === null ? 'all evaluators' : gradedBy(evalCase, evaluators).map(({ name }) => name).join(', ');
+  const expectedOutput = evalCase.expectedOutput === null ? null : JSON.stringify(evalCase.expectedOutput);
   return (
-    <li className="border-t pt-1.5 first:border-t-0 first:pt-0" data-testid="eval-case-row">
-      <div className="flex items-center gap-2">
-        {mayEdit && <input type="checkbox" aria-label={`Select ${evalCase.name}`} checked={selected} onChange={(event) => onSelect(event.target.checked)} />}
-        <span className="truncate">{evalCase.name}</span>
-        <CaseRunMark evalCase={evalCase} />
-        <CaseExpectationMark evalCase={evalCase} />
-        {evalCase.perturbation !== null && (
-          <InstantTooltip label={evalCase.perturbation.description}>
-            <span className="shrink-0 rounded bg-muted px-1.5 text-[11px] text-muted-foreground" data-testid="eval-case-perturbation">{evalCase.perturbation.kind.replace(/_/g, ' ')}</span>
-          </InstantTooltip>
+    <tbody className="border-b last:border-0" data-testid="eval-case-row">
+      <tr className="align-top hover:bg-muted/30">
+        {mayEdit && (
+          <td className="py-2 pl-3">
+            <input type="checkbox" aria-label={`Select ${evalCase.name}`} checked={selected} onChange={(event) => onSelect(event.target.checked)} />
+          </td>
         )}
-        {evalCase.origin === 'assistant' && (
-          <InstantTooltip label="Added by the assistant.">
-            <Bot className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Added by the assistant" />
-          </InstantTooltip>
-        )}
-        {unsaved && (
-          <InstantTooltip label="Not in the next Eval Run until you Save.">
-            <span className="shrink-0 rounded bg-amber-500/10 px-1.5 text-[11px] text-amber-700 dark:text-amber-300" data-testid="eval-case-unsaved">unsaved</span>
-          </InstantTooltip>
-        )}
-        <span className="ml-auto flex shrink-0 items-center gap-1.5">
-          {evalCase.expectedOutput !== null && (
-            <span className="text-xs text-muted-foreground" data-testid="eval-case-comparison">
-              {evalCase.comparison === 'exact' ? 'Exact match' : 'By meaning'} ·
-            </span>
-          )}
-          <InstantTooltip label={`Checked by ${checkedBy}.`}>
-            <span className="text-xs text-muted-foreground" data-testid="eval-case-evaluators">
-              {evalCase.evaluatorIds === null ? 'All evaluators' : `${evalCase.evaluatorIds.length} selected evaluator${evalCase.evaluatorIds.length === 1 ? '' : 's'}`}
-            </span>
-          </InstantTooltip>
-          {mayEdit && <button type="button" className={buttonClass} onClick={() => setEditing(true)}>Edit</button>}
-          {mayEdit && <button type="button" className={buttonClass} disabled={remove.isPending} onClick={() => remove.mutate(undefined)}>Remove</button>}
-        </span>
-      </div>
-      {remove.error !== null && <p className="text-xs text-destructive">{remove.error.message}</p>}
-      <details className="mt-0.5 text-xs" data-testid="eval-case-details">
-        <summary className="cursor-pointer text-muted-foreground">Details</summary>
-        <div className="mt-1 space-y-1.5">
-          <div className="grid gap-2 md:grid-cols-2">
-            <div className="min-w-0">
-              <div className="text-muted-foreground">Input</div>
-              <pre className="mt-0.5 max-h-60 overflow-auto rounded bg-muted p-1.5 whitespace-pre-wrap" data-testid="eval-case-input">{JSON.stringify(evalCase.input, null, 2)}</pre>
-            </div>
-            <CaseExpects evalCase={evalCase} />
+        <td className="px-3 py-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="font-medium">{evalCase.name}</span>
+            <CaseRunMark evalCase={evalCase} />
+            {evalCase.perturbation !== null && (
+              <InstantTooltip label={evalCase.perturbation.description}>
+                <span className="shrink-0 rounded bg-muted px-1.5 text-[11px] text-muted-foreground" data-testid="eval-case-perturbation">{evalCase.perturbation.kind.replace(/_/g, ' ')}</span>
+              </InstantTooltip>
+            )}
+            {evalCase.origin === 'assistant' && (
+              <InstantTooltip label="Added by the assistant.">
+                <Bot className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Added by the assistant" />
+              </InstantTooltip>
+            )}
+            {unsaved && (
+              <InstantTooltip label="Not in the next Eval Run until you Save.">
+                <span className="shrink-0 rounded bg-amber-500/10 px-1.5 text-[11px] text-amber-700 dark:text-amber-300" data-testid="eval-case-unsaved">unsaved</span>
+              </InstantTooltip>
+            )}
           </div>
-          <p><span className="text-muted-foreground">Checked by:</span> {checkedBy}</p>
-          {evalCase.sourceAgentRunId !== null && <SourceRunLog agentRunId={evalCase.sourceAgentRunId} />}
-        </div>
-      </details>
+          {remove.error !== null && <p className="text-xs text-destructive">{remove.error.message}</p>}
+        </td>
+        <td className="px-3 py-2">
+          {evalCase.expectedOutput === null ? <span className="text-xs text-muted-foreground">input only</span> : <CaseExpectationMark evalCase={evalCase} />}
+        </td>
+        <td className="hidden max-w-[14rem] px-3 py-2 lg:table-cell">
+          {expectedOutput === null ? <span className="text-muted-foreground">—</span> : (
+            <span className="block truncate font-mono text-xs" title={expectedOutput} data-testid="eval-case-expected-preview">{expectedOutput}</span>
+          )}
+        </td>
+        <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell" data-testid="eval-case-comparison">
+          {evalCase.expectedOutput === null ? <span className="text-muted-foreground">—</span> : evalCase.comparison === 'exact' ? 'Exact match' : 'By meaning'}
+        </td>
+        <td className="whitespace-nowrap px-3 py-2">
+          <CaseGradedBy evalCase={evalCase} evaluators={evaluators} />
+        </td>
+        <td className="whitespace-nowrap px-3 py-2 text-right">
+          <span className="inline-flex items-center gap-1.5">
+            <button
+              type="button"
+              aria-expanded={showDetails}
+              className="inline-flex items-center gap-0.5 text-xs text-primary hover:underline"
+              onClick={() => setShowDetails((current) => current === false)}
+            >
+              Details <ChevronRight className={cn('h-3 w-3 transition-transform', showDetails && 'rotate-90')} />
+            </button>
+            {mayEdit && <button type="button" className={buttonClass} onClick={() => setEditing(true)}>Edit</button>}
+            {mayEdit && <button type="button" className={buttonClass} disabled={remove.isPending} onClick={() => remove.mutate(undefined)}>Remove</button>}
+          </span>
+        </td>
+      </tr>
+      {showDetails && (
+        <tr>
+          <td colSpan={columns} className="bg-muted/20 px-3 pb-3 pt-1 text-xs" data-testid="eval-case-details">
+            <div className="space-y-1.5">
+              <div className="grid gap-2 md:grid-cols-2">
+                <div className="min-w-0">
+                  <div className="text-muted-foreground">Input</div>
+                  <pre className="mt-0.5 max-h-60 overflow-auto rounded bg-muted p-1.5 whitespace-pre-wrap" data-testid="eval-case-input">{JSON.stringify(evalCase.input, null, 2)}</pre>
+                </div>
+                <CaseExpects evalCase={evalCase} />
+              </div>
+              <p><span className="text-muted-foreground">Checked by:</span> {checkedBy}</p>
+              {evalCase.sourceAgentRunId !== null && <SourceRunLog agentRunId={evalCase.sourceAgentRunId} />}
+            </div>
+          </td>
+        </tr>
+      )}
       {editing && (
         <CaseDialog
           title={`Edit ${evalCase.name}`}
@@ -887,7 +947,7 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSel
           />
         </CaseDialog>
       )}
-    </li>
+    </tbody>
   );
 }
 
@@ -1201,6 +1261,7 @@ export function CasesSection({ step, evaluation, mayEdit }: {
   const [selectedIds, setSelectedIds] = React.useState<ReadonlySet<string>>(new Set());
   const selectedCases = cases.filter((evalCase) => selectedIds.has(evalCase.id));
   const [settingEvaluators, setSettingEvaluators] = React.useState(false);
+  const columnCount = mayEdit ? 7 : 6;
 
   return (
     <Section
@@ -1254,25 +1315,43 @@ export function CasesSection({ step, evaluation, mayEdit }: {
       {evaluation.cases.isLoading ? <Loading /> : cases.length === 0 ? (
         <p className="text-sm text-muted-foreground">No cases yet. Add one, or ask the assistant.</p>
       ) : (
-        <ul className="space-y-1.5 text-sm">
-          {cases.map((evalCase) => (
-            <CaseRow
-              key={evalCase.id}
-              step={step}
-              evalCase={evalCase}
-              evaluators={evaluators}
-              mayEdit={mayEdit}
-              unsaved={latest !== undefined && unsaved.has(evalCase.id)}
-              selected={selectedIds.has(evalCase.id)}
-              onSelect={(selected) => setSelectedIds((current) => {
-                const next = new Set(current);
-                if (selected) next.add(evalCase.id);
-                else next.delete(evalCase.id);
-                return next;
-              })}
-            />
-          ))}
-        </ul>
+        <div className="overflow-x-auto rounded-md border">
+          <table className="w-full text-sm" data-testid="eval-cases-table">
+            <thead>
+              <tr className="border-b bg-muted text-left text-xs text-muted-foreground">
+                {mayEdit && <th className="w-0 pl-3"><span className="sr-only">Select</span></th>}
+                <th className="px-3 py-2 font-medium">Case</th>
+                <th className="px-3 py-2 font-medium">
+                  <InstantTooltip label="Positive: the output must match the expected output. Negative: it must not. Input only: no expected output; only the Evaluators grade it.">
+                    <span>Type</span>
+                  </InstantTooltip>
+                </th>
+                <th className="hidden px-3 py-2 font-medium lg:table-cell">Expected output</th>
+                <th className="hidden px-3 py-2 font-medium md:table-cell">Comparison</th>
+                <th className="px-3 py-2 font-medium">Graded by</th>
+                <th className="px-3 py-2"><span className="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            {cases.map((evalCase) => (
+              <CaseRow
+                key={evalCase.id}
+                step={step}
+                evalCase={evalCase}
+                evaluators={evaluators}
+                mayEdit={mayEdit}
+                unsaved={latest !== undefined && unsaved.has(evalCase.id)}
+                selected={selectedIds.has(evalCase.id)}
+                onSelect={(selected) => setSelectedIds((current) => {
+                  const next = new Set(current);
+                  if (selected) next.add(evalCase.id);
+                  else next.delete(evalCase.id);
+                  return next;
+                })}
+                columns={columnCount}
+              />
+            ))}
+          </table>
+        </div>
       )}
       {cases.length > 0 && <DatasetStatus cases={cases} datasets={datasets} />}
       {save.error !== null && <p className="text-xs text-destructive">{save.error.message}</p>}

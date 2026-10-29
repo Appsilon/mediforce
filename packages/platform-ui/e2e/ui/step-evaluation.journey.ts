@@ -445,8 +445,10 @@ test.describe('Step Evaluation tab', () => {
     const row = page.getByTestId('eval-case-row').filter({ hasText: 'Fatal sepsis graded 4' });
     await expect(row.getByTestId('eval-case-expectation')).toHaveText('negative', { timeout: 10_000 });
     await expect(row.getByTestId('eval-case-comparison')).toContainText('By meaning');
-    await expect(row.getByTestId('eval-case-evaluators')).toHaveText('1 selected evaluator');
-    await row.getByText('Details', { exact: true }).click();
+    await expect(row.getByTestId('eval-case-evaluators')).toHaveText('1');
+    await row.getByTestId('eval-case-evaluators').click();
+    await expect(row.getByTestId('eval-case-evaluator-names')).toHaveText('matches-expected');
+    await row.getByRole('button', { name: 'Details' }).click();
     await expect(row.getByTestId('eval-case-expected-output')).toContainText('The output must not match this, by meaning');
     await expect(row.getByTestId('eval-case-expected-output')).toContainText('"grade": 4');
     await expect(row.getByTestId('eval-case-expected-output')).toContainText('Narrative wording is trivial; the grade decides.');

@@ -233,10 +233,14 @@ numbered Dataset; an Eval Run uses exactly that version.
 
 With an expected output, the form also sets whether the output must match it and how it is
 compared; **Checked by** picks **All evaluators** or **Only these**. **Edit** replaces a case
-with a new one; **Archive** takes it out of the next save. Ticking cases and **Set evaluators…** sets them in bulk.
+with a new one; **Remove** takes it out of the next save. Ticking cases and **Set evaluators…** sets them in bulk.
 
 **Test**
-- ✅ Cases show their labels (positive/negative, split, source) and *as run* / *edited*.
+- ✅ Cases are a table: **Case** (with *from run* / *edited from run*), **Type** (positive /
+  negative / input only), **Expected output**, **Comparison** (Exact match / By meaning) and
+  **Graded by** (*All N* or a count).
+- ✅ Clicking **Graded by** opens the Evaluators' names; **Details** opens the input, expected
+  output and source run log under the row.
 - ✅ Editing a production case's input turns it `manual` and keeps its source run.
 - ✅ **Save** → a Dataset version; add or edit one case → the tab marks it *unsaved* and says the
   next run is behind the list; **Save** is disabled while the newest version has every live case.

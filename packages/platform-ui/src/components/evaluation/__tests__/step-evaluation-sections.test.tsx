@@ -381,8 +381,48 @@ describe('Eval Case view and edit', () => {
     evaluators: { data: { evaluators } },
   }) as never;
 
+  it('lists a case in a row with its type, expected output, comparison and Evaluators, without a split', () => {
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ expectation: 'negative', comparison: 'agreement' }))} mayEdit={true} />);
+
+    const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
+    expect(headers).toEqual(['Select', 'Case', 'Type', 'Expected output', 'Comparison', 'Graded by', 'Actions']);
+    expect(screen.getByTestId('eval-case-expectation').textContent).toBe('negative');
+    expect(screen.getByTestId('eval-case-expected-preview').textContent).toBe('{"grade":5}');
+    expect(screen.getByTestId('eval-case-comparison').textContent).toBe('By meaning');
+    expect(screen.queryByTestId('eval-case-details')).toBeNull();
+  });
+
+  it('marks a case without an expected output input only, compared by nothing', () => {
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ expectedOutput: null }))} mayEdit={false} />);
+
+    expect(screen.getByTestId('eval-case-row').textContent).toContain('input only');
+    expect(screen.getByTestId('eval-case-comparison').textContent).toBe('—');
+  });
+
+  it('opens the names of the Evaluators grading a case from their count', () => {
+    const { unmount } = render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={false} />);
+    const all = screen.getByTestId('eval-case-evaluators');
+    expect(all.textContent).toBe('All 2');
+    expect(screen.queryByTestId('eval-case-evaluator-names')).toBeNull();
+    fireEvent.click(all);
+    expect(all.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByTestId('eval-case-evaluator-names').textContent).toBe('matches-expectedfindings-present');
+    unmount();
+
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ evaluatorIds: ['e-schema'] }))} mayEdit={false} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Graded by 1 evaluator' }));
+    expect(screen.getByTestId('eval-case-evaluator-names').textContent).toBe('findings-present');
+  });
+
+  it('says All, with nothing to open, while the step has no Evaluators', () => {
+    render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}), [])} mayEdit={false} />);
+    expect(screen.getByTestId('eval-case-evaluators').textContent).toBe('All');
+    expect(screen.queryByRole('button', { name: /Graded by/ })).toBeNull();
+  });
+
   it('shows only what a case gives the step and what it expects, with Edit beside its labels', () => {
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({}))} mayEdit={true} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }));
 
     const details = screen.getByTestId('eval-case-details');
     expect(screen.getByTestId('eval-case-expected-output').textContent).toContain('The output must match this, exactly');
@@ -415,6 +455,7 @@ describe('Eval Case view and edit', () => {
 
   it('opens the source run\'s log from the details, for a person who cannot edit too', () => {
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ source: 'synthesized' }))} mayEdit={false} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }));
     const log = screen.getByTestId('source-run-log') as HTMLDetailsElement;
     log.open = true;
     fireEvent(log, new Event('toggle'));
