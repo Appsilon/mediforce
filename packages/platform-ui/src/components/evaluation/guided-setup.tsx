@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { useStepEvaluationMutation, type useStepEvaluation } from '@/hooks/use-step-evaluation';
 import { EvaluationAssistantPanel, type EvaluationAssistantStarter } from './evaluation-assistant-panel';
-import { EvaluationBriefField } from './evaluation-brief-field';
+import type { BriefQuery } from './evaluation-brief-field';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
 import { CasesSection, EvaluatorsSection, StartEvalRunControls, hasUnsavedCases, loadedAgentRuns } from './step-evaluation-sections';
 
@@ -104,11 +104,11 @@ function StageHeading({ title, optional, purpose, why }: { title: string; option
 /** What each stage hands the assistant: the job is the assistant's, so its buttons sit in the panel. */
 function stageStarter(stage: SetupStage, step: EvaluationSubject): EvaluationAssistantStarter | undefined {
   if (stage === 'brief') {
-    return { intro: 'Drafts it from the step\'s prompt, output schema and a few recent runs.', actions: [{ label: 'Draft the Brief', prompt: PROMPTS.brief, testId: 'guided-setup-draft-brief' }] };
+    return { actions: [{ label: 'Draft the Brief', prompt: PROMPTS.brief, testId: 'guided-setup-draft-brief' }] };
   }
   if (stage === 'cases') {
     return {
-      intro: step.kind === 'step' ? 'Turns reviewed runs into cases, and covers inputs production hasn\'t sent yet.' : 'Covers inputs production hasn\'t sent yet.',
+      intro: 'Cover inputs production hasn\'t sent yet.',
       actions: [
         ...(step.kind === 'step' ? [{ label: 'Cases from reviewed runs', prompt: PROMPTS.reviewedRuns, testId: 'guided-setup-reviewed-runs' }] : []),
         { label: 'Suggest edge cases', prompt: PROMPTS.edgeCases, testId: 'guided-setup-edge-cases' },
@@ -116,9 +116,41 @@ function stageStarter(stage: SetupStage, step: EvaluationSubject): EvaluationAss
     };
   }
   if (stage === 'evaluators') {
-    return { intro: 'Picks checks from the step\'s output and the Brief.', actions: [{ label: 'Propose checks', prompt: PROMPTS.checks, testId: 'guided-setup-propose-checks' }] };
+    return { intro: 'Picks checks from the step\'s shape and the Brief.', actions: [{ label: 'Propose checks', prompt: PROMPTS.checks, testId: 'guided-setup-propose-checks' }] };
   }
   return undefined;
+}
+
+/**
+ * The Brief as the guided stage shows it: always open for writing, saved as a
+ * new version when the person leaves the field, and following the saved Brief
+ * — one the assistant drafted and the person accepted — until they type.
+ */
+function BriefCard({ step, brief, mayEdit }: { step: EvaluationSubject; brief: BriefQuery; mayEdit: boolean }) {
+  const saved = brief.data?.brief?.text ?? '';
+  const [edited, setEdited] = React.useState<string | null>(null);
+  const save = useStepEvaluationMutation(step, (text: string) => mediforce.evaluation.setBrief({ ...step, text }));
+  const commit = () => {
+    if (edited === null || edited.trim() === '' || edited === saved || save.isPending) return;
+    save.mutate(edited, { onSuccess: () => setEdited(null) });
+  };
+  return (
+    <section className="flex flex-col gap-2.5 rounded-lg border p-5" data-testid="guided-setup-brief">
+      <label htmlFor="guided-setup-brief-text" className="text-sm font-semibold">Evaluation Brief</label>
+      <textarea
+        id="guided-setup-brief-text"
+        rows={10}
+        className={cn(inputClass, 'w-full resize-y text-sm leading-relaxed')}
+        placeholder="Write it, or let the assistant draft it →"
+        disabled={mayEdit === false || brief.isLoading}
+        value={edited ?? saved}
+        onChange={(event) => setEdited(event.target.value)}
+        onBlur={commit}
+      />
+      {brief.isError && <p role="alert" className="text-xs text-destructive">Could not load the Brief.</p>}
+      {save.error !== null && <p role="alert" className="text-xs text-destructive">{save.error.message}</p>}
+    </section>
+  );
 }
 
 const EXPECTATION_CHOICES = [
@@ -391,7 +423,9 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
   return (
     <div className="space-y-4" data-testid="guided-setup" data-stage={stage}>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-2.5">
-        <span className="text-sm font-semibold">Guided setup</span>
+        <span className="text-sm font-semibold">
+          {step.kind === 'step' ? step.stepId : step.agentId} <span className="font-normal text-muted-foreground">· guided setup</span>
+        </span>
         <nav aria-label="Setup progress" className="flex flex-wrap items-center gap-1.5">
           {SETUP_STAGES.map((candidate, index) => (
             <button
@@ -444,9 +478,7 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
         <div className="min-w-0 space-y-4">
           {stage === 'brief' && (
-            <section aria-label="Evaluation Brief" className="rounded-lg border p-4">
-              <EvaluationBriefField step={step} brief={evaluation.brief} mayEdit={mayEdit} />
-            </section>
+            <BriefCard step={step} brief={evaluation.brief} mayEdit={mayEdit} />
           )}
           {stage === 'cases' && (
             <>

@@ -8,6 +8,7 @@ const evaluation = vi.hoisted(() => ({
   createEvaluator: vi.fn(),
   setAcceptanceCriteria: vi.fn(),
   saveDataset: vi.fn(),
+  setBrief: vi.fn(),
 }));
 
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
@@ -38,7 +39,6 @@ vi.mock('../evaluation-assistant-panel', () => ({
     </div>
   ),
 }));
-vi.mock('../evaluation-brief-field', () => ({ EvaluationBriefField: () => <div data-testid="evaluation-brief" /> }));
 vi.mock('../step-evaluation-sections', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../step-evaluation-sections')>()),
   CasesSection: () => <div data-testid="cases-section" />,
@@ -101,6 +101,7 @@ beforeEach(() => {
   evaluation.createEvaluator.mockResolvedValue({});
   evaluation.setAcceptanceCriteria.mockResolvedValue({});
   evaluation.saveDataset.mockResolvedValue({});
+  evaluation.setBrief.mockResolvedValue({});
 });
 
 describe('SetupChoice', () => {
@@ -130,6 +131,23 @@ describe('GuidedSetup', () => {
     renderSetup('brief', evaluationOf());
     fireEvent.click(screen.getByTestId('guided-setup-draft-brief'));
     expect(asked).toHaveBeenCalledWith(expect.stringContaining('Evaluation Brief'));
+  });
+
+  it('keeps the Brief open for writing and saves it when the person leaves the field', async () => {
+    renderSetup('brief', evaluationOf());
+    const field = screen.getByLabelText('Evaluation Brief');
+    expect(field).toHaveAttribute('placeholder', 'Write it, or let the assistant draft it →');
+    fireEvent.change(field, { target: { value: 'Extracts adverse events.' } });
+    fireEvent.blur(field);
+    await waitFor(() => expect(evaluation.setBrief).toHaveBeenCalledWith({ ...step, text: 'Extracts adverse events.' }));
+  });
+
+  it('shows the saved Brief, and leaves it alone when nothing changed', () => {
+    renderSetup('brief', evaluationOf({ brief: { text: 'Drafted by the assistant.' } }));
+    const field = screen.getByLabelText('Evaluation Brief');
+    expect(field).toHaveValue('Drafted by the assistant.');
+    fireEvent.blur(field);
+    expect(evaluation.setBrief).not.toHaveBeenCalled();
   });
 
   it('offers cases from reviewed runs only for a step, which has production runs', () => {

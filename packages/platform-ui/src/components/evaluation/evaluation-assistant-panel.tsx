@@ -132,7 +132,7 @@ function StepsSummary({ steps }: { steps: ActivityStep[] }) {
 
 /** The jobs a page hands the assistant, each asked with one button in the panel. */
 export interface EvaluationAssistantStarter {
-  intro: string;
+  intro?: string;
   actions: { label: string; prompt: string; testId: string }[];
 }
 
@@ -153,7 +153,7 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
   editReason: string | undefined;
   mayRun: boolean;
   runReason: string | undefined;
-  /** Shown above the conversation for as long as the page offers it. */
+  /** Opens the conversation, in place of the general intro, for as long as the page offers it. */
   starter?: EvaluationAssistantStarter;
 }) {
   const [messages, setMessages] = React.useState<PanelMessage[]>([]);
@@ -288,23 +288,6 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
           </details>
         </div>
       )}
-      {starter !== undefined && starter.actions.length > 0 && (
-        <div className="shrink-0 space-y-2 border-b px-4 py-3" data-testid="evaluation-assistant-starter">
-          <p className="text-xs text-muted-foreground">{starter.intro}</p>
-          <div className="flex flex-wrap gap-2">
-            {starter.actions.map((action) => (
-              <button
-                key={action.testId}
-                type="button"
-                className={primaryButtonClass}
-                data-testid={action.testId}
-                disabled={pending}
-                onClick={() => void send(action.prompt, 'card')}
-              >{action.label}</button>
-            ))}
-          </div>
-        </div>
-      )}
       <div
         ref={assistantScrollRef}
         className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3"
@@ -313,7 +296,23 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
           followLatest.current = element.scrollHeight - element.scrollTop - element.clientHeight < FOLLOW_LATEST_THRESHOLD;
         }}
       >
-        {messages.length === 0 && (
+        {starter !== undefined && starter.actions.length > 0 ? (
+          <div className="space-y-2.5 pb-1" data-testid="evaluation-assistant-starter">
+            {starter.intro !== undefined && <p className="text-sm text-muted-foreground">{starter.intro}</p>}
+            <div className="flex flex-wrap gap-2">
+              {starter.actions.map((action) => (
+                <button
+                  key={action.testId}
+                  type="button"
+                  className={primaryButtonClass}
+                  data-testid={action.testId}
+                  disabled={pending}
+                  onClick={() => void send(action.prompt, 'card')}
+                >{action.label}</button>
+              ))}
+            </div>
+          </div>
+        ) : messages.length === 0 && (
           <p className="text-xs text-muted-foreground">
             Ask for an evaluation plan, turn a rule into a check tried on real runs,
             synthesize edge cases, prepare an Eval Run or explain a report. It proposes; you decide.
