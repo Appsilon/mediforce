@@ -131,6 +131,13 @@ Legend: ✅ expected · 🔍 try to break it · 🧪 in the sandbox workflow
 A status strip on top, three tabs under it; the **Evaluation Assistant** is the right-hand panel,
 which **Hide assistant** in the strip folds away.
 
+A step with nothing set up yet first offers **Guided setup** (Brief → Eval Cases → Evaluators →
+Review, the assistant drafting each) or **Set up manually** (the tabs below).
+
+- ✅ **Guided setup** → **For some** on *Do you know the correct outputs?* adds `matches-expected-output`; add a case
+  from a run; **Review** → set 90% → **Save** opens the tabs with criteria ≥ 90% and Dataset v1.
+- 🔍 Pick **For some** twice, or come back to the stage: still one `matches-expected-output`.
+
 | Part | What it is for |
 |---|---|
 | Drift banner | Amber warning when production quality drops (only shown while an Evaluator drifts) |

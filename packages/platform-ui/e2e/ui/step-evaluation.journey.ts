@@ -18,8 +18,9 @@ import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
  * are set on accepting them, and a person confirms or overwrites a run's verdict from a
  * finished run's report. A step opens on its Eval Runs once it has any, else
  * on its cases; a banner over the tabs leads to Code Evaluators nobody
- * approved; `?section=` and a hidden assistant survive a reload. The model is
- * the scripted mock OpenRouter.
+ * approved; `?section=` and a hidden assistant survive a reload. An empty step
+ * offers a guided setup — Brief, Eval Cases, Evaluators, Review — or the tabs.
+ * The model is the scripted mock OpenRouter.
  */
 test.describe('Step Evaluation tab', () => {
   // Each worker seeding the workspace's model key at once races on its insert, so the tab's journeys share one worker.
@@ -52,6 +53,7 @@ test.describe('Step Evaluation tab', () => {
     await page.getByRole('tab', { name: /evaluation/i }).click();
     await expect(page).toHaveURL(/tab=evaluation/);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await page.getByTestId('evaluation-setup-manual').click();
     await page.getByTestId('evaluation-tab-evaluators').click();
     await expect(page).toHaveURL(/section=evaluators/);
     await expect(page.getByText('No Evaluators yet.')).toBeVisible({ timeout: 10_000 });
@@ -133,6 +135,7 @@ test.describe('Step Evaluation tab', () => {
 
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await page.getByTestId('evaluation-setup-manual').click();
     await page.getByTestId('evaluation-assistant-input').fill(question);
     await page.getByTestId('evaluation-assistant-send').click();
     await expect(page.getByText('Here is the plan.')).toBeVisible({ timeout: 20_000 });
@@ -376,6 +379,7 @@ test.describe('Step Evaluation tab', () => {
 
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
     await expect(page.getByTestId('evaluation-step-select')).toHaveValue('grade-aes', { timeout: 15_000 });
+    await page.getByTestId('evaluation-setup-manual').click();
     await page.getByTestId('evaluation-tab-evaluators').click();
     await expect(page).toHaveURL(/section=evaluators/);
     await expect(page.getByText('No Evaluators yet.')).toBeVisible({ timeout: 10_000 });
@@ -453,5 +457,43 @@ test.describe('Step Evaluation tab', () => {
     await expect(row.getByTestId('eval-case-expected-output')).toContainText('"grade": 4');
     await expect(row.getByTestId('eval-case-expected-output')).toContainText('Narrative wording is trivial; the grade decides.');
     await expect(row.getByTestId('eval-case-details')).toContainText('Checked by: matches-expected');
+  });
+
+  test('an empty step is set up in guided stages: a comparison check from known outputs, a case from a run, criteria saved with the Dataset', async ({ page, request }) => {
+    test.setTimeout(90_000);
+    trackPageErrors(page);
+    const workflowName = `e2e-eval-guided-${randomUUID().slice(0, 8)}`;
+    const runId = await startRun(request, agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agent: { prompt: 'Grade each AE.' } }), {}, EVALUATION_WORKSPACE);
+    await awaitFinishedAgentRun(request, runId);
+
+    await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
+    await expect(page.getByTestId('evaluation-setup-detected')).toContainText('1 production run', { timeout: 15_000 });
+    await page.getByTestId('evaluation-setup-guided').click();
+    await expect(page).toHaveURL(/setup=guided&stage=brief/);
+    await expect(page.getByTestId('guided-setup-stage-brief')).toHaveAttribute('aria-current', 'step');
+    await page.getByRole('button', { name: 'Skip' }).click();
+
+    // Knowing some outputs adds the check that compares them.
+    await expect(page).toHaveURL(/stage=cases/);
+    await page.getByRole('button', { name: 'For some' }).click();
+    await expect(page.getByTestId('guided-setup-stage-evaluators')).toHaveAttribute('data-filled', 'true', { timeout: 10_000 });
+    await page.getByRole('button', { name: 'Add case' }).click();
+    await page.getByTestId('case-dialog').getByTestId('case-form').getByRole('button', { name: 'Add case' }).click();
+    await expect(page.getByTestId('case-dialog')).toHaveCount(0);
+    await expect(page.getByTestId('eval-case-row')).toHaveCount(1, { timeout: 10_000 });
+
+    await page.getByTestId('guided-setup-next').click();
+    await expect(page.getByTestId('evaluator-row').filter({ hasText: 'matches-expected-output' })).toBeVisible();
+    await page.getByTestId('guided-setup-next').click();
+
+    await expect(page.getByTestId('review-eval-cases')).toContainText('unsaved');
+    await page.getByLabel('Minimum pass rate (%)').fill('90');
+    await page.getByTestId('guided-setup-save').click();
+
+    // Saved, the step opens on its tabs.
+    await expect(page).toHaveURL(/setup=manual/);
+    await expect(page.getByTestId('acceptance-criteria-summary')).toHaveText('Each counted Evaluator ≥ 90%', { timeout: 10_000 });
+    await expect(page.getByTestId('dataset-summary')).toHaveText('v1 · 1 case');
+    await expect(page.getByTestId('evaluation-tab-cases')).toHaveAttribute('data-state', 'active');
   });
 });

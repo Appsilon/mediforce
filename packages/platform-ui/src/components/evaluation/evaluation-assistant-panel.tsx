@@ -129,6 +129,11 @@ function StepsSummary({ steps }: { steps: ActivityStep[] }) {
   );
 }
 
+/** Lets the page around the assistant ask it something, as a card does. */
+export interface EvaluationAssistantHandle {
+  ask: (message: string) => void;
+}
+
 /**
  * The Evaluation Assistant (ADR-0023 D14–D15) beside the Step's evaluation.
  * It reads and previews on its own; everything it would change arrives as a
@@ -136,7 +141,8 @@ function StepsSummary({ steps }: { steps: ActivityStep[] }) {
  * person confirms the budget on the card. The Step's Brief, which it reads on
  * every turn, opens from the header.
  */
-export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEdit, editReason, mayRun, runReason }: {
+export function EvaluationAssistantPanel({ ref, step, definitionVersion, brief, mayEdit, editReason, mayRun, runReason }: {
+  ref?: React.Ref<EvaluationAssistantHandle>;
   step: EvaluationSubject;
   /** The workflow version whose step the assistant reads and runs. */
   /** Null for an Agent evaluated on its own (ADR-0029), which runs as it is now. */
@@ -220,6 +226,8 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
       setPending(false);
     }
   };
+
+  React.useImperativeHandle(ref, () => ({ ask: (message) => void send(message, 'card') }));
 
   return (
     <aside className="flex h-full min-h-0 flex-col rounded-xl border bg-white shadow-lg dark:bg-background" data-testid="evaluation-assistant" data-tour="eval-assistant">

@@ -47,6 +47,23 @@ the selected version has it
 when absent). A step's Evaluators, cases, Brief and criteria are the step's,
 not a version's: they stay readable and editable from an older version even
 once the runnable version no longer has the step.
+
+A step (or Agent) with nothing yet — no Brief, cases, Evaluators or Eval Runs —
+opens, for a person who may edit it, on a choice: **Guided setup** or **Set up
+manually** (the tabs; `?setup=manual`). The guided setup (`?setup=guided&stage=
+brief|cases|evaluators|review`) walks four stages beside the same assistant,
+whose conversation carries from stage to stage: **Brief** (optional), **Eval
+Cases** — *Do you know the correct outputs?* **Yes** or **For some** adds one
+`expected_output` Evaluator, `matches-expected-output`, unless the step has one
+— **Evaluators**, and **Review**. Each of the first three has a button that asks
+the assistant to draft it (the Brief; cases from reviewed runs or edge cases;
+an evaluation plan); its proposals arrive as cards, as on the tabs. Review sums
+up the stages, sets the Acceptance Criteria (minimum pass rate, optionally
+pass^k) and, on **Save**, writes them if changed and saves the cases as a new
+Dataset version if unsaved, then opens the tabs; **Save and start Eval Run**
+saves, then asks for trials and a budget as the Eval Runs tab does. **Exit
+setup** opens the tabs without saving anything more.
+
 Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
 
 - **Runs freely:** reading the step (config, agent prompt and system prompt,

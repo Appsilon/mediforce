@@ -10,6 +10,7 @@ import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-ve
 import { VALIDATION_STATUS } from './validation-status';
 import { buttonClass, tabTriggerClass } from './evaluation-styles';
 import { EvaluationAssistantPanel } from './evaluation-assistant-panel';
+import { GuidedSetup, SETUP_STAGES, SetupChoice, type SetupStage } from './guided-setup';
 import {
   EvaluationStatusStrip,
   CasesSection,
@@ -127,6 +128,47 @@ function useSectionTab(hasRuns: boolean | undefined) {
   return { section, select };
 }
 
+function isSetupStage(value: string | null): value is SetupStage {
+  return SETUP_STAGES.some((stage) => stage === value);
+}
+
+/**
+ * How the Evaluation is being set up, kept in `?setup=` and `?stage=`: in the
+ * guided stages, by hand on the tabs, or not chosen yet.
+ */
+function useSetupMode() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const requested = searchParams.get('setup');
+  const setup = requested === 'guided' || requested === 'manual' ? requested : null;
+  const requestedStage = searchParams.get('stage');
+  const stage: SetupStage = isSetupStage(requestedStage) ? requestedStage : 'brief';
+  const replace = (change: (params: URLSearchParams) => void) => {
+    const params = new URLSearchParams(searchParams.toString());
+    change(params);
+    router.replace(`${pathname}?${params}`, { scroll: false });
+  };
+  const go = (next: SetupStage) => replace((params) => {
+    params.set('setup', 'guided');
+    params.set('stage', next);
+  });
+  const manual = (section: string | null) => replace((params) => {
+    params.set('setup', 'manual');
+    params.delete('stage');
+    if (section === null) params.delete('section');
+    else params.set('section', section);
+  });
+  return { setup, stage, go, manual };
+}
+
+/** Whether the subject has nothing to evaluate with yet — no Brief, cases, Evaluators or Eval Runs; undefined while any is loading. */
+function isEmptySubject(evaluation: ReturnType<typeof useStepEvaluation>): boolean | undefined {
+  const { brief, cases, evaluators, runs } = evaluation;
+  if (brief.data === undefined || cases.data === undefined || evaluators.data === undefined || runs.data === undefined) return undefined;
+  return brief.data.brief === null && cases.data.cases.length === 0 && evaluators.data.evaluators.length === 0 && runs.data.evalRuns.length === 0;
+}
+
 /** Whether the assistant column is shown, remembered per browser; shown until hidden. */
 function useAssistantOpen() {
   const [open, setOpen] = React.useState(true);
@@ -155,7 +197,8 @@ function useAssistantOpen() {
  * The subject is an agent Step in one workflow version, or an Agent on its own
  * (ADR-0029), with no version to pick. Every tab and the hidden assistant stay
  * mounted, so a half-filled form, the unsaved-cases guard, or an assistant
- * conversation survives switching tabs or hiding the assistant.
+ * conversation survives switching tabs or hiding the assistant. A subject
+ * with nothing set up first offers the guided setup or the tabs.
  */
 export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit, editReason, mayRun, runReason }: {
   step: EvaluationSubject;
@@ -167,6 +210,8 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
   runReason: string | undefined;
 }) {
   const evaluation = useStepEvaluation(step, definitionVersion);
+  const setupMode = useSetupMode();
+  const empty = isEmptySubject(evaluation);
   const layoutRef = React.useRef<HTMLDivElement>(null);
   const assistantWidth = useAssistantWidth(layoutRef);
   const assistant = useAssistantOpen();
@@ -183,6 +228,27 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
     { value: 'cases', label: 'Eval Cases', count: caseCount, tour: 'eval-cases' },
     { value: 'evaluators', label: 'Evaluators', count: evaluation.evaluators.data === undefined ? undefined : evaluators.length, tour: 'eval-evaluators' },
   ];
+  if (setupMode.setup === 'guided') {
+    return (
+      <GuidedSetup
+        step={step}
+        definitionVersion={definitionVersion}
+        evaluation={evaluation}
+        outputSchema={outputSchema}
+        mayEdit={mayEdit}
+        editReason={editReason}
+        mayRun={mayRun}
+        runReason={runReason}
+        stage={setupMode.stage}
+        onStage={setupMode.go}
+        onExit={setupMode.manual}
+      />
+    );
+  }
+  if (setupMode.setup === null && mayEdit) {
+    if (empty === undefined) return <p className="text-sm text-muted-foreground">Loading…</p>;
+    if (empty) return <SetupChoice step={step} evaluation={evaluation} onGuided={() => setupMode.go('brief')} onManual={() => setupMode.manual(null)} />;
+  }
   return (
     <div className="space-y-4">
       <DriftAlert data={evaluation.drift} />
@@ -281,6 +347,9 @@ export function EvaluationTab({ handle, workflowName, runnableVersion, mayEdit, 
   const select = (next: { version?: number; step?: string }) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', 'evaluation');
+    // How one step is set up says nothing about the next.
+    params.delete('setup');
+    params.delete('stage');
     if (next.version !== undefined) {
       params.set('version', String(next.version));
       params.delete('step');
