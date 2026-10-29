@@ -448,11 +448,11 @@ The cases are a table, one row per case: **Case** — its name and, for a case
 made from a run, whether it is **from run** or **edited from run** (its input
 differs from what the run was given, or its expected output, none included,
 from what the run returned) — **Type** (positive, negative, or input only
-without an expected output), a one-line **Expected output**, **Comparison**
-(Exact match or By meaning), and **Graded by** — *All N* or a count, which
-opens into the Evaluators' names — then **Details**, **Edit** and **Remove**
-(archives the case). On narrow screens Expected output and Comparison are
-hidden; Details still has both. **Details** opens under the row and shows only what the
+without an expected output), **Expected output** — a checkmark when the case
+has one, *missing* when not; Details shows it — **Comparison** (Exact match or
+By meaning), and **Graded by** — *All N* or a count, which opens into the
+Evaluators' names — then **Details**, **Edit** and **Remove** (archives the
+case). On narrow screens Comparison is hidden; Details still has it. **Details** opens under the row and shows only what the
 case gives the step and what it expects: its
 input, its expected output and how it is compared, and the Evaluators that grade
 it — plus **Source run log** for a case made from a run, synthesized ones
