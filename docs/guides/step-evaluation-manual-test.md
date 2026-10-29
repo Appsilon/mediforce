@@ -137,6 +137,8 @@ Review, the assistant drafting each) or **Set up manually** (the tabs below).
 - ✅ **Guided setup** → **For some** on *Do you know the correct outputs?* adds `matches-expected-output`; add a case
   from a run; **Review** → set 90% → **Save** opens the tabs with criteria ≥ 90% and Dataset v1.
 - 🔍 Pick **For some** twice, or come back to the stage: still one `matches-expected-output`.
+- 🔍 Ask the assistant on **Brief**, then open **Eval Cases**: its conversation starts empty; back on **Brief**,
+  the earlier one is still there.
 
 | Part | What it is for |
 |---|---|

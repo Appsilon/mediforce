@@ -408,8 +408,8 @@ function StageFooter({ back, next, skip }: { back: React.ReactNode; next: { labe
 /**
  * Guided setup of a subject's Evaluation: Brief, Eval Cases, Evaluators and
  * Review, one stage at a time, beside the Evaluation Assistant, which offers
- * each stage's drafting job as a button and keeps its conversation from stage
- * to stage. Every stage writes as the tabs do; only Review saves the cases as a
+ * each stage's drafting job as a button and holds a conversation per stage,
+ * kept for going back to it. Every stage writes as the tabs do; only Review saves the cases as a
  * Dataset version and sets the Acceptance Criteria.
  */
 export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema, mayEdit, editReason, mayRun, runReason, stage, onStage, onExit }: {
@@ -434,6 +434,8 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
   };
   const [expectationChoice, setExpectationChoice] = React.useState<ExpectationChoice | null>(null);
   const expectation = expectationChoice ?? (hasComparisonEvaluator(evaluation) ? 'some' : null);
+  const [visited, setVisited] = React.useState<SetupStage[]>([stage]);
+  if (visited.includes(stage) === false) setVisited([...visited, stage]);
   const layoutRef = React.useRef<HTMLDivElement>(null);
   const assistantWidth = useAssistantWidth(layoutRef);
   const assistantHeight = useAssistantHeight();
@@ -524,16 +526,20 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
         </div>
         <div ref={assistantHeight.ref} className="relative lg:sticky lg:top-6 lg:h-[var(--assistant-height,calc(100dvh-10rem))]" style={{ '--assistant-height': assistantHeight.height === undefined ? undefined : `${assistantHeight.height}px` } as React.CSSProperties}>
           <AssistantResizeHandle {...assistantWidth} />
-          <EvaluationAssistantPanel
-            step={step}
-            definitionVersion={definitionVersion}
-            brief={evaluation.brief}
-            mayEdit={mayEdit}
-            editReason={editReason}
-            mayRun={mayRun}
-            runReason={runReason}
-            starter={mayEdit ? stageStarter(stage, step, expectation) : undefined}
-          />
+          {SETUP_STAGES.filter((candidate) => visited.includes(candidate)).map((candidate) => (
+            <div key={candidate} hidden={candidate !== stage} className="h-full">
+              <EvaluationAssistantPanel
+                step={step}
+                definitionVersion={definitionVersion}
+                brief={evaluation.brief}
+                mayEdit={mayEdit}
+                editReason={editReason}
+                mayRun={mayRun}
+                runReason={runReason}
+                starter={mayEdit ? stageStarter(candidate, step, expectation) : undefined}
+              />
+            </div>
+          ))}
         </div>
       </div>
     </div>

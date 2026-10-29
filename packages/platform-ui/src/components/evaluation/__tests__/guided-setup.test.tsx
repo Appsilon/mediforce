@@ -31,13 +31,17 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
   },
 }));
 vi.mock('../evaluation-assistant-panel', () => ({
-  EvaluationAssistantPanel: ({ starter }: { starter?: { actions: { label: string; prompt: string; testId: string }[] } }) => (
-    <div data-testid="evaluation-assistant">
-      {starter?.actions.map((action) => (
-        <button key={action.testId} type="button" data-testid={action.testId} onClick={() => asked(action.prompt)}>{action.label}</button>
-      ))}
-    </div>
-  ),
+  EvaluationAssistantPanel: ({ starter }: { starter?: { actions: { label: string; prompt: string; testId: string }[] } }) => {
+    const [conversation, setConversation] = React.useState<string[]>([]);
+    return (
+      <div data-testid="evaluation-assistant">
+        {starter?.actions.map((action) => (
+          <button key={action.testId} type="button" data-testid={action.testId} onClick={() => { asked(action.prompt); setConversation((current) => [...current, action.label]); }}>{action.label}</button>
+        ))}
+        <p data-testid="assistant-conversation">{conversation.join(', ')}</p>
+      </div>
+    );
+  },
 }));
 vi.mock('../step-evaluation-sections', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../step-evaluation-sections')>()),
@@ -77,7 +81,7 @@ function evaluationOf({ brief = null, cases = [], evaluators = [], datasets = []
 function renderSetup(stage: SetupStage, data: Parameters<typeof GuidedSetup>[0]['evaluation'], overrides: Partial<Parameters<typeof GuidedSetup>[0]> = {}) {
   const onStage = vi.fn();
   const onExit = vi.fn();
-  render(
+  const setupAt = (at: SetupStage) => (
     <GuidedSetup
       step={step}
       definitionVersion={3}
@@ -87,13 +91,14 @@ function renderSetup(stage: SetupStage, data: Parameters<typeof GuidedSetup>[0][
       editReason={undefined}
       mayRun
       runReason={undefined}
-      stage={stage}
+      stage={at}
       onStage={onStage}
       onExit={onExit}
       {...overrides}
-    />,
+    />
   );
-  return { onStage, onExit };
+  const { rerender } = render(setupAt(stage));
+  return { onStage, onExit, moveTo: (at: SetupStage) => rerender(setupAt(at)) };
 }
 
 beforeEach(() => {
@@ -131,6 +136,19 @@ describe('GuidedSetup', () => {
     renderSetup('brief', evaluationOf());
     fireEvent.click(screen.getByTestId('guided-setup-draft-brief'));
     expect(asked).toHaveBeenCalledWith(expect.stringContaining('Evaluation Brief'));
+  });
+
+  it('keeps a conversation per stage: a new stage starts its own, and going back returns to the earlier one', () => {
+    const shownConversation = () => screen.getAllByTestId('assistant-conversation').filter((element) => element.closest('[hidden]') === null);
+    const { moveTo } = renderSetup('brief', evaluationOf());
+    fireEvent.click(screen.getByTestId('guided-setup-draft-brief'));
+    expect(shownConversation()).toHaveLength(1);
+    expect(shownConversation()[0]).toHaveTextContent('Draft the Brief');
+    moveTo('cases');
+    expect(shownConversation()).toHaveLength(1);
+    expect(shownConversation()[0]).toBeEmptyDOMElement();
+    moveTo('brief');
+    expect(shownConversation()[0]).toHaveTextContent('Draft the Brief');
   });
 
   it('keeps the Brief open for writing and saves it when the person leaves the field', async () => {
