@@ -14,6 +14,7 @@ import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 import { AgentSkillsSection } from '@/components/agents/agent-skills-section';
 import { AGENT_ICON_OPTIONS, AgentImageField, AgentOutputSchemaField, AgentRuntimeField, RecognitionLabel } from '@/components/agents/agent-form-parts';
 import { AgentEvaluation } from '@/components/evaluation/agent-evaluation';
+import { EVALUATION_QUERY_PARAMS } from '@/components/evaluation/evaluation-tab';
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 
@@ -43,7 +44,10 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const selectTab = (next: 'configuration' | 'evaluation') => {
     const query = new URLSearchParams(searchParams.toString());
     if (next === 'evaluation') query.set('tab', 'evaluation');
-    else query.delete('tab');
+    else {
+      query.delete('tab');
+      for (const name of EVALUATION_QUERY_PARAMS) query.delete(name);
+    }
     router.replace(query.size === 0 ? pathname : `${pathname}?${query}`, { scroll: false });
   };
 

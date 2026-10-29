@@ -468,13 +468,22 @@ test.describe('Step Evaluation tab', () => {
 
     await page.goto(`/${EVALUATION_WORKSPACE}/workflows/${encodeURIComponent(workflowName)}?tab=evaluation`);
     await expect(page.getByTestId('evaluation-setup-detected')).toContainText('1 production run', { timeout: 15_000 });
+
+    // Choosing the tabs leaves nothing in the URL: another tab gets none of the Evaluation's parameters, and coming back offers the choice again.
+    await page.getByTestId('evaluation-setup-manual').click();
+    await expect(page.getByTestId('evaluation-tab-cases')).toHaveAttribute('data-state', 'active');
+    await page.getByRole('tab', { name: 'Access' }).click();
+    await expect(page).toHaveURL(/tab=access$/);
+    await page.getByRole('tab', { name: /evaluation/i }).click();
+    await expect(page.getByTestId('evaluation-setup-guided')).toBeVisible({ timeout: 15_000 });
+
     await page.getByTestId('evaluation-setup-guided').click();
-    await expect(page).toHaveURL(/setup=guided&stage=brief/);
+    await expect(page).toHaveURL(/guided=brief/);
     await expect(page.getByTestId('guided-setup-stage-brief')).toHaveAttribute('aria-current', 'step');
     await page.getByRole('button', { name: 'Skip' }).click();
 
     // Knowing some outputs adds the check that compares them.
-    await expect(page).toHaveURL(/stage=cases/);
+    await expect(page).toHaveURL(/guided=cases/);
     await page.getByRole('button', { name: 'For some' }).click();
     await expect(page.getByTestId('guided-setup-stage-evaluators')).toHaveAttribute('data-filled', 'true', { timeout: 10_000 });
     await page.getByRole('button', { name: 'Add case' }).click();
@@ -491,14 +500,14 @@ test.describe('Step Evaluation tab', () => {
     await page.getByTestId('guided-setup-save').click();
 
     // Saved, the step opens on its tabs.
-    await expect(page).toHaveURL(/setup=manual/);
+    await expect(page).not.toHaveURL(/guided=/);
     await expect(page.getByTestId('acceptance-criteria-summary')).toHaveText('Each counted Evaluator ≥ 90%', { timeout: 10_000 });
     await expect(page.getByTestId('dataset-summary')).toHaveText('v1 · 1 case');
     await expect(page.getByTestId('evaluation-tab-cases')).toHaveAttribute('data-state', 'active');
 
     // A step already set up reopens the guided setup from the status strip, its stages marked filled.
     await page.getByTestId('evaluation-open-guided-setup').click();
-    await expect(page).toHaveURL(/setup=guided&stage=brief/);
+    await expect(page).toHaveURL(/guided=brief/);
     await expect(page.getByTestId('guided-setup-stage-cases')).toHaveAttribute('data-filled', 'true');
   });
 });

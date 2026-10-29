@@ -132,34 +132,38 @@ function isSetupStage(value: string | null): value is SetupStage {
   return SETUP_STAGES.some((stage) => stage === value);
 }
 
+/** The query parameters only the Evaluation tab reads; a page drops them on leaving it. */
+export const EVALUATION_QUERY_PARAMS = ['version', 'step', 'section', 'guided'] as const;
+
 /**
- * How the Evaluation is being set up, kept in `?setup=` and `?stage=`: in the
- * guided stages, by hand on the tabs, or not chosen yet.
+ * How the Evaluation is being set up: the guided stage `?guided=` names, else
+ * by hand on the tabs once the person chose them, else not chosen yet. The
+ * choice of the tabs is not kept in the URL, so it lasts only while the
+ * Evaluation stays open and an empty subject offers the choice again.
  */
 function useSetupMode() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const requested = searchParams.get('setup');
-  const setup = requested === 'guided' || requested === 'manual' ? requested : null;
-  const requestedStage = searchParams.get('stage');
-  const stage: SetupStage = isSetupStage(requestedStage) ? requestedStage : 'brief';
+  const [manualChosen, setManualChosen] = React.useState(false);
+  const requestedStage = searchParams.get('guided');
+  const stage: SetupStage | null = isSetupStage(requestedStage) ? requestedStage : null;
+  const setup = stage !== null ? 'guided' : manualChosen ? 'manual' : null;
   const replace = (change: (params: URLSearchParams) => void) => {
     const params = new URLSearchParams(searchParams.toString());
     change(params);
     router.replace(`${pathname}?${params}`, { scroll: false });
   };
-  const go = (next: SetupStage) => replace((params) => {
-    params.set('setup', 'guided');
-    params.set('stage', next);
-  });
-  const manual = (section: string | null) => replace((params) => {
-    params.set('setup', 'manual');
-    params.delete('stage');
-    if (section === null) params.delete('section');
-    else params.set('section', section);
-  });
-  return { setup, stage, go, manual };
+  const go = (next: SetupStage) => replace((params) => params.set('guided', next));
+  const manual = (section: string | null) => {
+    setManualChosen(true);
+    replace((params) => {
+      params.delete('guided');
+      if (section === null) params.delete('section');
+      else params.set('section', section);
+    });
+  };
+  return { setup, stage: stage ?? 'brief', go, manual };
 }
 
 /** Whether the subject has nothing to evaluate with yet — no Brief, cases, Evaluators or Eval Runs; undefined while any is loading. */
@@ -355,8 +359,7 @@ export function EvaluationTab({ handle, workflowName, runnableVersion, mayEdit, 
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', 'evaluation');
     // How one step is set up says nothing about the next.
-    params.delete('setup');
-    params.delete('stage');
+    params.delete('guided');
     if (next.version !== undefined) {
       params.set('version', String(next.version));
       params.delete('step');

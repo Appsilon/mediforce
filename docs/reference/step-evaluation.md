@@ -50,9 +50,10 @@ once the runnable version no longer has the step.
 
 A step (or Agent) with nothing yet — no Brief, cases, Evaluators or Eval Runs —
 opens, for a person who may edit it, on a choice: **Guided setup** or **Set up
-manually** (the tabs; `?setup=manual`). The guided setup (`?setup=guided&stage=
-brief|cases|evaluators|review`) walks four stages beside the same assistant,
-whose conversation carries from stage to stage: **Brief** (optional), **Eval
+manually** (the tabs, until the Evaluation is left — an empty step offers the
+choice again). The guided setup (`?guided=brief|cases|evaluators|review`)
+walks four stages beside the same assistant, whose conversation carries from
+stage to stage: **Brief** (optional), **Eval
 Cases** — *Do you know the correct outputs?* **Yes** or **For some** adds one
 `expected_output` Evaluator, `matches-expected-output`, unless the step has one
 — **Evaluators**, and **Review**. Each of the first three has a button that asks
