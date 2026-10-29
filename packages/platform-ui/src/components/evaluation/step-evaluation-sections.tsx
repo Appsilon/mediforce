@@ -5,7 +5,7 @@ import { z } from 'zod';
 import * as Dialog from '@radix-ui/react-dialog';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
-import { Bot, ChevronRight, Info, Loader2, X } from 'lucide-react';
+import { Bot, Check, ChevronRight, Info, Loader2, X } from 'lucide-react';
 import {
   DEFAULT_ACCEPTANCE_CRITERIA,
   EvalCaseComparisonSchema,
@@ -851,7 +851,6 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSel
     edit.reset();
   };
   const checkedBy = evalCase.evaluatorIds === null ? 'all evaluators' : gradedBy(evalCase, evaluators).map(({ name }) => name).join(', ');
-  const expectedOutput = evalCase.expectedOutput === null ? null : JSON.stringify(evalCase.expectedOutput);
   return (
     <tbody className="border-b last:border-0" data-testid="eval-case-row">
       <tr className="align-top hover:bg-muted/30">
@@ -885,10 +884,10 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSel
         <td className="px-3 py-2">
           {evalCase.expectedOutput === null ? <span className="text-xs text-muted-foreground">input only</span> : <CaseExpectationMark evalCase={evalCase} />}
         </td>
-        <td className="hidden max-w-[14rem] px-3 py-2 lg:table-cell">
-          {expectedOutput === null ? <span className="text-muted-foreground">—</span> : (
-            <span className="block truncate font-mono text-xs" title={expectedOutput} data-testid="eval-case-expected-preview">{expectedOutput}</span>
-          )}
+        <td className="px-3 py-2 text-xs" data-testid="eval-case-has-expected-output">
+          {evalCase.expectedOutput === null
+            ? <span className="text-muted-foreground">missing</span>
+            : <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-label="Has an expected output" />}
         </td>
         <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell" data-testid="eval-case-comparison">
           {evalCase.expectedOutput === null ? <span className="text-muted-foreground">—</span> : evalCase.comparison === 'exact' ? 'Exact match' : 'By meaning'}
@@ -1326,7 +1325,7 @@ export function CasesSection({ step, evaluation, mayEdit }: {
                     <span>Type</span>
                   </InstantTooltip>
                 </th>
-                <th className="hidden px-3 py-2 font-medium lg:table-cell">Expected output</th>
+                <th className="px-3 py-2 font-medium">Expected output</th>
                 <th className="hidden px-3 py-2 font-medium md:table-cell">Comparison</th>
                 <th className="px-3 py-2 font-medium">Graded by</th>
                 <th className="px-3 py-2"><span className="sr-only">Actions</span></th>

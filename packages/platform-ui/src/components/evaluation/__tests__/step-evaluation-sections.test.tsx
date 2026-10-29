@@ -387,7 +387,7 @@ describe('Eval Case view and edit', () => {
     const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
     expect(headers).toEqual(['Select', 'Case', 'Type', 'Expected output', 'Comparison', 'Graded by', 'Actions']);
     expect(screen.getByTestId('eval-case-expectation').textContent).toBe('negative');
-    expect(screen.getByTestId('eval-case-expected-preview').textContent).toBe('{"grade":5}');
+    expect(screen.getByTestId('eval-case-has-expected-output').querySelector('[aria-label="Has an expected output"]')).not.toBeNull();
     expect(screen.getByTestId('eval-case-comparison').textContent).toBe('By meaning');
     expect(screen.queryByTestId('eval-case-details')).toBeNull();
   });
@@ -396,6 +396,7 @@ describe('Eval Case view and edit', () => {
     render(<CasesSection step={step} evaluation={withCase(evalCaseOf({ expectedOutput: null }))} mayEdit={false} />);
 
     expect(screen.getByTestId('eval-case-row').textContent).toContain('input only');
+    expect(screen.getByTestId('eval-case-has-expected-output').textContent).toBe('missing');
     expect(screen.getByTestId('eval-case-comparison').textContent).toBe('—');
   });
 

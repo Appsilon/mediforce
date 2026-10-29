@@ -237,7 +237,7 @@ with a new one; **Remove** takes it out of the next save. Ticking cases and **Se
 
 **Test**
 - ✅ Cases are a table: **Case** (with *from run* / *edited from run*), **Type** (positive /
-  negative / input only), **Expected output**, **Comparison** (Exact match / By meaning) and
+  negative / input only), **Expected output** (a checkmark, or *missing*), **Comparison** (Exact match / By meaning) and
   **Graded by** (*All N* or a count).
 - ✅ Clicking **Graded by** opens the Evaluators' names; **Details** opens the input, expected
   output and source run log under the row.
