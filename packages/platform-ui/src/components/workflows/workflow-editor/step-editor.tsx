@@ -245,6 +245,8 @@ const TIP = {
 
   verdictName:             'Verdict label (e.g. "approve", "reject"). Referenced in downstream transition conditions.',
   verdictTarget:           'The step to route to when this verdict is selected.',
+  transitionWhen:          'Expression checked against this step\'s output, e.g. output.status == "ok". Leave empty to always take this transition, or use "else" to match only if no other condition on this step did. With more than one outgoing transition, every one of them needs a condition.',
+  transitionTarget:        'The step this transition leads to.',
 
   paramName:               'Identifier for this parameter. Its submitted value becomes part of this step\'s output — later steps read it as ${steps.<this step id>.<name>}.',
   paramType:               'Data type: string, number, boolean, or date. Controls validation and the input widget shown to users.',
@@ -354,6 +356,8 @@ export function StepEditor({
   workflowVisibility = 'private',
   workflowPreamble,
   savedValidation,
+  transitions = [],
+  onTransitionsChange = () => {},
 }: {
   step: WorkflowStep;
   allSteps: WorkflowStep[];
@@ -364,6 +368,8 @@ export function StepEditor({
   imageWarning?: string;
   dockerImages?: DockerImageInfo[];
   catalogEntries?: ImageCatalogEntryView[];
+  transitions?: WorkflowDefinition['transitions'];
+  onTransitionsChange?: (next: WorkflowDefinition['transitions']) => void;
   /** The files this workflow carries: a Dockerfile among them is an image
    *  source the step can build from. */
   workflowArtifacts?: WorkflowDefinition['artifacts'];
@@ -409,6 +415,8 @@ export function StepEditor({
   const isDecision = step.type === 'decision';
   const hasVerdicts = isReview || isDecision;
   const isTerminal = step.type === 'terminal';
+  const outgoingTransitions = transitions.filter((t) => t.from === step.id);
+  const hasRoutingConfigured = Object.keys(step.verdicts ?? {}).length > 0 || outgoingTransitions.some((t) => t.when);
   const [agentDefinitions, setAgentDefinitions] = useState<AgentDefinition[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
   const [agentsError, setAgentsError] = useState<string | null>(null);
@@ -653,7 +661,7 @@ export function StepEditor({
   // of cards may be open — toggling one never closes the others.
   // Card ids + their default open state live here once; the reset effect and
   // toggle derive from this rather than re-typing the literal.
-  const defaultOpenCards: Record<string, boolean> = { basics: true, primary: false, routing: false, advanced: false };
+  const defaultOpenCards: Record<string, boolean> = { basics: true, primary: false, routing: hasRoutingConfigured, advanced: false };
   const [openCards, setOpenCards] = useState<Record<string, boolean>>(defaultOpenCards);
   useEffect(() => {
     setOpenCards(defaultOpenCards);
@@ -1750,8 +1758,10 @@ export function StepEditor({
       )}
 
       {/* ── Routing ──────────────────────────────────────────────── */}
-      {hasVerdicts && (
+      {!isTerminal && (
         <CollapsibleCard title="Routing" open={openCards.routing} onToggle={() => toggleCard('routing')}>
+      {hasVerdicts && (
+      <>
       {/* ── Verdicts ─────────────────────────────────────────────── */}
         <Section title="Verdicts">
           <FieldGroup>
@@ -1833,6 +1843,48 @@ export function StepEditor({
             }}
             className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
           >+ Add verdict</button>
+        </Section>
+      </>
+      )}
+        <Section title="Conditions">
+          <FieldGroup>
+            {outgoingTransitions.map((transition) => {
+              const index = transitions.indexOf(transition);
+              return (
+                <FieldRow key={index} label="When" tooltip={TIP.transitionWhen}>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      value={transition.when ?? ''}
+                      placeholder="always"
+                      onChange={(e) => onTransitionsChange(transitions.map((t, i) => (i === index ? { ...t, when: e.target.value || undefined } : t)))}
+                      className={cn(ri, 'flex-1 placeholder:italic placeholder:text-muted-foreground/40')}
+                    />
+                    <span className="text-xs text-muted-foreground/50 shrink-0">→</span>
+                    <select
+                      value={transition.to}
+                      onChange={(e) => onTransitionsChange(transitions.map((t, i) => (i === index ? { ...t, to: e.target.value } : t)))}
+                      className={cn(rs, 'flex-1')}
+                      title={TIP.transitionTarget}
+                    >
+                      <option value="">Select step…</option>
+                      {otherSteps.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.id})</option>)}
+                    </select>
+                    <button
+                      onClick={() => onTransitionsChange(transitions.filter((_, i) => i !== index))}
+                      className="text-[10px] text-muted-foreground/30 hover:text-red-500 transition-colors shrink-0"
+                    >×</button>
+                  </div>
+                </FieldRow>
+              );
+            })}
+            {outgoingTransitions.length === 0 && (
+              <div className="px-3 py-2 text-[11px] text-muted-foreground/40 italic">No outgoing transitions</div>
+            )}
+          </FieldGroup>
+          <button
+            onClick={() => onTransitionsChange([...transitions, { from: step.id, to: otherSteps[0]?.id ?? '' }])}
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >+ Add transition</button>
         </Section>
         </CollapsibleCard>
       )}

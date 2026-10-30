@@ -289,7 +289,6 @@ describe('StepEditor', () => {
     }
 
     render(<ControlledStepEditor />);
-    expandCard('Routing');
 
     const verdictInput = screen.getByDisplayValue('approve') as HTMLInputElement;
     fireEvent.change(verdictInput, { target: { value: 'approved' } });
@@ -322,6 +321,34 @@ describe('StepEditor', () => {
     expect(screen.getAllByText('Verdict').length).toBe(2);
     expect(screen.getByDisplayValue('new-verdict')).toBeTruthy();
     expect(screen.getByDisplayValue('new-verdict-2')).toBeTruthy();
+  });
+
+  it('adds, edits and removes an outgoing transition condition on a non-verdict step', () => {
+    function ControlledStepEditor() {
+      const [step] = React.useState(buildStep({ executor: 'script' }));
+      const [transitions, setTransitions] = React.useState([{ from: 'step-1', to: 'next-step' }]);
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step, buildStep({ id: 'next-step', name: 'Next Step' })]}
+          onChange={noop}
+          transitions={transitions}
+          onTransitionsChange={setTransitions}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    expandCard('Routing');
+
+    fireEvent.change(screen.getByPlaceholderText('always'), { target: { value: 'output.status == "ok"' } });
+    expect(screen.getByDisplayValue('output.status == "ok"')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add transition' }));
+    expect(screen.getAllByPlaceholderText('always').length).toBe(2);
+
+    fireEvent.click(screen.getAllByText('×')[0]);
+    expect(screen.getAllByPlaceholderText('always').length).toBe(1);
   });
 
   it('[REGRESSION] adds a second environment variable without renaming the first', () => {
@@ -2104,7 +2131,6 @@ describe('StepEditor — verdict presentation and conditional params', () => {
         onChange={onChange}
       />,
     );
-    expandCard('Routing');
 
     // The label input is empty and placeheld with the default the server fills.
     fireEvent.change(screen.getByPlaceholderText('Approve'), { target: { value: 'Sign off' } });
