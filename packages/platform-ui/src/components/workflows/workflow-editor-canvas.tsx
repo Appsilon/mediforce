@@ -1078,6 +1078,8 @@ export function WorkflowEditorCanvas({
               workflowPreamble={settingsDraft?.preamble}
               savedValidation={savedStepEvaluation?.get(selectedStep.id)?.status}
               catalogEntries={catalogEntries}
+              transitions={editedTransitions}
+              onTransitionsChange={setEditedTransitions}
             />
           </div>
         )}
