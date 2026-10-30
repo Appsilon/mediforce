@@ -89,8 +89,10 @@ export async function askEvaluationAssistant(
   const previewed: PreviewedCheck[] = [];
   const executePlatformTool = async (toolName: EvaluationAssistantPlatformToolName, args: unknown) => {
     const toolResult = await executeEvaluationTool(toolName, args, scope, { step, definition, workflowStep, agent, ...(unattended === undefined ? {} : { unattended }) });
-    if (toolName === 'preview_evaluator') {
-      previewed.push({ check: (args as { check: EvaluatorCheck }).check, preview: toolResult as PreviewEvaluatorOutput });
+    // A preview on runs the assistant chose skips the Eval Cases, so it cannot stand in for the card's self-test.
+    const { check, agentRunIds } = args as { check: EvaluatorCheck; agentRunIds?: string[] };
+    if (toolName === 'preview_evaluator' && agentRunIds === undefined) {
+      previewed.push({ check, preview: toolResult as PreviewEvaluatorOutput });
     }
     return toolResult;
   };
