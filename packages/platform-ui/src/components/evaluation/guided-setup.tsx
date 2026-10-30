@@ -30,6 +30,15 @@ const STAGE_LABELS: Record<SetupStage, string> = {
   review: 'Summary',
 };
 
+/** What Summary saves the setup from; a change to any of it after a save asks for another. */
+export function setupSnapshot(evaluation: StepEvaluation): string {
+  return JSON.stringify({
+    brief: evaluation.brief.data?.brief?.version ?? null,
+    cases: evaluation.cases.data?.cases ?? [],
+    evaluators: (evaluation.evaluators.data?.evaluators ?? []).map((evaluator) => [evaluator.id, evaluator.latest.version]),
+  });
+}
+
 export const EXPECTED_OUTPUT_EVALUATOR = 'matches-expected-output';
 
 const PROMPTS = {
@@ -241,13 +250,14 @@ function SummaryCard({ label, value, detail, warn, onEdit }: { label: string; va
  * against, and Save — the criteria if changed, the cases as a new Dataset
  * version if unsaved — or Save, then start an Eval Run once its budget is confirmed.
  */
-function ReviewStage({ step, definitionVersion, evaluation, mayEdit, mayRun, onStage, onDone }: {
+function ReviewStage({ step, definitionVersion, evaluation, mayEdit, mayRun, onStage, onSaved, onDone }: {
   step: EvaluationSubject;
   definitionVersion: number | null;
   evaluation: StepEvaluation;
   mayEdit: boolean;
   mayRun: boolean;
   onStage: (stage: SetupStage) => void;
+  onSaved: () => void;
   onDone: (section: 'runs' | null) => void;
 }) {
   const brief = evaluation.brief.data?.brief ?? null;
@@ -372,7 +382,12 @@ function ReviewStage({ step, definitionVersion, evaluation, mayEdit, mayRun, onS
               className={buttonClass}
               disabled={blocked}
               data-testid="guided-setup-save"
-              onClick={() => save.mutate(undefined, { onSuccess: () => onDone(null) })}
+              onClick={() => save.mutate(undefined, {
+                onSuccess: () => {
+                  onSaved();
+                  onDone(null);
+                },
+              })}
             >{save.isPending && starting === false ? 'Saving…' : 'Save'}</button>
             {mayRun && (
               <button
@@ -382,7 +397,7 @@ function ReviewStage({ step, definitionVersion, evaluation, mayEdit, mayRun, onS
                 data-testid="guided-setup-save-and-start"
                 onClick={() => {
                   setStarting(true);
-                  save.mutate(undefined);
+                  save.mutate(undefined, { onSuccess: onSaved });
                 }}
               >{save.isPending && starting ? 'Saving…' : 'Save and start Eval Run'}</button>
             )}
@@ -412,7 +427,7 @@ function StageFooter({ back, next, skip }: { back: React.ReactNode; next: { labe
  * kept for going back to it. Every stage writes as the tabs do; only Summary saves the cases as a
  * Dataset version and sets the Acceptance Criteria.
  */
-export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema, mayEdit, editReason, mayRun, runReason, stage, onStage, onExit }: {
+export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema, mayEdit, editReason, mayRun, runReason, stage, savedSnapshot, onStage, onSaved, onExit }: {
   step: EvaluationSubject;
   definitionVersion: number | null;
   evaluation: StepEvaluation;
@@ -422,7 +437,10 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
   mayRun: boolean;
   runReason: string | undefined;
   stage: SetupStage;
+  /** `setupSnapshot` as Summary last saved it, null before the first save. */
+  savedSnapshot: string | null;
   onStage: (stage: SetupStage) => void;
+  onSaved: (snapshot: string) => void;
   /** Leaves the setup for the tabs, on the named one. */
   onExit: (section: 'runs' | null) => void;
 }) {
@@ -430,7 +448,7 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
     brief: (evaluation.brief.data?.brief ?? null) !== null,
     cases: (evaluation.cases.data?.cases.length ?? 0) > 0,
     evaluators: (evaluation.evaluators.data?.evaluators.length ?? 0) > 0,
-    review: false,
+    review: savedSnapshot !== null && savedSnapshot === setupSnapshot(evaluation),
   };
   const [expectationChoice, setExpectationChoice] = React.useState<ExpectationChoice | null>(null);
   const expectation = expectationChoice ?? (hasComparisonEvaluator(evaluation) ? 'some' : null);
@@ -516,7 +534,7 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
           )}
           {stage === 'review' && (
             <div className="rounded-lg border p-4">
-              <ReviewStage step={step} definitionVersion={definitionVersion} evaluation={evaluation} mayEdit={mayEdit} mayRun={mayRun} onStage={onStage} onDone={onExit} />
+              <ReviewStage step={step} definitionVersion={definitionVersion} evaluation={evaluation} mayEdit={mayEdit} mayRun={mayRun} onStage={onStage} onSaved={() => onSaved(setupSnapshot(evaluation))} onDone={onExit} />
             </div>
           )}
           {stage === 'brief' && <StageFooter back={<span />} skip={() => onStage('cases')} next={{ label: 'Next: Eval Cases →', onClick: () => onStage('cases') }} />}

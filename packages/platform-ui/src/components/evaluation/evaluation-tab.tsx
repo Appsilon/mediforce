@@ -116,6 +116,7 @@ export function StepEvaluation({ header, step, definitionVersion, outputSchema, 
 }) {
   const evaluation = useStepEvaluation(step, definitionVersion);
   const setupMode = useSetupMode();
+  const [savedSetup, setSavedSetup] = React.useState<string | null>(null);
   const empty = isEmptySubject(evaluation);
   const layoutRef = React.useRef<HTMLDivElement>(null);
   const assistantWidth = useAssistantWidth(layoutRef);
@@ -152,7 +153,9 @@ export function StepEvaluation({ header, step, definitionVersion, outputSchema, 
         mayRun={mayRun}
         runReason={runReason}
         stage={setupMode.stage}
+        savedSnapshot={savedSetup}
         onStage={setupMode.go}
+        onSaved={setSavedSetup}
         onExit={setupMode.manual}
       />,
       <button type="button" className={cn(buttonClass, switchClass)} data-testid="evaluation-open-manual-setup" onClick={() => setupMode.manual(null)}>

@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { GuidedSetup, SetupChoice, EXPECTED_OUTPUT_EVALUATOR, type SetupStage } from '../guided-setup';
+import { GuidedSetup, SetupChoice, EXPECTED_OUTPUT_EVALUATOR, setupSnapshot, type SetupStage } from '../guided-setup';
 
 const asked = vi.hoisted(() => vi.fn());
 const evaluation = vi.hoisted(() => ({
@@ -81,6 +81,7 @@ function evaluationOf({ brief = null, cases = [], evaluators = [], datasets = []
 function renderSetup(stage: SetupStage, data: Parameters<typeof GuidedSetup>[0]['evaluation'], overrides: Partial<Parameters<typeof GuidedSetup>[0]> = {}) {
   const onStage = vi.fn();
   const onExit = vi.fn();
+  const onSaved = vi.fn();
   const setupAt = (at: SetupStage) => (
     <GuidedSetup
       step={step}
@@ -92,13 +93,15 @@ function renderSetup(stage: SetupStage, data: Parameters<typeof GuidedSetup>[0][
       mayRun
       runReason={undefined}
       stage={at}
+      savedSnapshot={null}
       onStage={onStage}
+      onSaved={onSaved}
       onExit={onExit}
       {...overrides}
     />
   );
-  const { rerender } = render(setupAt(stage));
-  return { onStage, onExit, moveTo: (at: SetupStage) => rerender(setupAt(at)) };
+  const { rerender, unmount } = render(setupAt(stage));
+  return { onStage, onSaved, onExit, unmount, moveTo: (at: SetupStage) => rerender(setupAt(at)) };
 }
 
 beforeEach(() => {
@@ -275,6 +278,23 @@ describe('GuidedSetup review', () => {
     expect(evaluation.saveDataset).toHaveBeenCalledWith(step);
     fireEvent.click(screen.getByRole('button', { name: 'Start' }));
     expect(onExit).toHaveBeenCalledWith('runs');
+  });
+
+  it('checks Summary once saved, until the Brief, cases or Evaluators change', async () => {
+    const data = filled();
+    const first = renderSetup('review', data);
+    expect(screen.getByTestId('guided-setup-stage-review')).toHaveAttribute('data-filled', 'false');
+    fireEvent.click(screen.getByTestId('guided-setup-save'));
+    await waitFor(() => expect(first.onSaved).toHaveBeenCalledWith(setupSnapshot(data)));
+    first.unmount();
+
+    const saved = renderSetup('brief', data, { savedSnapshot: setupSnapshot(data) });
+    expect(screen.getByTestId('guided-setup-stage-review')).toHaveAttribute('data-filled', 'true');
+    saved.unmount();
+
+    const briefChanged = { ...data, brief: { data: { brief: { version: 2, text: 'changed' } } } } as typeof data;
+    renderSetup('brief', briefChanged, { savedSnapshot: setupSnapshot(data) });
+    expect(screen.getByTestId('guided-setup-stage-review')).toHaveAttribute('data-filled', 'false');
   });
 
   it('cannot save without a case and an Evaluator', () => {
