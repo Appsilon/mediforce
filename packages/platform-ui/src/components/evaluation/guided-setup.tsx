@@ -443,8 +443,8 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
 
   return (
     <div className="space-y-4" data-testid="guided-setup" data-stage={stage}>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-lg border px-4 py-2.5">
-        <nav aria-label="Setup progress" className="col-start-2 flex flex-wrap items-center justify-center gap-1.5">
+      <div className="rounded-lg border px-4 py-2.5">
+        <nav aria-label="Setup progress" className="flex flex-wrap items-center justify-center gap-1.5">
           {SETUP_STAGES.map((candidate, index) => (
             <button
               key={candidate}
@@ -468,7 +468,6 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
             </button>
           ))}
         </nav>
-        <button type="button" className="justify-self-end text-xs text-primary hover:underline" data-testid="guided-setup-exit" onClick={() => onExit(null)}>Exit setup</button>
       </div>
       {stage === 'brief' && (
         <StageHeading

@@ -10,7 +10,7 @@ import { useStepEvaluation, useWorkflowValidation } from '@/hooks/use-step-evalu
 import { useWorkflowRunGate } from '@/hooks/use-workflow-access';
 import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
 import { VALIDATION_STATUS } from './validation-status';
-import { primaryButtonClass, tabTriggerClass } from './evaluation-styles';
+import { buttonClass, primaryButtonClass, tabTriggerClass } from './evaluation-styles';
 import { EvaluationAssistantPanel } from './evaluation-assistant-panel';
 import { AssistantResizeHandle, assistantColumns, useAssistantHeight, useAssistantWidth } from './assistant-width';
 import { GuidedSetup, SETUP_STAGES, SetupChoice, type SetupStage } from './guided-setup';
@@ -100,8 +100,9 @@ function isEmptySubject(evaluation: ReturnType<typeof useStepEvaluation>): boole
  * The subject is an agent Step in one workflow version, or an Agent on its own
  * (ADR-0029), with no version to pick. Every tab stays mounted, so a
  * half-filled form or the unsaved-cases guard survives switching tabs. A subject
- * with nothing set up first offers the guided setup or the tabs; on the tabs,
- * Guided setup sits after the page's `header`, which stays over every mode.
+ * with nothing set up first offers the guided setup or the tabs. After the
+ * page's `header`, which stays over every mode, Guided setup opens the setup
+ * from the tabs and Manual setup leaves it for them.
  */
 export function StepEvaluation({ header, step, definitionVersion, outputSchema, mayEdit, editReason, mayRun, runReason }: {
   header: React.ReactNode;
@@ -129,16 +130,12 @@ export function StepEvaluation({ header, step, definitionVersion, outputSchema, 
     { value: 'cases', label: 'Eval Cases', count: caseCount, tour: 'eval-cases' },
     { value: 'evaluators', label: 'Evaluators', count: evaluation.evaluators.data === undefined ? undefined : evaluators.length, tour: 'eval-evaluators' },
   ];
-  const frame = (content: React.ReactNode, guidedButton: boolean) => (
+  const switchClass = 'inline-flex items-center gap-1.5 px-3 py-1.5 text-sm';
+  const frame = (content: React.ReactNode, switchButton: React.ReactNode) => (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-4">
         {header}
-        {guidedButton && mayEdit && (
-          <button type="button" className={cn(primaryButtonClass, 'inline-flex items-center gap-1.5 px-3 py-1.5 text-sm')} data-testid="evaluation-open-guided-setup" onClick={() => setupMode.go('brief')}>
-            <Sparkles className="h-4 w-4" aria-hidden />
-            Guided setup
-          </button>
-        )}
+        {switchButton}
       </div>
       {content}
     </div>
@@ -158,12 +155,14 @@ export function StepEvaluation({ header, step, definitionVersion, outputSchema, 
         onStage={setupMode.go}
         onExit={setupMode.manual}
       />,
-      false,
+      <button type="button" className={cn(buttonClass, switchClass)} data-testid="evaluation-open-manual-setup" onClick={() => setupMode.manual(null)}>
+        Manual setup
+      </button>,
     );
   }
   if (setupMode.setup === null && mayEdit) {
-    if (empty === undefined) return frame(<p className="text-sm text-muted-foreground">Loading…</p>, false);
-    if (empty) return frame(<SetupChoice step={step} evaluation={evaluation} onGuided={() => setupMode.go('brief')} onManual={() => setupMode.manual(null)} />, false);
+    if (empty === undefined) return frame(<p className="text-sm text-muted-foreground">Loading…</p>, null);
+    if (empty) return frame(<SetupChoice step={step} evaluation={evaluation} onGuided={() => setupMode.go('brief')} onManual={() => setupMode.manual(null)} />, null);
   }
   return frame(
     <div className="space-y-4">
@@ -219,7 +218,12 @@ export function StepEvaluation({ header, step, definitionVersion, outputSchema, 
         </div>
       </div>
     </div>,
-    true,
+    mayEdit && (
+      <button type="button" className={cn(primaryButtonClass, switchClass)} data-testid="evaluation-open-guided-setup" onClick={() => setupMode.go('brief')}>
+        <Sparkles className="h-4 w-4" aria-hidden />
+        Guided setup
+      </button>
+    ),
   );
 }
 
