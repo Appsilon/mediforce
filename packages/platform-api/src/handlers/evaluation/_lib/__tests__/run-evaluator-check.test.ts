@@ -1,4 +1,8 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { InMemoryAgentTrajectoryRepository, buildAgentRun } from '@mediforce/platform-core/testing';
 import { OPENROUTER_KEY_MISSING_MESSAGE } from '../../../../services/openrouter-key';
 import { runEvaluatorCheck } from '../run-evaluator-check';
@@ -85,6 +89,46 @@ describe('runEvaluatorCheck', () => {
     const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as { model: string; temperature: number; messages: Array<{ content: string }> };
     expect(body).toMatchObject({ model: 'anthropic/claude-haiku-4.5', temperature: 0 });
     expect(body.messages[1]!.content).toContain('Sepsis was fatal, so it is grade 5.');
+  });
+
+  it('shows the judge the files the run wrote, as its commit left them, but not its result.json again', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'judge-files-'));
+    try {
+      const worktree = join(root, 'work');
+      const bareRepoPath = join(root, 'repo.git');
+      execFileSync('git', ['init', '-q', '-b', 'main', worktree]);
+      await mkdir(join(worktree, '.mediforce', 'output', 'grade-aes'), { recursive: true });
+      await writeFile(join(worktree, '.mediforce', 'output', 'grade-aes', 'report.md'), '# Safety report\nREPORT-BODY-MARKER: sepsis, CTCAE grade 5.');
+      await writeFile(join(worktree, '.mediforce', 'output', 'grade-aes', 'result.json'), '{"RESULT-FILE-MARKER": true}');
+      execFileSync('git', ['-C', worktree, 'add', '-A']);
+      execFileSync('git', ['-C', worktree, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'grade-aes']);
+      const commitSha = execFileSync('git', ['-C', worktree, 'rev-parse', 'HEAD'], { encoding: 'utf-8' }).trim();
+      execFileSync('git', ['clone', '-q', '--bare', worktree, bareRepoPath]);
+
+      const fixture = await evaluationFixture();
+      const graded = await fixture.agentRunRepo.getById(GRADED_RUN);
+      await fixture.agentRunRepo.create(buildAgentRun({
+        id: 'graded-with-report', processInstanceId: graded!.processInstanceId, stepId: graded!.stepId, status: 'completed',
+        envelope: {
+          ...graded!.envelope!,
+          gitMetadata: {
+            commitSha, branch: 'run/run-graded', repoUrl: bareRepoPath,
+            changedFiles: ['.mediforce/output/grade-aes/report.md', '.mediforce/output/grade-aes/result.json'],
+          },
+        },
+      }));
+      const fetchMock = answeringOpenRouter(ANSWER);
+      const scope = withOpenRouterKey(fixture);
+
+      const outcome = await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, 'graded-with-report', STEP), null);
+
+      expect(outcome).toMatchObject({ passed: true, error: null });
+      const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as { messages: Array<{ content: string }> };
+      expect(body.messages[1]!.content).toContain('--- .mediforce/output/grade-aes/report.md\n# Safety report\nREPORT-BODY-MARKER');
+      expect(body.messages[1]!.content).not.toContain('RESULT-FILE-MARKER');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it('tells an llm_judge neither a case\'s expected output nor whether the case is negative', async () => {

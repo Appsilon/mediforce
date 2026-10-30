@@ -120,6 +120,41 @@ export async function listRevisionOutputFiles(bareRepoPath: string, revision: st
   return entries;
 }
 
+export function isBinary(content: Buffer): boolean {
+  return content.subarray(0, 8000).includes(0);
+}
+
+/** A file a step wrote larger than this is named, not read: no judge prompt holds it. */
+const MAX_STEP_FILE_BYTES = 1024 * 1024;
+
+export type StepFileOmission = 'deleted' | 'binary' | 'too_large' | 'unreadable';
+
+/** A file a step wrote: its text, or why it is not shown. */
+export type StepFile =
+  | { readonly path: string; readonly content: string }
+  | { readonly path: string; readonly content: null; readonly omitted: StepFileOmission };
+
+/**
+ * The files a step changed (`changedFiles` of its commit), as the commit left
+ * them — except its `result.json`, which is the step's result, not a file it
+ * wrote (ADR-0030). A missing repo or commit leaves every file `unreadable`.
+ */
+export async function readStepFiles(bareRepoPath: string, commit: string, changedFiles: readonly string[]): Promise<StepFile[]> {
+  const paths = changedFiles.filter((path) => parseOutputFilePath(path)?.name !== RESULT_FILE_NAME);
+  if (paths.length === 0) return [];
+  const sizes = new Map((await listCommitFiles(bareRepoPath, commit)).map((entry) => [entry.path, entry.size]));
+  if (sizes.size === 0) return paths.map((path) => ({ path, content: null, omitted: 'unreadable' }));
+  return Promise.all(paths.map(async (path): Promise<StepFile> => {
+    const size = sizes.get(path);
+    if (size === undefined) return { path, content: null, omitted: 'deleted' };
+    if (size > MAX_STEP_FILE_BYTES) return { path, content: null, omitted: 'too_large' };
+    const content = await readCommitFile(bareRepoPath, commit, path);
+    if (content === null) return { path, content: null, omitted: 'unreadable' };
+    if (isBinary(content)) return { path, content: null, omitted: 'binary' };
+    return { path, content: content.toString('utf-8') };
+  }));
+}
+
 export class WorkspaceReader {
   private readonly dataDir: string;
 

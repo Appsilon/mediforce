@@ -3,14 +3,15 @@
  * branches in the bare repo. Real git via WorkspaceManager against temp dirs.
  */
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, mkdir, readFile, unlink } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { WorkflowWorkspace } from '@mediforce/platform-core';
 import { WorkspaceManager } from '../workspace-manager';
-import { WorkspaceReader } from '../workspace-reader';
+import { WorkspaceReader, readStepFiles } from '../workspace-reader';
+import { bareRepoPathFor } from '../workspace-paths';
 
 describe('WorkspaceReader', () => {
   let dataDir: string;
@@ -258,6 +259,36 @@ describe('WorkspaceReader', () => {
 
     it('returns null when the bare repo does not exist', async () => {
       expect(await reader.archiveOutputFiles({ name: 'never-created' }, 'run-1')).toBeNull();
+    });
+  });
+
+  describe('readStepFiles', () => {
+    it('reads what the step changed as its commit left it, naming the files it cannot show and leaving out its result', async () => {
+      const workflow = { name: 'wd-step-files', workspace: {} as WorkflowWorkspace };
+      const ws = await manager.createRunWorkspace(workflow, 'run-1');
+      await writeFile(join(ws.path, 'draft.md'), 'first draft');
+      await manager.commitStep(ws, { stepId: 'draft' });
+
+      await mkdir(join(ws.path, '.mediforce', 'output', 'report'), { recursive: true });
+      await writeFile(join(ws.path, '.mediforce', 'output', 'report', 'result.json'), '{"ok":true}');
+      await writeFile(join(ws.path, '.mediforce', 'output', 'report', 'report.md'), '# Safety report\nSepsis, grade 5.');
+      await writeFile(join(ws.path, 'chart.png'), Buffer.from([0x89, 0x50, 0x00, 0x47]));
+      await unlink(join(ws.path, 'draft.md'));
+      const { commitSha, changedFiles } = await manager.commitStep(ws, { stepId: 'report' });
+
+      const files = await readStepFiles(bareRepoPathFor(dataDir, workflow), commitSha, changedFiles);
+
+      expect([...files].sort((left, right) => left.path.localeCompare(right.path))).toEqual([
+        { path: '.mediforce/output/report/report.md', content: '# Safety report\nSepsis, grade 5.' },
+        { path: 'chart.png', content: null, omitted: 'binary' },
+        { path: 'draft.md', content: null, omitted: 'deleted' },
+      ]);
+    });
+
+    it('names every file unreadable when the workspace is gone', async () => {
+      const files = await readStepFiles(join(dataDir, 'gone.git'), 'abc123', ['report.md']);
+
+      expect(files).toEqual([{ path: 'report.md', content: null, omitted: 'unreadable' }]);
     });
   });
 });

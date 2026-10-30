@@ -151,7 +151,8 @@ Fingerprint frozen with the run.
 `getEvalRunFailures` is the assistant's `get_failures` and `mediforce eval failures`.
 `getEvalTrial` is one trial with everything its Evaluators read and gave; a model judge's
 messages are rebuilt with agent-runtime's `llmJudgeMessages` / `outputAgreementMessages`, the
-functions that sent them, so nothing extra is stored on the Score.
+functions that sent them, so nothing extra is stored on the Score — a judge's files are read
+again from the run's commit (`judgedFiles` in `_lib/run-evaluator-check.ts`).
 
 **A Step Qualification binds a Step Fingerprint.** `_lib/step-fingerprint.ts`
 hashes each part of a step that shapes its behaviour on its own, so the badge

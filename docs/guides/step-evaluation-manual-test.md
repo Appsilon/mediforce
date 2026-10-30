@@ -187,7 +187,8 @@ save. Every save is a new version. **CLI** `mediforce eval brief-get|brief-set`.
 - `schema` — JSON Schema on the result;
 - `code` — a small Python/JS script reading `/output/input.json` (and the run workspace), writing
   `{passed, comment}`;
-- `llm_judge` — a model grading against a rubric, answering pass/fail with a confidence;
+- `llm_judge` — a model grading against a rubric, from the input, the agent's log, the result and
+  the text files the step wrote (such as a report), answering pass/fail with a confidence;
 - `expected_output` — the output compared with the case's expected output: exact, or an agreement score.
 
 **Counts.** `schema`, `llm_judge` and `expected_output` count at once; `code` counts after a person

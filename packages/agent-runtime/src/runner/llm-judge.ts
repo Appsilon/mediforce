@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { AgentOutputEnvelope, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import type { ReviewPlugin, ReviewPluginContext, ReviewPluginResult } from '../interfaces/review-plugin';
 import type { LlmAnswerSchema, LlmClient, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
+import type { StepFile, StepFileOmission } from '../workspace/workspace-reader';
 import { parseAnswer } from './llm-answer';
 
 export interface LlmJudgeConfig {
@@ -11,6 +12,8 @@ export interface LlmJudgeConfig {
   readonly stepInput: Record<string, unknown> | null;
   /** Everything the agent did during the step — its reasoning, tool calls and their results — in order. */
   readonly trajectory: readonly StoredAgentTrajectoryEntry[];
+  /** The files the step wrote, such as a report, as its commit left them. */
+  readonly files: readonly StepFile[];
 }
 
 export interface LlmJudgeResult extends ReviewPluginResult {
@@ -47,6 +50,15 @@ const MAX_TRAJECTORY_CHARS = 60_000;
 const MAX_ENTRY_CHARS = 2_000;
 /** What the agent wrote, such as a report, as large as a section so it reaches the judge whole. */
 const MAX_TOOL_CALL_CHARS = MAX_SECTION_CHARS;
+/** The files the step wrote, each cut as a section is; past this, a file is named, not shown. */
+const MAX_FILES_CHARS = 60_000;
+
+const OMITTED_FILE: Record<StepFileOmission, string> = {
+  deleted: 'the step deleted it',
+  binary: 'it is a binary file',
+  too_large: 'it is larger than 1 MB',
+  unreadable: 'the workspace could not be read',
+};
 
 /** Why a judge's answer could not be read, when the provider says more than the answer does. */
 function unreadableAnswer(response: LlmResponse): string | null {
@@ -101,9 +113,21 @@ function formatTrajectory(entries: readonly StoredAgentTrajectoryEntry[]): strin
   return [...head, `… ${lines.length - head.length - tail.length} entries omitted …`, ...tail].join('\n');
 }
 
+/** Each file the step wrote under its path, in order, until the files' budget runs out. */
+function formatFiles(files: readonly StepFile[]): string {
+  let used = 0;
+  return files.map((file) => {
+    if (file.content === null) return `--- ${file.path}: not shown, ${OMITTED_FILE[file.omitted]}`;
+    const text = truncate(file.content, MAX_SECTION_CHARS);
+    if (used + text.length > MAX_FILES_CHARS) return `--- ${file.path}: not shown, no room left in this prompt`;
+    used += text.length;
+    return `--- ${file.path}\n${text}`;
+  }).join('\n\n');
+}
+
 /**
  * What an `llm_judge` is sent: the rubric and how to answer, then the step's
- * input, the agent's log, its output and its own summary. The judge and
+ * input, the agent's log, its output, the files it wrote and its own summary. The judge and
  * anyone checking its verdict read the same messages.
  */
 export function llmJudgeMessages(
@@ -114,11 +138,11 @@ export function llmJudgeMessages(
     {
       role: 'system',
       content: [
-        'You grade one step of a pharmaceutical workflow against a rubric. You see what the step was given, the agent\'s log of everything it did — its reasoning, every tool call and every tool result, in order — and what it returned.',
+        'You grade one step of a pharmaceutical workflow against a rubric. You see what the step was given, the agent\'s log of everything it did — its reasoning, every tool call and every tool result, in order — what it returned and the files it wrote.',
         `Rubric:\n${config.rubric}`,
         [
           'A person reads your rationale to accept or deny your verdict, so explain your judgment. Say what exactly contributed to the decision and why:',
-          'cite the parts of the input, the output and the log entries (by their [number]) that decided it, follow the agent\'s reasoning to where it went right or wrong,',
+          'cite the parts of the input, the output, the files and the log entries (by their [number]) that decided it, follow the agent\'s reasoning to where it went right or wrong,',
           'and name anything you could not verify.',
         ].join(' '),
         'Cite a log entry by its number in square brackets, one entry per bracket, right after what it shows: "the agent looked up the term [7][8]". Never a range, a list or a word inside the brackets — not [7-9], [7, 8] or [entry 7].',
@@ -132,6 +156,7 @@ export function llmJudgeMessages(
         ...(config.stepInput === null ? [] : [`Step input:\n${section(config.stepInput)}`]),
         ...(config.trajectory.length === 0 ? [] : [`Agent log:\n${formatTrajectory(config.trajectory)}`]),
         `Step output:\n${section(output.result ?? null)}`,
+        ...(config.files.length === 0 ? [] : [`Files the step wrote:\n${formatFiles(config.files)}`]),
         ...(output.reasoning_summary.length > 0 ? [`The agent's own summary:\n${output.reasoning_summary}`] : []),
         ANSWER_VERDICT,
       ].join('\n\n'),
@@ -141,7 +166,7 @@ export function llmJudgeMessages(
 
 /**
  * An `llm_judge` Evaluator (ADR-0023 D3) on the `ReviewPlugin` seam. The judge
- * reads what the step was given, what it returned and the agent's whole log,
+ * reads what the step was given, what it returned, the files it wrote and the agent's whole log,
  * explains what decided its verdict, then answers pass or fail with how
  * confident it is. An answer without all three throws — a judge that did not
  * judge must not be scored as a failure of the output.

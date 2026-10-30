@@ -2,9 +2,11 @@ import { outputDifferences, type AgentRun, type EvalCase, type EvaluatorCheck, t
 import {
   LlmJudgeReviewPlugin,
   judgeOutputAgreement,
+  readStepFiles,
   runCodeCheck,
   validateOutputSchema,
   type LlmClient,
+  type StepFile,
 } from '@mediforce/agent-runtime';
 import type { EvaluatorOutcome } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
@@ -65,8 +67,14 @@ function binary(agentRunId: string, passed: boolean, comment: string | null): Ev
   return { agentRunId, passed, value: passed ? 1 : 0, label: passed ? 'pass' : 'fail', confidence: null, agreement: null, comment, error: null };
 }
 
+/** The files a run wrote, as its judge reads them; none for a run without a workspace. */
+export async function judgedFiles(agentRun: AgentRun): Promise<StepFile[]> {
+  const git = agentRun.envelope?.gitMetadata ?? null;
+  return git === null ? [] : readStepFiles(git.repoUrl, git.commitSha, git.changedFiles);
+}
+
 /**
- * Asks an `llm_judge` about one Agent Run: its input, its log and its output.
+ * Asks an `llm_judge` about one Agent Run: its input, its log, its output and the files it wrote.
  * A judge that gives no usable verdict comes back as `error`, never as a
  * failed output.
  */
@@ -83,6 +91,7 @@ async function runJudgeCheck(
     rubric: check.rubric,
     stepInput: subject.stepInput,
     trajectory: subject.trajectory,
+    files: await judgedFiles(agentRun),
   });
   const verdict = await judge.review({
     stepId: agentRun.stepId,

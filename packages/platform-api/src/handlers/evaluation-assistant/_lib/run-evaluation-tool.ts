@@ -16,6 +16,7 @@ import {
   AgentDefinitionNotFoundError,
   RetiredFileSkillError,
   SkillNotFoundError,
+  isBinary,
   listCommitFiles,
   readCommitFile,
   resolveMcpForStep,
@@ -30,7 +31,6 @@ import { isProductionRunOfAgent, listAgentProductionRuns } from '../../evaluatio
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
 import { stepOnly } from '../../evaluation/_lib/evaluation-subject';
 import { loadEvaluator } from '../../evaluation/_lib/evaluator-view';
-import { isBinary } from '../../evaluation/_lib/workspace-seed';
 import { HUMAN_VERDICT_SCORE_NAME } from '../../scores/record-human-verdict';
 import { listEvaluators } from '../../evaluation/evaluators';
 import { listEvalCases } from '../../evaluation/eval-cases';

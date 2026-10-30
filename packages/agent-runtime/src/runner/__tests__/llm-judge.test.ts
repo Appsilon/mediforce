@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { AgentOutputEnvelope, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import { LlmJudgeReviewPlugin, judgeOutputAgreement } from '../llm-judge';
+import type { StepFile } from '../../workspace/workspace-reader';
 import type { LlmClient } from '../../interfaces/step-executor-plugin';
 
 const envelope = {
@@ -19,12 +20,13 @@ const trajectory: StoredAgentTrajectoryEntry[] = [
   { seq: 2, ts: '2026-10-01T10:00:02.000Z', type: 'tool_result', tool: 'Read', content: 'term,outcome\nSepsis,fatal' },
 ];
 
-function judge(llm: LlmClient, entries: StoredAgentTrajectoryEntry[] = trajectory) {
+function judge(llm: LlmClient, entries: StoredAgentTrajectoryEntry[] = trajectory, files: StepFile[] = []) {
   const plugin = new LlmJudgeReviewPlugin({
     model: 'anthropic/claude-haiku-4.5',
     rubric: 'A fatal event must be graded 5.',
     stepInput: { events: [{ term: 'Sepsis', outcome: 'fatal' }] },
     trajectory: entries,
+    files,
   });
   return plugin.review({ stepId: 'grade-aes', processInstanceId: 'run-1', executorOutput: envelope, iterationNumber: 0, llm });
 }
@@ -81,6 +83,40 @@ describe('LlmJudgeReviewPlugin', () => {
     await judge(llm, [{ seq: 4, ts: '2026-10-01T10:00:00.000Z', type: 'assistant', subtype: 'tool_call', tool: 'write', input: { filePath: '/output/report.md', content: report } }]);
 
     expect(vi.mocked(llm.complete).mock.calls[0]![0][1]!.content).toContain('THE-LAST-SECTION');
+  });
+
+  it('shows the judge the files the step wrote, and names those it cannot show', async () => {
+    const llm = answering('{"rationale": "r", "passed": true, "confidence": 0.8}');
+    await judge(llm, trajectory, [
+      { path: '.mediforce/output/grade-aes/report.md', content: '# Safety report\nSepsis: CTCAE grade 5 (fatal).' },
+      { path: 'chart.png', content: null, omitted: 'binary' },
+    ]);
+
+    const userMessage = vi.mocked(llm.complete).mock.calls[0]![0][1]!.content;
+    expect(userMessage).toContain('Files the step wrote:');
+    expect(userMessage).toContain('--- .mediforce/output/grade-aes/report.md\n# Safety report\nSepsis: CTCAE grade 5 (fatal).');
+    expect(userMessage).toContain('--- chart.png: not shown, it is a binary file');
+  });
+
+  it('leaves out the files section for a step that wrote no files', async () => {
+    const llm = answering('{"rationale": "r", "passed": true, "confidence": 0.8}');
+    await judge(llm);
+
+    expect(vi.mocked(llm.complete).mock.calls[0]![0][1]!.content).not.toContain('Files the step wrote');
+  });
+
+  it('cuts each file as a section and names, without showing, the files past the files budget', async () => {
+    const files: StepFile[] = Array.from({ length: 3 }, (_unused, index) => ({
+      path: `part-${index}.md`,
+      content: `${'z'.repeat(25_000)}TAIL-${index}`,
+    }));
+    const llm = answering('{"rationale": "r", "passed": true, "confidence": 0.8}');
+    await judge(llm, trajectory, files);
+
+    const userMessage = vi.mocked(llm.complete).mock.calls[0]![0][1]!.content;
+    expect(userMessage).not.toContain('TAIL-0');
+    expect(userMessage).toContain('--- part-1.md\n');
+    expect(userMessage).toContain('--- part-2.md: not shown, no room left in this prompt');
   });
 
   it('cuts a long tool result or reasoning entry at 2,000 characters, so a log of many keeps its entries', async () => {

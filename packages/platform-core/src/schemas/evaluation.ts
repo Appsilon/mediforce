@@ -124,7 +124,8 @@ export const CodeCheckSchema = z.object({
 export const DEFAULT_JUDGE_MIN_CONFIDENCE = 0.8;
 
 /**
- * An LLM judge: it reads the step's input, the agent's log and its output,
+ * An LLM judge: it reads the step's input, the agent's log, its output and
+ * the text files the step wrote (its commit's `changedFiles`),
  * explains what decided its verdict, then answers pass or fail with a
  * confidence. A verdict below `minConfidence` is reported but does not count
  * toward the Acceptance Criteria.

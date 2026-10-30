@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { isBinary } from '@mediforce/agent-runtime';
 import type { WorkspaceFileChange } from '@mediforce/platform-core';
 import { ValidationError } from '../../../errors';
 
@@ -47,10 +48,6 @@ export async function parentCommit(bareRepoPath: string, commitSha: string): Pro
     // means the workspace is gone, and the case starts from an empty one.
     return null;
   }
-}
-
-export function isBinary(content: Buffer): boolean {
-  return content.subarray(0, 8000).includes(0);
 }
 
 /**
