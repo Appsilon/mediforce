@@ -24,6 +24,8 @@ import type {
   GetStepQualificationOutput,
   GetWorkflowValidationInputSchema,
   GetWorkflowValidationOutput,
+  ListAgentValidationsInputSchema,
+  ListAgentValidationsOutput,
   SignStepQualificationInputSchema,
   SignStepQualificationOutput,
   StepValidation,
@@ -275,6 +277,25 @@ export async function getStepQualification(
     evaluatorsChanged: evaluatorChanges(await rows.evaluators(), shown.evaluators, 'qualified with'),
     history,
   };
+}
+
+/**
+ * Every evaluable agent's validation status in the namespace, one request
+ * instead of one per agent — the same per-agent read `getStepQualification`
+ * does, through the same `agentValidations` cache.
+ */
+export async function listAgentValidations(
+  input: z.output<typeof ListAgentValidationsInputSchema>,
+  scope: CallerScope,
+): Promise<ListAgentValidationsOutput> {
+  const agents = (await scope.agentDefinitions.list(input.namespace))
+    .filter((agent) => agent.kind === 'plugin' && agent.runtimeId !== undefined);
+  const validations = agentValidations(scope);
+  const entries = await Promise.all(agents.map(async (agent) => {
+    const read = await validations(agent.id);
+    return read === null ? null : [agent.id, read.qualification.validation.status] as const;
+  }));
+  return { statuses: Object.fromEntries(entries.filter((entry) => entry !== null)) };
 }
 
 /**

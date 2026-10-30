@@ -4,6 +4,7 @@ import {
   EvalRunOutputSchema,
   GetStepQualificationOutputSchema,
   GetWorkflowValidationOutputSchema,
+  ListAgentValidationsOutputSchema,
   ListAgentVersionsOutputSchema,
   ListEvalRunsOutputSchema,
   type EvalRunOutput,
@@ -261,6 +262,26 @@ test.describe('Agent Evaluation — API E2E', () => {
       { headers: AUTH_HEADERS },
     );
     expect(both.status(), await both.text()).toBe(400);
+  });
+
+  test('batch-reads every evaluable agent\'s validation status in one call, leaving out a cowork agent (#1553)', async ({ request }) => {
+    const suffix = randomUUID().slice(0, 8);
+    const evaluableId = await createAgent(request, `AE grader ${suffix}`);
+    const cowork = await post(request, '/api/agents', {
+      name: `AE chat ${suffix}`, iconName: 'Bot', description: 'Talks AEs through',
+      kind: 'cowork', runtimeId: 'chat', foundationModel: 'anthropic/claude-sonnet-4',
+      systemPrompt: 'You discuss adverse events.', inputDescription: 'A question', outputDescription: 'An answer',
+      namespace: TEST_ORG_HANDLE,
+    }, 201) as { agent: { id: string } };
+
+    const batch = ListAgentValidationsOutputSchema.parse(await getJson(request, `/api/evaluation/qualification/agents?namespace=${TEST_ORG_HANDLE}`));
+    expect(batch.statuses[evaluableId]).toBe('not_verified');
+    expect(batch.statuses).not.toHaveProperty(cowork.agent.id);
+
+    const direct = GetStepQualificationOutputSchema.parse(
+      await getJson(request, `/api/evaluation/qualification?namespace=${TEST_ORG_HANDLE}&agentId=${evaluableId}`),
+    );
+    expect(batch.statuses[evaluableId]).toBe(direct.validation.status);
   });
 
   test('a public Agent\'s suite is read from any workspace and changed only from its own, and stays with it', async ({ request }) => {
