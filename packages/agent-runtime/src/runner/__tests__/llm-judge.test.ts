@@ -29,9 +29,9 @@ function judge(llm: LlmClient, entries: StoredAgentTrajectoryEntry[] = trajector
   return plugin.review({ stepId: 'grade-aes', processInstanceId: 'run-1', executorOutput: envelope, iterationNumber: 0, llm });
 }
 
-function answering(content: string): LlmClient {
+function answering(content: string, stopReason?: string): LlmClient {
   return {
-    complete: vi.fn().mockResolvedValue({ content, model: 'anthropic/claude-haiku-4.5', usage: { promptTokens: 10, completionTokens: 5 } }),
+    complete: vi.fn().mockResolvedValue({ content, model: 'anthropic/claude-haiku-4.5', usage: { promptTokens: 10, completionTokens: 5 }, stopReason }),
   };
 }
 
@@ -100,6 +100,29 @@ describe('LlmJudgeReviewPlugin', () => {
     const result = await judge(answering('```json\n{"rationale": "r", "passed": false, "confidence": 0.55}\n```'));
     expect(result).toMatchObject({ passed: false, confidence: 0.55 });
   });
+
+  it('asks the judge to answer by calling its verdict tool, so the answer cannot be prose', async () => {
+    const llm = answering('{"rationale": "r", "passed": true, "confidence": 0.9}');
+    await judge(llm);
+
+    const options = vi.mocked(llm.complete).mock.calls[0]![2];
+    expect(options?.answerTool).toMatchObject({
+      name: 'verdict',
+      parameters: { type: 'object', required: ['rationale', 'passed', 'confidence'] },
+    });
+  });
+
+  it('reads an answer with prose around it, even prose that quotes the output\'s JSON', async () => {
+    const result = await judge(answering(
+      'The result file is {"report": "report.txt", "summary": ""}, so the summary is empty.\n\n{"rationale": "The summary is empty.", "passed": false, "confidence": 0.85}',
+    ));
+    expect(result).toMatchObject({ passed: false, confidence: 0.85, reasoning: 'The summary is empty.' });
+  });
+
+  it('says the judge was cut off when its answer hit the output-token limit, and when it answered nothing', async () => {
+    await expect(judge(answering('{"rationale": "The report covers', 'length'))).rejects.toThrow(/cut off at the output-token limit/);
+    await expect(judge(answering(''))).rejects.toThrow(/empty answer/);
+  });
 });
 
 describe('judgeOutputAgreement', () => {
@@ -136,6 +159,15 @@ describe('judgeOutputAgreement', () => {
     const llm = answering('{"rationale": "r", "agreement": 1}');
     await compare(llm, null);
     expect(vi.mocked(llm.complete).mock.calls[0]![0][0]!.content).not.toMatch(/this case/i);
+  });
+
+  it('asks for the agreement through its own answer tool', async () => {
+    const llm = answering('{"rationale": "r", "agreement": 1}');
+    await compare(llm);
+    expect(vi.mocked(llm.complete).mock.calls[0]![2]?.answerTool).toMatchObject({
+      name: 'agreement',
+      parameters: { type: 'object', required: ['rationale', 'agreement'] },
+    });
   });
 
   it('throws on an answer without an agreement from 0 to 1, so it is never scored as a disagreement', async () => {

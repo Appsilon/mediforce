@@ -266,6 +266,12 @@ describe('executeEvaluationTool', () => {
     expect(result).toEqual({ cases: [], results: [{ agentRunId: GRADED_RUN, passed: true, value: 1, label: 'pass', confidence: null, agreement: null, comment: null, error: null }] });
   });
 
+  it('offers no preview of a judge, so the assistant spends no model call on two outputs', () => {
+    const preview = EVALUATION_ASSISTANT_PLATFORM_TOOLS.preview_evaluator;
+    expect(preview.safeParse({ check: { kind: 'llm_judge', rubric: 'Is every AE graded?' } }).success).toBe(false);
+    expect(preview.safeParse({ check: { kind: 'schema', schema: { required: ['findings'] } } }).success).toBe(true);
+  });
+
   it('lists the catalog Skills the step is offered with their SKILL.md, and none for a step offered none', async () => {
     const { scope, context } = await setup();
     const skillMd = '---\nname: grade-aes\ndescription: Grade AEs by CTCAE v5\n---\nGrade by CTCAE v5.';

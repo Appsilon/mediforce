@@ -1,7 +1,7 @@
 ---
 status: living
 audience: engineers
-last_reviewed: 2026-10-29
+last_reviewed: 2026-10-30
 ---
 
 # Step Evaluation — manual test guide
@@ -139,8 +139,8 @@ Review, the assistant drafting each) or **Set up manually** (the tabs below).
 - 🔍 Pick **For some** twice, or come back to the stage: still one `matches-expected-output`.
 - 🔍 Ask the assistant on **Brief**, then open **Eval Cases**: its conversation starts empty; back on **Brief**,
   the earlier one is still there.
-- ✅ **Evaluators** → **Propose checks**: Evaluator cards arrive one at a time, each already previewed, ready to
-  accept — no plan card, no **Draft this check**.
+- ✅ **Evaluators** → **Propose checks**: Evaluator cards arrive one at a time, each schema or code one already
+  previewed and each judge marked untried, ready to accept — no plan card, no **Draft this check**.
 
 | Part | What it is for |
 |---|---|
@@ -213,10 +213,12 @@ version. *Archive* removes one.
 
 ### 3.1 Evaluators from the assistant (previewed)
 
-**What.** The assistant proposes checks; each one is **tried on up to 5 outputs** before you see
-it — the step's Eval Cases first (each case's expected output, graded as its source run's), then
-recent production outputs that gave a result — so the card shows how many passed / failed /
-errored on each. A check that errors on every output goes back to the assistant instead of to you.
+**What.** The assistant proposes checks; each schema or code check is **tried on up to 2 outputs**
+before you see it — the step's Eval Cases first (each case's expected output, graded as its source
+run's), then recent production outputs that gave a result — so the card shows how many passed /
+failed / errored on each. A check that errors on every output goes back to the assistant instead of
+to you. A judge is not tried: its card says so, on the pinned default model unless you asked for
+another.
 
 **Test**
 - *"Make an evaluation plan for this step"* → ✅ progress lines ("Reading the step", "Previewing a
@@ -229,6 +231,10 @@ errored on each. A check that errors on every output goes back to the assistant 
   output(s): …*, each case by name; a run that escalated or was cancelled is never among them.
 - *"Refine the <name> evaluator"* → ✅ **Proposed Evaluator version** card; accepting bumps to v2.
 - 🔍 As a user without the `run` verb: the card says the check was not tried.
+- *"Add a judge for whether each grade is justified"* → ✅ an **llm_judge** card marked *not tried*,
+  its model the newest Claude Sonnet; no judge call is made. *"…using openai/gpt-5"* → ✅ that model.
+  With the model registry synced, a model it does not list → 🔍 the assistant says so instead of
+  proposing it.
 
 > 🧪 Add the four checks above: `output-schema` → *Counts*; approve the source of the two code
 > checks → *Counts*; `grade-justified` → *Counts*. Ask the assistant for a rule such as *"no

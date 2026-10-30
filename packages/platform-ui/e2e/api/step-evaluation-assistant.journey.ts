@@ -93,6 +93,23 @@ test.describe('Evaluation Assistant — API E2E', () => {
     });
   });
 
+  test('proposes a judge untried, on the pinned default model when the assistant names none', async ({ request }) => {
+    const question = `Is every grade justified? ${randomUUID()}`;
+    const judge = { kind: 'llm_judge', rubric: 'Each grade follows from the AE\'s outcome in the input.', minConfidence: 0.8 };
+    await scriptOpenRouter(question, [
+      { toolCalls: [{ name: 'propose_evaluator', arguments: { name: 'grades-justified', rule: 'Each grade is justified.', check: judge } }] },
+      { content: 'I proposed a judge; try it in a small Eval Run.' },
+    ]);
+
+    const answer = await ask(request, step, question);
+
+    expect(answer.proposals).toEqual([{
+      tool: 'propose_evaluator',
+      arguments: { name: 'grades-justified', rule: 'Each grade is justified.', check: { ...judge, model: expect.stringMatching(/^anthropic\/claude-sonnet-[\d.]+$/) } },
+      selfTest: { unavailable: expect.stringMatching(/judge is not tried before it is proposed/i) },
+    }]);
+  });
+
   test('streams each round and tool call before the result when asked for NDJSON', async ({ request }) => {
     const question = `Show your work. ${randomUUID()}`;
     await scriptOpenRouter(question, [

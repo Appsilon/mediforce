@@ -8,7 +8,7 @@ import {
 } from '@mediforce/agent-runtime';
 import type { EvaluatorOutcome } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
-import { callOpenRouter } from '../../../services/openrouter-client';
+import { callOpenRouter, OpenRouterApiError, type OpenRouterRequest } from '../../../services/openrouter-client';
 import { requireOpenRouterApiKey } from '../../../services/openrouter-key';
 import type { ScoredRun } from './scored-run';
 
@@ -16,23 +16,43 @@ type LlmJudgeCheck = Extract<EvaluatorCheck, { kind: 'llm_judge' }>;
 type ExpectedOutputCheck = Extract<EvaluatorCheck, { kind: 'expected_output' }>;
 
 const CODE_CHECK_TIMEOUT_MS = 2 * 60_000;
-/** Room for a rationale that cites what decided the verdict. */
-const JUDGE_MAX_OUTPUT_TOKENS = 2000;
+/** Room for a rationale that cites what decided the verdict; a ceiling, so a short answer costs no more. */
+const JUDGE_MAX_OUTPUT_TOKENS = 4000;
+const JUDGE_RETRY_DELAY_MS = 2000;
 
-/** The judge's model, through the platform's OpenRouter seam (mockable via `OPENROUTER_BASE_URL`). */
-function openRouterJudgeClient(apiKey: string, model: string, onCall: (call: JudgeCall) => void): LlmClient {
+/** A rate limit or a provider failure is asked once more before it errors the check. */
+async function callJudgeModel(request: OpenRouterRequest): ReturnType<typeof callOpenRouter> {
+  try {
+    return await callOpenRouter(request);
+  } catch (err) {
+    if (err instanceof OpenRouterApiError === false || (err.status !== 429 && err.status < 500)) throw err;
+    await new Promise((resolve) => setTimeout(resolve, JUDGE_RETRY_DELAY_MS));
+    return callOpenRouter(request);
+  }
+}
+
+/**
+ * The judge's model, through the platform's OpenRouter seam (mockable via
+ * `OPENROUTER_BASE_URL`). A model the registry says cannot call tools answers
+ * in text instead of by its answer tool, so a judge saved on one still runs.
+ */
+async function openRouterJudgeClient(scope: CallerScope, apiKey: string, model: string, onCall: (call: JudgeCall) => void): Promise<LlmClient> {
+  const callsTools = (await scope.models.list()).find((entry) => entry.id === model)?.supportsTools !== false;
   return {
-    complete: async (messages) => {
+    complete: async (messages, _model, options = {}) => {
       const startedAt = Date.now();
-      const response = await callOpenRouter({
+      const { answerTool } = options;
+      const response = await callJudgeModel({
         model,
         apiKey,
         messages,
         temperature: 0,
         maxTokens: JUDGE_MAX_OUTPUT_TOKENS,
+        ...(answerTool === undefined || callsTools === false ? {} : { answerTool }),
       });
-      onCall({ model, ...response.usage, durationMs: Date.now() - startedAt, response: response.content });
-      return { content: response.content, model, usage: response.usage };
+      const content = response.toolCalls[0]?.function.arguments ?? response.content;
+      onCall({ model, ...response.usage, durationMs: Date.now() - startedAt, response: content });
+      return { content, model, usage: response.usage, stopReason: response.finishReason };
     },
   };
 }
@@ -65,7 +85,7 @@ async function runJudgeCheck(
     processInstanceId: agentRun.processInstanceId,
     executorOutput: agentRun.envelope!,
     iterationNumber: 0,
-    llm: openRouterJudgeClient(apiKey, check.model, onJudgeCall),
+    llm: await openRouterJudgeClient(scope, apiKey, check.model, onJudgeCall),
   });
   return { ...binary(agentRun.id, verdict.passed, verdict.reasoning), confidence: verdict.confidence };
 }
@@ -98,7 +118,7 @@ async function runExpectedOutputCheck(
     return binary(agentRun.id, matches !== negative, comment);
   }
   const apiKey = await requireOpenRouterApiKey(scope, subject.instance.namespace ?? '');
-  const { agreement, rationale } = await judgeOutputAgreement(openRouterJudgeClient(apiKey, check.model, onJudgeCall), {
+  const { agreement, rationale } = await judgeOutputAgreement(await openRouterJudgeClient(scope, apiKey, check.model, onJudgeCall), {
     model: check.model,
     instructions: check.instructions ?? null,
     caseInstructions: evalCase.agreementInstructions,

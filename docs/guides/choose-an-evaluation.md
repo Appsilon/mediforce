@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-29
+last_reviewed: 2026-10-30
 ---
 
 # Choosing an evaluation
@@ -93,8 +93,10 @@ flowchart TD
 ```
 
 - Preview any check on real outputs before saving it (`evaluator-preview`, or
-  let the assistant do it — it previews every card it proposes). A `code`
-  preview starts a sandbox per output and a judge preview pays per output.
+  let the assistant do it — it previews every schema or code check it
+  proposes). A `code` preview starts a sandbox per output and a judge preview
+  pays per output, so the assistant proposes a judge untried: try it in a small
+  Eval Run.
   `expected_output` cannot be previewed: a production output has no expected
   output.
 - An `llm_judge` verdict below its `minConfidence` is shown in the report but

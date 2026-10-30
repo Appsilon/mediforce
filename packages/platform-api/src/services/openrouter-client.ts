@@ -53,6 +53,8 @@ export interface OpenRouterRequest {
   messages: OpenRouterChatMessage[];
   apiKey: string;
   tools?: OpenRouterToolDefinition[];
+  /** A tool the model must answer by calling; offered alongside `tools`. */
+  answerTool?: { name: string; parameters: Record<string, unknown> };
   temperature?: number;
   maxTokens?: number;
 }
@@ -62,6 +64,14 @@ export class OpenRouterNetworkError extends Error {
   constructor(cause: unknown) {
     super(`Could not reach the model provider (${cause instanceof Error ? cause.message : String(cause)}). Check your connection and try again in a moment.`, { cause });
     this.name = 'OpenRouterNetworkError';
+  }
+}
+
+/** OpenRouter answered with a failing HTTP status; the message says what it means for the person. */
+export class OpenRouterApiError extends Error {
+  constructor(readonly status: number) {
+    super(`Model API error ${String(status)}: ${describeModelApiFailure(status)}`);
+    this.name = 'OpenRouterApiError';
   }
 }
 
@@ -95,7 +105,9 @@ export async function callOpenRouter(req: OpenRouterRequest): Promise<OpenRouter
     temperature: req.temperature ?? 0.7,
     max_tokens: req.maxTokens ?? 4096,
   };
-  if (req.tools !== undefined) body.tools = req.tools;
+  const tools = [...(req.tools ?? []), ...(req.answerTool === undefined ? [] : [{ type: 'function', function: req.answerTool }])];
+  if (tools.length > 0) body.tools = tools;
+  if (req.answerTool !== undefined) body.tool_choice = { type: 'function', function: { name: req.answerTool.name } };
 
   const response = await postChatCompletion({
     method: 'POST',
@@ -109,7 +121,7 @@ export async function callOpenRouter(req: OpenRouterRequest): Promise<OpenRouter
   if (!response.ok) {
     const errorText = await response.text();
     console.warn('[openrouter] model API error', { status: response.status, model: req.model, body: errorText.slice(0, 600) });
-    throw new Error(`Model API error ${String(response.status)}: ${describeModelApiFailure(response.status)}`);
+    throw new OpenRouterApiError(response.status);
   }
 
   const data = (await response.json()) as {

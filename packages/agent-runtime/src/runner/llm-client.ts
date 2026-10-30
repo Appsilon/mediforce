@@ -40,6 +40,10 @@ export class OpenRouterLlmClient {
             messages,
             temperature: options.temperature ?? 0.7,
             max_tokens: 16_000,
+            ...(options.answerTool === undefined ? {} : {
+              tools: [{ type: 'function', function: options.answerTool }],
+              tool_choice: { type: 'function', function: { name: options.answerTool.name } },
+            }),
           }),
         });
 
@@ -50,9 +54,15 @@ export class OpenRouterLlmClient {
 
         const data = await response.json() as {
           model?: string;
-          choices: Array<{ message: { content: string } }>;
+          choices: Array<{
+            message: { content: string | null; tool_calls?: Array<{ function: { arguments: string } }> };
+            finish_reason?: string | null;
+          }>;
           usage?: { prompt_tokens: number; completion_tokens: number };
         };
+        const choice = data.choices[0];
+        const content = (options.answerTool === undefined ? undefined : choice.message.tool_calls?.[0]?.function.arguments)
+          ?? choice.message.content ?? '';
         const answeredBy = data.model ?? model;
         const promptTokens = data.usage?.prompt_tokens ?? 0;
         const completionTokens = data.usage?.completion_tokens ?? 0;
@@ -63,15 +73,16 @@ export class OpenRouterLlmClient {
             model: answeredBy,
             promptTokens,
             completionTokens,
-            content: data.choices[0].message.content,
+            content,
           },
           this.tracingOptions.captureContent === true,
         );
 
         return {
-          content: data.choices[0].message.content,
+          content,
           model: answeredBy,
           usage: { promptTokens, completionTokens },
+          stopReason: choice.finish_reason ?? null,
         };
       },
     );

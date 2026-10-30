@@ -47,6 +47,7 @@ function withOpenRouterKey(fixture: EvaluationFixture) {
 describe('runEvaluatorCheck', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it('fails every check on a run that produced no result, without running it', async () => {
@@ -191,6 +192,73 @@ describe('runEvaluatorCheck', () => {
     expect(calls[0]).toEqual({
       model: 'anthropic/claude-haiku-4.5', promptTokens: 4000, completionTokens: 500, durationMs: expect.any(Number), response: 'I would rather not choose.',
     });
+  });
+
+  it('forces the judge to answer by calling its verdict tool, with room for a long rationale', async () => {
+    const fixture = await evaluationFixture();
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: null, tool_calls: [{ id: 'call-1', type: 'function', function: { name: 'verdict', arguments: ANSWER } }] }, finish_reason: 'tool_calls' }],
+    })));
+    vi.stubGlobal('fetch', fetchMock);
+    const scope = withOpenRouterKey(fixture);
+
+    const outcome = await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, GRADED_RUN, STEP), null);
+
+    expect(outcome).toMatchObject({ passed: true, confidence: 0.85, comment: 'Sepsis is graded 5, as the fatal outcome requires.' });
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      max_tokens: 4000,
+      tools: [{ type: 'function', function: { name: 'verdict' } }],
+      tool_choice: { type: 'function', function: { name: 'verdict' } },
+    });
+  });
+
+  it('asks a judge on a model that cannot call tools for its answer in text, so a judge saved on one still runs', async () => {
+    const fixture = await evaluationFixture();
+    const fetchMock = answeringOpenRouter(ANSWER);
+    const scope = withOpenRouterKey(fixture);
+    Object.assign(scope, { models: { list: async () => [{ id: judge.model, supportsTools: false }] } });
+
+    const outcome = await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, GRADED_RUN, STEP), null);
+
+    expect(outcome).toMatchObject({ passed: true, confidence: 0.85 });
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as Record<string, unknown>;
+    expect(body.tools).toBeUndefined();
+    expect(body.tool_choice).toBeUndefined();
+  });
+
+  it('says a judge answer was cut off at the output-token limit, not that the judge did not judge', async () => {
+    const fixture = await evaluationFixture();
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: '{"rationale": "The report covers' }, finish_reason: 'length' }],
+    }))));
+    const scope = withOpenRouterKey(fixture);
+
+    const outcome = await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, GRADED_RUN, STEP), null);
+    expect(outcome).toMatchObject({ passed: null, error: expect.stringContaining('cut off at the output-token limit') });
+  });
+
+  it('asks a rate-limited or failing provider once more before reporting the provider\'s error', async () => {
+    vi.useFakeTimers();
+    const fixture = await evaluationFixture();
+    const scope = withOpenRouterKey(fixture);
+    const subject = await loadScoredRun(scope, GRADED_RUN, STEP);
+    const recovering = vi.fn()
+      .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: ANSWER }, finish_reason: 'stop' }] })));
+    vi.stubGlobal('fetch', recovering);
+
+    const recovered = runEvaluatorCheck(scope, judge, subject, null);
+    await vi.runAllTimersAsync();
+    expect(await recovered).toMatchObject({ passed: true, error: null });
+    expect(recovering).toHaveBeenCalledTimes(2);
+
+    const failing = vi.fn().mockImplementation(async () => new Response('unavailable', { status: 503 }));
+    vi.stubGlobal('fetch', failing);
+    const failed = runEvaluatorCheck(scope, judge, subject, null);
+    await vi.runAllTimersAsync();
+    expect(await failed).toMatchObject({ passed: null, error: expect.stringContaining('OpenRouter is having trouble') });
+    expect(failing).toHaveBeenCalledTimes(2);
   });
 
   it('reports a check that cannot run as an error, not a failure', async () => {

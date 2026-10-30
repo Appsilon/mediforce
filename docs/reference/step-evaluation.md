@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-29
+last_reviewed: 2026-10-30
 ---
 
 # Step Evaluation
@@ -60,7 +60,8 @@ Cases** — *Do you know the correct outputs?* **Yes** or **For some** adds one
 — **Evaluators**, and **Review**. For each of the first three the assistant's
 panel offers a button that asks it to draft that stage (the Brief; cases from
 runs, or edge cases and planted errors; the checks themselves — up to five
-Evaluators, each previewed, with no plan to pick from first); its proposals arrive as
+Evaluators, each schema or code one previewed and each judge proposed untried,
+with no plan to pick from first); its proposals arrive as
 cards, as on the tabs. **Cases from runs** follows the answer to *Do you know
 the correct outputs?*: on **No** each run gives a case without an expected
 output; otherwise a reviewed run's decisions label its cases — every review
@@ -90,7 +91,13 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   reports — with every judge verdict's rationale and review — a run's failing trials
   (`get_failures`), the step's qualification and Acceptance
   Criteria (`get_qualification`), and `preview_evaluator` — it
-  tries a check on the step's Eval Cases and real outputs before proposing it.
+  tries a schema or code check on the step's Eval Cases and real outputs
+  before proposing it. A judge is not previewed: two outputs say little of how
+  it judges, so the card marks it untried and the assistant suggests a small
+  Eval Run. The assistant leaves a judge's model to the platform, which pins
+  its default (the newest Claude Sonnet in the model registry); it names one
+  only when the person asks, and the platform refuses a model the registry does
+  not list, has retired, or that cannot call tools.
 - **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
   written or synthesized), Brief drafts and Acceptance Criteria come back as
   cards to accept or reject. An Eval Case card shows the case as it would be
@@ -159,14 +166,14 @@ The step's Brief is sent to the assistant on every turn. What it can help with:
   trial of that run.
 - **Rule to check.** A plain-language rule becomes the cheapest reliable kind —
   `schema`, then `code`, a judge only when a script cannot decide it. Every
-  proposed check is tried by the platform on the step's recent production
-  outputs before the card is shown (reusing the assistant's own preview of the
+  proposed `schema` or `code` check is tried by the platform on up to 2 outputs
+  — the step's Eval Cases first, then recent production outputs that gave a
+  result — before the card is shown (reusing the assistant's own preview of the
   same check), and the card shows what it did. A check that errors on every
   output goes back to the assistant instead of to the person; for a person
-  without the `run` verb the card says it was not tried. The try runs the check on up to 5 outputs, so it is not free: a `code` check
-  starts a sandbox per output, and an `llm_judge` pays for a model call per
-  output — a turn that proposes a judge the assistant did not preview takes
-  longer and costs more. A refined rule is a proposed new version of the
+  without the `run` verb the card says it was not tried. A `code` try starts a
+  sandbox per output. A judge is not tried: its card says so, and a small Eval
+  Run shows how it judges. A refined rule is a proposed new version of the
   Evaluator.
 - **Judges.** It writes a rubric that names what passes, what fails and the
   evidence that decides it. After a run it reads the judge verdicts a person
@@ -252,7 +259,9 @@ A `code` check reads `/output/input.json` — `{ result, stepInput, trajectory,
 case }` — and the step's workspace commit read-only at `/workspace`, and writes
 `/output/result.json` as `{ "passed": boolean, "comment"?: string }`. A check
 that crashes, or a judge that gives no usable verdict, is an *error*, never a
-failed output.
+failed output. A judge's error says when its answer was cut off at its
+output-token limit or came back empty; a rate limit or provider failure is
+asked once more before it errors the check.
 
 Every change is a new immutable version; a `code` version's source approval
 attaches to it. In the tab's form, what blocks a save — no name, no rule, a
@@ -265,7 +274,9 @@ the agent's whole Trajectory — its reasoning, every tool call and tool result,
 numbered, long logs cut in the middle — its output and its own summary. It is
 not told a case's expected output or whether the case is negative. It must explain its judgment — what exactly decided the
 verdict and why, citing the input, the output and log entries by number — and
-answer `{ "rationale", "passed", "confidence" }`. The Score is `1`/`0` with
+answer by calling a `verdict` tool with `{ "rationale", "passed", "confidence" }`
+(an `expected_output` agreement judge calls `agreement` with
+`{ "rationale", "agreement" }`), so the answer cannot come back as prose. The Score is `1`/`0` with
 label `pass`/`fail`, the rationale as its comment, and
 `metadata.judgeConfidence` and `metadata.judgeMinConfidence`.
 

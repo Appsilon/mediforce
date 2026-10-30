@@ -173,6 +173,22 @@ describe('runProposalToolLoop', () => {
     expect(answers[2]).toMatchObject({ proposed: true, checkedOn: 2 });
   });
 
+  it('proposes what a review completed, and tells the model what it completed', async () => {
+    const bodies = scriptOpenRouter([
+      { toolCalls: [{ name: 'propose_note', arguments: { text: 'Check grade 5 first.' } }] },
+      { content: 'One note proposed.' },
+    ]);
+    const reviewProposal = vi.fn().mockResolvedValue({ ok: true, arguments: { text: 'Check grade 5 first, then grade 4.' } });
+
+    const result = await runProposalToolLoop({
+      ...config, messages: [{ role: 'user', content: 'go' }], executePlatformTool: vi.fn(), reviewProposal,
+    });
+
+    expect(result.proposals).toEqual([{ tool: 'propose_note', arguments: { text: 'Check grade 5 first, then grade 4.' } }]);
+    const answer = JSON.parse(bodies[1]!.messages.find((message) => message.role === 'tool')!.content);
+    expect(answer).toMatchObject({ proposed: true, arguments: { text: 'Check grade 5 first, then grade 4.' } });
+  });
+
   it('treats a tool named after an Object builtin as unknown, not as a tool', async () => {
     const bodies = scriptOpenRouter([
       { toolCalls: [{ name: 'constructor', arguments: {} }, { name: 'toString', arguments: {} }] },

@@ -175,7 +175,9 @@ changes are all proposals — the Evaluation Assistant
 (`handlers/evaluation-assistant/`) runs on it. Its `reviewProposal` hook checks
 each proposal against the platform before the person sees it: a refusal goes
 back to the model as a tool error, and what the review found (the Evaluation
-Assistant's self-test of a proposed check) travels with the proposal. The workflow assistant
+Assistant's self-test of a proposed check) travels with the proposal. A review
+may also complete the proposal — the Evaluation Assistant pins a judge's model
+the assistant left out — and the card then carries the completed arguments. The workflow assistant
 (`handlers/workflow-assistant/ask-workflow-assistant.ts`) keeps its own loop,
 interleaved with its graph-completeness gates and truncation salvage. The
 cowork chat (`handlers/cowork/`) is a separate OpenRouter loop and does not use

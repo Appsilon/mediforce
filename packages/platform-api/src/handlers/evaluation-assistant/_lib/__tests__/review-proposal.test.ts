@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import type { EvaluationSubject } from '@mediforce/platform-core';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { FALLBACK_PINNED_MODEL, type CreateModelRegistryEntryInput, type EvaluationSubject } from '@mediforce/platform-core';
+import { InMemoryModelRegistryRepository } from '@mediforce/platform-core/testing';
 import { userCaller } from '../../../../repositories/__tests__/create-test-scope';
 import { createEvaluator } from '../../../evaluation/evaluators';
 import { createEvalCase } from '../../../evaluation/eval-cases';
@@ -8,19 +9,41 @@ import { prepareEvalRun } from '../../../evaluation/eval-runs';
 import { reviewEvaluationProposal } from '../review-proposal';
 import { evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, type EvaluationFixture } from '../../../evaluation/__tests__/fixture';
 
+const runCodeCheck = vi.hoisted(() => vi.fn());
+vi.mock('@mediforce/agent-runtime', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@mediforce/agent-runtime')>()),
+  runCodeCheck,
+}));
+
 const findings = { kind: 'schema' as const, schema: { required: ['findings'] } };
+const script = { kind: 'code' as const, runtime: 'python' as const, source: 'raise SystemExit(1)' };
 const judge = {
   kind: 'llm_judge' as const,
-  model: 'anthropic/claude-haiku-4.5',
   rubric: 'Is every AE graded?',
   minConfidence: 0.8,
 };
+
+/** A scope whose model registry lists only these entries. */
+async function withRegistry(fixture: EvaluationFixture, entries: CreateModelRegistryEntryInput[]) {
+  const models = new InMemoryModelRegistryRepository();
+  for (const entry of entries) await models.upsert(entry);
+  return Object.assign(fixture.scope(), { models });
+}
+
+function registryEntry(id: string, overrides: Partial<CreateModelRegistryEntryInput> = {}): CreateModelRegistryEntryInput {
+  return {
+    id, name: id, provider: id.split('/')[0]!, contextLength: 200_000, maxCompletionTokens: null,
+    pricing: { input: 0.000003, output: 0.000015 }, modality: 'text->text', inputModalities: ['text'], outputModalities: ['text'],
+    supportsTools: true, supportsVision: false, source: 'openrouter', canonicalSlug: null, requestCount: null,
+    lastSyncedAt: '2026-10-01T00:00:00Z', retiredAt: null, ...overrides,
+  };
+}
 
 describe('reviewEvaluationProposal', () => {
   let fixture: EvaluationFixture;
   beforeEach(async () => { fixture = await evaluationFixture(); });
 
-  const proposeEvaluator = (check: typeof findings | typeof judge, name = 'findings-present') =>
+  const proposeEvaluator = <Check>(check: Check, name = 'findings-present') =>
     ({ name, rule: 'The result lists findings.' as const, check });
 
   it('self-tests a proposed check on the step\'s real outputs before the person sees it', async () => {
@@ -50,13 +73,49 @@ describe('reviewEvaluationProposal', () => {
   });
 
   it('sends back a check that errors on every output, and a name the step already uses', async () => {
-    // No model key in the workspace: the judge cannot grade anything.
-    const broken = await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(judge, 'grades-justified'), fixture.scope(), STEP, []);
+    runCodeCheck.mockRejectedValue(new Error('Traceback: SystemExit'));
+    const broken = await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(script, 'grades-justified'), fixture.scope(), STEP, []);
     expect(broken).toMatchObject({ ok: false, error: expect.stringContaining('errored on every output it was tried on (2)') });
 
     await createEvaluator({ ...STEP, ...proposeEvaluator(findings), origin: 'user' }, fixture.scope());
     const taken = await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(findings), fixture.scope(), STEP, []);
     expect(taken).toMatchObject({ ok: false, error: expect.stringContaining('propose_evaluator_version') });
+  });
+
+  it('proposes a judge untried, without calling a model, on the newest Sonnet when the assistant names no model', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const scope = await withRegistry(fixture, [registryEntry('anthropic/claude-sonnet-5.5'), registryEntry('anthropic/claude-sonnet-5.7')]);
+
+    const review = await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(judge, 'grades-justified'), scope, STEP, []);
+
+    expect(review).toEqual({
+      ok: true,
+      arguments: { ...proposeEvaluator(judge, 'grades-justified'), check: { ...judge, model: 'anthropic/claude-sonnet-5.7' } },
+      evidence: { selfTest: { unavailable: expect.stringMatching(/judge is not tried before it is proposed/i) } },
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('pins the fallback Sonnet for a judge while the model registry is not synced', async () => {
+    const review = await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(judge, 'grades-justified'), await withRegistry(fixture, []), STEP, []);
+    expect(review).toMatchObject({ ok: true, arguments: { check: { model: FALLBACK_PINNED_MODEL } } });
+  });
+
+  it('keeps a judge model the person asked for, and sends back one the registry does not offer, has retired or that cannot call tools', async () => {
+    const scope = await withRegistry(fixture, [
+      registryEntry('openai/gpt-5'),
+      registryEntry('openai/gpt-4', { retiredAt: '2026-09-01T00:00:00Z' }),
+      registryEntry('deepseek/deepseek-chat', { supportsTools: false }),
+    ]);
+    const asking = (model: string) => reviewEvaluationProposal('propose_evaluator', proposeEvaluator({ ...judge, model }, 'grades-justified'), scope, STEP, []);
+
+    expect(await asking('openai/gpt-5')).toMatchObject({ ok: true, arguments: { check: { model: 'openai/gpt-5' } } });
+    await expect(asking('openai/gpt-6')).rejects.toThrow('is not in the model registry');
+    await expect(asking('openai/gpt-4')).rejects.toThrow('retired');
+    await expect(asking('deepseek/deepseek-chat')).rejects.toThrow('cannot call tools');
+    await expect(asking('~anthropic/claude-sonnet-latest')).rejects.toThrow('alias');
   });
 
   it('marks a check untested for a person who may not run checks, instead of dropping it', async () => {

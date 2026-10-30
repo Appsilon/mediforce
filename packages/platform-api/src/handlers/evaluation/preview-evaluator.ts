@@ -13,6 +13,9 @@ type TriedCase = EvalCase & { sourceAgentRunId: string; expectedOutput: Record<s
 /** An Agent evaluated on its own (ADR-0029) has no production outputs; a check is first tried in its Eval Run. */
 export const AGENT_NOT_PREVIEWED = 'An agent evaluated on its own has no production outputs to try a check on; the check is first tried in its next Eval Run.';
 
+/** The Evaluation Assistant proposes a judge untried; a person may still preview one. */
+export const JUDGE_NOT_PREVIEWED = 'A judge is not tried before it is proposed: a couple of outputs say little of how it judges. Try it in a small Eval Run.';
+
 export const EXPECTED_OUTPUT_NOT_PREVIEWED = 'An expected-output check compares an Eval Case trial\'s output with the case\'s expected output; a production output has none, so it cannot be tried on one.';
 
 /**

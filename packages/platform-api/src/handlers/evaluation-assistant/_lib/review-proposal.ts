@@ -1,7 +1,10 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { z } from 'zod';
 import {
+  isMovingModelAlias,
   isOwnedBy,
+  pinDefaultModel,
+  type AssistantCheck,
   type EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   type EvaluationSubject,
   type EvaluationAssistantProposalToolName,
@@ -10,8 +13,8 @@ import {
 import type { ProposalReview } from '../../../assistant-core';
 import type { PreviewEvaluatorOutput } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
-import { HandlerError } from '../../../errors';
-import { AGENT_NOT_PREVIEWED, EXPECTED_OUTPUT_NOT_PREVIEWED, previewEvaluator } from '../../evaluation/preview-evaluator';
+import { HandlerError, ValidationError } from '../../../errors';
+import { AGENT_NOT_PREVIEWED, EXPECTED_OUTPUT_NOT_PREVIEWED, JUDGE_NOT_PREVIEWED, previewEvaluator } from '../../evaluation/preview-evaluator';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
 import { stepOnly } from '../../evaluation/_lib/evaluation-subject';
 import { perturbCase } from '../../evaluation/_lib/perturb-case';
@@ -26,11 +29,41 @@ export interface PreviewedCheck {
 }
 
 /**
+ * A judge's model: the platform's pinned default when the assistant names
+ * none, or the one the person asked for — if the model registry offers it, it
+ * is not retired and it can answer by a tool call, as a judge does. An
+ * unsynced registry cannot say, so a named model then stands.
+ */
+async function resolveCheck(scope: CallerScope, check: AssistantCheck): Promise<EvaluatorCheck> {
+  if (check.kind !== 'llm_judge' && check.kind !== 'expected_output') return check;
+  const models = await scope.models.list();
+  if (check.model === undefined) return { ...check, model: pinDefaultModel(models) };
+  const { model } = check;
+  if (isMovingModelAlias(model)) {
+    throw new ValidationError(`'${model}' is an alias whose model changes under the same name; leave the model out for the pinned default, or name a concrete model.`);
+  }
+  const entry = models.find((candidate) => candidate.id === model);
+  if (models.length > 0 && entry === undefined) {
+    throw new ValidationError(`The judge model '${model}' is not in the model registry; ask the person for a model the registry lists, or leave it out for the pinned default.`);
+  }
+  if (entry !== undefined && entry.retiredAt !== null) {
+    throw new ValidationError(`The judge model '${model}' was retired on ${entry.retiredAt}; leave the model out for the pinned default, or name a live one.`);
+  }
+  if (entry !== undefined && entry.supportsTools === false) {
+    throw new ValidationError(`The judge model '${model}' cannot call tools, and a judge answers by calling one; leave the model out for the pinned default, or name a model that supports tools.`);
+  }
+  return { ...check, model };
+}
+
+/**
  * A proposed check is tried on the step's Eval Cases and real outputs before
  * the person sees it (ADR-0023 D14): the assistant's own preview of that exact
  * check this turn, or a fresh one. A check that errors on every output it is
  * tried on does not run at all, so it goes back to the model instead of to the
- * person. A caller who may not run checks still gets the proposal, marked untested.
+ * person. A caller who may not run checks still gets the proposal, marked
+ * untested. A judge is not tried: its answer cannot break (it answers by a
+ * tool call on a vetted model), and two outputs say little of how it judges —
+ * an Eval Run does.
  */
 async function selfTest(
   scope: CallerScope,
@@ -38,6 +71,9 @@ async function selfTest(
   check: EvaluatorCheck,
   previewed: readonly PreviewedCheck[],
 ): Promise<ProposalReview> {
+  if (check.kind === 'llm_judge') {
+    return { ok: true, evidence: { selfTest: { unavailable: JUDGE_NOT_PREVIEWED } } };
+  }
   if (check.kind === 'expected_output') {
     return { ok: true, evidence: { selfTest: { unavailable: EXPECTED_OUTPUT_NOT_PREVIEWED } } };
   }
@@ -104,6 +140,11 @@ function reviewAgentCase(agentRunId: string | undefined, input: Args<'propose_ev
   return { ok: true };
 }
 
+/** A standing proposal whose check the platform completed carries it, so the card shows the check that will be saved. */
+function withCheck<Proposal extends { check?: AssistantCheck }>(review: ProposalReview, proposal: Proposal, check: EvaluatorCheck): ProposalReview {
+  return review.ok && check !== proposal.check ? { ...review, arguments: { ...proposal, check } } : review;
+}
+
 /**
  * Checks one Evaluation Assistant proposal against the platform before the
  * person sees it, so a card never offers what accepting would refuse: a name
@@ -120,7 +161,8 @@ export async function reviewEvaluationProposal(
 ): Promise<ProposalReview> {
   switch (toolName as EvaluationAssistantProposalToolName) {
     case 'propose_evaluator': {
-      const { name, check } = args as Args<'propose_evaluator'>;
+      const proposal = args as Args<'propose_evaluator'>;
+      const { name } = proposal;
       const taken = (await scope.evaluation.listEvaluators(step)).find((evaluator) => evaluator.name === name);
       if (taken !== undefined) {
         return {
@@ -128,17 +170,20 @@ export async function reviewEvaluationProposal(
           error: `This step has an Evaluator named '${name}' already (${taken.id}${taken.archived ? ', archived' : ''}) — propose a new version of it with propose_evaluator_version, or choose another name.`,
         };
       }
+      const check = await resolveCheck(scope, proposal.check);
       const schemaReview = await reviewAgentSchemaCheck(scope, step, check);
       if (schemaReview.ok === false) return schemaReview;
-      return selfTest(scope, step, check, previewed);
+      return withCheck(await selfTest(scope, step, check, previewed), proposal, check);
     }
     case 'propose_evaluator_version': {
-      const { evaluatorId, check } = args as Args<'propose_evaluator_version'>;
-      const evaluator = await loadStepEvaluator(scope, step, evaluatorId);
+      const proposal = args as Args<'propose_evaluator_version'>;
+      const evaluator = await loadStepEvaluator(scope, step, proposal.evaluatorId);
       if (evaluator.archived) return { ok: false, error: `Evaluator '${evaluator.name}' is archived` };
+      if (proposal.check === undefined) return { ok: true };
+      const check = await resolveCheck(scope, proposal.check);
       const schemaReview = await reviewAgentSchemaCheck(scope, step, check);
       if (schemaReview.ok === false) return schemaReview;
-      return check === undefined ? { ok: true } : selfTest(scope, step, check, previewed);
+      return withCheck(await selfTest(scope, step, check, previewed), proposal, check);
     }
     case 'propose_perturbed_case': {
       const proposal = args as Args<'propose_perturbed_case'>;

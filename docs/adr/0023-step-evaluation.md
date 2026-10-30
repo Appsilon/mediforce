@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-10-16
+last_reviewed: 2026-10-30
 ---
 
 # 0023 — Step Evaluation: Evaluation Assistant, Evaluators, single-step Eval Runs, Step Qualification
@@ -34,6 +34,11 @@ last_reviewed: 2026-10-16
   deleted, not only out of the UI; ADR-0024 pins the commit that has it.
   From 2026-10-05 an Eval Run carries the Step Fingerprint itself, with no
   variants (D5).
+- **Amended 2026-10-30 (D14):** the assistant previews only `schema` and
+  `code` checks; a judge is proposed untried, since two outputs say little of
+  how it judges and an Eval Run does. The platform pins a proposed judge's
+  model unless the person asked for one. A judge answers by a forced tool call
+  on a model that can call tools.
 - **Partially superseded 2026-10-15 by [ADR-0029](./0029-agent-evaluation.md):**
   D2 — an Evaluation is owned by a Step or by an Agent, and an Agent's Eval Run
   assesses one Agent version. Everything else here holds for an Agent's
@@ -271,8 +276,11 @@ assistant keeps its own loop until it can move onto the shared one without
 losing its canvas gates and truncation salvage. Heavy work is exposed as platform tools, never done by the
 model itself: `preview_evaluator` runs a draft check (in `script-container`
 for `code`) against existing outputs of the Step so the assistant sees a check
-fail on real outputs before proposing it. Every tool wraps a headless handler
-(ADR-0005), so the CLI and the manual UI get the same operations.
+fail on real outputs before proposing it. _Amended 2026-10-30: only a
+`schema` or `code` check is previewed; a judge is proposed untried, on the
+platform's pinned default model unless the person asked for another._ Every
+tool wraps a headless handler (ADR-0005), so the CLI and the manual UI get the
+same operations.
 
 **D15 — The assistant's authority is tiered by consequence.**
 - *Runs freely:* reads (Step config, SKILL.md, MCPs, runs, trajectories,

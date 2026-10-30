@@ -376,6 +376,7 @@ export {
   type EvaluationAssistantProposalToolName,
   type EvaluationAssistantPlatformToolName,
   type EvaluationAssistantProposal,
+  type AssistantCheck,
   type FailureRootCause,
   type FixKind,
 } from './schemas/evaluation-assistant-tools';
