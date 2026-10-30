@@ -234,7 +234,7 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
         </Tabs.Root>
         <div ref={assistantHeight.ref} hidden={assistant.open === false} className="relative lg:sticky lg:top-6 lg:h-[var(--assistant-height,calc(100dvh-10rem))]" style={{ '--assistant-height': assistantHeight.height === undefined ? undefined : `${assistantHeight.height}px` } as React.CSSProperties}>
           <AssistantResizeHandle {...assistantWidth} />
-          <EvaluationAssistantPanel step={step} definitionVersion={definitionVersion} brief={evaluation.brief} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
+          <EvaluationAssistantPanel step={step} definitionVersion={definitionVersion} outputSchema={outputSchema} brief={evaluation.brief} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
         </div>
       </div>
     </div>

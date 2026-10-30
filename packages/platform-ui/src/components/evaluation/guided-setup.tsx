@@ -531,6 +531,7 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
               <EvaluationAssistantPanel
                 step={step}
                 definitionVersion={definitionVersion}
+                outputSchema={outputSchema}
                 brief={evaluation.brief}
                 mayEdit={mayEdit}
                 editReason={editReason}

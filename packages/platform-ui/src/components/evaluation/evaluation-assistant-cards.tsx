@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Check, Eye, X } from 'lucide-react';
 import {
   describeAcceptanceCriteria,
+  type AgentOutputSchema,
   type EvalCaseExpectation,
   type EvalCaseInput,
   type EvaluationSubject,
@@ -15,7 +16,8 @@ import { useAgentRunIo, useStepEvaluationMutation, useStepEvaluators } from '@/h
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
-import { CaseDialog, CaseForm, outputText, type CaseFormResult } from './step-evaluation-sections';
+import { CaseForm, EvaluatorForm, FormDialog, outputText, type CaseFormResult, type EvaluatorFormResult } from './step-evaluation-sections';
+import { draftFromCheck } from './evaluator-check-editor';
 
 export type ProposalStatus = 'open' | 'accepted' | 'rejected';
 
@@ -260,7 +262,7 @@ function ReviewProposedCase({ step, proposal, content, mayEdit, onAccepted, onCl
   const accept = useStepEvaluationMutation(step, (values: CaseFormResult) => createReviewedCase(step, proposal, values));
   const { arguments: args } = proposal;
   return (
-    <CaseDialog title="Review the proposed Eval Case" description="Edit it if it needs it; Accept adds it as it stands here." onClose={onClose}>
+    <FormDialog title="Review the proposed Eval Case" description="Edit it if it needs it; Accept adds it as it stands here." testId="case-dialog" onClose={onClose}>
       <CaseForm
         initial={{
           name: args.name,
@@ -281,7 +283,38 @@ function ReviewProposedCase({ step, proposal, content, mayEdit, onAccepted, onCl
         onSubmit={(values) => accept.mutate(values, { onSuccess: onAccepted })}
         onCancel={onClose}
       />
-    </CaseDialog>
+    </FormDialog>
+  );
+}
+
+type EvaluatorProposal = Proposal<'propose_evaluator'>;
+
+/** The proposed Evaluator in the form a person adds Evaluators with; accepting it there creates it as edited, still the assistant's. */
+function ReviewProposedEvaluator({ step, proposal, stepOutputSchema, mayEdit, onAccepted, onClose }: {
+  step: EvaluationSubject;
+  proposal: EvaluatorProposal;
+  stepOutputSchema: AgentOutputSchema | undefined;
+  mayEdit: boolean;
+  onAccepted: () => void;
+  onClose: () => void;
+}) {
+  const evaluators = useStepEvaluators(step).data?.evaluators ?? [];
+  const { name, rule, check, runInProduction } = proposal.arguments;
+  const accept = useStepEvaluationMutation(step, (values: EvaluatorFormResult) =>
+    mediforce.evaluation.createEvaluator({ ...step, ...values, ...(runInProduction === undefined ? {} : { runInProduction }), origin: 'assistant' }));
+  return (
+    <FormDialog title="Review the proposed Evaluator" description="Edit it if it needs it; Accept creates it as it stands here." testId="evaluator-dialog" onClose={onClose}>
+      <EvaluatorForm
+        initial={{ name, rule, draft: draftFromCheck(check) }}
+        schemaTaken={evaluators.some((evaluator) => evaluator.latest.check.kind === 'schema')}
+        stepOutputSchema={stepOutputSchema}
+        submitLabel="Accept"
+        pending={mayEdit === false || accept.isPending}
+        error={accept.error?.message ?? null}
+        onSubmit={(values) => accept.mutate(values, { onSuccess: onAccepted })}
+        onCancel={onClose}
+      />
+    </FormDialog>
   );
 }
 
@@ -342,9 +375,11 @@ function relabelled(proposal: DecidableProposal, label: CaseLabel | null): Decid
   return { ...proposal, arguments: label === 'none' ? { ...args, expectedOutput: null } : { ...args, expectation: label } };
 }
 
-export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
+export function ProposalCard({ step, state, stepOutputSchema, mayEdit, editReason, onDecided }: {
   step: EvaluationSubject;
   state: { proposal: DecidableProposal; status: ProposalStatus };
+  /** The step's `agent.outputSchema`, offered when a reviewed Evaluator becomes a schema check. */
+  stepOutputSchema?: AgentOutputSchema;
   mayEdit: boolean;
   editReason: string | undefined;
   onDecided: (status: ProposalStatus) => void;
@@ -404,7 +439,7 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
               </button>
             </span>
           </InstantTooltip>
-          {isCaseProposal(proposal) && caseContent !== null && (
+          {((isCaseProposal(proposal) && caseContent !== null) || proposal.tool === 'propose_evaluator') && (
             <button type="button" className={buttonClass} onClick={() => setReviewing(true)}>
               <Eye className="h-3 w-3" />Review
             </button>
@@ -423,6 +458,19 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
           step={step}
           proposal={proposal}
           content={caseContent}
+          mayEdit={mayEdit}
+          onAccepted={() => {
+            setReviewing(false);
+            onDecided('accepted');
+          }}
+          onClose={() => setReviewing(false)}
+        />
+      )}
+      {reviewing && proposal.tool === 'propose_evaluator' && (
+        <ReviewProposedEvaluator
+          step={step}
+          proposal={proposal}
+          stepOutputSchema={stepOutputSchema}
           mayEdit={mayEdit}
           onAccepted={() => {
             setReviewing(false);

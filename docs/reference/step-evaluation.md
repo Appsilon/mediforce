@@ -99,7 +99,9 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   changes applied, which its description sums up). One with an expected output lets
   the person mark it **Positive** or **Negative**, or drop it (**No expected
   output**), before accepting. **Review** opens it whole in the Add case form,
-  to edit before accepting; a synthesized case accepted there keeps its file changes. Accepting one is the same write the forms
+  to edit before accepting; a synthesized case accepted there keeps its file changes.
+  An Evaluator card's **Review** likewise opens the proposed check in the Add
+  Evaluator form. Accepting one is the same write the forms
   make, recorded with `origin: assistant`. A routing recommendation (a Control
   Mode) comes back as a card to apply in the workflow editor. So does a **diagnosis** of an Eval Run's failures
   (`propose_diagnosis`) — see below. Nothing is applied to the step by the

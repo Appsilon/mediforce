@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Bot, Check, Loader2, Send, Settings, Sparkles, User, X } from 'lucide-react';
 import { DEFAULT_MODEL } from '@mediforce/platform-core';
 import type {
+  AgentOutputSchema,
   EvaluationSubject,
   EvaluationAssistantPlatformToolName,
   EvaluationAssistantProposalToolName,
@@ -143,11 +144,13 @@ export interface EvaluationAssistantStarter {
  * person confirms the budget on the card. The Step's Brief, which it reads on
  * every turn, opens from the header.
  */
-export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEdit, editReason, mayRun, runReason, starter }: {
+export function EvaluationAssistantPanel({ step, definitionVersion, outputSchema, brief, mayEdit, editReason, mayRun, runReason, starter }: {
   step: EvaluationSubject;
   /** The workflow version whose step the assistant reads and runs. */
   /** Null for an Agent evaluated on its own (ADR-0029), which runs as it is now. */
   definitionVersion: number | null;
+  /** The step's `agent.outputSchema`, offered when a proposed Evaluator is reviewed. */
+  outputSchema: AgentOutputSchema | undefined;
   brief: BriefQuery;
   mayEdit: boolean;
   editReason: string | undefined;
@@ -341,6 +344,7 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
                     key={proposalIndex}
                     step={step}
                     state={{ proposal, status: state.status }}
+                    stepOutputSchema={outputSchema}
                     mayEdit={mayEdit}
                     editReason={editReason}
                     onDecided={(status) => decide(index, proposalIndex, status)}

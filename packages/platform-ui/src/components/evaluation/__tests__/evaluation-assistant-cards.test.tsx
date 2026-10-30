@@ -3,10 +3,11 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ProposalCard } from '../evaluation-assistant-cards';
 
-const evaluation = vi.hoisted(() => ({ createCaseFromAgentRun: vi.fn(), createCase: vi.fn(), createPerturbedCase: vi.fn() }));
+const evaluation = vi.hoisted(() => ({ createCaseFromAgentRun: vi.fn(), createCase: vi.fn(), createPerturbedCase: vi.fn(), createEvaluator: vi.fn() }));
 const runIo = vi.hoisted(() => ({ current: undefined as unknown, error: null as Error | null }));
 
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
+vi.mock('@/hooks/use-model-registry', () => ({ usePinnedDefaultModel: () => 'anthropic/claude-sonnet-5.5' }));
 vi.mock('@/hooks/use-step-evaluation', () => ({
   useStepEvaluators: () => ({ data: { evaluators: [] } }),
   useAgentRunIo: (agentRunId: string | null) => (agentRunId !== null && runIo.error !== null
@@ -62,6 +63,7 @@ beforeEach(() => {
   evaluation.createCaseFromAgentRun.mockResolvedValue({});
   evaluation.createCase.mockResolvedValue({});
   evaluation.createPerturbedCase.mockResolvedValue({});
+  evaluation.createEvaluator.mockResolvedValue({});
   runIo.current = sourceRun;
   runIo.error = null;
 });
@@ -158,6 +160,52 @@ describe('ProposalCard shows what an Eval Case holds', () => {
       expectation: 'positive',
       containsProductionData: true,
       origin: 'assistant',
+    }));
+  });
+});
+
+describe('ProposalCard for an Evaluator', () => {
+  it('opens the Evaluator in the Add form to review, and creates it as edited there, still the assistant\'s', async () => {
+    const onDecided = renderProposal({
+      tool: 'propose_evaluator',
+      arguments: {
+        name: 'grades-valid',
+        rule: 'Every grade is 1 to 5.',
+        check: { kind: 'code', runtime: 'javascript', source: 'process.exit(0)' },
+        rationale: 'Grades out of range broke the last run.',
+        runInProduction: true,
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    const dialog = await screen.findByTestId('evaluator-dialog');
+    expect(within(dialog).getByLabelText('Evaluator name')).toHaveValue('grades-valid');
+    expect(within(dialog).getByLabelText('Source')).toHaveValue('process.exit(0)');
+    fireEvent.change(within(dialog).getByLabelText('Rule'), { target: { value: 'Every grade is 1 to 5, as CTCAE has it.' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Accept' }));
+    await waitFor(() => expect(onDecided).toHaveBeenCalledWith('accepted'));
+    expect(evaluation.createEvaluator).toHaveBeenCalledWith({
+      ...step,
+      name: 'grades-valid',
+      rule: 'Every grade is 1 to 5, as CTCAE has it.',
+      check: { kind: 'code', runtime: 'javascript', source: 'process.exit(0)' },
+      runInProduction: true,
+      origin: 'assistant',
+    });
+  });
+
+  it('keeps the assistant\'s name and rule for a schema check accepted on Review, as Accept on the card does', async () => {
+    const onDecided = renderProposal({
+      tool: 'propose_evaluator',
+      arguments: { name: 'grades-shape', rule: 'Every adverse event carries a grade.', check: { kind: 'schema', schema: { type: 'object', required: ['grades'] } } },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    const dialog = await screen.findByTestId('evaluator-dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Accept' }));
+    await waitFor(() => expect(onDecided).toHaveBeenCalledWith('accepted'));
+    expect(evaluation.createEvaluator).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'grades-shape',
+      rule: 'Every adverse event carries a grade.',
+      check: { kind: 'schema', schema: { type: 'object', required: ['grades'] } },
     }));
   });
 });

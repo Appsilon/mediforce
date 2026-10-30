@@ -255,6 +255,12 @@ interface EvaluatorFormValues {
   draft: CheckDraft;
 }
 
+export interface EvaluatorFormResult {
+  name: string;
+  rule: string;
+  check: EvaluatorCheck;
+}
+
 interface EvaluatorFormProblems {
   name?: string;
   rule?: string;
@@ -265,7 +271,7 @@ interface EvaluatorFormProblems {
  * Name, the kind of check and its fields. The kind comes from the dropdown,
  * never typed. What blocks a save is said under its field until it is edited.
  */
-function EvaluatorForm({ initial, editing = false, schemaTaken = false, stepOutputSchema, submitLabel, pending, error, onSubmit, onCancel }: {
+export function EvaluatorForm({ initial, editing = false, schemaTaken = false, stepOutputSchema, submitLabel, pending, error, onSubmit, onCancel }: {
   initial: EvaluatorFormValues;
   /**
    * Editing an existing Evaluator: its name and type stay. The name is its
@@ -278,20 +284,23 @@ function EvaluatorForm({ initial, editing = false, schemaTaken = false, stepOutp
   submitLabel: string;
   pending: boolean;
   error: string | null;
-  onSubmit: (values: { name: string; rule: string; check: EvaluatorCheck }) => void;
+  onSubmit: (values: EvaluatorFormResult) => void;
   onCancel: () => void;
 }) {
   const [values, setValues] = React.useState(initial);
   const [problems, setProblems] = React.useState<EvaluatorFormProblems>({});
   const isSchema = values.draft.kind === 'schema';
+  // A schema check keeps the name and rule it came with; a new one takes the fixed ones.
+  const schemaName = initial.name === '' ? OUTPUT_SCHEMA_NAME : initial.name;
+  const schemaRule = initial.rule === '' ? OUTPUT_SCHEMA_RULE : initial.rule;
   const judgeModel = usePinnedDefaultModel();
   const edit = (changes: Partial<EvaluatorFormValues>, cleared: keyof EvaluatorFormProblems) => {
     setValues((current) => ({ ...current, ...changes }));
     setProblems((current) => ({ ...current, [cleared]: undefined }));
   };
   const submit = () => {
-    const name = isSchema ? (editing ? initial.name : OUTPUT_SCHEMA_NAME) : values.name.replace(/-+$/, '');
-    const rule = isSchema ? (editing ? initial.rule : OUTPUT_SCHEMA_RULE) : values.rule;
+    const name = isSchema ? schemaName : values.name.replace(/-+$/, '');
+    const rule = isSchema ? schemaRule : values.rule;
     const result = checkFromDraft(values.draft);
     const found: EvaluatorFormProblems = {
       name: name === '' ? 'Give the evaluator a name.' : undefined,
@@ -307,7 +316,7 @@ function EvaluatorForm({ initial, editing = false, schemaTaken = false, stepOutp
     <div className="space-y-2 rounded-md bg-muted/40 p-3" data-testid="evaluator-form">
       <div className="flex gap-2">
         {isSchema ? (
-          <span className="flex-1 self-center text-sm font-medium">{editing ? initial.name : OUTPUT_SCHEMA_NAME}</span>
+          <span className="flex-1 self-center text-sm font-medium">{schemaName}</span>
         ) : (
           <input
             aria-label="Evaluator name"
@@ -400,10 +409,14 @@ export function EvaluatorsSection({ step, data, mayEdit, editReason, stepOutputS
   const columns = React.useMemo(() => evaluatorColumns(step), [step]);
   const view = useTableView(evaluators, columns);
   const schemaTaken = evaluators.some((evaluator) => evaluator.latest.check.kind === 'schema');
+  const closeAdd = () => {
+    setAdding(false);
+    create.reset();
+  };
   return (
-    <Section title="Evaluators" action={mayEdit === true && adding === false ? <button type="button" className={buttonClass} onClick={() => setAdding(true)}>Add</button> : undefined}>
+    <Section title="Evaluators" action={mayEdit === true ? <button type="button" className={buttonClass} onClick={() => setAdding(true)}>Add</button> : undefined}>
       {data.isLoading === true && <Loading />}
-      {data.isLoading === false && evaluators.length === 0 && adding === false && (
+      {data.isLoading === false && evaluators.length === 0 && (
         <p className="text-sm text-muted-foreground">No Evaluators yet. Ask the assistant what to check, or add one.</p>
       )}
       {data.isLoading === false && evaluators.length > 0 && (
@@ -418,19 +431,18 @@ export function EvaluatorsSection({ step, data, mayEdit, editReason, stepOutputS
         </div>
       )}
       {adding === true && (
-        <EvaluatorForm
-          initial={{ name: '', rule: '', draft: emptyCheckDraft(schemaTaken ? 'code' : 'schema', stepOutputSchema) }}
-          schemaTaken={schemaTaken}
-          stepOutputSchema={stepOutputSchema}
-          submitLabel="Create"
-          pending={create.isPending}
-          error={create.error?.message ?? null}
-          onSubmit={(values) => create.mutate(values, { onSuccess: () => setAdding(false) })}
-          onCancel={() => {
-            setAdding(false);
-            create.reset();
-          }}
-        />
+        <FormDialog title="Add an Evaluator" description="What every output of the step is checked against." testId="evaluator-dialog" onClose={closeAdd}>
+          <EvaluatorForm
+            initial={{ name: '', rule: '', draft: emptyCheckDraft(schemaTaken ? 'code' : 'schema', stepOutputSchema) }}
+            schemaTaken={schemaTaken}
+            stepOutputSchema={stepOutputSchema}
+            submitLabel="Create"
+            pending={create.isPending}
+            error={create.error?.message ?? null}
+            onSubmit={(values) => create.mutate(values, { onSuccess: closeAdd })}
+            onCancel={closeAdd}
+          />
+        </FormDialog>
       )}
     </Section>
   );
@@ -764,13 +776,13 @@ export function CaseForm({ initial, inputHelp, evaluators, sourceAgentRunId, sub
   );
 }
 
-/** A wide dialog holding a case form. */
-export function CaseDialog({ title, description, onClose, children }: { title: string; description: React.ReactNode; onClose: () => void; children: React.ReactNode }) {
+/** A wide dialog holding an Eval Case or Evaluator form. */
+export function FormDialog({ title, description, testId, onClose, children }: { title: string; description: React.ReactNode; testId: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <Dialog.Root open onOpenChange={(open) => { if (open === false) onClose(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border bg-background p-6 shadow-lg" data-testid="case-dialog">
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border bg-background p-6 shadow-lg" data-testid={testId}>
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <Dialog.Title className="text-lg font-semibold">{title}</Dialog.Title>
@@ -981,9 +993,10 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSel
         </DetailsRow>
       )}
       {editing && (
-        <CaseDialog
+        <FormDialog
           title={`Edit ${evalCase.name}`}
           description="Earlier Dataset versions keep the original."
+          testId="case-dialog"
           onClose={closeEdit}
         >
           <CaseForm
@@ -997,7 +1010,7 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSel
             onSubmit={(values) => edit.mutate(values, { onSuccess: closeEdit })}
             onCancel={closeEdit}
           />
-        </CaseDialog>
+        </FormDialog>
       )}
     </tbody>
   );
@@ -1365,13 +1378,14 @@ export function CasesSection({ step, evaluation, mayEdit }: {
         Inputs to re-run the step on, each with the output you expect if you know it.
       </p>
       {adding && (
-        <CaseDialog
+        <FormDialog
           title="Add an Eval Case"
           description="Start from a production run, or write an input yourself."
+          testId="case-dialog"
           onClose={() => setAdding(false)}
         >
           <AddCase step={step} evaluation={evaluation} cases={cases} evaluators={evaluators} onClose={() => setAdding(false)} />
-        </CaseDialog>
+        </FormDialog>
       )}
       {mayEdit && selectedCases.length > 0 && !settingEvaluators && (
         <div className="flex items-center gap-2 text-xs">

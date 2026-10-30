@@ -205,6 +205,16 @@ describe('EvaluatorsSection', () => {
     expect(screen.queryByTestId('evaluator-rule-error')).toBeNull();
     expect(screen.getByTestId('evaluator-name-error')).toBeTruthy();
   });
+
+  it('adds an Evaluator in a dialog, as Eval Cases are added, and closes it on Cancel', () => {
+    render(<EvaluatorsSection step={step} data={{ isLoading: false, data: { evaluators: [] } } as never} mayEdit={true} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    const dialog = screen.getByTestId('evaluator-dialog');
+    expect(within(dialog).getByTestId('evaluator-form')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByTestId('evaluator-dialog')).toBeNull();
+  });
 });
 
 describe('The output schema check', () => {
