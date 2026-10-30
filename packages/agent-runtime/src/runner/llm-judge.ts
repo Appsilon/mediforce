@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { AgentOutputEnvelope, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import type { ReviewPlugin, ReviewPluginContext, ReviewPluginResult } from '../interfaces/review-plugin';
-import type { LlmAnswerTool, LlmClient, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
+import type { LlmClient, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
 import { parseAnswer } from './llm-answer';
 
 export interface LlmJudgeConfig {
@@ -29,13 +29,6 @@ const MAX_SECTION_CHARS = 20_000;
 /** The agent's log may run long; its start and end are kept, the middle is cut. */
 const MAX_TRAJECTORY_CHARS = 60_000;
 const MAX_ENTRY_CHARS = 2_000;
-
-/** A JSON Schema the model's answer tool takes, from the schema its answer is read with. */
-function answerTool(name: string, schema: z.ZodType): LlmAnswerTool {
-  return { name, parameters: z.toJSONSchema(schema, { io: 'input' }) as Record<string, unknown> };
-}
-
-const VERDICT_TOOL = answerTool('verdict', JudgeAnswerSchema);
 
 /** Why a judge's answer could not be read, when the provider says more than the answer does. */
 function unreadableAnswer(response: LlmResponse): string | null {
@@ -112,7 +105,7 @@ export function llmJudgeMessages(
         ].join(' '),
         'Cite a log entry by its number in square brackets, one entry per bracket, right after what it shows: "the agent looked up the term [7][8]". Never a range, a list or a word inside the brackets — not [7-9], [7, 8] or [entry 7].',
         'confidence is how sure you are of your verdict, from 0 to 1: lower it when the evidence is incomplete, ambiguous or the rubric does not clearly decide the case.',
-        'Answer by calling verdict with your rationale, passed (true or false) and confidence (0 to 1) — or, when no verdict tool is offered, with one JSON object and nothing else: {"rationale": "<your explanation>", "passed": <true or false>, "confidence": <0 to 1>}. The rationale goes in its rationale field, never outside it. Write the rationale before deciding.',
+        'Answer with one JSON object and nothing else: {"rationale": "<your explanation>", "passed": <true or false>, "confidence": <0 to 1>}. Write the rationale before deciding.',
       ].join('\n\n'),
     },
     {
@@ -138,7 +131,7 @@ export class LlmJudgeReviewPlugin implements ReviewPlugin {
   constructor(private readonly config: LlmJudgeConfig) {}
 
   async review(context: ReviewPluginContext): Promise<LlmJudgeResult> {
-    const response = await context.llm.complete(llmJudgeMessages(this.config, context.executorOutput), this.config.model, { answerTool: VERDICT_TOOL });
+    const response = await context.llm.complete(llmJudgeMessages(this.config, context.executorOutput), this.config.model);
 
     const answer = parseAnswer(response.content, JudgeAnswerSchema);
     if (answer === null) {
@@ -176,8 +169,6 @@ const AgreementAnswerSchema = z.object({
   agreement: z.number().min(0).max(1),
 });
 
-const AGREEMENT_TOOL = answerTool('agreement', AgreementAnswerSchema);
-
 /** What the agreement judge is sent: how to score and the instructions, the case's overriding the check's, then the expected output and the output. */
 export function outputAgreementMessages(config: Omit<OutputAgreementConfig, 'model'>): LlmMessage[] {
   return [
@@ -189,7 +180,7 @@ export function outputAgreementMessages(config: Omit<OutputAgreementConfig, 'mod
         ...(config.instructions === null ? [] : [`On every case:\n${config.instructions}`]),
         ...(config.caseInstructions === null ? [] : [`On this case — this decides the comparison and overrides the instructions for every case where they conflict:\n${config.caseInstructions}`]),
         'Explain your score: name each difference that mattered and why, and the ones you treated as trivial.',
-        'Answer by calling agreement with your rationale and agreement (0 to 1) — or, when no agreement tool is offered, with one JSON object and nothing else: {"rationale": "<your explanation>", "agreement": <0 to 1>}. The rationale goes in its rationale field, never outside it. Write the rationale before scoring.',
+        'Answer with one JSON object and nothing else: {"rationale": "<your explanation>", "agreement": <0 to 1>}. Write the rationale before scoring.',
       ].join('\n\n'),
     },
     {
@@ -209,7 +200,7 @@ export function outputAgreementMessages(config: Omit<OutputAgreementConfig, 'mod
  * scored as a disagreement.
  */
 export async function judgeOutputAgreement(llm: LlmClient, config: OutputAgreementConfig): Promise<OutputAgreement> {
-  const response = await llm.complete(outputAgreementMessages(config), config.model, { answerTool: AGREEMENT_TOOL });
+  const response = await llm.complete(outputAgreementMessages(config), config.model);
 
   const answer = parseAnswer(response.content, AgreementAnswerSchema);
   if (answer === null) {

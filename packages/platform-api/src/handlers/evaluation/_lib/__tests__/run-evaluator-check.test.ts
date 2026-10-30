@@ -194,35 +194,16 @@ describe('runEvaluatorCheck', () => {
     });
   });
 
-  it('forces the judge to answer by calling its verdict tool, with room for a long rationale', async () => {
+  it('asks the judge for its verdict as JSON in text, forcing no tool call, with room for a long rationale', async () => {
     const fixture = await evaluationFixture();
-    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({
-      choices: [{ message: { content: null, tool_calls: [{ id: 'call-1', type: 'function', function: { name: 'verdict', arguments: ANSWER } }] }, finish_reason: 'tool_calls' }],
-    })));
-    vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = answeringOpenRouter(ANSWER);
     const scope = withOpenRouterKey(fixture);
 
     const outcome = await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, GRADED_RUN, STEP), null);
 
     expect(outcome).toMatchObject({ passed: true, confidence: 0.85, comment: 'Sepsis is graded 5, as the fatal outcome requires.' });
     const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as Record<string, unknown>;
-    expect(body).toMatchObject({
-      max_tokens: 4000,
-      tools: [{ type: 'function', function: { name: 'verdict' } }],
-      tool_choice: { type: 'function', function: { name: 'verdict' } },
-    });
-  });
-
-  it('asks a judge on a model that cannot call tools for its answer in text, so a judge saved on one still runs', async () => {
-    const fixture = await evaluationFixture();
-    const fetchMock = answeringOpenRouter(ANSWER);
-    const scope = withOpenRouterKey(fixture);
-    Object.assign(scope, { models: { list: async () => [{ id: judge.model, supportsTools: false }] } });
-
-    const outcome = await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, GRADED_RUN, STEP), null);
-
-    expect(outcome).toMatchObject({ passed: true, confidence: 0.85 });
-    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as Record<string, unknown>;
+    expect(body).toMatchObject({ max_tokens: 4000 });
     expect(body.tools).toBeUndefined();
     expect(body.tool_choice).toBeUndefined();
   });

@@ -105,27 +105,6 @@ describe('OpenRouterLlmClient endpoint', () => {
     });
   });
 
-  it('forces a call of the answer tool a call asks for, and answers with its arguments', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ choices: [{
-        message: { content: null, tool_calls: [{ function: { arguments: '{"passed": true}' } }] },
-        finish_reason: 'tool_calls',
-      }] }),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    const verdict = { name: 'verdict', parameters: { type: 'object' } };
-
-    const response = await new OpenRouterLlmClient('test-api-key')
-      .complete([{ role: 'user', content: 'Judge this.' }], 'anthropic/claude-sonnet-4', { answerTool: verdict });
-
-    expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string)).toMatchObject({
-      tools: [{ type: 'function', function: verdict }],
-      tool_choice: { type: 'function', function: { name: 'verdict' } },
-    });
-    expect(response).toMatchObject({ content: '{"passed": true}', stopReason: 'tool_calls' });
-  });
-
   it('posts the temperature a call asks for', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

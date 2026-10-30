@@ -103,18 +103,16 @@ describe('reviewEvaluationProposal', () => {
     expect(review).toMatchObject({ ok: true, arguments: { check: { model: FALLBACK_PINNED_MODEL } } });
   });
 
-  it('keeps a judge model the person asked for, and sends back one the registry does not offer, has retired or that cannot call tools', async () => {
+  it('keeps a judge model the person asked for, and sends back one the registry does not offer or has retired', async () => {
     const scope = await withRegistry(fixture, [
       registryEntry('openai/gpt-5'),
       registryEntry('openai/gpt-4', { retiredAt: '2026-09-01T00:00:00Z' }),
-      registryEntry('deepseek/deepseek-chat', { supportsTools: false }),
     ]);
     const asking = (model: string) => reviewEvaluationProposal('propose_evaluator', proposeEvaluator({ ...judge, model }, 'grades-justified'), scope, STEP, []);
 
     expect(await asking('openai/gpt-5')).toMatchObject({ ok: true, arguments: { check: { model: 'openai/gpt-5' } } });
     await expect(asking('openai/gpt-6')).rejects.toThrow('is not in the model registry');
     await expect(asking('openai/gpt-4')).rejects.toThrow('retired');
-    await expect(asking('deepseek/deepseek-chat')).rejects.toThrow('cannot call tools');
     await expect(asking('~anthropic/claude-sonnet-latest')).rejects.toThrow('alias');
   });
 

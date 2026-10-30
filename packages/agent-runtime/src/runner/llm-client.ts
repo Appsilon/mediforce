@@ -40,10 +40,6 @@ export class OpenRouterLlmClient {
             messages,
             temperature: options.temperature ?? 0.7,
             max_tokens: 16_000,
-            ...(options.answerTool === undefined ? {} : {
-              tools: [{ type: 'function', function: options.answerTool }],
-              tool_choice: { type: 'function', function: { name: options.answerTool.name } },
-            }),
           }),
         });
 
@@ -55,14 +51,13 @@ export class OpenRouterLlmClient {
         const data = await response.json() as {
           model?: string;
           choices: Array<{
-            message: { content: string | null; tool_calls?: Array<{ function: { arguments: string } }> };
+            message: { content: string | null };
             finish_reason?: string | null;
           }>;
           usage?: { prompt_tokens: number; completion_tokens: number };
         };
         const choice = data.choices[0];
-        const content = (options.answerTool === undefined ? undefined : choice.message.tool_calls?.[0]?.function.arguments)
-          ?? choice.message.content ?? '';
+        const content = choice.message.content ?? '';
         const answeredBy = data.model ?? model;
         const promptTokens = data.usage?.prompt_tokens ?? 0;
         const completionTokens = data.usage?.completion_tokens ?? 0;

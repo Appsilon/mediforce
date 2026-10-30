@@ -30,9 +30,9 @@ export interface PreviewedCheck {
 
 /**
  * A judge's model: the platform's pinned default when the assistant names
- * none, or the one the person asked for — if the model registry offers it, it
- * is not retired and it can answer by a tool call, as a judge does. An
- * unsynced registry cannot say, so a named model then stands.
+ * none, or the one the person asked for — if the model registry offers it and
+ * it is not retired. An unsynced registry cannot say, so a named model then
+ * stands.
  */
 async function resolveCheck(scope: CallerScope, check: AssistantCheck): Promise<EvaluatorCheck> {
   if (check.kind !== 'llm_judge' && check.kind !== 'expected_output') return check;
@@ -49,9 +49,6 @@ async function resolveCheck(scope: CallerScope, check: AssistantCheck): Promise<
   if (entry !== undefined && entry.retiredAt !== null) {
     throw new ValidationError(`The judge model '${model}' was retired on ${entry.retiredAt}; leave the model out for the pinned default, or name a live one.`);
   }
-  if (entry !== undefined && entry.supportsTools === false) {
-    throw new ValidationError(`The judge model '${model}' cannot call tools, and a judge answers by calling one; leave the model out for the pinned default, or name a model that supports tools.`);
-  }
   return { ...check, model };
 }
 
@@ -61,8 +58,7 @@ async function resolveCheck(scope: CallerScope, check: AssistantCheck): Promise<
  * check this turn, or a fresh one. A check that errors on every output it is
  * tried on does not run at all, so it goes back to the model instead of to the
  * person. A caller who may not run checks still gets the proposal, marked
- * untested. A judge is not tried: its answer cannot break (it answers by a
- * tool call on a vetted model), and two outputs say little of how it judges —
+ * untested. A judge is not tried: two outputs say little of how it judges —
  * an Eval Run does.
  */
 async function selfTest(

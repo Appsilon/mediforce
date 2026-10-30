@@ -31,28 +31,20 @@ async function callJudgeModel(request: OpenRouterRequest): ReturnType<typeof cal
   }
 }
 
-/**
- * The judge's model, through the platform's OpenRouter seam (mockable via
- * `OPENROUTER_BASE_URL`). A model the registry says cannot call tools answers
- * in text instead of by its answer tool, so a judge saved on one still runs.
- */
-async function openRouterJudgeClient(scope: CallerScope, apiKey: string, model: string, onCall: (call: JudgeCall) => void): Promise<LlmClient> {
-  const callsTools = (await scope.models.list()).find((entry) => entry.id === model)?.supportsTools !== false;
+/** The judge's model, through the platform's OpenRouter seam (mockable via `OPENROUTER_BASE_URL`). */
+function openRouterJudgeClient(apiKey: string, model: string, onCall: (call: JudgeCall) => void): LlmClient {
   return {
-    complete: async (messages, _model, options = {}) => {
+    complete: async (messages) => {
       const startedAt = Date.now();
-      const { answerTool } = options;
       const response = await callJudgeModel({
         model,
         apiKey,
         messages,
         temperature: 0,
         maxTokens: JUDGE_MAX_OUTPUT_TOKENS,
-        ...(answerTool === undefined || callsTools === false ? {} : { answerTool }),
       });
-      const content = response.toolCalls[0]?.function.arguments ?? response.content;
-      onCall({ model, ...response.usage, durationMs: Date.now() - startedAt, response: content });
-      return { content, model, usage: response.usage, stopReason: response.finishReason };
+      onCall({ model, ...response.usage, durationMs: Date.now() - startedAt, response: response.content });
+      return { content: response.content, model, usage: response.usage, stopReason: response.finishReason };
     },
   };
 }
@@ -85,7 +77,7 @@ async function runJudgeCheck(
     processInstanceId: agentRun.processInstanceId,
     executorOutput: agentRun.envelope!,
     iterationNumber: 0,
-    llm: await openRouterJudgeClient(scope, apiKey, check.model, onJudgeCall),
+    llm: openRouterJudgeClient(apiKey, check.model, onJudgeCall),
   });
   return { ...binary(agentRun.id, verdict.passed, verdict.reasoning), confidence: verdict.confidence };
 }
@@ -118,7 +110,7 @@ async function runExpectedOutputCheck(
     return binary(agentRun.id, matches !== negative, comment);
   }
   const apiKey = await requireOpenRouterApiKey(scope, subject.instance.namespace ?? '');
-  const { agreement, rationale } = await judgeOutputAgreement(await openRouterJudgeClient(scope, apiKey, check.model, onJudgeCall), {
+  const { agreement, rationale } = await judgeOutputAgreement(openRouterJudgeClient(apiKey, check.model, onJudgeCall), {
     model: check.model,
     instructions: check.instructions ?? null,
     caseInstructions: evalCase.agreementInstructions,

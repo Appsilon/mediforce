@@ -37,8 +37,9 @@ last_reviewed: 2026-10-30
 - **Amended 2026-10-30 (D14):** the assistant previews only `schema` and
   `code` checks; a judge is proposed untried, since two outputs say little of
   how it judges and an Eval Run does. The platform pins a proposed judge's
-  model unless the person asked for one. A judge answers by a forced tool call
-  on a model that can call tools.
+  model unless the person asked for one. A judge answers with a JSON object in
+  text; forcing a tool call was tried and dropped, since OpenRouter rejected
+  it for Claude Sonnet 5.5.
 - **Partially superseded 2026-10-15 by [ADR-0029](./0029-agent-evaluation.md):**
   D2 — an Evaluation is owned by a Step or by an Agent, and an Agent's Eval Run
   assesses one Agent version. Everything else here holds for an Agent's

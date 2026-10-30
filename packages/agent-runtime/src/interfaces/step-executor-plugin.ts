@@ -26,17 +26,9 @@ export interface LlmResponse {
   stopReason?: string | null;
 }
 
-/** A tool the model must answer by calling; the response's `content` is then the call's arguments, as JSON. */
-export interface LlmAnswerTool {
-  name: string;
-  /** JSON Schema of the arguments. */
-  parameters: Record<string, unknown>;
-}
-
 export interface LlmCallOptions {
   /** Defaults to 0.7; a call that must not paraphrase, such as reshaping an output, asks for 0. */
   temperature?: number;
-  answerTool?: LlmAnswerTool;
 }
 
 export interface LlmClient {

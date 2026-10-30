@@ -53,8 +53,6 @@ export interface OpenRouterRequest {
   messages: OpenRouterChatMessage[];
   apiKey: string;
   tools?: OpenRouterToolDefinition[];
-  /** A tool the model must answer by calling; offered alongside `tools`. */
-  answerTool?: { name: string; parameters: Record<string, unknown> };
   temperature?: number;
   maxTokens?: number;
 }
@@ -105,9 +103,7 @@ export async function callOpenRouter(req: OpenRouterRequest): Promise<OpenRouter
     temperature: req.temperature ?? 0.7,
     max_tokens: req.maxTokens ?? 4096,
   };
-  const tools = [...(req.tools ?? []), ...(req.answerTool === undefined ? [] : [{ type: 'function', function: req.answerTool }])];
-  if (tools.length > 0) body.tools = tools;
-  if (req.answerTool !== undefined) body.tool_choice = { type: 'function', function: { name: req.answerTool.name } };
+  if (req.tools !== undefined) body.tools = req.tools;
 
   const response = await postChatCompletion({
     method: 'POST',
