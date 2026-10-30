@@ -85,7 +85,8 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   configuration production refuses shows as such — and as trials see them,
   SKILL.md, the steps upstream of it), its
   production runs with the reviewer's verdict and their trajectories, the
-  workspace files a run started from, Evaluators, cases, Eval Runs and
+  workspace files of a run that gave a result, as it started or as it left
+  them (with the files it wrote), Evaluators, cases, Eval Runs and
   reports — with every judge verdict's rationale and review — a run's failing trials
   (`get_failures`), the step's qualification and Acceptance
   Criteria (`get_qualification`), and `preview_evaluator` — it

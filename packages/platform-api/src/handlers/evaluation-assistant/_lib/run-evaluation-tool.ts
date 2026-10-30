@@ -36,6 +36,7 @@ import { listEvaluators } from '../../evaluation/evaluators';
 import { listEvalCases } from '../../evaluation/eval-cases';
 import { getEvalRun, listEvalRuns, prepareEvalRun, startEvalRun } from '../../evaluation/eval-runs';
 import { getEvalRunFailures } from '../../evaluation/eval-run-failures';
+import { producedResult } from '../../evaluation/_lib/run-evaluator-check';
 import { previewEvaluator } from '../../evaluation/preview-evaluator';
 import { getAcceptanceCriteria } from '../../evaluation/acceptance-criteria';
 import { getStepQualification } from '../../evaluation/step-qualification';
@@ -180,6 +181,26 @@ async function reviewRounds(scope: CallerScope, workflowRunId: string, stepId: s
 const MAX_LISTED_FILES = 300;
 
 /**
+ * The commit of a production run's workspace at its start or end, or null
+ * when the run had none. A run that gave no result is refused: what it left
+ * says nothing about the step.
+ */
+async function runWorkspace(
+  scope: CallerScope,
+  subject: EvaluationSubject,
+  agentRunId: string,
+  at: 'start' | 'end',
+): Promise<{ repoPath: string; commit: string } | null> {
+  const source = await loadCaseSource(scope, agentRunId, stepOnly(subject, 'Reading a production workspace'), 'read');
+  if (producedResult(source.subject.agentRun) === false) {
+    throw new ValidationError(`Agent Run '${agentRunId}' gave no result (${source.subject.agentRun.status}); choose a run that completed`);
+  }
+  const commit = at === 'start' ? source.workspaceSeedCommit : source.subject.agentRun.envelope?.gitMetadata?.commitSha ?? null;
+  if (source.bareRepoPath === null || commit === null) return null;
+  return { repoPath: source.bareRepoPath, commit };
+}
+
+/**
  * The unattended budget a person granted for one request (D15), and what it
  * has paid for so far — the runs started under it, and what is left.
  */
@@ -319,21 +340,24 @@ export async function executeEvaluationTool(
       };
     }
     case 'list_workspace_files': {
-      const { agentRunId } = args as Args<'list_workspace_files'>;
-      const source = await loadCaseSource(scope, agentRunId, stepOnly(step, 'Reading a production workspace'), 'read');
-      if (source.bareRepoPath === null || source.workspaceSeedCommit === null) {
+      const { agentRunId, at } = EVALUATION_ASSISTANT_PLATFORM_TOOLS.list_workspace_files.parse(args);
+      const workspace = await runWorkspace(scope, step, agentRunId, at);
+      if (workspace === null) {
         return { files: [], note: 'This run had no workspace; a case from it starts from an empty one.' };
       }
-      const files = await listCommitFiles(source.bareRepoPath, source.workspaceSeedCommit);
-      return { commit: source.workspaceSeedCommit, files: files.slice(0, MAX_LISTED_FILES), total: files.length };
+      const files = await listCommitFiles(workspace.repoPath, workspace.commit);
+      return { commit: workspace.commit, files: files.slice(0, MAX_LISTED_FILES), total: files.length };
     }
     case 'read_workspace_file': {
-      const { agentRunId, path } = args as Args<'read_workspace_file'>;
-      const source = await loadCaseSource(scope, agentRunId, stepOnly(step, 'Reading a production workspace'), 'read');
-      const content = source.bareRepoPath === null || source.workspaceSeedCommit === null
-        ? null
-        : await readCommitFile(source.bareRepoPath, source.workspaceSeedCommit, path);
-      if (content === null) throw new NotFoundError(`The workspace of Agent Run '${agentRunId}' has no file '${path}'`);
+      const { agentRunId, path, at } = EVALUATION_ASSISTANT_PLATFORM_TOOLS.read_workspace_file.parse(args);
+      const workspace = await runWorkspace(scope, step, agentRunId, at);
+      if (workspace === null) throw new NotFoundError(`Agent Run '${agentRunId}' had no workspace; it has no file '${path}'`);
+      const content = await readCommitFile(workspace.repoPath, workspace.commit, path);
+      if (content === null) {
+        throw new NotFoundError(at === 'start'
+          ? `Agent Run '${agentRunId}' has no file '${path}' in the workspace it started from; a file the run wrote is there only at "end"`
+          : `Agent Run '${agentRunId}' has no file '${path}' in the workspace it left`);
+      }
       if (isBinary(content)) return { path, size: content.length, binary: true };
       return { path, size: content.length, content: clip(content.toString('utf-8'), 20_000) };
     }

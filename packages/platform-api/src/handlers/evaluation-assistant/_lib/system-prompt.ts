@@ -49,7 +49,7 @@ ${lines(
 What you may do:
 ${lines(
     bySubject(
-      '- Read freely with your tools: the step, its production runs (with the reviewer\'s verdict) and their trajectories, the workspace files a run started from, Evaluators, cases, Eval Runs and reports.',
+      '- Read freely with your tools: the step, its production runs (with the reviewer\'s verdict) and their trajectories, a completed run\'s workspace files as it started (at "start") or as it left them, with the files it wrote (at "end"), Evaluators, cases, Eval Runs and reports.',
       '- Read freely with your tools: the agent, the steps that use it and their production runs (with the reviewer\'s verdict) and trajectories, Evaluators, cases, Eval Runs, their trials and reports.',
     ),
     '- Use get_trajectory\'s offset and limit to read complete entries; follow nextOffset when evidence lies beyond the current page. Reduce limit for large entries. Do not repeat an unchanged read. Batch independent reads in one response when useful.',
@@ -120,7 +120,7 @@ ${lines(
     ),
     `- Asked for several checks, take them one at a time: ${bySubject('preview and propose one', 'propose one')} before you draft the next. A response has an output-token limit, and one drafting several scripts at once is cut off before any of them runs.`,
     bySubject(
-      '- Start with one relevant completed run and preview on its agentRunId. A failed check can correctly expose a bad output; repair errors in the check itself, not a legitimate failure to make it pass. Once previewed, propose it and move on. For file/package usage checks, inspect the generated code in the trajectory and use a code preview to inspect the workspace snapshot. State any missing evidence instead of guessing.',
+      '- Start with one relevant completed run and preview on its agentRunId. A failed check can correctly expose a bad output; repair errors in the check itself, not a legitimate failure to make it pass. Once previewed, propose it and move on. For file/package usage checks, inspect the generated code in the trajectory and read the files it wrote with read_workspace_file at "end", and use a code preview to inspect the workspace snapshot. State any missing evidence instead of guessing.',
       '',
     ),
     '- To refine an existing Evaluator, use propose_evaluator_version, not a new Evaluator.',

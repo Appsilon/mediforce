@@ -208,6 +208,8 @@ export const EVALUATION_ASSISTANT_PROPOSAL_TOOLS = {
 } as const;
 
 const NoArguments = z.object({});
+const WorkspaceMomentSchema = z.enum(['start', 'end']).default('start')
+  .describe('"start": the workspace the run started from. "end": the workspace the run left, with the files it wrote.');
 
 export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
   /**
@@ -243,10 +245,10 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
     limit: z.number().int().min(1).max(150).default(50)
       .describe('Maximum number of complete entries per page (1–150; default 50). Use a smaller limit for large tool payloads.'),
   }).describe('Read an Agent Run trajectory in stored order, including system and thinking entries, without truncating entry content. Returns { entries, total, nextOffset }; total is the full entry count. Request subsequent pages using nextOffset as offset until nextOffset is null. An offset at or beyond total returns an empty page with nextOffset null.'),
-  /** Files of the workspace an Agent Run started from — what a case from it would start from. */
-  list_workspace_files: z.object({ agentRunId: z.string().min(1) }),
-  /** One text file of that workspace. */
-  read_workspace_file: z.object({ agentRunId: z.string().min(1), path: WorkspaceFilePathSchema }),
+  list_workspace_files: z.object({ agentRunId: z.string().min(1), at: WorkspaceMomentSchema })
+    .describe('List the files of an Agent Run\'s workspace. at "start" (default) is the workspace the run started from — what a case from it starts from; at "end" it also holds the files the run wrote (its changedFiles). Refuses a run that gave no result.'),
+  read_workspace_file: z.object({ agentRunId: z.string().min(1), path: WorkspaceFilePathSchema, at: WorkspaceMomentSchema })
+    .describe('Read one text file of an Agent Run\'s workspace. A file the run wrote (its changedFiles) is there only at "end"; at "start" (default) is the workspace the run started from. Refuses a run that gave no result.'),
   list_evaluators: NoArguments,
   list_eval_cases: NoArguments,
   list_eval_runs: NoArguments,

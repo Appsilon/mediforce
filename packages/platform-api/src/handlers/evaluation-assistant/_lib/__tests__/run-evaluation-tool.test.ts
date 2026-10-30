@@ -213,11 +213,41 @@ describe('executeEvaluationTool', () => {
       expect(await executeEvaluationTool('read_workspace_file', { agentRunId: 'agent-run-with-files', path: 'data/ae.csv' }, scope, context))
         .toEqual({ path: 'data/ae.csv', size: 24, content: 'AETERM,AETOXGR\nSepsis,5\n' });
       await expect(executeEvaluationTool('read_workspace_file', { agentRunId: 'agent-run-with-files', path: 'graded.json' }, scope, context))
-        .rejects.toThrow("has no file 'graded.json'");
+        .rejects.toThrow("has no file 'graded.json' in the workspace it started from");
       expect(await executeEvaluationTool('list_workspace_files', { agentRunId: GRADED_RUN }, scope, context))
         .toMatchObject({ files: [], note: expect.stringContaining('no workspace') });
+      await expect(executeEvaluationTool('read_workspace_file', { agentRunId: GRADED_RUN, path: 'data/ae.csv' }, scope, context))
+        .rejects.toThrow(`Agent Run '${GRADED_RUN}' had no workspace`);
     } finally {
       workspace.remove();
+    }
+  });
+
+  it('lists and reads the workspace a run left behind, with the files it wrote', async () => {
+    const { fixture, scope, context } = await setup();
+    const workspace = gitWorkspace({ 'data/ae.csv': 'AETERM,AETOXGR\nSepsis,5\n' });
+    try {
+      await addStepRun(fixture, {
+        instanceId: 'run-with-files', agentRunId: 'agent-run-with-files', result: {}, at: '2026-09-22T11:00:00.000Z',
+        gitMetadata: { repoUrl: workspace.repoPath, commitSha: workspace.stepCommit },
+      });
+      expect(await executeEvaluationTool('list_workspace_files', { agentRunId: 'agent-run-with-files', at: 'end' }, scope, context))
+        .toEqual({ commit: workspace.stepCommit, files: [{ path: 'data/ae.csv', size: 24 }, { path: 'graded.json', size: 15 }], total: 2 });
+      expect(await executeEvaluationTool('read_workspace_file', { agentRunId: 'agent-run-with-files', path: 'graded.json', at: 'end' }, scope, context))
+        .toEqual({ path: 'graded.json', size: 15, content: '{"findings":[]}' });
+    } finally {
+      workspace.remove();
+    }
+  });
+
+  it('refuses the workspace of a run that gave no result', async () => {
+    const { fixture, scope, context } = await setup();
+    await fixture.agentRunRepo.create(buildAgentRun({
+      id: 'agent-run-cancelled', processInstanceId: 'run-graded', stepId: STEP.stepId, status: 'escalated', envelope: null, startedAt: '2026-09-22T11:00:00.000Z',
+    }));
+    for (const tool of ['list_workspace_files', 'read_workspace_file'] as const) {
+      await expect(executeEvaluationTool(tool, { agentRunId: 'agent-run-cancelled', path: 'data/ae.csv' }, scope, context))
+        .rejects.toThrow("Agent Run 'agent-run-cancelled' gave no result");
     }
   });
 
