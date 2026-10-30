@@ -47,7 +47,7 @@ async function selfTest(
   let preview = previewed.find((candidate) => isDeepStrictEqual(candidate.check, check))?.preview;
   if (preview === undefined) {
     try {
-      preview = await previewEvaluator({ ...step, check, limit: 5 }, scope);
+      preview = await previewEvaluator({ ...step, check, limit: 2 }, scope);
     } catch (err) {
       if (err instanceof HandlerError && err.code === 'forbidden') {
         return { ok: true, evidence: { selfTest: { unavailable: err.message } } };

@@ -395,7 +395,7 @@ export async function executeEvaluationTool(
     }
     case 'preview_evaluator': {
       const { check, agentRunIds } = args as Args<'preview_evaluator'>;
-      return previewEvaluator({ ...stepOnly(step, 'A preview'), check, limit: 5, ...(agentRunIds === undefined ? {} : { agentRunIds }) }, scope);
+      return previewEvaluator({ ...stepOnly(step, 'A preview'), check, limit: 2, ...(agentRunIds === undefined ? {} : { agentRunIds }) }, scope);
     }
     case 'get_qualification': {
       const [qualification, { criteria }] = await Promise.all([
