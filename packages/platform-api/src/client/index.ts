@@ -612,6 +612,8 @@ import {
   SetAcceptanceCriteriaOutputSchema,
   GetStepQualificationInputSchema,
   GetStepQualificationOutputSchema,
+  ListAgentValidationsInputSchema,
+  ListAgentValidationsOutputSchema,
   GetWorkflowValidationInputSchema,
   GetWorkflowValidationOutputSchema,
   SignStepQualificationInputSchema,
@@ -659,6 +661,8 @@ import {
   type SetAcceptanceCriteriaOutput,
   type GetStepQualificationInput,
   type GetStepQualificationOutput,
+  type ListAgentValidationsInput,
+  type ListAgentValidationsOutput,
   type GetWorkflowValidationInput,
   type GetWorkflowValidationOutput,
   type SignStepQualificationInput,
@@ -1159,6 +1163,8 @@ export class Mediforce {
     getAcceptanceCriteria: (input: GetAcceptanceCriteriaInput) => Promise<GetAcceptanceCriteriaOutput>;
     setAcceptanceCriteria: (input: SetAcceptanceCriteriaInput) => Promise<SetAcceptanceCriteriaOutput>;
     getQualification: (input: GetStepQualificationInput) => Promise<GetStepQualificationOutput>;
+    /** Every evaluable agent's validation status in the namespace, one request instead of one per agent. */
+    listAgentValidations: (input: ListAgentValidationsInput) => Promise<ListAgentValidationsOutput>;
     /** Whether each version of a workflow is verified: every agent step's validation in it. */
     getWorkflowValidation: (input: GetWorkflowValidationInput) => Promise<GetWorkflowValidationOutput>;
     signQualification: (input: SignStepQualificationInput) => Promise<SignStepQualificationOutput>;
@@ -2839,6 +2845,13 @@ export class Mediforce {
           definitionVersion: validated.definitionVersion === undefined ? undefined : String(validated.definitionVersion),
         });
         return this.getJson(`/api/evaluation/qualification${qs}`, GetStepQualificationOutputSchema, 'mediforce.evaluation.getQualification');
+      },
+      listAgentValidations: async (input) => {
+        const validated = ListAgentValidationsInputSchema.parse(input);
+        return this.getJson(
+          `/api/evaluation/qualification/agents${toSearchParams({ namespace: validated.namespace })}`,
+          ListAgentValidationsOutputSchema, 'mediforce.evaluation.listAgentValidations',
+        );
       },
       getWorkflowValidation: async (input) => {
         const workflow = GetWorkflowValidationInputSchema.parse(input);
