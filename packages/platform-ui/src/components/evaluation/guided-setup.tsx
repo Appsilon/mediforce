@@ -27,7 +27,7 @@ const STAGE_LABELS: Record<SetupStage, string> = {
   brief: 'Brief',
   cases: 'Eval Cases',
   evaluators: 'Evaluators',
-  review: 'Review',
+  review: 'Summary',
 };
 
 export const EXPECTED_OUTPUT_EVALUATOR = 'matches-expected-output';
@@ -407,9 +407,9 @@ function StageFooter({ back, next, skip }: { back: React.ReactNode; next: { labe
 
 /**
  * Guided setup of a subject's Evaluation: Brief, Eval Cases, Evaluators and
- * Review, one stage at a time, beside the Evaluation Assistant, which offers
+ * Summary, one stage at a time, beside the Evaluation Assistant, which offers
  * each stage's drafting job as a button and holds a conversation per stage,
- * kept for going back to it. Every stage writes as the tabs do; only Review saves the cases as a
+ * kept for going back to it. Every stage writes as the tabs do; only Summary saves the cases as a
  * Dataset version and sets the Acceptance Criteria.
  */
 export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema, mayEdit, editReason, mayRun, runReason, stage, onStage, onExit }: {
@@ -492,7 +492,7 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
           why="Cheapest check first: the output schema, then Code, then an LLM judge. A Code check counts toward the result only after a person approves its source."
         />
       )}
-      {stage === 'review' && <StageHeading title="Review" purpose="Save the setup, or save it and start an Eval Run." />}
+      {stage === 'review' && <StageHeading title="Summary" purpose="Save the setup, or save it and start an Eval Run." />}
       <div
         ref={layoutRef}
         className="grid gap-4 lg:grid-cols-(--guided-setup-columns) lg:items-start"
@@ -522,7 +522,7 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
           )}
           {stage === 'brief' && <StageFooter back={<span />} skip={() => onStage('cases')} next={{ label: 'Next: Eval Cases →', onClick: () => onStage('cases') }} />}
           {stage === 'cases' && <StageFooter back={backLink('brief')} next={{ label: 'Next: Evaluators →', onClick: () => onStage('evaluators') }} />}
-          {stage === 'evaluators' && <StageFooter back={backLink('cases')} next={{ label: 'Next: Review →', onClick: () => onStage('review') }} />}
+          {stage === 'evaluators' && <StageFooter back={backLink('cases')} next={{ label: 'Next: Summary →', onClick: () => onStage('review') }} />}
         </div>
         <div ref={assistantHeight.ref} className="relative lg:sticky lg:top-6 lg:h-[var(--assistant-height,calc(100dvh-10rem))]" style={{ '--assistant-height': assistantHeight.height === undefined ? undefined : `${assistantHeight.height}px` } as React.CSSProperties}>
           <AssistantResizeHandle {...assistantWidth} />

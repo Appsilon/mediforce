@@ -19,7 +19,7 @@ import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
  * finished run's report. A step opens on its Eval Runs once it has any, else
  * on its cases; a banner over the tabs leads to Code Evaluators nobody
  * approved; `?section=` and a hidden assistant survive a reload. An empty step
- * offers a guided setup — Brief, Eval Cases, Evaluators, Review — or the tabs.
+ * offers a guided setup — Brief, Eval Cases, Evaluators, Summary — or the tabs.
  * The model is the scripted mock OpenRouter.
  */
 test.describe('Step Evaluation tab', () => {
