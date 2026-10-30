@@ -38,10 +38,8 @@ plus any prepared or running run of another version, tagged with it; the Eval
 Cases; and the Evaluators. A step with Eval Runs opens on them, one without on
 its cases. A banner over the tabs counts `code` Evaluators whose source nobody
 approved. Beside the tabs is the Evaluation Assistant (`mediforce eval ask`,
-`POST /api/evaluation/assistant`), whose header holds the step's Brief;
-**Hide assistant** in the strip gives the tabs the full width, remembered per
-browser; the conversation, a typed draft and a reply still on its way are kept
-for when it is shown again. The assistant reads and prepares runs of the step as
+`POST /api/evaluation/assistant`), whose header holds the step's Brief and
+which is always shown. The assistant reads and prepares runs of the step as
 the selected version has it
 (`definitionVersion`, `mediforce eval ask --version N`; the runnable version
 when absent). A step's Evaluators, cases, Brief and criteria are the step's,
@@ -75,8 +73,8 @@ up the stages, sets the Acceptance Criteria (minimum pass rate, optionally
 pass^k) and, on **Save**, writes them if changed and saves the cases as a new
 Dataset version if unsaved, then opens the tabs; **Save and start Eval Run**
 saves, then asks for trials and a budget as the Eval Runs tab does. **Exit
-setup** opens the tabs without saving anything more. **Guided setup** in the
-status strip reopens it at any time, whatever the step already has.
+setup** opens the tabs without saving anything more. **Guided setup** beside the
+Version and Step pickers reopens it at any time, whatever the step already has.
 
 Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
 

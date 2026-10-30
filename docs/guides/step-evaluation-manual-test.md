@@ -128,8 +128,7 @@ Legend: ✅ expected · 🔍 try to break it · 🧪 in the sandbox workflow
 
 ## 1. The Evaluation tab at a glance
 
-A status strip on top, three tabs under it; the **Evaluation Assistant** is the right-hand panel,
-which **Hide assistant** in the strip folds away.
+A status strip on top, three tabs under it; the **Evaluation Assistant** is the right-hand panel.
 
 A step with nothing set up yet first offers **Guided setup** (Brief → Eval Cases → Evaluators →
 Review, the assistant drafting each) or **Set up manually** (the tabs below).

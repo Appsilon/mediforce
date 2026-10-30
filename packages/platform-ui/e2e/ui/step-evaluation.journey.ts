@@ -328,7 +328,7 @@ test.describe('Step Evaluation tab', () => {
     await expect(startCard).toContainText('on v1', { timeout: 15_000 });
   });
 
-  test('a step without runs opens on its cases, an unapproved Code Evaluator is flagged over the tabs, and ?section= and the hidden assistant survive a reload', async ({ page, request }) => {
+  test('a step without runs opens on its cases, an unapproved Code Evaluator is flagged over the tabs, a typed assistant draft survives switching tabs, and ?section= survives a reload', async ({ page, request }) => {
     test.setTimeout(60_000);
     trackPageErrors(page);
     const workflowName = `e2e-eval-tabs-${randomUUID().slice(0, 8)}`;
@@ -355,19 +355,11 @@ test.describe('Step Evaluation tab', () => {
 
     await expect(page.getByTestId('evaluation-assistant')).toBeVisible();
     await page.getByTestId('evaluation-assistant-input').fill('Which grades are risky?');
-    await page.getByTestId('evaluation-assistant-toggle').click();
-    await expect(page.getByTestId('evaluation-assistant')).toBeHidden();
-    await page.getByTestId('evaluation-assistant-toggle').click();
+    await page.getByTestId('evaluation-tab-cases').click();
     await expect(page.getByTestId('evaluation-assistant-input')).toHaveValue('Which grades are risky?');
-    await page.getByTestId('evaluation-assistant-toggle').click();
-    await expect(page.getByTestId('evaluation-assistant')).toBeHidden();
 
     await page.reload();
-    await expect(page.getByTestId('evaluation-tab-evaluators')).toHaveAttribute('data-state', 'active', { timeout: 15_000 });
-    await expect(page.getByTestId('evaluation-assistant-toggle')).toHaveText('Assistant');
-    await expect(page.getByTestId('evaluation-assistant')).toBeHidden();
-
-    await page.getByTestId('evaluation-assistant-toggle').click();
+    await expect(page.getByTestId('evaluation-tab-cases')).toHaveAttribute('data-state', 'active', { timeout: 15_000 });
     await expect(page.getByTestId('evaluation-assistant')).toBeVisible();
   });
 

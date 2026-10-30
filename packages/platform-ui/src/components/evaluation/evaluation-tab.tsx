@@ -2,13 +2,15 @@
 
 import * as React from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
+import { Sparkles } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { AgentOutputSchema, EvaluationSubject } from '@mediforce/platform-core';
+import { cn } from '@/lib/utils';
 import { useStepEvaluation, useWorkflowValidation } from '@/hooks/use-step-evaluation';
 import { useWorkflowRunGate } from '@/hooks/use-workflow-access';
 import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
 import { VALIDATION_STATUS } from './validation-status';
-import { buttonClass, tabTriggerClass } from './evaluation-styles';
+import { primaryButtonClass, tabTriggerClass } from './evaluation-styles';
 import { EvaluationAssistantPanel } from './evaluation-assistant-panel';
 import { AssistantResizeHandle, assistantColumns, useAssistantHeight, useAssistantWidth } from './assistant-width';
 import { GuidedSetup, SETUP_STAGES, SetupChoice, type SetupStage } from './guided-setup';
@@ -19,8 +21,6 @@ import {
   EvaluatorsSection,
   DriftAlert,
 } from './step-evaluation-sections';
-
-const ASSISTANT_OPEN_KEY = 'mediforce.evaluation-assistant.open';
 
 const SECTIONS = ['runs', 'cases', 'evaluators'] as const;
 type SectionTab = (typeof SECTIONS)[number];
@@ -94,38 +94,17 @@ function isEmptySubject(evaluation: ReturnType<typeof useStepEvaluation>): boole
   return brief.data.brief === null && cases.data.cases.length === 0 && evaluators.data.evaluators.length === 0 && runs.data.evalRuns.length === 0;
 }
 
-/** Whether the assistant column is shown, remembered per browser; shown until hidden. */
-function useAssistantOpen() {
-  const [open, setOpen] = React.useState(true);
-  React.useEffect(() => {
-    try {
-      if (localStorage.getItem(ASSISTANT_OPEN_KEY) === 'false') setOpen(false);
-    } catch {
-      // Storage unavailable: keep it shown.
-    }
-  }, []);
-  const toggle = () => {
-    const next = open === false;
-    setOpen(next);
-    try {
-      localStorage.setItem(ASSISTANT_OPEN_KEY, String(next));
-    } catch {
-      // Not remembered; the choice still applies for this visit.
-    }
-  };
-  return { open, toggle };
-}
-
 /**
  * One subject's Evaluation: a status strip over its Eval Runs, Eval Cases and
- * Evaluators, one tab at a time, beside the assistant, which can be hidden.
+ * Evaluators, one tab at a time, beside the assistant.
  * The subject is an agent Step in one workflow version, or an Agent on its own
- * (ADR-0029), with no version to pick. Every tab and the hidden assistant stay
- * mounted, so a half-filled form, the unsaved-cases guard, or an assistant
- * conversation survives switching tabs or hiding the assistant. A subject
- * with nothing set up first offers the guided setup or the tabs.
+ * (ADR-0029), with no version to pick. Every tab stays mounted, so a
+ * half-filled form or the unsaved-cases guard survives switching tabs. A subject
+ * with nothing set up first offers the guided setup or the tabs; on the tabs,
+ * Guided setup sits after the page's `header`, which stays over every mode.
  */
-export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit, editReason, mayRun, runReason }: {
+export function StepEvaluation({ header, step, definitionVersion, outputSchema, mayEdit, editReason, mayRun, runReason }: {
+  header: React.ReactNode;
   step: EvaluationSubject;
   definitionVersion: number | null;
   outputSchema: AgentOutputSchema | undefined;
@@ -140,19 +119,32 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
   const layoutRef = React.useRef<HTMLDivElement>(null);
   const assistantWidth = useAssistantWidth(layoutRef);
   const assistantHeight = useAssistantHeight();
-  const assistant = useAssistantOpen();
   const { section, select } = useSectionTab(evaluation.runs.isLoading ? undefined : (evaluation.runs.data?.evalRuns.length ?? 0) > 0);
   const evaluators = evaluation.evaluators.data?.evaluators ?? [];
   const caseCount = evaluation.cases.data?.cases.length;
   const unapproved = evaluators.filter((evaluator) => evaluator.trust.trusted === false).length;
-  const columns = assistant.open ? assistantColumns(assistantWidth.width) : 'minmax(0,1fr)';
+  const columns = assistantColumns(assistantWidth.width);
   const tabs: { value: SectionTab; label: string; count: number | undefined; tour: string }[] = [
     { value: 'runs', label: 'Eval Runs', count: undefined, tour: 'eval-runs' },
     { value: 'cases', label: 'Eval Cases', count: caseCount, tour: 'eval-cases' },
     { value: 'evaluators', label: 'Evaluators', count: evaluation.evaluators.data === undefined ? undefined : evaluators.length, tour: 'eval-evaluators' },
   ];
+  const frame = (content: React.ReactNode, guidedButton: boolean) => (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-4">
+        {header}
+        {guidedButton && mayEdit && (
+          <button type="button" className={cn(primaryButtonClass, 'inline-flex items-center gap-1.5 px-3 py-1.5 text-sm')} data-testid="evaluation-open-guided-setup" onClick={() => setupMode.go('brief')}>
+            <Sparkles className="h-4 w-4" aria-hidden />
+            Guided setup
+          </button>
+        )}
+      </div>
+      {content}
+    </div>
+  );
   if (setupMode.setup === 'guided') {
-    return (
+    return frame(
       <GuidedSetup
         step={step}
         definitionVersion={definitionVersion}
@@ -165,14 +157,15 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
         stage={setupMode.stage}
         onStage={setupMode.go}
         onExit={setupMode.manual}
-      />
+      />,
+      false,
     );
   }
   if (setupMode.setup === null && mayEdit) {
-    if (empty === undefined) return <p className="text-sm text-muted-foreground">Loading…</p>;
-    if (empty) return <SetupChoice step={step} evaluation={evaluation} onGuided={() => setupMode.go('brief')} onManual={() => setupMode.manual(null)} />;
+    if (empty === undefined) return frame(<p className="text-sm text-muted-foreground">Loading…</p>, false);
+    if (empty) return frame(<SetupChoice step={step} evaluation={evaluation} onGuided={() => setupMode.go('brief')} onManual={() => setupMode.manual(null)} />, false);
   }
-  return (
+  return frame(
     <div className="space-y-4">
       <DriftAlert data={evaluation.drift} />
       <EvaluationStatusStrip
@@ -181,18 +174,6 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
         qualification={evaluation.qualification}
         datasets={evaluation.datasets}
         mayEdit={mayEdit}
-        action={(
-          <>
-            {mayEdit && (
-              <button type="button" className={buttonClass} data-testid="evaluation-open-guided-setup" onClick={() => setupMode.go('brief')}>
-                Guided setup
-              </button>
-            )}
-            <button type="button" className={buttonClass} aria-pressed={assistant.open} data-testid="evaluation-assistant-toggle" onClick={assistant.toggle}>
-              {assistant.open ? 'Hide assistant' : 'Assistant'}
-            </button>
-          </>
-        )}
       />
       {unapproved > 0 && (
         <div role="status" className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200" data-testid="unapproved-evaluators">
@@ -232,12 +213,13 @@ export function StepEvaluation({ step, definitionVersion, outputSchema, mayEdit,
             />
           </Tabs.Content>
         </Tabs.Root>
-        <div ref={assistantHeight.ref} hidden={assistant.open === false} className="relative lg:sticky lg:top-6 lg:h-[var(--assistant-height,calc(100dvh-10rem))]" style={{ '--assistant-height': assistantHeight.height === undefined ? undefined : `${assistantHeight.height}px` } as React.CSSProperties}>
+        <div ref={assistantHeight.ref} className="relative lg:sticky lg:top-6 lg:h-[var(--assistant-height,calc(100dvh-10rem))]" style={{ '--assistant-height': assistantHeight.height === undefined ? undefined : `${assistantHeight.height}px` } as React.CSSProperties}>
           <AssistantResizeHandle {...assistantWidth} />
           <EvaluationAssistantPanel step={step} definitionVersion={definitionVersion} outputSchema={outputSchema} brief={evaluation.brief} mayEdit={mayEdit} editReason={editReason} mayRun={mayRun} runReason={runReason} />
         </div>
       </div>
-    </div>
+    </div>,
+    true,
   );
 }
 
@@ -311,48 +293,54 @@ export function EvaluationTab({ handle, workflowName, runnableVersion, mayEdit, 
     return status === undefined ? name : `${name} — ${VALIDATION_STATUS[status].symbol} ${VALIDATION_STATUS[status].label.toLowerCase()}`;
   };
 
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-4" data-tour="eval-selectors">
+  const selectors = (
+    <div className="flex flex-wrap items-center gap-4" data-tour="eval-selectors">
+      <label className="flex items-center gap-2 text-sm">
+        <span className="text-muted-foreground">Version</span>
+        <select
+          data-testid="evaluation-version-select"
+          className={selectClass}
+          value={selectedVersion}
+          onChange={(event) => select({ version: Number(event.target.value) })}
+        >
+          {liveVersions.map((version) => <option key={version.version} value={version.version}>{versionOption(version.version)}</option>)}
+        </select>
+      </label>
+      {selected !== undefined && (
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Version</span>
+          <span className="text-muted-foreground">Step</span>
           <select
-            data-testid="evaluation-version-select"
+            data-testid="evaluation-step-select"
             className={selectClass}
-            value={selectedVersion}
-            onChange={(event) => select({ version: Number(event.target.value) })}
+            value={selected.id}
+            onChange={(event) => select({ step: event.target.value })}
           >
-            {liveVersions.map((version) => <option key={version.version} value={version.version}>{versionOption(version.version)}</option>)}
+            {agentSteps.map((step) => <option key={step.id} value={step.id}>{stepOption(step.id, step.name)}</option>)}
           </select>
         </label>
-        {selected !== undefined && (
-          <label className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Step</span>
-            <select
-              data-testid="evaluation-step-select"
-              className={selectClass}
-              value={selected.id}
-              onChange={(event) => select({ step: event.target.value })}
-            >
-              {agentSteps.map((step) => <option key={step.id} value={step.id}>{stepOption(step.id, step.name)}</option>)}
-            </select>
-          </label>
-        )}
-      </div>
-      {selected === undefined ? (
-        <p className="text-sm text-muted-foreground">Version {selectedVersion} has no agent steps to evaluate.</p>
-      ) : (
-        <StepEvaluation
-          key={`${selectedVersion}:${selected.id}`}
-          step={{ kind: 'step', namespace: handle, workflowName, stepId: selected.id }}
-          definitionVersion={selectedVersion}
-          outputSchema={selected.agent?.outputSchema}
-          mayEdit={mayEdit}
-          editReason={editReason}
-          mayRun={mayRun}
-          runReason={runReason}
-        />
       )}
     </div>
+  );
+
+  if (selected === undefined) {
+    return (
+      <div className="space-y-4">
+        {selectors}
+        <p className="text-sm text-muted-foreground">Version {selectedVersion} has no agent steps to evaluate.</p>
+      </div>
+    );
+  }
+  return (
+    <StepEvaluation
+      key={`${selectedVersion}:${selected.id}`}
+      header={selectors}
+      step={{ kind: 'step', namespace: handle, workflowName, stepId: selected.id }}
+      definitionVersion={selectedVersion}
+      outputSchema={selected.agent?.outputSchema}
+      mayEdit={mayEdit}
+      editReason={editReason}
+      mayRun={mayRun}
+      runReason={runReason}
+    />
   );
 }

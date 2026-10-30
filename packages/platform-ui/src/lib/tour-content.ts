@@ -358,7 +358,7 @@ export const GUIDE_CHAPTERS: readonly TourChapter[] = [
       {
         id: 'assistant',
         title: 'The assistant proposes; nothing exists until you Accept',
-        body: 'Ask it what to check on this step and it returns a plan of risks, each with a Draft this check button. Its step brief, kept in the header, tells it what the step is for. Hide assistant in the status strip gives the tabs the full width.',
+        body: 'Ask it what to check on this step and it returns a plan of risks, each with a Draft this check button. Its step brief, kept in the header, tells it what the step is for.',
         target: 'eval-assistant',
       },
       {

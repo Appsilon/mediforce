@@ -1604,16 +1604,14 @@ function ValidationReason({ validation }: { validation: StepValidation }) {
  * verified once anything it rested on changed — with the signed Step
  * Qualification, if any, opening from the same status; the Acceptance Criteria
  * every run is judged against, 100% until set and tuned in a dialog; and the
- * Dataset the next Eval Run takes. `action` sits at its end — the tab's own
- * controls, such as showing the assistant.
+ * Dataset the next Eval Run takes.
  */
-export function EvaluationStatusStrip({ step, criteria, qualification, datasets, mayEdit, action }: {
+export function EvaluationStatusStrip({ step, criteria, qualification, datasets, mayEdit }: {
   step: EvaluationSubject;
   criteria: StepEvaluation['criteria'];
   qualification: StepEvaluation['qualification'];
   datasets: StepEvaluation['datasets'];
   mayEdit: boolean;
-  action?: React.ReactNode;
 }) {
   const [showDetails, setShowDetails] = React.useState(false);
   const [editing, setEditing] = React.useState(false);
@@ -1663,7 +1661,6 @@ export function EvaluationStatusStrip({ step, criteria, qualification, datasets,
             {datasets.isLoading ? '…' : dataset === undefined ? 'Not saved yet' : `v${dataset.version} · ${pluralCases(dataset.caseIds.length)}`}
           </div>
         </div>
-        {action !== undefined && <div className="ml-auto flex items-center gap-2">{action}</div>}
       </div>
       {status !== undefined && (
         <p className={cn('text-xs', status.validation.status === 'failed' ? validation?.textClassName : 'text-muted-foreground')} data-testid="validation-reason">
