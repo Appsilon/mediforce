@@ -144,6 +144,18 @@ describe('callOpenRouter', () => {
     expect(result.toolCalls).toEqual([]);
   });
 
+  it('says no provider takes the request\'s parameters when OpenRouter finds no endpoint for them, not that the model is not offered', async () => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: 'No endpoints found that can handle the requested parameters.', code: 404 } }), { status: 404 }),
+    );
+    const request = { model: 'model-x', messages: [{ role: 'user' as const, content: 'hi' }], apiKey: 'key-abc' };
+
+    await expect(callOpenRouter(request)).rejects.toThrow(/no provider of model-x takes every parameter/i);
+
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({ error: { message: 'No endpoints found for model-x.', code: 404 } }), { status: 404 }));
+    await expect(callOpenRouter(request)).rejects.toThrow(/does not offer the selected model/);
+  });
+
   it('throws when the model API returns non-OK', async () => {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('boom', { status: 500 }),

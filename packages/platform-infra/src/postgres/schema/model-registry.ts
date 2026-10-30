@@ -25,6 +25,7 @@ export const modelRegistryEntries = pgTable('model_registry_entries', {
   outputModalities: jsonb('output_modalities').$type<string[]>().notNull(),
   supportsTools: boolean('supports_tools').notNull(),
   supportsVision: boolean('supports_vision').notNull(),
+  supportedParameters: jsonb('supported_parameters').$type<string[]>(),
   source: text('source').notNull(),
   requestCount: integer('request_count'),
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }).notNull(),

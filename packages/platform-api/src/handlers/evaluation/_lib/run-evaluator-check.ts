@@ -31,17 +31,29 @@ async function callJudgeModel(request: OpenRouterRequest): ReturnType<typeof cal
   }
 }
 
-/** The judge's model, through the platform's OpenRouter seam (mockable via `OPENROUTER_BASE_URL`). */
-function openRouterJudgeClient(apiKey: string, model: string, onCall: (call: JudgeCall) => void): LlmClient {
+/**
+ * The judge's model, through the platform's OpenRouter seam (mockable via
+ * `OPENROUTER_BASE_URL`). Its answer is constrained to the judge's schema on a
+ * model the registry says takes `structured_outputs`; any other answers in
+ * text, so a judge saved on one still runs. A constrained request reaches only
+ * providers that take every parameter it sends, so it sends `temperature` only
+ * to a model that takes it.
+ */
+async function openRouterJudgeClient(scope: CallerScope, apiKey: string, model: string, onCall: (call: JudgeCall) => void): Promise<LlmClient> {
+  const parameters = (await scope.models.getById(model))?.supportedParameters;
+  const constrains = parameters?.includes('structured_outputs') === true;
+  const takesTemperature = parameters === undefined || parameters.includes('temperature') === true;
   return {
-    complete: async (messages) => {
+    complete: async (messages, _model, options = {}) => {
       const startedAt = Date.now();
+      const { answerSchema } = options;
       const response = await callJudgeModel({
         model,
         apiKey,
         messages,
-        temperature: 0,
+        temperature: takesTemperature ? 0 : null,
         maxTokens: JUDGE_MAX_OUTPUT_TOKENS,
+        ...(answerSchema === undefined || constrains === false ? {} : { answerSchema }),
       });
       onCall({ model, ...response.usage, durationMs: Date.now() - startedAt, response: response.content });
       return { content: response.content, model, usage: response.usage, stopReason: response.finishReason };
@@ -77,7 +89,7 @@ async function runJudgeCheck(
     processInstanceId: agentRun.processInstanceId,
     executorOutput: agentRun.envelope!,
     iterationNumber: 0,
-    llm: openRouterJudgeClient(apiKey, check.model, onJudgeCall),
+    llm: await openRouterJudgeClient(scope, apiKey, check.model, onJudgeCall),
   });
   return { ...binary(agentRun.id, verdict.passed, verdict.reasoning), confidence: verdict.confidence };
 }
@@ -110,7 +122,7 @@ async function runExpectedOutputCheck(
     return binary(agentRun.id, matches !== negative, comment);
   }
   const apiKey = await requireOpenRouterApiKey(scope, subject.instance.namespace ?? '');
-  const { agreement, rationale } = await judgeOutputAgreement(openRouterJudgeClient(apiKey, check.model, onJudgeCall), {
+  const { agreement, rationale } = await judgeOutputAgreement(await openRouterJudgeClient(scope, apiKey, check.model, onJudgeCall), {
     model: check.model,
     instructions: check.instructions ?? null,
     caseInstructions: evalCase.agreementInstructions,

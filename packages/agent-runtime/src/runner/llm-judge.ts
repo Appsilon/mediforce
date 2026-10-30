@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { AgentOutputEnvelope, StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import type { ReviewPlugin, ReviewPluginContext, ReviewPluginResult } from '../interfaces/review-plugin';
-import type { LlmClient, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
+import type { LlmAnswerSchema, LlmClient, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
 import { parseAnswer } from './llm-answer';
 
 export interface LlmJudgeConfig {
@@ -24,11 +24,29 @@ const JudgeAnswerSchema = z.object({
   confidence: z.number().min(0).max(1),
 });
 
+/**
+ * What a provider constrains a verdict to. Providers do not constrain number
+ * ranges or empty strings, so `JudgeAnswerSchema` still checks those.
+ */
+const VERDICT_ANSWER: LlmAnswerSchema = {
+  name: 'verdict',
+  schema: {
+    type: 'object',
+    properties: { rationale: { type: 'string' }, passed: { type: 'boolean' }, confidence: { type: 'number' } },
+    required: ['rationale', 'passed', 'confidence'],
+    additionalProperties: false,
+  },
+};
+
+const ANSWER_VERDICT = 'Answer with one JSON object and nothing else: {"rationale": "<your explanation>", "passed": <true or false>, "confidence": <0 to 1>}.';
+
 /** Keeps a judge prompt bounded when an input or output is a large document. */
 const MAX_SECTION_CHARS = 20_000;
 /** The agent's log may run long; its start and end are kept, the middle is cut. */
 const MAX_TRAJECTORY_CHARS = 60_000;
 const MAX_ENTRY_CHARS = 2_000;
+/** What the agent wrote, such as a report, as large as a section so it reaches the judge whole. */
+const MAX_TOOL_CALL_CHARS = MAX_SECTION_CHARS;
 
 /** Why a judge's answer could not be read, when the provider says more than the answer does. */
 function unreadableAnswer(response: LlmResponse): string | null {
@@ -55,7 +73,7 @@ function entryBody(entry: StoredAgentTrajectoryEntry): string {
 function entryLine(entry: StoredAgentTrajectoryEntry): string {
   const kind = [entry.type, entry.subtype].filter((part) => part !== undefined).join('/');
   const tool = entry.tool ?? entry.tool_name;
-  return `[${entry.seq}] ${kind}${tool === undefined ? '' : ` ${tool}`}: ${truncate(entryBody(entry), MAX_ENTRY_CHARS)}`;
+  return `[${entry.seq}] ${kind}${tool === undefined ? '' : ` ${tool}`}: ${truncate(entryBody(entry), entry.input === undefined ? MAX_ENTRY_CHARS : MAX_TOOL_CALL_CHARS)}`;
 }
 
 /** The log, one numbered line per entry; over budget, as many entries from each end as fit. */
@@ -105,7 +123,7 @@ export function llmJudgeMessages(
         ].join(' '),
         'Cite a log entry by its number in square brackets, one entry per bracket, right after what it shows: "the agent looked up the term [7][8]". Never a range, a list or a word inside the brackets — not [7-9], [7, 8] or [entry 7].',
         'confidence is how sure you are of your verdict, from 0 to 1: lower it when the evidence is incomplete, ambiguous or the rubric does not clearly decide the case.',
-        'Answer with one JSON object and nothing else: {"rationale": "<your explanation>", "passed": <true or false>, "confidence": <0 to 1>}. Write the rationale before deciding.',
+        `${ANSWER_VERDICT} Write the rationale before deciding.`,
       ].join('\n\n'),
     },
     {
@@ -115,6 +133,7 @@ export function llmJudgeMessages(
         ...(config.trajectory.length === 0 ? [] : [`Agent log:\n${formatTrajectory(config.trajectory)}`]),
         `Step output:\n${section(output.result ?? null)}`,
         ...(output.reasoning_summary.length > 0 ? [`The agent's own summary:\n${output.reasoning_summary}`] : []),
+        ANSWER_VERDICT,
       ].join('\n\n'),
     },
   ];
@@ -131,7 +150,7 @@ export class LlmJudgeReviewPlugin implements ReviewPlugin {
   constructor(private readonly config: LlmJudgeConfig) {}
 
   async review(context: ReviewPluginContext): Promise<LlmJudgeResult> {
-    const response = await context.llm.complete(llmJudgeMessages(this.config, context.executorOutput), this.config.model);
+    const response = await context.llm.complete(llmJudgeMessages(this.config, context.executorOutput), this.config.model, { answerSchema: VERDICT_ANSWER });
 
     const answer = parseAnswer(response.content, JudgeAnswerSchema);
     if (answer === null) {
@@ -169,6 +188,19 @@ const AgreementAnswerSchema = z.object({
   agreement: z.number().min(0).max(1),
 });
 
+/** What a provider constrains an agreement to; `AgreementAnswerSchema` still checks its range. */
+const AGREEMENT_ANSWER: LlmAnswerSchema = {
+  name: 'agreement',
+  schema: {
+    type: 'object',
+    properties: { rationale: { type: 'string' }, agreement: { type: 'number' } },
+    required: ['rationale', 'agreement'],
+    additionalProperties: false,
+  },
+};
+
+const ANSWER_AGREEMENT = 'Answer with one JSON object and nothing else: {"rationale": "<your explanation>", "agreement": <0 to 1>}.';
+
 /** What the agreement judge is sent: how to score and the instructions, the case's overriding the check's, then the expected output and the output. */
 export function outputAgreementMessages(config: Omit<OutputAgreementConfig, 'model'>): LlmMessage[] {
   return [
@@ -180,7 +212,7 @@ export function outputAgreementMessages(config: Omit<OutputAgreementConfig, 'mod
         ...(config.instructions === null ? [] : [`On every case:\n${config.instructions}`]),
         ...(config.caseInstructions === null ? [] : [`On this case — this decides the comparison and overrides the instructions for every case where they conflict:\n${config.caseInstructions}`]),
         'Explain your score: name each difference that mattered and why, and the ones you treated as trivial.',
-        'Answer with one JSON object and nothing else: {"rationale": "<your explanation>", "agreement": <0 to 1>}. Write the rationale before scoring.',
+        `${ANSWER_AGREEMENT} Write the rationale before scoring.`,
       ].join('\n\n'),
     },
     {
@@ -188,6 +220,7 @@ export function outputAgreementMessages(config: Omit<OutputAgreementConfig, 'mod
       content: [
         `Expected output:\n${section(config.expected)}`,
         `Output:\n${section(config.actual)}`,
+        ANSWER_AGREEMENT,
       ].join('\n\n'),
     },
   ];
@@ -200,7 +233,7 @@ export function outputAgreementMessages(config: Omit<OutputAgreementConfig, 'mod
  * scored as a disagreement.
  */
 export async function judgeOutputAgreement(llm: LlmClient, config: OutputAgreementConfig): Promise<OutputAgreement> {
-  const response = await llm.complete(outputAgreementMessages(config), config.model);
+  const response = await llm.complete(outputAgreementMessages(config), config.model, { answerSchema: AGREEMENT_ANSWER });
 
   const answer = parseAnswer(response.content, AgreementAnswerSchema);
   if (answer === null) {

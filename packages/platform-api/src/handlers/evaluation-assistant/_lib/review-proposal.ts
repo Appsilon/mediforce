@@ -30,9 +30,9 @@ export interface PreviewedCheck {
 
 /**
  * A judge's model: the platform's pinned default when the assistant names
- * none, or the one the person asked for — if the model registry offers it and
- * it is not retired. An unsynced registry cannot say, so a named model then
- * stands.
+ * none, or the one the person asked for — if the model registry offers it, it
+ * is not retired and it can constrain its answer to the judge's schema. An
+ * unsynced registry cannot say, so a named model then stands.
  */
 async function resolveCheck(scope: CallerScope, check: AssistantCheck): Promise<EvaluatorCheck> {
   if (check.kind !== 'llm_judge' && check.kind !== 'expected_output') return check;
@@ -48,6 +48,9 @@ async function resolveCheck(scope: CallerScope, check: AssistantCheck): Promise<
   }
   if (entry !== undefined && entry.retiredAt !== null) {
     throw new ValidationError(`The judge model '${model}' was retired on ${entry.retiredAt}; leave the model out for the pinned default, or name a live one.`);
+  }
+  if (entry?.supportedParameters !== undefined && entry.supportedParameters.includes('structured_outputs') === false) {
+    throw new ValidationError(`The judge model '${model}' cannot constrain its answer to a JSON Schema, so its verdict could come back as prose or broken JSON; leave the model out for the pinned default, or name a model that supports structured outputs.`);
   }
   return { ...check, model };
 }

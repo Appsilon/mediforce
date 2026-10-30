@@ -99,6 +99,7 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
           outputModalities: values.outputModalities,
           supportsTools: values.supportsTools,
           supportsVision: values.supportsVision,
+          ...(entry.supportedParameters === undefined ? {} : { supportedParameters: values.supportedParameters }),
           source: values.source,
           requestCount: values.requestCount,
           lastSyncedAt: values.lastSyncedAt,
@@ -125,6 +126,7 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
     if (rest.outputModalities !== undefined) set.outputModalities = rest.outputModalities;
     if (rest.supportsTools !== undefined) set.supportsTools = rest.supportsTools;
     if (rest.supportsVision !== undefined) set.supportsVision = rest.supportsVision;
+    if (rest.supportedParameters !== undefined) set.supportedParameters = rest.supportedParameters;
     if (rest.source !== undefined) set.source = rest.source;
     if (rest.requestCount !== undefined) set.requestCount = rest.requestCount;
     if (rest.lastSyncedAt !== undefined) set.lastSyncedAt = new Date(rest.lastSyncedAt);
@@ -166,6 +168,7 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
             outputModalities: sql`excluded.output_modalities`,
             supportsTools: sql`excluded.supports_tools`,
             supportsVision: sql`excluded.supports_vision`,
+            supportedParameters: sql`excluded.supported_parameters`,
             source: sql`excluded.source`,
             requestCount: sql`excluded.request_count`,
             lastSyncedAt: sql`excluded.last_synced_at`,
@@ -262,6 +265,7 @@ function toRowValues(entry: CreateModelRegistryEntryInput) {
     outputModalities: entry.outputModalities,
     supportsTools: entry.supportsTools,
     supportsVision: entry.supportsVision,
+    supportedParameters: entry.supportedParameters ?? null,
     source: entry.source,
     requestCount: entry.requestCount,
     lastSyncedAt: new Date(entry.lastSyncedAt),
@@ -283,6 +287,7 @@ function toEntry(row: typeof modelRegistryEntries.$inferSelect): ModelRegistryEn
     outputModalities: row.outputModalities,
     supportsTools: row.supportsTools,
     supportsVision: row.supportsVision,
+    ...(row.supportedParameters === null ? {} : { supportedParameters: row.supportedParameters }),
     source: row.source as ModelRegistryEntry['source'],
     requestCount: row.requestCount,
     lastSyncedAt: row.lastSyncedAt.toISOString(),

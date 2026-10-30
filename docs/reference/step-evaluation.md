@@ -97,7 +97,7 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   Eval Run. The assistant leaves a judge's model to the platform, which pins
   its default (the newest Claude Sonnet in the model registry); it names one
   only when the person asks, and the platform refuses a model the registry does
-  not list or has retired.
+  not list, has retired, or whose supported parameters lack `structured_outputs`.
 - **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
   written or synthesized), Brief drafts and Acceptance Criteria come back as
   cards to accept or reject. An Eval Case card shows the case as it would be
@@ -271,12 +271,24 @@ field it is about, and cleared once that field is edited.
 An `llm_judge` check is `{ kind, model, rubric, minConfidence }`
 (`minConfidence` 0–1, 0.8 when not set). The judge is given the step's input,
 the agent's whole Trajectory — its reasoning, every tool call and tool result,
-numbered, long logs cut in the middle — its output and its own summary. It is
-not told a case's expected output or whether the case is negative. It must explain its judgment — what exactly decided the
-verdict and why, citing the input, the output and log entries by number — and
-answer with one JSON object, `{ "rationale", "passed", "confidence" }` (an
-`expected_output` agreement judge answers `{ "rationale", "agreement" }`); the
-first object in its text that parses to that shape is the answer, so prose
+numbered, each entry cut at 2,000 characters except a tool call's input (up to
+20,000, so a document the agent wrote arrives whole), long logs cut in the
+middle — its output and its own summary. It is not told a case's expected
+output or whether the case is negative. It must explain its judgment — what
+exactly decided the verdict and why, citing the input, the output and log
+entries by number — and answer with one JSON object,
+`{ "rationale", "passed", "confidence" }` (an `expected_output` agreement judge
+answers `{ "rationale", "agreement" }`).
+
+On a model whose model-registry entry lists `structured_outputs` among its
+supported parameters (synced from OpenRouter), the request constrains decoding
+to that object's JSON Schema: `response_format` with `strict`, and
+`provider.require_parameters` so OpenRouter routes only to providers that take
+every parameter sent. The answer cannot come back as prose or broken JSON. The
+request sends `temperature: 0` only to a model that lists `temperature` —
+Claude 5.5 does not, and sending it would leave no provider to route to. On any
+other model the answer is asked for in text, before and after the material;
+the first object in its text that parses to that shape is the answer, so prose
 around it — even prose quoting JSON — is skipped. The Score is `1`/`0` with
 label `pass`/`fail`, the rationale as its comment, and
 `metadata.judgeConfidence` and `metadata.judgeMinConfidence`.

@@ -334,7 +334,7 @@ describe('Eval Runs (ADR-0023 D4, D10)', () => {
     }))));
     Object.assign(scope, {
       workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) },
-      models: { list: async () => prices },
+      models: { list: async () => prices, getById: async (id: string) => prices.find((entry) => entry.id === id) ?? null },
     });
   }
 

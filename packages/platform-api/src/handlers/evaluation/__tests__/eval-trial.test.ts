@@ -34,7 +34,7 @@ describe('getEvalTrial (ADR-0023)', () => {
     }));
     Object.assign(scenario.scope, {
       workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) },
-      models: { list: async () => [{ id: 'anthropic/claude-haiku-4.5', pricing: { input: 0.000001, output: 0.000005 } }] },
+      models: { list: async () => [{ id: 'anthropic/claude-haiku-4.5', pricing: { input: 0.000001, output: 0.000005 } }], getById: async () => null },
     });
   });
 

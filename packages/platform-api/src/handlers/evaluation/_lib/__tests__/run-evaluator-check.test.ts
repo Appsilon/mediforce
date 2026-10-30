@@ -5,7 +5,7 @@ import { runEvaluatorCheck } from '../run-evaluator-check';
 import { loadScoredRun } from '../scored-run';
 import { createEvalCase } from '../../eval-cases';
 import { CreateEvalCaseInputSchema } from '../../../../contract/evaluation';
-import { evaluationFixture, GRADED_RUN, STEP, type EvaluationFixture } from '../../__tests__/fixture';
+import { evaluationFixture, GRADED_RUN, registryEntry, STEP, type EvaluationFixture } from '../../__tests__/fixture';
 
 const judge = {
   kind: 'llm_judge' as const,
@@ -194,18 +194,56 @@ describe('runEvaluatorCheck', () => {
     });
   });
 
-  it('asks the judge for its verdict as JSON in text, forcing no tool call, with room for a long rationale', async () => {
+  it('constrains a judge\'s answer to its schema on a model whose providers can, routed only to those, sending no parameter the model does not take', async () => {
     const fixture = await evaluationFixture();
-    const fetchMock = answeringOpenRouter(ANSWER);
+    await fixture.modelRegistryRepo.upsert(registryEntry(judge.model, { supportedParameters: ['max_tokens', 'response_format', 'structured_outputs'] }));
     const scope = withOpenRouterKey(fixture);
+    const subject = await loadScoredRun(scope, GRADED_RUN, STEP);
 
-    const outcome = await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, GRADED_RUN, STEP), null);
+    const judging = answeringOpenRouter(ANSWER);
+    expect(await runEvaluatorCheck(scope, judge, subject, null)).toMatchObject({ passed: true, confidence: 0.85 });
+    const judgeBody = JSON.parse(String(judging.mock.calls[0]![1]!.body)) as Record<string, unknown>;
+    expect(judgeBody).toMatchObject({
+      max_tokens: 4000,
+      response_format: { type: 'json_schema', json_schema: { name: 'verdict', strict: true, schema: { required: ['rationale', 'passed', 'confidence'] } } },
+      provider: { require_parameters: true },
+    });
+    expect(judgeBody).not.toHaveProperty('temperature');
 
-    expect(outcome).toMatchObject({ passed: true, confidence: 0.85, comment: 'Sepsis is graded 5, as the fatal outcome requires.' });
-    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as Record<string, unknown>;
-    expect(body).toMatchObject({ max_tokens: 4000 });
-    expect(body.tools).toBeUndefined();
-    expect(body.tool_choice).toBeUndefined();
+    const comparing = answeringOpenRouter('{"rationale": "Same term and grade.", "agreement": 0.9}');
+    const evalCase = await caseExpecting(fixture, { expectedOutput: { findings: [{ term: 'Sepsis', grade: 5 }] }, comparison: 'agreement' });
+    expect(await runEvaluatorCheck(scope, expected, subject, evalCase)).toMatchObject({ passed: true, agreement: 0.9 });
+    expect(JSON.parse(String(comparing.mock.calls[0]![1]!.body))).toMatchObject({
+      response_format: { type: 'json_schema', json_schema: { name: 'agreement', strict: true } },
+      provider: { require_parameters: true },
+    });
+  });
+
+  it('asks a judge for an answer at temperature 0 on a model that takes it', async () => {
+    const fixture = await evaluationFixture();
+    await fixture.modelRegistryRepo.upsert(registryEntry(judge.model, { supportedParameters: ['max_tokens', 'temperature', 'structured_outputs'] }));
+    const scope = withOpenRouterKey(fixture);
+    const fetchMock = answeringOpenRouter(ANSWER);
+
+    await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, GRADED_RUN, STEP), null);
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]!.body))).toMatchObject({ temperature: 0, provider: { require_parameters: true } });
+  });
+
+  it('asks a judge on a model the registry does not say can constrain its answer for JSON in text, so a judge saved on one still runs', async () => {
+    for (const parameters of [null, undefined, ['max_tokens', 'temperature', 'response_format']]) {
+      const fixture = await evaluationFixture();
+      if (parameters !== null) await fixture.modelRegistryRepo.upsert(registryEntry(judge.model, parameters === undefined ? {} : { supportedParameters: parameters }));
+      const scope = withOpenRouterKey(fixture);
+      const fetchMock = answeringOpenRouter(ANSWER);
+
+      expect(await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, GRADED_RUN, STEP), null)).toMatchObject({ passed: true, comment: 'Sepsis is graded 5, as the fatal outcome requires.' });
+      const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as Record<string, unknown>;
+      expect(body).toMatchObject({ max_tokens: 4000, temperature: 0 });
+      expect(body.response_format).toBeUndefined();
+      expect(body.provider).toBeUndefined();
+      expect(body.tools).toBeUndefined();
+    }
   });
 
   it('says a judge answer was cut off at the output-token limit, not that the judge did not judge', async () => {

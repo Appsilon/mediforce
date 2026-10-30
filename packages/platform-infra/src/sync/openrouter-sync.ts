@@ -69,6 +69,7 @@ function transformModel(model: OpenRouterModel): CreateModelRegistryEntryInput {
     outputModalities: model.architecture?.output_modalities ?? ['text'],
     supportsTools: model.supported_parameters?.includes('tools') ?? false,
     supportsVision: model.architecture?.input_modalities?.includes('image') ?? false,
+    supportedParameters: model.supported_parameters ?? [],
     source: 'openrouter' as const,
     requestCount: null,
     lastSyncedAt: new Date().toISOString(),

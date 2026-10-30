@@ -14,6 +14,7 @@ import {
   buildStepExecution,
   buildWorkflowDefinition,
 } from '@mediforce/platform-core/testing';
+import type { CreateModelRegistryEntryInput } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../../../auth';
 import type { CallerScope } from '../../../repositories/index';
 import { createTestScope, userCaller, type TestScopeOverrides } from '../../../repositories/__tests__/create-test-scope';
@@ -39,7 +40,17 @@ export interface EvaluationFixture {
   readonly auditRepo: InMemoryAuditRepository;
   readonly agentDefinitionRepo: InMemoryAgentDefinitionRepository;
   readonly toolCatalogRepo: InMemoryToolCatalogRepository;
+  readonly modelRegistryRepo: InMemoryModelRegistryRepository;
   scope(caller?: CallerIdentity, overrides?: TestScopeOverrides): CallerScope;
+}
+
+export function registryEntry(id: string, overrides: Partial<CreateModelRegistryEntryInput> = {}): CreateModelRegistryEntryInput {
+  return {
+    id, name: id, provider: id.split('/')[0]!, contextLength: 200_000, maxCompletionTokens: null,
+    pricing: { input: 0.000003, output: 0.000015 }, modality: 'text->text', inputModalities: ['text'], outputModalities: ['text'],
+    supportsTools: true, supportsVision: false, source: 'openrouter', canonicalSlug: null, requestCount: null,
+    lastSyncedAt: '2026-10-01T00:00:00Z', retiredAt: null, ...overrides,
+  };
 }
 
 /**
@@ -58,13 +69,8 @@ export async function evaluationFixture(): Promise<EvaluationFixture> {
   await toolCatalogRepo.upsert(NAMESPACE, { id: 'edc', type: 'stdio', command: 'edc-mcp' });
   await toolCatalogRepo.upsert(NAMESPACE, { id: 'email', type: 'http', url: 'https://mcp.example.com/email' });
   const modelRegistryRepo = new InMemoryModelRegistryRepository();
-  for (const [id, provider] of [['anthropic/claude-sonnet-5', 'anthropic'], ['openai/gpt-5', 'openai']]) {
-    await modelRegistryRepo.upsert({
-      id, canonicalSlug: null, name: id, provider, contextLength: 200_000, maxCompletionTokens: null,
-      pricing: { input: 0.000003, output: 0.000015 }, modality: 'text', inputModalities: ['text'], outputModalities: ['text'],
-      supportsTools: true, supportsVision: false, source: 'openrouter', requestCount: null,
-      lastSyncedAt: '2026-09-01T00:00:00Z', retiredAt: null,
-    });
+  for (const id of ['anthropic/claude-sonnet-5', 'openai/gpt-5']) {
+    await modelRegistryRepo.upsert(registryEntry(id));
   }
 
   await agentDefinitionRepo.upsert('ae-grader', {
@@ -103,6 +109,7 @@ export async function evaluationFixture(): Promise<EvaluationFixture> {
     auditRepo,
     agentDefinitionRepo,
     toolCatalogRepo,
+    modelRegistryRepo,
     scope: (caller = userCaller('author-1', [NAMESPACE]), overrides = {}) => createTestScope({
       ...overrides,
       processRepo,

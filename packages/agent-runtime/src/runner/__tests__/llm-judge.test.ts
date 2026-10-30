@@ -75,6 +75,37 @@ describe('LlmJudgeReviewPlugin', () => {
     expect(userMessage).toContain('Graded 3 AEs by CTCAE v5.');
   });
 
+  it('shows the judge a long tool call in full, such as the report the agent wrote', async () => {
+    const report = `# Report\n${'A paragraph of the report. '.repeat(250)}\nTHE-LAST-SECTION`;
+    const llm = answering('{"rationale": "r", "passed": true, "confidence": 0.8}');
+    await judge(llm, [{ seq: 4, ts: '2026-10-01T10:00:00.000Z', type: 'assistant', subtype: 'tool_call', tool: 'write', input: { filePath: '/output/report.md', content: report } }]);
+
+    expect(vi.mocked(llm.complete).mock.calls[0]![0][1]!.content).toContain('THE-LAST-SECTION');
+  });
+
+  it('cuts a long tool result or reasoning entry at 2,000 characters, so a log of many keeps its entries', async () => {
+    const llm = answering('{"rationale": "r", "passed": true, "confidence": 0.8}');
+    await judge(llm, [
+      { seq: 0, ts: '2026-10-01T10:00:00.000Z', type: 'tool_result', tool: 'read', content: `${'x'.repeat(2_000)}RESULT-TAIL` },
+      { seq: 1, ts: '2026-10-01T10:00:01.000Z', type: 'assistant', text: `${'y'.repeat(2_000)}THOUGHT-TAIL` },
+    ]);
+
+    const userMessage = vi.mocked(llm.complete).mock.calls[0]![0][1]!.content;
+    expect(userMessage).not.toContain('RESULT-TAIL');
+    expect(userMessage).not.toContain('THOUGHT-TAIL');
+  });
+
+  it('asks for its verdict constrained to the verdict schema, and says how to answer again after the log', async () => {
+    const llm = answering('{"rationale": "r", "passed": true, "confidence": 0.8}');
+    await judge(llm);
+
+    const [messages, , options] = vi.mocked(llm.complete).mock.calls[0]!;
+    expect(options).toEqual({
+      answerSchema: { name: 'verdict', schema: expect.objectContaining({ required: ['rationale', 'passed', 'confidence'], additionalProperties: false }) },
+    });
+    expect(messages[1]!.content).toMatch(/Answer with one JSON object and nothing else: \{"rationale".*\}\.$/);
+  });
+
   it('keeps the start and end of a log too long for the prompt', async () => {
     const long = Array.from({ length: 400 }, (_unused, seq): StoredAgentTrajectoryEntry => ({
       seq, ts: '2026-10-01T10:00:00.000Z', type: 'assistant', text: `step ${seq} ${'x'.repeat(300)}`,
@@ -142,6 +173,17 @@ describe('judgeOutputAgreement', () => {
       'Wording is never decisive.\n\nOn this case — this decides the comparison and overrides the instructions for every case where they conflict:\nDifferences in summary are trivial; a changed grade means low agreement.',
     );
     expect(user!.content).not.toContain('a changed grade means low agreement');
+  });
+
+  it('asks for its agreement constrained to the agreement schema, and says how to answer again after the outputs', async () => {
+    const llm = answering('{"rationale": "r", "agreement": 1}');
+    await compare(llm);
+
+    const [messages, , options] = vi.mocked(llm.complete).mock.calls[0]!;
+    expect(options).toEqual({
+      answerSchema: { name: 'agreement', schema: expect.objectContaining({ required: ['rationale', 'agreement'], additionalProperties: false }) },
+    });
+    expect(messages[1]!.content).toMatch(/Answer with one JSON object and nothing else: \{"rationale".*\}\.$/);
   });
 
   it('leaves out case instructions a case does not give', async () => {

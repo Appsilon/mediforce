@@ -31,6 +31,7 @@ export class InMemoryModelRegistryRepository implements ModelRegistryRepository 
     const existing = this.entries.get(parsed.id);
     const stored = ModelRegistryEntrySchema.parse({
       ...parsed,
+      ...(parsed.supportedParameters === undefined && existing?.supportedParameters !== undefined ? { supportedParameters: existing.supportedParameters } : {}),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     });
