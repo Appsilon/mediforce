@@ -62,6 +62,14 @@ describe('recordHumanVerdictScore', () => {
     expect(recheck).toMatchObject({ value: 0.5, label: 'recheck', comment: null });
   });
 
+  it('keeps the reviewer\'s param values with the verdict', async () => {
+    const score = await recordHumanVerdictScore(
+      { task: reviewTask(), payload: { kind: 'verdict-with-params', verdict: 'revise', comment: 'Split it', paramValues: { phases: 7 } }, actorId: 'u-1', namespace: 'team-alpha' },
+      scope(),
+    );
+    expect(score?.metadata).toMatchObject({ paramValues: { phases: 7 } });
+  });
+
   it('falls back to the step\'s latest Agent Run started before the review for a task that predates agentRunId', async () => {
     await agentRunRepo.create(buildAgentRun({
       id: AGENT_RUN_ID, processInstanceId: 'inst-a', stepId: 'grade-aes', startedAt: '2026-09-23T09:00:00.000Z',

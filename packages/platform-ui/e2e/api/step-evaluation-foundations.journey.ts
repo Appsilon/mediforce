@@ -1,6 +1,7 @@
 import type { APIRequestContext } from '@playwright/test';
 import type { StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import {
+  GetAgentRunIoOutputSchema,
   GetAgentTrajectoryOutputSchema,
   EvalCaseOutputSchema,
   ListScoresOutputSchema,
@@ -144,6 +145,59 @@ test.describe('Step Evaluation foundations — API E2E', () => {
 
     const malformedRes = await request.get('/api/agent-runs/not-a-run-id/trajectory', { headers: AUTH_HEADERS });
     expect(malformedRes.status()).toBe(400);
+  });
+
+  test('a re-run reads the reviewer\'s comment, and a later round\'s case holds the input production first sent', async ({ request }) => {
+    const runId = await startRun(request, agentStepWorkflow(`e2e-revise-rounds-${Date.now()}`, {
+      autonomyLevel: 'L3',
+      allowedRoles: ['operator'],
+    }));
+    const reviseRound = async (round: number, comment: string) => {
+      const task = await pollUntil(
+        async () => {
+          const res = await request.get(`/api/tasks?instanceId=${runId}`, { headers: AUTH_HEADERS });
+          if (res.status() !== 200) return null;
+          const { tasks } = (await res.json()) as { tasks: Array<{ id: string; stepId: string; status: string }> };
+          return tasks.find((candidate) => candidate.stepId === 'grade-aes' && candidate.status !== 'completed') ?? null;
+        },
+        { description: `CM3 review task of round ${round} in ${runId}` },
+      );
+      const agentRuns = await pollUntil(
+        async () => {
+          const runs = await listAgentRuns(request, runId);
+          return runs !== null && runs.length === round ? runs : null;
+        },
+        { description: `agent run of round ${round} in ${runId}` },
+      );
+      const completeRes = await request.post(`/api/tasks/${task.id}/complete`, {
+        headers: JSON_HEADERS,
+        data: { kind: 'verdict', verdict: 'revise', comment },
+      });
+      expect(completeRes.status(), await completeRes.text()).toBe(200);
+      return [...agentRuns].sort((left, right) => left.startedAt.localeCompare(right.startedAt))[round - 1]!;
+    };
+    const runIo = async (agentRunId: string) => {
+      const res = await request.get(`/api/evaluation/agent-runs/${agentRunId}/io`, { headers: AUTH_HEADERS });
+      expect(res.status(), await res.text()).toBe(200);
+      return GetAgentRunIoOutputSchema.parse(await res.json());
+    };
+
+    const firstRound = await reviseRound(1, 'Grade the sepsis event again');
+    const secondRound = await reviseRound(2, 'Add the CTCAE version');
+
+    const secondIo = await runIo(secondRound.id);
+    expect(secondIo.stepInput).toMatchObject({ verdict: 'revise', reviewerComment: 'Grade the sepsis event again' });
+    expect(secondIo.caseInput).toEqual((await runIo(firstRound.id)).caseInput);
+
+    const harvestRes = await request.post('/api/evaluation/cases/from-agent-run', {
+      headers: JSON_HEADERS,
+      data: { agentRunId: secondRound.id },
+    });
+    expect(harvestRes.status(), await harvestRes.text()).toBe(201);
+    const { evalCase } = EvalCaseOutputSchema.parse(await harvestRes.json());
+    expect(evalCase).toMatchObject({ source: 'production', expectation: 'negative', comparison: 'agreement', expectedOutput: secondRound.envelope?.result });
+    expect(evalCase.agreementInstructions).toContain('Add the CTCAE version');
+    expect(JSON.stringify(evalCase.input)).not.toContain('reviewerComment');
   });
 
   test('a run sent back with a revise verdict harvests as a negative case compared by meaning on the comment', async ({ request }) => {

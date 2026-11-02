@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { buildAgentOutputEnvelope, buildAgentRun, buildStepExecution } from '@mediforce/platform-core/testing';
 import { recordScore } from '../../scores/record-score';
 import {
   archiveEvalCase,
@@ -37,6 +38,14 @@ async function reviewVerdict(fixture: EvaluationFixture, agentRunId: string, val
     supersedes: null,
     basis: 'test',
   }, fixture.scope());
+}
+
+const AGENT_OF_LOOP = { namespace: NAMESPACE, agentId: 'ae-grader' };
+
+/** Another round of the step in the same Workflow Run. */
+async function addStepExecutionAndRun(fixture: EvaluationFixture, instanceId: string, agentRunId: string, result: Record<string, unknown> | null, at: string, stepInput: Record<string, unknown>, stepId = 'grade') {
+  await fixture.instanceRepo.addStepExecution(instanceId, buildStepExecution({ instanceId, stepId, input: stepInput, startedAt: at }));
+  await fixture.agentRunRepo.create(buildAgentRun({ id: agentRunId, processInstanceId: instanceId, stepId, startedAt: at, envelope: result === null ? null : buildAgentOutputEnvelope({ result }) }));
 }
 
 describe('Eval Cases', () => {
@@ -86,6 +95,76 @@ describe('Eval Cases', () => {
       comparison: 'agreement',
     });
     expect(evalCase.agreementInstructions).toContain('Grade the sepsis event again.');
+  });
+
+  describe('a run of a review loop', () => {
+    beforeEach(async () => {
+      const grader = (await fixture.agentDefinitionRepo.getById('ae-grader'))!;
+      await fixture.agentDefinitionRepo.upsert('ae-grader', { ...grader, runtimeId: 'claude-code-agent' });
+    });
+
+    const rounds = async () => {
+      const at = (minute: number) => `2026-10-05T10:0${minute}:00.000Z`;
+      await addAgentWorkflowRun(fixture, { workflowName: 'loop', agentRunId: 'round-1', result: { plan: 'one' }, at: at(1), stepInput: { steps: {} }, triggerPayload: { topic: 'RAG' }, step: { stepParams: { topic: '${triggerPayload.topic}' } } });
+      await addStepExecutionAndRun(fixture, 'instance-round-1', 'round-2', { plan: 'two' }, at(2), { plan: 'one', steps: { grade: { plan: 'one' } } });
+      await addStepExecutionAndRun(fixture, 'instance-round-1', 'round-3', { plan: 'three' }, at(3), { plan: 'two', steps: { grade: { plan: 'two' } } });
+      await reviewVerdict(fixture, 'round-1', 0.5, 'Add cloud providers.');
+      await reviewVerdict(fixture, 'round-2', 0.5, 'Split it into seven phases.');
+      await reviewVerdict(fixture, 'round-3', 1, null);
+    };
+
+    it('gives every round the input production first sent, with that round\'s own output and comment', async () => {
+      await rounds();
+      const fromRound = (agentRunId: string) => createEvalCaseFromAgentRun(CreateEvalCaseFromAgentRunInputSchema.parse({ agentRunId, agent: AGENT_OF_LOOP }), fixture.scope());
+      const { evalCase: second } = await fromRound('round-2');
+      expect(second).toMatchObject({
+        input: { triggerPayload: { topic: 'RAG' }, previousStepOutputs: {} },
+        source: 'production',
+        sourceAgentRunId: 'round-2',
+        expectation: 'negative',
+        expectedOutput: { plan: 'two' },
+        comparison: 'agreement',
+      });
+      expect(second.input.triggerPayload).toEqual({ topic: 'RAG' });
+      expect(second.agreementInstructions).toContain('Split it into seven phases.');
+      const { evalCase: approved } = await fromRound('round-3');
+      expect(approved).toMatchObject({ expectation: 'positive', expectedOutput: { plan: 'three' }, comparison: 'exact' });
+      expect(approved.input.triggerPayload).toEqual({ topic: 'RAG' });
+    });
+
+    it('keeps a later run\'s own input when the earlier one was not sent back', async () => {
+      await addAgentWorkflowRun(fixture, { workflowName: 'batch', agentRunId: 'item-1', result: { plan: 'one' }, at: '2026-10-05T11:01:00.000Z', stepInput: { item: 1, steps: {} } });
+      await addStepExecutionAndRun(fixture, 'instance-item-1', 'item-2', { plan: 'two' }, '2026-10-05T11:02:00.000Z', { item: 2, steps: {} });
+      const { evalCase } = await createEvalCaseFromAgentRun(CreateEvalCaseFromAgentRunInputSchema.parse({ agentRunId: 'item-2', agent: AGENT_OF_LOOP }), fixture.scope());
+      expect(evalCase.input.triggerPayload).toMatchObject({ item: 2 });
+    });
+
+    it('reads past an attempt that failed between rounds', async () => {
+      await addAgentWorkflowRun(fixture, { workflowName: 'retried', agentRunId: 'try-1', result: { plan: 'one' }, at: '2026-10-05T12:01:00.000Z', stepInput: { item: 'original', steps: {} } });
+      await addStepExecutionAndRun(fixture, 'instance-try-1', 'try-2', null, '2026-10-05T12:02:00.000Z', { plan: 'one', steps: {} });
+      await addStepExecutionAndRun(fixture, 'instance-try-1', 'try-3', { plan: 'two' }, '2026-10-05T12:03:00.000Z', { plan: 'one', steps: {} });
+      await reviewVerdict(fixture, 'try-1', 0.5, 'Redo it.');
+      const { evalCase } = await createEvalCaseFromAgentRun(CreateEvalCaseFromAgentRunInputSchema.parse({ agentRunId: 'try-3', agent: AGENT_OF_LOOP }), fixture.scope());
+      expect(evalCase.input.triggerPayload).toMatchObject({ item: 'original' });
+    });
+
+    it('puts the reviewer\'s param values in the agreement instructions, with or without a comment', async () => {
+      await recordScore({
+        subject: { type: 'agent_run', id: GRADED_RUN }, name: 'human_verdict', value: 0.5, label: 'revise', comment: null, source: 'human', createdBy: 'reviewer-1',
+        metadata: { paramValues: { phases: 7 } }, namespace: NAMESPACE, processInstanceId: null, stepId: 'grade-aes', evaluatorId: null, supersedes: null, basis: 'test',
+      }, fixture.scope());
+      const { evalCase } = await harvest({ agentRunId: GRADED_RUN });
+      expect(evalCase.comparison).toBe('agreement');
+      expect(evalCase.agreementInstructions).toContain('"phases":7');
+    });
+
+    it('takes a Step\'s case from the first round too, leaving out the output the step later saw of itself', async () => {
+      await addStepRun(fixture, { instanceId: 'run-loop', agentRunId: 'step-round-1', result: { grade: 1 }, at: '2026-10-05T13:01:00.000Z' });
+      await addStepExecutionAndRun(fixture, 'run-loop', 'step-round-2', { grade: 2 }, '2026-10-05T13:02:00.000Z', { grade: 1, steps: { 'grade-aes': { grade: 1 } } }, 'grade-aes');
+      await reviewVerdict(fixture, 'step-round-1', 0.5, 'Regrade.');
+      const { evalCase } = await harvest({ agentRunId: 'step-round-2' });
+      expect(evalCase.input.previousStepOutputs).not.toHaveProperty('grade-aes');
+    });
   });
 
   it('lets the caller override what a revise verdict makes of the case', async () => {

@@ -14,6 +14,7 @@ import {
 import type { AgentRunChange } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { NotFoundError, ValidationError } from '../../../errors';
+import { loadFirstRound } from './case-source';
 import { loadGatedAgentRun, loadStepInput } from './scored-run';
 import { listStepProductionAgentRunsPage } from './step-agent-runs';
 
@@ -43,7 +44,7 @@ export interface AgentRunSource {
   readonly instance: ProcessInstance;
   readonly stepInput: Record<string, unknown> | null;
   readonly change: AgentRunChange;
-  /** What the Agent was given, as its case holds it. */
+  /** What the Agent was given before any reviewer sent it back, as its case holds it. */
   readonly input: EvalCaseInput;
   /** What the run returned; null when it answered under another output schema than the Agent's. */
   readonly result: NonNullable<AgentRun['envelope']>['result'];
@@ -107,10 +108,12 @@ function agentChangeOf(agent: AgentDefinition, definition: WorkflowDefinition, s
  * What the Agent was given in a run, as its case holds it (ADR-0029 D4): a
  * trial's trigger payload is the Agent's whole input, so the step's input goes
  * there as the step merged it — literal stepParams, overridden by the step's
- * input, overridden by its `${…}` mappings.
+ * input, overridden by its `${…}` mappings. A `steps` that holds no earlier
+ * output gave the Agent nothing.
  */
 function agentCaseInputOf(step: WorkflowStep, instance: ProcessInstance, stepInput: Record<string, unknown> | null): EvalCaseInput {
-  const given = stepInput ?? instance.triggerPayload ?? {};
+  const { steps, ...fields } = stepInput ?? instance.triggerPayload ?? {};
+  const given = isDeepStrictEqual(steps, {}) || steps === undefined ? fields : { ...fields, steps };
   try {
     const { defaults, mappings } = resolveStepParams(step.stepParams ?? {}, instance);
     return { triggerPayload: { ...defaults, ...given, ...mappings }, previousStepOutputs: {} };
@@ -178,7 +181,7 @@ export async function loadAgentRunSource(scope: CallerScope, agent: EvaluatedAge
     instance,
     stepInput,
     change,
-    input: agentCaseInputOf(using.step, instance, stepInput),
+    input: agentCaseInputOf(using.step, instance, await loadStepInput(scope, await loadFirstRound(scope, agentRun), instance)),
     result: change.outputSchemaDiffers ? null : agentRun.envelope?.result ?? null,
   };
 }

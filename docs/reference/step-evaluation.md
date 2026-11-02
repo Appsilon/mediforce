@@ -66,9 +66,10 @@ cards, as on the tabs. **Cases from runs** follows the answer to *Do you know
 the correct outputs?*: on **No** each run gives a case without an expected
 output (`expectedOutput: null`, which a verdict does not override); otherwise a reviewed run's decisions label its cases — every review
 round sent back with **Request changes** is a negative case (that round's
-own output and input, compared by meaning with the reviewer's comment as its
-agreement instructions, all taken by the platform from that round's run), the
-output finally approved a positive one on the first round's input — and an
+own output, compared by meaning with the reviewer's comment and param values as
+its agreement instructions, all taken by the platform from that round's run),
+the output finally approved a positive one, each on the input of the review's
+first round — and an
 unreviewed run's output comes as an expected output for the person to mark.
 `list_step_runs` lists runs grouped by Workflow Run, each with the step's
 rounds oldest first, so a review reads as one chain. Summary sums
@@ -511,8 +512,11 @@ A harvested case takes the run's output as its expected output when a person
 reviewed the run: approved, a positive case; rejected, a negative one, both
 compared exactly unless the request says otherwise. A run sent back with the
 `revise` verdict is a negative case too, compared by meaning (`agreement`), with
-the reviewer's comment in its agreement instructions. Any other verdict (a
-recheck) or no review gives none. An `expectedOutput` in the
+the reviewer's comment and any param values in its agreement instructions. Any
+other verdict (a recheck) or no review gives none. Whatever the round, a case
+holds the input and workspace of the review's first round: a round sent back
+starts from the output it replaces, which the case must not hand over. A run
+after one nobody sent back, such as a loop's next item, keeps its own. An `expectedOutput` in the
 request (`null` for none) replaces the run's output and is positive unless
 `expectation` says otherwise — the verdict labels only the run's own output, so
 its comparison and instructions apply only to that output under the verdict's

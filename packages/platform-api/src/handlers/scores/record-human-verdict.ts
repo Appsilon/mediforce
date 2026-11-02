@@ -76,7 +76,12 @@ export async function recordHumanVerdictScore(
     comment: comment.length > 0 ? comment : null,
     source: 'human',
     createdBy: actorId,
-    metadata: { verdictKey: payload.verdict, intent, taskId: task.id },
+    metadata: {
+      verdictKey: payload.verdict,
+      intent,
+      taskId: task.id,
+      ...(payload.kind === 'verdict-with-params' && Object.keys(payload.paramValues).length > 0 ? { paramValues: payload.paramValues } : {}),
+    },
     namespace,
     processInstanceId: task.processInstanceId,
     stepId: task.stepId,

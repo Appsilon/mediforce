@@ -296,8 +296,8 @@ one the step must *not* return: it passes when the new output differs (exact) or
 
 **Where a negative comes from.** A reviewer who **rejects** a run makes its case negative
 (`case-from-run`; the form starts negative for a rejected run). A run sent back with `revise` is
-negative too, compared by meaning with the reviewer's comment as its agreement instructions. A run
-never reviewed gives no expected output — choose the expectation yourself
+negative too, on the input of the review's first round, compared by meaning with the reviewer's
+comment and any param values as its agreement instructions. A run never reviewed gives no expected output — choose the expectation yourself
 (`case-from-run --expectation`).
 
 **Inputs that produce bad outputs.** Samples 10–16 target gaps in the prompt. Results on Gemma 4

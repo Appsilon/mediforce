@@ -2,7 +2,7 @@ import type { GetAgentRunIoInput, GetAgentRunIoOutput } from '../../contract/eva
 import type { CallerScope } from '../../repositories/index';
 import { loadEvaluationSubject } from './_lib/evaluation-subject';
 import { loadGatedAgentRun, loadStepInput, runSubjectRef } from './_lib/scored-run';
-import { caseInputOf, loadVerdictLabel, type VerdictLabel } from './_lib/case-source';
+import { caseInputOf, loadFirstRound, loadVerdictLabel, type VerdictLabel } from './_lib/case-source';
 import { loadAgentRunSource } from './_lib/agent-production-runs';
 
 function verdictFields(label: VerdictLabel | null) {
@@ -28,7 +28,7 @@ export async function getAgentRunIo(input: GetAgentRunIoInput, scope: CallerScop
     agentRunId: agentRun.id,
     status: agentRun.status,
     stepInput,
-    caseInput: caseInputOf(instance, stepInput),
+    caseInput: caseInputOf(instance, await loadStepInput(scope, await loadFirstRound(scope, agentRun), instance)),
     result: agentRun.envelope?.result ?? null,
     reasoningSummary: agentRun.envelope?.reasoning_summary ?? null,
     confidence: agentRun.envelope?.confidence ?? null,
