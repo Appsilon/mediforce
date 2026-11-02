@@ -291,6 +291,88 @@ test.describe('Step Evaluation foundations — API E2E', () => {
     expect(evalCase.agreementInstructions).toContain('Grade the sepsis event again');
   });
 
+  test('an agent review requires a revise comment unless the step turns the requirement off', async ({ request }) => {
+    const openReviewTask = (runId: string) => pollUntil(
+      async () => {
+        const res = await request.get(`/api/tasks?instanceId=${runId}`, { headers: AUTH_HEADERS });
+        if (res.status() !== 200) return null;
+        const { tasks } = (await res.json()) as { tasks: Array<{ id: string; stepId: string; status: string }> };
+        return tasks.find((candidate) => candidate.stepId === 'grade-aes' && candidate.status !== 'completed') ?? null;
+      },
+      { description: `CM3 review task for ${runId}` },
+    );
+    const reviseWithoutComment = (taskId: string) => request.post(`/api/tasks/${taskId}/complete`, {
+      headers: AUTH_HEADERS,
+      data: { kind: 'verdict', verdict: 'revise' },
+    });
+
+    const defaultRunId = await startRun(request, agentStepWorkflow(`e2e-revise-comment-default-${Date.now()}`, {
+      autonomyLevel: 'L3',
+      allowedRoles: ['operator'],
+    }));
+    const defaultTask = await openReviewTask(defaultRunId);
+    const rejected = await reviseWithoutComment(defaultTask.id);
+    expect(rejected.ok(), await rejected.text()).toBe(false);
+
+    const optionalRunId = await startRun(request, agentStepWorkflow(`e2e-revise-comment-optional-${Date.now()}`, {
+      autonomyLevel: 'L3',
+      allowedRoles: ['operator'],
+      comment: { requiredForVerdicts: [] },
+    }));
+    const optionalTask = await openReviewTask(optionalRunId);
+    const accepted = await reviseWithoutComment(optionalTask.id);
+    expect(accepted.status(), await accepted.text()).toBe(200);
+
+    const nextRound = await openReviewTask(optionalRunId);
+    expect(nextRound.id).not.toBe(optionalTask.id);
+  });
+
+  test('an agent review collects the params of the step: a revise hands them to the re-run, an approve to the next step', async ({ request }) => {
+    const runId = await startRun(request, agentStepWorkflow(`e2e-review-params-${Date.now()}`, {
+      autonomyLevel: 'L3',
+      allowedRoles: ['operator'],
+      params: [{ name: 'ctcaeVersion', type: 'string', required: false }],
+      comment: { requiredForVerdicts: [] },
+    }));
+    const openReviewTask = () => pollUntil(
+      async () => {
+        const res = await request.get(`/api/tasks?instanceId=${runId}`, { headers: AUTH_HEADERS });
+        if (res.status() !== 200) return null;
+        const { tasks } = (await res.json()) as { tasks: Array<{ id: string; stepId: string; status: string; params?: Array<{ name: string }> }> };
+        return tasks.find((candidate) => candidate.stepId === 'grade-aes' && candidate.status !== 'completed') ?? null;
+      },
+      { description: `CM3 review task for ${runId}` },
+    );
+    const complete = (taskId: string, verdict: string) => request.post(`/api/tasks/${taskId}/complete`, {
+      headers: JSON_HEADERS,
+      data: { kind: 'verdict-with-params', verdict, paramValues: { ctcaeVersion: 'v5.0' } },
+    });
+
+    const firstTask = await openReviewTask();
+    expect(firstTask.params?.map(({ name }) => name)).toEqual(['ctcaeVersion']);
+    const revised = await complete(firstTask.id, 'revise');
+    expect(revised.status(), await revised.text()).toBe(200);
+
+    const secondTask = await openReviewTask();
+    expect(secondTask.id).not.toBe(firstTask.id);
+    const agentRuns = await pollUntil(
+      async () => {
+        const runs = await listAgentRuns(request, runId);
+        return runs !== null && runs.length === 2 ? runs : null;
+      },
+      { description: `second agent run in ${runId}` },
+    );
+    const [rerun] = [...agentRuns].sort((left, right) => right.startedAt.localeCompare(left.startedAt));
+    const ioRes = await request.get(`/api/evaluation/agent-runs/${rerun!.id}/io`, { headers: AUTH_HEADERS });
+    expect(ioRes.status(), await ioRes.text()).toBe(200);
+    const { stepInput } = GetAgentRunIoOutputSchema.parse(await ioRes.json());
+    expect(stepInput).toMatchObject({ verdict: 'revise', ctcaeVersion: 'v5.0' });
+    expect(JSON.stringify(stepInput)).toContain('Values the reviewer set');
+
+    const approved = await complete(secondTask.id, 'approve');
+    expect(approved.status(), await approved.text()).toBe(200);
+  });
+
   test('a CM3 approval records a human_verdict Score on the reviewed agent run', async ({ request }) => {
     const runId = await startRun(request, agentStepWorkflow(`e2e-human-verdict-${Date.now()}`, {
       autonomyLevel: 'L3',

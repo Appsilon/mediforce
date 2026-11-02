@@ -13,6 +13,8 @@ interface SelectionFormProps {
   options: Record<string, unknown>[];
   remainingTaskCount?: number;
   onCompleted?: () => void;
+  /** From the task's `revise` descriptor; older tasks carry none and keep requiring it. */
+  reviseRequiresComment?: boolean;
 }
 
 interface SubmittedData {
@@ -28,6 +30,7 @@ export function SelectionForm({
   options,
   remainingTaskCount,
   onCompleted,
+  reviseRequiresComment = true,
 }: SelectionFormProps) {
   const handle = useHandleFromPath();
   const [selectedIndex, setSelectedIndex] = React.useState<number | null>(null);
@@ -36,6 +39,8 @@ export function SelectionForm({
   const [submitting, setSubmitting] = React.useState(false);
   const [submitted, setSubmitted] = React.useState<SubmittedData | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+
+  const reviseBlocked = reviseRequiresComment && !comment.trim();
 
   async function handleApprove() {
     if (selectedIndex === null) return;
@@ -63,7 +68,7 @@ export function SelectionForm({
   }
 
   async function handleRevise() {
-    if (!comment.trim()) return;
+    if (reviseBlocked) return;
     setSubmitting(true);
     setError(null);
 
@@ -183,11 +188,11 @@ export function SelectionForm({
 
           <button
             onClick={handleRevise}
-            disabled={submitting || !comment.trim()}
+            disabled={submitting || reviseBlocked}
             className={cn(
               'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
               'bg-amber-600 text-white hover:bg-amber-700',
-              (submitting || !comment.trim()) && 'opacity-50 cursor-not-allowed',
+              (submitting || reviseBlocked) && 'opacity-50 cursor-not-allowed',
             )}
           >
             {submitting && mode === 'revise' && <Loader2 className="h-4 w-4 animate-spin" />}

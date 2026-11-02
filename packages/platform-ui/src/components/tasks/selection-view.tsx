@@ -13,6 +13,7 @@ export function SelectionView({ task, remainingTaskCount }: TaskBodyProps) {
       <SelectionForm
         taskId={task.id}
         options={task.options ?? []}
+        reviseRequiresComment={task.verdicts?.find((verdict) => verdict.key === 'revise')?.requiresComment ?? true}
         remainingTaskCount={remainingTaskCount}
       />
     );

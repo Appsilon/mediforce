@@ -272,6 +272,57 @@ describe('AgentStepExecutor', () => {
     );
   });
 
+  it('L3 paused: the review task carries the comment setting of the step', async () => {
+    const l3Step: WorkflowStep = {
+      ...agentStep,
+      autonomyLevel: 'L3',
+      allowedRoles: ['reviewer'],
+      comment: { requiredForVerdicts: [] },
+    };
+    mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+      status: 'paused',
+      envelope: defaultEnvelope,
+      appliedToWorkflow: false,
+      fallbackReason: null,
+    });
+
+    await executor.execute(mockPlugin, makeContext({ autonomyLevel: 'L3', step: l3Step }), services, meta);
+
+    expect(mockHumanTaskRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creationReason: 'agent_review_l3',
+        verdicts: [
+          { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+          { key: 'revise', label: 'Request changes', intent: 'warning', requiresComment: false },
+        ],
+      }),
+    );
+  });
+
+  it('L3 paused: the review task carries the params of the step, its defaults resolved', async () => {
+    const l3Step: WorkflowStep = {
+      ...agentStep,
+      autonomyLevel: 'L3',
+      allowedRoles: ['reviewer'],
+      params: [{ name: 'ctcaeVersion', type: 'string', required: false, default: '${variables.version}' }],
+    };
+    mockInstanceRepo.getById.mockResolvedValue({ id: 'inst-001', status: 'running', currentStepId: 'analyze-data', variables: { version: 'v5.0' } });
+    mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+      status: 'paused',
+      envelope: defaultEnvelope,
+      appliedToWorkflow: false,
+      fallbackReason: null,
+    });
+
+    await executor.execute(mockPlugin, makeContext({ autonomyLevel: 'L3', step: l3Step }), services, meta);
+
+    expect(mockHumanTaskRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: [{ name: 'ctcaeVersion', type: 'string', required: false, default: 'v5.0' }],
+      }),
+    );
+  });
+
   describe('L3 review task assignee', () => {
     const l3Step: WorkflowStep = {
       ...agentStep,

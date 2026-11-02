@@ -95,10 +95,12 @@ export function buildVerdictStepOutput(
   payload: Extract<CompleteHumanTaskPayload, { kind: 'verdict' }>,
   actorId: string,
   now: string,
+  paramValues: Record<string, unknown> = {},
 ): StepOutputBundle & { isL3Revise: boolean } {
   const { verdict } = payload;
   const comment = payload.comment ?? '';
   const selectedIndex = payload.selectedIndex;
+  const hasParamValues = Object.keys(paramValues).length > 0;
 
   const isSelectionReview =
     selectedIndex !== undefined &&
@@ -139,7 +141,7 @@ export function buildVerdictStepOutput(
         );
       }
 
-      stepOutput = { ...agentResult };
+      stepOutput = { ...agentResult, ...paramValues };
     } else {
       stepOutput = {};
     }
@@ -150,12 +152,17 @@ export function buildVerdictStepOutput(
       completedBy: actorId,
       completedAt: now,
       ...(agentOutput !== undefined ? { agentOutput } : {}),
+      ...(hasParamValues ? { paramValues } : {}),
     };
   }
 
   stepOutput.verdict = verdict;
-  if (comment.length > 0) {
-    stepOutput.reviewerComment = comment;
+  if (comment.length > 0) stepOutput.reviewerComment = comment;
+  const reviewerValues = hasParamValues && verdict === 'revise'
+    ? `Values the reviewer set: ${JSON.stringify(paramValues)}`
+    : '';
+  const feedback = [comment, reviewerValues].filter((part) => part.length > 0).join('\n\n');
+  if (feedback.length > 0) {
     stepOutput.reviewerCallToAction =
       `=== REVIEWER FEEDBACK ON PRIOR ITERATION (verdict=${verdict}) ===\n` +
       `\n` +
@@ -163,7 +170,7 @@ export function buildVerdictStepOutput(
       `anything else. Do not return the same output as the prior iteration ` +
       `unless the comment explicitly approves it.\n` +
       `\n` +
-      `${comment}\n` +
+      `${feedback}\n` +
       `\n` +
       `=== END REVIEWER FEEDBACK ===`;
   }
@@ -318,7 +325,11 @@ export function shapeCompletion(
       return { ...buildParamsStepOutput(payload, actorId, now), isL3Revise: false };
     }
     case 'verdict-with-params': {
-      validateVerdictPayload(task, { kind: 'verdict', verdict: payload.verdict, comment: payload.comment });
+      const verdictPayload = { kind: 'verdict' as const, verdict: payload.verdict, comment: payload.comment };
+      validateVerdictPayload(task, verdictPayload);
+      if (task.creationReason === 'agent_review_l3') {
+        return buildVerdictStepOutput(task, verdictPayload, actorId, now, payload.paramValues);
+      }
       const stepOutput: Record<string, unknown> = {
         ...payload.paramValues,
         verdict: payload.verdict,

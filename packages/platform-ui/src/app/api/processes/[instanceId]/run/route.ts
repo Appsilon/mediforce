@@ -5,7 +5,7 @@ import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { advanceEvalRunOfInstance, checkRetiredModels, checkUnknownModels, settleRunWaits } from '@mediforce/platform-api/handlers';
 import { defaultBuildScope } from '@/lib/route-adapter';
-import { DEFAULT_MODEL, resolveCoworkOutputSchema, resolveDefinitionModels, resolvePreviousStepId, resolveStepTimeoutMs, buildTaskVerdicts, resolveParamDefaults, runInterpolationSources, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
+import { DEFAULT_MODEL, resolveCoworkOutputSchema, resolveDefinitionModels, resolvePreviousStepId, resolveStepTimeoutMs, buildHumanTaskVerdicts, resolveParamDefaults, runInterpolationSources, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -527,7 +527,7 @@ export async function POST(
               }
             }
 
-            const resolvedVerdicts = buildTaskVerdicts(currentStep.verdicts);
+            const resolvedVerdicts = buildHumanTaskVerdicts(currentStep);
             await humanTaskRepo.create({
               id: taskId,
               processInstanceId: instanceId,

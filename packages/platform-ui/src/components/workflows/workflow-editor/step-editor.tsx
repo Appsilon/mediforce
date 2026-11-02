@@ -17,8 +17,8 @@ import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 import { parseJsonObjectText } from '@/lib/trigger-input-payload';
 
-import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, agentImageOf, agentStepChanges, DEFAULT_STEP_TIMEOUT_MINUTES, defaultVerdictLabel, scriptConfigKeyForPlugin, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
-import type { AgentDefinition, AgentStepChange, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
+import { AGENT_REVIEW_VERDICT_KEYS, AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, agentImageOf, agentStepChanges, DEFAULT_STEP_TIMEOUT_MINUTES, defaultVerdictLabel, scriptConfigKeyForPlugin, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
+import type { AgentDefinition, AgentStepChange, StepParam, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
 import type { DockerImageInfo, ImageCatalogEntryView, StepValidation } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import { selectAgentPatch } from '../workflow-editor-utils';
@@ -35,6 +35,7 @@ import { ImageSourceFields } from './image-source-fields';
 import { identityImageValue, pickerImageValue } from './image-options';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
 import { StepSkillsField } from './step-skills-field';
+import { StepCommentSection, commentAfterVerdictDelete, commentAfterVerdictRename } from './step-comment-section';
 import { McpCommandWarnings } from '@/components/agents/mcp-command-alert';
 import { stdioServerCommands } from '@/components/agents/mcp-command-warnings';
 import { useToolCatalogEntries } from '@/hooks/use-tool-catalog';
@@ -98,13 +99,13 @@ export function buildExecutorChangePatch(step: WorkflowStep, targetExecutor: Wor
       : undefined;
     const script = step.script ?? (Object.keys(carriedFromAgent ?? {}).length > 0 ? carriedFromAgent as WorkflowStep['script'] : undefined);
     return {
-      ...base, allowedRoles: undefined, assignedTo: undefined, autonomyLevel: undefined, cowork: undefined, agent: undefined,
+      ...base, allowedRoles: undefined, assignedTo: undefined, comment: undefined, autonomyLevel: undefined, cowork: undefined, agent: undefined,
       plugin: step.plugin ?? 'script-container',
       script,
     };
   }
   return {
-    ...base, plugin: undefined, autonomyLevel: undefined, allowedRoles: undefined, assignedTo: undefined,
+    ...base, plugin: undefined, autonomyLevel: undefined, allowedRoles: undefined, assignedTo: undefined, comment: undefined,
     agent: undefined, script: undefined, databricks: undefined, databricksSql: undefined, cowork: step.cowork ?? { agent: 'chat' },
   };
 }
@@ -228,8 +229,7 @@ const TIP = {
   actionRunWorkflowStep:   'Step id whose output to return from the workflow. Leave empty to return all of its variables.',
   verdictLabel:            'Button text shown to the reviewer. Defaults to a title-cased form of the verdict key.',
   verdictIntent:           'Button styling: success, danger, warning or neutral. Defaults from the key for the common names.',
-  verdictRequiresComment:  'Enforced server-side — the task cannot be completed on this verdict without a comment.',
-  paramRequiredForVerdicts: 'Verdict keys that make this parameter mandatory. Leave empty to use the plain required flag.',
+  paramRequiredForVerdicts: 'The assignee cannot submit a ticked verdict until the field has a value.',
   actionMethod:            'HTTP method for the outbound request.',
   actionUrl:               'Target URL. Supports ${steps.<id>.<field>} and ${triggerPayload.<field>} interpolation — never put ${secrets.NAME} here, the resolved URL is persisted as this step\'s output.',
   actionBody:              'JSON body sent with the request. Supports ${steps.<id>.<field>} interpolation. Only the response is stored, so ${secrets.NAME} is safe here.',
@@ -633,7 +633,11 @@ export function StepEditor({
   // ── Accordion sections ─────────────────────────────────────────────────
   const hasPrimarySection = isAgent || isScript || isHuman || isAction || isReview || isCowork;
   const paramsInPrimary = isHuman;
-  const paramsInAdvanced = !isTerminal && !isHuman;
+  const hasAgentTaskSetup = isAgent && hasHumanReviewer;
+  const paramVerdictKeys = isAgent ? AGENT_REVIEW_VERDICT_KEYS : Object.keys(step.verdicts ?? {});
+  const isParamRequiredFor = (param: StepParam, verdictKey: string) =>
+    param.required === true || param.requiredForVerdicts?.includes(verdictKey) === true;
+  const paramsInAdvanced = !isTerminal && !isHuman && !hasAgentTaskSetup;
 
   const primaryTitle = isAgent
     ? 'Prompt & model'
@@ -653,7 +657,7 @@ export function StepEditor({
   // of cards may be open — toggling one never closes the others.
   // Card ids + their default open state live here once; the reset effect and
   // toggle derive from this rather than re-typing the literal.
-  const defaultOpenCards: Record<string, boolean> = { basics: true, primary: false, routing: false, advanced: false };
+  const defaultOpenCards: Record<string, boolean> = { basics: true, primary: false, taskSetup: false, routing: false, advanced: false };
   const [openCards, setOpenCards] = useState<Record<string, boolean>>(defaultOpenCards);
   useEffect(() => {
     setOpenCards(defaultOpenCards);
@@ -675,12 +679,12 @@ export function StepEditor({
 
   const parametersSection = !isTerminal ? (
         <Section title="Parameters">
-          {/* Only the human-executor branch of the engine copies step.params
-              onto a task, so they are inert anywhere else — say so rather than
+          {/* Only a human step's task and an L3 agent step's review task carry
+              step.params, so they are inert anywhere else — say so rather than
               letting an author configure a form nobody is ever shown. */}
           {paramsInAdvanced && (
             <p className="text-[11px] leading-relaxed text-muted-foreground mb-3">
-              Parameters are only collected on human steps — the assignee fills them in on the task form.
+              Parameters are only collected on human steps and agent steps at Human Review — the assignee fills them in on the task form.
               This step takes its input from previous step outputs instead.
             </p>
           )}
@@ -733,44 +737,42 @@ export function StepEditor({
                     ))}
                   </select>
                 </FieldRow>
-                <FieldRow label="required" tooltip={TIP.paramRequired}>
-                  <input
-                    type="checkbox"
-                    checked={param.required ?? false}
-                    onChange={(e) => {
-                      const next = [...(step.params ?? [])];
-                      next[idx] = { ...next[idx], required: e.target.checked };
-                      onChange({ params: next });
-                    }}
-                    className="w-3.5 h-3.5 accent-primary cursor-pointer"
-                  />
-                </FieldRow>
-                <FieldRow label="requiredForVerdicts" tooltip={TIP.paramRequiredForVerdicts}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {Object.keys(step.verdicts ?? {}).map((verdictKey) => (
-                      <label key={verdictKey} className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                        <input
-                          type="checkbox"
-                          checked={param.requiredForVerdicts?.includes(verdictKey) === true}
-                          onChange={(e) => {
-                            const current = param.requiredForVerdicts ?? [];
-                            const keys = e.target.checked
-                              ? [...current, verdictKey]
-                              : current.filter((k) => k !== verdictKey);
-                            const next = [...(step.params ?? [])];
-                            next[idx] = { ...next[idx], requiredForVerdicts: keys.length > 0 ? keys : undefined };
-                            onChange({ params: next });
-                          }}
-                          className="h-3.5 w-3.5 accent-primary cursor-pointer"
-                        />
-                        {verdictKey}
-                      </label>
-                    ))}
-                    {Object.keys(step.verdicts ?? {}).length === 0 && (
-                      <span className="text-[11px] italic text-muted-foreground/40">Define verdicts to make this conditional</span>
-                    )}
-                  </div>
-                </FieldRow>
+                {paramVerdictKeys.length === 0 ? (
+                  <FieldRow label="required" tooltip={TIP.paramRequired}>
+                    <input
+                      type="checkbox"
+                      checked={param.required ?? false}
+                      onChange={(e) => {
+                        const next = [...(step.params ?? [])];
+                        next[idx] = { ...next[idx], required: e.target.checked };
+                        onChange({ params: next });
+                      }}
+                      className="w-3.5 h-3.5 accent-primary cursor-pointer"
+                    />
+                  </FieldRow>
+                ) : (
+                  <FieldRow label="requiredForVerdicts" tooltip={TIP.paramRequiredForVerdicts}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {paramVerdictKeys.map((verdictKey) => (
+                        <label key={verdictKey} className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <input
+                            type="checkbox"
+                            checked={isParamRequiredFor(param, verdictKey)}
+                            onChange={(e) => {
+                              const keys = paramVerdictKeys.filter((key) => (key === verdictKey ? e.target.checked : isParamRequiredFor(param, key)));
+                              const required = keys.length === paramVerdictKeys.length;
+                              const next = [...(step.params ?? [])];
+                              next[idx] = { ...next[idx], required, requiredForVerdicts: required || keys.length === 0 ? undefined : keys };
+                              onChange({ params: next });
+                            }}
+                            className="h-3.5 w-3.5 accent-primary cursor-pointer"
+                          />
+                          {verdictKey}
+                        </label>
+                      ))}
+                    </div>
+                  </FieldRow>
+                )}
                 <FieldRow label="description" tooltip={TIP.paramDescription}>
                   <input
                     value={param.description ?? ''}
@@ -936,7 +938,7 @@ export function StepEditor({
               onChange={(v) => onChange(
                 v === 'L3'
                   ? { autonomyLevel: 'L3' }
-                  : { autonomyLevel: v as WorkflowStep['autonomyLevel'], allowedRoles: undefined, assignedTo: undefined },
+                  : { autonomyLevel: v as WorkflowStep['autonomyLevel'], allowedRoles: undefined, assignedTo: undefined, comment: undefined },
               )}
               options={[
                 { value: 'L2', label: 'Assist', icon: Bot, activeClassName: 'border-lime-400 bg-lime-50 text-lime-700 dark:bg-lime-950/30 dark:text-lime-400' },
@@ -1746,6 +1748,17 @@ export function StepEditor({
       {/* ── Parameters (human task setup) ────────────────────────── */}
       {paramsInPrimary && parametersSection}
 
+      {/* ── Comment (human reviewer) ─────────────────────────────── */}
+      {isHuman && <StepCommentSection step={step} onChange={onChange} />}
+
+        </CollapsibleCard>
+      )}
+
+      {/* ── Task setup (reviewer of an agent step) ───────────────── */}
+      {hasAgentTaskSetup && (
+        <CollapsibleCard title="Task setup" open={openCards.taskSetup} onToggle={() => toggleCard('taskSetup')}>
+          {parametersSection}
+          <StepCommentSection step={step} onChange={onChange} />
         </CollapsibleCard>
       )}
 
@@ -1767,7 +1780,7 @@ export function StepEditor({
                       for (const [k, v] of Object.entries(step.verdicts ?? {})) {
                         next[k === verdictName ? e.target.value : k] = v;
                       }
-                      onChange({ verdicts: next });
+                      onChange({ verdicts: next, comment: commentAfterVerdictRename(step.comment, verdictName, e.target.value) });
                     }}
                     className="bg-card text-xs font-medium rounded border border-border/60 hover:border-border focus:border-primary/60 focus:ring-1 focus:ring-primary/20 focus:outline-none px-2 py-1 transition-colors w-24 shrink-0"
                   />
@@ -1785,7 +1798,7 @@ export function StepEditor({
                     onClick={() => {
                       const next = { ...step.verdicts };
                       delete next[verdictName];
-                      onChange({ verdicts: Object.keys(next).length > 0 ? next : undefined });
+                      onChange({ verdicts: Object.keys(next).length > 0 ? next : undefined, comment: commentAfterVerdictDelete(step.comment, verdictName) });
                     }}
                     className="text-[10px] text-muted-foreground/30 hover:text-red-500 transition-colors shrink-0"
                   >×</button>
@@ -1810,15 +1823,6 @@ export function StepEditor({
                     <option value="warning">Warning</option>
                     <option value="neutral">Neutral</option>
                   </select>
-                  <label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground" title={TIP.verdictRequiresComment}>
-                    <input
-                      type="checkbox"
-                      checked={verdict.requiresComment === true}
-                      onChange={(e) => onChange({ verdicts: { ...step.verdicts, [verdictName]: { ...verdict, requiresComment: e.target.checked ? true : undefined } } })}
-                      className="h-3.5 w-3.5 accent-primary"
-                    />
-                    comment
-                  </label>
                 </div>
               </FieldRow>
             ))}

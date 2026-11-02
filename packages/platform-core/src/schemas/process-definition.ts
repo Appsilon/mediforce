@@ -7,6 +7,12 @@ export const VerdictSchema = z.object({
   requiresComment: z.boolean().optional(),
 });
 
+// Which verdicts of a human or L3 agent review need a comment. When set it
+// replaces each verdict's own `requiresComment`; an empty list requires none.
+export const StepCommentSchema = z.object({
+  requiredForVerdicts: z.array(z.string()),
+});
+
 export const StepUiSchema = z.object({
   component: z.string().min(1),
   config: z.record(z.string(), z.unknown()).optional(),
@@ -25,8 +31,8 @@ export const StepParamSchema = z.object({
   required: z.boolean().default(false),
   // When set, the param is only required when the user chooses one of these
   // verdict keys — all other verdicts can be submitted without filling it.
-  // Takes precedence over `required` for the named verdicts; `required: true`
-  // still blocks every verdict unconditionally.
+  // Any value here counts as required (`isParamRequired`), for the form's mark
+  // and on a task with no verdict buttons; `required: true` still blocks every verdict.
   requiredForVerdicts: z.array(z.string()).optional(),
   description: z.string().optional(),
   default: z.unknown().optional(),
@@ -106,6 +112,7 @@ export function normalizeSelection(selection: Selection): { min: number; max: nu
 }
 
 export type Verdict = z.infer<typeof VerdictSchema>;
+export type StepComment = z.infer<typeof StepCommentSchema>;
 export type StepUi = z.infer<typeof StepUiSchema>;
 export type StepParam = z.infer<typeof StepParamSchema>;
 export type Selection = z.infer<typeof SelectionSchema>;

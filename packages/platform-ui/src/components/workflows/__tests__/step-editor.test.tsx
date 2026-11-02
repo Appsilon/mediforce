@@ -2095,7 +2095,7 @@ describe('StepEditor — wait config', () => {
 });
 
 describe('StepEditor — verdict presentation and conditional params', () => {
-  it('writes the verdict label, intent and comment requirement', () => {
+  it('writes the verdict label', () => {
     const onChange = vi.fn();
     render(
       <StepEditor
@@ -2110,11 +2110,122 @@ describe('StepEditor — verdict presentation and conditional params', () => {
     fireEvent.change(screen.getByPlaceholderText('Approve'), { target: { value: 'Sign off' } });
     expect((onChange.mock.calls[0]?.[0] as { verdicts?: Record<string, { label?: string }> })
       .verdicts?.approve?.label).toBe('Sign off');
+  });
 
-    onChange.mockClear();
-    fireEvent.click(screen.getByRole('checkbox', { name: /comment/i }));
-    expect((onChange.mock.calls[0]?.[0] as { verdicts?: Record<string, { requiresComment?: boolean }> })
-      .verdicts?.approve?.requiresComment).toBe(true);
+  it('configures the comment in Task setup, on a human step and on an agent step at Human Review', () => {
+    const { unmount } = render(
+      <StepEditor
+        step={buildStep({ type: 'decision', verdicts: { revise: { target: 'done' } } })}
+        allSteps={[]}
+        onChange={vi.fn()}
+      />,
+    );
+    expandCard('Task setup');
+    expect(screen.getByRole('checkbox', { name: 'Comment required for revise' })).toBeChecked();
+    unmount();
+
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', autonomyLevel: 'L3' })}
+        allSteps={[]}
+        onChange={vi.fn()}
+      />,
+    );
+    expandCard('Task setup');
+    expect(screen.getByRole('checkbox', { name: 'Comment required for revise' })).toBeChecked();
+  });
+
+  it('keeps comment and parameters together in Task setup on an agent step at Human Review', () => {
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', autonomyLevel: 'L3' })}
+        allSteps={[]}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expandCard('Task setup');
+    expect(screen.getByText('Parameters')).toBeInTheDocument();
+    expect(screen.queryByText(/only collected on human steps/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Comment required for revise' })).toBeInTheDocument();
+
+    expandCard('Advanced');
+    expect(screen.queryByText('Parameters')).not.toBeInTheDocument();
+  });
+
+  it('makes a parameter of an agent review required for approve or revise', () => {
+    const onChange = vi.fn();
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', autonomyLevel: 'L3', params: [{ name: 'reason', type: 'string', required: false }] })}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+    expandCard('Task setup');
+    expect(screen.queryByText('Define verdicts to make this conditional')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'revise' }));
+    expect((onChange.mock.calls[0]?.[0] as { params?: { requiredForVerdicts?: string[] }[] })
+      .params?.[0]?.requiredForVerdicts).toEqual(['revise']);
+  });
+
+  describe('one required control per parameter', () => {
+    const param = { name: 'reason', type: 'string', required: false };
+    const verdicts = { approve: { target: 'done' }, reject: { target: 'done' } };
+    const lastParam = (onChange: ReturnType<typeof vi.fn>) =>
+      (onChange.mock.calls[0]?.[0] as { params: { required?: boolean; requiredForVerdicts?: string[] }[] }).params[0];
+
+    it('a step with verdicts offers only the verdict checkboxes', () => {
+      render(<StepEditor step={buildStep({ type: 'decision', verdicts, params: [param] })} allSteps={[]} onChange={vi.fn()} />);
+      expandCard('Task setup');
+      expect(screen.queryByText(/^required$/i)).not.toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: 'approve' })).not.toBeChecked();
+    });
+
+    it('a step with no verdicts offers only required', () => {
+      render(<StepEditor step={buildStep({ params: [param] })} allSteps={[]} onChange={vi.fn()} />);
+      expandCard('Task setup');
+      expect(screen.getByText(/^required$/i)).toBeInTheDocument();
+      expect(screen.queryByText(/^required for verdicts$/i)).not.toBeInTheDocument();
+      expect(screen.queryByText('Define verdicts to make this conditional')).not.toBeInTheDocument();
+    });
+
+    it('shows an always-required parameter as ticked for every verdict', () => {
+      render(<StepEditor step={buildStep({ type: 'decision', verdicts, params: [{ ...param, required: true }] })} allSteps={[]} onChange={vi.fn()} />);
+      expandCard('Task setup');
+      expect(screen.getByRole('checkbox', { name: 'approve' })).toBeChecked();
+      expect(screen.getByRole('checkbox', { name: 'reject' })).toBeChecked();
+    });
+
+    it('unticking one verdict of an always-required parameter leaves it required for the rest', () => {
+      const onChange = vi.fn();
+      render(<StepEditor step={buildStep({ type: 'decision', verdicts, params: [{ ...param, required: true }] })} allSteps={[]} onChange={onChange} />);
+      expandCard('Task setup');
+      fireEvent.click(screen.getByRole('checkbox', { name: 'approve' }));
+      expect(lastParam(onChange)).toMatchObject({ required: false, requiredForVerdicts: ['reject'] });
+    });
+
+    it('ticking every verdict saves it as required, keeping the mark on the task form', () => {
+      const onChange = vi.fn();
+      render(<StepEditor step={buildStep({ type: 'decision', verdicts, params: [{ ...param, requiredForVerdicts: ['reject'] }] })} allSteps={[]} onChange={onChange} />);
+      expandCard('Task setup');
+      fireEvent.click(screen.getByRole('checkbox', { name: 'approve' }));
+      expect(lastParam(onChange)).toMatchObject({ required: true, requiredForVerdicts: undefined });
+    });
+  });
+
+  it('leaves parameters in Advanced, with no Task setup, on an agent step without a reviewer', () => {
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', autonomyLevel: 'L4' })}
+        allSteps={[]}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /Task setup/ })).not.toBeInTheDocument();
+    expandCard('Advanced');
+    expect(screen.getByText('Parameters')).toBeInTheDocument();
   });
 
   it('marks a param required only for the verdicts the step defines', () => {

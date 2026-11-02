@@ -2,12 +2,14 @@ import { z } from 'zod';
 import {
   StepParamSchema,
   VerdictSchema,
+  StepCommentSchema,
   SelectionSchema,
   StepUiSchema,
   TransitionSchema,
   RepoSchema,
   CommitShaSchema,
 } from './process-definition';
+import { AGENT_REVIEW_VERDICT_KEYS } from './verdicts';
 import { ProcessNotificationConfigSchema } from './process-config';
 import { BuildContextSchema } from '../utils/docker-build-paths';
 import { invalidTimeoutMessage, parseIsoDurationMs } from '../utils/iso-duration';
@@ -303,6 +305,7 @@ export const WorkflowStepSchema = z.object({
   description: z.string().optional(),
   params: z.array(StepParamSchema).optional(),
   verdicts: z.record(z.string(), VerdictSchema).optional(),
+  comment: StepCommentSchema.optional(),
   selection: SelectionSchema.optional(),
   ui: StepUiSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -706,7 +709,7 @@ function validateInputForNextRun(
  * verdicts on L3 steps would silently break the loop. Lifting this is
  * tracked in #391.
  */
-const L3_VERDICT_KEYS = ['approve', 'revise'] as const; // see #391 — lift this allowlist when isL3Revise generalises to a per-verdict loopBack flag
+const L3_VERDICT_KEYS = AGENT_REVIEW_VERDICT_KEYS; // see #391 — lift this allowlist when isL3Revise generalises to a per-verdict loopBack flag
 
 function validateVerdicts(
   wd: {

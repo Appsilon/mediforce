@@ -1,7 +1,9 @@
 import {
+  buildAgentReviewTaskVerdicts,
   calculateEstimatedCost,
   offeredSkill,
   resolveInstanceAssignee,
+  resolveParamDefaults,
   type AgentFallbackReason,
   type AgentOutputEnvelope,
 } from '@mediforce/platform-core';
@@ -196,6 +198,8 @@ export class AgentStepExecutor implements StepExecutor {
         unresolvedAssignee = assignee?.unresolved ?? null;
       }
 
+      const paramsInstance = workflowStep.params?.length ? await instanceRepo.getById(instanceId) : null;
+
       await humanTaskRepo.create({
         id: reviewTaskId,
         processInstanceId: instanceId,
@@ -223,6 +227,8 @@ export class AgentStepExecutor implements StepExecutor {
           iterationNumber: priorReviewExecutions,
         },
         creationReason: 'agent_review_l3',
+        verdicts: buildAgentReviewTaskVerdicts(workflowStep.verdicts, workflowStep.comment),
+        ...(paramsInstance !== null ? { params: resolveParamDefaults(workflowStep.params ?? [], paramsInstance) } : {}),
       });
 
       await auditRepo.append({
