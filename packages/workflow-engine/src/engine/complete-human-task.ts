@@ -139,7 +139,7 @@ export function buildVerdictStepOutput(
         );
       }
 
-      stepOutput = agentResult ?? {};
+      stepOutput = { ...agentResult };
     } else {
       stepOutput = {};
     }

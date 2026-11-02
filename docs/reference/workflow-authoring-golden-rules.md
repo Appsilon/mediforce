@@ -266,6 +266,12 @@ separate human `type: review` step, which keeps working for existing workflows â
 but per [ADR-0014](../adr/0014-control-mode-ui-concept.md) the designer no longer
 offers that type for new steps, so reach for CM3 when authoring.
 
+On an L3 `revise`, the step runs again with its prior output plus `verdict`,
+`reviewerComment` and `reviewerCallToAction` at the top level of its input and
+under `steps.<stepId>`. A human step that sends a run back hands over the same
+way through its own output: `reviewerComment` and `reviewerCallToAction` for a
+plain verdict, `comment` and its param values for a verdict with params.
+
 Human review steps MUST define explicit `verdicts`. Use `requiresComment: true`
 for revise/reject-style verdicts.
 

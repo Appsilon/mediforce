@@ -867,6 +867,8 @@ export class WorkflowEngine {
       status: 'running',
       pauseReason: null,
       updatedAt: now,
+      // The step stays put and runs again: its next iteration reads the reviewer's feedback from here.
+      ...(isL3Revise ? { variables: { ...instance.variables, [resolvedTask.stepId]: stepOutput } } : {}),
     });
 
     if (!isL3Revise) {
