@@ -10,6 +10,7 @@ import {
   ListAgentValidationsOutputSchema,
   ListAgentVersionsOutputSchema,
   ListEvalRunsOutputSchema,
+  PreviewEvaluatorOutputSchema,
   type EvalRunOutput,
 } from '@mediforce/platform-api/contract';
 import { test, expect } from '../helpers/test-fixtures';
@@ -242,6 +243,14 @@ test.describe('Agent Evaluation — API E2E', () => {
       data: { agentRunId: asItIs.id, agent: { namespace: TEST_ORG_HANDLE, agentId: stranger } },
     });
     expect(notItsRun.status(), await notItsRun.text()).toBe(400);
+
+    const { evalCase: labelled } = EvalCaseOutputSchema.parse(await post(request, '/api/evaluation/cases/from-agent-run', { agentRunId: asItIs.id, agent: subject, expectedOutput: { summary: 'Grade 5 sepsis' } }, 201));
+    const check = { kind: 'schema', schema: { required: ['summary'] } };
+    const preview = PreviewEvaluatorOutputSchema.parse(await post(request, '/api/evaluation/evaluators/preview', { ...subject, check }));
+    expect(preview.results).toEqual([]);
+    expect(preview.cases).toEqual([expect.objectContaining({ caseId: labelled.id, expectation: 'positive', agentRunId: asItIs.id, passed: true })]);
+    const namedRun = await request.post('/api/evaluation/evaluators/preview', { headers: JSON_HEADERS, data: { ...subject, check, agentRunIds: [asItIs.id] } });
+    expect(namedRun.status(), await namedRun.text()).toBe(400);
   });
 
   test('an MCP binding change is a new version; a moving model alias and a cowork agent are refused', async ({ request }) => {

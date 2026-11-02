@@ -11,7 +11,8 @@ last_reviewed: 2026-11-02
 **Partially supersedes:** [ADR-0029](./0029-agent-evaluation.md) D5 ("Harvesting
 a case from a run … refused for an Agent", "nothing is harvested"). The rest of
 ADR-0029 stays binding: an Agent still has no production runs of its own, and no
-perturbed cases, previews against past outputs, drift or production Evaluators.
+perturbed cases, previews against production outputs, drift or production
+Evaluators. It may preview a check on its Eval Cases (decision 5).
 
 ## Context
 
@@ -41,6 +42,19 @@ alike: some run it as it was validated, others add to it (ADR-0029 D8).
    output as an expected output. Its input stays usable, and a person may write an
    expected output of their own. A Step repeating the Agent's schema is still a D8
    change, but its output is used.
+5. **A check is tried on the Agent's Eval Cases before it is proposed.** _Added
+   2026-11-02: an Agent's case can now keep a source run, so the reason for
+   refusing its previews no longer holds._ A preview grades a case taken from a
+   run, with an expected output, on the case's input, with the expected output as
+   the run's result. It never falls back to production outputs and refuses naming
+   a run. A case is skipped when its run went under another output schema
+   (decision 4) or the caller may not run its workflow, since a check runs over
+   that workspace. With no case to try, the check is first tried in an Eval Run.
+   The log and workspace stay the production run's, while a trial starts from an
+   empty workspace (ADR-0029 D4): a check on a file the Agent did not write can
+   pass in a preview and fail in an Eval Run, and the card says so. A preview with
+   no workspace was rejected, because a check on a file the Agent writes would then
+   error on every case and be refused.
 
 ## Consequences
 

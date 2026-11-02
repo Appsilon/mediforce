@@ -521,8 +521,18 @@ describe('executeEvaluationTool', () => {
       const listed = await executeEvaluationTool('list_agent_production_runs', {}, scope, context) as { runs: { agentRunId: string; result: unknown; outputSchemaDiffers: boolean }[] };
       expect(listed.runs.find((run) => run.agentRunId === 'run-other')).toMatchObject({ result: null, reviewVerdict: null, outputSchemaDiffers: true });
       expect(await executeEvaluationTool('get_agent_run', { agentRunId: 'run-other' }, scope, context)).toMatchObject({
-        result: null, changedFromAgent: ['output schema'], outputSchemaDiffers: true, caseInput: { previousStepOutputs: {} },
+        result: null, confidence: null, reasoningSummary: null, changedFromAgent: ['output schema'], outputSchemaDiffers: true, caseInput: { previousStepOutputs: {} },
       });
+      const agentTrajectoryRepo = new InMemoryAgentTrajectoryRepository(fixture.agentRunRepo);
+      await agentTrajectoryRepo.append('run-other', [{ seq: 0, ts: '2026-10-03T10:00:00.000Z', type: 'result', content: { grades: [] } }]);
+      expect(await executeEvaluationTool('get_trajectory', { agentRunId: 'run-other' }, fixture.scope(undefined, { agentTrajectoryRepo }), context)).toMatchObject({ entries: [], total: 0 });
+    });
+
+    it('previews a check on the Agent\'s Eval Cases, and refuses naming a production run', async () => {
+      const { scope, context } = await agentSetup();
+      const check = { kind: 'schema', schema: { required: ['findings'] } };
+      expect(await executeEvaluationTool('preview_evaluator', { check }, scope, context)).toEqual({ cases: [], results: [] });
+      await expect(executeEvaluationTool('preview_evaluator', { check, agentRunIds: [GRADED_RUN] }, scope, context)).rejects.toThrow('not on production runs');
     });
 
     it('is refused for a Step, which reads itself and its own runs', async () => {

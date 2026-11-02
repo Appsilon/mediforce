@@ -38,9 +38,9 @@ export const StartedEvalRunSchema = z.object({
 });
 
 /**
- * A proposed check tried by the platform on the step's Eval Cases, then its
- * recent production outputs, before the person sees it — or why it could not
- * be (no `run` verb).
+ * A proposed check tried by the platform on the subject's Eval Cases, then a
+ * step's recent production outputs, before the person sees it — or why it could
+ * not be (no `run` verb, or an Agent with no case to try).
  */
 export const EvaluatorSelfTestSchema = z.union([
   PreviewEvaluatorOutputSchema,

@@ -3,7 +3,8 @@ import { FALLBACK_PINNED_MODEL, type CreateModelRegistryEntryInput, type Evaluat
 import { InMemoryModelRegistryRepository } from '@mediforce/platform-core/testing';
 import { userCaller } from '../../../../repositories/__tests__/create-test-scope';
 import { createEvaluator } from '../../../evaluation/evaluators';
-import { createEvalCase } from '../../../evaluation/eval-cases';
+import { CreateEvalCaseFromAgentRunInputSchema } from '../../../../contract/evaluation';
+import { createEvalCase, createEvalCaseFromAgentRun } from '../../../evaluation/eval-cases';
 import { saveEvalDataset } from '../../../evaluation/eval-datasets';
 import { prepareEvalRun } from '../../../evaluation/eval-runs';
 import { reviewEvaluationProposal } from '../review-proposal';
@@ -241,7 +242,63 @@ describe('reviewEvaluationProposal', () => {
         .toEqual({ ok: true });
     });
 
+    describe('self-testing a proposed check on its Eval Cases (ADR-0031)', () => {
+      const runnable = { kind: 'code' as const, runtime: 'javascript' as const, source: 'process.exit(0)' };
+
+      async function withCase(expectedOutput?: Record<string, unknown>) {
+        const grader = (await fixture.agentDefinitionRepo.getById('ae-grader'))!;
+        await fixture.agentDefinitionRepo.upsert('ae-grader', { ...grader, runtimeId: 'claude-code-agent', outputSchema: { type: 'object', required: ['findings'] } });
+        await addAgentWorkflowRun(fixture, { workflowName: 'as-is', step: { agent: { outputSchema: { type: 'object', required: ['findings'] } } }, agentRunId: 'run-as-is', result: { findings: [] }, at: '2026-10-03T10:00:00.000Z' });
+        await createEvalCaseFromAgentRun(CreateEvalCaseFromAgentRunInputSchema.parse({
+          agentRunId: 'run-as-is', agent: { namespace: NAMESPACE, agentId: 'ae-grader' }, name: 'Fatal sepsis', ...(expectedOutput === undefined ? {} : { expectedOutput }),
+        }), fixture.scope());
+      }
+
+      it('shows what the check did on them', async () => {
+        await withCase({ findings: [] });
+        expect(await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(findings), fixture.scope(), AGENT, [])).toEqual({
+          ok: true,
+          evidence: { selfTest: { cases: [expect.objectContaining({ caseName: 'Fatal sepsis', passed: true })], results: [] } },
+        });
+      });
+
+      it('says it was not tried when no case can stand in for an output', async () => {
+        await withCase();
+        expect(await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(findings), fixture.scope(), AGENT, [])).toEqual({
+          ok: true,
+          evidence: { selfTest: { unavailable: expect.stringContaining('next Eval Run') } },
+        });
+      });
+
+      it('still gives the proposal, marked untried, to a caller the agent\'s gate reads as missing', async () => {
+        await withCase({ findings: [] });
+        await fixture.agentDefinitionRepo.update('ae-grader', { visibility: 'public' });
+        const outsider = fixture.scope(userCaller('outsider', ['elsewhere']));
+        expect(await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(findings), outsider, AGENT, [])).toEqual({
+          ok: true,
+          evidence: { selfTest: { unavailable: expect.any(String) } },
+        });
+      });
+
+      it('sends back a check that errors on every case', async () => {
+        await withCase({ findings: [] });
+        runCodeCheck.mockRejectedValue(new Error('SyntaxError'));
+        const review = await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(runnable), fixture.scope(), AGENT, []);
+        expect(review).toEqual({ ok: false, error: expect.stringContaining('errored on every output') });
+      });
+    });
+
+    it('takes an output-schema-differing run with no output and no expected output', async () => {
+      await addAgentWorkflowRun(fixture, { workflowName: 'other-schema', step: { agent: { outputSchema: { type: 'object', required: ['grades'] } } }, agentRunId: 'run-empty', result: {}, at: '2026-10-05T10:00:00.000Z' });
+      const run = (await fixture.agentRunRepo.getById('run-empty'))!;
+      await fixture.agentRunRepo.update('run-empty', { envelope: { ...run.envelope!, result: null } });
+      expect(await reviewEvaluationProposal('propose_eval_case', { name: 'No output', agentRunId: 'run-empty', expectedOutput: null }, fixture.scope(), AGENT, []))
+        .toMatchObject({ ok: true });
+    });
+
     it('gets a schema check only once the agent declares an output schema', async () => {
+      const grader = (await fixture.agentDefinitionRepo.getById('ae-grader'))!;
+      await fixture.agentDefinitionRepo.upsert('ae-grader', { ...grader, runtimeId: 'claude-code-agent' });
       const refused = await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(findings), fixture.scope(), AGENT, []);
       expect(refused).toEqual({ ok: false, error: expect.stringContaining('declares no Output schema') });
       expect(await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(judge), fixture.scope(), AGENT, []))

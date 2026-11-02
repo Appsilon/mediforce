@@ -24,8 +24,8 @@ describe('Evaluation Assistant toolsets', () => {
 
   it('gives an Agent its own reads and none that need a Step\'s production runs', () => {
     const { platform, proposals } = EVALUATION_ASSISTANT_TOOLSETS.agent;
-    expect(platform).toEqual(expect.arrayContaining(['get_agent', 'list_agent_production_runs', 'get_agent_run', 'get_trajectory']));
-    for (const stepOnly of ['get_step', 'list_step_runs', 'list_workspace_files', 'read_workspace_file', 'preview_evaluator']) {
+    expect(platform).toEqual(expect.arrayContaining(['get_agent', 'list_agent_production_runs', 'get_agent_run', 'get_trajectory', 'preview_evaluator']));
+    for (const stepOnly of ['get_step', 'list_step_runs', 'list_workspace_files', 'read_workspace_file']) {
       expect(platform).not.toContain(stepOnly);
     }
     expect(proposals).not.toContain('propose_perturbed_case');

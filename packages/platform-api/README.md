@@ -112,8 +112,9 @@ back as the single-step Definition its trials run, carried on each trial's run
 Evaluation holds one (`mcp_eval_policies.env`, set once with
 `setMcpEvalPolicy`; secret templates such as `{{OPENROUTER_API_KEY}}`), which
 each Eval Run freezes at prepare and the auto-runner's pre-flight and executor
-resolve like a Workflow Step's. Production-only features — harvesting, previews, drift,
-production Evaluators — refuse an Agent (`stepOnly`). Agent versions are
+resolve like a Workflow Step's. Production-only features — perturbed cases, drift,
+production Evaluators — refuse an Agent (`stepOnly`); a preview tries a check on
+the Agent's Eval Cases alone. Agent versions are
 recorded by `handlers/agents/_lib/agent-version.ts` on every agent save and
 every Eval Run prepare.
 An Evaluator check that cannot run comes back as `error`, never as a failed
@@ -193,8 +194,8 @@ system prompt with a shared core (`_lib/system-prompt.ts`). What each subject
 is offered is a selection from the catalog, `EVALUATION_ASSISTANT_TOOLSETS`:
 an Agent reads itself (`get_agent`) and the production runs of the Steps that
 use it (`list_agent_production_runs`, from `evaluation/_lib/agent-production-runs.ts`)
-in place of a Step's own reads, previews, synthesized cases and routing; a case
-taken from such a run is the Agent's, under the rules of
+in place of a Step's own reads, synthesized cases and routing, and previews a
+check on its Eval Cases alone; a case taken from such a run is the Agent's, under the rules of
 [ADR-0031](../../docs/adr/0031-agent-cases-from-workflow-runs.md). A tool added for both lands in both toolsets; one for a single subject, in its own.
 
 A request may grant the Evaluation Assistant an unattended budget

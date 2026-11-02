@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { buildAgentRun } from '@mediforce/platform-core/testing';
 import { CreateEvalCaseFromAgentRunInputSchema, CreateEvalCaseInputSchema } from '../../../contract/evaluation';
-import { ForbiddenError, NotFoundError } from '../../../errors';
+import { ForbiddenError, NotFoundError, ValidationError } from '../../../errors';
 import { userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { createEvalCase, createEvalCaseFromAgentRun } from '../eval-cases';
 import { previewEvaluator } from '../preview-evaluator';
-import { evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN } from './fixture';
+import { addAgentWorkflowRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, type EvaluationFixture } from './fixture';
 
 const runCodeCheck = vi.hoisted(() => vi.fn());
 vi.mock('@mediforce/agent-runtime', async (importOriginal) => ({
@@ -98,5 +98,74 @@ describe('previewEvaluator', () => {
       { ...STEP, stepId: 'grade-aes', workflowName: 'ae-grading', namespace: NAMESPACE, check: findingsSchema, agentRunIds: ['no-such-run'], limit: 5 },
       fixture.scope(),
     )).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  describe('for an Agent evaluated on its own (ADR-0031)', () => {
+    const AGENT = { namespace: NAMESPACE, agentId: 'ae-grader' };
+
+    async function agentFixture(): Promise<EvaluationFixture> {
+      const fixture = await evaluationFixture();
+      const grader = (await fixture.agentDefinitionRepo.getById('ae-grader'))!;
+      await fixture.agentDefinitionRepo.upsert('ae-grader', { ...grader, runtimeId: 'claude-code-agent' });
+      return fixture;
+    }
+
+    async function caseFromRun(fixture: EvaluationFixture, agentRunId: string, name: string, fields: Record<string, unknown>) {
+      return (await createEvalCaseFromAgentRun(CreateEvalCaseFromAgentRunInputSchema.parse({ agentRunId, agent: AGENT, name, ...fields }), fixture.scope())).evalCase;
+    }
+
+    it('tries the check on the Agent\'s cases taken from a run, and on no production output', async () => {
+      const fixture = await agentFixture();
+      await addAgentWorkflowRun(fixture, { workflowName: 'as-is', agentRunId: 'run-as-is', result: { findings: [] }, at: '2026-10-03T10:00:00.000Z' });
+      const sentBack = await caseFromRun(fixture, 'run-as-is', 'Sent back', { expectedOutput: { summary: 'none' }, expectation: 'negative' });
+      await caseFromRun(fixture, 'run-as-is', 'No expected output', {});
+
+      const { cases, results } = await previewEvaluator({ ...AGENT, check: findingsSchema, limit: 5 }, fixture.scope());
+
+      expect(cases).toEqual([expect.objectContaining({ caseId: sentBack.id, caseName: 'Sent back', expectation: 'negative', agentRunId: 'run-as-is', passed: false })]);
+      expect(results).toEqual([]);
+      expect(await fixture.scoreRepo.list({ limit: 10 })).toEqual([]);
+    });
+
+    it('skips a case whose run ran under another output schema, and still reaches the limit', async () => {
+      const fixture = await agentFixture();
+      await addAgentWorkflowRun(fixture, { workflowName: 'as-is', agentRunId: 'run-as-is', result: { findings: [] }, at: '2026-10-03T10:00:00.000Z' });
+      await addAgentWorkflowRun(fixture, { workflowName: 'other-schema', step: { agent: { outputSchema: { type: 'object', required: ['grades'] } } }, agentRunId: 'run-other', result: { grades: [] }, at: '2026-10-04T10:00:00.000Z' });
+      const usable = await caseFromRun(fixture, 'run-as-is', 'As is', { expectedOutput: { findings: [] } });
+      await caseFromRun(fixture, 'run-other', 'Other schema', { expectedOutput: { findings: [] } });
+
+      const { cases } = await previewEvaluator({ ...AGENT, check: findingsSchema, limit: 1 }, fixture.scope());
+
+      expect(cases.map((outcome) => outcome.caseId)).toEqual([usable.id]);
+    });
+
+    it('grades a case on the input the case holds, and names what the run\'s step altered', async () => {
+      const fixture = await agentFixture();
+      await addAgentWorkflowRun(fixture, { workflowName: 'altered', step: { agent: { prompt: 'Grade each AE.' } }, agentRunId: 'run-altered', result: { findings: [] }, at: '2026-10-03T10:00:00.000Z' });
+      await caseFromRun(fixture, 'run-altered', 'As given', { expectedOutput: { findings: [] } });
+      runCodeCheck.mockResolvedValue({ passed: true, comment: null });
+
+      const { cases } = await previewEvaluator({ ...AGENT, check: { kind: 'code', runtime: 'javascript', source: 'process.exit(0)' }, limit: 5 }, fixture.scope());
+
+      expect(cases).toEqual([expect.objectContaining({ caseName: 'As given', changedFromAgent: ['step prompt'] })]);
+      expect(runCodeCheck).toHaveBeenLastCalledWith(expect.objectContaining({ input: expect.objectContaining({ stepInput: { term: 'Sepsis' } }) }));
+    });
+
+    it('skips a case whose source workflow the caller may not run', async () => {
+      const fixture = await agentFixture();
+      await addAgentWorkflowRun(fixture, { workflowName: 'gated', agentRunId: 'run-gated', result: { findings: [] }, at: '2026-10-03T10:00:00.000Z' });
+      await caseFromRun(fixture, 'run-gated', 'Gated', { expectedOutput: { findings: [] } });
+      await fixture.processRepo.setWorkflowAccess(NAMESPACE, 'gated', { run: ['runner'], edit: [] });
+
+      const { cases } = await previewEvaluator({ ...AGENT, check: findingsSchema, limit: 5 }, fixture.scope(userCaller('author-1', [NAMESPACE])));
+
+      expect(cases).toEqual([]);
+    });
+
+    it('refuses naming production runs to try the check on', async () => {
+      const fixture = await agentFixture();
+      await expect(previewEvaluator({ ...AGENT, check: findingsSchema, agentRunIds: [GRADED_RUN], limit: 5 }, fixture.scope()))
+        .rejects.toBeInstanceOf(ValidationError);
+    });
   });
 });

@@ -45,7 +45,7 @@ async function getAgentCaseRunIo(agentRunId: string, namespace: string, agentId:
     stepInput: source.stepInput,
     caseInput: source.input,
     result: source.result,
-    reasoningSummary: source.agentRun.envelope?.reasoning_summary ?? null,
+    reasoningSummary: source.change.outputSchemaDiffers ? null : source.agentRun.envelope?.reasoning_summary ?? null,
     confidence: source.agentRun.envelope?.confidence ?? null,
     ...verdictFields(source.change.outputSchemaDiffers ? null : await loadVerdictLabel(scope, agentRunId)),
     agentChange: source.change,

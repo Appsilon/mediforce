@@ -119,6 +119,13 @@ describe('Evaluation Assistant prompt', () => {
       }
     });
 
+    it('previews a check on the agent\'s Eval Cases, never on production outputs', () => {
+      expect(prompt).toContain('Before proposing a schema or code check, run it with preview_evaluator');
+      expect(prompt).toContain('the agent\'s Eval Cases');
+      expect(prompt).toContain('Name no agentRunIds');
+      expect(prompt).not.toContain('is not previewed: it is first tried in an Eval Run');
+    });
+
     it('speaks of the agent in its Brief and budget messages', () => {
       expect(briefMessage(null, 'agent')).toContain('This agent has no Evaluation Brief yet');
       expect(unattendedBudgetMessage(5, 'agent')).toContain('prepared runs of this agent');

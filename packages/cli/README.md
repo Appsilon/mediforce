@@ -59,7 +59,8 @@ create.
 `mediforce eval` commands name a workflow step with `--workflow` and `--step`,
 or an agent evaluated on its own with `--agent`
 ([ADR-0029](../../docs/adr/0029-agent-evaluation.md)); production-only ones
-(`case-perturb`, `evaluator-preview`, `drift`) take a step only. `case-from-run`
+(`case-perturb`, `drift`) take a step only. `evaluator-preview --agent` tries a
+check on the agent's Eval Cases alone. `case-from-run`
 and `run-io` read a run as its step's, or with `--agent` and `--namespace` as a
 case of an agent the step uses, whose runs `eval agent-runs` lists
 ([ADR-0031](../../docs/adr/0031-agent-cases-from-workflow-runs.md)).

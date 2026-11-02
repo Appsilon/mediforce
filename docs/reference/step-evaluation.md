@@ -388,7 +388,8 @@ real outputs before saving it. The Step's Eval Cases come first: each case taken
 from a run on its own input, with an expected output, is graded as that run
 with the case's expected output as its result (`cases`) — only the result is
 swapped: the input, log and workspace files stay the run's. The case's expectation
-is not consulted — it only labels the case for `expected_output` checks. The
+is not consulted — it only labels the case for `expected_output` checks, and the
+assistant's card marks a negative case as an output to avoid. The
 Step's latest production runs that gave a result fill the rest (`results`),
 leaving out dry runs, runs that ended without one (escalated, cancelled) and
 the runs those cases came from. `--agent-run` tries only the runs named. It runs check
@@ -1022,8 +1023,17 @@ Criteria, Eval Runs and Qualification work as above, with these differences:
 - `mediforce eval qualification --agent <id>` reads the Agent as it is now and
   prints its Agent version; `--version` is for a step.
 - **No production features of its own.** An Agent has no production runs of its
-  own, so perturbing cases, previewing a check, drift and production Evaluators
-  are refused.
+  own, so perturbing cases, previewing a check on production outputs, drift and
+  production Evaluators are refused.
+- **A check is tried on its Eval Cases.** `evaluator-preview --agent` and the
+  assistant's self-test grade the Agent's cases taken from a run, with an expected
+  output, on the case's input with the expected output as the result. The log and
+  workspace stay the production run's, and the card says an Eval Run starts from an
+  empty workspace and names what a workflow altered. A case is skipped when its run
+  went under another output schema or the caller may not run its workflow, and
+  naming a run is refused
+  ([ADR-0031](../adr/0031-agent-cases-from-workflow-runs.md) decision 5). With no
+  case to try, the card says the check is first tried in its next Eval Run.
 - **Its cases can start from runs of the Workflows that use it**
   ([ADR-0031](../adr/0031-agent-cases-from-workflow-runs.md)). **Add case → Start
   from** groups those runs under *Workflows running this agent as it is* and
@@ -1052,7 +1062,7 @@ Criteria, Eval Runs and Qualification work as above, with these differences:
   (`list_agent_production_runs`), reading one as for a step (`get_agent_run`,
   `get_trajectory`), each with what its step changed. It proposes a case from a
   run, or a written one, says when a run came from a workflow that altered the
-  Agent, and its card says so too. It has no step reads, previews, synthesized
-  cases or routing.
+  Agent, and its card says so too. It previews a check on the Agent's Eval Cases.
+  It has no step reads, synthesized cases or routing.
 - Only a container agent of the workspace, with a runtime, is evaluated.
 

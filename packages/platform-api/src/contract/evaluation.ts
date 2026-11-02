@@ -49,8 +49,8 @@ import {
  * Criteria, Eval Runs and Step Qualifications. Every read and write names the
  * agent Workflow Step it belongs to by `(namespace, workflowName, stepId)`,
  * or the Agent by `(namespace, agentId)` (ADR-0029); writes need the
- * workflow's `edit` verb, or the right to change the Agent. Harvesting cases
- * from production runs, drift and previews stay a Step's.
+ * workflow's `edit` verb, or the right to change the Agent. Perturbing a
+ * production run, drift and previews of production outputs stay a Step's.
  */
 
 /** A query-string boolean. */
@@ -159,12 +159,13 @@ export const EvaluatorOutcomeSchema = z.object({
 });
 
 /**
- * Runs a draft check against existing outputs of the Step, writing nothing (D14 `preview_evaluator`):
- * up to `limit` of them — the Step's Eval Cases first, then its latest production runs that gave a result.
+ * Runs a draft check against existing outputs, writing nothing (D14 `preview_evaluator`): up to `limit`
+ * of them — the subject's Eval Cases first, then a Step's latest production runs that gave a result.
+ * An Agent is tried on its Eval Cases alone (ADR-0031).
  */
-export const PreviewEvaluatorInputSchema = EvaluatedStepSchema.extend({
+export const PreviewEvaluatorInputSchema = EvaluationSubjectRefSchema.extend({
   check: EvaluatorCheckSchema,
-  /** Only these production outputs, and no Eval Case. */
+  /** Only these production outputs of a Step, and no Eval Case. */
   agentRunIds: z.array(z.string().min(1)).min(1).max(20).optional(),
   limit: z.number().int().min(1).max(20).default(5),
 });
@@ -172,6 +173,9 @@ export const PreviewEvaluatorInputSchema = EvaluatedStepSchema.extend({
 const CaseEvaluatorOutcomeSchema = EvaluatorOutcomeSchema.extend({
   caseId: z.string(),
   caseName: z.string(),
+  expectation: EvalCaseExpectationSchema,
+  /** An Agent's case: what the Step of its run altered about the Agent, empty when it ran the Agent as it is (ADR-0031 D3). */
+  changedFromAgent: z.array(z.string()).optional(),
 });
 export const PreviewEvaluatorOutputSchema = z.object({
   cases: z.array(CaseEvaluatorOutcomeSchema),

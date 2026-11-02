@@ -27,7 +27,7 @@ import { NotFoundError, ValidationError } from '../../../errors';
 import { getMcpEvalPolicy } from '../../evaluation/mcp-eval-policy';
 import { listStepAgentRuns } from '../../evaluation/step-agent-runs';
 import { isTrialOfAgent, loadScoredRun, type ScoredRun } from '../../evaluation/_lib/scored-run';
-import { isProductionRunOfAgent, listAgentProductionRuns, loadAgentRunSource } from '../../evaluation/_lib/agent-production-runs';
+import { agentRunChange, isProductionRunOfAgent, listAgentProductionRuns, loadAgentRunSource } from '../../evaluation/_lib/agent-production-runs';
 import { loadCaseSource, newestVerdict, reviewerParamValues } from '../../evaluation/_lib/case-source';
 import { stepOnly } from '../../evaluation/_lib/evaluation-subject';
 import { loadEvaluator } from '../../evaluation/_lib/evaluator-view';
@@ -320,6 +320,7 @@ export async function executeEvaluationTool(
       const agentSource = step.kind === 'agent' && isTrialOfAgent(subject.agentRun, subject.instance, step) === false
         ? await loadAgentRunSource(scope, step, agentRunId)
         : null;
+      const withheld = agentSource?.change.outputSchemaDiffers === true;
       return {
         agentRunId,
         status: subject.agentRun.status,
@@ -333,14 +334,18 @@ export async function executeEvaluationTool(
           outputSchemaDiffers: agentSource.change.outputSchemaDiffers,
         }),
         result: clip(agentSource === null ? subject.agentRun.envelope?.result ?? null : agentSource.result, 8000),
-        confidence: subject.agentRun.envelope?.confidence ?? null,
-        reasoningSummary: subject.agentRun.envelope?.reasoning_summary ?? null,
+        confidence: withheld ? null : subject.agentRun.envelope?.confidence ?? null,
+        reasoningSummary: withheld ? null : subject.agentRun.envelope?.reasoning_summary ?? null,
         changedFiles: subject.agentRun.envelope?.gitMetadata?.changedFiles ?? [],
       };
     }
     case 'get_trajectory': {
       const { agentRunId, offset, limit } = EVALUATION_ASSISTANT_PLATFORM_TOOLS.get_trajectory.parse(args);
       const subject = await loadSubjectRun(scope, step, agentRunId);
+      const change = step.kind === 'agent' ? await agentRunChange(scope, step, subject.agentRun, subject.instance) : null;
+      if (change?.outputSchemaDiffers === true) {
+        return { entries: [], total: 0, nextOffset: null, note: 'This run answered under another output schema than the agent, and its log ends in that output, so it is withheld.' };
+      }
       const entries = subject.trajectory.slice(offset, offset + limit);
       const total = subject.trajectory.length;
       return {
@@ -429,7 +434,7 @@ export async function executeEvaluationTool(
     }
     case 'preview_evaluator': {
       const { check, agentRunIds } = args as Args<'preview_evaluator'>;
-      return previewEvaluator({ ...stepOnly(step, 'A preview'), check, limit: 2, ...(agentRunIds === undefined ? {} : { agentRunIds }) }, scope);
+      return previewEvaluator({ ...step, check, limit: 2, ...(agentRunIds === undefined ? {} : { agentRunIds }) }, scope);
     }
     case 'get_qualification': {
       const [qualification, { criteria }] = await Promise.all([

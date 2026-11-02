@@ -1,7 +1,7 @@
 ---
 status: partially superseded by 0031
 audience: engineers
-last_reviewed: 2026-10-16
+last_reviewed: 2026-11-02
 ---
 
 # ADR-0029: An Agent can own an Evaluation, and an Eval Run assesses one Agent version
@@ -96,7 +96,9 @@ point at.
    — in a version that gave the step this Agent — and write the Agent's cases
    from what they were given, flagged as containing production data. They
    stay written cases: nothing is harvested. The assistant is one, with a
-   toolset per subject (ADR-0023 D14)._ Only a container
+   toolset per subject (ADR-0023 D14)._ _Amended 2026-11-02: a check may be
+   previewed on the Agent's own Eval Cases (ADR-0031 decision 5), never on
+   production outputs._ Only a container
    (`plugin`) Agent of a workspace, with a runtime, is evaluated: a cowork
    Agent has no single output to grade, and a platform-global Agent has no
    workspace for its Evaluation to live in.

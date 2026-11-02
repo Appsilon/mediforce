@@ -54,6 +54,7 @@ export const WITHHELD_OUTPUT_ERROR = 'This run\'s step declares another output s
 
 /** Whether `expectedOutput` is the output of a run whose output no case of the Agent may take. */
 export function expectsWithheldOutput(source: Pick<AgentRunSource, 'agentRun' | 'change'>, expectedOutput: unknown): boolean {
+  if (expectedOutput === undefined || expectedOutput === null) return false;
   return source.change.outputSchemaDiffers && isDeepStrictEqual(expectedOutput, source.agentRun.envelope?.result);
 }
 
@@ -123,6 +124,21 @@ function agentCaseInputOf(step: WorkflowStep, instance: ProcessInstance, stepInp
   }
 }
 
+/**
+ * The run as it stood when `at` began: each step's output is its newest one
+ * finished by then, so a step re-run later does not reach an earlier round.
+ */
+async function instanceAsOf(scope: CallerScope, instance: ProcessInstance, at: string): Promise<ProcessInstance> {
+  const variables = { ...instance.variables };
+  const finished = (await scope.runs.getStepExecutions(instance.id))
+    .sort((left, right) => left.startedAt.localeCompare(right.startedAt));
+  for (const { stepId } of finished) delete variables[stepId];
+  for (const { stepId, output, completedAt } of finished) {
+    if (completedAt !== null && completedAt <= at && output !== null) variables[stepId] = output;
+  }
+  return { ...instance, variables };
+}
+
 async function loadAgentDefinition(scope: CallerScope, agent: EvaluatedAgent): Promise<AgentDefinition> {
   const definition = await scope.agentDefinitions.getById(agent.agentId);
   if (definition === null) throw new NotFoundError(`Agent '${agent.agentId}' not found in '${agent.namespace}'`);
@@ -169,6 +185,17 @@ export async function isProductionRunOfAgent(
   return await stepUsingAgent(scope, agent, agentRun, instance) !== null;
 }
 
+/** What the Step of a production run changes about the Agent; null when the run is not a production run of a Step that used it. */
+export async function agentRunChange(
+  scope: CallerScope,
+  agent: EvaluatedAgent,
+  agentRun: AgentRun,
+  instance: ProcessInstance,
+): Promise<AgentRunChange | null> {
+  const using = await stepUsingAgent(scope, agent, agentRun, instance);
+  return using === null ? null : agentChangeOf(await loadAgentDefinition(scope, agent), using.definition, using.step);
+}
+
 /** A production run of a Step that used the Agent, as the source of the Agent's Eval Case; any other run is refused. */
 export async function loadAgentRunSource(scope: CallerScope, agent: EvaluatedAgent, agentRunId: string): Promise<AgentRunSource> {
   const { agentRun, instance } = await loadGatedAgentRun(scope, agentRunId);
@@ -176,12 +203,13 @@ export async function loadAgentRunSource(scope: CallerScope, agent: EvaluatedAge
   if (using === null) throw new ValidationError(`Agent Run '${agentRunId}' is not a production run of a step that uses agent '${agent.agentId}'`);
   const change = agentChangeOf(await loadAgentDefinition(scope, agent), using.definition, using.step);
   const stepInput = await loadStepInput(scope, agentRun, instance);
+  const firstRound = await loadFirstRound(scope, agentRun);
   return {
     agentRun,
     instance,
     stepInput,
     change,
-    input: agentCaseInputOf(using.step, instance, await loadStepInput(scope, await loadFirstRound(scope, agentRun), instance)),
+    input: agentCaseInputOf(using.step, await instanceAsOf(scope, instance, firstRound.startedAt), await loadStepInput(scope, firstRound, instance)),
     result: change.outputSchemaDiffers ? null : agentRun.envelope?.result ?? null,
   };
 }

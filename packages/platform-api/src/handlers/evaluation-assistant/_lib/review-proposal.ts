@@ -69,8 +69,8 @@ async function resolveCheck(scope: CallerScope, check: AssistantCheck, replaced?
 }
 
 /**
- * A proposed check is tried on the step's Eval Cases and real outputs before
- * the person sees it (ADR-0023 D14): the assistant's own preview of that exact
+ * A proposed check is tried on the subject's Eval Cases and a step's real
+ * outputs before the person sees it (ADR-0023 D14): the assistant's own preview of that exact
  * check this turn, or a fresh one. A check that errors on every output it is
  * tried on does not run at all, so it goes back to the model instead of to the
  * person. A caller who may not run checks still gets the proposal, marked
@@ -89,9 +89,6 @@ async function selfTest(
   if (check.kind === 'expected_output') {
     return { ok: true, evidence: { selfTest: { unavailable: EXPECTED_OUTPUT_NOT_PREVIEWED } } };
   }
-  if (step.kind === 'agent') {
-    return { ok: true, evidence: { selfTest: { unavailable: AGENT_NOT_PREVIEWED } } };
-  }
   let preview = previewed.find((candidate) => isDeepStrictEqual(candidate.check, check))?.preview;
   if (preview === undefined) {
     try {
@@ -100,10 +97,17 @@ async function selfTest(
       if (err instanceof HandlerError && err.code === 'forbidden') {
         return { ok: true, evidence: { selfTest: { unavailable: err.message } } };
       }
+      // An Agent's gate reads a caller outside its workspace as missing.
+      if (err instanceof HandlerError && err.code === 'not_found' && step.kind === 'agent') {
+        return { ok: true, evidence: { selfTest: { unavailable: AGENT_NOT_PREVIEWED } } };
+      }
       throw err;
     }
   }
   const outcomes = [...preview.cases, ...preview.results];
+  if (step.kind === 'agent' && outcomes.length === 0) {
+    return { ok: true, evidence: { selfTest: { unavailable: AGENT_NOT_PREVIEWED } } };
+  }
   if (outcomes.length > 0 && outcomes.every((outcome) => outcome.error !== null)) {
     return {
       ok: false,

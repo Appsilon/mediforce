@@ -185,6 +185,37 @@ describe('ProposalCard shows what an Eval Case holds', () => {
 });
 
 describe('ProposalCard for an Evaluator', () => {
+  it('names a negative Eval Case the check was tried on as an output to avoid', () => {
+    const outcome = { agentRunId: 'run-1', passed: false, value: 0, label: 'fail', confidence: null, agreement: null, comment: null, error: null };
+    renderProposal({
+      tool: 'propose_evaluator',
+      arguments: { name: 'grades-valid', rule: 'Every grade is 1 to 5.', check: { kind: 'schema', schema: { required: ['grades'] } } },
+      selfTest: {
+        cases: [
+          { ...outcome, caseId: 'case-sent-back', caseName: 'Sent back', expectation: 'negative' },
+          { ...outcome, caseId: 'case-approved', caseName: 'Approved', expectation: 'positive' },
+        ],
+        results: [],
+      },
+    });
+    const selfTest = screen.getByTestId('proposal-self-test');
+    expect(within(selfTest).getByText('Sent back').closest('li')).toHaveTextContent('an output to avoid');
+    expect(within(selfTest).getByText('Approved').closest('li')).not.toHaveTextContent('an output to avoid');
+    expect(selfTest).not.toHaveTextContent('empty workspace');
+  });
+
+  it('names what a workflow altered about an Agent\'s case, and that an Eval Run starts from an empty workspace', () => {
+    const outcome = { agentRunId: 'run-1', passed: true, value: 1, label: 'pass', confidence: null, agreement: null, comment: null, error: null };
+    renderProposal({
+      tool: 'propose_evaluator',
+      arguments: { name: 'grades-valid', rule: 'Every grade is 1 to 5.', check: { kind: 'schema', schema: { required: ['grades'] } } },
+      selfTest: { cases: [{ ...outcome, caseId: 'case-altered', caseName: 'Altered', expectation: 'positive', changedFromAgent: ['step prompt'] }], results: [] },
+    });
+    const selfTest = screen.getByTestId('proposal-self-test');
+    expect(within(selfTest).getByText('Altered').closest('li')).toHaveTextContent('altered: step prompt');
+    expect(selfTest).toHaveTextContent('an Eval Run starts from an empty workspace');
+  });
+
   it('opens the Evaluator in the Add form to review, and creates it as edited there, still the assistant\'s', async () => {
     const onDecided = renderProposal({
       tool: 'propose_evaluator',

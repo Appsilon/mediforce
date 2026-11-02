@@ -296,11 +296,11 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
    * case and the Evaluators that failed or errored on it.
    */
   get_failures: z.object({ evalRunId: z.uuid() }),
-  /** Run a draft check against the step's Eval Cases, then its recent outputs; writes nothing. */
+  /** Run a draft check against the Eval Cases, then a step's recent outputs; writes nothing. */
   preview_evaluator: z.object({
     check: PreviewableCheckSchema,
     agentRunIds: z.array(z.string().min(1)).min(1).max(10).optional()
-      .describe('Only these production runs, and no Eval Case'),
+      .describe('Only these production runs of a step, and no Eval Case; an agent takes none'),
   }),
   /**
    * Prepare an Eval Run of the step as it is over the newest Dataset version,
@@ -345,7 +345,8 @@ const SHARED_PROPOSALS = [
  * executor serve both: a Step reads its own production runs and workspaces,
  * previews checks on them, synthesizes cases from them and recommends a
  * Control Mode; an Agent (ADR-0029) reads itself and the production runs of
- * the Steps that use it, to write its cases from.
+ * the Steps that use it, to write its cases from, and previews checks on its
+ * Eval Cases alone (ADR-0031).
  */
 export const EVALUATION_ASSISTANT_TOOLSETS = {
   step: {
@@ -353,7 +354,7 @@ export const EVALUATION_ASSISTANT_TOOLSETS = {
     proposals: [...SHARED_PROPOSALS, 'propose_perturbed_case', 'propose_control_settings'],
   },
   agent: {
-    platform: ['get_agent', 'list_agent_production_runs', ...READ_RUNS, ...READ_EVALUATION, ...RUN_EVALUATION],
+    platform: ['get_agent', 'list_agent_production_runs', ...READ_RUNS, ...READ_EVALUATION, 'preview_evaluator', ...RUN_EVALUATION],
     proposals: SHARED_PROPOSALS,
   },
 } as const satisfies Record<EvaluationSubject['kind'], EvaluationAssistantToolset>;

@@ -83,8 +83,8 @@ test.describe('Agent Evaluation Assistant — API E2E', () => {
     expect((await ask(request, subject, question)).reply).toBe('It grades adverse events.');
     const requests = await openRouterRequests(question);
     const offered = (requests[0]!.tools ?? []).map((tool) => tool.function.name);
-    expect(offered).toEqual(expect.arrayContaining(['get_agent', 'list_agent_production_runs', 'get_agent_run', 'list_evaluators', 'propose_eval_case']));
-    for (const stepTool of ['get_step', 'list_step_runs', 'preview_evaluator', 'propose_perturbed_case', 'propose_control_settings']) {
+    expect(offered).toEqual(expect.arrayContaining(['get_agent', 'list_agent_production_runs', 'get_agent_run', 'list_evaluators', 'preview_evaluator', 'propose_eval_case']));
+    for (const stepTool of ['get_step', 'list_step_runs', 'propose_perturbed_case', 'propose_control_settings']) {
       expect(offered).not.toContain(stepTool);
     }
     expect(toolResult(requests[1]!.messages)).toMatchObject({

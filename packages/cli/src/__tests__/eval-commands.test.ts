@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { evalAgentRunsCommand, evalCaseFromRunCommand, evalCaseListCommand, evalCasePerturbCommand, evalMcpPolicySetCommand } from '../commands/eval-cases';
 import { agentVersionsCommand } from '../commands/agent-versions';
-import { evalDriftCommand, evalEvaluatorProductionCommand } from '../commands/eval-evaluators';
+import { evalDriftCommand, evalEvaluatorPreviewCommand, evalEvaluatorProductionCommand } from '../commands/eval-evaluators';
 import { evalCriteriaSetCommand, evalQualificationCommand, evalValidationCommand } from '../commands/eval-qualification';
 import { evalJudgeReviewCommand } from '../commands/eval-runs';
 import { buildAgentRun } from '@mediforce/platform-core/testing';
@@ -26,6 +26,19 @@ describe('mediforce eval', () => {
 
     expect(code).toBe(0);
     expect(fetchSpy.mock.calls[0]![0]).toBe('http://localhost:5555/api/evaluation/cases?namespace=pharma-a&agentId=ae-grader');
+  });
+
+  it('evaluator-preview tries a check on an agent\'s Eval Cases with --agent (ADR-0031)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'eval-preview-'));
+    const file = join(dir, 'check.json');
+    writeFileSync(file, JSON.stringify({ kind: 'schema', schema: { required: ['summary'] } }));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ cases: [], results: [] }));
+    const output = captureOutput();
+    const code = await evalEvaluatorPreviewCommand({ argv: ['--namespace', 'pharma-a', '--agent', 'ae-grader', '--file', file, ...BASE], env: ENV, output });
+    rmSync(dir, { recursive: true });
+
+    expect(code).toBe(0);
+    expect(JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string)).toMatchObject({ namespace: 'pharma-a', agentId: 'ae-grader' });
   });
 
   it('refuses naming both a step and an agent, and neither', async () => {

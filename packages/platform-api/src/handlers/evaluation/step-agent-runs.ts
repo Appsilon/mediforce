@@ -23,7 +23,12 @@ export async function listAgentProductionRunsPage(
   const offset = input.cursor === undefined ? 0 : Number(input.cursor);
   const { runs, hasMore } = await listAgentProductionRuns(scope, { kind: 'agent', namespace: input.namespace, agentId: input.agentId }, input.limit, offset);
   return {
-    runs: runs.map(({ agentRun, change, instance }) => ({ agentRun, change, workflowRunStatus: instance.status })),
+    runs: runs.map(({ agentRun, change, instance }) => ({
+      // What a run answered under another output schema is no case's to use (ADR-0031 D4).
+      agentRun: change.outputSchemaDiffers ? { ...agentRun, envelope: null } : agentRun,
+      change,
+      workflowRunStatus: instance.status,
+    })),
     ...(hasMore ? { nextCursor: String(offset + input.limit) } : {}),
   };
 }

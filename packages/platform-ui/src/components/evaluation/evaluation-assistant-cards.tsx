@@ -81,10 +81,12 @@ async function acceptProposal(step: EvaluationSubject, proposal: DecidablePropos
 type PreviewOutcome = Extract<EvaluatorSelfTest, { results: unknown }>['results'][number];
 
 /** One output a proposed check was tried on, by the name it goes by. */
-function OutcomeLine({ name, outcome }: { name: string; outcome: PreviewOutcome }) {
+function OutcomeLine({ name, outcome, negative = false, altered = [] }: { name: string; outcome: PreviewOutcome; negative?: boolean; altered?: readonly string[] }) {
   return (
     <li>
       <span className="font-mono">{name}</span>{' '}
+      {negative === true && <span className="text-muted-foreground">(an output to avoid) </span>}
+      {altered.length > 0 && <span className="text-muted-foreground">(from a workflow that altered: {altered.join(', ')}) </span>}
       <span className={cn(outcome.passed === true ? 'text-green-700 dark:text-green-400' : outcome.passed === false ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-300')}>
         {outcome.passed === null ? 'error' : outcome.passed ? 'pass' : 'fail'}
       </span>
@@ -98,7 +100,7 @@ function tally(outcomes: readonly PreviewOutcome[]): string {
   return `${count(true)} pass · ${count(false)} fail · ${count(null)} error`;
 }
 
-/** What trying a proposed check on the step's Eval Cases and real outputs showed. */
+/** What trying a proposed check on the subject's Eval Cases and a step's real outputs showed. */
 function SelfTestSummary({ selfTest }: { selfTest: EvaluatorSelfTest }) {
   if ('unavailable' in selfTest) {
     return <p className="mt-1 text-amber-700 dark:text-amber-300">Not tried on real outputs — {selfTest.unavailable}</p>;
@@ -114,9 +116,12 @@ function SelfTestSummary({ selfTest }: { selfTest: EvaluatorSelfTest }) {
         ].join('; ')}
       </summary>
       <ul className="mt-1 space-y-0.5">
-        {cases.map((outcome) => <OutcomeLine key={outcome.caseId} name={outcome.caseName} outcome={outcome} />)}
+        {cases.map((outcome) => <OutcomeLine key={outcome.caseId} name={outcome.caseName} outcome={outcome} negative={outcome.expectation === 'negative'} altered={outcome.changedFromAgent} />)}
         {results.map((outcome) => <OutcomeLine key={outcome.agentRunId} name={outcome.agentRunId.slice(0, 8)} outcome={outcome} />)}
       </ul>
+      {cases.some((outcome) => outcome.changedFromAgent !== undefined) && (
+        <p className="mt-1 text-muted-foreground">Tried with each production run&rsquo;s log and workspace; an Eval Run starts from an empty workspace.</p>
+      )}
     </details>
   );
 }
