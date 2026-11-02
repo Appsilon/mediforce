@@ -289,7 +289,7 @@ only `maxIterations` is checked. Treat it as declarative-only.
 
 Every agent step's Agent Run keeps its **Agent Trajectory** — the tool calls and
 results the agent made — readable with `mediforce agent-run trajectory <id>`,
-and a verdict on an L3 review becomes a `human_verdict` **Score** on that run
+and a verdict on an L3 review, or a human step's verdict sending it back, becomes a `human_verdict` **Score** on that run
 (`mediforce score list`). Neither is configured per step. See
 [`container-steps.md`](container-steps.md#result-and-agent-trajectory).
 Evaluators, Eval Cases and the MCP eval policy of an agent step live outside

@@ -50,7 +50,8 @@ last_reviewed: 2026-10-30
   each round sent back with Request changes is a negative case, compared by
   agreement with the reviewer's comment and param values as its instructions,
   the output finally approved a positive one, each on the input of the review's
-  first round. The assistant also red-teams with negative
+  first round. A human review step's verdict that sends an earlier agent step
+  back is recorded on that step's run the same way. The assistant also red-teams with negative
   cases planted from real output — one obvious error in it, compared by
   agreement. A preview of a `schema` or `code` check tries Eval Cases taken from
   runs first, then production outputs, and skips a run that gave no result. A

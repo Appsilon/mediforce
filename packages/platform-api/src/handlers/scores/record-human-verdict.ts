@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   defaultVerdictIntent,
+  type AgentRun,
   type CompleteHumanTaskPayload,
   type HumanTask,
   type Score,
@@ -42,10 +43,31 @@ async function reviewedAgentRunId(task: HumanTask, scope: CallerScope): Promise<
 }
 
 /**
- * Turn a completed CM3 review into a `human_verdict` Score on the Agent Run it
- * reviewed (ADR-0023 D13). The verdict key is the label; its intent is mapped
- * to 1 / 0.5 / 0 so verdicts from different vocabularies aggregate. Returns
- * `null` for any task that is not an agent review with a verdict, or whose
+ * The Agent Run a human step's verdict sends back: the latest run, by the time
+ * the task opened, of the earlier agent step the verdict routes to. `null` for
+ * a verdict that moves the workflow on.
+ */
+async function sentBackAgentRun(task: HumanTask, verdict: string, scope: CallerScope): Promise<AgentRun | null> {
+  const instance = await scope.runs.getById(task.processInstanceId);
+  if (instance === null) return null;
+  const definition = await scope.workflowDefinitions.get(instance.namespace ?? '', instance.definitionName, Number(instance.definitionVersion));
+  const reviewIndex = definition?.steps.findIndex((step) => step.id === task.stepId) ?? -1;
+  const targetId = definition?.steps[reviewIndex]?.verdicts?.[verdict]?.target;
+  const targetIndex = definition?.steps.findIndex((step) => step.id === targetId) ?? -1;
+  if (targetIndex === -1 || targetIndex > reviewIndex || definition?.steps[targetIndex]?.executor !== 'agent') return null;
+  const reviewOpenedAt = Date.parse(task.createdAt);
+  const [latest] = (await scope.agentRuns.getByInstanceId(task.processInstanceId))
+    .filter((run) => run.stepId === targetId && Date.parse(run.startedAt) <= reviewOpenedAt)
+    .sort((left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt));
+  return latest ?? null;
+}
+
+/**
+ * Turn a completed review into a `human_verdict` Score on the Agent Run it
+ * reviewed (ADR-0023 D13): a CM3 review of its own step, or a human step whose
+ * verdict sends an earlier agent step back to run again. The verdict key is the
+ * label; its intent is mapped to 1 / 0.5 / 0 so verdicts from different
+ * vocabularies aggregate. Returns `null` for any other task, or when the
  * reviewed Agent Run cannot be identified.
  */
 export async function recordHumanVerdictScore(
@@ -58,10 +80,11 @@ export async function recordHumanVerdictScore(
   scope: CallerScope,
 ): Promise<Score | null> {
   const { task, payload, actorId, namespace } = params;
-  if (task.creationReason !== 'agent_review_l3') return null;
   if (payload.kind !== 'verdict' && payload.kind !== 'verdict-with-params') return null;
 
-  const agentRunId = await reviewedAgentRunId(task, scope);
+  const isCm3Review = task.creationReason === 'agent_review_l3';
+  const sentBackRun = isCm3Review ? null : await sentBackAgentRun(task, payload.verdict, scope);
+  const agentRunId = isCm3Review ? await reviewedAgentRunId(task, scope) : sentBackRun?.id ?? null;
   if (agentRunId === null) return null;
 
   const intent = task.verdicts?.find((descriptor) => descriptor.key === payload.verdict)?.intent
@@ -80,13 +103,14 @@ export async function recordHumanVerdictScore(
       verdictKey: payload.verdict,
       intent,
       taskId: task.id,
+      ...(sentBackRun === null ? {} : { sentBack: true }),
       ...(payload.kind === 'verdict-with-params' && Object.keys(payload.paramValues).length > 0 ? { paramValues: payload.paramValues } : {}),
     },
     namespace,
     processInstanceId: task.processInstanceId,
-    stepId: task.stepId,
+    stepId: sentBackRun?.stepId ?? task.stepId,
     evaluatorId: null,
     supersedes: null,
-    basis: 'Control Mode 3 review verdict',
+    basis: isCm3Review ? 'Control Mode 3 review verdict' : `Human step '${task.stepId}' sent the run back`,
   }, scope);
 }

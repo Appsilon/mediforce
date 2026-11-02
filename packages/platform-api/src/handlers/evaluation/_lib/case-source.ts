@@ -31,9 +31,11 @@ export function caseInputOf(instance: ProcessInstance, stepInput: Record<string,
   };
 }
 
+const SentBackMetadataSchema = z.object({ sentBack: z.literal(true) });
+
 /** Whether a person's verdict sent a run's step back to run again. */
 function sentBack(verdict: Score | undefined): boolean {
-  return verdict?.label === 'revise';
+  return verdict?.label === 'revise' || SentBackMetadataSchema.safeParse(verdict?.metadata).success;
 }
 
 async function newestVerdict(scope: CallerScope, agentRunId: string): Promise<Score | undefined> {
@@ -116,8 +118,8 @@ function reviseInstructions(verdict: Score): string | null {
 
 /**
  * A person's newest verdict on a run's output: approved (1) is positive and
- * rejected (0) negative, compared exactly; `revise` is negative, compared by
- * meaning on the reviewer's comment and param values, since a re-run never
+ * rejected (0) negative, compared exactly; `revise`, or any verdict of a human
+ * step that sends the run back, is negative, compared by meaning on the reviewer's comment and param values, since a re-run never
  * equals the discarded output word for word. Any other verdict, a recheck,
  * labels nothing.
  */

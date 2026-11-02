@@ -89,7 +89,8 @@ authenticated, and only these two may do that.
 
 **Every Score goes through `recordScore`** (`handlers/scores/record-score.ts`),
 which appends its `score.created` audit event. There is no generic Score write
-route: Scores arrive from task completion (Control Mode 3 verdicts), from
+route: Scores arrive from task completion (Control Mode 3 verdicts and human
+steps sending a run back), from
 Evaluators, and from a person accepting or denying a judge verdict or agreement
 score of an Eval Run (`reviewJudgeVerdict`, `judge-reviews.ts`). With
 `MEDIFORCE_SCORE_EXPORT` set, `services/score-export.ts` wraps the Score

@@ -512,7 +512,10 @@ A harvested case takes the run's output as its expected output when a person
 reviewed the run: approved, a positive case; rejected, a negative one, both
 compared exactly unless the request says otherwise. A run sent back with the
 `revise` verdict is a negative case too, compared by meaning (`agreement`), with
-the reviewer's comment and any param values in its agreement instructions. Any
+the reviewer's comment and any param values in its agreement instructions. So
+is a run a human review step sends back: a verdict routing to an earlier agent
+step, under any key, records a `human_verdict` Score on that step's latest run
+(`metadata.sentBack`). A human step's other verdicts are not recorded. Any
 other verdict (a recheck) or no review gives none. Whatever the round, a case
 holds the input and workspace of the review's first round: a round sent back
 starts from the output it replaces, which the case must not hand over. A run
@@ -528,7 +531,7 @@ file, or an empty input. **Start from** lists the Step's finished production
 runs, newest first and a page at a time (**Load more runs**; `GET
 /api/evaluation/agent-runs` takes the previous page's `nextCursor` as `cursor`),
 marking runs that already have a case; it starts on the newest run that has none. Starting from a run fills the **Input**
-with what its step was given and the **Expected output** with what it returned
+with what its step was first given (a review's first round) and the **Expected output** with what it returned
 (`eval run-io <agentRunId>`, `GET /api/evaluation/agent-runs/:agentRunId/io`; its
 `caseInput` is the same input as an Eval Case made from the run holds it, and its
 `verdictExpectation` is what a person's review makes of the output: approved

@@ -148,7 +148,7 @@ async function emitAuditEvents(
   });
 }
 
-/** A CM3 verdict also becomes a `human_verdict` Score, best-effort: the engine
+/** A verdict on an Agent Run also becomes a `human_verdict` Score, best-effort: the engine
  *  has already committed the task and no transaction spans the two, so a failed
  *  Score write is logged, not surfaced. The verdict itself stays on the
  *  `task.completed` audit event. */

@@ -200,6 +200,59 @@ test.describe('Step Evaluation foundations — API E2E', () => {
     expect(JSON.stringify(evalCase.input)).not.toContain('reviewerComment');
   });
 
+  test('a human step that sends a run back hands the agent its comment and params, and labels the run\'s case with them', async ({ request }) => {
+    const runId = await startRun(request, {
+      name: `e2e-human-send-back-${Date.now()}`,
+      title: 'Human send-back',
+      steps: [
+        { id: 'grade-aes', name: 'Grade adverse events', type: 'creation', executor: 'agent', autonomyLevel: 'L4' },
+        {
+          id: 'review', name: 'Review', type: 'review', executor: 'human', allowedRoles: ['operator'],
+          params: [{ name: 'ctcaeVersion', type: 'string', required: false }],
+          verdicts: { send_back: { target: 'grade-aes' }, approve: { target: 'done' } },
+        },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'grade-aes', to: 'review' }],
+    });
+    const task = await pollUntil(
+      async () => {
+        const res = await request.get(`/api/tasks?instanceId=${runId}`, { headers: AUTH_HEADERS });
+        if (res.status() !== 200) return null;
+        const { tasks } = (await res.json()) as { tasks: Array<{ id: string; stepId: string; status: string }> };
+        return tasks.find((candidate) => candidate.stepId === 'review' && candidate.status !== 'completed') ?? null;
+      },
+      { description: `review task in ${runId}` },
+    );
+    const firstRound = await awaitFinishedAgentRun(request, runId);
+    const completeRes = await request.post(`/api/tasks/${task.id}/complete`, {
+      headers: JSON_HEADERS,
+      data: { kind: 'verdict-with-params', verdict: 'send_back', comment: 'Grade the sepsis event again', paramValues: { ctcaeVersion: 'v5.0' } },
+    });
+    expect(completeRes.status(), await completeRes.text()).toBe(200);
+
+    const secondRound = await pollUntil(
+      async () => {
+        const runs = await listAgentRuns(request, runId);
+        return runs?.find((run) => run.id !== firstRound.id && run.status !== 'running') ?? null;
+      },
+      { description: `second agent run in ${runId}` },
+    );
+    const ioRes = await request.get(`/api/evaluation/agent-runs/${secondRound.id}/io`, { headers: AUTH_HEADERS });
+    expect(ioRes.status(), await ioRes.text()).toBe(200);
+    expect(GetAgentRunIoOutputSchema.parse(await ioRes.json()).stepInput).toMatchObject({ comment: 'Grade the sepsis event again', ctcaeVersion: 'v5.0' });
+
+    const harvestRes = await request.post('/api/evaluation/cases/from-agent-run', {
+      headers: JSON_HEADERS,
+      data: { agentRunId: firstRound.id },
+    });
+    expect(harvestRes.status(), await harvestRes.text()).toBe(201);
+    const { evalCase } = EvalCaseOutputSchema.parse(await harvestRes.json());
+    expect(evalCase).toMatchObject({ expectation: 'negative', comparison: 'agreement', expectedOutput: firstRound.envelope?.result });
+    expect(evalCase.agreementInstructions).toContain('Grade the sepsis event again');
+    expect(evalCase.agreementInstructions).toContain('"ctcaeVersion":"v5.0"');
+  });
+
   test('a run sent back with a revise verdict harvests as a negative case compared by meaning on the comment', async ({ request }) => {
     const runId = await startRun(request, agentStepWorkflow(`e2e-revise-case-${Date.now()}`, {
       autonomyLevel: 'L3',

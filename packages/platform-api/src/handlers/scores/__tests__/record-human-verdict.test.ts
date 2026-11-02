@@ -3,10 +3,12 @@ import {
   InMemoryAgentRunRepository,
   InMemoryAuditRepository,
   InMemoryProcessInstanceRepository,
+  InMemoryProcessRepository,
   InMemoryScoreRepository,
   buildAgentRun,
   buildHumanTask,
   buildProcessInstance,
+  buildWorkflowDefinition,
 } from '@mediforce/platform-core/testing';
 import type { HumanTask } from '@mediforce/platform-core';
 import { recordHumanVerdictScore } from '../record-human-verdict';
@@ -60,6 +62,47 @@ describe('recordHumanVerdictScore', () => {
 
     expect(unsafe).toMatchObject({ value: 0, label: 'unsafe', comment: null });
     expect(recheck).toMatchObject({ value: 0.5, label: 'recheck', comment: null });
+  });
+
+  describe('a human step reviewing an earlier agent step', () => {
+    const humanTask = (overrides: Partial<HumanTask> = {}) => buildHumanTask({
+      processInstanceId: 'inst-a', stepId: 'review', creationReason: 'human_executor', createdAt: '2026-09-23T10:00:00.000Z', ...overrides,
+    });
+
+    async function scopeWithLoop() {
+      const processRepo = new InMemoryProcessRepository();
+      const instance = (await instanceRepo.getById('inst-a'))!;
+      await processRepo.saveWorkflowDefinition(buildWorkflowDefinition({
+        name: instance.definitionName,
+        version: Number(instance.definitionVersion),
+        namespace: 'team-alpha',
+        steps: [
+          { id: 'draft', name: 'Draft', type: 'creation', executor: 'agent' },
+          { id: 'review', name: 'Review', type: 'review', executor: 'human', verdicts: { send_back: { target: 'draft' }, approve: { target: 'done' } } },
+          { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+        ],
+        transitions: [],
+      }));
+      await agentRunRepo.create(buildAgentRun({ id: 'draft-old', processInstanceId: 'inst-a', stepId: 'draft', startedAt: '2026-09-23T08:00:00.000Z' }));
+      await agentRunRepo.create(buildAgentRun({ id: 'draft-reviewed', processInstanceId: 'inst-a', stepId: 'draft', startedAt: '2026-09-23T09:00:00.000Z' }));
+      return createTestScope({ instanceRepo, agentRunRepo, scoreRepo, processRepo, auditRepo: new InMemoryAuditRepository(instanceRepo) });
+    }
+
+    it('scores the run it sends back, with its comment and param values', async () => {
+      const score = await recordHumanVerdictScore(
+        { task: humanTask(), payload: { kind: 'verdict-with-params', verdict: 'send_back', comment: 'Split it', paramValues: { phases: 7 } }, actorId: 'u-1', namespace: 'team-alpha' },
+        await scopeWithLoop(),
+      );
+      expect(score).toMatchObject({ subject: { type: 'agent_run', id: 'draft-reviewed' }, stepId: 'draft', label: 'send_back', comment: 'Split it', metadata: { sentBack: true, paramValues: { phases: 7 } } });
+    });
+
+    it('scores nothing for a verdict that moves the workflow on', async () => {
+      const score = await recordHumanVerdictScore(
+        { task: humanTask(), payload: { kind: 'verdict', verdict: 'approve' }, actorId: 'u-1', namespace: 'team-alpha' },
+        await scopeWithLoop(),
+      );
+      expect(score).toBeNull();
+    });
   });
 
   it('keeps the reviewer\'s param values with the verdict', async () => {
