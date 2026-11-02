@@ -179,6 +179,29 @@ export function taskCompletionEvaluatorsDraftMessage(): string {
     + 'once, and call no other proposal tool this turn.';
 }
 
+/**
+ * The fixed instruction for a `draft_deterministic_presets` request (epic
+ * #1516 F2): the only thing this turn may do, with a narrow tool set instead
+ * of the ordinary one.
+ */
+export function deterministicPresetsDraftMessage(): string {
+  return 'Suggest deterministic checks for this step, only where they genuinely fit — never force one. Read get_step for its outputSchema, '
+    + 'and a couple of recent runs with list_step_runs and get_agent_run. propose_preset_evaluator takes one argument, preset, an object with '
+    + 'its own kind — always send a complete preset object, never an empty one and never a bare kind with no other fields. '
+    + 'Extraction: call it only when you can point to a real, non-empty array on both sides — propose_preset_evaluator({ preset: { kind: '
+    + '"extraction", resultIdsPath, inputIdsPart, inputIdsPath } }), where resultIdsPath is the path into `result` to the returned ids and '
+    + 'inputIdsPart + inputIdsPath say where in the step\'s input the valid ids live (both paths need at least one element — never []). Where '
+    + 'a path crosses an array, give only the rest of the path — it is read from every element and flattened automatically. If the result has '
+    + 'no id-shaped field (e.g. it is free text, or only counts/flags), extraction does not fit this step: do not call it, with an empty path '
+    + 'or otherwise — just skip straight to file-producing or your reply. '
+    + 'File-producing: call list_output_files (and read_output_file) on a couple of recent runs; if the step writes a file, call '
+    + 'propose_preset_evaluator({ preset: { kind: "file_producing", fileName, format: "json" | "csv", requiredFields } }). '
+    + 'There is no preset check to preview beforehand — do not call preview_evaluator (it is not offered this turn, and would not understand '
+    + '"extraction" or "file_producing" anyway); the platform renders the real script and tries it on recent runs for you the moment you call '
+    + 'propose_preset_evaluator, and the card carries that result. propose_preset_evaluator is the only proposal tool offered this turn — call '
+    + 'it at most once per kind, never for a step that does neither. If neither fits, say so in your reply and call no proposal tool.';
+}
+
 export function unattendedBudgetMessage(unattendedBudgetUsd: number | undefined, kind: SubjectKind): string {
   return unattendedBudgetUsd === undefined
     ? 'No unattended budget was granted for this request: start_eval_run is refused; the person confirms each run on its card.'

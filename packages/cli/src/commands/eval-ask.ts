@@ -2,6 +2,12 @@ import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson } from '../output';
 import { SUBJECT_ARGS, subjectFrom } from './eval-step-args';
 
+/** `--action` values, by the fixed instruction each restricts the turn to. */
+const DRAFT_ACTIONS = {
+  'draft-task-completion-evaluators': 'draft_task_completion_evaluators',
+  'draft-deterministic-presets': 'draft_deterministic_presets',
+} as const;
+
 export const evalAskCommand = defineCommand({
   name: 'mediforce eval ask',
   description: 'Ask a step\'s Evaluation Assistant one question. Proposals are printed, not applied.',
@@ -11,7 +17,7 @@ export const evalAskCommand = defineCommand({
     version: { type: 'string', description: 'Workflow Definition version whose step the assistant reads and runs (default: the runnable one)' },
     model: { type: 'string', description: 'OpenRouter model id' },
     'unattended-budget': { type: 'string', description: 'USD the assistant may spend starting prepared Eval Runs during this request, without asking (default: none — starting a run is refused)' },
-    action: { type: 'string', description: 'Restrict this turn to a fixed task, with its own narrow tool set: "draft-task-completion-evaluators" drafts the step\'s task-completion Evaluators — one per requirement of its instructions' },
+    action: { type: 'string', description: 'Restrict this turn to a fixed task, with its own narrow tool set: "draft-task-completion-evaluators" drafts the step\'s task-completion Evaluators — one per requirement of its instructions (F1); "draft-deterministic-presets" suggests extraction/file-producing code checks where the step\'s shape fits (F2)' },
   },
   async run({ args, output, mediforce, jsonMode }) {
     const version = parsePositiveIntArg(args.version);
@@ -19,8 +25,8 @@ export const evalAskCommand = defineCommand({
       output.stderr('--version must be a positive integer');
       return 2;
     }
-    if (args.action !== undefined && args.action !== 'draft-task-completion-evaluators') {
-      output.stderr('--action must be "draft-task-completion-evaluators"');
+    if (args.action !== undefined && !(args.action in DRAFT_ACTIONS)) {
+      output.stderr(`--action must be one of: ${Object.keys(DRAFT_ACTIONS).join(', ')}`);
       return 2;
     }
     const unattendedBudget = args['unattended-budget'] === undefined ? undefined : Number(args['unattended-budget']);
@@ -34,7 +40,7 @@ export const evalAskCommand = defineCommand({
       messages: [{ role: 'user', content: args.message }],
       ...(args.model !== undefined ? { model: args.model } : {}),
       ...(unattendedBudget !== undefined ? { unattendedBudgetUsd: unattendedBudget } : {}),
-      ...(args.action === 'draft-task-completion-evaluators' ? { action: 'draft_task_completion_evaluators' as const } : {}),
+      ...(args.action !== undefined ? { action: DRAFT_ACTIONS[args.action as keyof typeof DRAFT_ACTIONS] } : {}),
     }, {
       onProgress: (event) => {
         if (jsonMode === true || event.type !== 'tool' || event.status === 'done') return;

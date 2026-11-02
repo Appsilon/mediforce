@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { EvaluationSubject } from '@mediforce/platform-core';
 import { userCaller } from '../../../../repositories/__tests__/create-test-scope';
 import { createEvaluator } from '../../../evaluation/evaluators';
@@ -7,6 +7,12 @@ import { saveEvalDataset } from '../../../evaluation/eval-datasets';
 import { prepareEvalRun } from '../../../evaluation/eval-runs';
 import { reviewEvaluationProposal } from '../review-proposal';
 import { evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, type EvaluationFixture } from '../../../evaluation/__tests__/fixture';
+
+const runCodeCheck = vi.hoisted(() => vi.fn());
+vi.mock('@mediforce/agent-runtime', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@mediforce/agent-runtime')>()),
+  runCodeCheck,
+}));
 
 const findings = { kind: 'schema' as const, schema: { required: ['findings'] } };
 const judge = {
@@ -18,7 +24,10 @@ const judge = {
 
 describe('reviewEvaluationProposal', () => {
   let fixture: EvaluationFixture;
-  beforeEach(async () => { fixture = await evaluationFixture(); });
+  beforeEach(async () => {
+    fixture = await evaluationFixture();
+    runCodeCheck.mockReset();
+  });
 
   const proposeEvaluator = (check: typeof findings | typeof judge, name = 'findings-present') =>
     ({ name, rule: 'The result lists findings.' as const, check });
@@ -93,6 +102,23 @@ describe('reviewEvaluationProposal', () => {
       const taken = await reviewEvaluationProposal('propose_task_completion_evaluators', { evaluators: [present], vagueInstructions: [] }, fixture.scope(), STEP, []);
       expect(taken).toMatchObject({ ok: false, error: expect.stringContaining('\'task-completion-findings-present\' already') });
     });
+  });
+
+  it('self-tests a drafted deterministic preset against real outputs (F2)', async () => {
+    runCodeCheck.mockResolvedValue({ passed: true, comment: null });
+    const extraction = {
+      kind: 'extraction' as const,
+      resultIdsPath: ['findings'],
+      inputIdsPart: 'previousStepOutputs' as const,
+      inputIdsPath: ['extract-aes'],
+    };
+    const review = await reviewEvaluationProposal('propose_preset_evaluator', { preset: extraction }, fixture.scope(), STEP, []);
+    expect(review).toMatchObject({ ok: true, evidence: { selfTest: { results: expect.any(Array) } } });
+    expect(runCodeCheck).toHaveBeenCalled();
+
+    const filePreset = { kind: 'file_producing' as const, fileName: 'summary.csv', format: 'csv' as const, requiredFields: ['grade'] };
+    expect(await reviewEvaluationProposal('propose_preset_evaluator', { preset: filePreset }, fixture.scope(), STEP, []))
+      .toMatchObject({ ok: true, evidence: { selfTest: { results: expect.any(Array) } } });
   });
 
   it('marks a check untested for a person who may not run checks, instead of dropping it', async () => {

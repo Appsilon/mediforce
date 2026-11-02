@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import {
+  DRAFT_DETERMINISTIC_PRESETS_TOOLSET,
   DRAFT_TASK_COMPLETION_EVALUATORS_TOOLSET,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
@@ -19,13 +20,25 @@ import {
 describe('Evaluation Assistant toolsets', () => {
   const toolsets = Object.values(EVALUATION_ASSISTANT_TOOLSETS);
 
-  it('offers every catalog tool to at least one subject, or reserves it for the dedicated draft_task_completion_evaluators action (F1), and names only catalog tools', () => {
-    const allToolsets = [...toolsets, DRAFT_TASK_COMPLETION_EVALUATORS_TOOLSET];
+  it('offers every catalog tool to at least one subject, or reserves it for a dedicated draft action (F1, F2), and names only catalog tools', () => {
+    const allToolsets = [...toolsets, DRAFT_TASK_COMPLETION_EVALUATORS_TOOLSET, DRAFT_DETERMINISTIC_PRESETS_TOOLSET];
     expect(new Set(allToolsets.flatMap((toolset) => toolset.platform))).toEqual(new Set(Object.keys(EVALUATION_ASSISTANT_PLATFORM_TOOLS)));
     expect(new Set(allToolsets.flatMap((toolset) => toolset.proposals))).toEqual(new Set(Object.keys(EVALUATION_ASSISTANT_PROPOSAL_TOOLS)));
     // Held back from ordinary conversation: offered only behind the dedicated action, never as a free-form proposal.
     expect(toolsets.flatMap((toolset) => toolset.platform)).not.toContain('get_step_instructions');
     expect(toolsets.flatMap((toolset) => toolset.proposals)).not.toContain('propose_task_completion_evaluators');
+    expect(toolsets.flatMap((toolset) => toolset.proposals)).not.toContain('propose_preset_evaluator');
+  });
+
+  it('gives every catalog tool a plain-object top-level schema (OpenAI function-calling refuses oneOf/anyOf/allOf/enum/const/not there)', () => {
+    const allTools = { ...EVALUATION_ASSISTANT_PLATFORM_TOOLS, ...EVALUATION_ASSISTANT_PROPOSAL_TOOLS };
+    for (const [name, schema] of Object.entries(allTools)) {
+      const jsonSchema = z.toJSONSchema(schema, { io: 'input' }) as Record<string, unknown>;
+      expect(jsonSchema.type, `${name}'s top-level schema must be type 'object'`).toBe('object');
+      for (const forbidden of ['oneOf', 'anyOf', 'allOf', 'enum', 'const', 'not']) {
+        expect(jsonSchema, `${name} must not have '${forbidden}' at the top level`).not.toHaveProperty(forbidden);
+      }
+    }
   });
 
   it('gives an Agent its own reads and none that need a Step\'s production runs', () => {
