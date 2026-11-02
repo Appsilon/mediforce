@@ -54,6 +54,25 @@ describe('Evaluators', () => {
     expect(again).toMatchObject({ id: evaluator.id, archived: false, latest: { version: 2, check: gradesSchema } });
   });
 
+  it('brings an archived expected-output check back when one is created again under its name', async () => {
+    const comparison = { kind: 'expected_output' as const, model: 'anthropic/claude-sonnet-5.5', minAgreement: 0.8, maxAgreement: 0.2 };
+    const { evaluator } = await createEvaluator({ ...STEP, name: 'matches-expected-output', rule: 'r', check: comparison, origin: 'user' }, fixture.scope());
+    await archiveEvaluator({ evaluatorId: evaluator.id, archived: true }, fixture.scope());
+
+    const { evaluator: again } = await createEvaluator({ ...STEP, name: 'matches-expected-output', rule: 'r', check: comparison, origin: 'user' }, fixture.scope());
+
+    expect(again).toMatchObject({ id: evaluator.id, archived: false, latest: { version: 2, check: comparison } });
+  });
+
+  it('refuses an archived name when the new check is of another kind', async () => {
+    const comparison = { kind: 'expected_output' as const, model: 'anthropic/claude-sonnet-5.5', minAgreement: 0.8, maxAgreement: 0.2 };
+    const { evaluator } = await createEvaluator({ ...STEP, name: 'taken', rule: 'r', check: comparison, origin: 'user' }, fixture.scope());
+    await archiveEvaluator({ evaluatorId: evaluator.id, archived: true }, fixture.scope());
+
+    await expect(createEvaluator({ ...STEP, name: 'taken', rule: 'r', check: { kind: 'code', runtime: 'python', source: 'print(1)' }, origin: 'user' }, fixture.scope()))
+      .rejects.toBeInstanceOf(ConflictError);
+  });
+
   it('makes a change a new version that carries over what it does not change', async () => {
     const { evaluator } = await createEvaluator(
       { ...STEP, name: 'findings-present', rule: 'The result lists findings.', check: findingsSchema, origin: 'user' },

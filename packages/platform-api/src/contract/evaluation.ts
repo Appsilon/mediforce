@@ -168,7 +168,7 @@ export const PreviewEvaluatorInputSchema = EvaluatedStepSchema.extend({
   limit: z.number().int().min(1).max(20).default(5),
 });
 /** The check on an Eval Case taken from a run: the run, with the case's expected output as its result. */
-export const CaseEvaluatorOutcomeSchema = EvaluatorOutcomeSchema.extend({
+const CaseEvaluatorOutcomeSchema = EvaluatorOutcomeSchema.extend({
   caseId: z.string(),
   caseName: z.string(),
 });

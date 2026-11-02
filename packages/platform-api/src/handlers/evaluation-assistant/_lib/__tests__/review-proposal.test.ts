@@ -109,6 +109,19 @@ describe('reviewEvaluationProposal', () => {
     await expect(asking('~anthropic/claude-sonnet-latest')).rejects.toThrow('alias');
   });
 
+  it('keeps a judge\'s model on a new version that leaves it out, unless that model is gone', async () => {
+    const owned = 'openai/gpt-5';
+    const entries = [registryEntry('anthropic/claude-sonnet-5.5'), registryEntry(owned)];
+    const { evaluator } = await createEvaluator({ ...STEP, ...proposeEvaluator({ ...judge, model: owned }, 'grades-justified'), origin: 'user' }, await withRegistry(fixture, entries));
+    const propose = async (registry: CreateModelRegistryEntryInput[]) =>
+      reviewEvaluationProposal('propose_evaluator_version', { evaluatorId: evaluator.id, check: judge }, await withRegistry(fixture, registry), STEP, []);
+
+    expect(await propose(entries)).toMatchObject({ ok: true, arguments: { check: { model: owned } } });
+    expect(await propose([])).toMatchObject({ ok: true, arguments: { check: { model: owned } } });
+    expect(await propose([registryEntry('anthropic/claude-sonnet-5.5'), registryEntry(owned, { retiredAt: '2026-09-01T00:00:00Z' })]))
+      .toMatchObject({ ok: true, arguments: { check: { model: 'anthropic/claude-sonnet-5.5' } } });
+  });
+
   it('marks a check untested for a person who may not run checks, instead of dropping it', async () => {
     await fixture.processRepo.setWorkflowAccess(NAMESPACE, STEP.workflowName, { run: ['runner'], edit: ['viewer'] });
     const review = await reviewEvaluationProposal('propose_evaluator', proposeEvaluator(findings), fixture.scope(userCaller('viewer', [NAMESPACE])), STEP, []);

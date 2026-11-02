@@ -63,7 +63,7 @@ export function SetupChoice({ step, evaluation, onGuided, onManual }: {
   const runs = loadedAgentRuns(evaluation).length;
   const choiceClass = 'flex flex-1 basis-80 flex-col gap-2 rounded-xl border bg-background p-5 text-left transition-colors hover:bg-muted/40';
   return (
-    <section className="mx-auto max-w-3xl space-y-6 py-8" data-testid="evaluation-setup-choice">
+    <section className="mx-auto max-w-3xl space-y-6 py-8" data-testid="evaluation-setup-choice" data-tour="eval-setup-choice">
       <div className="space-y-1">
         <h2 className="text-2xl font-bold">{step.kind === 'agent' ? 'Evaluate this agent' : 'Evaluate this step'}</h2>
         <p className="text-sm text-muted-foreground">Re-run it on Eval Cases and grade each output with Evaluators.</p>
@@ -103,12 +103,12 @@ function StageHeading({ title, optional, purpose, why }: { title: string; option
         </h2>
         {why !== undefined && (
           <button type="button" className="text-xs text-primary underline underline-offset-2" aria-expanded={showWhy} onClick={() => setShowWhy(showWhy === false)}>
-            {showWhy ? 'Hide' : 'Why?'}
+            {showWhy === true ? 'Hide' : 'Why?'}
           </button>
         )}
       </div>
       <p className="text-sm text-muted-foreground">{purpose}</p>
-      {showWhy && <p className="max-w-3xl rounded-md bg-primary/5 px-3 py-2 text-xs leading-relaxed">{why}</p>}
+      {showWhy === true && <p className="max-w-3xl rounded-md bg-primary/5 px-3 py-2 text-xs leading-relaxed">{why}</p>}
     </div>
   );
 }
@@ -230,6 +230,14 @@ function parsePercent(text: string): number | null {
   return text.trim() !== '' && Number.isFinite(value) && value >= 0 && value <= 100 ? value / 100 : null;
 }
 
+/** The criteria as the fields show them, so a stored rate they round does not read as a change. */
+function shownCriteria(criteria: AcceptanceCriteria) {
+  return {
+    minPassRate: parsePercent(percentText(criteria.minPassRate)),
+    ...(criteria.minPassHatK === undefined ? {} : { minPassHatK: parsePercent(percentText(criteria.minPassHatK)) }),
+  };
+}
+
 function SummaryCard({ label, value, detail, warn, onEdit }: { label: string; value: string; detail: string; warn: boolean; onEdit: () => void }) {
   return (
     <button
@@ -272,19 +280,19 @@ function ReviewStage({ step, definitionVersion, evaluation, mayEdit, mayRun, onS
   const withExpected = cases.filter((evalCase) => evalCase.expectedOutput !== null).length;
   const negative = cases.filter((evalCase) => evalCase.expectedOutput !== null && evalCase.expectation === 'negative').length;
   const unapproved = evaluators.filter((evaluator) => evaluator.trust.trusted === false).length;
-  const hasComparison = evaluators.some((evaluator) => evaluator.latest.check.kind === 'expected_output');
+  const hasComparison = hasComparisonEvaluator(evaluation);
   const minPassRate = parsePercent(passRateText);
   const minPassHatK = passHatKText === null ? undefined : parsePercent(passHatKText);
   const criteria: AcceptanceCriteria | null = minPassRate === null || minPassHatK === null ? null : {
     minPassRate,
     ...(minPassHatK === undefined ? {} : { minPassHatK }),
   };
-  const criteriaChanged = criteria !== null && JSON.stringify(criteria) !== JSON.stringify(current);
+  const criteriaChanged = criteria !== null && JSON.stringify(criteria) !== JSON.stringify(shownCriteria(current));
   const casesUnsaved = hasUnsavedCases(cases, latestDataset);
 
   const save = useStepEvaluationMutation(step, async () => {
-    if (criteria !== null && criteriaChanged) await mediforce.evaluation.setAcceptanceCriteria({ ...step, criteria });
-    if (casesUnsaved) await mediforce.evaluation.saveDataset(step);
+    if (criteria !== null && criteriaChanged === true) await mediforce.evaluation.setAcceptanceCriteria({ ...step, criteria });
+    if (casesUnsaved === true) await mediforce.evaluation.saveDataset(step);
   });
   const blocked = mayEdit === false || criteria === null || save.isPending || cases.length === 0 || evaluators.length === 0;
 
@@ -302,7 +310,7 @@ function ReviewStage({ step, definitionVersion, evaluation, mayEdit, mayRun, onS
         <SummaryCard
           label="Eval Cases"
           value={String(cases.length)}
-          detail={`${withExpected} with expected output${casesUnsaved ? ' · unsaved' : ''}`}
+          detail={`${withExpected} with expected output${casesUnsaved === true ? ' · unsaved' : ''}`}
           warn={cases.length === 0}
           onEdit={() => onStage('cases')}
         />
@@ -361,7 +369,7 @@ function ReviewStage({ step, definitionVersion, evaluation, mayEdit, mayRun, onS
         ))}
       </ul>
       {save.error !== null && <p className="text-xs text-destructive">{save.error.message}</p>}
-      {starting && save.isSuccess ? (
+      {starting === true && save.isSuccess === true ? (
         <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-4" data-testid="review-start-eval-run">
           <h3 className="text-sm font-semibold">Start an Eval Run</h3>
           <StartEvalRunControls
@@ -388,8 +396,8 @@ function ReviewStage({ step, definitionVersion, evaluation, mayEdit, mayRun, onS
                   onDone(null);
                 },
               })}
-            >{save.isPending && starting === false ? 'Saving…' : 'Save'}</button>
-            {mayRun && (
+            >{save.isPending === true && starting === false ? 'Saving…' : 'Save'}</button>
+            {mayRun === true && (
               <button
                 type="button"
                 className={primaryButtonClass}
@@ -399,7 +407,7 @@ function ReviewStage({ step, definitionVersion, evaluation, mayEdit, mayRun, onS
                   setStarting(true);
                   save.mutate(undefined, { onSuccess: onSaved });
                 }}
-              >{save.isPending && starting ? 'Saving…' : 'Save and start Eval Run'}</button>
+              >{save.isPending === true && starting === true ? 'Saving…' : 'Save and start Eval Run'}</button>
             )}
           </div>
         </footer>
@@ -534,7 +542,13 @@ export function GuidedSetup({ step, definitionVersion, evaluation, outputSchema,
           )}
           {stage === 'review' && (
             <div className="rounded-lg border p-4">
-              <ReviewStage step={step} definitionVersion={definitionVersion} evaluation={evaluation} mayEdit={mayEdit} mayRun={mayRun} onStage={onStage} onSaved={() => onSaved(setupSnapshot(evaluation))} onDone={onExit} />
+              {evaluation.criteria.data === undefined ? (
+                evaluation.criteria.isError === true
+                  ? <p role="alert" className="text-xs text-destructive">Could not load the Acceptance Criteria.</p>
+                  : <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : (
+                <ReviewStage step={step} definitionVersion={definitionVersion} evaluation={evaluation} mayEdit={mayEdit} mayRun={mayRun} onStage={onStage} onSaved={() => onSaved(setupSnapshot(evaluation))} onDone={onExit} />
+              )}
             </div>
           )}
           {stage === 'brief' && <StageFooter back={<span />} skip={() => onStage('cases')} next={{ label: 'Next: Eval Cases →', onClick: () => onStage('cases') }} />}

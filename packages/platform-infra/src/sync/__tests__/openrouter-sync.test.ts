@@ -77,6 +77,20 @@ describe('syncFromOpenRouter', () => {
     ]);
   });
 
+  it('leaves a model\'s parameters unknown when OpenRouter does not list them', async () => {
+    stubOpenRouter({ models: [makeFakeModel({ supported_parameters: undefined })] });
+    const written: CreateModelRegistryEntryInput[] = [];
+
+    await syncFromOpenRouter(makeRepo({
+      bulkUpsert: async (items) => {
+        written.push(...items);
+        return items.length;
+      },
+    }));
+
+    expect(written[0]?.supportedParameters).toBeUndefined();
+  });
+
   it('writes request counts from the rankings feed, which the model catalogue does not carry', async () => {
     stubOpenRouter({
       models: [makeFakeModel()],

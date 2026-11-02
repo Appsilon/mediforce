@@ -46,6 +46,13 @@ last_reviewed: 2026-10-30
   `temperature` on Claude 5.5 — is left out), since asking in text alone let
   judges answer in prose or with unescaped quotes; the platform refuses a
   named judge model that does not list it.
+- **Amended 2026-11-02 (D14, D17):** a reviewed run labels its cases by round:
+  each round sent back with Request changes is a negative case, the output
+  finally approved a positive one. The assistant also red-teams with negative
+  cases planted from real output — one obvious error in it, compared by
+  agreement. A preview of a `schema` or `code` check tries Eval Cases taken from
+  runs first, then production outputs, and skips a run that gave no result. A
+  judge reads the text files its run wrote.
 - **Partially superseded 2026-10-15 by [ADR-0029](./0029-agent-evaluation.md):**
   D2 — an Evaluation is owned by a Step or by an Agent, and an Agent's Eval Run
   assesses one Agent version. Everything else here holds for an Agent's

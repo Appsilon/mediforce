@@ -18,7 +18,7 @@ import { scriptOpenRouter } from '../helpers/mock-openrouter-server';
  * are set on accepting them, and a person confirms or overwrites a run's verdict from a
  * finished run's report. A step opens on its Eval Runs once it has any, else
  * on its cases; a banner over the tabs leads to Code Evaluators nobody
- * approved; `?section=` and a hidden assistant survive a reload. An empty step
+ * approved; `?section=` survives a reload. An empty step
  * offers a guided setup — Brief, Eval Cases, Evaluators, Summary — or the tabs.
  * The model is the scripted mock OpenRouter.
  */
@@ -357,6 +357,7 @@ test.describe('Step Evaluation tab', () => {
     await page.getByTestId('evaluation-assistant-input').fill('Which grades are risky?');
     await page.getByTestId('evaluation-tab-cases').click();
     await expect(page.getByTestId('evaluation-assistant-input')).toHaveValue('Which grades are risky?');
+    await expect(page).toHaveURL(/section=cases/);
 
     await page.reload();
     await expect(page.getByTestId('evaluation-tab-cases')).toHaveAttribute('data-state', 'active', { timeout: 15_000 });
@@ -497,7 +498,7 @@ test.describe('Step Evaluation tab', () => {
     await expect(page.getByTestId('dataset-summary')).toHaveText('v1 · 1 case');
     await expect(page.getByTestId('evaluation-tab-cases')).toHaveAttribute('data-state', 'active');
 
-    // A step already set up reopens the guided setup from the status strip, its stages marked filled.
+    // A step already set up reopens the guided setup from beside the step picker, its stages marked filled.
     await page.getByTestId('evaluation-open-guided-setup').click();
     await expect(page).toHaveURL(/guided=brief/);
     await expect(page.getByTestId('guided-setup-stage-cases')).toHaveAttribute('data-filled', 'true');

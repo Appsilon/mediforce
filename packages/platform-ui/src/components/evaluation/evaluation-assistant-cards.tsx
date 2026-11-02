@@ -179,6 +179,14 @@ function JsonPreview({ value, testId }: { value: unknown; testId: string }) {
   );
 }
 
+/** What a synthesized case changes of its run, a deleted file included: the input alone does not show a file change. */
+function perturbedChanges(proposal: Proposal<'propose_perturbed_case'>['arguments']): string {
+  return [
+    ...(proposal.inputChanges ?? []).map((change) => `${change.op} ${[change.part, ...change.path].join('.')}`),
+    ...(proposal.fileChanges ?? []).map((change) => `${change.op} ${change.path}`),
+  ].join('; ');
+}
+
 /** A proposed Eval Case as it would be stored: where it comes from, why, its input and its expected output. */
 function ProposedCaseBody({ proposal, content, loadError }: {
   proposal: CaseProposal;
@@ -192,6 +200,7 @@ function ProposedCaseBody({ proposal, content, loadError }: {
     : [proposal.arguments.agentRunId === undefined ? 'Written input' : `From run ${proposal.arguments.agentRunId.slice(0, 8)}`];
   const notes = [proposal.tool === 'propose_perturbed_case' ? proposal.arguments.perturbation.description : undefined, args.rationale]
     .filter((note) => note !== undefined);
+  const changes = proposal.tool === 'propose_perturbed_case' ? perturbedChanges(proposal.arguments) : '';
   return (
     <div className="space-y-1.5">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -201,6 +210,7 @@ function ProposedCaseBody({ proposal, content, loadError }: {
         ))}
       </div>
       {notes.map((note) => <p key={note} className="whitespace-pre-wrap text-muted-foreground">{note}</p>)}
+      {changes !== '' && <p className="text-muted-foreground" data-testid="proposed-case-changes">Changes: {changes}</p>}
       {content === null ? (
         loadError === null
           ? <p className="text-muted-foreground">Loading the run&apos;s input and output…</p>
@@ -245,7 +255,10 @@ function createReviewedCase(step: EvaluationSubject, proposal: CaseProposal, val
 }
 
 function reviewInputHelp(proposal: CaseProposal): string {
-  if (proposal.tool === 'propose_perturbed_case') return 'The run\'s input with the assistant\'s changes.';
+  if (proposal.tool === 'propose_perturbed_case') {
+    const changes = perturbedChanges(proposal.arguments);
+    return changes === '' ? 'The run\'s input with the assistant\'s changes.' : `The run's input with the assistant's changes: ${changes}.`;
+  }
   return proposal.arguments.agentRunId === undefined ? 'The input the assistant wrote.' : 'What the step received in this run.';
 }
 

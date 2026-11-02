@@ -271,6 +271,45 @@ describe('GuidedSetup review', () => {
     expect(evaluation.saveDataset).not.toHaveBeenCalled();
   });
 
+  it('keeps the stored criteria when they load after the stage opens', async () => {
+    const stored = { minPassRate: 0.9, minPassHatK: 0.8 };
+    const loaded = evaluationOf({
+      cases: [caseOf('c-1', 'positive', null)],
+      evaluators: [evaluatorOf('schema')],
+      datasets: [{ version: 1, caseIds: ['c-1'] }],
+      criteria: { criteria: stored },
+    });
+    const loading = { ...loaded, criteria: { data: undefined, isError: false } } as typeof loaded;
+    const first = renderSetup('review', loading);
+    expect(screen.queryByTestId('guided-setup-save')).toBeNull();
+    first.unmount();
+
+    const { onExit } = renderSetup('review', loaded);
+    expect(screen.getByLabelText('Minimum pass rate (%)')).toHaveValue(90);
+    fireEvent.click(screen.getByTestId('guided-setup-save'));
+    await waitFor(() => expect(onExit).toHaveBeenCalledWith(null));
+    expect(evaluation.setAcceptanceCriteria).not.toHaveBeenCalled();
+  });
+
+  it('offers no Save when the criteria could not be loaded', () => {
+    const data = filled();
+    renderSetup('review', { ...data, criteria: { data: undefined, isError: true } } as typeof data);
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not load the Acceptance Criteria.');
+    expect(screen.queryByTestId('guided-setup-save')).toBeNull();
+  });
+
+  it('does not rewrite a stored rate the field shows rounded', async () => {
+    const { onExit } = renderSetup('review', evaluationOf({
+      cases: [caseOf('c-1', 'positive', null)],
+      evaluators: [evaluatorOf('schema')],
+      datasets: [{ version: 1, caseIds: ['c-1'] }],
+      criteria: { criteria: { minPassRate: 0.9333 } },
+    }));
+    fireEvent.click(screen.getByTestId('guided-setup-save'));
+    await waitFor(() => expect(onExit).toHaveBeenCalledWith(null));
+    expect(evaluation.setAcceptanceCriteria).not.toHaveBeenCalled();
+  });
+
   it('saves, then starts an Eval Run and opens the Eval Runs tab', async () => {
     const { onExit } = renderSetup('review', filled());
     fireEvent.click(screen.getByTestId('guided-setup-save-and-start'));

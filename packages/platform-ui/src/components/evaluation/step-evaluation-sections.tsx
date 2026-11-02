@@ -952,7 +952,7 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSel
                 <Bot className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Added by the assistant" />
               </InstantTooltip>
             )}
-            {unsaved && (
+            {unsaved === true && (
               <InstantTooltip label="Not in the next Eval Run until you Save.">
                 <span className="shrink-0 rounded bg-amber-500/10 px-1.5 text-[11px] text-amber-700 dark:text-amber-300" data-testid="eval-case-unsaved">unsaved</span>
               </InstantTooltip>

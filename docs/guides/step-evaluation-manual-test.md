@@ -131,10 +131,10 @@ Legend: ✅ expected · 🔍 try to break it · 🧪 in the sandbox workflow
 A status strip on top, three tabs under it; the **Evaluation Assistant** is the right-hand panel.
 
 A step with nothing set up yet first offers **Guided setup** (Brief → Eval Cases → Evaluators →
-Review, the assistant drafting each) or **Set up manually** (the tabs below).
+Summary, the assistant drafting each) or **Set up manually** (the tabs below).
 
 - ✅ **Guided setup** → **For some** on *Do you know the correct outputs?* adds `matches-expected-output`; add a case
-  from a run; **Review** → set 90% → **Save** opens the tabs with criteria ≥ 90% and Dataset v1.
+  from a run; **Summary** → set 90% → **Save** opens the tabs with criteria ≥ 90% and Dataset v1.
 - 🔍 Pick **For some** twice, or come back to the stage: still one `matches-expected-output`.
 - 🔍 Ask the assistant on **Brief**, then open **Eval Cases**: its conversation starts empty; back on **Brief**,
   the earlier one is still there.
@@ -225,7 +225,7 @@ another.
   check on real runs"…), then a **plan card**: risks highest first, each with a cheapest check.
   *Draft this check* → an **Evaluator** card with the preview summary; *Use as Acceptance Criteria*
   sets the suggested floor.
-- *Accept* → ✅ listed with `· from the assistant`. *Edit* the JSON, then *Accept* → ✅ your edited
+- *Accept* → ✅ listed with `· from the assistant`. *Review*, edit it in the form, then *Accept* → ✅ your edited
   version is saved.
 - With Eval Cases taken from runs → ✅ the summary reads *Tried on N Eval Case(s): … ; M recent
   output(s): …*, each case by name; a run that escalated or was cancelled is never among them.

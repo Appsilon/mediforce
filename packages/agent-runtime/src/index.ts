@@ -126,7 +126,7 @@ export type {
   CommitStepResult,
 } from './workspace/workspace-manager';
 export { WorkspaceReader, isBinary, listCommitFiles, readCommitFile, readStepFiles } from './workspace/workspace-reader';
-export type { CommitFileEntry, OutputFileEntry, StepFile, StepFileOmission, WorkspaceReaderInit } from './workspace/workspace-reader';
+export type { CommitFileEntry, OutputFileEntry, StepFile, WorkspaceReaderInit } from './workspace/workspace-reader';
 export { OUTPUT_FILES_REPO_ROOT } from './workspace/output-files';
 
 // Testing utilities

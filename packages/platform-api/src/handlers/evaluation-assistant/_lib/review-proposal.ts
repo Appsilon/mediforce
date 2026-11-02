@@ -16,6 +16,7 @@ import type { CallerScope } from '../../../repositories/index';
 import { HandlerError, ValidationError } from '../../../errors';
 import { AGENT_NOT_PREVIEWED, EXPECTED_OUTPUT_NOT_PREVIEWED, JUDGE_NOT_PREVIEWED, previewEvaluator } from '../../evaluation/preview-evaluator';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
+import { evaluatorView } from '../../evaluation/_lib/evaluator-view';
 import { stepOnly } from '../../evaluation/_lib/evaluation-subject';
 import { perturbCase } from '../../evaluation/_lib/perturb-case';
 import { loadStepEvaluator } from './run-evaluation-tool';
@@ -29,15 +30,21 @@ export interface PreviewedCheck {
 }
 
 /**
- * A judge's model: the platform's pinned default when the assistant names
- * none, or the one the person asked for — if the model registry offers it, it
- * is not retired and it can constrain its answer to the judge's schema. An
- * unsynced registry cannot say, so a named model then stands.
+ * A judge's model: the one the person asked for — if the model registry offers
+ * it, it is not retired and it can constrain its answer to the judge's schema.
+ * Named by no one, a new version keeps the model its Evaluator's check of the
+ * same kind has while the registry does not retire or drop it, as a change of
+ * rubric is no change of judge; otherwise the platform's pinned default. An
+ * unsynced registry cannot say, so a named or kept model then stands.
  */
-async function resolveCheck(scope: CallerScope, check: AssistantCheck): Promise<EvaluatorCheck> {
+async function resolveCheck(scope: CallerScope, check: AssistantCheck, replaced?: EvaluatorCheck): Promise<EvaluatorCheck> {
   if (check.kind !== 'llm_judge' && check.kind !== 'expected_output') return check;
   const models = await scope.models.list();
-  if (check.model === undefined) return { ...check, model: pinDefaultModel(models) };
+  if (check.model === undefined) {
+    const kept = (replaced?.kind === 'llm_judge' || replaced?.kind === 'expected_output') && replaced.kind === check.kind ? replaced.model : undefined;
+    const keeps = kept !== undefined && (models.length === 0 || models.some((candidate) => candidate.id === kept && candidate.retiredAt === null));
+    return { ...check, model: keeps === true ? kept : pinDefaultModel(models) };
+  }
   const { model } = check;
   if (isMovingModelAlias(model)) {
     throw new ValidationError(`'${model}' is an alias whose model changes under the same name; leave the model out for the pinned default, or name a concrete model.`);
@@ -107,9 +114,9 @@ async function selfTest(
 async function reviewAgentSchemaCheck(
   scope: CallerScope,
   step: EvaluationSubject,
-  check: EvaluatorCheck | undefined,
+  check: EvaluatorCheck,
 ): Promise<ProposalReview> {
-  if (step.kind !== 'agent' || check?.kind !== 'schema') return { ok: true };
+  if (step.kind !== 'agent' || check.kind !== 'schema') return { ok: true };
   const agent = await scope.agentDefinitions.getById(step.agentId);
   if (agent?.outputSchema !== undefined) return { ok: true };
   return {
@@ -179,7 +186,7 @@ export async function reviewEvaluationProposal(
       const evaluator = await loadStepEvaluator(scope, step, proposal.evaluatorId);
       if (evaluator.archived) return { ok: false, error: `Evaluator '${evaluator.name}' is archived` };
       if (proposal.check === undefined) return { ok: true };
-      const check = await resolveCheck(scope, proposal.check);
+      const check = await resolveCheck(scope, proposal.check, (await evaluatorView(scope, evaluator)).latest.check);
       const schemaReview = await reviewAgentSchemaCheck(scope, step, check);
       if (schemaReview.ok === false) return schemaReview;
       return withCheck(await selfTest(scope, step, check, previewed), proposal, check);

@@ -184,6 +184,13 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
         action: 'Pick an agent step',
       },
       {
+        id: 'setup-choice',
+        title: 'A step with nothing set up first asks how to set it up',
+        body: 'Guided setup walks four stages, the assistant drafting each. Setting it up by hand opens the tabs this guide follows, with the assistant beside them.',
+        target: 'eval-setup-choice',
+        action: 'If you see the choice, pick Set up manually',
+      },
+      {
         id: 'assistant',
         title: 'Start by asking what to check',
         body: 'The assistant reads the step and returns a plan of risks, most important first, each with the cheapest check that catches it. Nothing is created until you Accept a card.',
@@ -193,7 +200,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
       {
         id: 'evaluators',
         title: 'Each check is an Evaluator',
-        body: 'Draft this check on a risk builds one and tries it on real production outputs before showing you. On the Evaluators tab, a Code Evaluator stays Not counted until you read the script and approve it.',
+        body: 'Draft this check on a risk builds one. A schema or Code check is tried on the step\'s Eval Cases and production outputs before you see it; an LLM judge comes untried, for an Eval Run to try. On the Evaluators tab, a Code Evaluator stays Not counted until you read the script and approve it.',
         target: 'eval-evaluators',
         action: 'Accept a drafted check',
       },

@@ -87,9 +87,10 @@ function useSetupMode() {
   return { setup, stage: stage ?? 'brief', go, manual };
 }
 
-/** Whether the subject has nothing to evaluate with yet — no Brief, cases, Evaluators or Eval Runs; undefined while any is loading. */
+/** Whether the subject has nothing to evaluate with yet — no Brief, cases, Evaluators or Eval Runs; undefined while any is loading, false if any failed, so the tabs say what could not load. */
 function isEmptySubject(evaluation: ReturnType<typeof useStepEvaluation>): boolean | undefined {
   const { brief, cases, evaluators, runs } = evaluation;
+  if ([brief, cases, evaluators, runs].some((query) => query.isError === true)) return false;
   if (brief.data === undefined || cases.data === undefined || evaluators.data === undefined || runs.data === undefined) return undefined;
   return brief.data.brief === null && cases.data.cases.length === 0 && evaluators.data.evaluators.length === 0 && runs.data.evalRuns.length === 0;
 }
@@ -141,7 +142,7 @@ export function StepEvaluation({ header, step, definitionVersion, outputSchema, 
       {content}
     </div>
   );
-  if (setupMode.setup === 'guided') {
+  if (setupMode.setup === 'guided' && mayEdit === true) {
     return frame(
       <GuidedSetup
         step={step}
@@ -163,9 +164,9 @@ export function StepEvaluation({ header, step, definitionVersion, outputSchema, 
       </button>,
     );
   }
-  if (setupMode.setup === null && mayEdit) {
+  if (setupMode.setup === null && mayEdit === true) {
     if (empty === undefined) return frame(<p className="text-sm text-muted-foreground">Loading…</p>, null);
-    if (empty) return frame(<SetupChoice step={step} evaluation={evaluation} onGuided={() => setupMode.go('brief')} onManual={() => setupMode.manual(null)} />, null);
+    if (empty === true) return frame(<SetupChoice step={step} evaluation={evaluation} onGuided={() => setupMode.go('brief')} onManual={() => setupMode.manual(null)} />, null);
   }
   return frame(
     <div className="space-y-4">
@@ -221,7 +222,7 @@ export function StepEvaluation({ header, step, definitionVersion, outputSchema, 
         </div>
       </div>
     </div>,
-    mayEdit && (
+    mayEdit === true && (
       <button type="button" className={cn(primaryButtonClass, switchClass)} data-testid="evaluation-open-guided-setup" onClick={() => setupMode.go('brief')}>
         <Sparkles className="h-4 w-4" aria-hidden />
         Guided setup

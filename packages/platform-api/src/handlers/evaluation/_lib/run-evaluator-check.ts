@@ -143,8 +143,10 @@ async function runExpectedOutputCheck(
   return { ...binary(agentRun.id, passed, `Agreement ${agreement} (${threshold}). ${rationale}`), agreement };
 }
 
+type RunWithResult = AgentRun & { envelope: NonNullable<AgentRun['envelope']> & { result: Record<string, unknown> } };
+
 /** Whether a run gave a result for a check to grade. */
-export function producedResult(agentRun: AgentRun): boolean {
+export function producedResult(agentRun: AgentRun): agentRun is RunWithResult {
   const result = agentRun.envelope?.result;
   return result !== null && result !== undefined;
 }
@@ -164,11 +166,11 @@ export async function runEvaluatorCheck(
   onJudgeCall: (call: JudgeCall) => void = () => {},
 ): Promise<EvaluatorOutcome> {
   const { agentRun } = subject;
-  const envelope = agentRun.envelope;
-  const result = envelope?.result;
-  if (envelope === null || result === null || result === undefined) {
+  if (producedResult(agentRun) === false) {
     return binary(agentRun.id, false, `The Agent Run produced no result (status: ${agentRun.status})`);
   }
+  const { envelope } = agentRun;
+  const { result } = envelope;
 
   try {
     switch (check.kind) {

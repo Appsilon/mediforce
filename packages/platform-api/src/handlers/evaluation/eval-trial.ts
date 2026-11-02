@@ -10,7 +10,7 @@ import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
 import { loadEvaluationSubject, subjectRef, runVersionOf } from './_lib/evaluation-subject';
 import { loadScoredRun, type ScoredRun } from './_lib/scored-run';
-import { judgedFiles } from './_lib/run-evaluator-check';
+import { judgedFiles, producedResult } from './_lib/run-evaluator-check';
 import {
   checkOutcome,
   evaluatorError,
@@ -27,9 +27,9 @@ import {
  * model runs, and for a run with no output — no check ran on it.
  */
 async function judgePromptOf(check: EvaluatorCheck | null, subject: ScoredRun | null, evalCase: EvalCase | null): Promise<JudgeMessage[] | null> {
-  const envelope = subject?.agentRun.envelope ?? null;
-  const result = envelope?.result;
-  if (check === null || subject === null || envelope === null || result === null || result === undefined) return null;
+  if (check === null || subject === null || producedResult(subject.agentRun) === false) return null;
+  const { envelope } = subject.agentRun;
+  const { result } = envelope;
   if (check.kind === 'llm_judge') {
     return llmJudgeMessages({
       rubric: check.rubric,

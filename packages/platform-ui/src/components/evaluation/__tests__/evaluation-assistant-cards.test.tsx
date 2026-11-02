@@ -237,6 +237,14 @@ describe('ProposalCard for an edge case', () => {
     expect(screen.getByRole('button', { name: 'Positive' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('lists every change it makes, a deleted file included, on the card and on Review', async () => {
+    renderProposal(edgeCase);
+    expect(screen.getByTestId('proposed-case-changes')).toHaveTextContent('remove triggerPayload.narrative; delete data/ae.csv');
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    const dialog = await screen.findByTestId('case-dialog');
+    expect(dialog).toHaveTextContent('remove triggerPayload.narrative; delete data/ae.csv');
+  });
+
   it('lets the person relabel its expected output before accepting', async () => {
     const onDecided = renderProposal(edgeCase);
     fireEvent.click(screen.getByRole('button', { name: 'Negative' }));

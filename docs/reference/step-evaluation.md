@@ -49,13 +49,15 @@ once the runnable version no longer has the step.
 A step (or Agent) with nothing yet — no Brief, cases, Evaluators or Eval Runs —
 opens, for a person who may edit it, on a choice: **Guided setup** or **Set up
 manually** (the tabs, until the Evaluation is left — an empty step offers the
-choice again). The guided setup (`?guided=brief|cases|evaluators|review`)
+choice again), with how many production runs a step has to start cases from.
+The guided setup (`?guided=brief|cases|evaluators|review`, only for a person
+who may edit — anyone else on such a link sees the tabs)
 walks four stages beside the assistant, which holds one conversation per stage
 — a stage opens on its own, and going back to one returns to it: **Brief** (optional; an open field, saved as a new version
 when the person leaves it), **Eval
 Cases** — *Do you know the correct outputs?* **Yes** or **For some** adds one
 `expected_output` Evaluator, `matches-expected-output`, unless the step has one
-— **Evaluators**, and **Review**. For each of the first three the assistant's
+(an archived one comes back as a new version) — **Evaluators**, and **Summary**. For each of the first three the assistant's
 panel offers a button that asks it to draft that stage (the Brief; cases from
 runs, or edge cases and planted errors; the checks themselves — up to five
 Evaluators, each schema or code one previewed and each judge proposed untried,
@@ -68,11 +70,14 @@ output to avoid, the reviewer's comment as its agreement instructions), the
 output finally approved a positive one, all on the first round's input — and an
 unreviewed run's output comes as an expected output for the person to mark.
 `list_step_runs` lists runs grouped by Workflow Run, each with the step's
-rounds oldest first, so a review reads as one chain. Review sums
+rounds oldest first, so a review reads as one chain. Summary sums
 up the stages, sets the Acceptance Criteria (minimum pass rate, optionally
 pass^k) and, on **Save**, writes them if changed and saves the cases as a new
 Dataset version if unsaved, then opens the tabs; **Save and start Eval Run**
-saves, then asks for trials and a budget as the Eval Runs tab does. **Manual
+saves, then asks for trials and a budget as the Eval Runs tab does. Both need
+a case and an Evaluator, and wait for the stored criteria to load. Summary's
+progress pill is checked after a save until the Brief, cases or Evaluators
+change, for as long as the Evaluation stays open. **Manual
 setup**, beside the Version and Step pickers, opens the tabs without saving
 anything more; **Guided setup** in the same place reopens the setup at any
 time, whatever the step already has.
@@ -96,14 +101,16 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   Eval Run. The assistant leaves a judge's model to the platform, which pins
   its default (the newest Claude Sonnet in the model registry); it names one
   only when the person asks, and the platform refuses a model the registry does
-  not list, has retired, or whose supported parameters lack `structured_outputs`.
+  not list, has retired, or whose supported parameters lack `structured_outputs`,
+  and an alias whose model changes under the same name. A new version that names
+  no model keeps its Evaluator's, unless the registry retired or dropped it.
 - **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
   written or synthesized), Brief drafts and Acceptance Criteria come back as
   cards to accept or reject. An Eval Case card shows the case as it would be
   stored — its source, the assistant's rationale, and previews of its input and
   expected output (a harvested case's are the run's own, the output only once
   a person reviewed the run; a synthesized case's is its run's input with the
-  changes applied, which its description sums up). One with an expected output lets
+  changes applied, each listed, a file change included). One with an expected output lets
   the person mark it **Positive** or **Negative**, or drop it (**No expected
   output**), before accepting. **Review** opens it whole in the Add case form,
   to edit before accepting; a synthesized case accepted there keeps its file changes.
@@ -251,7 +258,7 @@ One rule in plain language plus the check behind it. Four kinds:
 |---|---|---|
 | `schema` | `result` against the JSON Schema subset `agent.outputSchema` uses | at once |
 | `code` | a `python` or `javascript` script in the `script-container` sandbox (no network) | after a person approves that version's source |
-| `llm_judge` | a model reads the step's input, the agent's Trajectory and its output, explains its judgment, then answers pass or fail with a confidence 0–1 | at once; each verdict below its `minConfidence` is left out unless a person accepts it |
+| `llm_judge` | a model reads the step's input, the agent's Trajectory, the files it wrote and its output, explains its judgment, then answers pass or fail with a confidence 0–1 | at once; each verdict below its `minConfidence` is left out unless a person accepts it |
 | `expected_output` | `result` against the Eval Case's expected output — an exact match, or an agreement score 0–1 from its model; see [Expected outputs](#expected-outputs) | at once |
 
 A `code` check reads `/output/input.json` — `{ result, stepInput, trajectory,
@@ -272,7 +279,10 @@ An `llm_judge` check is `{ kind, model, rubric, minConfidence }`
 the agent's whole Trajectory — its reasoning, every tool call and tool result,
 numbered, each entry cut at 2,000 characters except a tool call's input (up to
 20,000, so a document the agent wrote arrives whole), long logs cut in the
-middle — its output and its own summary. It is not told a case's expected
+middle — the text files the run's commit changed, each cut at 20,000 characters
+and 60,000 in all (a binary, deleted, over-1 MB or unreadable file is named with
+why it is not shown; the step's own `result.json` is left out), its output and
+its own summary. It is not told a case's expected
 output or whether the case is negative. It must explain its judgment — what
 exactly decided the verdict and why, citing the input, the output and log
 entries by number — and answer with one JSON object,
@@ -284,8 +294,9 @@ supported parameters (synced from OpenRouter), the request constrains decoding
 to that object's JSON Schema: `response_format` with `strict`, and
 `provider.require_parameters` so OpenRouter routes only to providers that take
 every parameter sent. The answer cannot come back as prose or broken JSON. The
-request sends `temperature: 0` only to a model that lists `temperature` —
-Claude 5.5 does not, and sending it would leave no provider to route to. On any
+request leaves out `temperature: 0` on a model whose supported parameters do
+not list `temperature` — Claude 5.5 does not, and sending it would leave no
+provider to route to. On any
 other model the answer is asked for in text, before and after the material;
 the first object in its text that parses to that shape is the answer, so prose
 around it — even prose quoting JSON — is skipped. The Score is `1`/`0` with
@@ -809,7 +820,7 @@ person's review, and for a model judge (an `llm_judge`, or an agreement
 comparison) its **Evaluator logs**: the exact messages it was sent, then each
 answer its model gave, with the model, tokens and duration. The messages are
 rebuilt from the Evaluator version frozen into the run and the trial's input,
-log and output by the code that sent them (`llmJudgeMessages`,
+log, written files and output by the code that sent them (`llmJudgeMessages`,
 `outputAgreementMessages`); the answers are kept on the Score
 (`metadata.judgeCalls`), or, for a check that gave no Score, on the trial
 (`erroredJudgeCalls`, by Evaluator id), and returned as `judgeCalls`. A trial
