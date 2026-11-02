@@ -33,6 +33,8 @@ const sourceRun = {
   reasoningSummary: null,
   confidence: null,
   verdictExpectation: 'negative',
+  verdictComparison: 'exact',
+  verdictAgreementInstructions: null,
 };
 
 function renderProposal(proposal: React.ComponentProps<typeof ProposalCard>['state']['proposal'], onDecided = vi.fn()) {
@@ -125,8 +127,23 @@ describe('ProposalCard shows what an Eval Case holds', () => {
     expect(screen.getByRole('button', { name: 'Negative' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('shows a run sent back for revision as a negative case compared by meaning', () => {
+    runIo.current = { ...sourceRun, verdictComparison: 'agreement', verdictAgreementInstructions: 'Reviewer\'s request: grade it again' };
+    renderProposal({ tool: 'propose_eval_case', arguments: { name: 'Sent back', agentRunId: 'agent-run-1' } });
+    expect(screen.getByTestId('proposed-case-output')).toHaveTextContent('"grade": 4');
+    expect(screen.getByText(/Must not match, by agreement score/)).toBeInTheDocument();
+    expect(screen.getByTestId('proposed-case-instructions')).toHaveTextContent('grade it again');
+  });
+
+  it('leaves a revise verdict\'s comparison behind when the case is proposed as positive', () => {
+    runIo.current = { ...sourceRun, verdictComparison: 'agreement', verdictAgreementInstructions: 'Reviewer\'s request: grade it again' };
+    renderProposal({ tool: 'propose_eval_case', arguments: { name: 'Flipped', agentRunId: 'agent-run-1', expectation: 'positive' } });
+    expect(screen.getByText(/Must match, exactly/)).toBeInTheDocument();
+    expect(screen.queryByTestId('proposed-case-instructions')).toBeNull();
+  });
+
   it('says a case from an unreviewed run has no expected output', () => {
-    runIo.current = { ...sourceRun, verdictExpectation: null };
+    runIo.current = { ...sourceRun, verdictExpectation: null, verdictComparison: null };
     renderProposal({ tool: 'propose_eval_case', arguments: { name: 'Unreviewed', agentRunId: 'agent-run-1' } });
     expect(screen.getByTestId('proposed-case-output')).toHaveTextContent('None — only the Evaluators grade it');
     expect(screen.queryByRole('button', { name: 'Positive' })).toBeNull();

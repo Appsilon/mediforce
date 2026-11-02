@@ -2,6 +2,7 @@ import type { APIRequestContext } from '@playwright/test';
 import type { StoredAgentTrajectoryEntry } from '@mediforce/platform-core';
 import {
   GetAgentTrajectoryOutputSchema,
+  EvalCaseOutputSchema,
   ListScoresOutputSchema,
 } from '@mediforce/platform-api/contract';
 import {
@@ -143,6 +144,44 @@ test.describe('Step Evaluation foundations — API E2E', () => {
 
     const malformedRes = await request.get('/api/agent-runs/not-a-run-id/trajectory', { headers: AUTH_HEADERS });
     expect(malformedRes.status()).toBe(400);
+  });
+
+  test('a run sent back with a revise verdict harvests as a negative case compared by meaning on the comment', async ({ request }) => {
+    const runId = await startRun(request, agentStepWorkflow(`e2e-revise-case-${Date.now()}`, {
+      autonomyLevel: 'L3',
+      allowedRoles: ['operator'],
+    }));
+    const task = await pollUntil(
+      async () => {
+        const res = await request.get(`/api/tasks?instanceId=${runId}`, { headers: AUTH_HEADERS });
+        if (res.status() !== 200) return null;
+        const { tasks } = (await res.json()) as { tasks: Array<{ id: string; stepId: string; status: string }> };
+        return tasks.find((candidate) => candidate.stepId === 'grade-aes' && candidate.status !== 'completed') ?? null;
+      },
+      { description: `CM3 review task for ${runId}` },
+    );
+    const [agentRun] = await pollUntil(
+      async () => {
+        const runs = await listAgentRuns(request, runId);
+        return runs !== null && runs.length > 0 ? runs : null;
+      },
+      { description: `agent run in ${runId}` },
+    );
+    const completeRes = await request.post(`/api/tasks/${task.id}/complete`, {
+      headers: JSON_HEADERS,
+      data: { kind: 'verdict', verdict: 'revise', comment: 'Grade the sepsis event again' },
+    });
+    expect(completeRes.status(), await completeRes.text()).toBe(200);
+
+    const harvestRes = await request.post('/api/evaluation/cases/from-agent-run', {
+      headers: JSON_HEADERS,
+      data: { agentRunId: agentRun!.id },
+    });
+    expect(harvestRes.status(), await harvestRes.text()).toBe(201);
+    const { evalCase } = EvalCaseOutputSchema.parse(await harvestRes.json());
+    expect(evalCase).toMatchObject({ expectation: 'negative', comparison: 'agreement', expectedOutput: agentRun!.envelope?.result });
+    expect(evalCase.expectedOutput).not.toBeNull();
+    expect(evalCase.agreementInstructions).toContain('Grade the sepsis event again');
   });
 
   test('a CM3 approval records a human_verdict Score on the reviewed agent run', async ({ request }) => {

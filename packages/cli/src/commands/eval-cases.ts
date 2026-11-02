@@ -103,13 +103,13 @@ export const evalCaseAddCommand = defineCommand({
 
 export const evalCaseFromRunCommand = defineCommand({
   name: 'mediforce eval case-from-run',
-  description: 'Add a production Agent Run to its step\'s eval set — a reviewed run\'s output is the expected output: approved to match, rejected to avoid.',
+  description: 'Add a production Agent Run to its step\'s eval set — a reviewed run\'s output is the expected output: approved to match, rejected or sent back for revision to avoid.',
   args: {
     agentRunId: { type: 'positional', required: true, description: 'Agent Run id' },
     ...AGENT_CASE_ARGS,
     name: { type: 'string', description: 'Case name' },
     expectation: enumArg(['positive', 'negative'] as const, { description: 'Default: from the review verdict, positive when there is none' }),
-    comparison: enumArg(['exact', 'agreement'] as const, { description: 'How the expected output is compared. Default: exact' }),
+    comparison: enumArg(['exact', 'agreement'] as const, { description: 'How the expected output is compared. Default: agreement for a run sent back for revision, otherwise exact' }),
     split: enumArg(['dev', 'holdout'] as const, { description: 'Default: dev' }),
     inputFile: { type: 'string', description: 'JSON file with the case input to use instead of the run\'s; one that differs makes a manual case that keeps the run' },
   },

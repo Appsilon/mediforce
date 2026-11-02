@@ -18,6 +18,8 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
       reasoningSummary: null,
       confidence: null,
       verdictExpectation: verdicts[agentRunId] ?? null,
+      verdictComparison: null,
+      verdictAgreementInstructions: null,
     },
   }),
   useStepEvaluationMutation: (_step: unknown, mutationFn: (value: unknown) => unknown) => ({

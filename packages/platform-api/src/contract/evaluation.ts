@@ -240,8 +240,12 @@ export const GetAgentRunIoOutputSchema = z.object({
   result: z.unknown(),
   reasoningSummary: z.string().nullable(),
   confidence: z.number().nullable(),
-  /** What a person's review makes of `result`: approved is a positive case, rejected a negative one; null when neither. */
+  /** What a person's review makes of `result`: approved is a positive case, rejected or sent back for revision a negative one; null when neither. */
   verdictExpectation: EvalCaseExpectationSchema.nullable(),
+  /** How that review compares `result`: by meaning for a run sent back for revision, otherwise exactly; null with no label. */
+  verdictComparison: EvalCaseComparisonSchema.nullable(),
+  /** The reviewer's request on a run sent back for revision, as the case's agreement instructions. */
+  verdictAgreementInstructions: z.string().nullable(),
   /** With an agent asked about: what the run's step changes about it. `caseInput` is then that Agent's; an output it cannot use is null, with no verdict. */
   agentChange: AgentRunChangeSchema.optional(),
 });
@@ -283,8 +287,8 @@ export const CreateEvalCaseFromAgentRunInputSchema = z.object({
   input: EvalCaseInputSchema.optional(),
   expectedOutput: EvalCaseSchema.shape.expectedOutput.optional(),
   expectation: EvalCaseExpectationSchema.optional(),
-  comparison: EvalCaseComparisonSchema.default('exact'),
-  agreementInstructions: z.string().trim().max(4000).nullable().default(null),
+  comparison: EvalCaseComparisonSchema.optional(),
+  agreementInstructions: z.string().trim().max(4000).nullable().optional(),
   evaluatorIds: EvalCaseSchema.shape.evaluatorIds.default(null),
   split: EvalCaseSplitSchema.default('dev'),
   origin: EvaluationOriginSchema.default('user'),

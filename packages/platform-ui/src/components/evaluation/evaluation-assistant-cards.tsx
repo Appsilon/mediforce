@@ -5,6 +5,7 @@ import { Check, Eye, X } from 'lucide-react';
 import {
   describeAcceptanceCriteria,
   type AgentOutputSchema,
+  type EvalCaseComparison,
   type EvalCaseExpectation,
   type EvalCaseInput,
   type EvaluationSubject,
@@ -133,6 +134,8 @@ interface ProposedCaseContent {
   /** Null: no expected output, only the Evaluators grade the case. */
   expectedOutput: unknown;
   expectation: EvalCaseExpectation;
+  comparison: EvalCaseComparison;
+  agreementInstructions: string | null;
 }
 
 /**
@@ -143,19 +146,23 @@ interface ProposedCaseContent {
  */
 function proposedCaseContent(proposal: CaseProposal, sourceRun: GetAgentRunIoOutput | undefined): ProposedCaseContent | null {
   if (proposal.tool === 'propose_perturbed_case') {
-    const { expectedOutput, expectation } = proposal.arguments;
-    return proposal.caseInput === undefined ? null : { input: proposal.caseInput, expectedOutput: expectedOutput ?? null, expectation };
+    const { expectedOutput, expectation, comparison, agreementInstructions } = proposal.arguments;
+    return proposal.caseInput === undefined ? null : { input: proposal.caseInput, expectedOutput: expectedOutput ?? null, expectation, comparison: comparison ?? 'exact', agreementInstructions: agreementInstructions ?? null };
   }
   const args = proposal.arguments;
   if (args.agentRunId === undefined) {
-    return { input: args.input!, expectedOutput: args.expectedOutput ?? null, expectation: args.expectation ?? 'positive' };
+    return { input: args.input!, expectedOutput: args.expectedOutput ?? null, expectation: args.expectation ?? 'positive', comparison: args.comparison ?? 'exact', agreementInstructions: args.agreementInstructions ?? null };
   }
   if (sourceRun === undefined) return null;
   const fromRun = args.expectedOutput === undefined;
+  const expectation = args.expectation ?? (fromRun ? sourceRun.verdictExpectation : null) ?? 'positive';
+  const verdictApplies = fromRun && sourceRun.verdictExpectation === expectation;
   return {
     input: args.input ?? sourceRun.caseInput,
     expectedOutput: fromRun ? (sourceRun.verdictExpectation === null ? null : sourceRun.result ?? null) : args.expectedOutput,
-    expectation: args.expectation ?? (fromRun ? sourceRun.verdictExpectation : null) ?? 'positive',
+    expectation,
+    comparison: args.comparison ?? (verdictApplies ? sourceRun.verdictComparison : null) ?? 'exact',
+    agreementInstructions: args.agreementInstructions === undefined ? (verdictApplies ? sourceRun.verdictAgreementInstructions : null) : args.agreementInstructions ?? null,
   };
 }
 
@@ -226,11 +233,14 @@ function ProposedCaseBody({ proposal, content, loadError, agentChange }: {
           <div className="space-y-0.5">
             <div className="font-medium">
               Expected output
-              {content.expectedOutput !== null && <span className="font-normal text-muted-foreground"> · {expectationPhrase({ ...args, expectation: content.expectation })}</span>}
+              {content.expectedOutput !== null && <span className="font-normal text-muted-foreground"> · {expectationPhrase(content)}</span>}
             </div>
             {content.expectedOutput === null
               ? <p className="text-muted-foreground" data-testid="proposed-case-output">None — only the Evaluators grade it</p>
               : <JsonPreview value={content.expectedOutput} testId="proposed-case-output" />}
+            {content.expectedOutput !== null && content.comparison === 'agreement' && content.agreementInstructions !== null && (
+              <p className="whitespace-pre-wrap text-muted-foreground" data-testid="proposed-case-instructions">On this case: {content.agreementInstructions}</p>
+            )}
           </div>
         </>
       )}
@@ -287,8 +297,8 @@ function ReviewProposedCase({ step, proposal, content, mayEdit, onAccepted, onCl
           input: JSON.stringify(content.input, null, 2),
           expectedOutput: outputText(content.expectedOutput),
           expectation: content.expectation,
-          comparison: args.comparison ?? 'exact',
-          agreementInstructions: args.agreementInstructions ?? '',
+          comparison: content.comparison,
+          agreementInstructions: content.agreementInstructions ?? '',
           evaluatorIds: null,
         }}
         inputHelp={reviewInputHelp(step, proposal)}

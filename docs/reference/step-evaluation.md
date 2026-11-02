@@ -64,10 +64,11 @@ Evaluators, each schema or code one previewed and each judge proposed untried,
 with no plan to pick from first); its proposals arrive as
 cards, as on the tabs. **Cases from runs** follows the answer to *Do you know
 the correct outputs?*: on **No** each run gives a case without an expected
-output; otherwise a reviewed run's decisions label its cases — every review
+output (`expectedOutput: null`, which a verdict does not override); otherwise a reviewed run's decisions label its cases — every review
 round sent back with **Request changes** is a negative case (that round's
-output to avoid, the reviewer's comment as its agreement instructions), the
-output finally approved a positive one, all on the first round's input — and an
+own output and input, compared by meaning with the reviewer's comment as its
+agreement instructions, all taken by the platform from that round's run), the
+output finally approved a positive one on the first round's input — and an
 unreviewed run's output comes as an expected output for the person to mark.
 `list_step_runs` lists runs grouped by Workflow Run, each with the step's
 rounds oldest first, so a review reads as one chain. Summary sums
@@ -507,10 +508,15 @@ new output. What a case expects of that output:
   Evaluator that grades its case passed.
 
 A harvested case takes the run's output as its expected output when a person
-reviewed the run: approved, a positive case; rejected, a negative one. A run
-sent back for revision or never reviewed gives none. An `expectedOutput` in the
+reviewed the run: approved, a positive case; rejected, a negative one, both
+compared exactly unless the request says otherwise. A run sent back with the
+`revise` verdict is a negative case too, compared by meaning (`agreement`), with
+the reviewer's comment in its agreement instructions. Any other verdict (a
+recheck) or no review gives none. An `expectedOutput` in the
 request (`null` for none) replaces the run's output and is positive unless
-`expectation` says otherwise — the verdict labels only the run's own output. `case-from-run` takes `--expectation`, `--comparison` and `--input-file` (a case input other than the run's makes a `manual` case that keeps the run).
+`expectation` says otherwise — the verdict labels only the run's own output, so
+its comparison and instructions apply only to that output under the verdict's
+own expectation; flipping a `revise` run to positive compares exactly. `case-from-run` takes `--expectation`, `--comparison` and `--input-file` (a case input other than the run's makes a `manual` case that keeps the run).
 
 In the Evaluation tab, **Eval Cases → Add case** is the one way to add a case:
 a dialog that starts from a production run, an existing case's input, a `.json`
@@ -522,8 +528,9 @@ with what its step was given and the **Expected output** with what it returned
 (`eval run-io <agentRunId>`, `GET /api/evaluation/agent-runs/:agentRunId/io`; its
 `caseInput` is the same input as an Eval Case made from the run holds it, and its
 `verdictExpectation` is what a person's review makes of the output: approved
-positive, rejected negative, `null` unreviewed). The case then starts positive or
-negative from that review. Each side is marked **As the source run** or
+positive, rejected or `revise` negative, `null` otherwise), with
+`verdictComparison` and `verdictAgreementInstructions` beside it. The case then
+starts from that review. Each side is marked **As the source run** or
 **Edited**, with **Use the source run's input** / **output** to put the run's
 back, and **Source run log** opens the run's execution log inline. It is saved
 with `POST /api/evaluation/cases/from-agent-run` carrying the form's `input`:

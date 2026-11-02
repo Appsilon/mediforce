@@ -16,7 +16,7 @@ import type { CallerScope } from '../../repositories/index';
 import { NotFoundError, ValidationError } from '../../errors';
 import { expectsWithheldOutput, loadAgentRunSource, WITHHELD_OUTPUT_ERROR } from './_lib/agent-production-runs';
 import { loadEvaluationSubject, stepOnly, subjectRef, subjectName } from './_lib/evaluation-subject';
-import { loadCaseSource, loadVerdictExpectation } from './_lib/case-source';
+import { loadCaseSource, loadVerdictLabel } from './_lib/case-source';
 import { perturbCase } from './_lib/perturb-case';
 import { commitWorkspaceChanges } from './_lib/workspace-seed';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
@@ -124,7 +124,8 @@ export async function createEvalCase(
  * payload and the outputs of the steps before it rebuild the step's input,
  * and the parent of the commit it produced is the workspace it saw. An
  * approved run's output is the case's expected output, to match; a rejected
- * run's is one to avoid. A run sent back for revision or a recheck, or never
+ * run's is one to avoid, and so is one sent back for revision, compared by
+ * meaning on the reviewer's comment. A run sent for a recheck, or never
  * reviewed, gives no expected output unless the caller gives one. An input
  * other than the run's is one production never saw: the case is manual, and
  * keeps the run it came from.
@@ -140,7 +141,11 @@ export async function createEvalCaseFromAgentRun(
   const { instance, agentRun } = source;
   // The verdict labels the run's own output; an expected output the caller gives (null included) is one to match unless it says otherwise.
   const fromRun = input.expectedOutput === undefined;
-  const expectedOutput = fromRun ? (source.verdictLabel === null ? null : source.runOutput) : input.expectedOutput;
+  const verdictLabel = fromRun ? source.verdictLabel : null;
+  const expectedOutput = fromRun ? (verdictLabel === null ? null : source.runOutput) : input.expectedOutput;
+  const expectation = input.expectation ?? verdictLabel?.expectation ?? 'positive';
+  // A person who flips the verdict's label leaves its comparison behind: a revise comment describes an output to avoid.
+  const verdictComparison = verdictLabel?.expectation === expectation ? verdictLabel : null;
   const caseInput = input.input ?? source.runInput;
   if (source.owner.agentId !== null) assertAgentCaseInput({ kind: 'agent', namespace: source.owner.namespace, agentId: source.owner.agentId }, { input: caseInput, workspaceSeedCommit: null });
   return storeCase(scope, {
@@ -149,7 +154,13 @@ export async function createEvalCaseFromAgentRun(
     name: input.name ?? `From run ${instance.id.slice(0, 8)} (${agentRun.startedAt.slice(0, 10)})`,
     input: caseInput,
     workspaceSeedCommit: source.workspaceSeedCommit,
-    ...labelOf({ ...input, expectedOutput, expectation: input.expectation ?? (fromRun ? source.verdictLabel : null) ?? 'positive' }),
+    ...labelOf({
+      ...input,
+      expectedOutput,
+      expectation,
+      comparison: input.comparison ?? verdictComparison?.comparison ?? 'exact',
+      agreementInstructions: input.agreementInstructions === undefined ? verdictComparison?.agreementInstructions ?? null : input.agreementInstructions,
+    }),
     source: isDeepStrictEqual(caseInput, source.runInput) ? 'production' : 'manual',
     sourceAgentRunId: input.agentRunId,
     perturbation: null,
@@ -172,7 +183,7 @@ async function stepCaseFromRun(scope: CallerScope, input: z.output<typeof Create
     runInput: source.input,
     workspaceSeedCommit: source.workspaceSeedCommit,
     runOutput: source.subject.agentRun.envelope?.result ?? null,
-    verdictLabel: await loadVerdictExpectation(scope, input.agentRunId),
+    verdictLabel: await loadVerdictLabel(scope, input.agentRunId),
   };
 }
 
@@ -197,7 +208,7 @@ async function agentCaseFromRun(
     runInput: source.input,
     workspaceSeedCommit: null,
     runOutput: source.result,
-    verdictLabel: source.change.outputSchemaDiffers ? null : await loadVerdictExpectation(scope, input.agentRunId),
+    verdictLabel: source.change.outputSchemaDiffers ? null : await loadVerdictLabel(scope, input.agentRunId),
   };
 }
 

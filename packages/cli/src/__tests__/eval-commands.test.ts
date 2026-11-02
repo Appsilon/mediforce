@@ -74,7 +74,7 @@ describe('mediforce eval', () => {
     const [url, init] = fetchSpy.mock.calls[0]!;
     expect(url).toBe('http://localhost:5555/api/evaluation/cases/from-agent-run');
     expect(JSON.parse(String(init?.body))).toEqual({
-      agentRunId: 'ar-1', expectation: 'negative', comparison: 'agreement', agreementInstructions: null, evaluatorIds: null, split: 'holdout', origin: 'user',
+      agentRunId: 'ar-1', expectation: 'negative', comparison: 'agreement', evaluatorIds: null, split: 'holdout', origin: 'user',
     });
     expect(output.stdoutLines.join('\n')).toContain('(negative, holdout)');
   });

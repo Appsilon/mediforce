@@ -1,4 +1,4 @@
-import type { EvalCaseExpectation, EvalCaseInput, EvaluatedStep, ProcessInstance } from '@mediforce/platform-core';
+import type { EvalCaseLabel, EvalCaseInput, EvaluatedStep, ProcessInstance } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { ValidationError } from '../../../errors';
 import { loadEvaluationSubject } from './evaluation-subject';
@@ -62,10 +62,27 @@ export async function loadCaseSource(
   };
 }
 
-/** A person's newest verdict on a run's output: approved (1) is positive, rejected (0) negative; revise and recheck (0.5) are neither. */
-export async function loadVerdictExpectation(scope: CallerScope, agentRunId: string): Promise<EvalCaseExpectation | null> {
+/** What a person's review makes of a run's output as an Eval Case. */
+export type VerdictLabel = Pick<EvalCaseLabel, 'expectation' | 'comparison' | 'agreementInstructions'>;
+
+const AGREEMENT_INSTRUCTIONS_MAX_CHARS = 4000;
+
+function reviseInstructions(comment: string | null | undefined): string | null {
+  const request = comment?.trim() ?? '';
+  if (request === '') return null;
+  return `The reviewer sent this output back and asked for a change. An output that still needs the change agrees with this one; an output that makes it does not.\n\nReviewer's request: ${request}`.slice(0, AGREEMENT_INSTRUCTIONS_MAX_CHARS);
+}
+
+/**
+ * A person's newest verdict on a run's output: approved (1) is positive and
+ * rejected (0) negative, compared exactly; `revise` is negative, compared by
+ * meaning on the reviewer's comment, since a re-run never equals the discarded
+ * output word for word. Any other verdict, a recheck, labels nothing.
+ */
+export async function loadVerdictLabel(scope: CallerScope, agentRunId: string): Promise<VerdictLabel | null> {
   const [verdict] = await scope.scores.list({ agentRunId, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 });
-  if (verdict?.value === 1) return 'positive';
-  if (verdict?.value === 0) return 'negative';
+  if (verdict?.label === 'revise') return { expectation: 'negative', comparison: 'agreement', agreementInstructions: reviseInstructions(verdict.comment) };
+  if (verdict?.value === 1) return { expectation: 'positive', comparison: 'exact', agreementInstructions: null };
+  if (verdict?.value === 0) return { expectation: 'negative', comparison: 'exact', agreementInstructions: null };
   return null;
 }

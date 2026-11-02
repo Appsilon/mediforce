@@ -20,12 +20,12 @@ import { addAgentWorkflowRun, addStepRun, evaluationFixture, GRADED_RUN, NAMESPA
 import { gitWorkspace } from './git-workspace';
 import { userCaller } from '../../../repositories/__tests__/create-test-scope';
 
-async function reviewVerdict(fixture: EvaluationFixture, agentRunId: string, value: number, comment: string | null) {
+async function reviewVerdict(fixture: EvaluationFixture, agentRunId: string, value: number, comment: string | null, verdictKey?: string) {
   await recordScore({
     subject: { type: 'agent_run', id: agentRunId },
     name: 'human_verdict',
     value,
-    label: value === 1 ? 'approve' : value === 0 ? 'reject' : 'revise',
+    label: verdictKey ?? (value === 1 ? 'approve' : value === 0 ? 'reject' : 'revise'),
     comment,
     source: 'human',
     createdBy: 'reviewer-1',
@@ -77,10 +77,47 @@ describe('Eval Cases', () => {
     expect(evalCase).toMatchObject({ expectation: 'positive', split: 'holdout', expectedOutput: { findings: [{ term: 'Sepsis', grade: 5 }] } });
   });
 
-  it('gives a run sent back for revision, or never reviewed, no expected output unless the caller gives one', async () => {
+  it('makes a run sent back for revision a negative case: its discarded output, compared by meaning, with the reviewer\'s comment', async () => {
     await reviewVerdict(fixture, GRADED_RUN, 0.5, 'Grade the sepsis event again.');
-    const { evalCase: revised } = await harvest({ agentRunId: GRADED_RUN });
-    expect(revised).toMatchObject({ expectation: 'positive', expectedOutput: null });
+    const { evalCase } = await harvest({ agentRunId: GRADED_RUN });
+    expect(evalCase).toMatchObject({
+      expectation: 'negative',
+      expectedOutput: { findings: [{ term: 'Sepsis', grade: 5 }] },
+      comparison: 'agreement',
+    });
+    expect(evalCase.agreementInstructions).toContain('Grade the sepsis event again.');
+  });
+
+  it('lets the caller override what a revise verdict makes of the case', async () => {
+    await reviewVerdict(fixture, GRADED_RUN, 0.5, 'Grade the sepsis event again.');
+    const { evalCase: exact } = await harvest({ agentRunId: GRADED_RUN, comparison: 'exact', agreementInstructions: null });
+    expect(exact).toMatchObject({ expectation: 'negative', comparison: 'exact', agreementInstructions: null });
+    const { evalCase: none } = await harvest({ agentRunId: GRADED_RUN, expectedOutput: null });
+    expect(none).toMatchObject({ expectedOutput: null, comparison: 'exact', agreementInstructions: null });
+  });
+
+  it('leaves a revise verdict\'s comparison behind when the caller flips the case to positive', async () => {
+    await reviewVerdict(fixture, GRADED_RUN, 0.5, 'Grade the sepsis event again.');
+    const { evalCase } = await harvest({ agentRunId: GRADED_RUN, expectation: 'positive' });
+    expect(evalCase).toMatchObject({ expectation: 'positive', expectedOutput: { findings: [{ term: 'Sepsis', grade: 5 }] }, comparison: 'exact', agreementInstructions: null });
+  });
+
+  it('compares a revise verdict with no comment by meaning, with no instructions', async () => {
+    await reviewVerdict(fixture, GRADED_RUN, 0.5, null);
+    const { evalCase } = await harvest({ agentRunId: GRADED_RUN });
+    expect(evalCase).toMatchObject({ expectation: 'negative', comparison: 'agreement', agreementInstructions: null });
+  });
+
+  it('keeps a long revise comment within the limit on agreement instructions', async () => {
+    await reviewVerdict(fixture, GRADED_RUN, 0.5, 'x'.repeat(5000));
+    const { evalCase } = await harvest({ agentRunId: GRADED_RUN });
+    expect(evalCase.agreementInstructions?.length).toBeLessThanOrEqual(4000);
+  });
+
+  it('gives a run sent for a recheck, or never reviewed, no expected output unless the caller gives one', async () => {
+    await reviewVerdict(fixture, GRADED_RUN, 0.5, null, 'recheck');
+    const { evalCase: rechecked } = await harvest({ agentRunId: GRADED_RUN });
+    expect(rechecked).toMatchObject({ expectation: 'positive', expectedOutput: null });
     const { evalCase: unreviewed } = await harvest({ agentRunId: UNGRADED_RUN });
     expect(unreviewed).toMatchObject({ expectation: 'positive', expectedOutput: null });
     await reviewVerdict(fixture, UNGRADED_RUN, 0, 'Wrong.');

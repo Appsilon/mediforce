@@ -1168,8 +1168,8 @@ function AddCase({ step, evaluation, cases, evaluators, onClose }: {
           input: JSON.stringify(runIo.data.caseInput, null, 2),
           expectedOutput: outputText(runIo.data.result),
           expectation: runIo.data.verdictExpectation ?? 'positive',
-          comparison: 'exact',
-          agreementInstructions: '',
+          comparison: runIo.data.verdictComparison ?? 'exact',
+          agreementInstructions: runIo.data.verdictAgreementInstructions ?? '',
           evaluatorIds: null,
         }}
         inputHelp={step.kind === 'agent' ? 'What the agent received in this run, as its one input.' : 'What the step received in this run.'}
