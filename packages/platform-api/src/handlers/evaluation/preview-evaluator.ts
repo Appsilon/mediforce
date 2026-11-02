@@ -62,7 +62,7 @@ export async function previewEvaluator(
     const envelope = source?.agentRun.envelope ?? null;
     if (source === null || envelope === null) continue;
     const subject = { ...source, agentRun: { ...source.agentRun, envelope: { ...envelope, result: evalCase.expectedOutput } } };
-    cases.push({ ...await runEvaluatorCheck(scope, input.check, subject, null), caseId: evalCase.id, caseName: evalCase.name });
+    cases.push({ ...await runEvaluatorCheck(scope, input.check, subject, evalCase), caseId: evalCase.id, caseName: evalCase.name });
   }
 
   const caseSources = new Set(cases.map((outcome) => outcome.agentRunId));

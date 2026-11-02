@@ -79,6 +79,9 @@ function contract(name: string, factory: () => Promise<ModelRegistryRepository>)
 
       await repo.upsert(entryInput({ id: 'a/known', name: 'renamed' }));
       expect(await repo.getById('a/known')).toMatchObject({ name: 'renamed', supportedParameters: ['tools', 'structured_outputs'] });
+
+      await repo.bulkUpsert([entryInput({ id: 'a/known', name: 'renamed again' })]);
+      expect(await repo.getById('a/known')).toMatchObject({ name: 'renamed again', supportedParameters: ['tools', 'structured_outputs'] });
     });
 
     it('upsert + getById round-trips the entry', async () => {

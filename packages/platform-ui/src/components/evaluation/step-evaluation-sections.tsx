@@ -155,10 +155,7 @@ function EvaluatorRow({ step, evaluator, mayEdit, editReason, stepOutputSchema, 
   const check = evaluator.latest.check;
   const thresholds = checkThresholds(check);
   const saveVersion = (values: { rule: string; check: EvaluatorCheck }) => {
-    const changes = {
-      ...(values.rule.trim() === evaluator.latest.rule ? {} : { rule: values.rule }),
-      ...(JSON.stringify(values.check) === JSON.stringify(check) ? {} : { check: values.check }),
-    };
+    const changes = evaluatorVersionChanges(evaluator.latest, values);
     if (Object.keys(changes).length === 0) {
       setUnchanged(true);
       return;
@@ -247,6 +244,14 @@ function EvaluatorRow({ step, evaluator, mayEdit, editReason, stepOutputSchema, 
       )}
     </tbody>
   );
+}
+
+/** What a saved form changes from an Evaluator's latest version; a new version carries only that. */
+export function evaluatorVersionChanges(latest: { rule: string; check: EvaluatorCheck }, values: { rule: string; check: EvaluatorCheck }): { rule?: string; check?: EvaluatorCheck } {
+  return {
+    ...(values.rule.trim() === latest.rule ? {} : { rule: values.rule }),
+    ...(JSON.stringify(values.check) === JSON.stringify(latest.check) ? {} : { check: values.check }),
+  };
 }
 
 interface EvaluatorFormValues {

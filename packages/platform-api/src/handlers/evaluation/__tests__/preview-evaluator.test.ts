@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { buildAgentRun } from '@mediforce/platform-core/testing';
 import { CreateEvalCaseFromAgentRunInputSchema, CreateEvalCaseInputSchema } from '../../../contract/evaluation';
 import { ForbiddenError, NotFoundError } from '../../../errors';
@@ -6,6 +6,12 @@ import { userCaller } from '../../../repositories/__tests__/create-test-scope';
 import { createEvalCase, createEvalCaseFromAgentRun } from '../eval-cases';
 import { previewEvaluator } from '../preview-evaluator';
 import { evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN } from './fixture';
+
+const runCodeCheck = vi.hoisted(() => vi.fn());
+vi.mock('@mediforce/agent-runtime', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@mediforce/agent-runtime')>(),
+  runCodeCheck,
+}));
 
 const findingsSchema = { kind: 'schema' as const, schema: { required: ['findings'] } };
 
@@ -36,6 +42,20 @@ describe('previewEvaluator', () => {
 
     expect(cases).toEqual([expect.objectContaining({ caseId: planted.id, caseName: 'Grade dropped', agentRunId: UNGRADED_RUN, passed: true })]);
     expect(results.map((outcome) => outcome.agentRunId)).toEqual([GRADED_RUN]);
+  });
+
+  it('gives a code check the Eval Case it is tried on, as an Eval Run does', async () => {
+    const fixture = await evaluationFixture();
+    const { evalCase } = await createEvalCaseFromAgentRun(CreateEvalCaseFromAgentRunInputSchema.parse({
+      agentRunId: UNGRADED_RUN, name: 'Grade dropped', expectedOutput: { findings: [] },
+    }), fixture.scope());
+    runCodeCheck.mockResolvedValue({ passed: true, comment: null });
+
+    await previewEvaluator({ ...STEP, check: { kind: 'code', runtime: 'javascript', source: 'process.exit(0)' }, limit: 1 }, fixture.scope());
+
+    expect(runCodeCheck).toHaveBeenCalledWith(expect.objectContaining({
+      input: expect.objectContaining({ result: { findings: [] }, case: expect.objectContaining({ id: evalCase.id }) }),
+    }));
   });
 
   it('leaves out production runs that produced no result — they say nothing about the check', async () => {

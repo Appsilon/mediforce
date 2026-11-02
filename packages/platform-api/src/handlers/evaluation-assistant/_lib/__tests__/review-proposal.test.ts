@@ -96,7 +96,7 @@ describe('reviewEvaluationProposal', () => {
 
   it('keeps a judge model the person asked for, and sends back one the registry does not offer, has retired or that cannot constrain its answer', async () => {
     const scope = await withRegistry(fixture, [
-      registryEntry('openai/gpt-5'),
+      registryEntry('openai/gpt-5', { supportedParameters: ['structured_outputs'] }),
       registryEntry('openai/gpt-4', { retiredAt: '2026-09-01T00:00:00Z' }),
       registryEntry('deepseek/deepseek-chat', { supportedParameters: ['tools', 'temperature'] }),
     ]);
@@ -107,6 +107,12 @@ describe('reviewEvaluationProposal', () => {
     await expect(asking('openai/gpt-4')).rejects.toThrow('retired');
     await expect(asking('deepseek/deepseek-chat')).rejects.toThrow('cannot constrain its answer');
     await expect(asking('~anthropic/claude-sonnet-latest')).rejects.toThrow('alias');
+  });
+
+  it('sends back a named judge model until the registry says it can constrain its answer, and lets it stand in a registry with no models', async () => {
+    const asking = async (entries: CreateModelRegistryEntryInput[]) => reviewEvaluationProposal('propose_evaluator', proposeEvaluator({ ...judge, model: 'openai/gpt-5' }, 'grades-justified'), await withRegistry(fixture, entries), STEP, []);
+    await expect(asking([registryEntry('openai/gpt-5')])).rejects.toThrow('does not yet say');
+    expect(await asking([])).toMatchObject({ ok: true, arguments: { check: { model: 'openai/gpt-5' } } });
   });
 
   it('keeps a judge\'s model on a new version that leaves it out, unless that model is gone', async () => {

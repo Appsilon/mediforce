@@ -49,7 +49,7 @@ once the runnable version no longer has the step.
 A step (or Agent) with nothing yet — no Brief, cases, Evaluators or Eval Runs —
 opens, for a person who may edit it, on a choice: **Guided setup** or **Set up
 manually** (the tabs, until the Evaluation is left — an empty step offers the
-choice again), with how many production runs a step has to start cases from.
+choice again, unless a link or reload names a tab with `?section=`), with how many production runs a step has to start cases from.
 The guided setup (`?guided=brief|cases|evaluators|review`, only for a person
 who may edit — anyone else on such a link sees the tabs)
 walks four stages beside the assistant, which holds one conversation per stage
@@ -101,7 +101,8 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   Eval Run. The assistant leaves a judge's model to the platform, which pins
   its default (the newest Claude Sonnet in the model registry); it names one
   only when the person asks, and the platform refuses a model the registry does
-  not list, has retired, or whose supported parameters lack `structured_outputs`,
+  not list, has retired, or whose supported parameters do not list `structured_outputs`
+  (a registry with no models yet cannot say, so a named model then stands),
   and an alias whose model changes under the same name. A new version that names
   no model keeps its Evaluator's, unless the registry retired or dropped it.
 - **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
@@ -115,7 +116,7 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   output**), before accepting. **Review** opens it whole in the Add case form,
   to edit before accepting; a synthesized case accepted there keeps its file changes.
   An Evaluator card's **Review** likewise opens the proposed check in the Add
-  Evaluator form. Accepting one is the same write the forms
+  Evaluator form, and a new version's in the form that edits its Evaluator. Accepting one is the same write the forms
   make, recorded with `origin: assistant`. A routing recommendation (a Control
   Mode) comes back as a card to apply in the workflow editor. So does a **diagnosis** of an Eval Run's failures
   (`propose_diagnosis`) — see below. Nothing is applied to the step by the
@@ -298,8 +299,9 @@ request leaves out `temperature: 0` on a model whose supported parameters do
 not list `temperature` — Claude 5.5 does not, and sending it would leave no
 provider to route to. On any
 other model the answer is asked for in text, before and after the material;
-the first object in its text that parses to that shape is the answer, so prose
-around it — even prose quoting JSON — is skipped. The Score is `1`/`0` with
+the last whole object in its text that parses to that shape is the answer, so a
+draft gives way to the final answer and prose around it — even prose quoting
+JSON — is skipped. The Score is `1`/`0` with
 label `pass`/`fail`, the rationale as its comment, and
 `metadata.judgeConfidence` and `metadata.judgeMinConfidence`.
 

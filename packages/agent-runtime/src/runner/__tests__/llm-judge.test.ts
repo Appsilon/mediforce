@@ -175,6 +175,18 @@ describe('LlmJudgeReviewPlugin', () => {
     expect(result).toMatchObject({ passed: false, confidence: 0.85, reasoning: 'The summary is empty.' });
   });
 
+  it('reads an answer that braced prose follows, and one whose rationale holds braces', async () => {
+    const answer = '{"rationale": "The summary has a stray } and a \\" in it.", "passed": false, "confidence": 0.85}';
+    const result = await judge(answering(`${answer}\n\nNote {"x": 1}`));
+    expect(result).toMatchObject({ passed: false, confidence: 0.85, reasoning: 'The summary has a stray } and a " in it.' });
+  });
+
+  it('takes the final answer over a draft before it, and no verdict nested in other JSON', async () => {
+    const verdict = (passed: boolean) => JSON.stringify({ rationale: 'Graded.', passed, confidence: 0.9 });
+    expect(await judge(answering(`Draft: ${verdict(true)}\nOn reflection, final answer: ${verdict(false)}`))).toMatchObject({ passed: false });
+    await expect(judge(answering(`{"note": "x", "verdict": ${verdict(true)}}`))).rejects.toThrow();
+  });
+
   it('says the judge was cut off when its answer hit the output-token limit, and when it answered nothing', async () => {
     await expect(judge(answering('{"rationale": "The report covers', 'length'))).rejects.toThrow(/cut off at the output-token limit/);
     await expect(judge(answering(''))).rejects.toThrow(/empty answer/);

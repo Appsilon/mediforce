@@ -9,14 +9,14 @@ import {
   type EvalCaseInput,
   type EvaluationSubject,
 } from '@mediforce/platform-core';
-import type { EvaluatorSelfTest, GetAgentRunIoOutput, ProposalView } from '@mediforce/platform-api/contract';
+import type { AddEvaluatorVersionInput, EvaluatorSelfTest, EvaluatorView, GetAgentRunIoOutput, ProposalView } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { useAgentRunIo, useStepEvaluationMutation, useStepEvaluators } from '@/hooks/use-step-evaluation';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
-import { CaseForm, EvaluatorForm, FormDialog, outputText, type CaseFormResult, type EvaluatorFormResult } from './step-evaluation-sections';
+import { CaseForm, EvaluatorForm, FormDialog, evaluatorVersionChanges, outputText, type CaseFormResult, type EvaluatorFormResult } from './step-evaluation-sections';
 import { draftFromCheck } from './evaluator-check-editor';
 
 export type ProposalStatus = 'open' | 'accepted' | 'rejected';
@@ -331,6 +331,47 @@ function ReviewProposedEvaluator({ step, proposal, stepOutputSchema, mayEdit, on
   );
 }
 
+/**
+ * The proposed version in the form a person edits an Evaluator with, over what
+ * it leaves unchanged; accepting it there saves what differs from the latest
+ * version as the new one, still the assistant's.
+ */
+function ReviewProposedEvaluatorVersion({ step, proposal, evaluator, stepOutputSchema, mayEdit, onAccepted, onClose }: {
+  step: EvaluationSubject;
+  proposal: Proposal<'propose_evaluator_version'>;
+  evaluator: EvaluatorView;
+  stepOutputSchema: AgentOutputSchema | undefined;
+  mayEdit: boolean;
+  onAccepted: () => void;
+  onClose: () => void;
+}) {
+  const { latest } = evaluator;
+  const { rule = latest.rule, check = latest.check } = proposal.arguments;
+  const [unchanged, setUnchanged] = React.useState(false);
+  const accept = useStepEvaluationMutation(step, (changes: Omit<AddEvaluatorVersionInput, 'evaluatorId' | 'origin'>) =>
+    mediforce.evaluation.addEvaluatorVersion({ evaluatorId: evaluator.id, ...changes, origin: 'assistant' }));
+  const onSubmit = (values: EvaluatorFormResult) => {
+    const changes = evaluatorVersionChanges(latest, values);
+    const nothingChanged = Object.keys(changes).length === 0;
+    setUnchanged(nothingChanged);
+    if (nothingChanged === false) accept.mutate(changes, { onSuccess: onAccepted });
+  };
+  return (
+    <FormDialog title={`Review the proposed ${evaluator.name} v${latest.version + 1}`} description={`Edit it if it needs it; Accept saves it as it stands here.${check.kind === 'code' ? ' The new version needs its source approved again before it counts, whatever changed.' : ''}`} testId="evaluator-dialog" onClose={onClose}>
+      <EvaluatorForm
+        initial={{ name: evaluator.name, rule, draft: draftFromCheck(check) }}
+        editing
+        stepOutputSchema={stepOutputSchema}
+        submitLabel="Accept"
+        pending={mayEdit === false || accept.isPending}
+        error={unchanged === true ? 'Nothing changed.' : accept.error?.message ?? null}
+        onSubmit={onSubmit}
+        onCancel={onClose}
+      />
+    </FormDialog>
+  );
+}
+
 function ProposalSummary({ step, proposal }: { step: EvaluationSubject; proposal: DecidableProposal }) {
   const evaluators = useStepEvaluators(step);
   switch (proposal.tool) {
@@ -402,6 +443,8 @@ export function ProposalCard({ step, state, stepOutputSchema, mayEdit, editReaso
   const [caseLabel, setCaseLabel] = React.useState<CaseLabel | null>(null);
   const [reviewing, setReviewing] = React.useState(false);
   const proposal = relabelled(state.proposal, caseLabel);
+  const evaluators = useStepEvaluators(step).data?.evaluators;
+  const versionedEvaluator = proposal.tool === 'propose_evaluator_version' ? evaluators?.find((candidate) => candidate.id === proposal.arguments.evaluatorId) : undefined;
   const sourceRun = useAgentRunIo(state.proposal.tool === 'propose_eval_case' ? state.proposal.arguments.agentRunId ?? null : null);
   const proposedCase = isCaseProposal(state.proposal) ? proposedCaseContent(state.proposal, sourceRun.data) : null;
   const caseContent = isCaseProposal(proposal) ? proposedCaseContent(proposal, sourceRun.data) : null;
@@ -452,7 +495,7 @@ export function ProposalCard({ step, state, stepOutputSchema, mayEdit, editReaso
               </button>
             </span>
           </InstantTooltip>
-          {((isCaseProposal(proposal) && caseContent !== null) || proposal.tool === 'propose_evaluator') && (
+          {((isCaseProposal(proposal) && caseContent !== null) || proposal.tool === 'propose_evaluator' || versionedEvaluator !== undefined) && (
             <button type="button" className={buttonClass} onClick={() => setReviewing(true)}>
               <Eye className="h-3 w-3" />Review
             </button>
@@ -471,6 +514,20 @@ export function ProposalCard({ step, state, stepOutputSchema, mayEdit, editReaso
           step={step}
           proposal={proposal}
           content={caseContent}
+          mayEdit={mayEdit}
+          onAccepted={() => {
+            setReviewing(false);
+            onDecided('accepted');
+          }}
+          onClose={() => setReviewing(false)}
+        />
+      )}
+      {reviewing && proposal.tool === 'propose_evaluator_version' && versionedEvaluator !== undefined && (
+        <ReviewProposedEvaluatorVersion
+          step={step}
+          proposal={proposal}
+          evaluator={versionedEvaluator}
+          stepOutputSchema={stepOutputSchema}
           mayEdit={mayEdit}
           onAccepted={() => {
             setReviewing(false);

@@ -34,8 +34,9 @@ export interface PreviewedCheck {
  * it, it is not retired and it can constrain its answer to the judge's schema.
  * Named by no one, a new version keeps the model its Evaluator's check of the
  * same kind has while the registry does not retire or drop it, as a change of
- * rubric is no change of judge; otherwise the platform's pinned default. An
- * unsynced registry cannot say, so a named or kept model then stands.
+ * rubric is no change of judge; otherwise the platform's pinned default. A
+ * registry with no models at all cannot say, so a named or kept model then
+ * stands; a named model listed without saying what it takes is refused.
  */
 async function resolveCheck(scope: CallerScope, check: AssistantCheck, replaced?: EvaluatorCheck): Promise<EvaluatorCheck> {
   if (check.kind !== 'llm_judge' && check.kind !== 'expected_output') return check;
@@ -50,13 +51,17 @@ async function resolveCheck(scope: CallerScope, check: AssistantCheck, replaced?
     throw new ValidationError(`'${model}' is an alias whose model changes under the same name; leave the model out for the pinned default, or name a concrete model.`);
   }
   const entry = models.find((candidate) => candidate.id === model);
-  if (models.length > 0 && entry === undefined) {
+  if (entry === undefined) {
+    if (models.length === 0) return { ...check, model };
     throw new ValidationError(`The judge model '${model}' is not in the model registry; ask the person for a model the registry lists, or leave it out for the pinned default.`);
   }
-  if (entry !== undefined && entry.retiredAt !== null) {
+  if (entry.retiredAt !== null) {
     throw new ValidationError(`The judge model '${model}' was retired on ${entry.retiredAt}; leave the model out for the pinned default, or name a live one.`);
   }
-  if (entry?.supportedParameters !== undefined && entry.supportedParameters.includes('structured_outputs') === false) {
+  if (entry.supportedParameters === undefined) {
+    throw new ValidationError(`The model registry does not yet say whether the judge model '${model}' can constrain its answer to a JSON Schema; leave the model out for the pinned default, or ask the person to sync the model registry first.`);
+  }
+  if (entry.supportedParameters.includes('structured_outputs') === false) {
     throw new ValidationError(`The judge model '${model}' cannot constrain its answer to a JSON Schema, so its verdict could come back as prose or broken JSON; leave the model out for the pinned default, or name a model that supports structured outputs.`);
   }
   return { ...check, model };

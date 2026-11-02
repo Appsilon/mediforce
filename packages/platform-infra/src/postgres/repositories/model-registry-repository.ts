@@ -168,7 +168,7 @@ export class PostgresModelRegistryRepository implements ModelRegistryRepository 
             outputModalities: sql`excluded.output_modalities`,
             supportsTools: sql`excluded.supports_tools`,
             supportsVision: sql`excluded.supports_vision`,
-            supportedParameters: sql`excluded.supported_parameters`,
+            supportedParameters: sql`coalesce(excluded.supported_parameters, ${modelRegistryEntries.supportedParameters})`,
             source: sql`excluded.source`,
             requestCount: sql`excluded.request_count`,
             lastSyncedAt: sql`excluded.last_synced_at`,

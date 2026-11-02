@@ -1,10 +1,11 @@
 import * as React from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { StepEvaluation } from '../evaluation-tab';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { EvaluationTab, StepEvaluation } from '../evaluation-tab';
 
 const navigation = vi.hoisted(() => ({ search: '' }));
 const stepEvaluation = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
+const workflowDefinition = vi.hoisted(() => ({ current: null as unknown }));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn() }),
@@ -17,7 +18,7 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
 }));
 vi.mock('@/hooks/use-workflow-access', () => ({ useWorkflowRunGate: () => ({ mayRun: true, reason: undefined }) }));
 vi.mock('@/hooks/use-workflow-versions', () => ({
-  useWorkflowVersion: () => ({ definition: null, loading: false, error: null }),
+  useWorkflowVersion: () => ({ definition: workflowDefinition.current, loading: false, error: null }),
   useWorkflowVersions: () => ({ versions: [], defaultVersion: null, loading: false }),
 }));
 vi.mock('../evaluation-assistant-panel', () => ({ EvaluationAssistantPanel: () => <div data-testid="evaluation-assistant" /> }));
@@ -42,6 +43,7 @@ function renderEvaluation(mayEdit: boolean) {
 
 beforeEach(() => {
   navigation.search = '';
+  workflowDefinition.current = null;
   stepEvaluation.current = {
     brief: { data: { brief: null }, isError: false },
     cases: { data: { cases: [] }, isError: false },
@@ -54,6 +56,13 @@ describe('StepEvaluation', () => {
   it('offers an empty subject the choice of setup', () => {
     renderEvaluation(true);
     expect(screen.getByTestId('evaluation-setup-choice')).toBeInTheDocument();
+  });
+
+  it('opens an empty subject on the tab a link or a reload names', () => {
+    navigation.search = 'section=evaluators';
+    renderEvaluation(true);
+    expect(screen.queryByTestId('evaluation-setup-choice')).toBeNull();
+    expect(screen.getByTestId('evaluation-tab-evaluators')).toHaveAttribute('data-state', 'active');
   });
 
   it('opens on the tabs, not on Loading forever, when a query failed', () => {
@@ -74,5 +83,23 @@ describe('StepEvaluation', () => {
     renderEvaluation(false);
     expect(screen.queryByTestId('guided-setup')).toBeNull();
     expect(screen.getByTestId('evaluation-tab-cases')).toBeInTheDocument();
+  });
+});
+
+describe('EvaluationTab', () => {
+  it('offers an empty step picked on the page the choice of setup, though the URL keeps the last step\'s tab', () => {
+    navigation.search = 'section=evaluators&step=extract-aes';
+    workflowDefinition.current = {
+      steps: [
+        { id: 'extract-aes', name: 'Extract AEs', executor: 'agent' },
+        { id: 'grade-aes', name: 'Grade AEs', executor: 'agent' },
+      ],
+    };
+    render(<EvaluationTab handle="acme" workflowName="safety" runnableVersion={1} mayEdit editReason={undefined} />);
+    expect(screen.queryByTestId('evaluation-setup-choice')).toBeNull();
+
+    fireEvent.change(screen.getByTestId('evaluation-step-select'), { target: { value: 'grade-aes' } });
+
+    expect(screen.getByTestId('evaluation-setup-choice')).toBeInTheDocument();
   });
 });

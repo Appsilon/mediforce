@@ -3,13 +3,14 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ProposalCard } from '../evaluation-assistant-cards';
 
-const evaluation = vi.hoisted(() => ({ createCaseFromAgentRun: vi.fn(), createCase: vi.fn(), createPerturbedCase: vi.fn(), createEvaluator: vi.fn() }));
+const evaluation = vi.hoisted(() => ({ createCaseFromAgentRun: vi.fn(), createCase: vi.fn(), createPerturbedCase: vi.fn(), createEvaluator: vi.fn(), addEvaluatorVersion: vi.fn() }));
+const stepEvaluators = vi.hoisted(() => ({ current: [] as unknown[] }));
 const runIo = vi.hoisted(() => ({ current: undefined as unknown, error: null as Error | null }));
 
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
 vi.mock('@/hooks/use-model-registry', () => ({ usePinnedDefaultModel: () => 'anthropic/claude-sonnet-5.5' }));
 vi.mock('@/hooks/use-step-evaluation', () => ({
-  useStepEvaluators: () => ({ data: { evaluators: [] } }),
+  useStepEvaluators: () => ({ data: { evaluators: stepEvaluators.current } }),
   useAgentRunIo: (agentRunId: string | null) => (agentRunId !== null && runIo.error !== null
     ? { data: undefined, isError: true, error: runIo.error }
     : { data: agentRunId === null ? undefined : runIo.current, isError: false, error: null }),
@@ -64,6 +65,8 @@ beforeEach(() => {
   evaluation.createCase.mockResolvedValue({});
   evaluation.createPerturbedCase.mockResolvedValue({});
   evaluation.createEvaluator.mockResolvedValue({});
+  evaluation.addEvaluatorVersion.mockResolvedValue({});
+  stepEvaluators.current = [];
   runIo.current = sourceRun;
   runIo.error = null;
 });
@@ -207,6 +210,38 @@ describe('ProposalCard for an Evaluator', () => {
       rule: 'Every adverse event carries a grade.',
       check: { kind: 'schema', schema: { type: 'object', required: ['grades'] } },
     }));
+  });
+});
+
+describe('ProposalCard for a new Evaluator version', () => {
+  const evaluatorId = '11111111-1111-4111-8111-111111111111';
+  const latest = { version: 2, rule: 'Every grade is 1 to 5.', check: { kind: 'code', runtime: 'javascript', source: 'process.exit(0)' } };
+
+  it('opens the version in the Evaluator\'s edit form over what it leaves unchanged, and saves it as edited there, still the assistant\'s', async () => {
+    stepEvaluators.current = [{ id: evaluatorId, name: 'grades-valid', latest }];
+    const onDecided = renderProposal({
+      tool: 'propose_evaluator_version',
+      arguments: { evaluatorId, rule: 'Every grade is 1 to 5, as CTCAE has it.', rationale: 'The rule did not name its source.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    const dialog = await screen.findByTestId('evaluator-dialog');
+    expect(within(dialog).getByLabelText('Evaluator name')).toBeDisabled();
+    expect(within(dialog).getByLabelText('Rule')).toHaveValue('Every grade is 1 to 5, as CTCAE has it.');
+    expect(within(dialog).getByLabelText('Source')).toHaveValue('process.exit(0)');
+    fireEvent.change(within(dialog).getByLabelText('Source'), { target: { value: 'process.exit(1)' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Accept' }));
+    await waitFor(() => expect(onDecided).toHaveBeenCalledWith('accepted'));
+    expect(evaluation.addEvaluatorVersion).toHaveBeenCalledWith({
+      evaluatorId,
+      rule: 'Every grade is 1 to 5, as CTCAE has it.',
+      check: { kind: 'code', runtime: 'javascript', source: 'process.exit(1)' },
+      origin: 'assistant',
+    });
+  });
+
+  it('offers no Review while its Evaluator is not known', () => {
+    renderProposal({ tool: 'propose_evaluator_version', arguments: { evaluatorId, rule: 'Every grade is 1 to 5.' } });
+    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull();
   });
 });
 

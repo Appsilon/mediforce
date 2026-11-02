@@ -58,18 +58,20 @@ export const EVALUATION_QUERY_PARAMS = ['version', 'step', 'section', 'guided'] 
 
 /**
  * How the Evaluation is being set up: the guided stage `?guided=` names, else
- * by hand on the tabs once the person chose them, else not chosen yet. The
- * choice of the tabs is not kept in the URL, so it lasts only while the
- * Evaluation stays open and an empty subject offers the choice again.
+ * by hand on the tabs once the person chose them or the page opened on a
+ * `?section=`, else not chosen yet. The choice itself is not kept in the URL,
+ * so with no tab named it lasts only while the Evaluation stays open and an
+ * empty subject offers the choice again. A tab kept while picking another step
+ * chooses nothing for it.
  */
-function useSetupMode() {
+function useSetupMode(pickedHere: boolean) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [manualChosen, setManualChosen] = React.useState(false);
   const requestedStage = searchParams.get('guided');
   const stage: SetupStage | null = isSetupStage(requestedStage) ? requestedStage : null;
-  const setup = stage !== null ? 'guided' : manualChosen ? 'manual' : null;
+  const setup = stage !== null ? 'guided' : manualChosen === true || (pickedHere === false && isSectionTab(searchParams.get('section')) === true) ? 'manual' : null;
   const replace = (change: (params: URLSearchParams) => void) => {
     const params = new URLSearchParams(searchParams.toString());
     change(params);
@@ -105,7 +107,7 @@ function isEmptySubject(evaluation: ReturnType<typeof useStepEvaluation>): boole
  * page's `header`, which stays over every mode, Guided setup opens the setup
  * from the tabs and Manual setup leaves it for them.
  */
-export function StepEvaluation({ header, step, definitionVersion, outputSchema, mayEdit, editReason, mayRun, runReason }: {
+export function StepEvaluation({ header, step, definitionVersion, outputSchema, mayEdit, editReason, mayRun, runReason, pickedHere = false }: {
   header: React.ReactNode;
   step: EvaluationSubject;
   definitionVersion: number | null;
@@ -114,9 +116,11 @@ export function StepEvaluation({ header, step, definitionVersion, outputSchema, 
   editReason: string | undefined;
   mayRun: boolean;
   runReason: string | undefined;
+  /** The subject was picked on the open page, rather than opened from the URL. */
+  pickedHere?: boolean;
 }) {
   const evaluation = useStepEvaluation(step, definitionVersion);
-  const setupMode = useSetupMode();
+  const setupMode = useSetupMode(pickedHere);
   const [savedSetup, setSavedSetup] = React.useState<string | null>(null);
   const empty = isEmptySubject(evaluation);
   const layoutRef = React.useRef<HTMLDivElement>(null);
@@ -264,7 +268,9 @@ export function EvaluationTab({ handle, workflowName, runnableVersion, mayEdit, 
   const selectedVersion = liveVersions.some((version) => version.version === requestedVersion) ? requestedVersion : runnableVersion;
   const { definition, loading: definitionLoading, error: definitionError } = useWorkflowVersion(workflowName, handle, selectedVersion);
 
+  const [pickedHere, setPickedHere] = React.useState(false);
   const select = (next: { version?: number; step?: string }) => {
+    setPickedHere(true);
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', 'evaluation');
     // How one step is set up says nothing about the next.
@@ -349,6 +355,7 @@ export function EvaluationTab({ handle, workflowName, runnableVersion, mayEdit, 
       editReason={editReason}
       mayRun={mayRun}
       runReason={runReason}
+      pickedHere={pickedHere}
     />
   );
 }
