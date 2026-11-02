@@ -148,6 +148,7 @@ import {
   evalTrialCommand,
 } from './commands/eval-runs';
 import { evalAskCommand } from './commands/eval-ask';
+import { evalAskReviewGapsCommand } from './commands/eval-ask-review-gaps';
 import { evalCriteriaGetCommand, evalCriteriaSetCommand, evalQualificationCommand, evalValidationCommand } from './commands/eval-qualification';
 import { namespaceUpdateCommand } from './commands/namespace-update';
 import { namespaceDeleteCommand } from './commands/namespace-delete';
@@ -351,6 +352,7 @@ export const TREE: Record<string, BranchEntry> = {
       validation: { description: 'Print whether each version of a workflow is verified, step by step', fn: evalValidationCommand },
       drift: { description: 'Print drift alerts: production Evaluators whose rolling Score mean dropped', fn: evalDriftCommand },
       ask: { description: 'Ask the step\'s Evaluation Assistant (proposals are printed, not applied)', fn: evalAskCommand },
+      'ask-review-gaps': { description: 'Feed accumulated review_gap misses into the step\'s Evaluation Assistant (proposals are printed, not applied)', fn: evalAskReviewGapsCommand },
     },
   },
   model: {

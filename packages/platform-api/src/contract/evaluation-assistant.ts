@@ -72,6 +72,33 @@ export const EvaluationAssistantProgressSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
+/**
+ * Contract for `POST /api/evaluation/assistant/review-gaps` — feeds the
+ * production-review feedback loop (`review_gap` Scores, see
+ * `classify-review-gap.ts`) into the Step's Evaluation Assistant: only when
+ * at least one reviewer correction since `since` named something the step's
+ * output missed does this ask the Assistant to diagnose and propose a fix.
+ * Agent-only subjects are refused — review_gap Scores carry a stepId, not an
+ * agentId, so only a Step's own gaps can be attributed correctly.
+ */
+export const AskAboutReviewGapsInputSchema = EvaluationSubjectRefSchema.extend({
+  definitionVersion: z.number().int().positive().optional(),
+  /** Only `review_gap` Scores recorded at or after this time count as new. */
+  since: z.iso.datetime(),
+  model: z.string().min(1).optional(),
+  unattendedBudgetUsd: z.number().positive().max(10_000).optional(),
+});
+
+export const AskAboutReviewGapsOutputSchema = z.object({
+  /** How many `review_gap` Scores since `since` had the judge say the output missed something. */
+  missedCount: z.number().int().nonnegative(),
+  /** Set only when `missedCount` > 0 — the Assistant was actually asked. */
+  assistant: AskEvaluationAssistantOutputSchema.nullable(),
+});
+
+export type AskAboutReviewGapsInput = z.infer<typeof AskAboutReviewGapsInputSchema>;
+export type AskAboutReviewGapsOutput = z.infer<typeof AskAboutReviewGapsOutputSchema>;
+
 export type AskEvaluationAssistantInput = z.infer<typeof AskEvaluationAssistantInputSchema>;
 export type AskEvaluationAssistantOutput = z.infer<typeof AskEvaluationAssistantOutputSchema>;
 export type PreparedEvalRun = z.infer<typeof PreparedEvalRunSchema>;

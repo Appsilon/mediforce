@@ -290,8 +290,13 @@ only `maxIterations` is checked. Treat it as declarative-only.
 Every agent step's Agent Run keeps its **Agent Trajectory** — the tool calls and
 results the agent made — readable with `mediforce agent-run trajectory <id>`,
 and a verdict on an L3 review becomes a `human_verdict` **Score** on that run
-(`mediforce score list`). Neither is configured per step. See
-[`container-steps.md`](container-steps.md#result-and-agent-trajectory).
+(`mediforce score list`) — as does a verdict on a plain (`human_executor`)
+review step that names the earlier agent step it judges via
+`reviewsAgentStep`. A `danger`/`warning` verdict with a comment is further
+judged for whether it names something the output missed (`review_gap` Score);
+`mediforce eval ask-review-gaps` feeds accumulated misses to the step's
+Evaluation Assistant. Neither Trajectory nor Score capture is configured per
+step. See [`container-steps.md`](container-steps.md#result-and-agent-trajectory).
 Evaluators, Eval Cases and the MCP eval policy of an agent step live outside
 the definition — see [`step-evaluation.md`](step-evaluation.md).
 

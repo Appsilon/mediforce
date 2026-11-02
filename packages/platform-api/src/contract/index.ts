@@ -798,6 +798,8 @@ export {
 export {
   AskEvaluationAssistantInputSchema,
   AskEvaluationAssistantOutputSchema,
+  AskAboutReviewGapsInputSchema,
+  AskAboutReviewGapsOutputSchema,
   EvaluationAssistantProgressSchema,
   PreparedEvalRunSchema,
   StartedEvalRunSchema,
@@ -805,6 +807,8 @@ export {
   ProposalViewSchema,
   type AskEvaluationAssistantInput,
   type AskEvaluationAssistantOutput,
+  type AskAboutReviewGapsInput,
+  type AskAboutReviewGapsOutput,
   type EvaluationAssistantProgress,
   type PreparedEvalRun,
   type StartedEvalRun,

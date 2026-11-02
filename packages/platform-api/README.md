@@ -89,9 +89,18 @@ authenticated, and only these two may do that.
 
 **Every Score goes through `recordScore`** (`handlers/scores/record-score.ts`),
 which appends its `score.created` audit event. There is no generic Score write
-route: Scores arrive from task completion (Control Mode 3 verdicts), from
+route: Scores arrive from task completion — a `human_verdict` Score on a CM3
+review, and on a plain review step that names the earlier agent step it judges
+via `reviewsAgentStep` (`handlers/scores/record-human-verdict.ts`) — from
 Evaluators, and from a person accepting or denying a judge verdict or agreement
-score of an Eval Run (`reviewJudgeVerdict`, `judge-reviews.ts`). With
+score of an Eval Run (`reviewJudgeVerdict`, `judge-reviews.ts`). A
+`human_verdict` correction with a comment is further judged for whether it
+names something the step's output missed (`review_gap` Score,
+`handlers/scores/classify-review-gap.ts`);
+`handlers/evaluation-assistant/ask-about-review-gaps.ts` feeds accumulated
+misses into the step's Evaluation Assistant as a production-review feedback
+loop — it only asks; nothing is applied without the person accepting a
+proposal (D15). With
 `MEDIFORCE_SCORE_EXPORT` set, `services/score-export.ts` wraps the Score
 repository and also sends each Score of a traced Agent Run to Phoenix or
 Langfuse. It only writes, runs in the background, and never fails the Score
