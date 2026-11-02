@@ -248,7 +248,7 @@ describe('runEvaluatorCheck', () => {
     expect(await runEvaluatorCheck(scope, judge, subject, null)).toMatchObject({ passed: true, confidence: 0.85 });
     const judgeBody = JSON.parse(String(judging.mock.calls[0]![1]!.body)) as Record<string, unknown>;
     expect(judgeBody).toMatchObject({
-      max_tokens: 4000,
+      max_tokens: 16000,
       response_format: { type: 'json_schema', json_schema: { name: 'verdict', strict: true, schema: { required: ['rationale', 'passed', 'confidence'] } } },
       provider: { require_parameters: true },
     });
@@ -274,6 +274,19 @@ describe('runEvaluatorCheck', () => {
     expect(JSON.parse(String(fetchMock.mock.calls[0]![1]!.body))).toMatchObject({ temperature: 0, provider: { require_parameters: true } });
   });
 
+  it('asks a judge for no more output tokens than its model allows', async () => {
+    for (const [maxCompletionTokens, sent] of [[8192, 8192], [32_000, 16_000], [null, 16_000]] as const) {
+      const fixture = await evaluationFixture();
+      await fixture.modelRegistryRepo.upsert(registryEntry(judge.model, { maxCompletionTokens }));
+      const scope = withOpenRouterKey(fixture);
+      const fetchMock = answeringOpenRouter(ANSWER);
+
+      await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, GRADED_RUN, STEP), null);
+
+      expect(JSON.parse(String(fetchMock.mock.calls[0]![1]!.body))).toMatchObject({ max_tokens: sent });
+    }
+  });
+
   it('asks a judge on a model the registry does not say can constrain its answer for JSON in text, so a judge saved on one still runs', async () => {
     for (const parameters of [null, undefined, ['max_tokens', 'temperature', 'response_format']]) {
       const fixture = await evaluationFixture();
@@ -283,7 +296,7 @@ describe('runEvaluatorCheck', () => {
 
       expect(await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, GRADED_RUN, STEP), null)).toMatchObject({ passed: true, comment: 'Sepsis is graded 5, as the fatal outcome requires.' });
       const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as Record<string, unknown>;
-      expect(body).toMatchObject({ max_tokens: 4000, temperature: 0 });
+      expect(body).toMatchObject({ max_tokens: 16000, temperature: 0 });
       expect(body.response_format).toBeUndefined();
       expect(body.provider).toBeUndefined();
       expect(body.tools).toBeUndefined();
@@ -299,6 +312,21 @@ describe('runEvaluatorCheck', () => {
 
     const outcome = await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, GRADED_RUN, STEP), null);
     expect(outcome).toMatchObject({ passed: null, error: expect.stringContaining('cut off at the output-token limit') });
+  });
+
+  it('reports a judge that spent its whole output-token limit on reasoning, and what that call spent', async () => {
+    const fixture = await evaluationFixture();
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: '' }, finish_reason: 'length' }],
+      usage: { prompt_tokens: 6239, completion_tokens: 16000, completion_tokens_details: { reasoning_tokens: 16000 } },
+    }))));
+    const scope = withOpenRouterKey(fixture);
+    const calls: unknown[] = [];
+
+    const outcome = await runEvaluatorCheck(scope, judge, await loadScoredRun(scope, GRADED_RUN, STEP), null, (call) => calls.push(call));
+
+    expect(outcome).toMatchObject({ passed: null, error: 'the judge used up its output-token limit before writing any answer (16000 tokens, 16000 of them reasoning)' });
+    expect(calls[0]).toMatchObject({ completionTokens: 16000, reasoningTokens: 16000, response: '' });
   });
 
   it('asks a rate-limited or failing provider once more before reporting the provider\'s error', async () => {

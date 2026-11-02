@@ -231,7 +231,7 @@ export const evalTrialCommand = defineCommand({
       if (said !== null) output.stdout(`  ${said}`);
       if (args.prompts === true) {
         for (const message of entry.judgePrompt ?? []) output.stdout(`  --- ${message.role} ---\n${message.content}`);
-        for (const call of entry.judgeCalls ?? []) output.stdout(`  --- assistant (${call.model}, ${call.promptTokens} in / ${call.completionTokens} out tokens, ${call.durationMs} ms) ---\n${call.response}`);
+        for (const call of entry.judgeCalls ?? []) output.stdout(`  --- assistant (${call.model}, ${call.promptTokens} in / ${call.completionTokens} out tokens${call.reasoningTokens === undefined ? '' : ` (${call.reasoningTokens} reasoning)`}, ${call.durationMs} ms) ---\n${call.response}`);
       }
     }
     return 0;

@@ -18,8 +18,8 @@ type LlmJudgeCheck = Extract<EvaluatorCheck, { kind: 'llm_judge' }>;
 type ExpectedOutputCheck = Extract<EvaluatorCheck, { kind: 'expected_output' }>;
 
 const CODE_CHECK_TIMEOUT_MS = 2 * 60_000;
-/** Room for a rationale that cites what decided the verdict; a ceiling, so a short answer costs no more. */
-const JUDGE_MAX_OUTPUT_TOKENS = 4000;
+/** Room for a model's reasoning, which counts against this too, and a rationale that cites what decided the verdict; a ceiling, so a short answer costs no more. */
+const JUDGE_MAX_OUTPUT_TOKENS = 16_000;
 const JUDGE_RETRY_DELAY_MS = 2000;
 
 /** A rate limit or a provider failure is asked once more before it errors the check. */
@@ -42,7 +42,9 @@ async function callJudgeModel(request: OpenRouterRequest): ReturnType<typeof cal
  * to a model that takes it.
  */
 async function openRouterJudgeClient(scope: CallerScope, apiKey: string, model: string, onCall: (call: JudgeCall) => void): Promise<LlmClient> {
-  const parameters = (await scope.models.getById(model))?.supportedParameters;
+  const entry = await scope.models.getById(model);
+  const parameters = entry?.supportedParameters;
+  const maxTokens = Math.min(JUDGE_MAX_OUTPUT_TOKENS, entry?.maxCompletionTokens ?? JUDGE_MAX_OUTPUT_TOKENS);
   const constrains = parameters?.includes('structured_outputs') === true;
   const takesTemperature = parameters === undefined || parameters.includes('temperature') === true;
   return {
@@ -54,7 +56,7 @@ async function openRouterJudgeClient(scope: CallerScope, apiKey: string, model: 
         apiKey,
         messages,
         temperature: takesTemperature ? 0 : null,
-        maxTokens: JUDGE_MAX_OUTPUT_TOKENS,
+        maxTokens,
         ...(answerSchema === undefined || constrains === false ? {} : { answerSchema }),
       });
       onCall({ model, ...response.usage, durationMs: Date.now() - startedAt, response: response.content });

@@ -60,11 +60,17 @@ const OMITTED_FILE: Record<StepFileOmission, string> = {
   unreadable: 'the workspace could not be read',
 };
 
-/** Why a judge's answer could not be read, when the provider says more than the answer does. */
-function unreadableAnswer(response: LlmResponse): string | null {
-  if (response.stopReason === 'length') return 'the judge\'s answer was cut off at the output-token limit';
-  if (response.content.trim() === '') return 'the judge gave an empty answer';
-  return null;
+/** Why a judge's answer could not be read; `otherwise` when the provider's stop reason does not say. */
+function unreadableAnswerError(response: LlmResponse, otherwise: string): Error {
+  if (response.content.trim() === '') {
+    if (response.stopReason !== 'length') return new Error('the judge gave an empty answer');
+    const { completionTokens, reasoningTokens } = response.usage;
+    const reasoning = reasoningTokens === undefined ? '' : `, ${reasoningTokens} of them reasoning`;
+    const spent = completionTokens === 0 ? '' : ` (${completionTokens} tokens${reasoning})`;
+    return new Error(`the judge used up its output-token limit before writing any answer${spent}`);
+  }
+  const reason = response.stopReason === 'length' ? 'the judge\'s answer was cut off at the output-token limit' : otherwise;
+  return new Error(`${reason}: ${response.content.slice(0, 300)}`);
 }
 
 function truncate(text: string, limit: number): string {
@@ -179,7 +185,7 @@ export class LlmJudgeReviewPlugin implements ReviewPlugin {
 
     const answer = parseAnswer(response.content, JudgeAnswerSchema);
     if (answer === null) {
-      throw new Error(`${unreadableAnswer(response) ?? 'judge gave no usable verdict (rationale, passed, confidence 0–1)'}: ${response.content.slice(0, 300)}`);
+      throw unreadableAnswerError(response, 'judge gave no usable verdict (rationale, passed, confidence 0–1)');
     }
     return {
       verdict: answer.passed ? 'approve' : 'reject',
@@ -262,7 +268,7 @@ export async function judgeOutputAgreement(llm: LlmClient, config: OutputAgreeme
 
   const answer = parseAnswer(response.content, AgreementAnswerSchema);
   if (answer === null) {
-    throw new Error(`${unreadableAnswer(response) ?? 'the agreement judge gave no usable agreement (rationale, agreement 0–1)'}: ${response.content.slice(0, 300)}`);
+    throw unreadableAnswerError(response, 'the agreement judge gave no usable agreement (rationale, agreement 0–1)');
   }
   return { agreement: answer.agreement, rationale: answer.rationale, model: response.model };
 }

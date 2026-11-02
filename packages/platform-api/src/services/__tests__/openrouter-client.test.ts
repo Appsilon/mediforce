@@ -19,6 +19,30 @@ describe('callOpenRouter', () => {
     expect(result.usage).toEqual({ promptTokens: 812, completionTokens: 64 });
   });
 
+  it('returns how many output tokens went on reasoning', async () => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: 'ok' } }],
+      usage: { prompt_tokens: 812, completion_tokens: 64, completion_tokens_details: { reasoning_tokens: 50 } },
+    }), { status: 200 }));
+
+    const result = await callOpenRouter({ model: 'model-x', messages: [{ role: 'user', content: 'hi' }], apiKey: 'key-abc' });
+
+    expect(result.usage).toEqual({ promptTokens: 812, completionTokens: 64, reasoningTokens: 50 });
+  });
+
+  it('leaves reasoning tokens out when the model does not report a number', async () => {
+    for (const details of [undefined, {}, { reasoning_tokens: null }]) {
+      fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+        choices: [{ message: { content: 'ok' } }],
+        usage: { prompt_tokens: 812, completion_tokens: 64, completion_tokens_details: details },
+      }), { status: 200 }));
+
+      const result = await callOpenRouter({ model: 'model-x', messages: [{ role: 'user', content: 'hi' }], apiKey: 'key-abc' });
+
+      expect(result.usage).toStrictEqual({ promptTokens: 812, completionTokens: 64 });
+    }
+  });
+
   it('retries once when the connection drops, then reports a network error', async () => {
     const ok = () => new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 });
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('fetch failed')).mockResolvedValueOnce(ok());

@@ -270,8 +270,12 @@ case }` — and the step's workspace commit read-only at `/workspace`, and write
 `/output/result.json` as `{ "passed": boolean, "comment"?: string }`. A check
 that crashes, or a judge that gives no usable verdict, is an *error*, never a
 failed output. A judge's error says when its answer was cut off at its
-output-token limit or came back empty; a rate limit or provider failure is
-asked once more before it errors the check.
+output-token limit, when it used up that limit before writing anything, or when
+it came back empty; a rate limit or provider failure is asked once more before
+it errors the check. The limit is 16,000 tokens per call, or the model's own
+limit in the registry when that is lower, and a model's reasoning counts against
+it, so each judge call records its reasoning tokens when the provider reports
+them.
 
 Every change is a new immutable version; a `code` version's source approval
 attaches to it. In the tab's form, what blocks a save — no name, no rule, a

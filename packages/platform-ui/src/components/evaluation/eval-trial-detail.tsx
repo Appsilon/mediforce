@@ -80,7 +80,7 @@ function evaluatorLogEntries(entry: EvalTrialEvaluator): EvaluatorLogEntry[] {
   const sent = (entry.judgePrompt ?? []).map((message) => ({ kind: message.role, detail: null, body: message.content }));
   const answered = (entry.judgeCalls ?? []).map((call) => ({
     kind: 'assistant',
-    detail: `${call.model} · ${call.promptTokens} in / ${call.completionTokens} out tokens · ${formatDuration(call.durationMs)}`,
+    detail: `${call.model} · ${call.promptTokens} in / ${call.completionTokens} out tokens${call.reasoningTokens === undefined ? '' : ` (${call.reasoningTokens} reasoning)`} · ${formatDuration(call.durationMs)}`,
     body: call.response,
   }));
   return [...sent, ...answered];

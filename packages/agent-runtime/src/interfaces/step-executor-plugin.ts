@@ -21,7 +21,8 @@ export interface LlmMessage {
 export interface LlmResponse {
   content: string;
   model: string;
-  usage: { promptTokens: number; completionTokens: number };
+  /** `completionTokens` includes `reasoningTokens`, which is absent when the client or provider does not report it. */
+  usage: { promptTokens: number; completionTokens: number; reasoningTokens?: number };
   /** Why the model stopped, as the provider says it; `'length'` means the answer was cut off at the output-token limit. */
   stopReason?: string | null;
 }

@@ -107,6 +107,19 @@ describe('getEvalTrial (ADR-0023)', () => {
     expect(judge.judgeCalls?.[0]).toMatchObject({ model: 'anthropic/claude-haiku-4.5', response: 'I would rather not say.' });
   });
 
+  it('shows how many of a judge call\'s output tokens went on reasoning', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: '' }, finish_reason: 'length' }],
+      usage: { prompt_tokens: 100, completion_tokens: 16000, completion_tokens_details: { reasoning_tokens: 15900 } },
+    }))));
+    const evalRunId = await finishedRun();
+    const [trial] = (await getEvalRun({ evalRunId }, scenario.scope)).trials;
+
+    const judge = (await getEvalTrial({ evalRunId, trialId: trial!.id }, scenario.scope)).evaluators[1]!;
+
+    expect(judge.judgeCalls?.[0]).toMatchObject({ completionTokens: 16000, reasoningTokens: 15900 });
+  });
+
   it('lists each run with how it fared on the Acceptance Criteria, none while it is prepared', async () => {
     const evalRunId = await finishedRun();
     const { evalRun: prepared } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scenario.scope);

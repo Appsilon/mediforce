@@ -191,6 +191,19 @@ describe('LlmJudgeReviewPlugin', () => {
     await expect(judge(answering('{"rationale": "The report covers', 'length'))).rejects.toThrow(/cut off at the output-token limit/);
     await expect(judge(answering(''))).rejects.toThrow(/empty answer/);
   });
+
+  it('says the judge used up its output-token limit when it hit the limit before writing anything, and on what', async () => {
+    const usingUp = (usage: { promptTokens: number; completionTokens: number; reasoningTokens?: number }): LlmClient => ({
+      complete: vi.fn().mockResolvedValue({ content: '', model: 'anthropic/claude-haiku-4.5', usage, stopReason: 'length' }),
+    });
+
+    await expect(judge(usingUp({ promptTokens: 10, completionTokens: 4000, reasoningTokens: 3990 })))
+      .rejects.toThrow(/^the judge used up its output-token limit before writing any answer \(4000 tokens, 3990 of them reasoning\)$/);
+    await expect(judge(usingUp({ promptTokens: 10, completionTokens: 4000 })))
+      .rejects.toThrow(/^the judge used up its output-token limit before writing any answer \(4000 tokens\)$/);
+    await expect(judge(usingUp({ promptTokens: 0, completionTokens: 0 })))
+      .rejects.toThrow(/^the judge used up its output-token limit before writing any answer$/);
+  });
 });
 
 describe('judgeOutputAgreement', () => {
@@ -211,6 +224,14 @@ describe('judgeOutputAgreement', () => {
     expect(messages[0]!.content).toContain('Wording is never decisive.');
     expect(messages[1]!.content).toContain('"grade": 5');
     expect(messages[1]!.content).toContain('"grade": 4');
+  });
+
+  it('says the judge used up its output-token limit when it hit the limit before writing anything', async () => {
+    const llm: LlmClient = {
+      complete: vi.fn().mockResolvedValue({ content: '', model: 'anthropic/claude-haiku-4.5', usage: { promptTokens: 10, completionTokens: 4000, reasoningTokens: 3990 }, stopReason: 'length' }),
+    };
+
+    await expect(compare(llm)).rejects.toThrow(/^the judge used up its output-token limit before writing any answer \(4000 tokens, 3990 of them reasoning\)$/);
   });
 
   it('puts the case instructions right after the every-case ones, as overriding them', async () => {
