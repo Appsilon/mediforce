@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { isProductionRunOfAgent, listAgentProductionRuns, loadAgentRunSource } from '../agent-production-runs';
+import { listAgentProductionRunsPage } from '../../step-agent-runs';
 import { buildAgentRun, buildProcessInstance } from '@mediforce/platform-core/testing';
 import { addAgentWorkflowRun, evaluationFixture, GRADED_RUN, NAMESPACE, UNGRADED_RUN, WORKFLOW } from '../../__tests__/fixture';
 
@@ -12,6 +13,17 @@ describe('listAgentProductionRuns', () => {
     expect(usages.map(({ workflowName, stepId }) => ({ workflowName, stepId }))).toEqual([{ workflowName: WORKFLOW, stepId: 'grade-aes' }]);
     expect(runs.map(({ agentRun }) => agentRun.id)).toEqual([UNGRADED_RUN, GRADED_RUN]);
     expect((await listAgentProductionRuns(fixture.scope(), AGENT, 1)).runs.map(({ agentRun }) => agentRun.id)).toEqual([UNGRADED_RUN]);
+  });
+
+  it('gives each run its workflow run, whose status outlives the Agent Run a review left paused', async () => {
+    const fixture = await evaluationFixture();
+    const grader = (await fixture.agentDefinitionRepo.getById('ae-grader'))!;
+    await fixture.agentDefinitionRepo.upsert('ae-grader', { ...grader, runtimeId: 'claude-code-agent' });
+    const { processInstanceId } = (await fixture.scope().agentRuns.getById(UNGRADED_RUN))!;
+    await fixture.instanceRepo.update(processInstanceId, { status: 'completed' });
+    await fixture.agentRunRepo.update(UNGRADED_RUN, { status: 'paused' });
+    const { runs } = await listAgentProductionRunsPage({ namespace: NAMESPACE, agentId: 'ae-grader', limit: 5 }, fixture.scope());
+    expect(runs.find(({ agentRun }) => agentRun.id === UNGRADED_RUN)).toMatchObject({ agentRun: { status: 'paused' }, workflowRunStatus: 'completed' });
   });
 
   it('is empty for an agent no step uses', async () => {

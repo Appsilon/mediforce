@@ -1015,7 +1015,12 @@ Criteria, Eval Runs and Qualification work as above, with these differences:
   *Workflows that alter this agent*, by `agentStepChanges` on the Workflow version
   each run ran (`mediforce eval agent-runs --agent <id>`, `GET
   /api/evaluation/agent-production-runs`), and starts on the newest unused run of
-  the first group. An altered run says which fields it altered. The case holds
+  the first group. Each entry names the workflow and step, the workflow run's id,
+  the Agent Run's local start time and the workflow run's status
+  (`workflowRunStatus`), because an Agent Run that went to review stays `paused`
+  after its workflow run moves on; an Agent Run in any status other than
+  `completed` or `paused` also shows its own. An altered run says which fields it
+  altered. The case holds
   what the Agent was given as its trigger payload — literal `stepParams`, then the
   step's input, then its `${…}` mappings — from an empty workspace, keeps the run
   and is flagged as containing production data (`eval run-io <agentRunId> --agent

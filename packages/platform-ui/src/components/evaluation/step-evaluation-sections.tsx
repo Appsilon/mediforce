@@ -26,6 +26,7 @@ import {
   type EvalDatasetVersion,
   type EvaluationSubject,
   type EvaluatorCheck,
+  type InstanceStatus,
   type StepFingerprintComponent,
   evaluatorAppliesToCase,
 } from '@mediforce/platform-core';
@@ -1120,11 +1121,21 @@ function AddCase({ step, evaluation, cases, evaluators, onClose }: {
   const runIo = useAgentRunIo(run?.id ?? null, step);
   const createFromRun = useStepEvaluationMutation(step, ({ agentRunId, values }: { agentRunId: string; values: CaseFormResult }) =>
     mediforce.evaluation.createCaseFromAgentRun({ agentRunId, ...caseOwnerOfRun(step), ...values }));
-  const runOptionOf = (candidate: AgentRun, workflow?: string) => (
-    <option key={candidate.id} value={runOption(candidate.id)}>
-      {workflow === undefined ? '' : `${workflow} · `}{candidate.startedAt.slice(0, 16).replace('T', ' ')} · {candidate.status}{candidate.fallbackReason === null ? '' : ` (${candidate.fallbackReason})`} · {candidate.id.slice(0, 8)}{usedRuns.has(candidate.id) ? ' · already a case' : ''}
-    </option>
-  );
+  const runOptionOf = (candidate: AgentRun, ofAgent?: { change: AgentRunChange; workflowRunStatus: InstanceStatus }) => {
+    const agentRanNormally = candidate.status === 'completed' || candidate.status === 'paused';
+    const label = [
+      ...(ofAgent === undefined ? [] : [`${ofAgent.change.workflowName}/${ofAgent.change.stepId}`]),
+      `run ${candidate.processInstanceId.slice(0, 8)}`,
+      new Date(candidate.startedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' }),
+      ofAgent?.workflowRunStatus ?? candidate.status,
+      ...(ofAgent === undefined || agentRanNormally ? [] : [`agent ${candidate.status}`]),
+    ].join(' · ');
+    return (
+      <option key={candidate.id} value={runOption(candidate.id)}>
+        {label}{candidate.fallbackReason === null ? '' : ` (${candidate.fallbackReason})`}{usedRuns.has(candidate.id) ? ' · already a case' : ''}
+      </option>
+    );
+  };
   const create = useStepEvaluationMutation(step, (values: CaseFormResult) => mediforce.evaluation.createCase({
     ...step,
     ...values,
@@ -1216,12 +1227,12 @@ function AddCase({ step, evaluation, cases, evaluators, onClose }: {
             {step.kind === 'step' && runs.length > 0 && <optgroup label="Production runs">{runs.map((candidate) => runOptionOf(candidate))}</optgroup>}
             {runsAsItIs.length > 0 && (
               <optgroup label="Workflows running this agent as it is">
-                {runsAsItIs.map(({ agentRun, change }) => runOptionOf(agentRun, change.workflowName))}
+                {runsAsItIs.map(({ agentRun, change, workflowRunStatus }) => runOptionOf(agentRun, { change, workflowRunStatus }))}
               </optgroup>
             )}
             {runsAltered.length > 0 && (
               <optgroup label="Workflows that alter this agent">
-                {runsAltered.map(({ agentRun, change }) => runOptionOf(agentRun, change.workflowName))}
+                {runsAltered.map(({ agentRun, change, workflowRunStatus }) => runOptionOf(agentRun, { change, workflowRunStatus }))}
               </optgroup>
             )}
             {cases.length > 0 && (

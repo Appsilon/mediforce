@@ -219,6 +219,10 @@ test.describe('Agent Evaluation — API E2E', () => {
       [asItIs.id]: [],
       [altered.id]: ['step prompt', 'output schema'],
     });
+    // The Agent Run is finished before the engine advances its workflow run.
+    await expect.poll(async () => ListAgentProductionRunsOutputSchema
+      .parse(await getJson(request, `/api/evaluation/agent-production-runs?namespace=${TEST_ORG_HANDLE}&agentId=${agentId}`))
+      .runs.map(({ workflowRunStatus }) => workflowRunStatus)).toEqual(['completed', 'completed']);
 
     const alteredIo = GetAgentRunIoOutputSchema.parse(await getJson(request, `/api/evaluation/agent-runs/${altered.id}/io?namespace=${TEST_ORG_HANDLE}&agentId=${agentId}`));
     expect(alteredIo).toMatchObject({ result: null, agentChange: { outputSchemaDiffers: true } });

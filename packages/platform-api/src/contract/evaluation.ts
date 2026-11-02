@@ -16,6 +16,7 @@ import {
   EvalRunEvaluatorSchema,
   EvalTrialOutcomeSchema,
   EvalTrialSchema,
+  InstanceStatusSchema,
   JudgeCallSchema,
   EvalTrialStatusSchema,
   JudgeVerdictSchema,
@@ -209,7 +210,12 @@ export const ListAgentProductionRunsInputSchema = z.object({
   cursor: z.string().regex(/^\d+$/).optional(),
 });
 export const ListAgentProductionRunsOutputSchema = z.object({
-  runs: z.array(z.object({ agentRun: AgentRunSchema, change: AgentRunChangeSchema })),
+  runs: z.array(z.object({
+    agentRun: AgentRunSchema,
+    change: AgentRunChangeSchema,
+    /** The status of the workflow run it belongs to: a reviewed Agent Run stays `paused` after its workflow run moves on. */
+    workflowRunStatus: InstanceStatusSchema,
+  })),
   /** Present while older runs remain. */
   nextCursor: z.string().optional(),
 });

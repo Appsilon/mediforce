@@ -309,9 +309,10 @@ describe('Adding an Agent\'s Eval Case from a run of a workflow that uses it', (
   const step = { kind: 'agent', namespace: 'acme', agentId: 'grader' } as const;
   const asItIs = { workflowName: 'safety', stepId: 'grade', definitionVersion: 1, changes: [], outputSchemaDiffers: false };
   const altered = { workflowName: 'oncology', stepId: 'grade', definitionVersion: 2, changes: ['step prompt', 'output schema'], outputSchemaDiffers: true };
-  const run = (id: string, change: unknown) => ({
-    agentRun: { id, status: 'completed', fallbackReason: null, startedAt: '2026-09-24T08:00:00.000Z', envelope: { reasoning_summary: 'graded' } },
+  const run = (id: string, change: unknown, overrides: { agentRun?: Record<string, unknown>; workflowRunStatus?: string } = {}) => ({
+    agentRun: { id, processInstanceId: `workflow-${id}`, status: 'completed', fallbackReason: null, startedAt: '2026-09-24T08:00:00.000Z', envelope: { reasoning_summary: 'graded' }, ...overrides.agentRun },
     change,
+    workflowRunStatus: overrides.workflowRunStatus ?? 'completed',
   });
   const evaluation = (runs: unknown[]) => ({
     cases: { isLoading: false, data: { cases: [] } },
@@ -328,6 +329,35 @@ describe('Adding an Agent\'s Eval Case from a run of a workflow that uses it', (
     expect(within(select).getByRole('group', { name: 'Workflows running this agent as it is' })).toHaveTextContent('safety');
     expect(within(select).getByRole('group', { name: 'Workflows that alter this agent' })).toHaveTextContent('oncology');
     expect(select.value).toBe('run:run-plain');
+  });
+
+  it('names a run as its workflow run: its id, local time and status, not the paused Agent Run a review leaves behind', () => {
+    const startedAt = '2026-11-02T11:51:41.389Z';
+    render(<CasesSection step={step} evaluation={evaluation([
+      run('5d5c9db3-agent', asItIs, { agentRun: { processInstanceId: 'c68e3a83-workflow', status: 'paused', startedAt } }),
+    ])} mayEdit />);
+    openDialog();
+    const local = new Date(startedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' });
+    expect(screen.getByRole('option', { name: `safety/grade · run c68e3a83 · ${local} · completed` })).toBeTruthy();
+  });
+
+  it('tells apart two steps of one workflow run that use the agent', () => {
+    const sameRun = { agentRun: { processInstanceId: 'c68e3a83-workflow' } };
+    render(<CasesSection step={step} evaluation={evaluation([
+      run('agent-first', { ...asItIs, stepId: 'first-pass' }, sameRun),
+      run('agent-second', { ...asItIs, stepId: 'second-pass' }, sameRun),
+    ])} mayEdit />);
+    openDialog();
+    expect(screen.getByRole('option', { name: /^safety\/first-pass · run c68e3a83/ })).toBeTruthy();
+    expect(screen.getByRole('option', { name: /^safety\/second-pass · run c68e3a83/ })).toBeTruthy();
+  });
+
+  it('still says when the agent escalated or fell back in a workflow run that completed', () => {
+    render(<CasesSection step={step} evaluation={evaluation([
+      run('agent-escalated', asItIs, { agentRun: { processInstanceId: 'aaaaaaaa-workflow', status: 'escalated', fallbackReason: 'timeout' } }),
+    ])} mayEdit />);
+    openDialog();
+    expect(screen.getByRole('option', { name: /run aaaaaaaa · .* · completed · agent escalated \(timeout\)$/ })).toBeTruthy();
   });
 
   it('says what a workflow altered, and that an output under another schema is not offered', () => {
@@ -351,7 +381,7 @@ describe('Adding an Agent\'s Eval Case from a run of a workflow that uses it', (
 describe('Adding an Eval Case from a production run', () => {
   const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
   const agentRun = (id: string, summary: string) => ({
-    id, status: 'completed', fallbackReason: null, startedAt: '2026-09-24T08:00:00.000Z', envelope: { reasoning_summary: summary },
+    id, processInstanceId: id, status: 'completed', fallbackReason: null, startedAt: '2026-09-24T08:00:00.000Z', envelope: { reasoning_summary: summary },
   });
   const withRuns = (pages: unknown[][], more: { hasNextPage: boolean; fetchNextPage?: () => void }) => ({
     cases: { isLoading: false, data: { cases: [] } },
@@ -363,6 +393,14 @@ describe('Adding an Eval Case from a production run', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add case' }));
     return within(screen.getByTestId('case-dialog'));
   };
+
+  it('names a step\'s run by its workflow run and local time, with the Agent Run\'s status', () => {
+    const startedAt = '2026-09-24T08:00:00.000Z';
+    render(<CasesSection step={step} evaluation={withRuns([[{ ...agentRun('run-a', 'Graded.'), processInstanceId: 'c68e3a83-workflow', status: 'paused' }]], { hasNextPage: false })} mayEdit />);
+    openDialog();
+    const local = new Date(startedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' });
+    expect(screen.getByRole('option', { name: `run c68e3a83 · ${local} · paused` })).toBeTruthy();
+  });
 
   it('has one way to add a case, and offers every loaded run to start from, loading more on request', () => {
     const fetchNextPage = vi.fn();

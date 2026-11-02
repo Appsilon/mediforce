@@ -23,7 +23,7 @@ export async function listAgentProductionRunsPage(
   const offset = input.cursor === undefined ? 0 : Number(input.cursor);
   const { runs, hasMore } = await listAgentProductionRuns(scope, { kind: 'agent', namespace: input.namespace, agentId: input.agentId }, input.limit, offset);
   return {
-    runs: runs.map(({ agentRun, change }) => ({ agentRun, change })),
+    runs: runs.map(({ agentRun, change, instance }) => ({ agentRun, change, workflowRunStatus: instance.status })),
     ...(hasMore ? { nextCursor: String(offset + input.limit) } : {}),
   };
 }

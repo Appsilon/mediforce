@@ -99,6 +99,7 @@ describe('mediforce eval', () => {
       runs: [{
         agentRun: buildAgentRun({ id: 'ar-1', startedAt: '2026-09-23T08:00:00.000Z' }),
         change: { workflowName: 'oncology', stepId: 'grade', definitionVersion: 2, changes: ['step prompt', 'output schema'], outputSchemaDiffers: true },
+        workflowRunStatus: 'completed',
       }],
     }));
     const output = captureOutput();
