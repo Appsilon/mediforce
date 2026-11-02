@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { Loader2, Send } from 'lucide-react';
-import { isParamRequired } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { ParamField } from '@/components/ui/param-field';
@@ -32,7 +31,7 @@ export function useParamValues(params: StepParam[]) {
   });
 
   const requiredMissing = params.some(
-    (p) => isParamRequired(p) && (values[p.name] === undefined || values[p.name] === ''),
+    (p) => p.required && (values[p.name] === undefined || values[p.name] === ''),
   );
 
   function setValue(name: string, value: unknown) {
@@ -87,7 +86,7 @@ export function ParamsForm({
         {params.map((param) => (
           <ParamField
             key={param.name}
-            param={param}
+            param={{ ...param, requiredForVerdicts: undefined }}
             value={values[param.name]}
             onChange={(value) => setValue(param.name, value)}
             disabled={submitting}

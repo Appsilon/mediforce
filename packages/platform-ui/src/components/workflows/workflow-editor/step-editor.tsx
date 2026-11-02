@@ -35,7 +35,7 @@ import { ImageSourceFields } from './image-source-fields';
 import { identityImageValue, pickerImageValue } from './image-options';
 import { McpRestrictionsSection } from './mcp-restrictions-section';
 import { StepSkillsField } from './step-skills-field';
-import { StepCommentSection, commentAfterVerdictDelete, commentAfterVerdictRename } from './step-comment-section';
+import { StepCommentSection, commentAfterVerdictDelete, commentAfterVerdictRename, paramsAfterVerdictDelete, paramsAfterVerdictRename } from './step-comment-section';
 import { McpCommandWarnings } from '@/components/agents/mcp-command-alert';
 import { stdioServerCommands } from '@/components/agents/mcp-command-warnings';
 import { useToolCatalogEntries } from '@/hooks/use-tool-catalog';
@@ -1780,7 +1780,7 @@ export function StepEditor({
                       for (const [k, v] of Object.entries(step.verdicts ?? {})) {
                         next[k === verdictName ? e.target.value : k] = v;
                       }
-                      onChange({ verdicts: next, comment: commentAfterVerdictRename(step.comment, verdictName, e.target.value) });
+                      onChange({ verdicts: next, comment: commentAfterVerdictRename(step.comment, verdictName, e.target.value), params: paramsAfterVerdictRename(step.params, verdictName, e.target.value) });
                     }}
                     className="bg-card text-xs font-medium rounded border border-border/60 hover:border-border focus:border-primary/60 focus:ring-1 focus:ring-primary/20 focus:outline-none px-2 py-1 transition-colors w-24 shrink-0"
                   />
@@ -1798,7 +1798,7 @@ export function StepEditor({
                     onClick={() => {
                       const next = { ...step.verdicts };
                       delete next[verdictName];
-                      onChange({ verdicts: Object.keys(next).length > 0 ? next : undefined, comment: commentAfterVerdictDelete(step.comment, verdictName) });
+                      onChange({ verdicts: Object.keys(next).length > 0 ? next : undefined, comment: commentAfterVerdictDelete(step.comment, verdictName), params: paramsAfterVerdictDelete(step.params, verdictName) });
                     }}
                     className="text-[10px] text-muted-foreground/30 hover:text-red-500 transition-colors shrink-0"
                   >×</button>

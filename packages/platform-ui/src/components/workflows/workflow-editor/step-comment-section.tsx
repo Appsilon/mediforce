@@ -22,6 +22,21 @@ export function commentAfterVerdictDelete(comment: StepComment, deleted: string)
   return { requiredForVerdicts: comment.requiredForVerdicts.filter((key) => key !== deleted) };
 }
 
+export function paramsAfterVerdictRename(params: WorkflowStep['params'], from: string, to: string): WorkflowStep['params'] {
+  return params?.map((param) => (param.requiredForVerdicts === undefined
+    ? param
+    : { ...param, requiredForVerdicts: param.requiredForVerdicts.map((key) => (key === from ? to : key)) }));
+}
+
+/** A parameter required for no verdict left is an optional one again, as the editor writes it. */
+export function paramsAfterVerdictDelete(params: WorkflowStep['params'], deleted: string): WorkflowStep['params'] {
+  return params?.map((param) => {
+    if (param.requiredForVerdicts === undefined) return param;
+    const requiredForVerdicts = param.requiredForVerdicts.filter((key) => key !== deleted);
+    return { ...param, requiredForVerdicts: requiredForVerdicts.length === 0 ? undefined : requiredForVerdicts };
+  });
+}
+
 export function StepCommentSection({
   step,
   onChange,

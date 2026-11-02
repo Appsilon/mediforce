@@ -73,12 +73,15 @@ interface StepCommentContext {
   comment?: StepComment;
   params?: unknown[];
   ui?: unknown;
+  selection?: unknown;
 }
 
 /** The verdicts a step's comment can be required for. A human step with none of
  *  its own shows approve and revise, unless params or a custom UI replace that
- *  form, in which case the task has no comment box at all. */
+ *  form, in which case the task has no comment box at all. Choosing from options
+ *  asks for a comment only on revise, so approve cannot need one. */
 export function commentVerdictKeys(step: StepCommentContext): readonly string[] {
+  if (step.selection !== undefined) return ['revise'];
   if (step.executor === 'agent') return AGENT_REVIEW_VERDICT_KEYS;
   const declared = Object.keys(step.verdicts ?? {});
   if (declared.length > 0) return declared;
@@ -95,8 +98,8 @@ export function buildHumanTaskVerdicts(step: StepCommentContext): TaskVerdict[] 
   return buildAgentReviewTaskVerdicts(undefined, step.comment);
 }
 
-/** Any verdict in `requiredForVerdicts` makes a parameter required. Which verdict
- *  buttons it blocks is still per verdict, where a task has verdict buttons. */
+/** Any verdict in `requiredForVerdicts` marks a parameter required on a verdict
+ *  form. Which verdict buttons it blocks is still per verdict. */
 export function isParamRequired(param: { required?: boolean; requiredForVerdicts?: string[] }): boolean {
   return param.required === true || (param.requiredForVerdicts?.length ?? 0) > 0;
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import type { WorkflowStep } from '@mediforce/platform-core';
-import { StepCommentSection, commentAfterVerdictRename, commentAfterVerdictDelete } from '../step-comment-section';
+import { StepCommentSection, commentAfterVerdictRename, commentAfterVerdictDelete, paramsAfterVerdictDelete, paramsAfterVerdictRename } from '../step-comment-section';
 
 const humanStep: WorkflowStep = {
   id: 'review',
@@ -67,5 +67,26 @@ describe('verdict edits keep the comment setting in step', () => {
   it('stays unset when the step has no setting', () => {
     expect(commentAfterVerdictRename(undefined, 'revise', 'rework')).toBeUndefined();
     expect(commentAfterVerdictDelete(undefined, 'revise')).toBeUndefined();
+  });
+});
+
+describe('a param required for a verdict, when that verdict changes', () => {
+  const params = [
+    { name: 'reason', type: 'string', required: false, requiredForVerdicts: ['reject'] },
+    { name: 'note', type: 'string', required: false },
+  ];
+
+  it('follows a renamed verdict', () => {
+    expect(paramsAfterVerdictRename(params, 'reject', 'decline')?.[0]?.requiredForVerdicts).toEqual(['decline']);
+  });
+
+  it('goes back to optional when its only verdict is deleted', () => {
+    expect(paramsAfterVerdictDelete(params, 'reject')?.[0]?.requiredForVerdicts).toBeUndefined();
+    expect(paramsAfterVerdictDelete(params, 'reject')?.[1]).toEqual(params[1]);
+  });
+
+  it('leaves a step with no params alone', () => {
+    expect(paramsAfterVerdictDelete(undefined, 'reject')).toBeUndefined();
+    expect(paramsAfterVerdictRename(undefined, 'reject', 'decline')).toBeUndefined();
   });
 });

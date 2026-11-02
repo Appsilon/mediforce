@@ -160,6 +160,8 @@ describe('a human step with no verdicts of its own', () => {
   it('offers the verdicts it declares, or both on an agent review', () => {
     expect(commentVerdictKeys({ executor: 'human', verdicts: { accept: { target: 'done' } }, params: [{ name: 'reason' }] })).toEqual(['accept']);
     expect(commentVerdictKeys({ executor: 'agent' })).toEqual(['approve', 'revise']);
+    expect(commentVerdictKeys({ executor: 'agent', selection: 2 })).toEqual(['revise']);
+    expect(commentVerdictKeys({ executor: 'human', selection: 2 })).toEqual(['revise']);
   });
 
   it('carries the setting onto the task', () => {

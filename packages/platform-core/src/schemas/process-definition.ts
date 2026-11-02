@@ -31,8 +31,8 @@ export const StepParamSchema = z.object({
   required: z.boolean().default(false),
   // When set, the param is only required when the user chooses one of these
   // verdict keys — all other verdicts can be submitted without filling it.
-  // Any value here counts as required (`isParamRequired`), for the form's mark
-  // and on a task with no verdict buttons; `required: true` still blocks every verdict.
+  // Any value here marks the field required on a verdict form (`isParamRequired`);
+  // a task with no verdict buttons ignores it. `required: true` still blocks every verdict.
   requiredForVerdicts: z.array(z.string()).optional(),
   description: z.string().optional(),
   default: z.unknown().optional(),
