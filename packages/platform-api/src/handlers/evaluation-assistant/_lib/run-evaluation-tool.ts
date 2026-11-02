@@ -27,7 +27,7 @@ import { NotFoundError, ValidationError } from '../../../errors';
 import { getMcpEvalPolicy } from '../../evaluation/mcp-eval-policy';
 import { listStepAgentRuns } from '../../evaluation/step-agent-runs';
 import { isTrialOfAgent, loadScoredRun, type ScoredRun } from '../../evaluation/_lib/scored-run';
-import { isProductionRunOfAgent, listAgentProductionRuns } from '../../evaluation/_lib/agent-production-runs';
+import { isProductionRunOfAgent, listAgentProductionRuns, loadAgentRunSource } from '../../evaluation/_lib/agent-production-runs';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
 import { stepOnly } from '../../evaluation/_lib/evaluation-subject';
 import { loadEvaluator } from '../../evaluation/_lib/evaluator-view';
@@ -279,7 +279,7 @@ export async function executeEvaluationTool(
       if (step.kind !== 'agent') throw new ValidationError('list_agent_production_runs is for an Agent evaluated on its own; a step lists its runs with list_step_runs');
       const { limit } = args as Args<'list_agent_production_runs'>;
       const { usages, runs } = await listAgentProductionRuns(scope, step, limit ?? 10);
-      const reviewed = await Promise.all(runs.map(async ({ usage, agentRun, instance }) => ({
+      const reviewed = await Promise.all(runs.map(async ({ usage, agentRun, instance, change }) => ({
         agentRunId: agentRun.id,
         workflowName: usage.workflowName,
         stepId: usage.stepId,
@@ -288,7 +288,9 @@ export async function executeEvaluationTool(
         startedAt: agentRun.startedAt,
         reviewVerdict: await reviewVerdict(scope, agentRun.id),
         triggerPayload: clip(instance.triggerPayload ?? {}, 2000),
-        result: clip(agentRun.envelope?.result ?? null, 600),
+        changedFromAgent: change.changes,
+        outputSchemaDiffers: change.outputSchemaDiffers,
+        result: clip(change.outputSchemaDiffers ? null : agentRun.envelope?.result ?? null, 600),
       })));
       return {
         steps: usages.map((usage) => ({
@@ -316,13 +318,22 @@ export async function executeEvaluationTool(
     case 'get_agent_run': {
       const { agentRunId } = args as Args<'get_agent_run'>;
       const subject = await loadSubjectRun(scope, step, agentRunId);
+      const agentSource = step.kind === 'agent' && isTrialOfAgent(subject.agentRun, subject.instance, step) === false
+        ? await loadAgentRunSource(scope, step, agentRunId)
+        : null;
       return {
         agentRunId,
         status: subject.agentRun.status,
         fallbackReason: subject.agentRun.fallbackReason,
         triggerPayload: clip(subject.instance.triggerPayload ?? {}, 6000),
         stepInput: clip(subject.stepInput, 6000),
-        result: clip(subject.agentRun.envelope?.result ?? null, 8000),
+        ...(agentSource === null ? {} : {
+          caseInput: clip(agentSource.input, 6000),
+          workflowName: agentSource.change.workflowName,
+          changedFromAgent: agentSource.change.changes,
+          outputSchemaDiffers: agentSource.change.outputSchemaDiffers,
+        }),
+        result: clip(agentSource === null ? subject.agentRun.envelope?.result ?? null : agentSource.result, 8000),
         confidence: subject.agentRun.envelope?.confidence ?? null,
         reasoningSummary: subject.agentRun.envelope?.reasoning_summary ?? null,
         changedFiles: subject.agentRun.envelope?.gitMetadata?.changedFiles ?? [],

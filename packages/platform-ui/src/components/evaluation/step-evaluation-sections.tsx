@@ -35,6 +35,8 @@ import {
   type PreparedEvalRun,
   type GetStepQualificationOutput,
   type StepValidation,
+  type AgentRunChange,
+  type ListAgentProductionRunsOutput,
 } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
@@ -85,6 +87,28 @@ function Loading() {
 /** Every production run of the Step loaded so far, newest first. */
 export function loadedAgentRuns(evaluation: StepEvaluation): AgentRun[] {
   return evaluation.agentRuns.data?.pages.flatMap((page) => page.runs) ?? [];
+}
+
+/** Every run of the Steps using the Agent loaded so far, newest first; a run that moved between pages shows once. */
+export function loadedAgentProductionRuns(evaluation: StepEvaluation): ListAgentProductionRunsOutput['runs'] {
+  const runs = evaluation.agentProductionRuns.data?.pages.flatMap((page) => page.runs) ?? [];
+  return [...new Map(runs.map((run) => [run.agentRun.id, run])).values()];
+}
+
+/** Whose Eval Case a run becomes: the Step it ran, or the Agent evaluated on its own. */
+export function caseOwnerOfRun(step: EvaluationSubject) {
+  return step.kind === 'step' ? { step } : { agent: { namespace: step.namespace, agentId: step.agentId } };
+}
+
+/** What a person is told about a run whose Step alters the Agent; nothing for one that runs it as it is. */
+export function AgentRunChangeNote({ change }: { change: AgentRunChange | undefined }) {
+  if (change === undefined || change.changes.length === 0) return null;
+  return (
+    <div className="rounded bg-amber-500/10 px-2 py-1 text-amber-700 dark:text-amber-300" data-testid="agent-run-change-note">
+      <p>This is from a run of workflow &lsquo;{change.workflowName}&rsquo; that has altered the agent&apos;s definition in: {change.changes.join(', ')}. It does not share the agent&apos;s validation.</p>
+      {change.outputSchemaDiffers && <p>Its step declares another output schema than the agent, so its output is not offered as an expected output.</p>}
+    </div>
+  );
 }
 
 /** Typing "Grades match CTCAE" gives "grades-match-ctcae" — the only form an Evaluator name takes. */
@@ -621,7 +645,9 @@ interface FieldErrors {
  * edited. A case from a run marks each side edited or as the run had it, and
  * opens the run's log.
  */
-export function CaseForm({ initial, inputHelp, evaluators, sourceAgentRunId, submitLabel, pending, error, onSubmit, onCancel }: {
+export function CaseForm({ subject, initial, inputHelp, evaluators, sourceAgentRunId, submitLabel, pending, error, onSubmit, onCancel }: {
+  /** Whose case it is: an Agent's reads its source run as that Agent's input. */
+  subject?: EvaluationSubject;
   initial: CaseFormValues;
   inputHelp: React.ReactNode;
   evaluators: readonly EvaluatorView[];
@@ -635,7 +661,7 @@ export function CaseForm({ initial, inputHelp, evaluators, sourceAgentRunId, sub
 }) {
   const [values, setValues] = React.useState(initial);
   const [fieldErrors, setFieldErrors] = React.useState<FieldErrors>({});
-  const sourceRun = useAgentRunIo(sourceAgentRunId).data;
+  const sourceRun = useAgentRunIo(sourceAgentRunId, subject).data;
   const hasExpectedOutput = values.expectedOutput.trim() !== '';
   const outputAsRun = sourceRun !== undefined && holdsJson(values.expectedOutput, sourceRun.result);
   const edit = (field: keyof FieldErrors, changes: Partial<CaseFormValues>) => {
@@ -704,7 +730,7 @@ export function CaseForm({ initial, inputHelp, evaluators, sourceAgentRunId, sub
         <div className="space-y-1">
           <div className="flex min-h-6 items-center justify-between gap-2">
             <span className="font-medium">Expected output <span className="font-normal text-muted-foreground">(optional)</span></span>
-            {sourceRun !== undefined && (
+            {sourceRun !== undefined && sourceRun.agentChange?.outputSchemaDiffers !== true && (
               <SourceRunMark
                 asRun={outputAsRun}
                 restoreLabel="Use the source run's output"
@@ -838,9 +864,9 @@ function CaseExpects({ evalCase }: { evalCase: EvalCase }) {
  * was given and expects what it returned — the same comparison the case form
  * marks. A synthesized case is a change by definition, and says so in its source.
  */
-function CaseRunMark({ evalCase }: { evalCase: EvalCase }) {
+function CaseRunMark({ evalCase, subject }: { evalCase: EvalCase; subject: EvaluationSubject }) {
   const fromRun = evalCase.sourceAgentRunId !== null && evalCase.source !== 'synthesized';
-  const sourceRun = useAgentRunIo(fromRun ? evalCase.sourceAgentRunId : null).data;
+  const sourceRun = useAgentRunIo(fromRun ? evalCase.sourceAgentRunId : null, subject).data;
   if (fromRun === false || sourceRun === undefined) return null;
   const changes = [
     ...(JSON.stringify(evalCase.input) === JSON.stringify(sourceRun.caseInput) ? [] : ['its input differs from what the source run was given']),
@@ -946,7 +972,7 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSel
         <td className="px-3 py-2">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span className="font-medium">{evalCase.name}</span>
-            <CaseRunMark evalCase={evalCase} />
+            <CaseRunMark evalCase={evalCase} subject={step} />
             {evalCase.perturbation !== null && (
               <InstantTooltip label={evalCase.perturbation.description}>
                 <span className="shrink-0 rounded bg-muted px-1.5 text-[11px] text-muted-foreground" data-testid="eval-case-perturbation">{evalCase.perturbation.kind.replace(/_/g, ' ')}</span>
@@ -1005,6 +1031,7 @@ function CaseRow({ step, evalCase, evaluators, mayEdit, unsaved, selected, onSel
           onClose={closeEdit}
         >
           <CaseForm
+            subject={step}
             initial={caseFormValues(evalCase)}
             inputHelp="What the step receives. Change the values, keep the shape."
             evaluators={evaluators}
@@ -1073,10 +1100,15 @@ function AddCase({ step, evaluation, cases, evaluators, onClose }: {
   evaluators: readonly EvaluatorView[];
   onClose: () => void;
 }) {
-  const runs = loadedAgentRuns(evaluation);
+  const agentRuns = step.kind === 'agent' ? loadedAgentProductionRuns(evaluation) : [];
+  const runsAsItIs = agentRuns.filter(({ change }) => change.changes.length === 0);
+  const runsAltered = agentRuns.filter(({ change }) => change.changes.length > 0);
+  const runs = step.kind === 'agent' ? agentRuns.map(({ agentRun }) => agentRun) : loadedAgentRuns(evaluation);
+  const runPages = step.kind === 'agent' ? evaluation.agentProductionRuns : evaluation.agentRuns;
   const usedRuns = new Set(cases.map((evalCase) => evalCase.sourceAgentRunId));
   const [startFrom, setStartFrom] = React.useState<string>(() => {
-    const unused = runs.find((candidate) => usedRuns.has(candidate.id) === false);
+    // An Agent's run that altered it is a choice to make, never where the form starts.
+    const unused = (step.kind === 'agent' ? runsAsItIs.map(({ agentRun }) => agentRun) : runs).find((candidate) => usedRuns.has(candidate.id) === false);
     if (unused !== undefined) return runOption(unused.id);
     if (cases[0] !== undefined) return caseOption(cases[0].id);
     return FROM_NOTHING;
@@ -1085,9 +1117,14 @@ function AddCase({ step, evaluation, cases, evaluators, onClose }: {
   const [fileError, setFileError] = React.useState<string | null>(null);
   const run = fromFile === null ? runs.find((candidate) => runOption(candidate.id) === startFrom) : undefined;
   const template = fromFile === null ? cases.find((evalCase) => caseOption(evalCase.id) === startFrom) : undefined;
-  const runIo = useAgentRunIo(run?.id ?? null);
+  const runIo = useAgentRunIo(run?.id ?? null, step);
   const createFromRun = useStepEvaluationMutation(step, ({ agentRunId, values }: { agentRunId: string; values: CaseFormResult }) =>
-    mediforce.evaluation.createCaseFromAgentRun({ agentRunId, ...(step.kind === 'step' ? { step } : {}), ...values }));
+    mediforce.evaluation.createCaseFromAgentRun({ agentRunId, ...caseOwnerOfRun(step), ...values }));
+  const runOptionOf = (candidate: AgentRun, workflow?: string) => (
+    <option key={candidate.id} value={runOption(candidate.id)}>
+      {workflow === undefined ? '' : `${workflow} · `}{candidate.startedAt.slice(0, 16).replace('T', ' ')} · {candidate.status}{candidate.fallbackReason === null ? '' : ` (${candidate.fallbackReason})`} · {candidate.id.slice(0, 8)}{usedRuns.has(candidate.id) ? ' · already a case' : ''}
+    </option>
+  );
   const create = useStepEvaluationMutation(step, (values: CaseFormResult) => mediforce.evaluation.createCase({
     ...step,
     ...values,
@@ -1113,6 +1150,7 @@ function AddCase({ step, evaluation, cases, evaluators, onClose }: {
     ) : (
       <CaseForm
         key={startFrom}
+        subject={step}
         initial={{
           name: `From run ${run.id.slice(0, 8)} (${run.startedAt.slice(0, 10)})`,
           split: 'dev',
@@ -1123,7 +1161,7 @@ function AddCase({ step, evaluation, cases, evaluators, onClose }: {
           agreementInstructions: '',
           evaluatorIds: null,
         }}
-        inputHelp="What the step received in this run."
+        inputHelp={step.kind === 'agent' ? 'What the agent received in this run, as its one input.' : 'What the step received in this run.'}
         evaluators={evaluators}
         sourceAgentRunId={run.id}
         submitLabel="Add case"
@@ -1175,13 +1213,15 @@ function AddCase({ step, evaluation, cases, evaluators, onClose }: {
             }}
           >
             {fromFile !== null && <option value={FROM_FILE}>{fromFile.name}</option>}
-            {runs.length > 0 && (
-              <optgroup label="Production runs">
-                {runs.map((candidate) => (
-                  <option key={candidate.id} value={runOption(candidate.id)}>
-                    {candidate.startedAt.slice(0, 16).replace('T', ' ')} · {candidate.status}{candidate.fallbackReason === null ? '' : ` (${candidate.fallbackReason})`} · {candidate.id.slice(0, 8)}{usedRuns.has(candidate.id) ? ' · already a case' : ''}
-                  </option>
-                ))}
+            {step.kind === 'step' && runs.length > 0 && <optgroup label="Production runs">{runs.map((candidate) => runOptionOf(candidate))}</optgroup>}
+            {runsAsItIs.length > 0 && (
+              <optgroup label="Workflows running this agent as it is">
+                {runsAsItIs.map(({ agentRun, change }) => runOptionOf(agentRun, change.workflowName))}
+              </optgroup>
+            )}
+            {runsAltered.length > 0 && (
+              <optgroup label="Workflows that alter this agent">
+                {runsAltered.map(({ agentRun, change }) => runOptionOf(agentRun, change.workflowName))}
               </optgroup>
             )}
             {cases.length > 0 && (
@@ -1192,13 +1232,13 @@ function AddCase({ step, evaluation, cases, evaluators, onClose }: {
             <option value={FROM_NOTHING}>{cases.length === 0 ? 'An empty input' : 'An empty input (no workspace files)'}</option>
           </select>
         </label>
-        {evaluation.agentRuns.hasNextPage && (
+        {runPages.hasNextPage && (
           <button
             type="button"
             className={buttonClass}
-            disabled={evaluation.agentRuns.isFetchingNextPage}
-            onClick={() => void evaluation.agentRuns.fetchNextPage()}
-          >{evaluation.agentRuns.isFetchingNextPage ? 'Loading…' : 'Load more runs'}</button>
+            disabled={runPages.isFetchingNextPage}
+            onClick={() => void runPages.fetchNextPage()}
+          >{runPages.isFetchingNextPage ? 'Loading…' : 'Load more runs'}</button>
         )}
         <label className={cn(buttonClass, 'cursor-pointer')}>
           Load a .json file
@@ -1218,6 +1258,7 @@ function AddCase({ step, evaluation, cases, evaluators, onClose }: {
       {run !== undefined && run.envelope !== null && run.envelope.reasoning_summary !== '' && (
         <p className="line-clamp-2 text-muted-foreground" title={run.envelope.reasoning_summary}>{run.envelope.reasoning_summary}</p>
       )}
+      {run !== undefined && <AgentRunChangeNote change={runIo.data?.agentChange} />}
       {template?.workspaceSeedCommit != null && (
         <p className="text-muted-foreground">It starts from the same workspace files as &lsquo;{template.name}&rsquo;.</p>
       )}

@@ -2,11 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { evalCaseFromRunCommand, evalCaseListCommand, evalCasePerturbCommand, evalMcpPolicySetCommand } from '../commands/eval-cases';
+import { evalAgentRunsCommand, evalCaseFromRunCommand, evalCaseListCommand, evalCasePerturbCommand, evalMcpPolicySetCommand } from '../commands/eval-cases';
 import { agentVersionsCommand } from '../commands/agent-versions';
 import { evalDriftCommand, evalEvaluatorProductionCommand } from '../commands/eval-evaluators';
 import { evalCriteriaSetCommand, evalQualificationCommand, evalValidationCommand } from '../commands/eval-qualification';
 import { evalJudgeReviewCommand } from '../commands/eval-runs';
+import { buildAgentRun } from '@mediforce/platform-core/testing';
 import { captureOutput, jsonResponse } from './test-helpers';
 
 const ENV = { MEDIFORCE_API_KEY: 'k' };
@@ -76,6 +77,33 @@ describe('mediforce eval', () => {
       agentRunId: 'ar-1', expectation: 'negative', comparison: 'agreement', agreementInstructions: null, evaluatorIds: null, split: 'holdout', origin: 'user',
     });
     expect(output.stdoutLines.join('\n')).toContain('(negative, holdout)');
+  });
+
+  it('case-from-run with --agent makes the case that agent\'s', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      evalCase: {
+        namespace: 'pharma-a', workflowName: null, stepId: null, agentId: 'ae-grader',
+        id: '0e2a3c4d-5b6f-4a1e-9c8d-7b6a5f4e3d2c', name: 'From run', input: { triggerPayload: {}, previousStepOutputs: {} },
+        workspaceSeedCommit: null, expectation: 'positive', expectedOutput: null, comparison: 'exact', agreementInstructions: null, evaluatorIds: null,
+        source: 'production', sourceAgentRunId: 'ar-1', perturbation: null, origin: 'user',
+        split: 'dev', containsProductionData: true, archived: false, createdBy: 'u-1', createdAt: '2026-09-23T08:00:00.000Z',
+      },
+    }, 201));
+    const code = await evalCaseFromRunCommand({ argv: ['ar-1', '--agent', 'ae-grader', '--namespace', 'pharma-a', ...BASE], env: ENV, output: captureOutput() });
+    expect(code).toBe(0);
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body))).toMatchObject({ agentRunId: 'ar-1', agent: { namespace: 'pharma-a', agentId: 'ae-grader' } });
+  });
+
+  it('agent-runs lists what each step changes about the agent', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      runs: [{
+        agentRun: buildAgentRun({ id: 'ar-1', startedAt: '2026-09-23T08:00:00.000Z' }),
+        change: { workflowName: 'oncology', stepId: 'grade', definitionVersion: 2, changes: ['step prompt', 'output schema'], outputSchemaDiffers: true },
+      }],
+    }));
+    const output = captureOutput();
+    expect(await evalAgentRunsCommand({ argv: ['--namespace', 'pharma-a', '--agent', 'ae-grader', ...BASE], env: ENV, output })).toBe(0);
+    expect(output.stdoutLines.join('\n')).toContain('oncology/grade v2  changes: step prompt, output schema  (other output schema: output withheld)');
   });
 
   it('case-perturb posts the synthesized case from the file for the step', async () => {

@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: partially superseded by 0031
 audience: engineers
 last_reviewed: 2026-10-16
 ---

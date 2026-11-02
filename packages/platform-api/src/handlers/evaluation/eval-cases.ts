@@ -14,6 +14,7 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { NotFoundError, ValidationError } from '../../errors';
+import { expectsWithheldOutput, loadAgentRunSource, WITHHELD_OUTPUT_ERROR } from './_lib/agent-production-runs';
 import { loadEvaluationSubject, stepOnly, subjectRef, subjectName } from './_lib/evaluation-subject';
 import { loadCaseSource, loadVerdictExpectation } from './_lib/case-source';
 import { perturbCase } from './_lib/perturb-case';
@@ -132,21 +133,24 @@ export async function createEvalCaseFromAgentRun(
   input: z.output<typeof CreateEvalCaseFromAgentRunInputSchema>,
   scope: CallerScope,
 ): Promise<EvalCaseOutput> {
-  const source = await loadCaseSource(scope, input.agentRunId, input.step, 'edit');
-  const verdictLabel = await loadVerdictExpectation(scope, input.agentRunId);
-  const { instance, agentRun } = source.subject;
+  if (input.agent !== undefined && input.step !== undefined) {
+    throw new ValidationError('Name either a step or an agent the case belongs to, not both');
+  }
+  const source = input.agent === undefined ? await stepCaseFromRun(scope, input) : await agentCaseFromRun(scope, input, input.agent);
+  const { instance, agentRun } = source;
   // The verdict labels the run's own output; an expected output the caller gives (null included) is one to match unless it says otherwise.
   const fromRun = input.expectedOutput === undefined;
-  const expectedOutput = fromRun ? (verdictLabel === null ? null : agentRun.envelope?.result ?? null) : input.expectedOutput;
-  const caseInput = input.input ?? source.input;
+  const expectedOutput = fromRun ? (source.verdictLabel === null ? null : source.runOutput) : input.expectedOutput;
+  const caseInput = input.input ?? source.runInput;
+  if (source.owner.agentId !== null) assertAgentCaseInput({ kind: 'agent', namespace: source.owner.namespace, agentId: source.owner.agentId }, { input: caseInput, workspaceSeedCommit: null });
   return storeCase(scope, {
-    ...evaluationOwnerOf({ kind: 'step', ...source.step }),
+    ...source.owner,
     id: randomUUID(),
     name: input.name ?? `From run ${instance.id.slice(0, 8)} (${agentRun.startedAt.slice(0, 10)})`,
     input: caseInput,
     workspaceSeedCommit: source.workspaceSeedCommit,
-    ...labelOf({ ...input, expectedOutput, expectation: input.expectation ?? (fromRun ? verdictLabel : null) ?? 'positive' }),
-    source: isDeepStrictEqual(caseInput, source.input) ? 'production' : 'manual',
+    ...labelOf({ ...input, expectedOutput, expectation: input.expectation ?? (fromRun ? source.verdictLabel : null) ?? 'positive' }),
+    source: isDeepStrictEqual(caseInput, source.runInput) ? 'production' : 'manual',
     sourceAgentRunId: input.agentRunId,
     perturbation: null,
     origin: input.origin,
@@ -156,6 +160,45 @@ export async function createEvalCaseFromAgentRun(
     createdBy: authorId(scope),
     createdAt: new Date().toISOString(),
   });
+}
+
+/** The run as a case of its own Step: the Step's input, the workspace it saw, and the output a review labelled. */
+async function stepCaseFromRun(scope: CallerScope, input: z.output<typeof CreateEvalCaseFromAgentRunInputSchema>) {
+  const source = await loadCaseSource(scope, input.agentRunId, input.step, 'edit');
+  return {
+    owner: evaluationOwnerOf({ kind: 'step', ...source.step }),
+    instance: source.subject.instance,
+    agentRun: source.subject.agentRun,
+    runInput: source.input,
+    workspaceSeedCommit: source.workspaceSeedCommit,
+    runOutput: source.subject.agentRun.envelope?.result ?? null,
+    verdictLabel: await loadVerdictExpectation(scope, input.agentRunId),
+  };
+}
+
+/**
+ * The run as a case of an Agent its Step uses (ADR-0029): what the Agent was
+ * given, from an empty workspace (D4). An output under another output schema
+ * than the Agent's is refused, and its verdict labels nothing.
+ */
+async function agentCaseFromRun(
+  scope: CallerScope,
+  input: z.output<typeof CreateEvalCaseFromAgentRunInputSchema>,
+  agent: { namespace: string; agentId: string },
+) {
+  await loadEvaluationSubject(scope, agent, 'edit');
+  const subject = { kind: 'agent', ...agent } as const;
+  const source = await loadAgentRunSource(scope, subject, input.agentRunId);
+  if (expectsWithheldOutput(source, input.expectedOutput)) throw new ValidationError(WITHHELD_OUTPUT_ERROR);
+  return {
+    owner: evaluationOwnerOf(subject),
+    instance: source.instance,
+    agentRun: source.agentRun,
+    runInput: source.input,
+    workspaceSeedCommit: null,
+    runOutput: source.result,
+    verdictLabel: source.change.outputSchemaDiffers ? null : await loadVerdictExpectation(scope, input.agentRunId),
+  };
 }
 
 /**

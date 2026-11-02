@@ -7,7 +7,7 @@ import { createEvalCase } from '../../../evaluation/eval-cases';
 import { saveEvalDataset } from '../../../evaluation/eval-datasets';
 import { prepareEvalRun } from '../../../evaluation/eval-runs';
 import { reviewEvaluationProposal } from '../review-proposal';
-import { evaluationFixture, GRADED_RUN, NAMESPACE, registryEntry, STEP, UNGRADED_RUN, type EvaluationFixture } from '../../../evaluation/__tests__/fixture';
+import { addAgentWorkflowRun, evaluationFixture, GRADED_RUN, NAMESPACE, registryEntry, STEP, UNGRADED_RUN, type EvaluationFixture } from '../../../evaluation/__tests__/fixture';
 
 const runCodeCheck = vi.hoisted(() => vi.fn());
 vi.mock('@mediforce/agent-runtime', async (importOriginal) => ({
@@ -216,9 +216,20 @@ describe('reviewEvaluationProposal', () => {
     const AGENT: EvaluationSubject = { kind: 'agent', namespace: NAMESPACE, agentId: 'ae-grader' };
     const triggerPayload = { events: [{ term: 'Sepsis', outcome: 'fatal' }] };
 
-    it('is written from a production run, not harvested from it', async () => {
-      const review = await reviewEvaluationProposal('propose_eval_case', { name: 'From production', agentRunId: GRADED_RUN }, fixture.scope(), AGENT, []);
-      expect(review).toEqual({ ok: false, error: expect.stringContaining('write its input from what get_agent_run shows') });
+    it('may be taken from a production run of a step that uses the Agent, and from no other', async () => {
+      expect(await reviewEvaluationProposal('propose_eval_case', { name: 'From production', agentRunId: GRADED_RUN }, fixture.scope(), AGENT, []))
+        .toEqual({ ok: true });
+      await expect(reviewEvaluationProposal('propose_eval_case', { name: 'Elsewhere', agentRunId: GRADED_RUN }, fixture.scope(), { ...AGENT, agentId: 'other' } as EvaluationSubject, []))
+        .rejects.toThrow('not a production run of a step that uses');
+    });
+
+    it('refuses to expect the output of a run under another output schema, and not its input', async () => {
+      const grades = { grades: [] };
+      await addAgentWorkflowRun(fixture, { workflowName: 'other-schema', step: { agent: { outputSchema: { type: 'object', required: ['grades'] } } }, agentRunId: 'run-other', result: grades, at: '2026-10-03T10:00:00.000Z' });
+      expect(await reviewEvaluationProposal('propose_eval_case', { name: 'Other', agentRunId: 'run-other', expectedOutput: grades }, fixture.scope(), AGENT, []))
+        .toEqual({ ok: false, error: expect.stringContaining('another output schema') });
+      expect(await reviewEvaluationProposal('propose_eval_case', { name: 'Other', agentRunId: 'run-other' }, fixture.scope(), AGENT, []))
+        .toEqual({ ok: true });
     });
 
     it('is given its trigger payload alone', async () => {

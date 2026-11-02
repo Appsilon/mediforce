@@ -9,14 +9,14 @@ import {
   type EvalCaseInput,
   type EvaluationSubject,
 } from '@mediforce/platform-core';
-import type { AddEvaluatorVersionInput, EvaluatorSelfTest, EvaluatorView, GetAgentRunIoOutput, ProposalView } from '@mediforce/platform-api/contract';
+import type { AddEvaluatorVersionInput, AgentRunChange, EvaluatorSelfTest, EvaluatorView, GetAgentRunIoOutput, ProposalView } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { useAgentRunIo, useStepEvaluationMutation, useStepEvaluators } from '@/hooks/use-step-evaluation';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
-import { CaseForm, EvaluatorForm, FormDialog, evaluatorVersionChanges, outputText, type CaseFormResult, type EvaluatorFormResult } from './step-evaluation-sections';
+import { AgentRunChangeNote, CaseForm, EvaluatorForm, FormDialog, caseOwnerOfRun, evaluatorVersionChanges, outputText, type CaseFormResult, type EvaluatorFormResult } from './step-evaluation-sections';
 import { draftFromCheck } from './evaluator-check-editor';
 
 export type ProposalStatus = 'open' | 'accepted' | 'rejected';
@@ -61,7 +61,7 @@ async function acceptProposal(step: EvaluationSubject, proposal: DecidablePropos
     case 'propose_eval_case': {
       const { agentRunId, input, containsProductionData, rationale: _rationale, ...written } = proposal.arguments;
       return agentRunId !== undefined
-        ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, ...(step.kind === 'step' ? { step } : {}), ...written, origin: 'assistant' })
+        ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, ...caseOwnerOfRun(step), ...written, origin: 'assistant' })
         : mediforce.evaluation.createCase({ ...step, ...written, input: input!, ...(containsProductionData === undefined ? {} : { containsProductionData }), origin: 'assistant' });
     }
     case 'propose_perturbed_case': {
@@ -188,11 +188,12 @@ function perturbedChanges(proposal: Proposal<'propose_perturbed_case'>['argument
 }
 
 /** A proposed Eval Case as it would be stored: where it comes from, why, its input and its expected output. */
-function ProposedCaseBody({ proposal, content, loadError }: {
+function ProposedCaseBody({ proposal, content, loadError, agentChange }: {
   proposal: CaseProposal;
   content: ProposedCaseContent | null;
   /** Why the case's input could not be shown. */
   loadError: string | null;
+  agentChange: AgentRunChange | undefined;
 }) {
   const { arguments: args } = proposal;
   const tags = proposal.tool === 'propose_perturbed_case'
@@ -210,6 +211,7 @@ function ProposedCaseBody({ proposal, content, loadError }: {
         ))}
       </div>
       {notes.map((note) => <p key={note} className="whitespace-pre-wrap text-muted-foreground">{note}</p>)}
+      <AgentRunChangeNote change={agentChange} />
       {changes !== '' && <p className="text-muted-foreground" data-testid="proposed-case-changes">Changes: {changes}</p>}
       {content === null ? (
         loadError === null
@@ -245,7 +247,7 @@ function createReviewedCase(step: EvaluationSubject, proposal: CaseProposal, val
   }
   const { agentRunId, containsProductionData } = proposal.arguments;
   return agentRunId !== undefined
-    ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, ...(step.kind === 'step' ? { step } : {}), ...values, origin: 'assistant' })
+    ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, ...caseOwnerOfRun(step), ...values, origin: 'assistant' })
     : mediforce.evaluation.createCase({
       ...step,
       ...values,
@@ -254,12 +256,13 @@ function createReviewedCase(step: EvaluationSubject, proposal: CaseProposal, val
     });
 }
 
-function reviewInputHelp(proposal: CaseProposal): string {
+function reviewInputHelp(step: EvaluationSubject, proposal: CaseProposal): string {
   if (proposal.tool === 'propose_perturbed_case') {
     const changes = perturbedChanges(proposal.arguments);
     return changes === '' ? 'The run\'s input with the assistant\'s changes.' : `The run's input with the assistant's changes: ${changes}.`;
   }
-  return proposal.arguments.agentRunId === undefined ? 'The input the assistant wrote.' : 'What the step received in this run.';
+  if (proposal.arguments.agentRunId === undefined) return 'The input the assistant wrote.';
+  return step.kind === 'agent' ? 'What the agent received in this run, as its one input.' : 'What the step received in this run.';
 }
 
 /** The proposed case in the form a person adds cases with; accepting it there adds it as edited, still the assistant's. */
@@ -277,6 +280,7 @@ function ReviewProposedCase({ step, proposal, content, mayEdit, onAccepted, onCl
   return (
     <FormDialog title="Review the proposed Eval Case" description="Edit it if it needs it; Accept adds it as it stands here." testId="case-dialog" onClose={onClose}>
       <CaseForm
+        subject={step}
         initial={{
           name: args.name,
           split: args.split ?? 'dev',
@@ -287,7 +291,7 @@ function ReviewProposedCase({ step, proposal, content, mayEdit, onAccepted, onCl
           agreementInstructions: args.agreementInstructions ?? '',
           evaluatorIds: null,
         }}
-        inputHelp={reviewInputHelp(proposal)}
+        inputHelp={reviewInputHelp(step, proposal)}
         evaluators={evaluators}
         sourceAgentRunId={proposal.tool === 'propose_eval_case' ? proposal.arguments.agentRunId ?? null : null}
         submitLabel="Accept"
@@ -445,7 +449,7 @@ export function ProposalCard({ step, state, stepOutputSchema, mayEdit, editReaso
   const proposal = relabelled(state.proposal, caseLabel);
   const evaluators = useStepEvaluators(step).data?.evaluators;
   const versionedEvaluator = proposal.tool === 'propose_evaluator_version' ? evaluators?.find((candidate) => candidate.id === proposal.arguments.evaluatorId) : undefined;
-  const sourceRun = useAgentRunIo(state.proposal.tool === 'propose_eval_case' ? state.proposal.arguments.agentRunId ?? null : null);
+  const sourceRun = useAgentRunIo(state.proposal.tool === 'propose_eval_case' ? state.proposal.arguments.agentRunId ?? null : null, step);
   const proposedCase = isCaseProposal(state.proposal) ? proposedCaseContent(state.proposal, sourceRun.data) : null;
   const caseContent = isCaseProposal(proposal) ? proposedCaseContent(proposal, sourceRun.data) : null;
   const proposedLabel = proposedCase === null || proposedCase.expectedOutput === null ? null : proposedCase.expectation;
@@ -467,6 +471,7 @@ export function ProposalCard({ step, state, stepOutputSchema, mayEdit, editReaso
           proposal={proposal}
           content={caseContent}
           loadError={caseLoadError(proposal, sourceRun)}
+          agentChange={proposal.tool === 'propose_eval_case' ? sourceRun.data?.agentChange : undefined}
         />}
       {proposal.tool !== 'propose_brief' && isCaseProposal(proposal) === false && (
         <p className="whitespace-pre-wrap text-muted-foreground"><ProposalSummary step={step} proposal={proposal} /></p>

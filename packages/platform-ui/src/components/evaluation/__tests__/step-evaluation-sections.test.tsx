@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { EvaluationStatusStrip, CasesSection, EvalRunsSection, DriftAlert, EvaluatorsSection, caseFromFile, datasetDrift, toEvaluatorName } from '../step-evaluation-sections';
+import { AgentRunChangeNote, EvaluationStatusStrip, CasesSection, EvalRunsSection, DriftAlert, EvaluatorsSection, caseFromFile, datasetDrift, toEvaluatorName } from '../step-evaluation-sections';
 
 const verdicts = vi.hoisted((): Record<string, 'positive' | 'negative'> => ({}));
 
@@ -302,6 +302,49 @@ describe('Evaluator view and edit', () => {
     fireEvent.change(screen.getByLabelText('Rule'), { target: { value: 'Every grade is justified by the record.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save as v2' }));
     expect(evaluation.addEvaluatorVersion).toHaveBeenCalledWith({ evaluatorId: evaluator.id, rule: 'Every grade is justified by the record.' });
+  });
+});
+
+describe('Adding an Agent\'s Eval Case from a run of a workflow that uses it', () => {
+  const step = { kind: 'agent', namespace: 'acme', agentId: 'grader' } as const;
+  const asItIs = { workflowName: 'safety', stepId: 'grade', definitionVersion: 1, changes: [], outputSchemaDiffers: false };
+  const altered = { workflowName: 'oncology', stepId: 'grade', definitionVersion: 2, changes: ['step prompt', 'output schema'], outputSchemaDiffers: true };
+  const run = (id: string, change: unknown) => ({
+    agentRun: { id, status: 'completed', fallbackReason: null, startedAt: '2026-09-24T08:00:00.000Z', envelope: { reasoning_summary: 'graded' } },
+    change,
+  });
+  const evaluation = (runs: unknown[]) => ({
+    cases: { isLoading: false, data: { cases: [] } },
+    agentProductionRuns: { data: { pages: [{ runs }] }, isFetchingNextPage: false, hasNextPage: false, fetchNextPage: () => undefined },
+    datasets: { data: { datasets: [] } },
+    evaluators: { data: { evaluators: [] } },
+  }) as never;
+  const openDialog = () => fireEvent.click(screen.getByRole('button', { name: 'Add case' }));
+
+  it('groups the runs by whether the workflow alters the agent, and starts on one that runs it as it is', () => {
+    render(<CasesSection step={step} evaluation={evaluation([run('run-altered', altered), run('run-plain', asItIs)])} mayEdit />);
+    openDialog();
+    const select = screen.getByRole('combobox', { name: 'Start from' }) as HTMLSelectElement;
+    expect(within(select).getByRole('group', { name: 'Workflows running this agent as it is' })).toHaveTextContent('safety');
+    expect(within(select).getByRole('group', { name: 'Workflows that alter this agent' })).toHaveTextContent('oncology');
+    expect(select.value).toBe('run:run-plain');
+  });
+
+  it('says what a workflow altered, and that an output under another schema is not offered', () => {
+    render(<AgentRunChangeNote change={altered} />);
+    expect(screen.getByTestId('agent-run-change-note')).toHaveTextContent('from a run of workflow ‘oncology’ that has altered the agent\'s definition in: step prompt, output schema');
+    expect(screen.getByTestId('agent-run-change-note')).toHaveTextContent('its output is not offered as an expected output');
+  });
+
+  it('says nothing about a run that uses the agent as it is', () => {
+    render(<AgentRunChangeNote change={asItIs} />);
+    expect(screen.queryByTestId('agent-run-change-note')).toBeNull();
+  });
+
+  it('starts empty when every run alters the agent, rather than on one of them', () => {
+    render(<CasesSection step={step} evaluation={evaluation([run('run-altered', altered)])} mayEdit />);
+    openDialog();
+    expect((screen.getByRole('combobox', { name: 'Start from' }) as HTMLSelectElement).value).not.toBe('run:run-altered');
   });
 });
 

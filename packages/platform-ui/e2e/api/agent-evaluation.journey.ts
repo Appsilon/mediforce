@@ -1,9 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { APIRequestContext } from '@playwright/test';
 import {
+  EvalCaseOutputSchema,
   EvalRunOutputSchema,
+  GetAgentRunIoOutputSchema,
   GetStepQualificationOutputSchema,
   GetWorkflowValidationOutputSchema,
+  ListAgentProductionRunsOutputSchema,
   ListAgentValidationsOutputSchema,
   ListAgentVersionsOutputSchema,
   ListEvalRunsOutputSchema,
@@ -12,7 +15,7 @@ import {
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { pollUntil } from '../helpers/poll-until';
-import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow } from '../helpers/agent-step-runs';
+import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow, awaitFinishedAgentRun, startRun } from '../helpers/agent-step-runs';
 import { OUTSIDER_NAMESPACE, sessionCookieHeaders, setupMultiNamespaceCallers } from '../helpers/multi-namespace';
 
 /**
@@ -196,6 +199,45 @@ test.describe('Agent Evaluation — API E2E', () => {
       reason: expect.stringContaining('as it was validated'),
       inheritedFromAgent: { agentId, version: 1 },
     });
+  });
+
+  test('an Agent\'s cases start from runs of the workflows that use it; an output under another schema stays out', async ({ request }) => {
+    test.setTimeout(120_000);
+    const agentId = await createAgent(request, `AE grader ${randomUUID().slice(0, 8)}`);
+    const subject = { namespace: TEST_ORG_HANDLE, agentId };
+    const suffix = agentId.slice(0, 8);
+    const asItIsRun = await startRun(request, agentStepWorkflow(`e2e-agent-as-is-${suffix}`, { autonomyLevel: 'L4', agentId, plugin: 'claude-code-agent' }));
+    const alteredRun = await startRun(request, agentStepWorkflow(`e2e-agent-altered-${suffix}`, {
+      autonomyLevel: 'L4', agentId, plugin: 'claude-code-agent',
+      agent: { prompt: 'Grade each AE.', outputSchema: { type: 'object', required: ['summary'] } },
+    }));
+    const asItIs = await awaitFinishedAgentRun(request, asItIsRun);
+    const altered = await awaitFinishedAgentRun(request, alteredRun);
+
+    const { runs } = ListAgentProductionRunsOutputSchema.parse(await getJson(request, `/api/evaluation/agent-production-runs?namespace=${TEST_ORG_HANDLE}&agentId=${agentId}`));
+    expect(Object.fromEntries(runs.map(({ agentRun, change }) => [agentRun.id, change.changes]))).toEqual({
+      [asItIs.id]: [],
+      [altered.id]: ['step prompt', 'output schema'],
+    });
+
+    const alteredIo = GetAgentRunIoOutputSchema.parse(await getJson(request, `/api/evaluation/agent-runs/${altered.id}/io?namespace=${TEST_ORG_HANDLE}&agentId=${agentId}`));
+    expect(alteredIo).toMatchObject({ result: null, agentChange: { outputSchemaDiffers: true } });
+    expect(alteredIo.caseInput.previousStepOutputs).toEqual({});
+
+    const { evalCase } = EvalCaseOutputSchema.parse(await post(request, '/api/evaluation/cases/from-agent-run', { agentRunId: altered.id, agent: subject }, 201));
+    expect(evalCase).toMatchObject({ agentId, stepId: null, expectedOutput: null, sourceAgentRunId: altered.id, containsProductionData: true });
+    const refused = await request.post('/api/evaluation/cases/from-agent-run', {
+      headers: JSON_HEADERS,
+      data: { agentRunId: altered.id, agent: subject, expectedOutput: altered.envelope?.result },
+    });
+    expect(refused.status(), await refused.text()).toBe(400);
+
+    const stranger = await createAgent(request, `Other grader ${randomUUID().slice(0, 8)}`);
+    const notItsRun = await request.post('/api/evaluation/cases/from-agent-run', {
+      headers: JSON_HEADERS,
+      data: { agentRunId: asItIs.id, agent: { namespace: TEST_ORG_HANDLE, agentId: stranger } },
+    });
+    expect(notItsRun.status(), await notItsRun.text()).toBe(400);
   });
 
   test('an MCP binding change is a new version; a moving model alias and a cowork agent are refused', async ({ request }) => {

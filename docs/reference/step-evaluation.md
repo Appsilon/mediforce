@@ -49,7 +49,7 @@ once the runnable version no longer has the step.
 A step (or Agent) with nothing yet — no Brief, cases, Evaluators or Eval Runs —
 opens, for a person who may edit it, on a choice: **Guided setup** or **Set up
 manually** (the tabs, until the Evaluation is left — an empty step offers the
-choice again, unless a link or reload names a tab with `?section=`), with how many production runs a step has to start cases from.
+choice again, unless a link or reload names a tab with `?section=`), with how many production runs it has to start cases from.
 The guided setup (`?guided=brief|cases|evaluators|review`, only for a person
 who may edit — anyone else on such a link sees the tabs)
 walks four stages beside the assistant, which holds one conversation per stage
@@ -59,7 +59,7 @@ Cases** — *Do you know the correct outputs?* **Yes** or **For some** adds one
 `expected_output` Evaluator, `matches-expected-output`, unless the step has one
 (an archived one comes back as a new version) — **Evaluators**, and **Summary**. For each of the first three the assistant's
 panel offers a button that asks it to draft that stage (the Brief; cases from
-runs, or edge cases and planted errors; the checks themselves — up to five
+runs — for an Agent, the runs of the Steps that use it, as it is first — or edge cases and planted errors; the checks themselves — up to five
 Evaluators, each schema or code one previewed and each judge proposed untried,
 with no plan to pick from first); its proposals arrive as
 cards, as on the tabs. **Cases from runs** follows the answer to *Do you know
@@ -1006,15 +1006,33 @@ Criteria, Eval Runs and Qualification work as above, with these differences:
   workspace (409): its suite lives in the workspace it has now.
 - `mediforce eval qualification --agent <id>` reads the Agent as it is now and
   prints its Agent version; `--version` is for a step.
-- **No production features.** An Agent has no production runs of its own, so
-  harvesting or perturbing cases, previewing a check, drift and production
-  Evaluators are refused. Write cases by hand.
+- **No production features of its own.** An Agent has no production runs of its
+  own, so perturbing cases, previewing a check, drift and production Evaluators
+  are refused.
+- **Its cases can start from runs of the Workflows that use it**
+  ([ADR-0031](../adr/0031-agent-cases-from-workflow-runs.md)). **Add case → Start
+  from** groups those runs under *Workflows running this agent as it is* and
+  *Workflows that alter this agent*, by `agentStepChanges` on the Workflow version
+  each run ran (`mediforce eval agent-runs --agent <id>`, `GET
+  /api/evaluation/agent-production-runs`), and starts on the newest unused run of
+  the first group. An altered run says which fields it altered. The case holds
+  what the Agent was given as its trigger payload — literal `stepParams`, then the
+  step's input, then its `${…}` mappings — from an empty workspace, keeps the run
+  and is flagged as containing production data (`eval run-io <agentRunId> --agent
+  <id> --namespace <ns>`, `eval case-from-run <agentRunId> --agent <id> --namespace
+  <ns>`).
+- **An output under another output schema is not used.** When the run's step
+  declares an `outputSchema` other than the Agent's, its output and the verdict on
+  it read as null, and that output is refused as an expected output. The input
+  stays usable. The comparison is with the Agent as it is now, so a change to the
+  Agent's own schema after the run is not detected.
 - **Its Evaluation Assistant reads the Steps that use it.** The assistant is the
   Step's, with the Agent's toolset: it reads the Agent (`get_agent`) instead of a
   step, and finds the Steps that use the Agent with their recent production runs
   (`list_agent_production_runs`), reading one as for a step (`get_agent_run`,
-  `get_trajectory`). From what a run was given it proposes a *written* case — the
-  trigger payload carrying what the Agent used, flagged as containing production
-  data. It has no step reads, previews, synthesized cases or routing.
+  `get_trajectory`), each with what its step changed. It proposes a case from a
+  run, or a written one, says when a run came from a workflow that altered the
+  Agent, and its card says so too. It has no step reads, previews, synthesized
+  cases or routing.
 - Only a container agent of the workspace, with a runtime, is evaluated.
 

@@ -16,7 +16,7 @@ import { EvaluationAssistantPanel, type EvaluationAssistantStarter } from './eva
 import { AssistantResizeHandle, assistantColumns, useAssistantHeight, useAssistantWidth } from './assistant-width';
 import type { BriefQuery } from './evaluation-brief-field';
 import { buttonClass, inputClass, primaryButtonClass } from './evaluation-styles';
-import { CasesSection, EvaluatorsSection, StartEvalRunControls, hasUnsavedCases, loadedAgentRuns } from './step-evaluation-sections';
+import { CasesSection, EvaluatorsSection, StartEvalRunControls, hasUnsavedCases, loadedAgentProductionRuns, loadedAgentRuns } from './step-evaluation-sections';
 
 type StepEvaluation = ReturnType<typeof useStepEvaluation>;
 
@@ -45,6 +45,8 @@ const PROMPTS = {
   brief: 'Draft this step\'s Evaluation Brief: what it is for, who relies on its output and which failures matter most. Read its prompt, output schema and a few recent runs first.',
   casesFromRuns: 'Propose Eval Cases from recent production runs. I know the correct outputs: take them from the reviewers\' decisions where a person reviewed a run, and ask me to mark the rest Positive or Negative.',
   casesFromRunsUnlabelled: 'Propose an Eval Case from each recent production run, without an expected output: the Evaluators\' rules grade them.',
+  casesFromAgentRuns: 'Propose Eval Cases from recent production runs of the steps that use this agent, those that run it as it is first. I know the correct outputs: take them from the reviewers\' decisions where a person reviewed a run, and ask me to mark the rest Positive or Negative.',
+  casesFromAgentRunsUnlabelled: 'Propose an Eval Case from each recent production run of the steps that use this agent, those that run it as it is first, without an expected output: the Evaluators\' rules grade them.',
   edgeCases: 'Suggest edge-case Eval Cases for inputs production has not sent yet, and negative cases from real outputs with one obvious error planted, the riskiest by the Brief first.',
   edgeCasesUnlabelled: 'Suggest edge-case Eval Cases for inputs production has not sent yet, the riskiest by the Brief first.',
   checks: 'Draft the checks this step needs as Evaluators I can accept — no plan. Riskiest by the Brief first, each the cheapest kind that catches it: the output schema, then Code, then an LLM judge. At most five; then name the risks left unchecked.',
@@ -60,7 +62,8 @@ export function SetupChoice({ step, evaluation, onGuided, onManual }: {
   onGuided: () => void;
   onManual: () => void;
 }) {
-  const runs = loadedAgentRuns(evaluation).length;
+  const runs = step.kind === 'agent' ? loadedAgentProductionRuns(evaluation).length : loadedAgentRuns(evaluation).length;
+  const runPages = step.kind === 'agent' ? evaluation.agentProductionRuns : evaluation.agentRuns;
   const choiceClass = 'flex flex-1 basis-80 flex-col gap-2 rounded-xl border bg-background p-5 text-left transition-colors hover:bg-muted/40';
   return (
     <section className="mx-auto max-w-3xl space-y-6 py-8" data-testid="evaluation-setup-choice" data-tour="eval-setup-choice">
@@ -83,9 +86,9 @@ export function SetupChoice({ step, evaluation, onGuided, onManual }: {
           <span className="text-sm font-semibold text-primary">Open →</span>
         </button>
       </div>
-      {step.kind === 'step' && evaluation.agentRuns.data !== undefined && (
+      {runPages.data !== undefined && (
         <p className="text-xs text-muted-foreground" data-testid="evaluation-setup-detected">
-          {runs === 0 ? 'No production runs yet.' : `${runs}${evaluation.agentRuns.hasNextPage ? '+' : ''} production run${runs === 1 ? '' : 's'} to start cases from.`}
+          {runs === 0 ? 'No production runs yet.' : `${runs}${runPages.hasNextPage ? '+' : ''} production run${runs === 1 ? '' : 's'} to start cases from.`}
         </p>
       )}
     </section>
@@ -122,11 +125,13 @@ function stageStarter(stage: SetupStage, step: EvaluationSubject, expectation: E
     return {
       intro: 'Cover inputs production hasn\'t sent yet, and wrong outputs to catch.',
       actions: [
-        ...(step.kind === 'step' ? [{
+        {
           label: 'Cases from runs',
-          prompt: expectation === 'no' ? PROMPTS.casesFromRunsUnlabelled : PROMPTS.casesFromRuns,
+          prompt: step.kind === 'agent'
+            ? (expectation === 'no' ? PROMPTS.casesFromAgentRunsUnlabelled : PROMPTS.casesFromAgentRuns)
+            : (expectation === 'no' ? PROMPTS.casesFromRunsUnlabelled : PROMPTS.casesFromRuns),
           testId: 'guided-setup-cases-from-runs',
-        }] : []),
+        },
         { label: 'Suggest edge cases', prompt: expectation === 'no' ? PROMPTS.edgeCasesUnlabelled : PROMPTS.edgeCases, testId: 'guided-setup-edge-cases' },
       ],
     };

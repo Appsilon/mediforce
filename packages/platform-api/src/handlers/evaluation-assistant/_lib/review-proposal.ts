@@ -15,6 +15,7 @@ import type { PreviewEvaluatorOutput } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { HandlerError, ValidationError } from '../../../errors';
 import { AGENT_NOT_PREVIEWED, EXPECTED_OUTPUT_NOT_PREVIEWED, JUDGE_NOT_PREVIEWED, previewEvaluator } from '../../evaluation/preview-evaluator';
+import { expectsWithheldOutput, loadAgentRunSource, WITHHELD_OUTPUT_ERROR } from '../../evaluation/_lib/agent-production-runs';
 import { loadCaseSource } from '../../evaluation/_lib/case-source';
 import { evaluatorView } from '../../evaluation/_lib/evaluator-view';
 import { stepOnly } from '../../evaluation/_lib/evaluation-subject';
@@ -131,16 +132,15 @@ async function reviewAgentSchemaCheck(
 }
 
 /**
- * An Agent's case is written, never harvested (ADR-0029 D5), and is given its
- * trigger payload alone (D4) — what accepting it would refuse goes back to the
- * model with how to write it from a production run instead.
+ * An Agent's case comes from a production run of a Step that uses it (ADR-0029
+ * D5) or is written, and is given its trigger payload alone (D4) — what
+ * accepting it would refuse goes back to the model: a run the Agent has nothing
+ * to do with, or an output under another output schema than the Agent's.
  */
-function reviewAgentCase(agentRunId: string | undefined, input: Args<'propose_eval_case'>['input']): ProposalReview {
+async function reviewAgentCase(scope: CallerScope, agent: Extract<EvaluationSubject, { kind: 'agent' }>, { agentRunId, input, expectedOutput }: Args<'propose_eval_case'>): Promise<ProposalReview> {
   if (agentRunId !== undefined) {
-    return {
-      ok: false,
-      error: 'An agent\'s case is not harvested from a run: write its input from what get_agent_run shows the run was given — the trigger payload, with what the agent used from earlier steps folded into it — and set containsProductionData to true.',
-    };
+    const source = await loadAgentRunSource(scope, agent, agentRunId);
+    return expectsWithheldOutput(source, expectedOutput) ? { ok: false, error: WITHHELD_OUTPUT_ERROR } : { ok: true };
   }
   if (input !== undefined && (Object.keys(input.previousStepOutputs).length > 0 || input.previousRun !== undefined)) {
     return {
@@ -222,8 +222,8 @@ export async function reviewEvaluationProposal(
         : { ok: false, error: `Not trials of Eval Run '${evalRunId}': ${[...new Set(unknown)].join(', ')} — take trial ids from get_failures` };
     }
     case 'propose_eval_case': {
-      const { agentRunId, input } = args as Args<'propose_eval_case'>;
-      if (step.kind === 'agent') return reviewAgentCase(agentRunId, input);
+      const { agentRunId } = args as Args<'propose_eval_case'>;
+      if (step.kind === 'agent') return reviewAgentCase(scope, step, args as Args<'propose_eval_case'>);
       if (agentRunId !== undefined) await loadCaseSource(scope, agentRunId, step, 'read');
       return { ok: true };
     }

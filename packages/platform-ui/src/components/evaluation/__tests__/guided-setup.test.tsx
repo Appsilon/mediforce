@@ -75,6 +75,7 @@ function evaluationOf({ brief = null, cases = [], evaluators = [], datasets = []
     criteria: { data: { criteria } },
     runs: { data: { evalRuns: [] } },
     agentRuns: { data: { pages: [{ runs: [{ id: 'r-1' }, { id: 'r-2' }] }] }, hasNextPage: false },
+    agentProductionRuns: { data: { pages: [{ runs: [{ agentRun: { id: 'r-1' } }] }] }, hasNextPage: true },
   } as unknown as Parameters<typeof GuidedSetup>[0]['evaluation'];
 }
 
@@ -173,7 +174,8 @@ describe('GuidedSetup', () => {
 
   it('offers cases from runs only for a step, which has production runs', () => {
     renderSetup('cases', evaluationOf(), { step: { kind: 'agent', namespace: 'acme', agentId: 'grader' } });
-    expect(screen.queryByTestId('guided-setup-cases-from-runs')).toBeNull();
+    fireEvent.click(screen.getByTestId('guided-setup-cases-from-runs'));
+    expect(asked).toHaveBeenCalledWith(expect.stringContaining('the steps that use this agent, those that run it as it is first'));
     expect(screen.getByTestId('guided-setup-edge-cases')).toBeVisible();
   });
 

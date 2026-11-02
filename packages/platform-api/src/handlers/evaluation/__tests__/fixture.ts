@@ -14,7 +14,7 @@ import {
   buildStepExecution,
   buildWorkflowDefinition,
 } from '@mediforce/platform-core/testing';
-import type { CreateModelRegistryEntryInput } from '@mediforce/platform-core';
+import type { CreateModelRegistryEntryInput, WorkflowStep } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../../../auth';
 import type { CallerScope } from '../../../repositories/index';
 import { createTestScope, userCaller, type TestScopeOverrides } from '../../../repositories/__tests__/create-test-scope';
@@ -165,6 +165,50 @@ export async function addStepRun(fixture: EvaluationFixture, run: {
         gitMetadata: { ...run.gitMetadata, branch: `run/${run.instanceId}`, changedFiles: ['graded.json'] },
       }),
     }),
+  }));
+}
+
+/**
+ * A workflow in the test workspace whose `grade` step runs the AE grader with
+ * `step` added to it, and one finished production run of it.
+ */
+export async function addAgentWorkflowRun(fixture: EvaluationFixture, run: {
+  workflowName: string;
+  step?: Partial<WorkflowStep>;
+  agentRunId: string;
+  result: Record<string, unknown>;
+  at: string;
+  stepInput?: Record<string, unknown>;
+  triggerPayload?: Record<string, unknown>;
+}): Promise<void> {
+  await fixture.processRepo.saveWorkflowDefinition(buildWorkflowDefinition({
+    name: run.workflowName,
+    namespace: NAMESPACE,
+    steps: [
+      { id: 'grade', name: 'Grade', type: 'creation', executor: 'agent', agentId: 'ae-grader', ...run.step },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ],
+    transitions: [{ from: 'grade', to: 'done' }],
+  }));
+  const instanceId = `instance-${run.agentRunId}`;
+  await fixture.instanceRepo.create(buildProcessInstance({
+    id: instanceId,
+    namespace: NAMESPACE,
+    definitionName: run.workflowName,
+    triggerPayload: run.triggerPayload ?? { studyId: 'CDISCPILOT01' },
+  }));
+  await fixture.instanceRepo.addStepExecution(instanceId, buildStepExecution({
+    instanceId,
+    stepId: 'grade',
+    input: run.stepInput ?? { term: 'Sepsis', steps: {} },
+    startedAt: run.at,
+  }));
+  await fixture.agentRunRepo.create(buildAgentRun({
+    id: run.agentRunId,
+    processInstanceId: instanceId,
+    stepId: 'grade',
+    startedAt: run.at,
+    envelope: buildAgentOutputEnvelope({ result: run.result }),
   }));
 }
 

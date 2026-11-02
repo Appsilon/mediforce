@@ -189,8 +189,42 @@ export const ListStepAgentRunsOutputSchema = z.object({
   nextCursor: z.string().optional(),
 });
 
-/** One Agent Run as an input/output pair: what its step was given and what it returned. */
-export const GetAgentRunIoInputSchema = z.object({ agentRunId: z.string().min(1) });
+/** What the Step of a production run changes about the Agent it ran (ADR-0029 D8), by the Workflow version the run ran. */
+export const AgentRunChangeSchema = z.object({
+  workflowName: z.string(),
+  stepId: z.string(),
+  definitionVersion: z.number().int(),
+  /** Empty when the step runs the Agent as it is (`agentStepChanges`). */
+  changes: z.array(z.string()),
+  /** The step declares an output schema other than the Agent's, so the run's output is no case's to use. */
+  outputSchemaDiffers: z.boolean(),
+});
+
+/** The finished production runs of the Steps that use an Agent, newest first. */
+export const ListAgentProductionRunsInputSchema = z.object({
+  namespace: z.string().min(1),
+  agentId: z.string().min(1),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  /** The previous page's `nextCursor`. */
+  cursor: z.string().regex(/^\d+$/).optional(),
+});
+export const ListAgentProductionRunsOutputSchema = z.object({
+  runs: z.array(z.object({ agentRun: AgentRunSchema, change: AgentRunChangeSchema })),
+  /** Present while older runs remain. */
+  nextCursor: z.string().optional(),
+});
+
+/**
+ * One Agent Run as an input/output pair: what its step was given and what it
+ * returned. With `namespace` and `agentId`, as the source of that Agent's case.
+ */
+export const GetAgentRunIoInputSchema = z.object({
+  agentRunId: z.string().min(1),
+  namespace: z.string().min(1).optional(),
+  agentId: z.string().min(1).optional(),
+}).refine((value) => (value.namespace === undefined) === (value.agentId === undefined), {
+  message: 'Name an agent by both namespace and agentId',
+});
 export const GetAgentRunIoOutputSchema = z.object({
   agentRunId: z.string(),
   status: AgentRunSchema.shape.status,
@@ -202,6 +236,8 @@ export const GetAgentRunIoOutputSchema = z.object({
   confidence: z.number().nullable(),
   /** What a person's review makes of `result`: approved is a positive case, rejected a negative one; null when neither. */
   verdictExpectation: EvalCaseExpectationSchema.nullable(),
+  /** With an agent asked about: what the run's step changes about it. `caseInput` is then that Agent's; an output it cannot use is null, with no verdict. */
+  agentChange: AgentRunChangeSchema.optional(),
 });
 
 export const ListEvalCasesInputSchema = EvaluationSubjectRefSchema.extend({
@@ -230,10 +266,13 @@ export const CreateEvalCaseInputSchema = EvaluationSubjectRefSchema.extend({
  * negative; an unreviewed run gives none. `expectedOutput` and `expectation`
  * override that. An `input` other than the run's makes a manual case that
  * keeps the run it came from. With `step`, the run must be a run of that step.
+ * With `agent`, the case is that Agent's (ADR-0029): the run must be of a step
+ * that uses it, and the output of a step with another output schema is refused.
  */
 export const CreateEvalCaseFromAgentRunInputSchema = z.object({
   agentRunId: z.string().min(1),
   step: EvaluatedStepSchema.optional(),
+  agent: z.object({ namespace: z.string().min(1), agentId: z.string().min(1) }).optional(),
   name: z.string().trim().min(1).max(200).optional(),
   input: EvalCaseInputSchema.optional(),
   expectedOutput: EvalCaseSchema.shape.expectedOutput.optional(),
@@ -670,6 +709,9 @@ export type ListEvalCasesInput = z.input<typeof ListEvalCasesInputSchema>;
 export type ListEvalCasesOutput = z.infer<typeof ListEvalCasesOutputSchema>;
 export type CreateEvalCaseInput = z.input<typeof CreateEvalCaseInputSchema>;
 export type CreateEvalCaseFromAgentRunInput = z.input<typeof CreateEvalCaseFromAgentRunInputSchema>;
+export type AgentRunChange = z.infer<typeof AgentRunChangeSchema>;
+export type ListAgentProductionRunsInput = z.input<typeof ListAgentProductionRunsInputSchema>;
+export type ListAgentProductionRunsOutput = z.infer<typeof ListAgentProductionRunsOutputSchema>;
 export type EvalCaseOutput = z.infer<typeof EvalCaseOutputSchema>;
 export type CreatePerturbedEvalCaseInput = z.input<typeof CreatePerturbedEvalCaseInputSchema>;
 export type ArchiveEvalCaseInput = z.input<typeof ArchiveEvalCaseInputSchema>;

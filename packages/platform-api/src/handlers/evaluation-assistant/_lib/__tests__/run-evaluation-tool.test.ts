@@ -13,7 +13,7 @@ import { setAcceptanceCriteria } from '../../../evaluation/acceptance-criteria';
 import { recordScore } from '../../../scores/record-score';
 import { createSkill } from '../../../skills/create-skill';
 import { executeEvaluationTool, type UnattendedGrant } from '../run-evaluation-tool';
-import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, WORKFLOW } from '../../../evaluation/__tests__/fixture';
+import { addAgentWorkflowRun, addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, WORKFLOW } from '../../../evaluation/__tests__/fixture';
 import { gitWorkspace } from '../../../evaluation/__tests__/git-workspace';
 import { evalScenario, finishEvalRun } from '../../../evaluation/__tests__/finished-eval-run';
 import { userCaller } from '../../../../repositories/__tests__/create-test-scope';
@@ -469,7 +469,7 @@ describe('executeEvaluationTool', () => {
       expect(await executeEvaluationTool('list_agent_production_runs', {}, scope, context)).toEqual({
         steps: [{ workflowName: WORKFLOW, stepId: 'grade-aes', stepName: 'Grade AEs', versions: [1], stepAgentConfig: { prompt: 'Grade each AE.' } }],
         runs: [UNGRADED_RUN, GRADED_RUN].map((agentRunId) => expect.objectContaining({
-          agentRunId, workflowName: WORKFLOW, stepId: 'grade-aes', triggerPayload: { studyId: 'CDISCPILOT01' },
+          agentRunId, workflowName: WORKFLOW, stepId: 'grade-aes', triggerPayload: { studyId: 'CDISCPILOT01' }, changedFromAgent: ['step prompt'], outputSchemaDiffers: false,
         })),
       });
     });
@@ -481,6 +481,21 @@ describe('executeEvaluationTool', () => {
       });
       await expect(executeEvaluationTool('get_trajectory', { agentRunId: 'agent-run-v2' }, scope, context))
         .rejects.toThrow('neither an eval trial of this agent nor a production run of a step that uses it');
+    });
+
+    it('does not show the output of a run under another output schema', async () => {
+      const fixture = await evaluationFixture();
+      const grader = (await fixture.agentDefinitionRepo.getById('ae-grader'))!;
+      await fixture.agentDefinitionRepo.upsert('ae-grader', { ...grader, runtimeId: 'claude-code-agent' });
+      await addAgentWorkflowRun(fixture, { workflowName: 'other-schema', step: { agent: { outputSchema: { type: 'object', required: ['grades'] } } }, agentRunId: 'run-other', result: { grades: [] }, at: '2026-10-03T10:00:00.000Z' });
+      const scope = fixture.scope();
+      const { definition, step, agent } = await loadEvaluationSubject(scope, AGENT, 'read');
+      const context = { step: AGENT, definition, workflowStep: step, agent };
+      const listed = await executeEvaluationTool('list_agent_production_runs', {}, scope, context) as { runs: { agentRunId: string; result: unknown; outputSchemaDiffers: boolean }[] };
+      expect(listed.runs.find((run) => run.agentRunId === 'run-other')).toMatchObject({ result: null, outputSchemaDiffers: true });
+      expect(await executeEvaluationTool('get_agent_run', { agentRunId: 'run-other' }, scope, context)).toMatchObject({
+        result: null, changedFromAgent: ['output schema'], outputSchemaDiffers: true, caseInput: { previousStepOutputs: {} },
+      });
     });
 
     it('is refused for a Step, which reads itself and its own runs', async () => {

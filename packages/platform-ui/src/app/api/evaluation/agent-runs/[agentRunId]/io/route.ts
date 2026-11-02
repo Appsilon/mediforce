@@ -10,6 +10,10 @@ interface RouteContext {
 /** GET /api/evaluation/agent-runs/:agentRunId/io — What the run's step was given and what it returned. */
 export const GET = createRouteAdapter<typeof GetAgentRunIoInputSchema, z.infer<typeof GetAgentRunIoInputSchema>, unknown, RouteContext>(
   GetAgentRunIoInputSchema,
-  async (_req, ctx) => ({ agentRunId: (await ctx.params).agentRunId }),
+  async (req, ctx) => ({
+    agentRunId: (await ctx.params).agentRunId,
+    namespace: req.nextUrl.searchParams.get('namespace') ?? undefined,
+    agentId: req.nextUrl.searchParams.get('agentId') ?? undefined,
+  }),
   getAgentRunIo,
 );

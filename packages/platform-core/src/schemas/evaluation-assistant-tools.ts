@@ -261,8 +261,9 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
   get_agent: NoArguments,
   /**
    * The Steps that use the Agent, with what each adds to it, and their recent
-   * finished production Agent Runs — the input each was given and the
-   * reviewer's verdict — to write the Agent's cases from.
+   * finished production Agent Runs — the input each was given, what its Step
+   * changes about the Agent and the reviewer's verdict — to take the Agent's
+   * cases from.
    */
   list_agent_production_runs: z.object({ limit: z.number().int().min(1).max(50).optional() }),
   /** Recent Workflow Runs of the step, each with the step's finished Agent Runs oldest first — one per review round — and the reviewer's verdict on each. */

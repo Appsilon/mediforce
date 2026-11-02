@@ -34,7 +34,7 @@ describe('Evaluation Assistant prompt', () => {
       expect(prompt).toContain('naming the planted error as the one difference that decides');
     }
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('propose_eval_case with only the run\'s agentRunId and, as expectedOutput, that output with the error planted — no input');
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPTS.agent).toContain('propose_eval_case with a real run\'s input written out');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPTS.agent).toContain('never one with outputSchemaDiffers');
   });
 
   it('keeps planted errors apart from perturbed cases: an error planted in the output is not a change to the input', () => {
@@ -104,7 +104,9 @@ describe('Evaluation Assistant prompt', () => {
     it('names the Agent\'s reads and none of the Step\'s own', () => {
       expect(prompt).toContain('Read before you plan: get_agent');
       expect(prompt).toContain('list_agent_production_runs gives the steps that use the agent');
-      expect(prompt).toContain('Set containsProductionData to true');
+      expect(prompt).toContain('set containsProductionData to true');
+      expect(prompt).toContain('that has altered the agent\'s definition in: <fields>');
+      expect(prompt).toContain('the platform refuses it as an expected output');
       for (const stepOnly of ['get_step', 'list_step_runs', 'propose_perturbed_case', 'propose_control_settings', 'list_workspace_files', 'workflow editor', 'with runInProduction true']) {
         expect(prompt).not.toContain(stepOnly);
       }

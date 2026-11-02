@@ -192,8 +192,9 @@ system prompt with a shared core (`_lib/system-prompt.ts`). What each subject
 is offered is a selection from the catalog, `EVALUATION_ASSISTANT_TOOLSETS`:
 an Agent reads itself (`get_agent`) and the production runs of the Steps that
 use it (`list_agent_production_runs`, from `evaluation/_lib/agent-production-runs.ts`)
-in place of a Step's own reads, previews, synthesized cases and routing. A
-tool added for both lands in both toolsets; one for a single subject, in its own.
+in place of a Step's own reads, previews, synthesized cases and routing; a case
+taken from such a run is the Agent's, under the rules of
+[ADR-0031](../../docs/adr/0031-agent-cases-from-workflow-runs.md). A tool added for both lands in both toolsets; one for a single subject, in its own.
 
 A request may grant the Evaluation Assistant an unattended budget
 (`unattendedBudgetUsd`): `start_eval_run` then starts prepared runs of the step

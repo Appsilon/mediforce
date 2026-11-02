@@ -16,7 +16,7 @@ import {
   CreatePerturbedEvalCaseInputSchema,
 } from '../../../contract/evaluation';
 import { listCommitFiles, readCommitFile } from '@mediforce/agent-runtime';
-import { addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, type EvaluationFixture, STEP_OWNER } from './fixture';
+import { addAgentWorkflowRun, addStepRun, evaluationFixture, GRADED_RUN, NAMESPACE, STEP, UNGRADED_RUN, type EvaluationFixture, STEP_OWNER } from './fixture';
 import { gitWorkspace } from './git-workspace';
 import { userCaller } from '../../../repositories/__tests__/create-test-scope';
 
@@ -312,5 +312,47 @@ describe('Eval Cases of an Agent (ADR-0029)', () => {
     const { evalCase } = await createEvalCase(caseOf(AGENT.agentId, { triggerPayload: { events: [] }, previousStepOutputs: {} }), fixture.scope());
     await expect(updateEvalCase({ caseId: evalCase.id, input: { triggerPayload: { events: [] }, previousStepOutputs: { extract: {} } } }, fixture.scope()))
       .rejects.toMatchObject({ code: 'validation' });
+  });
+
+  describe('an Agent\'s case from a production run of a step that uses it (ADR-0029)', () => {
+    const AGENT = { namespace: NAMESPACE, agentId: 'ae-grader' };
+    const fromRun = (input: Record<string, unknown>) => createEvalCaseFromAgentRun(CreateEvalCaseFromAgentRunInputSchema.parse({ agent: AGENT, ...input }), fixture.scope());
+
+    beforeEach(async () => {
+      const grader = (await fixture.agentDefinitionRepo.getById('ae-grader'))!;
+      await fixture.agentDefinitionRepo.upsert('ae-grader', { ...grader, runtimeId: 'claude-code-agent' });
+    });
+
+    it('belongs to the Agent, holds what it was given as its trigger payload, and keeps the run', async () => {
+      await reviewVerdict(fixture, GRADED_RUN, 1, null);
+      const { evalCase } = await fromRun({ agentRunId: GRADED_RUN });
+      expect(evalCase).toMatchObject({
+        agentId: 'ae-grader', workflowName: null, stepId: null,
+        source: 'production', sourceAgentRunId: GRADED_RUN, containsProductionData: true, workspaceSeedCommit: null,
+        expectedOutput: { findings: [{ term: 'Sepsis', grade: 5 }] }, expectation: 'positive',
+      });
+      expect(evalCase.input.previousStepOutputs).toEqual({});
+      expect(evalCase.input.triggerPayload).toMatchObject({ events: [{ term: 'Sepsis', outcome: 'fatal' }] });
+    });
+
+    it('keeps the run when the person edits the input, as a manual case', async () => {
+      const { evalCase } = await fromRun({ agentRunId: GRADED_RUN, input: { triggerPayload: { term: 'Rash' }, previousStepOutputs: {} } });
+      expect(evalCase).toMatchObject({ source: 'manual', sourceAgentRunId: GRADED_RUN });
+    });
+
+    it('takes no output of a run under another output schema, whatever its review, but takes one the person wrote', async () => {
+      const grades = { grades: [] };
+      await addAgentWorkflowRun(fixture, { workflowName: 'other-schema', step: { agent: { outputSchema: { type: 'object', required: ['grades'] } } }, agentRunId: 'run-other', result: grades, at: '2026-10-03T10:00:00.000Z' });
+      await reviewVerdict(fixture, 'run-other', 1, null);
+      expect((await fromRun({ agentRunId: 'run-other' })).evalCase.expectedOutput).toBeNull();
+      await expect(fromRun({ agentRunId: 'run-other', expectedOutput: grades })).rejects.toThrow('another output schema');
+      expect((await fromRun({ agentRunId: 'run-other', expectedOutput: { findings: [] } })).evalCase.expectedOutput).toEqual({ findings: [] });
+    });
+
+    it('refuses a run of a step that does not use the Agent, an input with earlier steps\' outputs, and naming a step too', async () => {
+      await expect(createEvalCaseFromAgentRun(CreateEvalCaseFromAgentRunInputSchema.parse({ agent: { ...AGENT, agentId: 'other' }, agentRunId: GRADED_RUN }), fixture.scope())).rejects.toThrow();
+      await expect(fromRun({ agentRunId: GRADED_RUN, input: { triggerPayload: {}, previousStepOutputs: { 'extract-aes': {} } } })).rejects.toThrow('trigger payload alone');
+      await expect(fromRun({ agentRunId: GRADED_RUN, step: { namespace: NAMESPACE, workflowName: 'ae-grading', stepId: 'grade-aes' } })).rejects.toThrow('not both');
+    });
   });
 });

@@ -163,7 +163,7 @@ export function runVersionOf(run: { definitionVersion: number | null; agentVersi
 }
 
 /**
- * The Step a production-only feature is about — harvesting a run, a preview
+ * The Step a production-only feature is about — a perturbed case, a preview
  * against past outputs, drift, production Evaluators. An Agent evaluated on
  * its own has no production runs of its own (ADR-0029), so it is refused.
  */

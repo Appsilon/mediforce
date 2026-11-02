@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { isProductionRunOfAgent, listAgentProductionRuns } from '../agent-production-runs';
+import { isProductionRunOfAgent, listAgentProductionRuns, loadAgentRunSource } from '../agent-production-runs';
 import { buildAgentRun, buildProcessInstance } from '@mediforce/platform-core/testing';
-import { evaluationFixture, GRADED_RUN, NAMESPACE, UNGRADED_RUN, WORKFLOW } from '../../__tests__/fixture';
+import { addAgentWorkflowRun, evaluationFixture, GRADED_RUN, NAMESPACE, UNGRADED_RUN, WORKFLOW } from '../../__tests__/fixture';
 
 const AGENT = { kind: 'agent', namespace: NAMESPACE, agentId: 'ae-grader' } as const;
 
@@ -16,7 +16,65 @@ describe('listAgentProductionRuns', () => {
 
   it('is empty for an agent no step uses', async () => {
     const fixture = await evaluationFixture();
-    expect(await listAgentProductionRuns(fixture.scope(), { ...AGENT, agentId: 'unused' }, 5)).toEqual({ usages: [], runs: [] });
+    expect(await listAgentProductionRuns(fixture.scope(), { ...AGENT, agentId: 'unused' }, 5)).toEqual({ usages: [], runs: [], hasMore: false });
+  });
+});
+
+describe('how a production run used the Agent', () => {
+  it('reads what the step changed from the version the run ran, and pages through the runs', async () => {
+    const fixture = await evaluationFixture();
+    await addAgentWorkflowRun(fixture, { workflowName: 'as-is', agentRunId: 'run-as-is', result: { findings: [] }, at: '2026-10-03T10:00:00.000Z' });
+    await addAgentWorkflowRun(fixture, {
+      workflowName: 'customised',
+      step: { agent: { prompt: 'Be brief.', skills: [{ namespace: NAMESPACE, id: 'ctcae' }] } as never },
+      agentRunId: 'run-customised',
+      result: { findings: [] },
+      at: '2026-10-02T10:00:00.000Z',
+    });
+    const { runs, hasMore } = await listAgentProductionRuns(fixture.scope(), AGENT, 2);
+    expect(runs.map(({ agentRun, change }) => [agentRun.id, change.changes])).toEqual([
+      ['run-as-is', []],
+      ['run-customised', ['step prompt', 'skills']],
+    ]);
+    expect(hasMore).toBe(true);
+    const next = await listAgentProductionRuns(fixture.scope(), AGENT, 2, 2);
+    expect(next.runs.map(({ agentRun }) => agentRun.id)).toEqual([UNGRADED_RUN, GRADED_RUN]);
+    expect(next.hasMore).toBe(false);
+  });
+
+  it('marks a step whose output schema differs, and not one that repeats the Agent\'s', async () => {
+    const fixture = await evaluationFixture();
+    const grader = (await fixture.agentDefinitionRepo.getById('ae-grader'))!;
+    const outputSchema = { type: 'object' as const, required: ['findings'] };
+    await fixture.agentDefinitionRepo.upsert('ae-grader', { ...grader, outputSchema });
+    await addAgentWorkflowRun(fixture, { workflowName: 'other-schema', step: { agent: { outputSchema: { type: 'object', required: ['grades'] } } }, agentRunId: 'run-other', result: { grades: [] }, at: '2026-10-03T10:00:00.000Z' });
+    await addAgentWorkflowRun(fixture, { workflowName: 'same-schema', step: { agent: { outputSchema } }, agentRunId: 'run-same', result: { findings: [] }, at: '2026-10-02T10:00:00.000Z' });
+    await addAgentWorkflowRun(fixture, { workflowName: 'inherits', agentRunId: 'run-inherits', result: { findings: [] }, at: '2026-10-01T10:00:00.000Z' });
+    const scope = fixture.scope();
+    expect((await loadAgentRunSource(scope, AGENT, 'run-other')).change).toMatchObject({ changes: ['output schema'], outputSchemaDiffers: true });
+    expect((await loadAgentRunSource(scope, AGENT, 'run-same')).change).toMatchObject({ changes: ['output schema'], outputSchemaDiffers: false });
+    expect((await loadAgentRunSource(scope, AGENT, 'run-inherits')).change).toMatchObject({ changes: [], outputSchemaDiffers: false });
+  });
+
+  it('folds what the agent was given into the case\'s trigger payload, as the step merged it', async () => {
+    const fixture = await evaluationFixture();
+    await addAgentWorkflowRun(fixture, {
+      workflowName: 'mapped',
+      step: { stepParams: { language: 'en', term: 'overridden by the input', study: '${triggerPayload.studyId}' } },
+      agentRunId: 'run-mapped',
+      result: {},
+      at: '2026-10-03T10:00:00.000Z',
+      stepInput: { term: 'Sepsis', study: 'overridden by the mapping', steps: { extract: { term: 'Sepsis' } } },
+    });
+    expect((await loadAgentRunSource(fixture.scope(), AGENT, 'run-mapped')).input).toEqual({
+      triggerPayload: { language: 'en', term: 'Sepsis', study: 'CDISCPILOT01', steps: { extract: { term: 'Sepsis' } } },
+      previousStepOutputs: {},
+    });
+  });
+
+  it('refuses a run of a step that does not use the Agent', async () => {
+    const fixture = await evaluationFixture();
+    await expect(loadAgentRunSource(fixture.scope(), { ...AGENT, agentId: 'other' }, GRADED_RUN)).rejects.toThrow('not a production run of a step that uses');
   });
 });
 
