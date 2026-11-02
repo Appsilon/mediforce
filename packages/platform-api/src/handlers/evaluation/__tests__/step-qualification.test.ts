@@ -16,7 +16,7 @@ import { addEvaluatorVersion, createEvaluator } from '../evaluators';
 import { createEvalCase } from '../eval-cases';
 import { saveEvalDataset } from '../eval-datasets';
 import { advanceEvalRunOfInstance, cancelEvalRun, prepareEvalRun, startEvalRun } from '../eval-runs';
-import { getStepQualification, getWorkflowValidation, signStepQualification } from '../step-qualification';
+import { getStepQualification, getWorkflowValidation, listAgentValidations, signStepQualification } from '../step-qualification';
 import { evaluationFixture, NAMESPACE, seedSchemaEvaluator, STEP, WORKFLOW, type EvaluationFixture } from './fixture';
 
 describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
@@ -222,6 +222,29 @@ describe('Step Qualification (ADR-0023 D5, D10, D11)', () => {
     await expect(signStepQualification({ evalRunId: evalRun.id, decision: 'confirmed' }, scope))
       .rejects.toThrow(/cancelled/);
   });
+  describe('batch agent validation statuses (#1553)', () => {
+    it('reads every evaluable agent\'s status in one call, leaving out agents that cannot be evaluated', async () => {
+      const agent = await fixture.agentDefinitionRepo.getById('ae-grader');
+      await fixture.agentDefinitionRepo.upsert('ae-grader', { ...agent!, runtimeId: 'claude-code-agent' });
+      await fixture.agentDefinitionRepo.upsert('not-evaluable', { ...agent!, name: 'Not evaluable' });
+
+      const { statuses } = await listAgentValidations({ namespace: NAMESPACE }, scope);
+      expect(statuses).toEqual({ 'ae-grader': 'not_verified' });
+
+      const direct = await getStepQualification({ namespace: NAMESPACE, agentId: 'ae-grader' }, scope);
+      expect(statuses['ae-grader']).toBe(direct.validation.status);
+    });
+
+    it('leaves out an evaluable agent from another namespace the caller cannot see', async () => {
+      const agent = await fixture.agentDefinitionRepo.getById('ae-grader');
+      await fixture.agentDefinitionRepo.upsert('ae-grader', { ...agent!, runtimeId: 'claude-code-agent' });
+      await fixture.agentDefinitionRepo.upsert('other-workspace-agent', { ...agent!, namespace: 'pharma-b' });
+
+      const { statuses } = await listAgentValidations({ namespace: 'pharma-b' }, scope);
+      expect(statuses).toEqual({});
+    });
+  });
+
   describe('validation status — the newest finished Eval Run of the version, judged on its criteria', () => {
     const aCase = {
       ...STEP,

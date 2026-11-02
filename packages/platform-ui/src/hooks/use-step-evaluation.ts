@@ -86,23 +86,18 @@ export function useStepQualification(step: EvaluationSubject | null, definitionV
 }
 
 /**
- * Each listed Agent's validation status, by agent id — read through the same
- * cache as `useStepQualification`, so an agent picker and the selected agent's
- * badge share one fetch. Agents still loading or unreadable are left out.
+ * Each listed Agent's validation status, by agent id — one request per
+ * namespace instead of one per agent.
  */
 export function useAgentValidationStatuses(agents: Array<{ namespace: string; agentId: string }>) {
+  const namespaces = [...new Set(agents.map((agent) => agent.namespace))];
   return useQueries({
-    queries: agents.map((agent) => {
-      const subject: EvaluationSubject = { kind: 'agent', ...agent };
-      return {
-        queryKey: sectionKey(subject, 'qualification:runnable'),
-        queryFn: () => mediforce.evaluation.getQualification(subject),
-        retry: stopRetryOn4xx,
-      };
-    }),
-    combine: (results) => new Map(results.flatMap((result, index) => (
-      result.data === undefined ? [] : [[agents[index]!.agentId, result.data.validation.status] as const]
-    ))),
+    queries: namespaces.map((namespace) => ({
+      queryKey: queryKeys.agentValidations(namespace),
+      queryFn: () => mediforce.evaluation.listAgentValidations({ namespace }),
+      retry: stopRetryOn4xx,
+    })),
+    combine: (results) => new Map(results.flatMap((result) => Object.entries(result.data?.statuses ?? {}))),
   });
 }
 

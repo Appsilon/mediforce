@@ -238,6 +238,8 @@ export const queryKeys = {
   /** Whether each version of a workflow is verified; every Evaluation write refreshes it. */
   workflowValidation: (namespace: string, workflowName: string) =>
     ['workflow-validation', namespace, workflowName] as const,
+  /** Every evaluable agent's validation status in a namespace, one request instead of one per agent. */
+  agentValidations: (namespace: string) => ['agent-validations', namespace] as const,
   /** An Agent's versions (ADR-0029); every save of the Agent and every Eval Run of it may add one. */
   agentVersions: (agentId: string) => ['agent-versions', agentId] as const,
   /** One Eval Run with its trials and report — its own domain so it polls alone while running. */

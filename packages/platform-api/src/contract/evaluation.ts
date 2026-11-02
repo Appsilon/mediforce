@@ -561,6 +561,10 @@ export const GetStepQualificationOutputSchema = z.object({
   history: z.array(StepQualificationSchema),
 });
 
+/** Every evaluable agent's validation status in a namespace, one request instead of one per agent. */
+export const ListAgentValidationsInputSchema = z.object({ namespace: z.string().min(1) });
+export const ListAgentValidationsOutputSchema = z.object({ statuses: z.record(z.string(), StepValidationSchema.shape.status) });
+
 /** Whether each version of a workflow is verified, one agent step at a time. */
 export const GetWorkflowValidationInputSchema = EvaluatedStepSchema.pick({ namespace: true, workflowName: true });
 
@@ -691,6 +695,8 @@ export type SetAcceptanceCriteriaOutput = z.infer<typeof SetAcceptanceCriteriaOu
 export type GetStepQualificationInput = z.input<typeof GetStepQualificationInputSchema>;
 export type GetStepQualificationOutput = z.infer<typeof GetStepQualificationOutputSchema>;
 export type StepValidation = z.infer<typeof StepValidationSchema>;
+export type ListAgentValidationsInput = z.infer<typeof ListAgentValidationsInputSchema>;
+export type ListAgentValidationsOutput = z.infer<typeof ListAgentValidationsOutputSchema>;
 export type GetWorkflowValidationInput = z.infer<typeof GetWorkflowValidationInputSchema>;
 export type GetWorkflowValidationOutput = z.infer<typeof GetWorkflowValidationOutputSchema>;
 export type WorkflowVersionValidation = z.infer<typeof WorkflowVersionValidationSchema>;

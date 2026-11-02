@@ -210,6 +210,7 @@ export {
   setAcceptanceCriteria,
   getStepQualification,
   getWorkflowValidation,
+  listAgentValidations,
   signStepQualification,
   getEvalRunFailures,
   getEvalTrial,

@@ -42,9 +42,18 @@ export const evalCriteriaSetCommand = defineCommand({
 
 export const evalQualificationCommand = defineCommand({
   name: 'mediforce eval qualification',
-  description: 'Print a step\'s qualification: Qualified, Stale (and what changed) or Not qualified. A person confirms or overwrites an Eval Run\'s verdict in the Evaluation tab.',
+  description: 'Print a step\'s qualification: Qualified, Stale (and what changed) or Not qualified. A person confirms or overwrites an Eval Run\'s verdict in the Evaluation tab. Without --agent/--workflow/--step, prints every evaluable agent\'s validation status in the namespace instead.',
   args: { ...SUBJECT_ARGS, version: { type: 'string', description: 'Definition version of a step (default: the runnable one); an agent is read as it is now' } },
   async run({ args, output, mediforce, jsonMode }) {
+    if (args.agent === undefined && args.workflow === undefined && args.step === undefined) {
+      const result = await mediforce.evaluation.listAgentValidations({ namespace: args.namespace });
+      if (jsonMode) {
+        printJson(output, result);
+        return 0;
+      }
+      for (const [agentId, status] of Object.entries(result.statuses)) output.stdout(`${agentId}  ${STEP_VALIDATION_LABEL[status]}`);
+      return 0;
+    }
     const version = parsePositiveIntArg(args.version);
     if (version === 'invalid') {
       output.stderr('--version must be a positive integer');

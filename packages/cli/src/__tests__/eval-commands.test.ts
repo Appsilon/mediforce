@@ -301,6 +301,18 @@ describe('mediforce eval', () => {
     expect(output.stdoutLines).toEqual(['validation not verified: No Eval Run of agent version 2 has finished yet.', `not qualified  (agent v2, fingerprint ${'a'.repeat(12)})`]);
   });
 
+  it('qualification without --agent/--workflow/--step prints every evaluable agent\'s status in the namespace', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      statuses: { 'ae-grader': 'passed', 'ae-chat': 'not_verified' },
+    }));
+    const output = captureOutput();
+    const code = await evalQualificationCommand({ argv: ['--namespace', 'pharma-a', ...BASE], env: ENV, output });
+
+    expect(code).toBe(0);
+    expect(fetchSpy.mock.calls[0]![0]).toBe('http://localhost:5555/api/evaluation/qualification/agents?namespace=pharma-a');
+    expect(output.stdoutLines).toEqual(['ae-grader  passed', 'ae-chat  not verified']);
+  });
+
   it('validation prints each workflow version and its agent steps', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
       versions: [
