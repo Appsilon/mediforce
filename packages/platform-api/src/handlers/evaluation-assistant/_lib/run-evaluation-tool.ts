@@ -28,10 +28,9 @@ import { getMcpEvalPolicy } from '../../evaluation/mcp-eval-policy';
 import { listStepAgentRuns } from '../../evaluation/step-agent-runs';
 import { isTrialOfAgent, loadScoredRun, type ScoredRun } from '../../evaluation/_lib/scored-run';
 import { isProductionRunOfAgent, listAgentProductionRuns, loadAgentRunSource } from '../../evaluation/_lib/agent-production-runs';
-import { loadCaseSource } from '../../evaluation/_lib/case-source';
+import { loadCaseSource, newestVerdict, reviewerParamValues } from '../../evaluation/_lib/case-source';
 import { stepOnly } from '../../evaluation/_lib/evaluation-subject';
 import { loadEvaluator } from '../../evaluation/_lib/evaluator-view';
-import { HUMAN_VERDICT_SCORE_NAME } from '../../scores/record-human-verdict';
 import { listEvaluators } from '../../evaluation/evaluators';
 import { listEvalCases } from '../../evaluation/eval-cases';
 import { getEvalRun, listEvalRuns, prepareEvalRun, startEvalRun } from '../../evaluation/eval-runs';
@@ -155,8 +154,8 @@ async function loadSubjectRun(scope: CallerScope, subject: EvaluationSubject, ag
 
 /** The reviewer's newest verdict on a run, as the assistant reads it. */
 async function reviewVerdict(scope: CallerScope, agentRunId: string) {
-  const [verdict] = await scope.scores.list({ agentRunId, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 });
-  return verdict === undefined ? null : { verdict: verdict.label, comment: verdict.comment };
+  const verdict = await newestVerdict(scope, agentRunId);
+  return verdict === undefined ? null : { verdict: verdict.label, comment: verdict.comment, paramValues: reviewerParamValues(verdict) };
 }
 
 /**
@@ -286,7 +285,7 @@ export async function executeEvaluationTool(
         status: agentRun.status,
         fallbackReason: agentRun.fallbackReason,
         startedAt: agentRun.startedAt,
-        reviewVerdict: await reviewVerdict(scope, agentRun.id),
+        reviewVerdict: change.outputSchemaDiffers ? null : await reviewVerdict(scope, agentRun.id),
         triggerPayload: clip(instance.triggerPayload ?? {}, 2000),
         changedFromAgent: change.changes,
         outputSchemaDiffers: change.outputSchemaDiffers,

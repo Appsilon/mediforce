@@ -28,6 +28,12 @@ describe('Evaluation Assistant prompt', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toMatch(/rejected (run|one)|reviewers rejected/);
   });
 
+  it('reads a reviewer\'s param values as the reason they did not approve', () => {
+    for (const prompt of Object.values(EVALUATION_ASSISTANT_SYSTEM_PROMPTS)) {
+      expect(prompt).toContain('Read paramValues exactly as you read a comment');
+    }
+  });
+
   it('red-teams the cases with negative ones: a real output with one obvious error planted, the error what decides', () => {
     for (const prompt of Object.values(EVALUATION_ASSISTANT_SYSTEM_PROMPTS)) {
       expect(prompt).toContain('A wrong output is a negative case too');

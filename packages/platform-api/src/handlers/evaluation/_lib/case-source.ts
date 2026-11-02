@@ -38,7 +38,7 @@ function sentBack(verdict: Score | undefined): boolean {
   return verdict?.label === 'revise' || SentBackMetadataSchema.safeParse(verdict?.metadata).success;
 }
 
-async function newestVerdict(scope: CallerScope, agentRunId: string): Promise<Score | undefined> {
+export async function newestVerdict(scope: CallerScope, agentRunId: string): Promise<Score | undefined> {
   const [verdict] = await scope.scores.list({ agentRunId, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 });
   return verdict;
 }
@@ -101,10 +101,22 @@ const AGREEMENT_INSTRUCTIONS_MAX_CHARS = 4000;
 
 const VerdictParamsSchema = z.object({ paramValues: z.record(z.string(), z.unknown()) });
 
+function isBlank(value: unknown): boolean {
+  if (typeof value === 'string') return value.trim() === '';
+  if (Array.isArray(value)) return value.length === 0;
+  return value === null || value === undefined;
+}
+
+/** The values a reviewer set on a review's parameters; one left blank says nothing. */
+export function reviewerParamValues(verdict: Score): Record<string, unknown> {
+  const params = VerdictParamsSchema.safeParse(verdict.metadata);
+  if (params.success === false) return {};
+  return Object.fromEntries(Object.entries(params.data.paramValues).filter(([, value]) => isBlank(value) === false));
+}
+
 function reviseInstructions(verdict: Score): string | null {
   const request = verdict.comment?.trim() ?? '';
-  const params = VerdictParamsSchema.safeParse(verdict.metadata);
-  const paramValues = params.success ? params.data.paramValues : {};
+  const paramValues = reviewerParamValues(verdict);
   const feedback = [
     ...(request === '' ? [] : [`Reviewer's request: ${request}`]),
     ...(Object.keys(paramValues).length === 0 ? [] : [`Values the reviewer set: ${JSON.stringify(paramValues)}`]),

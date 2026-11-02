@@ -167,9 +167,20 @@ describe('executeEvaluationTool', () => {
     }, scope);
     const { workflowRuns } = await executeEvaluationTool('list_step_runs', {}, scope, context) as ListedWorkflowRuns;
     expect(workflowRuns.map(({ rounds }) => rounds.map((round) => [round.agentRunId, round.reviewVerdict]))).toEqual([
-      [[UNGRADED_RUN, { verdict: 'reject', comment: 'No grades.' }]],
+      [[UNGRADED_RUN, { verdict: 'reject', comment: 'No grades.', paramValues: {} }]],
       [[GRADED_RUN, null]],
     ]);
+  });
+
+  it('lists the param values a reviewer sent a run back with, which say why when there is no comment', async () => {
+    const { scope, context } = await setup();
+    await recordScore({
+      subject: { type: 'agent_run', id: UNGRADED_RUN }, name: 'human_verdict', value: 0.5, label: 'revise', comment: null,
+      source: 'human', createdBy: 'reviewer-1', metadata: { paramValues: { Reason: 'Grade the sepsis event', Proposition: '' } }, namespace: NAMESPACE, processInstanceId: null,
+      stepId: 'grade-aes', evaluatorId: null, supersedes: null, basis: 'test',
+    }, scope);
+    const { workflowRuns } = await executeEvaluationTool('list_step_runs', {}, scope, context) as ListedWorkflowRuns;
+    expect(workflowRuns[0]?.rounds[0]?.reviewVerdict).toEqual({ verdict: 'revise', comment: null, paramValues: { Reason: 'Grade the sepsis event' } });
   });
 
   it('lists every review round of a Workflow Run oldest first, so a request for changes and the output approved after it read together', async () => {
@@ -194,8 +205,8 @@ describe('executeEvaluationTool', () => {
     expect(workflowRuns).toEqual([{
       workflowRunId: 'run-revised',
       rounds: [
-        expect.objectContaining({ agentRunId: 'agent-run-round-1', reviewVerdict: { verdict: 'revise', comment: 'Sepsis with a fatal outcome is Grade 5.' }, result: { findings: [] } }),
-        expect.objectContaining({ agentRunId: 'agent-run-round-2', reviewVerdict: { verdict: 'approve', comment: null } }),
+        expect.objectContaining({ agentRunId: 'agent-run-round-1', reviewVerdict: { verdict: 'revise', comment: 'Sepsis with a fatal outcome is Grade 5.', paramValues: {} }, result: { findings: [] } }),
+        expect.objectContaining({ agentRunId: 'agent-run-round-2', reviewVerdict: { verdict: 'approve', comment: null, paramValues: {} } }),
       ],
     }]);
   });
@@ -464,6 +475,17 @@ describe('executeEvaluationTool', () => {
       });
     });
 
+    it('lists the param values a reviewer sent an Agent\'s run back with', async () => {
+      const { scope, context } = await agentSetup();
+      await recordScore({
+        subject: { type: 'agent_run', id: GRADED_RUN }, name: 'human_verdict', value: 0.5, label: 'revise', comment: null,
+        source: 'human', createdBy: 'reviewer-1', metadata: { paramValues: { Reason: 'Grade the sepsis event' } }, namespace: NAMESPACE, processInstanceId: null,
+        stepId: 'grade-aes', evaluatorId: null, supersedes: null, basis: 'test',
+      }, scope);
+      const { runs } = await executeEvaluationTool('list_agent_production_runs', {}, scope, context) as { runs: { agentRunId: string; reviewVerdict: unknown }[] };
+      expect(runs.find((run) => run.agentRunId === GRADED_RUN)?.reviewVerdict).toEqual({ verdict: 'revise', comment: null, paramValues: { Reason: 'Grade the sepsis event' } });
+    });
+
     it('lists the production runs of the Steps that ran with the Agent, with what each Step adds to it', async () => {
       const { scope, context } = await agentSetup();
       expect(await executeEvaluationTool('list_agent_production_runs', {}, scope, context)).toEqual({
@@ -491,8 +513,13 @@ describe('executeEvaluationTool', () => {
       const scope = fixture.scope();
       const { definition, step, agent } = await loadEvaluationSubject(scope, AGENT, 'read');
       const context = { step: AGENT, definition, workflowStep: step, agent };
+      await recordScore({
+        subject: { type: 'agent_run', id: 'run-other' }, name: 'human_verdict', value: 0.5, label: 'revise', comment: 'Use grades.',
+        source: 'human', createdBy: 'reviewer-1', metadata: { paramValues: { grades: [1] } }, namespace: NAMESPACE, processInstanceId: null,
+        stepId: 'grade-aes', evaluatorId: null, supersedes: null, basis: 'test',
+      }, scope);
       const listed = await executeEvaluationTool('list_agent_production_runs', {}, scope, context) as { runs: { agentRunId: string; result: unknown; outputSchemaDiffers: boolean }[] };
-      expect(listed.runs.find((run) => run.agentRunId === 'run-other')).toMatchObject({ result: null, outputSchemaDiffers: true });
+      expect(listed.runs.find((run) => run.agentRunId === 'run-other')).toMatchObject({ result: null, reviewVerdict: null, outputSchemaDiffers: true });
       expect(await executeEvaluationTool('get_agent_run', { agentRunId: 'run-other' }, scope, context)).toMatchObject({
         result: null, changedFromAgent: ['output schema'], outputSchemaDiffers: true, caseInput: { previousStepOutputs: {} },
       });

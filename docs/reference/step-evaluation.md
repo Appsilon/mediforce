@@ -72,7 +72,8 @@ the output finally approved a positive one, each on the input of the review's
 first round — and an
 unreviewed run's output comes as an expected output for the person to mark.
 `list_step_runs` lists runs grouped by Workflow Run, each with the step's
-rounds oldest first, so a review reads as one chain. Summary sums
+rounds oldest first, so a review reads as one chain. Each round carries the
+reviewer's comment and non-blank param values. Summary sums
 up the stages, sets the Acceptance Criteria (minimum pass rate, optionally
 pass^k) and, on **Save**, writes them if changed and saves the cases as a new
 Dataset version if unsaved, then opens the tabs; **Save and start Eval Run**
@@ -512,7 +513,7 @@ A harvested case takes the run's output as its expected output when a person
 reviewed the run: approved, a positive case; rejected, a negative one, both
 compared exactly unless the request says otherwise. A run sent back with the
 `revise` verdict is a negative case too, compared by meaning (`agreement`), with
-the reviewer's comment and any param values in its agreement instructions. So
+the reviewer's comment and non-blank param values in its agreement instructions. So
 is a run a human review step sends back: a verdict routing to an earlier agent
 step, under any key, records a `human_verdict` Score on that step's latest run
 (`metadata.sentBack`). A human step's other verdicts are not recorded. Any

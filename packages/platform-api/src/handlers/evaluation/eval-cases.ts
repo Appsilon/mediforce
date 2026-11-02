@@ -125,10 +125,10 @@ export async function createEvalCase(
  * and the parent of the commit it produced is the workspace it saw. An
  * approved run's output is the case's expected output, to match; a rejected
  * run's is one to avoid, and so is one sent back for revision, compared by
- * meaning on the reviewer's comment. A run sent for a recheck, or never
- * reviewed, gives no expected output unless the caller gives one. An input
- * other than the run's is one production never saw: the case is manual, and
- * keeps the run it came from.
+ * meaning on the reviewer's comment and param values. A run sent for a
+ * recheck, or never reviewed, gives no expected output unless the caller gives
+ * one. An input other than the run's is one production never saw: the case is
+ * manual, and keeps the run it came from.
  */
 export async function createEvalCaseFromAgentRun(
   input: z.output<typeof CreateEvalCaseFromAgentRunInputSchema>,

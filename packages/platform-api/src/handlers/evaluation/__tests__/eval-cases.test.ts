@@ -158,6 +158,15 @@ describe('Eval Cases', () => {
       expect(evalCase.agreementInstructions).toContain('"phases":7');
     });
 
+    it('leaves params the reviewer left blank out of the agreement instructions', async () => {
+      await recordScore({
+        subject: { type: 'agent_run', id: GRADED_RUN }, name: 'human_verdict', value: 0.5, label: 'revise', comment: null, source: 'human', createdBy: 'reviewer-1',
+        metadata: { paramValues: { Reason: '', Note: '   ', Sites: [], Owner: null } }, namespace: NAMESPACE, processInstanceId: null, stepId: 'grade-aes', evaluatorId: null, supersedes: null, basis: 'test',
+      }, fixture.scope());
+      const { evalCase } = await harvest({ agentRunId: GRADED_RUN });
+      expect(evalCase.agreementInstructions).toBeNull();
+    });
+
     it('takes a Step\'s case from the first round too, leaving out the output the step later saw of itself', async () => {
       await addStepRun(fixture, { instanceId: 'run-loop', agentRunId: 'step-round-1', result: { grade: 1 }, at: '2026-10-05T13:01:00.000Z' });
       await addStepExecutionAndRun(fixture, 'run-loop', 'step-round-2', { grade: 2 }, '2026-10-05T13:02:00.000Z', { grade: 1, steps: { 'grade-aes': { grade: 1 } } }, 'grade-aes');
