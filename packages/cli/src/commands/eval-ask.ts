@@ -11,11 +11,16 @@ export const evalAskCommand = defineCommand({
     version: { type: 'string', description: 'Workflow Definition version whose step the assistant reads and runs (default: the runnable one)' },
     model: { type: 'string', description: 'OpenRouter model id' },
     'unattended-budget': { type: 'string', description: 'USD the assistant may spend starting prepared Eval Runs during this request, without asking (default: none — starting a run is refused)' },
+    action: { type: 'string', description: 'Restrict this turn to a fixed task, with its own narrow tool set: "draft-task-completion-evaluators" drafts the step\'s task-completion Evaluators — one per requirement of its instructions' },
   },
   async run({ args, output, mediforce, jsonMode }) {
     const version = parsePositiveIntArg(args.version);
     if (version === 'invalid') {
       output.stderr('--version must be a positive integer');
+      return 2;
+    }
+    if (args.action !== undefined && args.action !== 'draft-task-completion-evaluators') {
+      output.stderr('--action must be "draft-task-completion-evaluators"');
       return 2;
     }
     const unattendedBudget = args['unattended-budget'] === undefined ? undefined : Number(args['unattended-budget']);
@@ -29,6 +34,7 @@ export const evalAskCommand = defineCommand({
       messages: [{ role: 'user', content: args.message }],
       ...(args.model !== undefined ? { model: args.model } : {}),
       ...(unattendedBudget !== undefined ? { unattendedBudgetUsd: unattendedBudget } : {}),
+      ...(args.action === 'draft-task-completion-evaluators' ? { action: 'draft_task_completion_evaluators' as const } : {}),
     }, {
       onProgress: (event) => {
         if (jsonMode === true || event.type !== 'tool' || event.status === 'done') return;

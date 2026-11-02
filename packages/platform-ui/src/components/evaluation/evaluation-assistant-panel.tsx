@@ -2,13 +2,13 @@
 
 import * as React from 'react';
 import { Bot, Check, Loader2, Send, Settings, Sparkles, User, X } from 'lucide-react';
-import { DEFAULT_MODEL } from '@mediforce/platform-core';
+import { DEFAULT_MODEL, isTaskCompletionEvaluatorName } from '@mediforce/platform-core';
 import type {
   EvaluationSubject,
   EvaluationAssistantPlatformToolName,
   EvaluationAssistantProposalToolName,
 } from '@mediforce/platform-core';
-import type { EvaluationAssistantProgress, PreparedEvalRun, ProposalView, StartedEvalRun } from '@mediforce/platform-api/contract';
+import type { AskEvaluationAssistantInput, EvaluationAssistantProgress, PreparedEvalRun, ProposalView, StartedEvalRun } from '@mediforce/platform-api/contract';
 import { useQueryClient } from '@tanstack/react-query';
 import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { selectBase } from '@/components/workflows/workflow-editor/step-editor-fields';
+import { useStepEvaluators } from '@/hooks/use-step-evaluation';
+import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { StartEvalRunCard } from './step-evaluation-sections';
 import { EvaluationBriefField, EvaluationBriefToggle, type BriefQuery } from './evaluation-brief-field';
 import {
@@ -23,9 +25,14 @@ import {
   DiagnosisCard,
   PlanCard,
   ProposalCard,
+  TaskCompletionEvaluatorsCard,
   isDecidable,
   type ProposalStatus,
 } from './evaluation-assistant-cards';
+
+const ADD_TASK_COMPLETION_EVALUATORS_BUTTON = 'inline-flex h-8 items-center rounded-md border border-primary bg-muted/40 px-3 text-sm font-semibold text-primary transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50';
+const TASK_COMPLETION_EVALUATORS_ALREADY_ADDED = 'Task-completion Evaluators are already added to this step. Archive them all to draft a new set.';
+const DRAFT_TASK_COMPLETION_EVALUATORS_MESSAGE = 'Draft task-completion Evaluators from this step\'s instructions.';
 
 interface ProposalState {
   readonly proposal: ProposalView;
@@ -59,6 +66,7 @@ const FOLLOW_LATEST_THRESHOLD = 48;
 
 const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssistantProposalToolName, string> = {
   get_step: 'Reading the step',
+  get_step_instructions: 'Reading the step\'s instructions',
   get_agent: 'Reading the agent',
   list_agent_production_runs: 'Finding production runs of steps using the agent',
   list_step_runs: 'Listing recent runs',
@@ -84,6 +92,7 @@ const TOOL_LABELS: Record<EvaluationAssistantPlatformToolName | EvaluationAssist
   propose_control_settings: 'Recommending routing',
   get_failures: 'Reading an eval run\'s failures',
   propose_diagnosis: 'Diagnosing the failures',
+  propose_task_completion_evaluators: 'Drafting the task-completion Evaluators',
 };
 
 function toolLabel(tool: string): string {
@@ -175,8 +184,12 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
     }));
   };
 
+  const evaluators = useStepEvaluators(step);
+  const hasTaskCompletionEvaluators = evaluators.data?.evaluators.some((evaluator) => isTaskCompletionEvaluatorName(evaluator.name)) ?? false;
+  const offerTaskCompletionEvaluators = step.kind === 'step';
+
   /** Sends a message; one from a card leaves whatever the person is typing in the input. */
-  const send = async (message: string, from: 'input' | 'card') => {
+  const send = async (message: string, from: 'input' | 'card', action?: AskEvaluationAssistantInput['action']) => {
     const content = message.trim();
     if (content === '' || pending) return;
     const thread: PanelMessage[] = [...messages, { role: 'user', content }];
@@ -191,6 +204,7 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
       const result = await mediforce.evaluation.askAssistant({
         ...step,
         ...(definitionVersion === null ? {} : { definitionVersion }),
+        ...(action === undefined ? {} : { action }),
         messages: thread.map((message) => ({
           role: message.role,
           content: [message.content, ...(message.proposals ?? []).map(({ proposal }) => `[proposal: ${JSON.stringify(proposal)}]`)].join('\n'),
@@ -220,6 +234,8 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
       setPending(false);
     }
   };
+
+  const draftTaskCompletionEvaluators = () => void send(DRAFT_TASK_COMPLETION_EVALUATORS_MESSAGE, 'card', 'draft_task_completion_evaluators');
 
   return (
     <aside className="flex h-full min-h-0 flex-col rounded-xl border bg-white shadow-lg dark:bg-background" data-testid="evaluation-assistant" data-tour="eval-assistant">
@@ -288,10 +304,20 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
         }}
       >
         {messages.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            Ask for an evaluation plan, turn a rule into a check tried on real runs,
-            synthesize edge cases, prepare an Eval Run or explain a report. It proposes; you decide.
-          </p>
+          <div className="space-y-2 text-xs text-muted-foreground">
+            <p>
+              Ask for an evaluation plan, turn a rule into a check tried on real runs,
+              synthesize edge cases, prepare an Eval Run or explain a report. It proposes; you decide.
+            </p>
+            {offerTaskCompletionEvaluators && (
+              <AddTaskCompletionEvaluatorsButton
+                testId="draft-task-completion-evaluators"
+                alreadyAdded={hasTaskCompletionEvaluators}
+                pending={pending}
+                onClick={draftTaskCompletionEvaluators}
+              />
+            )}
+          </div>
         )}
         {messages.map((message, index) => (
           <div key={index} className={cn('flex gap-2 text-sm', message.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
@@ -325,6 +351,18 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
                 }
                 if (proposal.tool === 'propose_diagnosis') {
                   return <DiagnosisCard key={proposalIndex} diagnosis={proposal.arguments} />;
+                }
+                if (proposal.tool === 'propose_task_completion_evaluators') {
+                  return (
+                    <TaskCompletionEvaluatorsCard
+                      key={proposalIndex}
+                      step={step}
+                      state={{ proposal, status: state.status }}
+                      mayEdit={mayEdit}
+                      editReason={editReason}
+                      onDecided={(status) => decide(index, proposalIndex, status)}
+                    />
+                  );
                 }
                 return isDecidable(proposal) && (
                   <ProposalCard
@@ -364,6 +402,16 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
         )}
         {error !== null && <p className="text-xs text-destructive">{error}</p>}
       </div>
+      {offerTaskCompletionEvaluators && messages.length > 0 && (
+        <div className="shrink-0 border-t px-2 pt-2">
+          <AddTaskCompletionEvaluatorsButton
+            testId="draft-task-completion-evaluators-chip"
+            alreadyAdded={hasTaskCompletionEvaluators}
+            pending={pending}
+            onClick={draftTaskCompletionEvaluators}
+          />
+        </div>
+      )}
       <div className="flex shrink-0 gap-2 border-t p-2">
         <textarea
           data-testid="evaluation-assistant-input"
@@ -384,5 +432,27 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
         </button>
       </div>
     </aside>
+  );
+}
+
+/** Greyed out, with the reason on hover, while the step already has a live task-completion Evaluator. */
+function AddTaskCompletionEvaluatorsButton({ testId, alreadyAdded, pending, onClick }: {
+  testId: string;
+  alreadyAdded: boolean;
+  pending: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <InstantTooltip label={alreadyAdded ? TASK_COMPLETION_EVALUATORS_ALREADY_ADDED : undefined}>
+      <span className="inline-flex">
+        <button
+          type="button"
+          className={cn(ADD_TASK_COMPLETION_EVALUATORS_BUTTON, pending && 'pointer-events-none opacity-50')}
+          data-testid={testId}
+          disabled={alreadyAdded}
+          onClick={onClick}
+        >Add task-completion evaluators</button>
+      </span>
+    </InstantTooltip>
   );
 }

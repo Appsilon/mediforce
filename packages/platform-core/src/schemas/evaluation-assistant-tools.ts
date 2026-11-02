@@ -6,10 +6,12 @@ import {
   EvalCaseInputSchema,
   EvalCaseLabelSchema,
   EvalCaseSplitSchema,
+  CodeCheckSchema,
   EvaluatorCheckSchema,
   EvaluatorKindSchema,
   EvaluatorSchema,
   PerturbedEvalCaseSpecSchema,
+  SchemaCheckSchema,
   WorkspaceFilePathSchema,
   hasPerturbationChange,
   type EvaluationSubject,
@@ -80,6 +82,53 @@ export const ProposeEvalCaseToolSchema = z.object({
 /** Propose a new version of the step's Evaluation Brief. */
 export const ProposeBriefToolSchema = z.object({
   text: z.string().min(1).max(4000),
+});
+
+/** Where a task-completion requirement came from (epic #1516 F1 / issue #1527). */
+export const TaskCompletionRequirementSourceSchema = z.enum(['preamble', 'prompt', 'output_schema', 'skill', 'brief']);
+
+/**
+ * The check of one task-completion Evaluator: a `schema` or `code` check when
+ * the requirement is mechanical, an `llm_judge` only when it takes judgement —
+ * the platform renders that judge's rubric from the requirement and pins its
+ * model and confidence floor.
+ */
+const TaskCompletionCheckSchema = z.discriminatedUnion('kind', [
+  SchemaCheckSchema,
+  CodeCheckSchema,
+  z.object({ kind: z.literal('llm_judge') }),
+]).describe(
+  'The cheapest check that settles the requirement. schema: {"kind":"schema","schema":{...}} for fields present and typed — at most one per step, so put every field requirement in it, or use code once the step has one. code: {"kind":"code","runtime":"python","source":"..."} for anything a script can decide — counts, ids found in the input, allowed values, files written. llm_judge: {"kind":"llm_judge"} only when deciding it takes judgement; the platform writes its rubric from the requirement.',
+);
+
+/** One checkable thing the step's instructions ask the output to do, and the check that decides it. */
+export const TaskCompletionEvaluatorSchema = z.object({
+  name: AssistantEvaluatorNameSchema.describe('kebab-case, what the requirement checks (e.g. "every-ae-graded"); the platform prefixes it with task-completion-'),
+  requirement: z.string().min(1).max(500),
+  source: TaskCompletionRequirementSourceSchema,
+  /** A miss here matters most — shown on the card and carried into a judge's rubric. */
+  priority: z.literal('high').optional(),
+  check: TaskCompletionCheckSchema,
+});
+
+/**
+ * Draft the step's task-completion Evaluators: one Evaluator per requirement
+ * of the step's instructions, each of the cheapest kind that decides it, so a
+ * failure names the requirement that was missed (epic #1516 F1). Offered only
+ * behind the dedicated `action: 'draft_task_completion_evaluators'` request,
+ * never as a free-form proposal. Each is created like any other Evaluator,
+ * with production left opt-in.
+ */
+export const ProposeTaskCompletionEvaluatorsToolSchema = z.object({
+  evaluators: z.array(TaskCompletionEvaluatorSchema).min(1).max(20),
+  /** Instructions with no testable criterion — e.g. "be thorough". */
+  vagueInstructions: z.array(z.object({
+    quote: z.string().min(1).max(500),
+    why: z.string().min(1).max(500),
+  })).max(10).default([]),
+  rationale: z.string().max(1000).optional(),
+}).refine((value) => new Set(value.evaluators.map((evaluator) => evaluator.name)).size === value.evaluators.length, {
+  message: 'give each evaluator its own name',
 });
 
 /**
@@ -199,6 +248,7 @@ export const EVALUATION_ASSISTANT_PROPOSAL_TOOLS = {
   propose_acceptance_criteria: ProposeAcceptanceCriteriaToolSchema,
   propose_control_settings: ProposeControlSettingsToolSchema,
   propose_diagnosis: ProposeDiagnosisToolSchema,
+  propose_task_completion_evaluators: ProposeTaskCompletionEvaluatorsToolSchema,
 } as const;
 
 const NoArguments = z.object({});
@@ -210,6 +260,14 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
    * Skills it is offered with their SKILL.md, and the steps upstream of it.
    */
   get_step: NoArguments,
+  /**
+   * The step's instructions alone — preamble, step description, agent prompt,
+   * input/output descriptions, outputSchema, and skills as name + description
+   * only (no SKILL.md) — to draft task-completion Evaluators from (F1). Offered
+   * only behind `action: 'draft_task_completion_evaluators'`, never in ordinary
+   * conversation.
+   */
+  get_step_instructions: NoArguments,
   /**
    * The Agent as it runs on its own (ADR-0029): system prompt, model, runtime,
    * input/output descriptions, effective MCP servers with their eval policy and
@@ -310,6 +368,17 @@ export const EVALUATION_ASSISTANT_TOOLSETS = {
   },
 } as const satisfies Record<EvaluationSubject['kind'], EvaluationAssistantToolset>;
 
+/**
+ * The only tools a `draft_task_completion_evaluators` request offers (epic
+ * #1516 F1 decision B): a dedicated, narrow tool set instead of the Step's
+ * ordinary one, so drafting the task-completion Evaluators stays predictable —
+ * never a free-form `propose_evaluator`. A Step only.
+ */
+export const DRAFT_TASK_COMPLETION_EVALUATORS_TOOLSET = {
+  platform: ['get_step_instructions', 'list_step_runs', 'get_agent_run', 'preview_evaluator'],
+  proposals: ['propose_task_completion_evaluators'],
+} as const satisfies EvaluationAssistantToolset;
+
 /** The catalog entries `names` select. */
 export function pickTools<Name extends string, Selected extends Name, Schema extends z.ZodType>(
   catalog: Readonly<Record<Name, Schema>>,
@@ -329,8 +398,10 @@ export const EvaluationAssistantProposalSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('propose_acceptance_criteria'), arguments: ProposeAcceptanceCriteriaToolSchema }),
   z.object({ tool: z.literal('propose_control_settings'), arguments: ProposeControlSettingsToolSchema }),
   z.object({ tool: z.literal('propose_diagnosis'), arguments: ProposeDiagnosisToolSchema }),
+  z.object({ tool: z.literal('propose_task_completion_evaluators'), arguments: ProposeTaskCompletionEvaluatorsToolSchema }),
 ]);
 
 export type EvaluationAssistantProposal = z.infer<typeof EvaluationAssistantProposalSchema>;
 export type FailureRootCause = z.infer<typeof FailureRootCauseSchema>;
 export type FixKind = z.infer<typeof FixKindSchema>;
+export type TaskCompletionEvaluator = z.infer<typeof TaskCompletionEvaluatorSchema>;

@@ -1,5 +1,6 @@
 import {
   DEFAULT_MODEL,
+  DRAFT_TASK_COMPLETION_EVALUATORS_TOOLSET,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   EVALUATION_ASSISTANT_TOOLSETS,
@@ -17,10 +18,11 @@ import {
 } from '../../contract/evaluation-assistant';
 import type { PreviewEvaluatorOutput } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
+import { ValidationError } from '../../errors';
 import { recordAssistantPrompt, runProposalToolLoop } from '../../assistant-core';
 import { requireOpenRouterApiKey } from '../../services/openrouter-key';
 import { loadEvaluationSubject, subjectRef, subjectKey, subjectName } from '../evaluation/_lib/evaluation-subject';
-import { EVALUATION_ASSISTANT_SYSTEM_PROMPTS, briefMessage, unattendedBudgetMessage } from './_lib/system-prompt';
+import { EVALUATION_ASSISTANT_SYSTEM_PROMPTS, briefMessage, taskCompletionEvaluatorsDraftMessage, unattendedBudgetMessage } from './_lib/system-prompt';
 import { executeEvaluationTool, type UnattendedGrant } from './_lib/run-evaluation-tool';
 import { reviewEvaluationProposal, type PreviewedCheck } from './_lib/review-proposal';
 
@@ -64,6 +66,9 @@ export async function askEvaluationAssistant(
   onProgress?: (event: EvaluationAssistantProgress) => void,
 ): Promise<AskEvaluationAssistantOutput> {
   const step = subjectRef(input);
+  if (input.action === 'draft_task_completion_evaluators' && step.kind !== 'step') {
+    throw new ValidationError('Task-completion Evaluators draft from a workflow step\'s instructions; an agent evaluated on its own has none to draft from');
+  }
   const { definition, step: workflowStep, agent } = await loadEvaluationSubject(scope, step, 'read', step.kind === 'step' ? input.definitionVersion : undefined);
   const apiKey = await requireOpenRouterApiKey(scope, step.namespace);
   const model = input.model ?? DEFAULT_MODEL;
@@ -82,7 +87,7 @@ export async function askEvaluationAssistant(
   });
 
   const [brief] = await scope.evaluation.listBriefs(step);
-  const toolset = EVALUATION_ASSISTANT_TOOLSETS[step.kind];
+  const toolset = input.action === 'draft_task_completion_evaluators' ? DRAFT_TASK_COMPLETION_EVALUATORS_TOOLSET : EVALUATION_ASSISTANT_TOOLSETS[step.kind];
   const unattended: UnattendedGrant | undefined = input.unattendedBudgetUsd === undefined
     ? undefined
     : { remainingUsd: input.unattendedBudgetUsd, started: [] };
@@ -102,6 +107,7 @@ export async function askEvaluationAssistant(
       { role: 'system', content: subjectContext(step, workflowStep.name, definition.version) },
       { role: 'system', content: briefMessage(brief ?? null, step.kind) },
       { role: 'system', content: unattendedBudgetMessage(input.unattendedBudgetUsd, step.kind) },
+      ...(input.action === 'draft_task_completion_evaluators' ? [{ role: 'system' as const, content: taskCompletionEvaluatorsDraftMessage() }] : []),
       ...input.messages.map((message) => ({ role: message.role, content: message.content })),
     ],
     proposalTools: pickTools(EVALUATION_ASSISTANT_PROPOSAL_TOOLS, toolset.proposals),
