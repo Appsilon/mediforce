@@ -687,6 +687,7 @@ export {
   mergeVerdictTransitions,
   ensureEntryStepFirst,
   validateStepReferences,
+  computeAncestors,
   type ReferenceIssue,
 } from './workflow-graph';
 

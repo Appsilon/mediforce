@@ -287,6 +287,7 @@ export {
   mergeVerdictTransitions,
   ensureEntryStepFirst,
   validateStepReferences,
+  computeAncestors,
   type ReferenceIssue,
   validateStepGraph,
   validateWorkflowGraphAndReferences,

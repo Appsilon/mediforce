@@ -59,6 +59,21 @@ const HUMAN_COMPLETION_KEYS = new Set([
 ]);
 
 const PLACEHOLDER_RE = /\$\{([^}]+)\}/g;
+const OUTPUT_FIELD_RE = /\boutput\.([A-Za-z_]\w*)/g;
+const CROSS_STEP_FIELD_RE = /\bvariables\["([^"]+)"\]\.([A-Za-z_]\w*)/g;
+
+/** Output fields a step declares, or null when its executor has no declared
+ *  schema to check a `when` expression's `output.<field>` references against. */
+function declaredOutputFields(step: WorkflowStep): Set<string> | null {
+  if (step.executor === 'agent') {
+    const properties = step.agent?.outputSchema?.properties;
+    return properties ? new Set(Object.keys(properties)) : null;
+  }
+  if (step.executor === 'human') {
+    return new Set((step.params ?? []).map((p) => p.name));
+  }
+  return null;
+}
 
 /**
  * Extract the referenced step id and the remaining property path from a
@@ -90,7 +105,7 @@ function collectStrings(value: unknown, out: string[]): void {
   }
 }
 
-function computeAncestors(steps: WorkflowStep[], transitions: Transitions): Map<string, Set<string>> {
+export function computeAncestors(steps: WorkflowStep[], transitions: Transitions): Map<string, Set<string>> {
   const reverse = new Map<string, Set<string>>();
   const addEdge = (from: string, to: string) => {
     if (!reverse.has(to)) reverse.set(to, new Set());
@@ -165,5 +180,44 @@ export function validateStepReferences(steps: WorkflowStep[], transitions: Trans
       }
     }
   }
+
+  for (const transition of transitions) {
+    if (!transition.when) continue;
+    const fromStep = stepById.get(transition.from);
+    if (!fromStep) continue;
+    const fields = declaredOutputFields(fromStep);
+    if (!fields) continue;
+    for (const match of transition.when.matchAll(OUTPUT_FIELD_RE)) {
+      const field = match[1];
+      if (!fields.has(field)) {
+        const detail = fields.size > 0 ? ` (its output: ${[...fields].join(', ')})` : ' (it declares no output fields)';
+        push('warning', `Step "${fromStep.id}" has when: "${transition.when}" referencing output.${field}, but it does not declare that field${detail}.`);
+      }
+    }
+  }
+
+  for (const transition of transitions) {
+    if (!transition.when) continue;
+    const fromStep = stepById.get(transition.from);
+    if (!fromStep) continue;
+    for (const match of transition.when.matchAll(CROSS_STEP_FIELD_RE)) {
+      const [, refId, field] = match;
+      const target = stepById.get(refId);
+      if (!target) {
+        push('warning', `Step "${fromStep.id}" has when: "${transition.when}" referencing step "${refId}", but no such step exists.`);
+        continue;
+      }
+      if (refId === fromStep.id || !ancestors.get(fromStep.id)?.has(refId)) {
+        push('warning', `Step "${fromStep.id}" has when: "${transition.when}" referencing step "${refId}", but it is not upstream of it — its output will not be available when this transition runs.`);
+        continue;
+      }
+      const fields = declaredOutputFields(target);
+      if (fields && !fields.has(field)) {
+        const detail = fields.size > 0 ? ` (its output: ${[...fields].join(', ')})` : ' (it declares no output fields)';
+        push('warning', `Step "${fromStep.id}" has when: "${transition.when}" referencing "${refId}".${field}, but step "${refId}" does not declare that field${detail}.`);
+      }
+    }
+  }
+
   return issues;
 }
