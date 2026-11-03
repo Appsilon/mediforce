@@ -10,6 +10,7 @@ import {
   EvalCaseSchema,
   EvalCaseSplitSchema,
   EvalDatasetVersionSchema,
+  EvalVariantPatchSchema,
   EvalRunEstimateSchema,
   EvalRunReportSchema,
   EvalRunSchema,
@@ -406,6 +407,8 @@ export const PrepareEvalRunInputSchema = EvaluationSubjectRefSchema.extend({
   concurrency: z.number().int().min(1).max(8).default(2),
   /** Spend cap; defaults to 1.5× the estimate, and is required when there is no estimate. */
   budgetUsd: z.number().positive().max(10_000).optional(),
+  /** Runs the subject with another model or prompt, minting no version (ADR-0024 D2); absent or empty runs it as it is. */
+  variant: EvalVariantPatchSchema.optional(),
 });
 
 /** What an Eval Run of the step would cost, before it is prepared. */

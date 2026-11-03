@@ -23,6 +23,7 @@ import {
 import {
   applyAgentModel,
   applyAgentOutputSchema,
+  applyRunVariant,
   evaluationOwnerOf,
   evaluationSubjectOf,
   inlineMcpServerNames,
@@ -137,8 +138,8 @@ export async function executeAgentStep(
     }
   }
 
-  // An eval trial runs the step its Eval Run froze, with its MCP servers
-  // under the run's policy (ADR-0023 D5, D6).
+  // An eval trial runs the step its Eval Run froze — with its Variant, if it
+  // has one — and its MCP servers under the run's policy (ADR-0023 D5, D6, ADR-0024 D3).
   const evalTrial = reapTimedOut || instance.evalRunId === undefined
     ? null
     : await evalTrialConfig(workflowDefinition, workflowStep, instanceId, instance.evalRunId, evaluationRepo, agentDefinitionRepo, toolCatalogRepo, runtimeSkillRepo);
@@ -231,7 +232,7 @@ export async function executeAgentStep(
   // prompt (systemPrompt), the model and the output schema. Empty when the
   // step has no agentId.
   const agentDefaults = !reapTimedOut && workflowStep.agentId !== undefined
-    ? await resolveAgentDefaults(workflowStep.agentId, agentDefinitionRepo)
+    ? await resolveAgentDefaults(workflowStep.agentId, evalTrial?.agents ?? agentDefinitionRepo)
     : {};
   const agentIdentityPrompt = agentDefaults.identityPrompt;
 
@@ -244,7 +245,7 @@ export async function executeAgentStep(
     : (await resolveSkillsForStep(workflowStep, { agentDefinitionRepo, skillRepo: runtimeSkillRepo }, workflowDefinition)) ?? undefined;
 
   // Picking an agent picks its model and output schema unless the step deliberately overrides them.
-  const resolvedStep = applyAgentOutputSchema(applyAgentModel(workflowStep, agentDefaults.model), agentDefaults.outputSchema);
+  const resolvedStep = applyAgentOutputSchema(applyAgentModel(evalTrial?.step ?? workflowStep, agentDefaults.model), agentDefaults.outputSchema);
 
   const workflowAgentContext: WorkflowAgentContext = {
     stepId,
@@ -355,8 +356,10 @@ export async function executeAgentStep(
  * when there is none, so the case's next trial replays it. Inline servers
  * bypass the agent's bindings, so no policy can deny them: the trial fails
  * closed rather than run them. So does a trial whose step no longer matches
- * the Fingerprint its variant was prepared with — its agent's model, prompt or
- * tools edited since — as its Scores would describe a step no one froze.
+ * the Fingerprint its run was prepared with — its agent's model, prompt or
+ * tools edited since — as its Scores would describe a step no one froze. The
+ * run's Variant (ADR-0024 D3) comes back as the `step` to run and the
+ * `agents` to read its Agent through; a saved Workflow has no way to set it.
  */
 async function evalTrialConfig(
   definition: WorkflowDefinition,
@@ -367,7 +370,7 @@ async function evalTrialConfig(
   agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>,
   toolCatalogRepo: Pick<ToolCatalogRepository, 'getById'>,
   skillRepo: ResolveSkillsForStepDeps['skillRepo'],
-): Promise<{ mcpStep: WorkflowStep; mcpTapes?: McpTapeContext }> {
+): Promise<{ step: WorkflowStep; agents: Pick<AgentDefinitionRepository, 'getById'>; mcpStep: WorkflowStep; mcpTapes?: McpTapeContext }> {
   const inlineServers = inlineMcpServerNames(step);
   if (inlineServers.length > 0) {
     throw new Error(
@@ -381,11 +384,14 @@ async function evalTrialConfig(
   ]);
   if (evalRun === null) throw new Error(`Eval Run '${evalRunId}' of this trial not found`);
   if (trial === null) throw new Error(`Eval Run '${evalRunId}' has no trial for run '${instanceId}'`);
+  const evaluated = evaluationSubjectOf(evalRun);
+  if (evaluated === null) throw new Error(`Eval Run '${evalRunId}' names neither a step nor an agent`);
+  const run = applyRunVariant(evaluated.kind, { definition, step, agents: agentDefinitionRepo }, evalRun.variant);
   if (evalRun.fingerprint !== null) {
     const current = await computeStepFingerprint(
-      { agentDefinitions: agentDefinitionRepo, toolCatalog: toolCatalogRepo, skills: skillRepo },
-      definition,
-      step,
+      { agentDefinitions: run.agents, toolCatalog: toolCatalogRepo, skills: skillRepo },
+      run.definition,
+      run.step,
     );
     const changed = changedFingerprintComponents(evalRun.fingerprint, current);
     if (changed.length > 0) {
@@ -395,19 +401,18 @@ async function evalTrialConfig(
       );
     }
   }
-  if (step.agentId === undefined) return { mcpStep: step };
-  const agent = await agentDefinitionRepo.getById(step.agentId);
+  const ran = { step: run.step, agents: run.agents };
+  if (run.step.agentId === undefined) return { ...ran, mcpStep: run.step };
+  const agent = await agentDefinitionRepo.getById(run.step.agentId);
   const servers = Object.keys(agent?.mcpServers ?? {});
   const mcpStep = {
-    ...step,
-    mcpRestrictions: mcpEvalRestrictions(servers, evalRun.mcpPolicy, step.mcpRestrictions),
+    ...run.step,
+    mcpRestrictions: mcpEvalRestrictions(servers, evalRun.mcpPolicy, run.step.mcpRestrictions),
   };
   const record = servers.filter((server) => evalRun.mcpPolicy[server]?.mode === 'live');
   const replayed = servers.filter((server) => evalRun.mcpPolicy[server]?.mode === 'replay');
-  if (record.length === 0 && replayed.length === 0) return { mcpStep };
+  if (record.length === 0 && replayed.length === 0) return { ...ran, mcpStep };
 
-  const evaluated = evaluationSubjectOf(evalRun);
-  if (evaluated === null) throw new Error(`Eval Run '${evalRunId}' names neither a step nor an agent`);
   const replay: McpTapeContext['replay'] = {};
   for (const server of replayed) {
     const recordings = await evaluationRepo.listMcpRecordings(evaluated, { caseId: trial.caseId, server, limit: MCP_REPLAY_RECORDINGS });
@@ -415,6 +420,7 @@ async function evalTrialConfig(
     else replay[server] = mergeMcpTapes(recordings.map((recording) => recording.tape));
   }
   return {
+    ...ran,
     mcpStep,
     mcpTapes: {
       replay,

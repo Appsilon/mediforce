@@ -55,8 +55,13 @@ export class MockAgentPlugin implements StepExecutorPlugin {
       const mcpNote = mcpServers.length === 0 ? 'no MCP servers' : `MCP servers: ${mcpServers.join(', ')}`;
       const skills = (this.context.agentSkills ?? []).map((skill) => skill.id);
       const skillsNote = skills.length === 0 ? '' : ` Agent skills: ${skills.join(', ')}.`;
+      // And the model and instructions it was given, so a test can see an Eval Run's Variant take effect.
+      const model = this.context.step.agent?.model;
+      const modelNote = model === undefined ? '' : ` Model: ${model}.`;
+      const instructions = [this.context.agentIdentityPrompt, this.context.step.agent?.prompt].filter((part) => part !== undefined && part !== '');
+      const instructionsNote = instructions.length === 0 ? '' : ` Instructions: ${instructions.join(' | ')}`;
       this.context.trajectory?.record([
-        { ts, type: 'assistant', subtype: 'text', text: `Mock agent working on step '${this.context.stepId}' with ${mcpNote}.${skillsNote}` },
+        { ts, type: 'assistant', subtype: 'text', text: `Mock agent working on step '${this.context.stepId}' with ${mcpNote}.${skillsNote}${modelNote}${instructionsNote}` },
         { ts, type: 'result', subtype: 'success', text: `Mock output for step ${this.context.stepId}` },
       ]);
     }

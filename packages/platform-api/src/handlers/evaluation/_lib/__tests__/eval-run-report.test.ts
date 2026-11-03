@@ -17,6 +17,7 @@ function run(overrides: Partial<EvalRun> = {}): EvalRun {
     ...STEP, id: randomUUID(), definitionVersion: 1, agentVersion: null, datasetVersionId: randomUUID(), caseIds: [CASE_A, CASE_B],
     trialsPerCase: 2, concurrency: 2,
     evaluators: [{ evaluatorId: EVALUATOR, name: 'findings-present', version: 1, kind: 'schema', counted: true }],
+    variant: null,
     fingerprint: null,
     acceptanceCriteria: null,
     mcpPolicy: {}, env: {}, estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },
