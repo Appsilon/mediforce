@@ -1,119 +1,167 @@
 ---
-status: proposed
+status: accepted
 audience: engineers
-last_reviewed: 2026-10-04
+last_reviewed: 2026-11-03
 ---
 
-# 0024 — Optimisation: challengers, fix variants, GEPA and case expectations
+# 0024 — Optimisation: Variants, Comparisons, and learning from reviewed runs
 
-- **Status:** Proposed
-- **Date:** 2026-10-01
+- **Status:** Accepted
+- **Date:** 2026-10-01 (parked); rewritten and accepted 2026-11-03
 - **Authors:** Krystian Zielinski (@Griphu), with Claude
-- **Takes out of:** [ADR-0023](./0023-step-evaluation.md) — the variant half of
-  D5, D12, the Phase 4 fix loop of D15 and its 2026-09-29 GEPA amendment. The
-  positive/negative expectation of an Eval Case was parked here too; on
-  2026-10-02 it went back to ADR-0023 (D17) as the expectation of a case's
-  expected output. ADR-0023 stays binding for everything else; none of what is listed here is binding until this ADR is
-  accepted.
-- **Code reference:** every mechanism below was built and tested at commit
-  [`aa8ac636`](https://github.com/Appsilon/mediforce/tree/aa8ac636f773342f4fdbd90f5d9529ccdb92d651)
-  on `feat/review-of-evaluation`. That commit is the reference implementation to
-  reuse — read the code there, not the living docs, which no longer describe it.
-- **Amended 2026-10-04:** the parked backend is deleted (the open question
-  below); the pinned commit is now the only copy.
+- **Epic:** [#1650](https://github.com/Appsilon/mediforce/issues/1650)
+- **Amends:** [ADR-0023](./0023-step-evaluation.md) D5 (variants come back, one
+  per Eval Run) and D10 (a validation can rest on a run of the same
+  Fingerprint); D12 (few-shot examples) and the GEPA amendment of D15 stay
+  deferred (D9 below). Applies to an Agent's Evaluation as
+  [ADR-0029](./0029-agent-evaluation.md) and
+  [ADR-0031](./0031-agent-cases-from-workflow-runs.md) define it.
+- **Code reference:** challengers, the champion–challenger comparison, applying
+  a variant, few-shot examples and the GEPA job were built and then deleted;
+  commit [`aa8ac636`](https://github.com/Appsilon/mediforce/tree/aa8ac636f773342f4fdbd90f5d9529ccdb92d651)
+  holds them (`platform-core/src/evaluation/variant.ts`,
+  `handlers/evaluation/apply-step-variant.ts`, `agent-runtime/src/plugins/gepa-job.ts`).
+  Read that code, not this ADR's 2026-10-01 version, for how they worked.
 
 ## Context
 
-ADR-0023 set out to answer *can this Step be trusted for its context of use?*
-and then went on to *and how do we make it better?* — challengers, a fix loop,
-GEPA prompt search, few-shot examples, applying a winner back to the step. By
-2026-10-01 the Evaluation tab carried both, and the second half crowded out the
-first: an author qualifying a step met challenger JSON, an Optimisations
-section, fix cards and a positive/negative choice on every Eval Case, none of
-which a Step Qualification needs.
+An Evaluation answers *is this subject, in this configuration, fit for its
+context of use?* It cannot answer the two questions authors ask next:
 
-So the supported surface was cut back to evaluation: Evaluators, Eval Cases,
-Eval Runs of the step as it is, Acceptance Criteria and Step Qualification.
-Optimisation is parked here, as a proposal, until there is a reason to bring
-it back. Its backend (handlers, REST routes, client methods, CLI commands,
-tables, the GEPA job) was at first kept, unreachable from the web tab and the
-Evaluation Assistant; on 2026-10-04 it was deleted, with migration
-`0072_drop_eval_optimisation.sql` dropping `eval_optimisations` and
-`eval_runs.example_case_ids`. Stored rows are not rewritten — a signed Step
-Qualification never changes (ADR-0023 D10) — so a variant patch stored with
-`examples` keeps it, and the patch schema ignores it on read. Validation of a
-step whose newest run left example cases out reads not verified, since that
-run no longer covers every live case. A trial of a challenger still pending is
-refused rather than run unpatched.
+1. *What happens to quality and cost if I change the model, the prompt, the
+   Skills?* Today an author edits the step, runs an Eval Run, edits again, runs
+   again, and compares two reports by eye.
+2. *My reviewers keep sending this step's output back — how do I make it stop?*
+   A reviewed run already becomes Eval Cases (ADR-0023 D17: each round sent
+   back a negative case with the reviewer's comment, the approved output a
+   positive one), but one run at a time, and nothing turns those cases into a
+   better configuration.
 
-## What is parked, and where it lives at `aa8ac636`
+The 2026-10-01 version of this ADR parked an answer to the first: challengers
+run inside the champion's Eval Run, compared on non-overlapping Wilson
+intervals. It made one Eval Run hold several Fingerprints, gave the report and
+the qualification a per-variant level, and crowded the qualification screen.
+This rewrite keeps one Fingerprint per Eval Run and moves optimisation onto its
+own sub-tab.
 
-| Mechanism | What it does | Code |
+## Decisions
+
+**D1 — Optimisation is part of an Evaluation, on its own sub-tab.** A Step's
+and an Agent's Evaluation tab gains **Optimization** beside Eval Runs, Eval
+Cases and Evaluators. Optimisation reuses the subject's Eval Cases, Eval
+Datasets and Evaluators — it has none of its own. The Eval Runs sub-tab lists
+runs of the subject as it is; a variant's run is shown only under its
+Comparison, so a person qualifying a step never meets one.
+
+**D2 — A Variant is a patch over the subject as it is.** It changes:
+
+| | Step | Agent |
 |---|---|---|
-| **Variants / challengers** | An Eval Run runs the step as it is (the *champion*) and up to three *challengers*, each a patch (`model`, `prompt`, `skillCommit`, `allowedTools`, `mcpRestrictions`, `examples`) over the pinned Definition version. Each variant has its own Step Fingerprint. | `platform-core/src/evaluation/variant.ts`, `StepVariantPatchSchema` in `platform-core/src/schemas/evaluation.ts`, `challengers` in `PrepareEvalRunInputSchema` (`platform-api/src/contract/evaluation.ts`), `handlers/evaluation/eval-runs.ts`, CLI `eval run-prepare --challengers` |
-| **Champion–challenger comparison** | Per Evaluator, `better`/`worse` only when the Wilson 95% intervals do not overlap, plus cost and duration deltas. | `handlers/evaluation/_lib/eval-run-report.ts` (`comparison`) |
-| **Apply a variant** | Saves a challenger's patch as a new Workflow Definition version through `registerWorkflow`, optionally as the default, and says whether its Fingerprint (so its qualification) carries over. | `handlers/evaluation/apply-step-variant.ts`, `POST /api/evaluation/variants/apply`, CLI `eval apply-variant` |
-| **Few-shot examples from cases** | `agent.examples` (`{input, output, note?, caseId?}`) rendered as a prompt section and hashed into the Fingerprint; an example's case must be a live dev case and is left out of later Eval Runs (`exampleCaseIds`). | `agent.examples` in `WorkflowAgentConfig`, example checks in `eval-runs.ts` |
-| **Fix loop** | The assistant clusters an Eval Run's failures by root cause (`propose_diagnosis`, kept) and proposed each fix that a patch can express as a challenger (`propose_fix`), with a **Try it** card that prepared the run. | `ProposeFixToolSchema` in `platform-core/src/schemas/evaluation-assistant-tools.ts`, `FixCard` in `platform-ui/src/components/evaluation/evaluation-assistant-cards.tsx`, L3 `e2e/api/step-evaluation-fix-loop.journey.ts` |
-| **GEPA optimisation** | One round of GEPA's reflective proposal step over a finished run's failing **dev** trials, in its own container (`mediforce-gepa`) with network for the reflection model; its candidate prompts run as challengers over dev and holdout and are ranked by holdout Wilson lower bound, then dev, then cost. One budget covers the job and that run. | `agent-runtime/src/plugins/gepa-job.ts`, `container/Dockerfile.gepa`, `handlers/evaluation/optimisations.ts`, `_lib/optimisation-results.ts`, `platform-core/src/schemas/eval-optimisation.ts`, migration `0065_eval_optimisations.sql`, CLI `eval optimise|optimisation|optimisations`, L3 `e2e/api/step-evaluation-optimisation.journey.ts` |
-| **Assistant tools** | `compare_variants`, `list_optimisations`, `get_optimisation`, `start_optimisation` (under an unattended budget), `challengers` on `prepare_eval_run`, `propose_fix`. | `EVALUATION_ASSISTANT_PLATFORM_TOOLS` / `…_PROPOSAL_TOOLS`, `handlers/evaluation-assistant/_lib/run-evaluation-tool.ts` |
-| **Case expectation** | _Returned to ADR-0023 D17 on 2026-10-02._ Was: an Eval Case is `positive` (a correct output exists) or `negative` (no output should be accepted), used only as GEPA feedback. Now it says whether a case's expected output is one to match or to avoid. | `EvalCaseExpectationSchema` in `platform-core/src/schemas/evaluation.ts` |
-| **Web UI** | Challenger JSON on **Eval Runs → Prepare**, the comparison table and **Apply to step** in a run's report, the **Optimisations** section, the **Positive case / Negative case** buttons and the expectation selector on a case. | `platform-ui/src/components/evaluation/step-evaluation-sections.tsx` (`EvalRunsSection`, `OptimisationsSection`, `CasesSection`, `CaseForm`), `eval-run-report.tsx` (`Comparison`, `ApplyVariant`) |
+| `model` | replaces `step.agent.model` | replaces the Agent's `foundationModel` in the trial |
+| `prompt` | replaces `step.agent.prompt` | replaces the Agent's `systemPrompt` in the trial |
 
-What stays today: nothing of variants. Since 2026-10-05 an Eval Run carries
-its Step Fingerprint itself and its report has no per-variant level
-(migration `0073_eval_run_fingerprint.sql`); `eval_trials.variant_id` remains
-as a legacy column every row sets to `champion`, and a qualification signed
-before keeps its variant keys, which reads ignore.
+Skills, allowed tools and MCP restrictions are added to the same patch later
+(D9). A patch never mints a Workflow Definition version or an Agent version; an
+empty patch is the **baseline**. A `~` moving-alias model is refused, as
+ADR-0023 D5 refuses it for the step itself.
 
-## Decisions (proposed)
+**D3 — A variant runs as an ordinary Eval Run.** The run records its patch
+(`variant`), its Step Fingerprint is the Fingerprint of the patched step, and
+each trial runs the patched Definition — a Step's through the same
+`evalDefinition` an Agent's trial already carries (ADR-0029 D4). Everything
+else — trials, Scores, report, Acceptance Criteria, judge reviews — is the
+Eval Run's as ADR-0023 has it. A run with a patch is never the subject's
+validation while the subject's Fingerprint differs from it, which the
+Fingerprint already guarantees.
 
-**D1 — Optimisation is a separate activity from evaluation.** Evaluation
-answers whether one Step Fingerprint is fit for its context of use;
-optimisation searches for a better one. They share Eval Runs, but not a
-screen: optimisation gets its own surface, entered from a finished Eval Run,
-so a person qualifying a step never meets it.
+**D4 — A Comparison runs a baseline and its variants on the same ground.** One
+Comparison holds a baseline Eval Run and one to four variant Eval Runs, all on
+one Eval Dataset version, the same frozen Evaluator versions, trials per case,
+MCP policy and Acceptance Criteria. It is prepared as a whole, its budget is the
+sum of its runs' budgets, and a person confirms that sum once (ADR-0023 D15).
+The baseline may reuse a finished Eval Run of the subject as it is when that
+run has the same Fingerprint, dataset version and Evaluator versions, rather
+than spend on it again.
 
-**D2 — A variant is an override patch over a pinned Definition version.**
-As ADR-0023 D5 first stated: trying a model, prompt, skill commit, tool set or
-examples never mints a Definition version. Trust still binds to the Step
-Fingerprint (ADR-0023 D5, binding), so a qualified variant's qualification
-carries over when applying it produces the same Fingerprint.
+**D5 — A difference is called on paired cases.** Every run of a Comparison
+grades the same cases, so the report compares each variant with the baseline
+case by case: per counted Evaluator, a case is a *win* when the variant's pass
+rate over its trials is higher, a *loss* when lower, a *tie* otherwise.
+`better` or `worse` is called only when a two-sided exact sign test over the
+wins and losses gives p < 0.05; otherwise *no clear difference*. Beside it: each
+run's pass rate with its Wilson 95% interval, mean cost per trial (agent and
+judge apart), mean duration and tokens, and whether it met its Acceptance
+Criteria. When the dataset has holdout cases the report reads holdout and dev
+apart, and the recommendation reads holdout. This replaces the 2026-10-01 rule
+of non-overlapping intervals, which on the 10–30 cases a step usually has
+almost never calls a difference.
 
-**D3 — A difference is called only on non-overlapping intervals.**
-Champion against challenger, Evaluator by Evaluator, on Wilson 95% intervals;
-otherwise "no clear difference".
+**D6 — Applying a variant is a person's act.** A Step's variant is saved as a
+new Workflow Definition version through `registerWorkflow`, made the default
+only when the person asks; an Agent's is saved to the Agent, which records a
+new Agent version (ADR-0029 D2). Neither assistant applies one. When the
+subject's Fingerprint after applying equals the variant run's, that run counts
+as the subject's newest finished Eval Run for its validation — it ran exactly
+that configuration — and can be signed as a Step Qualification. This amends
+ADR-0023 D10, which read validation only from runs of the current Definition
+version.
 
-**D4 — Applying a winner is a person's act and a normal Definition save.**
-Through the workflow editor's save path, never on the assistant's authority.
+**D7 — Reviewed runs become Eval Cases in bulk.** A list of a subject's
+reviewed production runs not yet a case — for an Agent, runs of the Steps that
+used it (ADR-0031) — filtered by verdict, version and period, imports the
+chosen ones with ADR-0023 D17's labelling. Imported cases are split into dev
+and holdout, stratified by expectation, about 70/30, and a run round already
+imported is skipped.
 
-**D5 — Few-shot examples come from dev cases only** and the cases they come
-from are left out of later Eval Runs (ADR-0023 D12 as written).
+**D8 — The Evaluation Assistant guides optimisation from dev cases only.** It
+gains, within ADR-0023 D14's one assistant:
+- *Runs freely:* a **readiness** check (enough cases; negative cases and an
+  `expected_output` Evaluator to grade them; a holdout split; a baseline run)
+  and **feedback themes** — reviewer comments on dev cases grouped by what
+  they correct, each theme citing its runs.
+- *Proposes:* Variants — a model to try, or a prompt rewritten to address the
+  themes and the dev failures.
+- *Prepares, the person confirms the cost:* a Comparison (D4).
+- *Never:* applies a Variant (D6).
 
-**D6 — GEPA runs one reflective round per job, under a budget granted with the
-request** (ADR-0023 D15's 2026-09-29 amendment as written): each round is an
-Eval Run a person can read and stop; the job reflects on dev trials only;
-candidates are ranked by holdout first; a start whose worst case leaves nothing
-of the grant is refused.
+What the assistant reads to write a prompt Variant — expected outputs,
+reviewer comments, failing trials — comes from dev cases only; holdout cases
+are what the Variant is judged on.
 
-**D7 — Superseded by ADR-0023 D17.** The expectation is now evaluation's: it
-says whether a case's expected output is one to match or to avoid. GEPA's
-reflective records read it with the expected output.
+**D9 — Deferred.** Few-shot examples from cases (ADR-0023 D12), GEPA's
+reflective search as a generator of prompt Variants (the D15 amendment, under
+D8's dev-only rule), and Skill, tool and MCP Variants. The reference code is at
+`aa8ac636`.
 
-## Open questions before accepting
-
-- Where optimisation lives in the UI (a section of a finished run's report, a
-  tab of its own) and whether the assistant drives it or a form does.
-- Whether GEPA should stay one round per job (D6) or run a bounded multi-round
-  loop with per-round checkpoints.
-- ~~Whether to delete the parked backend instead of keeping it.~~ Deleted
-  2026-10-04; the pinned commit makes it recoverable.
+**D10 — Production review monitoring is separate.** Acceptance trends,
+correction themes and reviewer statistics over a step's production runs are a
+monitoring feature. They may link into optimisation ("optimise this step");
+optimisation does not depend on them.
 
 ## Considered options
 
-- **Leave optimisation in the Evaluation tab, collapsed.** Rejected: it kept
-  every concept on the screen and in the assistant's tool list, and the
-  assistant kept offering it.
-- **Delete the backend now.** Deferred on 2026-10-01, then done on 2026-10-04:
-  code nothing reaches still has to be typechecked, migrated and read, and the
-  pinned commit keeps it reusable.
+- **Challengers inside one Eval Run** (this ADR's 2026-10-01 version, built at
+  `aa8ac636`). Rejected: one run with several Fingerprints needs a per-variant
+  report, validation and qualification, and a winner's run could not back its
+  own validation (D6).
+- **Non-overlapping Wilson intervals as the test.** Rejected for D5: it ignores
+  that the runs share cases and calls almost nothing on small datasets.
+- **A top-level Optimization tab beside Evaluation.** Rejected: it would repeat
+  the subject's cases and Evaluators, which optimisation only reads.
+- **A section of a finished Eval Run's report.** Rejected: a Comparison spans
+  several runs, and a person starts one before any run exists.
+- **GEPA in the first release.** Deferred (D9): the assistant drafting a
+  Variant answers the same need with no container job, and GEPA can come back
+  as one more generator of Variants.
+
+## Consequences
+
+- `eval_runs` gains `variant` (the patch, null on a run of the subject as it is)
+  and `comparison_id`; a new `eval_comparisons` table groups the runs.
+  `eval_trials.variant_id` stays a legacy column.
+- The Eval Runs list and the subject's validation leave out runs with a
+  patch, except a run whose Fingerprint the subject now has (D6).
+- An Agent's trial needs a way to run with another `systemPrompt` than the
+  Agent's own; today the executor reads it from the Agent by `agentId`.
+- CLI: `mediforce eval run-prepare --variant`, `mediforce eval compare`,
+  `mediforce eval apply-variant`.

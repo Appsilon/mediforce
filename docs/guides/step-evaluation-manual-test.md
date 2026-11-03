@@ -540,8 +540,8 @@ Scores are exported to Phoenix / Langfuse.
 - **Drift is impractical to test manually** without lowering the window; the UI banner uses the deployment default.
 - **CM3 review has no Reject** — production runs never become negative cases automatically.
 - **The assistant does not fix the step** — it diagnoses and proposes guardrails and routing; prompt,
-  model and tool changes are made by hand in the workflow editor (optimisation is parked in
-  [ADR-0024](../adr/0024-optimisation.md)).
+  model and tool changes are made by hand in the workflow editor (optimisation is designed in
+  [ADR-0024](../adr/0024-optimisation.md) and not built yet).
 - **Audit log hides the output-schema fallback** — the task shows `agent_review_l3`; only the
   agent run records `fallbackReason: output_schema`.
 - **Agent vs step model is ambiguous in the UI** — nothing says the step's model wins over the agent's foundation model.
