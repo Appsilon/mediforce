@@ -1,4 +1,10 @@
 {$DOMAIN:localhost} {$DOMAIN_ALIASES} {
 	encode zstd gzip
-	reverse_proxy platform-ui:3000
+
+	# Server-local routes (e.g. demo apps). Files live in ./caddy.d, which git ignores.
+	import /etc/caddy/sites.d/*.caddy
+
+	handle {
+		reverse_proxy platform-ui:3000
+	}
 }

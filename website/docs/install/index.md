@@ -179,6 +179,26 @@ All services should be `running`, with `migrate` `exited (0)` — it does its jo
 once and stops. Then open your domain: with no workspace yet, Mediforce takes
 you to workspace creation.
 
+## Extra routes on the same domain
+
+To serve something else behind the same Caddy, say a demo app at `/demo/`, drop
+a `.caddy` file into `caddy.d/` in the checkout. Every `caddy.d/*.caddy` is
+imported inside the main site block, before the catch-all that proxies to the
+app, so use a `handle` or `handle_path` block:
+
+```
+handle_path /demo/* {
+	reverse_proxy demo-app:8080
+}
+```
+
+These files are server-local: git ignores them, and a deploy's checkout leaves
+them in place. After adding, changing, or removing one, reload Caddy:
+
+```bash
+docker exec mediforce-caddy-1 caddy reload --config /etc/caddy/Caddyfile
+```
+
 ## Upgrading
 
 Images are tagged `latest` on GHCR, so an upgrade is a pull and a recreate.
