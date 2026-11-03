@@ -9,10 +9,10 @@ last_reviewed: 2026-10-30
 How an author checks that one agent Workflow Step can be trusted for its
 context of use. The design and its reasons are
 [ADR-0023](../adr/0023-step-evaluation.md); the vocabulary is `CONTEXT.md`
-§ Evaluation domain. This page is what exists today. Optimisation — challenger
-variants, applying them, few-shot examples, fix variants and GEPA — is parked in
-[ADR-0024](../adr/0024-optimisation.md) (Proposed); its code was deleted and is
-pinned there for reuse.
+§ Evaluation domain. This page is what exists today. Optimisation — Variants,
+Comparisons and learning from reviewed runs — is designed in
+[ADR-0024](../adr/0024-optimisation.md) and being built under epic
+[#1650](https://github.com/Appsilon/mediforce/issues/1650); none of it exists yet.
 
 Everything below belongs to one agent Step, keyed by
 `(namespace, workflowName, stepId)` — or to one Agent evaluated on its own (see

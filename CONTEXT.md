@@ -583,10 +583,29 @@ _Avoid_: "validated version", "qualified version" (only a step is qualified).
 One execution of an Eval Dataset against a Workflow Step — or an Agent, as one
 Agent version — repeated per case, producing Scores judged against Acceptance
 Criteria; it carries the Step Fingerprint it ran, and an Agent's run the Agent
-version it assessed. (Running variants of the step beside it is parked in
-ADR-0024.) Fits the existing Run family (Workflow
+version it assessed. A run of a **Variant** carries its patch and belongs to a
+**Comparison** (ADR-0024). Fits the existing Run family (Workflow
 Run, Agent Run).
 _Avoid_: "Experiment" (vague, collides with nothing but explains nothing).
+
+**Optimisation**:
+The activity of finding a better configuration of an Evaluation's subject — by
+comparing Variants on its Eval Cases, and by learning from the runs reviewers
+sent back. Shares the subject's Eval Cases and Evaluators; has its own
+**Optimization** sub-tab (ADR-0024).
+_Avoid_: "tuning", "fine-tuning" (no model weights change).
+
+**Variant**:
+A patch over an Evaluation's subject as it is — another model or prompt — that
+an Eval Run runs without minting a Definition or Agent version. The empty patch
+is the **baseline**.
+_Avoid_: "challenger" (the retired in-run design), "candidate", "config".
+
+**Comparison**:
+A baseline Eval Run and one to four Variant Eval Runs on the same cases,
+Evaluators and criteria, prepared and confirmed as one, and reported case by
+case against the baseline.
+_Avoid_: "Experiment", "A/B test".
 
 ### Audit / observability
 

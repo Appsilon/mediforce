@@ -57,6 +57,11 @@ last_reviewed: 2026-11-02
   agreement. A preview of a `schema` or `code` check tries Eval Cases taken from
   runs first, then production outputs, and skips a run that gave no result. A
   judge reads the text files its run wrote.
+- **Amended 2026-11-03 by [ADR-0024](./0024-optimisation.md) (accepted):**
+  variants return, each as an Eval Run of its own with its own Fingerprint and
+  grouped in a Comparison (D5); a subject's validation may rest on a variant's
+  run whose Fingerprint it now has (D10). D12 and the GEPA amendment of D15
+  stay deferred.
 - **Partially superseded 2026-10-15 by [ADR-0029](./0029-agent-evaluation.md):**
   D2 — an Evaluation is owned by a Step or by an Agent, and an Agent's Eval Run
   assesses one Agent version. Everything else here holds for an Agent's
