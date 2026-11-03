@@ -1,6 +1,9 @@
 # Working directory for apps developer want to keep along the project but don't share publicly
 private-apps
 
+# Server-local Caddy routes, imported by Caddyfile. They must survive `git checkout -f` on deploy.
+caddy.d/*.caddy
+
 .planning
 .claude/worktrees/
 CONTINUE_HERE.md

@@ -24,6 +24,7 @@ services:
       - DOMAIN_ALIASES=${DOMAIN_ALIASES:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy.d:/etc/caddy/sites.d:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
