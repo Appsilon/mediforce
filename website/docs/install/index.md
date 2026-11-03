@@ -192,11 +192,16 @@ handle_path /demo/* {
 }
 ```
 
+The upstream must be reachable from the Caddy container. A service name like
+`demo-app` resolves only on a shared Docker network, so if the side app is its
+own Compose project, attach it to Mediforce's network (`<project>_default`,
+usually `mediforce_default`) as an external network.
+
 These files are server-local: git ignores them, and a deploy's checkout leaves
 them in place. After adding, changing, or removing one, reload Caddy:
 
 ```bash
-docker exec mediforce-caddy-1 caddy reload --config /etc/caddy/Caddyfile
+docker compose -f docker-compose.prod.yml exec caddy caddy reload --config /etc/caddy/Caddyfile
 ```
 
 ## Upgrading
