@@ -87,11 +87,12 @@ export const EvalRunAcceptanceSchema = z.object({
 /**
  * A Variant (ADR-0024 D2): what an Eval Run changes in its subject as it is.
  * On a Step, `model` and `prompt` replace `step.agent`'s; on an Agent, its
- * `foundationModel` and `systemPrompt`. Nothing set is the baseline.
+ * `foundationModel` and `systemPrompt`; an empty `prompt` tries the subject
+ * without one. Nothing set is the baseline.
  */
 export const EvalVariantPatchSchema = z.object({
   model: z.string().trim().min(1).optional(),
-  prompt: z.string().trim().min(1).max(64_000).optional(),
+  prompt: z.string().max(64_000).optional(),
 }).strict();
 
 export const EvalRunSchema = EvaluationOwnerSchema.extend({

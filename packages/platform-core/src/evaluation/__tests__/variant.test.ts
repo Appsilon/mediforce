@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildWorkflowDefinition } from '../../testing/index';
 import { AgentDefinitionSchema } from '../../schemas/agent-definition';
+import { EvalVariantPatchSchema } from '../../schemas/eval-run';
 import { applyAgentVariant, applyRunVariant, applyStepVariant, isEmptyVariant, withAgentVariant } from '../variant';
 
 const definition = buildWorkflowDefinition({
@@ -27,6 +28,15 @@ describe('isEmptyVariant', () => {
     expect(isEmptyVariant(null)).toBe(true);
     expect(isEmptyVariant({})).toBe(true);
     expect(isEmptyVariant({ model: 'openai/gpt-5' })).toBe(false);
+  });
+});
+
+describe('EvalVariantPatchSchema', () => {
+  it('takes an empty prompt as a Variant without one, not as no patch', () => {
+    const patch = EvalVariantPatchSchema.parse({ prompt: '' });
+    expect(isEmptyVariant(patch)).toBe(false);
+    expect(applyStepVariant(definition, step, patch).step.agent?.prompt).toBe('');
+    expect(applyAgentVariant(agent, patch).systemPrompt).toBe('');
   });
 });
 

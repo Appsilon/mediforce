@@ -862,7 +862,7 @@ Agent version: `variant` on `POST /api/evaluation/runs` and
 `/runs/estimate`, `run-prepare` / `run-estimate --model <id> --prompt-file
 <path>`. On a Step the patch replaces `step.agent.model` and
 `step.agent.prompt`; on an Agent, its `foundationModel` and `systemPrompt` for
-the trials only. The run records the patch (`variant`) and the Fingerprint of
+the trials only. An empty `prompt` runs the subject without one. The run records the patch (`variant`) and the Fingerprint of
 the patched subject, and its trials run the patch: the trial executor applies
 it from the run (`applyRunVariant`), so a saved Workflow cannot set it.
 A Variant's model must be listed in the model registry and not retired, and a
