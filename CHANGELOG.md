@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-11-03
+
+### Added
+
+- **Extra Routes On The Same Domain:** Self-hosted servers can serve a side app behind Mediforce's Caddy by dropping a route file into `caddy.d/`. Releases leave these files alone, so routes no longer need re-adding after every upgrade ([#1648](https://github.com/Appsilon/mediforce/pull/1648)).
+- **All Agent Statuses From The CLI:** `mediforce eval qualification` with no `--agent`, `--workflow` or `--step` lists the validation status of every evaluable Agent in the workspace ([#1640](https://github.com/Appsilon/mediforce/pull/1640)).
+
+### Changed
+
+- **Calmer Evaluation Tab:** A status strip at the top shows the step's validation, its Acceptance Criteria with an Edit button, and the Dataset the next run uses. Eval Runs, Eval Cases and Evaluators are tabs shown one at a time, the assistant can be hidden, and a banner points to Code Evaluators whose source still needs approval. This applies to workflow steps and Agents alike ([#1638](https://github.com/Appsilon/mediforce/pull/1638)).
+
+### Fixed
+
+- The AI Assistant can now add a Databricks step when asked, instead of falling back to a plain script step that gets rejected. It also no longer shows two near-duplicate answers to the same question ([#1626](https://github.com/Appsilon/mediforce/pull/1626)).
+- Databricks steps show as Databricks with their icon in the step editor, the execution history and the next-step card on a running run, instead of as Script. Databricks is also offered on the Full tab of Add Block ([#1626](https://github.com/Appsilon/mediforce/pull/1626)).
+- Deleting an image that an Agent still names as its image is now refused, instead of succeeding and breaking that Agent's next eval run ([#1629](https://github.com/Appsilon/mediforce/pull/1629)).
+- The workflow editor's agent picker loads validation badges faster in workspaces with many Agents ([#1640](https://github.com/Appsilon/mediforce/pull/1640)).
+
 ## [1.3.2] - 2026-10-26
 
 ### Added
