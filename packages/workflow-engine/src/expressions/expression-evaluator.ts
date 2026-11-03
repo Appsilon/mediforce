@@ -24,6 +24,7 @@ export class ExpressionError extends Error {
  * Supported syntax:
  *   - Literals: true, false, null, numbers, "strings"
  *   - Field access: output.field, variables.field, verdict, children.field
+ *   - Bracket key access for non-identifier keys, e.g. variables['a-step-id'].field
  *   - Comparisons: ==, !=, >, <, >=, <=
  *   - Logical: &&, ||, !
  *   - Parentheses for grouping
@@ -167,11 +168,27 @@ class ExpressionParser {
     if (ident === 'false') return false;
     if (ident === 'null') return null;
 
-    // Field path: ident(.ident)*
+    // Field path: (.ident | ['key'])*  — bracket form takes a quoted key, so a
+    // path segment that isn't a valid bare identifier (e.g. a kebab-case step
+    // id in `variables['my-step'].field`) is still reachable.
     const path = [ident];
-    while (this.pos < this.expr.length && this.expr[this.pos] === '.') {
-      this.pos++; // consume '.'
-      path.push(this.parseIdentifier());
+    while (this.pos < this.expr.length && (this.expr[this.pos] === '.' || this.expr[this.pos] === '[')) {
+      if (this.expr[this.pos] === '.') {
+        this.pos++;
+        path.push(this.parseIdentifier());
+        continue;
+      }
+      this.pos++; // consume '['
+      this.skipWhitespace();
+      if (this.expr[this.pos] !== '"') {
+        throw new ExpressionError(`Expected a quoted key after '[' at position ${this.pos}`, this.pos);
+      }
+      path.push(this.parseString());
+      this.skipWhitespace();
+      if (this.expr[this.pos] !== ']') {
+        throw new ExpressionError(`Expected closing ']' at position ${this.pos}`, this.pos);
+      }
+      this.pos++;
     }
 
     return this.resolveFieldPath(path);

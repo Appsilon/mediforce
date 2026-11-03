@@ -72,6 +72,30 @@ describe('evaluateExpression', () => {
     });
   });
 
+  describe('bracket key access', () => {
+    it('variables["kebab-step-id"].field reads a hyphenated key', () => {
+      const ctx = makeContext({ variables: { 'kebab-step-id': { status: 'ok' } } });
+      expect(evaluateExpression('variables["kebab-step-id"].status == "ok"', ctx)).toBe(true);
+    });
+
+    it('bracket access can continue with another bracket or dot', () => {
+      const ctx = makeContext({ variables: { 'step-a': { nested: { field: 'yes' } } } });
+      expect(evaluateExpression('variables["step-a"].nested.field == "yes"', ctx)).toBe(true);
+    });
+
+    it('[ERROR] unclosed bracket throws ExpressionError', () => {
+      expect(() =>
+        evaluateExpression('variables["x".field', makeContext()),
+      ).toThrow(ExpressionError);
+    });
+
+    it('[ERROR] unquoted bracket key throws ExpressionError', () => {
+      expect(() =>
+        evaluateExpression('variables[x].field', makeContext()),
+      ).toThrow(ExpressionError);
+    });
+  });
+
   describe('comparisons', () => {
     it('output.valid == true → true when valid is true', () => {
       const ctx = makeContext({ output: { valid: true } });

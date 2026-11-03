@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
 import type { AgentDefinition, ImageCommandCheck, ModelRegistryEntry, SkillSummary, ToolCatalogEntry, WorkflowStep } from '@mediforce/platform-core';
 import type { DockerImageInfo, ImageCatalogEntryView } from '@mediforce/platform-api/contract';
+import { mediforce } from '@/lib/mediforce';
 
 // ---- Mocks (must be before component import) ----
 
@@ -289,7 +290,6 @@ describe('StepEditor', () => {
     }
 
     render(<ControlledStepEditor />);
-    expandCard('Routing');
 
     const verdictInput = screen.getByDisplayValue('approve') as HTMLInputElement;
     fireEvent.change(verdictInput, { target: { value: 'approved' } });
@@ -322,6 +322,183 @@ describe('StepEditor', () => {
     expect(screen.getAllByText('Verdict').length).toBe(2);
     expect(screen.getByDisplayValue('new-verdict')).toBeTruthy();
     expect(screen.getByDisplayValue('new-verdict-2')).toBeTruthy();
+  });
+
+  it('adds, edits and removes an outgoing transition condition on a non-verdict step', () => {
+    function ControlledStepEditor() {
+      const [step] = React.useState(buildStep({ executor: 'script' }));
+      const [transitions, setTransitions] = React.useState([{ from: 'step-1', to: 'next-step' }]);
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step, buildStep({ id: 'next-step', name: 'Next Step' })]}
+          onChange={noop}
+          transitions={transitions}
+          onTransitionsChange={setTransitions}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    expandCard('Routing');
+
+    const modeSelect = screen.getByDisplayValue('None') as HTMLSelectElement;
+    fireEvent.change(modeSelect, { target: { value: 'custom' } });
+    const whenInput = screen.getByPlaceholderText(/output\.status/) as HTMLInputElement;
+    expect(whenInput.value).toBe('');
+    fireEvent.change(whenInput, { target: { value: 'output.status == "ok"' } });
+    expect(screen.getByDisplayValue('output.status == "ok"')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add transition' }));
+    expect(screen.getAllByRole('button', { name: 'Remove transition' }).length).toBe(2);
+    expect(screen.getAllByDisplayValue('None').length).toBe(1);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove transition' })[0]);
+    expect(screen.getAllByRole('button', { name: 'Remove transition' }).length).toBe(1);
+    expect(screen.getAllByDisplayValue('None').length).toBe(1);
+  });
+
+  it('builds a "when" condition from the field/operator/value pickers, then starts custom mode empty', () => {
+    function ControlledStepEditor() {
+      const [step] = React.useState(buildStep({
+        executor: 'agent',
+        agent: { outputSchema: { properties: { status: { type: 'string' } } } },
+      }));
+      const [transitions, setTransitions] = React.useState([{ from: 'step-1', to: 'next-step' }]);
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step, buildStep({ id: 'next-step', name: 'Next Step' })]}
+          onChange={noop}
+          transitions={transitions}
+          onTransitionsChange={setTransitions}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    expandCard('Routing');
+
+    const modeSelect = screen.getByDisplayValue('None') as HTMLSelectElement;
+    fireEvent.change(modeSelect, { target: { value: 'field' } });
+    expect(screen.getByDisplayValue('status')).toBeTruthy();
+
+    fireEvent.change(screen.getByPlaceholderText('value'), { target: { value: 'ok' } });
+    expect(screen.getByDisplayValue('ok')).toBeTruthy();
+
+    fireEvent.change(modeSelect, { target: { value: 'custom' } });
+    expect(modeSelect.value).toBe('custom');
+    const whenInput = screen.getByPlaceholderText(/output\.status/) as HTMLInputElement;
+    expect(whenInput.value).toBe('');
+
+    fireEvent.click(screen.getByRole('button', { name: 'output.status' }));
+    expect(whenInput.value).toBe('output.status');
+
+    fireEvent.change(whenInput, { target: { value: 'output.status ==' } });
+    expect(screen.getByText(/Unexpected end of expression/)).toBeTruthy();
+
+    fireEvent.change(whenInput, { target: { value: 'output.status == "ok"' } });
+    expect(screen.queryByText(/Unexpected end of expression/)).toBeNull();
+  });
+
+  it('builds a "when" condition on another step\'s declared output field', () => {
+    function ControlledStepEditor() {
+      const [step] = React.useState(buildStep({
+        executor: 'agent',
+        agent: { outputSchema: { properties: { status: { type: 'string' } } } },
+      }));
+      const otherStep = buildStep({ id: 'other-step', name: 'Other Step', params: [{ name: 'subject', type: 'string', required: true }] });
+      const doneStep = buildStep({ id: 'done', name: 'Done', type: 'terminal' });
+      const [transitions, setTransitions] = React.useState([
+        { from: 'other-step', to: 'step-1' },
+        { from: 'step-1', to: 'done' },
+      ]);
+      return (
+        <>
+          <div data-testid="when-value">{transitions[1]?.when ?? ''}</div>
+          <StepEditor
+            step={step}
+            allSteps={[otherStep, step, doneStep]}
+            onChange={noop}
+            transitions={transitions}
+            onTransitionsChange={setTransitions}
+          />
+        </>
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    expandCard('Routing');
+
+    const modeSelect = screen.getByDisplayValue('None') as HTMLSelectElement;
+    fireEvent.change(modeSelect, { target: { value: 'field' } });
+    expect(screen.getByDisplayValue('This step')).toBeTruthy();
+    expect(screen.getByDisplayValue('status')).toBeTruthy();
+
+    fireEvent.change(screen.getByDisplayValue('This step'), { target: { value: 'other-step' } });
+    expect(screen.getByDisplayValue('subject')).toBeTruthy();
+
+    fireEvent.change(screen.getByPlaceholderText('value'), { target: { value: 'hi' } });
+    expect(screen.getByTestId('when-value').textContent).toBe('variables["other-step"].subject == "hi"');
+  });
+
+  it('only offers upstream steps as a field source, not downstream ones', () => {
+    function ControlledStepEditor() {
+      const [step] = React.useState(buildStep({ executor: 'script' }));
+      const downstreamStep = buildStep({ id: 'downstream', name: 'Downstream', params: [{ name: 'subject', type: 'string', required: true }] });
+      const [transitions, setTransitions] = React.useState([{ from: 'step-1', to: 'downstream' }]);
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step, downstreamStep]}
+          onChange={noop}
+          transitions={transitions}
+          onTransitionsChange={setTransitions}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    expandCard('Routing');
+
+    const modeSelect = screen.getByDisplayValue('None') as HTMLSelectElement;
+    const options = Array.from(modeSelect.querySelectorAll('option')).map((o) => o.value);
+    expect(options).not.toContain('field');
+  });
+
+  it('falls back to a completed run\'s own fields for a step with no declared output schema', async () => {
+    const listSpy = vi.spyOn(mediforce.runs, 'list').mockResolvedValue({
+      runs: [{ variables: { 'step-1': { count: 3 } } }],
+    } as Awaited<ReturnType<typeof mediforce.runs.list>>);
+
+    function ControlledStepEditor() {
+      const [step] = React.useState(buildStep({ executor: 'script' }));
+      const [transitions, setTransitions] = React.useState([{ from: 'step-1', to: 'next-step' }]);
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step, buildStep({ id: 'next-step', name: 'Next Step' })]}
+          onChange={noop}
+          workflowName="wf-1"
+          transitions={transitions}
+          onTransitionsChange={setTransitions}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    expandCard('Routing');
+
+    await waitFor(() => {
+      const modeSelect = screen.getByDisplayValue('None') as HTMLSelectElement;
+      const options = Array.from(modeSelect.querySelectorAll('option')).map((o) => o.value);
+      expect(options).toContain('field');
+    });
+
+    fireEvent.change(screen.getByDisplayValue('None'), { target: { value: 'field' } });
+    expect(screen.getByDisplayValue('count')).toBeTruthy();
+
+    listSpy.mockRestore();
   });
 
   it('[REGRESSION] adds a second environment variable without renaming the first', () => {
@@ -2104,7 +2281,6 @@ describe('StepEditor — verdict presentation and conditional params', () => {
         onChange={onChange}
       />,
     );
-    expandCard('Routing');
 
     // The label input is empty and placeheld with the default the server fills.
     fireEvent.change(screen.getByPlaceholderText('Approve'), { target: { value: 'Sign off' } });

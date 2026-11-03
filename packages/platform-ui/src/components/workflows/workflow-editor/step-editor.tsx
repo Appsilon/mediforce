@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, CircleCheck, X } from 'lucide-react';
+import { Lock, User, Bot, Terminal, Users, PenLine, Search, GitBranch, Flag, AlertTriangle, CircleCheck, X, ArrowRight } from 'lucide-react';
 import { DatabricksLogo } from '../workflow-diagram';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -17,8 +17,9 @@ import { cn } from '@/lib/utils';
 import { paramNameCounts } from '@/lib/workflow-save-utils';
 import { parseJsonObjectText } from '@/lib/trigger-input-payload';
 
-import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, agentImageOf, agentStepChanges, DEFAULT_STEP_TIMEOUT_MINUTES, defaultVerdictLabel, scriptConfigKeyForPlugin, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
+import { AgentOutputSchemaSchema, DEFAULT_AGENT_IMAGE, agentImageOf, agentStepChanges, computeAncestors, DEFAULT_STEP_TIMEOUT_MINUTES, defaultVerdictLabel, scriptConfigKeyForPlugin, stepHasBuildSource, uniqueName, uniqueSlug } from '@mediforce/platform-core';
 import type { AgentDefinition, AgentStepChange, WorkflowDefinition, WorkflowStep, HttpMethod, ActionConfig, SpawnTargetConfig } from '@mediforce/platform-core';
+import { evaluateExpression, ExpressionError } from '@mediforce/workflow-engine';
 import type { DockerImageInfo, ImageCatalogEntryView, StepValidation } from '@mediforce/platform-api/contract';
 import { ModelPicker } from './model-picker';
 import { selectAgentPatch } from '../workflow-editor-utils';
@@ -67,6 +68,99 @@ function agentSummary(agent: AgentDefinition): string {
     plural(agent.skills?.length ?? 0, 'skill'),
     plural(Object.keys(agent.mcpServers ?? {}).length, 'MCP server'),
   ].join(' · ');
+}
+
+/** Output fields a step declares, so the Conditions section can offer them as
+ *  pickable `output.<field>` comparisons in a `when` condition, typed so the
+ *  value widget and literal quoting match what the field actually holds. */
+function stepOutputFields(step: WorkflowStep): { name: string; type: string }[] {
+  if (step.executor === 'agent') {
+    const properties = step.agent?.outputSchema?.properties ?? {};
+    return Object.entries(properties).map(([name, prop]) => ({ name, type: prop.type ?? 'string' }));
+  }
+  if (step.executor === 'human') return (step.params ?? []).map((p) => ({ name: p.name, type: p.type }));
+  return [];
+}
+
+/** A completed run's `variables` is the engine's own `{stepId: output}` map
+ *  (see `composeSimpleWhen`'s `variables["id"].field` accessor) — reshaped into
+ *  the same `{name, type}[]` the Conditions builder uses for a declared schema,
+ *  inferring type from the actual value since there's no declared one. */
+function fieldsFromRunVariables(variables: Record<string, unknown> | undefined): Record<string, { name: string; type: string }[]> {
+  const fields: Record<string, { name: string; type: string }[]> = {};
+  if (!variables) return fields;
+  for (const [stepId, output] of Object.entries(variables)) {
+    if (output !== null && typeof output === 'object' && !Array.isArray(output)) {
+      fields[stepId] = Object.entries(output as Record<string, unknown>).map(([name, value]) => ({ name, type: typeof value }));
+    }
+  }
+  return fields;
+}
+
+const TRANSITION_OPERATORS = ['==', '!=', '>', '<', '>=', '<='] as const;
+type TransitionOperator = typeof TRANSITION_OPERATORS[number];
+
+interface SimpleCondition {
+  stepId: string;
+  field: string;
+  operator: TransitionOperator;
+  value: string;
+}
+
+function unquoteValue(raw: string): string {
+  return /^".*"$/.test(raw) ? raw.slice(1, -1).replace(/\\"/g, '"') : raw;
+}
+
+/** Reads a `when` string back into field/operator/value, so the Conditions
+ *  section can show that builder instead of raw text for the common
+ *  single-comparison case — either on this step's own output
+ *  (`output.<field> <op> <value>`) or an upstream step's
+ *  (`variables["<stepId>"].<field> <op> <value>`, the engine's own cross-step
+ *  accessor — every completed step's output already accumulates into
+ *  `variables` keyed by step id). Anything else (compound logic, an unknown
+ *  field or step) falls back to the raw expression editor. */
+function parseSimpleWhen(
+  when: string,
+  currentStepId: string,
+  allSteps: WorkflowStep[],
+  fieldsOf: (stepId: string) => { name: string; type: string }[],
+): SimpleCondition | null {
+  const trimmed = when.trim();
+  const own = /^output\.([A-Za-z_]\w*)\s*(==|!=|>=|<=|>|<)\s*(.+)$/.exec(trimmed);
+  if (own) {
+    const [, field, operator, rawValue] = own;
+    if (!allSteps.some((s) => s.id === currentStepId) || !fieldsOf(currentStepId).some((f) => f.name === field)) return null;
+    return { stepId: currentStepId, field, operator: operator as TransitionOperator, value: unquoteValue(rawValue) };
+  }
+  const crossStep = /^variables\["([^"]+)"\]\.([A-Za-z_]\w*)\s*(==|!=|>=|<=|>|<)\s*(.+)$/.exec(trimmed);
+  if (crossStep) {
+    const [, stepId, field, operator, rawValue] = crossStep;
+    if (!allSteps.some((s) => s.id === stepId) || !fieldsOf(stepId).some((f) => f.name === field)) return null;
+    return { stepId, field, operator: operator as TransitionOperator, value: unquoteValue(rawValue) };
+  }
+  return null;
+}
+
+function composeSimpleWhen(condition: SimpleCondition, currentStepId: string, fieldType: string): string {
+  const numeric = fieldType === 'number' || fieldType === 'integer';
+  const literal = fieldType === 'boolean'
+    ? (condition.value === 'true' ? 'true' : 'false')
+    : numeric ? (condition.value === '' ? '0' : condition.value) : `"${condition.value.replace(/"/g, '\\"')}"`;
+  const accessor = condition.stepId === currentStepId ? `output.${condition.field}` : `variables["${condition.stepId}"].${condition.field}`;
+  return `${accessor} ${condition.operator} ${literal}`;
+}
+
+type TransitionMode = 'always' | 'else' | 'field' | 'custom';
+
+function transitionMode(
+  when: string | undefined,
+  currentStepId: string,
+  allSteps: WorkflowStep[],
+  fieldsOf: (stepId: string) => { name: string; type: string }[],
+): TransitionMode {
+  if (!when) return 'always';
+  if (when === 'else') return 'else';
+  return parseSimpleWhen(when, currentStepId, allSteps, fieldsOf) ? 'field' : 'custom';
 }
 
 function friendlyFieldError(message: string): string {
@@ -245,6 +339,8 @@ const TIP = {
 
   verdictName:             'Verdict label (e.g. "approve", "reject"). Referenced in downstream transition conditions.',
   verdictTarget:           'The step to route to when this verdict is selected.',
+  transitionWhen:          'When this transition is taken: None (always taken), Else (only if nothing else on this step matched), a field comparison on this step\'s own output, or a custom expression for && / || / ! logic. With more than one outgoing transition, every one of them needs a condition.',
+  transitionTarget:        'The step this transition leads to.',
 
   paramName:               'Identifier for this parameter. Its submitted value becomes part of this step\'s output — later steps read it as ${steps.<this step id>.<name>}.',
   paramType:               'Data type: string, number, boolean, or date. Controls validation and the input widget shown to users.',
@@ -354,6 +450,8 @@ export function StepEditor({
   workflowVisibility = 'private',
   workflowPreamble,
   savedValidation,
+  transitions = [],
+  onTransitionsChange = () => {},
 }: {
   step: WorkflowStep;
   allSteps: WorkflowStep[];
@@ -364,6 +462,8 @@ export function StepEditor({
   imageWarning?: string;
   dockerImages?: DockerImageInfo[];
   catalogEntries?: ImageCatalogEntryView[];
+  transitions?: WorkflowDefinition['transitions'];
+  onTransitionsChange?: (next: WorkflowDefinition['transitions']) => void;
   /** The files this workflow carries: a Dockerfile among them is an image
    *  source the step can build from. */
   workflowArtifacts?: WorkflowDefinition['artifacts'];
@@ -398,6 +498,27 @@ export function StepEditor({
     }
   }, [handle, workflowName, uid]);
 
+  // Fallback field source for a step with no declared output schema (script,
+  // action, cowork, or an agent that never set one): the fields actually seen
+  // on its most recent completed run, so the Conditions builder isn't a dead
+  // end for them. Best-effort only — the declared schema always wins when set.
+  const [lastRunFields, setLastRunFields] = useState<Record<string, { name: string; type: string }[]>>({});
+  useEffect(() => {
+    if (!workflowName) { setLastRunFields({}); return; }
+    let cancelled = false;
+    mediforce.runs.list({ workflow: workflowName, status: 'completed', limit: 1 })
+      .then((result) => {
+        if (!cancelled) setLastRunFields(fieldsFromRunVariables(result.runs[0]?.variables as Record<string, unknown> | undefined));
+      })
+      .catch((err) => console.error('Failed to load last run output fields:', err));
+    return () => { cancelled = true; };
+  }, [workflowName]);
+  const fieldsForStepId = (stepId: string): { name: string; type: string }[] => {
+    const candidate = allSteps.find((s) => s.id === stepId);
+    const declared = candidate ? stepOutputFields(candidate) : [];
+    return declared.length > 0 ? declared : (lastRunFields[stepId] ?? []);
+  };
+
   const otherSteps = allSteps.filter((s) => s.id !== step.id);
   const isAgent  = step.executor === 'agent'  && step.type !== 'terminal';
   const isHuman  = step.executor === 'human'  && step.type !== 'terminal';
@@ -409,6 +530,46 @@ export function StepEditor({
   const isDecision = step.type === 'decision';
   const hasVerdicts = isReview || isDecision;
   const isTerminal = step.type === 'terminal';
+  const outgoingTransitions = transitions.filter((t) => t.from === step.id);
+  const hasRoutingConfigured = Object.keys(step.verdicts ?? {}).length > 0 || outgoingTransitions.some((t) => t.when);
+  const outputFields = fieldsForStepId(step.id);
+  const upstreamStepIds = computeAncestors(allSteps, transitions).get(step.id) ?? new Set<string>();
+  const [transitionErrors, setTransitionErrors] = useState<Record<number, string>>({});
+  // A `when` string that happens to parse as a simple field comparison always
+  // derives to 'field' mode; this is the only way to pin the raw-text view for
+  // one that does (e.g. the user picked "Custom expression" without editing it yet).
+  const [forceCustomMode, setForceCustomMode] = useState<Record<number, boolean>>({});
+  const whenInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const setTransitionWhen = (index: number, expression: string) => {
+    onTransitionsChange(transitions.map((t, i) => (i === index ? { ...t, when: expression || undefined } : t)));
+    const clearError = () => setTransitionErrors((prev) => {
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
+    if (!expression || expression === 'else') {
+      clearError();
+      return;
+    }
+    try {
+      evaluateExpression(expression, { output: Object.fromEntries(outputFields.map((f) => [f.name, null])), variables: {} });
+      clearError();
+    } catch (error) {
+      setTransitionErrors((prev) => ({ ...prev, [index]: error instanceof ExpressionError ? error.message : 'Invalid expression' }));
+    }
+  };
+  const insertOutputField = (index: number, field: string) => {
+    const el = whenInputRefs.current[index];
+    const current = transitions[index]?.when ?? '';
+    const insertion = `output.${field}`;
+    const start = el?.selectionStart ?? current.length;
+    const end = el?.selectionEnd ?? current.length;
+    setTransitionWhen(index, current.slice(0, start) + insertion + current.slice(end));
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(start + insertion.length, start + insertion.length);
+    });
+  };
   const [agentDefinitions, setAgentDefinitions] = useState<AgentDefinition[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
   const [agentsError, setAgentsError] = useState<string | null>(null);
@@ -653,7 +814,7 @@ export function StepEditor({
   // of cards may be open — toggling one never closes the others.
   // Card ids + their default open state live here once; the reset effect and
   // toggle derive from this rather than re-typing the literal.
-  const defaultOpenCards: Record<string, boolean> = { basics: true, primary: false, routing: false, advanced: false };
+  const defaultOpenCards: Record<string, boolean> = { basics: true, primary: false, routing: hasRoutingConfigured, advanced: false };
   const [openCards, setOpenCards] = useState<Record<string, boolean>>(defaultOpenCards);
   useEffect(() => {
     setOpenCards(defaultOpenCards);
@@ -1750,8 +1911,10 @@ export function StepEditor({
       )}
 
       {/* ── Routing ──────────────────────────────────────────────── */}
-      {hasVerdicts && (
+      {!isTerminal && (
         <CollapsibleCard title="Routing" open={openCards.routing} onToggle={() => toggleCard('routing')}>
+      {hasVerdicts && (
+      <>
       {/* ── Verdicts ─────────────────────────────────────────────── */}
         <Section title="Verdicts">
           <FieldGroup>
@@ -1833,6 +1996,167 @@ export function StepEditor({
             }}
             className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
           >+ Add verdict</button>
+        </Section>
+      </>
+      )}
+        <Section title="Conditions">
+          <FieldGroup>
+            {outgoingTransitions.map((transition) => {
+              const index = transitions.indexOf(transition);
+              const mode = forceCustomMode[index] ? 'custom' : transitionMode(transition.when, step.id, allSteps, fieldsForStepId);
+              const simple = mode === 'field' ? parseSimpleWhen(transition.when ?? '', step.id, allSteps, fieldsForStepId) : null;
+              const fieldsOf = fieldsForStepId;
+              const simpleField = simple ? fieldsOf(simple.stepId).find((f) => f.name === simple.field) : undefined;
+              const stepsWithFields = [
+                ...(outputFields.length > 0 ? [step] : []),
+                ...otherSteps.filter((s) => upstreamStepIds.has(s.id) && fieldsForStepId(s.id).length > 0),
+              ];
+              return (
+                <FieldRow key={index} label="When" tooltip={TIP.transitionWhen} error={transitionErrors[index]}>
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={mode}
+                        onChange={(e) => {
+                          const nextMode = e.target.value as TransitionMode;
+                          setForceCustomMode((prev) => ({ ...prev, [index]: nextMode === 'custom' }));
+                          if (nextMode === 'always') { setTransitionWhen(index, ''); return; }
+                          if (nextMode === 'else') { setTransitionWhen(index, 'else'); return; }
+                          if (nextMode === 'field') {
+                            const defaultStep = stepsWithFields[0];
+                            const first = defaultStep ? fieldsOf(defaultStep.id)[0] : undefined;
+                            setTransitionWhen(index, defaultStep && first ? composeSimpleWhen({ stepId: defaultStep.id, field: first.name, operator: '==', value: '' }, step.id, first.type) : '');
+                            return;
+                          }
+                          setTransitionWhen(index, '');
+                        }}
+                        className={cn(rs, 'flex-1')}
+                      >
+                        <option value="always">None</option>
+                        <option value="else">Else (nothing else matched)</option>
+                        {stepsWithFields.length > 0 && <option value="field">If a field…</option>}
+                        <option value="custom">Custom expression</option>
+                      </select>
+                      <button
+                        onClick={() => {
+                          onTransitionsChange(transitions.filter((_, i) => i !== index));
+                          setTransitionErrors({});
+                          setForceCustomMode({});
+                        }}
+                        className="rounded-md p-1 text-muted-foreground/50 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors shrink-0"
+                        aria-label="Remove transition"
+                      ><X className="h-3.5 w-3.5" /></button>
+                    </div>
+
+                    {mode === 'field' && simple && (
+                      <div className="flex flex-col gap-1.5">
+                        {stepsWithFields.length > 1 && (
+                          <select
+                            value={simple.stepId}
+                            onChange={(e) => {
+                              const fields = fieldsOf(e.target.value);
+                              const first = fields[0];
+                              if (first) setTransitionWhen(index, composeSimpleWhen({ stepId: e.target.value, field: first.name, operator: simple.operator, value: '' }, step.id, first.type));
+                            }}
+                            className={cn(rs, 'flex-1')}
+                          >
+                            {stepsWithFields.map((s) => <option key={s.id} value={s.id}>{s.id === step.id ? 'This step' : s.name}</option>)}
+                          </select>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          <select
+                            value={simple.field}
+                            onChange={(e) => {
+                              const next = fieldsOf(simple.stepId).find((f) => f.name === e.target.value);
+                              if (next) setTransitionWhen(index, composeSimpleWhen({ stepId: simple.stepId, field: next.name, operator: simple.operator, value: '' }, step.id, next.type));
+                            }}
+                            className={cn(rs, 'flex-1')}
+                          >
+                            {fieldsOf(simple.stepId).map((f) => <option key={f.name} value={f.name}>{f.name}</option>)}
+                          </select>
+                          <select
+                            value={simple.operator}
+                            onChange={(e) => simpleField && setTransitionWhen(index, composeSimpleWhen({ ...simple, operator: e.target.value as TransitionOperator }, step.id, simpleField.type))}
+                            className={cn(rs, 'w-24 shrink-0')}
+                          >
+                            {TRANSITION_OPERATORS.map((op) => <option key={op} value={op}>{op}</option>)}
+                          </select>
+                          {simpleField?.type === 'boolean' ? (
+                            <select
+                              value={simple.value === 'true' ? 'true' : 'false'}
+                              onChange={(e) => setTransitionWhen(index, composeSimpleWhen({ ...simple, value: e.target.value }, step.id, 'boolean'))}
+                              className={cn(rs, 'flex-1')}
+                            >
+                              <option value="true">true</option>
+                              <option value="false">false</option>
+                            </select>
+                          ) : (
+                            <input
+                              value={simple.value}
+                              type={simpleField?.type === 'number' || simpleField?.type === 'integer' ? 'number' : 'text'}
+                              placeholder="value"
+                              onChange={(e) => simpleField && setTransitionWhen(index, composeSimpleWhen({ ...simple, value: e.target.value }, step.id, simpleField.type))}
+                              className={cn(ri, 'flex-1')}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {mode === 'custom' && (
+                      <>
+                        <input
+                          ref={(el) => { whenInputRefs.current[index] = el; }}
+                          value={transition.when ?? ''}
+                          placeholder="output.status == &quot;ok&quot; && output.priority > 2"
+                          onChange={(e) => setTransitionWhen(index, e.target.value)}
+                          className={cn(inputBaseMono, 'w-full placeholder:italic placeholder:text-muted-foreground/40 placeholder:font-sans')}
+                        />
+                        {outputFields.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className="text-[10px] text-muted-foreground/70">Output from &quot;{step.name}&quot;:</span>
+                            {outputFields.map((f) => (
+                              <button
+                                key={f.name}
+                                type="button"
+                                onClick={() => insertOutputField(index, f.name)}
+                                className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                              >output.{f.name}</button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    <div className="flex items-center gap-1.5 pt-1.5 mt-0.5 border-t border-border/40">
+                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
+                      <span className="text-[11px] text-muted-foreground/70 shrink-0">Go to</span>
+                      <select
+                        value={transition.to}
+                        onChange={(e) => onTransitionsChange(transitions.map((t, i) => (i === index ? { ...t, to: e.target.value } : t)))}
+                        className={cn(rs, 'flex-1')}
+                        title={TIP.transitionTarget}
+                      >
+                        <option value="">Select step…</option>
+                        {otherSteps.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.id})</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </FieldRow>
+              );
+            })}
+            {outgoingTransitions.length === 0 && (
+              <div className="px-3 py-2 text-[11px] text-muted-foreground/40 italic">No outgoing transitions</div>
+            )}
+          </FieldGroup>
+          <button
+            onClick={() => {
+              onTransitionsChange([...transitions, { from: step.id, to: otherSteps[0]?.id ?? '' }]);
+              setTransitionErrors({});
+              setForceCustomMode({});
+            }}
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >+ Add transition</button>
         </Section>
         </CollapsibleCard>
       )}

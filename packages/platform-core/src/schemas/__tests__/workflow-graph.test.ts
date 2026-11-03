@@ -138,4 +138,83 @@ describe('validateStepReferences', () => {
     const issues = validateStepReferences(steps, transitions);
     expect(issues.some((i) => i.severity === 'error' && /no step "nope" exists/.test(i.message))).toBe(true);
   });
+
+  it('warns when a transition "when" references an output field the agent step does not declare', () => {
+    const steps: WorkflowStep[] = [
+      { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent', agent: { outputSchema: { properties: { status: { type: 'string' } } } } },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ];
+    const transitions = [{ from: 'analyze', to: 'done', when: 'output.staus == "ok"' }];
+    const issues = validateStepReferences(steps, transitions);
+    expect(issues.some((i) => i.severity === 'warning' && /does not declare that field/.test(i.message))).toBe(true);
+  });
+
+  it('accepts a transition "when" that references a declared agent output field', () => {
+    const steps: WorkflowStep[] = [
+      { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent', agent: { outputSchema: { properties: { status: { type: 'string' } } } } },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ];
+    const transitions = [{ from: 'analyze', to: 'done', when: 'output.status == "ok"' }];
+    expect(validateStepReferences(steps, transitions)).toEqual([]);
+  });
+
+  it('does not check "when" output fields when the step declares no output schema', () => {
+    const steps: WorkflowStep[] = [
+      { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ];
+    const transitions = [{ from: 'analyze', to: 'done', when: 'output.anything == "ok"' }];
+    expect(validateStepReferences(steps, transitions)).toEqual([]);
+  });
+
+  it('accepts a transition "when" that reads an upstream step\'s declared output field', () => {
+    const steps: WorkflowStep[] = [
+      { id: 'intake', name: 'Intake', type: 'creation', executor: 'human', params: [{ name: 'words', type: 'string', required: true }] },
+      { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ];
+    const transitions = [
+      { from: 'intake', to: 'analyze' },
+      { from: 'analyze', to: 'done', when: 'variables["intake"].words == "hi"' },
+    ];
+    expect(validateStepReferences(steps, transitions)).toEqual([]);
+  });
+
+  it('warns when a transition "when" references a step field that step does not declare', () => {
+    const steps: WorkflowStep[] = [
+      { id: 'intake', name: 'Intake', type: 'creation', executor: 'human', params: [{ name: 'words', type: 'string', required: true }] },
+      { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ];
+    const transitions = [
+      { from: 'intake', to: 'analyze' },
+      { from: 'analyze', to: 'done', when: 'variables["intake"].wrongkey == "hi"' },
+    ];
+    const issues = validateStepReferences(steps, transitions);
+    expect(issues.some((i) => i.severity === 'warning' && /does not declare that field/.test(i.message))).toBe(true);
+  });
+
+  it('warns when a transition "when" references a step that is not upstream', () => {
+    const steps: WorkflowStep[] = [
+      { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent' },
+      { id: 'sibling', name: 'Sibling', type: 'creation', executor: 'human', params: [{ name: 'words', type: 'string', required: true }] },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ];
+    const transitions = [
+      { from: 'analyze', to: 'done', when: 'variables["sibling"].words == "hi"' },
+      { from: 'analyze', to: 'sibling' },
+    ];
+    const issues = validateStepReferences(steps, transitions);
+    expect(issues.some((i) => i.severity === 'warning' && /not upstream of it/.test(i.message))).toBe(true);
+  });
+
+  it('warns when a transition "when" references a step that does not exist', () => {
+    const steps: WorkflowStep[] = [
+      { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent' },
+      { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+    ];
+    const transitions = [{ from: 'analyze', to: 'done', when: 'variables["nope"].words == "hi"' }];
+    const issues = validateStepReferences(steps, transitions);
+    expect(issues.some((i) => i.severity === 'warning' && /no such step exists/.test(i.message))).toBe(true);
+  });
 });
