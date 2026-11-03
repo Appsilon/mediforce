@@ -19,6 +19,30 @@ describe('callOpenRouter', () => {
     expect(result.usage).toEqual({ promptTokens: 812, completionTokens: 64 });
   });
 
+  it('returns how many output tokens went on reasoning', async () => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: 'ok' } }],
+      usage: { prompt_tokens: 812, completion_tokens: 64, completion_tokens_details: { reasoning_tokens: 50 } },
+    }), { status: 200 }));
+
+    const result = await callOpenRouter({ model: 'model-x', messages: [{ role: 'user', content: 'hi' }], apiKey: 'key-abc' });
+
+    expect(result.usage).toEqual({ promptTokens: 812, completionTokens: 64, reasoningTokens: 50 });
+  });
+
+  it('leaves reasoning tokens out when the model does not report a number', async () => {
+    for (const details of [undefined, {}, { reasoning_tokens: null }]) {
+      fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+        choices: [{ message: { content: 'ok' } }],
+        usage: { prompt_tokens: 812, completion_tokens: 64, completion_tokens_details: details },
+      }), { status: 200 }));
+
+      const result = await callOpenRouter({ model: 'model-x', messages: [{ role: 'user', content: 'hi' }], apiKey: 'key-abc' });
+
+      expect(result.usage).toStrictEqual({ promptTokens: 812, completionTokens: 64 });
+    }
+  });
+
   it('retries once when the connection drops, then reports a network error', async () => {
     const ok = () => new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 });
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('fetch failed')).mockResolvedValueOnce(ok());
@@ -142,6 +166,18 @@ describe('callOpenRouter', () => {
     });
     expect(result.content).toBe('');
     expect(result.toolCalls).toEqual([]);
+  });
+
+  it('says no provider takes the request\'s parameters when OpenRouter finds no endpoint for them, not that the model is not offered', async () => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: 'No endpoints found that can handle the requested parameters.', code: 404 } }), { status: 404 }),
+    );
+    const request = { model: 'model-x', messages: [{ role: 'user' as const, content: 'hi' }], apiKey: 'key-abc' };
+
+    await expect(callOpenRouter(request)).rejects.toThrow(/no provider of model-x takes every parameter/i);
+
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({ error: { message: 'No endpoints found for model-x.', code: 404 } }), { status: 404 }));
+    await expect(callOpenRouter(request)).rejects.toThrow(/does not offer the selected model/);
   });
 
   it('throws when the model API returns non-OK', async () => {

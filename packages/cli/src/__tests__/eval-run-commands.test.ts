@@ -200,7 +200,7 @@ describe('mediforce eval trial', () => {
       error: null,
       review: null,
       judgePrompt: [{ role: 'system', content: 'Rubric:\nA fatal AE is Grade 5.' }, { role: 'user', content: 'Step output: ...' }],
-      judgeCalls: [{ model: 'anthropic/claude-haiku-4.5', promptTokens: 900, completionTokens: 60, durationMs: 1200, response: '{"rationale": "Grade 4 given for a fatal AE.", "passed": false, "confidence": 0.9}' }],
+      judgeCalls: [{ model: 'anthropic/claude-haiku-4.5', promptTokens: 900, completionTokens: 60, durationMs: 1200, response: '{"rationale": "Grade 4 given for a fatal AE.", "passed": false, "confidence": 0.9}' }, { model: 'anthropic/claude-haiku-4.5', promptTokens: 900, completionTokens: 16000, reasoningTokens: 15900, durationMs: 1500, response: '' }],
     }],
   };
 
@@ -220,6 +220,7 @@ describe('mediforce eval trial', () => {
     await evalTrialCommand({ argv: [RUN_ID, TRIAL_ID, '--prompts', ...BASE], env: ENV, output: withPrompts });
     expect(withPrompts.stdoutLines.join('\n')).toContain('--- system ---\nRubric:\nA fatal AE is Grade 5.');
     expect(withPrompts.stdoutLines.join('\n')).toContain('--- assistant (anthropic/claude-haiku-4.5, 900 in / 60 out tokens, 1200 ms) ---\n{"rationale": "Grade 4 given for a fatal AE."');
+    expect(withPrompts.stdoutLines.join('\n')).toContain('--- assistant (anthropic/claude-haiku-4.5, 900 in / 16000 out tokens (15900 reasoning), 1500 ms) ---');
   });
 });
 

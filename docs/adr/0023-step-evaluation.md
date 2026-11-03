@@ -1,7 +1,7 @@
 ---
 status: accepted
 audience: engineers
-last_reviewed: 2026-10-16
+last_reviewed: 2026-11-02
 ---
 
 # 0023 — Step Evaluation: Evaluation Assistant, Evaluators, single-step Eval Runs, Step Qualification
@@ -34,6 +34,29 @@ last_reviewed: 2026-10-16
   deleted, not only out of the UI; ADR-0024 pins the commit that has it.
   From 2026-10-05 an Eval Run carries the Step Fingerprint itself, with no
   variants (D5).
+- **Amended 2026-10-30 (D14):** the assistant previews only `schema` and
+  `code` checks; a judge is proposed untried, since two outputs say little of
+  how it judges and an Eval Run does. The platform pins a proposed judge's
+  model unless the person asked for one. A judge answers with a JSON object;
+  forcing a tool call was tried and dropped, since OpenRouter rejected it for
+  Claude Sonnet 5.5. On a model whose registry entry lists
+  `structured_outputs` among its supported parameters, decoding is constrained
+  to the answer's JSON Schema (`response_format`, routed only to providers
+  that take every parameter sent, so a parameter the model does not take —
+  `temperature` on Claude 5.5 — is left out), since asking in text alone let
+  judges answer in prose or with unescaped quotes; the platform refuses a
+  named judge model that does not list it.
+- **Amended 2026-11-02 (D14, D17):** a reviewed run labels its cases by round:
+  each round sent back with Request changes is a negative case, compared by
+  agreement with the reviewer's comment and param values as its instructions,
+  the output finally approved a positive one — under an agent step's own review;
+  a human review step records only what it sends back — each on the input of the
+  review's first round. A human review step's verdict that sends an earlier agent step
+  back is recorded on that step's run the same way. The assistant also red-teams with negative
+  cases planted from real output — one obvious error in it, compared by
+  agreement. A preview of a `schema` or `code` check tries Eval Cases taken from
+  runs first, then production outputs, and skips a run that gave no result. A
+  judge reads the text files its run wrote.
 - **Partially superseded 2026-10-15 by [ADR-0029](./0029-agent-evaluation.md):**
   D2 — an Evaluation is owned by a Step or by an Agent, and an Agent's Eval Run
   assesses one Agent version. Everything else here holds for an Agent's
@@ -271,8 +294,11 @@ assistant keeps its own loop until it can move onto the shared one without
 losing its canvas gates and truncation salvage. Heavy work is exposed as platform tools, never done by the
 model itself: `preview_evaluator` runs a draft check (in `script-container`
 for `code`) against existing outputs of the Step so the assistant sees a check
-fail on real outputs before proposing it. Every tool wraps a headless handler
-(ADR-0005), so the CLI and the manual UI get the same operations.
+fail on real outputs before proposing it. _Amended 2026-10-30: only a
+`schema` or `code` check is previewed; a judge is proposed untried, on the
+platform's pinned default model unless the person asked for another._ Every
+tool wraps a headless handler (ADR-0005), so the CLI and the manual UI get the
+same operations.
 
 **D15 — The assistant's authority is tiered by consequence.**
 - *Runs freely:* reads (Step config, SKILL.md, MCPs, runs, trajectories,

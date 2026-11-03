@@ -10,13 +10,15 @@ export interface StepProductionAgentRunsPage {
 /**
  * A page of the Step's finished production Agent Runs, newest first. Running
  * rows are skipped by fetching again rather than over-fetching and trimming,
- * so the cursor never passes a run the page did not return.
+ * so the cursor never passes a run the page did not return. With `keep`, so
+ * are the finished runs it turns down.
  */
 export async function listStepProductionAgentRunsPage(
   scope: CallerScope,
   step: EvaluatedStep,
   limit: number,
   cursor?: string,
+  keep: (run: AgentRun) => boolean = () => true,
 ): Promise<StepProductionAgentRunsPage> {
   const instanceIds = await scope.runs.getIdsByDefinitionName(step.namespace, step.workflowName, { excludeDryRuns: true });
   if (instanceIds.length === 0) return { runs: [] };
@@ -30,17 +32,18 @@ export async function listStepProductionAgentRunsPage(
       namespace: step.namespace,
       processInstanceIds: instanceIds,
     });
-    runs.push(...page.items.filter((run) => run.status !== 'running'));
+    runs.push(...page.items.filter((run) => run.status !== 'running' && keep(run)));
     nextCursor = page.nextCursor;
   } while (runs.length < limit && nextCursor !== undefined);
   return nextCursor === undefined ? { runs } : { runs, nextCursor };
 }
 
-/** The Step's latest finished production Agent Runs, newest first. */
+/** The Step's latest finished production Agent Runs that `keep` takes, newest first. */
 export async function listStepProductionAgentRuns(
   scope: CallerScope,
   step: EvaluatedStep,
   limit: number,
+  keep?: (run: AgentRun) => boolean,
 ): Promise<AgentRun[]> {
-  return (await listStepProductionAgentRunsPage(scope, step, limit)).runs;
+  return (await listStepProductionAgentRunsPage(scope, step, limit, undefined, keep)).runs;
 }

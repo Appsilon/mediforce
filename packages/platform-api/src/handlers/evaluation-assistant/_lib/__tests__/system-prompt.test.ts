@@ -7,7 +7,7 @@ describe('Evaluation Assistant prompt', () => {
   it('states the authority tiers of ADR-0023 D15', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('Never approve a code check\'s source, accept or deny a judge\'s verdict, or sign a Step Qualification');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('start_eval_run is refused without the person\'s confirmation');
-    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('run it with preview_evaluator on real outputs');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('run it with preview_evaluator and say what it did');
   });
 
   it('covers the plan, the cheapest reliable check, judge verdicts and case expectations only the person reviews', () => {
@@ -17,6 +17,37 @@ describe('Evaluation Assistant prompt', () => {
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toMatch(/get_calibration|propose_outputs_to_label|propose_written_outputs/);
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('negative, an output it must not return');
     expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toContain('notes');
+  });
+
+  it('derives cases from review rounds: each round sent back is negative, the approved output positive, on the input production sent', () => {
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('the rounds of one Workflow Run are one review');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('holds the input production first sent');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('each round sent back is a negative case');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('its agentRunId with expectedOutput null');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('mark it Positive or Negative on its card');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).not.toMatch(/rejected (run|one)|reviewers rejected/);
+  });
+
+  it('reads a reviewer\'s param values as the reason they did not approve', () => {
+    for (const prompt of Object.values(EVALUATION_ASSISTANT_SYSTEM_PROMPTS)) {
+      expect(prompt).toContain('Read paramValues exactly as you read a comment');
+    }
+  });
+
+  it('red-teams the cases with negative ones: a real output with one obvious error planted, the error what decides', () => {
+    for (const prompt of Object.values(EVALUATION_ASSISTANT_SYSTEM_PROMPTS)) {
+      expect(prompt).toContain('A wrong output is a negative case too');
+      expect(prompt).toContain('Plant in it one error a reviewer would catch at once');
+      expect(prompt).toContain('naming the planted error as the one difference that decides');
+    }
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('propose_eval_case with only the run\'s agentRunId and, as expectedOutput, that output with the error planted — no input');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPTS.agent).toContain('never one with outputSchemaDiffers');
+  });
+
+  it('keeps planted errors apart from perturbed cases: an error planted in the output is not a change to the input', () => {
+    const synthesis = EVALUATION_ASSISTANT_SYSTEM_PROMPT.split('Case synthesis')[1].split('\n\n')[0];
+    expect(synthesis).not.toContain('A wrong output is a negative case too');
+    expect(EVALUATION_ASSISTANT_SYSTEM_PROMPT).toContain('not propose_perturbed_case');
   });
 
   it('covers Acceptance Criteria set before a run, validation from the newest run of the version, and routing', () => {
@@ -80,10 +111,19 @@ describe('Evaluation Assistant prompt', () => {
     it('names the Agent\'s reads and none of the Step\'s own', () => {
       expect(prompt).toContain('Read before you plan: get_agent');
       expect(prompt).toContain('list_agent_production_runs gives the steps that use the agent');
-      expect(prompt).toContain('Set containsProductionData to true');
+      expect(prompt).toContain('set containsProductionData to true');
+      expect(prompt).toContain('that has altered the agent\'s definition in: <fields>');
+      expect(prompt).toContain('the platform refuses it as an expected output');
       for (const stepOnly of ['get_step', 'list_step_runs', 'propose_perturbed_case', 'propose_control_settings', 'list_workspace_files', 'workflow editor', 'with runInProduction true']) {
         expect(prompt).not.toContain(stepOnly);
       }
+    });
+
+    it('previews a check on the agent\'s Eval Cases, never on production outputs', () => {
+      expect(prompt).toContain('Before proposing a schema or code check, run it with preview_evaluator');
+      expect(prompt).toContain('the agent\'s Eval Cases');
+      expect(prompt).toContain('Name no agentRunIds');
+      expect(prompt).not.toContain('is not previewed: it is first tried in an Eval Run');
     });
 
     it('speaks of the agent in its Brief and budget messages', () => {

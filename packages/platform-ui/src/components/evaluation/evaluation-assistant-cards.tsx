@@ -1,18 +1,24 @@
 'use client';
 
 import * as React from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, Eye, X } from 'lucide-react';
 import {
   describeAcceptanceCriteria,
+  type AgentOutputSchema,
+  type EvalCaseComparison,
+  type EvalCaseExpectation,
+  type EvalCaseInput,
   type EvaluationSubject,
 } from '@mediforce/platform-core';
-import type { EvaluatorSelfTest, ProposalView } from '@mediforce/platform-api/contract';
+import type { AddEvaluatorVersionInput, AgentRunChange, EvaluatorSelfTest, EvaluatorView, GetAgentRunIoOutput, ProposalView } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
-import { useStepEvaluationMutation, useStepEvaluators } from '@/hooks/use-step-evaluation';
+import { useAgentRunIo, useStepEvaluationMutation, useStepEvaluators } from '@/hooks/use-step-evaluation';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { ControlModeBadge } from '@/components/ui/control-mode-badge';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
+import { AgentRunChangeNote, CaseForm, EvaluatorForm, FormDialog, caseOwnerOfRun, evaluatorVersionChanges, outputText, type CaseFormResult, type EvaluatorFormResult } from './step-evaluation-sections';
+import { draftFromCheck } from './evaluator-check-editor';
 
 export type ProposalStatus = 'open' | 'accepted' | 'rejected';
 
@@ -37,7 +43,7 @@ const TITLES: Record<DecidableProposal['tool'], string> = {
   propose_evaluator: 'Evaluator',
   propose_evaluator_version: 'Evaluator version',
   propose_eval_case: 'Eval Case',
-  propose_perturbed_case: 'synthesized Eval Case',
+  propose_perturbed_case: 'Eval Case',
   propose_brief: 'Evaluation Brief',
   propose_acceptance_criteria: 'Acceptance Criteria',
 };
@@ -56,7 +62,7 @@ async function acceptProposal(step: EvaluationSubject, proposal: DecidablePropos
     case 'propose_eval_case': {
       const { agentRunId, input, containsProductionData, rationale: _rationale, ...written } = proposal.arguments;
       return agentRunId !== undefined
-        ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, ...(step.kind === 'step' ? { step } : {}), ...written, origin: 'assistant' })
+        ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, ...caseOwnerOfRun(step), ...written, origin: 'assistant' })
         : mediforce.evaluation.createCase({ ...step, ...written, input: input!, ...(containsProductionData === undefined ? {} : { containsProductionData }), origin: 'assistant' });
     }
     case 'propose_perturbed_case': {
@@ -72,51 +78,317 @@ async function acceptProposal(step: EvaluationSubject, proposal: DecidablePropos
   }
 }
 
-/** What trying a proposed check on the step's real outputs showed. */
+type PreviewOutcome = Extract<EvaluatorSelfTest, { results: unknown }>['results'][number];
+
+/** One output a proposed check was tried on, by the name it goes by. */
+function OutcomeLine({ name, outcome, negative = false, altered = [] }: { name: string; outcome: PreviewOutcome; negative?: boolean; altered?: readonly string[] }) {
+  return (
+    <li>
+      <span className="font-mono">{name}</span>{' '}
+      {negative === true && <span className="text-muted-foreground">(an output to avoid) </span>}
+      {altered.length > 0 && <span className="text-muted-foreground">(from a workflow that altered: {altered.join(', ')}) </span>}
+      <span className={cn(outcome.passed === true ? 'text-green-700 dark:text-green-400' : outcome.passed === false ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-300')}>
+        {outcome.passed === null ? 'error' : outcome.passed ? 'pass' : 'fail'}
+      </span>
+      {(outcome.error ?? outcome.comment) !== null && <span className="text-muted-foreground"> — {outcome.error ?? outcome.comment}</span>}
+    </li>
+  );
+}
+
+function tally(outcomes: readonly PreviewOutcome[]): string {
+  const count = (passed: boolean | null) => outcomes.filter((outcome) => outcome.passed === passed).length;
+  return `${count(true)} pass · ${count(false)} fail · ${count(null)} error`;
+}
+
+/** What trying a proposed check on the subject's Eval Cases and a step's real outputs showed. */
 function SelfTestSummary({ selfTest }: { selfTest: EvaluatorSelfTest }) {
   if ('unavailable' in selfTest) {
     return <p className="mt-1 text-amber-700 dark:text-amber-300">Not tried on real outputs — {selfTest.unavailable}</p>;
   }
-  const { results } = selfTest;
-  if (results.length === 0) return <p className="mt-1 text-muted-foreground">No production outputs yet to try it on.</p>;
-  const count = (passed: boolean | null) => results.filter((outcome) => outcome.passed === passed).length;
+  const { cases, results } = selfTest;
+  if (cases.length + results.length === 0) return <p className="mt-1 text-muted-foreground">No Eval Cases or production outputs yet to try it on.</p>;
   return (
     <details className="mt-1" data-testid="proposal-self-test">
       <summary className="cursor-pointer text-muted-foreground">
-        Tried on {results.length} recent output(s): {count(true)} pass · {count(false)} fail · {count(null)} error
+        Tried on {[
+          ...(cases.length === 0 ? [] : [`${cases.length} Eval Case(s): ${tally(cases)}`]),
+          ...(results.length === 0 ? [] : [`${results.length} recent output(s): ${tally(results)}`]),
+        ].join('; ')}
       </summary>
       <ul className="mt-1 space-y-0.5">
-        {results.map((outcome) => (
-          <li key={outcome.agentRunId}>
-            <span className="font-mono">{outcome.agentRunId.slice(0, 8)}</span>{' '}
-            <span className={cn(outcome.passed === true ? 'text-green-700 dark:text-green-400' : outcome.passed === false ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-300')}>
-              {outcome.passed === null ? 'error' : outcome.passed ? 'pass' : 'fail'}
-            </span>
-            {(outcome.error ?? outcome.comment) !== null && <span className="text-muted-foreground"> — {outcome.error ?? outcome.comment}</span>}
-          </li>
-        ))}
+        {cases.map((outcome) => <OutcomeLine key={outcome.caseId} name={outcome.caseName} outcome={outcome} negative={outcome.expectation === 'negative'} altered={outcome.changedFromAgent} />)}
+        {results.map((outcome) => <OutcomeLine key={outcome.agentRunId} name={outcome.agentRunId.slice(0, 8)} outcome={outcome} />)}
       </ul>
+      {cases.some((outcome) => outcome.changedFromAgent !== undefined) && (
+        <p className="mt-1 text-muted-foreground">Tried with each production run&rsquo;s log and workspace; an Eval Run starts from an empty workspace.</p>
+      )}
     </details>
   );
 }
 
-/** What a proposed case expects of the output, in a line; null when it gives no expected output. */
-function expectedOutputSummary(proposal: { expectedOutput?: unknown; expectation?: string; comparison?: string }): string | null {
-  if (proposal.expectedOutput === undefined || proposal.expectedOutput === null) return null;
+/** How a case's output is held to its expected output, e.g. "Must match, exactly". */
+function expectationPhrase(proposal: { expectation?: string; comparison?: string }): string {
   const how = proposal.comparison === 'agreement' ? 'by agreement score' : 'exactly';
-  return `${proposal.expectation === 'negative' ? 'Must not match' : 'Must match'}, ${how}: ${JSON.stringify(proposal.expectedOutput)}`;
+  return `${proposal.expectation === 'negative' ? 'Must not match' : 'Must match'}, ${how}`;
 }
 
-function perturbedCaseSummary(proposal: Proposal<'propose_perturbed_case'>['arguments']): string {
-  const changes = [
+type CaseProposal = Extract<DecidableProposal, { tool: 'propose_eval_case' | 'propose_perturbed_case' }>;
+
+interface ProposedCaseContent {
+  input: EvalCaseInput;
+  /** Null: no expected output, only the Evaluators grade the case. */
+  expectedOutput: unknown;
+  expectation: EvalCaseExpectation;
+  comparison: EvalCaseComparison;
+  agreementInstructions: string | null;
+}
+
+/**
+ * The input and expected output a proposed case is stored with — for a case
+ * from a run, the run's input and, once a person reviewed it, its output, as
+ * creating the case from the run takes them; for one synthesized from a run,
+ * the input its changes make of the run's. Null while the run loads.
+ */
+function proposedCaseContent(proposal: CaseProposal, sourceRun: GetAgentRunIoOutput | undefined): ProposedCaseContent | null {
+  if (proposal.tool === 'propose_perturbed_case') {
+    const { expectedOutput, expectation, comparison, agreementInstructions } = proposal.arguments;
+    return proposal.caseInput === undefined ? null : { input: proposal.caseInput, expectedOutput: expectedOutput ?? null, expectation, comparison: comparison ?? 'exact', agreementInstructions: agreementInstructions ?? null };
+  }
+  const args = proposal.arguments;
+  if (args.agentRunId === undefined) {
+    return { input: args.input!, expectedOutput: args.expectedOutput ?? null, expectation: args.expectation ?? 'positive', comparison: args.comparison ?? 'exact', agreementInstructions: args.agreementInstructions ?? null };
+  }
+  if (sourceRun === undefined) return null;
+  const fromRun = args.expectedOutput === undefined;
+  const expectation = args.expectation ?? (fromRun ? sourceRun.verdictExpectation : null) ?? 'positive';
+  const verdictApplies = fromRun && sourceRun.verdictExpectation === expectation;
+  return {
+    input: args.input ?? sourceRun.caseInput,
+    expectedOutput: fromRun ? (sourceRun.verdictExpectation === null ? null : sourceRun.result ?? null) : args.expectedOutput,
+    expectation,
+    comparison: args.comparison ?? (verdictApplies ? sourceRun.verdictComparison : null) ?? 'exact',
+    agreementInstructions: args.agreementInstructions === undefined ? (verdictApplies ? sourceRun.verdictAgreementInstructions : null) : args.agreementInstructions ?? null,
+  };
+}
+
+/** JSON cut to a few lines, fading out where it runs on; Review shows it whole. */
+function JsonPreview({ value, testId }: { value: unknown; testId: string }) {
+  const ref = React.useRef<HTMLPreElement>(null);
+  const [overflows, setOverflows] = React.useState(false);
+  const text = JSON.stringify(value, null, 2);
+  React.useLayoutEffect(() => {
+    if (ref.current !== null) setOverflows(ref.current.scrollHeight > ref.current.clientHeight);
+  }, [text]);
+  return (
+    <pre
+      ref={ref}
+      data-testid={testId}
+      className={cn(
+        'max-h-28 overflow-hidden whitespace-pre-wrap break-all rounded bg-muted/50 p-1.5 font-mono text-[11px]',
+        overflows && '[mask-image:linear-gradient(to_bottom,black_65%,transparent)]',
+      )}
+    >{text}</pre>
+  );
+}
+
+/** What a synthesized case changes of its run, a deleted file included: the input alone does not show a file change. */
+function perturbedChanges(proposal: Proposal<'propose_perturbed_case'>['arguments']): string {
+  return [
     ...(proposal.inputChanges ?? []).map((change) => `${change.op} ${[change.part, ...change.path].join('.')}`),
     ...(proposal.fileChanges ?? []).map((change) => `${change.op} ${change.path}`),
-  ];
-  return [
-    `${proposal.name} — ${proposal.perturbation.kind.replace(/_/g, ' ')}: ${proposal.perturbation.description}`,
-    `From run ${proposal.baseAgentRunId.slice(0, 8)}: ${changes.join('; ')}`,
-    ...[expectedOutputSummary(proposal)].filter((line) => line !== null),
-  ].join('\n');
+  ].join('; ');
+}
+
+/** A proposed Eval Case as it would be stored: where it comes from, why, its input and its expected output. */
+function ProposedCaseBody({ proposal, content, loadError, agentChange }: {
+  proposal: CaseProposal;
+  content: ProposedCaseContent | null;
+  /** Why the case's input could not be shown. */
+  loadError: string | null;
+  agentChange: AgentRunChange | undefined;
+}) {
+  const { arguments: args } = proposal;
+  const tags = proposal.tool === 'propose_perturbed_case'
+    ? [`Edge case of run ${proposal.arguments.baseAgentRunId.slice(0, 8)}`, proposal.arguments.perturbation.kind.replace(/_/g, ' ')]
+    : [proposal.arguments.agentRunId === undefined ? 'Written input' : `From run ${proposal.arguments.agentRunId.slice(0, 8)}`];
+  const notes = [proposal.tool === 'propose_perturbed_case' ? proposal.arguments.perturbation.description : undefined, args.rationale]
+    .filter((note) => note !== undefined);
+  const changes = proposal.tool === 'propose_perturbed_case' ? perturbedChanges(proposal.arguments) : '';
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="font-medium">{args.name}</span>
+        {[...tags, ...(args.split === undefined ? [] : [args.split])].map((tag) => (
+          <span key={tag} className="rounded bg-muted px-1.5 text-[11px] text-muted-foreground">{tag}</span>
+        ))}
+      </div>
+      {notes.map((note) => <p key={note} className="whitespace-pre-wrap text-muted-foreground">{note}</p>)}
+      <AgentRunChangeNote change={agentChange} />
+      {changes !== '' && <p className="text-muted-foreground" data-testid="proposed-case-changes">Changes: {changes}</p>}
+      {content === null ? (
+        loadError === null
+          ? <p className="text-muted-foreground">Loading the run&apos;s input and output…</p>
+          : <p className="text-destructive" data-testid="proposed-case-load-error">{loadError}</p>
+      ) : (
+        <>
+          <div className="space-y-0.5">
+            <div className="font-medium">Input</div>
+            <JsonPreview value={content.input} testId="proposed-case-input" />
+          </div>
+          <div className="space-y-0.5">
+            <div className="font-medium">
+              Expected output
+              {content.expectedOutput !== null && <span className="font-normal text-muted-foreground"> · {expectationPhrase(content)}</span>}
+            </div>
+            {content.expectedOutput === null
+              ? <p className="text-muted-foreground" data-testid="proposed-case-output">None — only the Evaluators grade it</p>
+              : <JsonPreview value={content.expectedOutput} testId="proposed-case-output" />}
+            {content.expectedOutput !== null && content.comparison === 'agreement' && content.agreementInstructions !== null && (
+              <p className="whitespace-pre-wrap text-muted-foreground" data-testid="proposed-case-instructions">On this case: {content.agreementInstructions}</p>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Adds a proposed case as a person edited it on Review, still the assistant's; a synthesized one keeps its file changes. */
+function createReviewedCase(step: EvaluationSubject, proposal: CaseProposal, values: CaseFormResult): Promise<unknown> {
+  if (proposal.tool === 'propose_perturbed_case') {
+    const { rationale: _rationale, ...synthesized } = proposal.arguments;
+    if (step.kind === 'agent') throw new Error('An agent evaluated on its own has no production run to perturb');
+    return mediforce.evaluation.createPerturbedCase({ ...step, ...synthesized, ...values, origin: 'assistant' });
+  }
+  const { agentRunId, containsProductionData } = proposal.arguments;
+  return agentRunId !== undefined
+    ? mediforce.evaluation.createCaseFromAgentRun({ agentRunId, ...caseOwnerOfRun(step), ...values, origin: 'assistant' })
+    : mediforce.evaluation.createCase({
+      ...step,
+      ...values,
+      ...(containsProductionData === undefined ? {} : { containsProductionData }),
+      origin: 'assistant',
+    });
+}
+
+function reviewInputHelp(step: EvaluationSubject, proposal: CaseProposal): string {
+  if (proposal.tool === 'propose_perturbed_case') {
+    const changes = perturbedChanges(proposal.arguments);
+    return changes === '' ? 'The run\'s input with the assistant\'s changes.' : `The run's input with the assistant's changes: ${changes}.`;
+  }
+  if (proposal.arguments.agentRunId === undefined) return 'The input the assistant wrote.';
+  return step.kind === 'agent' ? 'What the agent received in this run, as its one input.' : 'What the step received in this run.';
+}
+
+/** The proposed case in the form a person adds cases with; accepting it there adds it as edited, still the assistant's. */
+function ReviewProposedCase({ step, proposal, content, mayEdit, onAccepted, onClose }: {
+  step: EvaluationSubject;
+  proposal: CaseProposal;
+  content: ProposedCaseContent;
+  mayEdit: boolean;
+  onAccepted: () => void;
+  onClose: () => void;
+}) {
+  const evaluators = useStepEvaluators(step).data?.evaluators ?? [];
+  const accept = useStepEvaluationMutation(step, (values: CaseFormResult) => createReviewedCase(step, proposal, values));
+  const { arguments: args } = proposal;
+  return (
+    <FormDialog title="Review the proposed Eval Case" description="Edit it if it needs it; Accept adds it as it stands here." testId="case-dialog" onClose={onClose}>
+      <CaseForm
+        subject={step}
+        initial={{
+          name: args.name,
+          split: args.split ?? 'dev',
+          input: JSON.stringify(content.input, null, 2),
+          expectedOutput: outputText(content.expectedOutput),
+          expectation: content.expectation,
+          comparison: content.comparison,
+          agreementInstructions: content.agreementInstructions ?? '',
+          evaluatorIds: null,
+        }}
+        inputHelp={reviewInputHelp(step, proposal)}
+        evaluators={evaluators}
+        sourceAgentRunId={proposal.tool === 'propose_eval_case' ? proposal.arguments.agentRunId ?? null : null}
+        submitLabel="Accept"
+        pending={mayEdit === false || accept.isPending}
+        error={accept.error?.message ?? null}
+        onSubmit={(values) => accept.mutate(values, { onSuccess: onAccepted })}
+        onCancel={onClose}
+      />
+    </FormDialog>
+  );
+}
+
+type EvaluatorProposal = Proposal<'propose_evaluator'>;
+
+/** The proposed Evaluator in the form a person adds Evaluators with; accepting it there creates it as edited, still the assistant's. */
+function ReviewProposedEvaluator({ step, proposal, stepOutputSchema, mayEdit, onAccepted, onClose }: {
+  step: EvaluationSubject;
+  proposal: EvaluatorProposal;
+  stepOutputSchema: AgentOutputSchema | undefined;
+  mayEdit: boolean;
+  onAccepted: () => void;
+  onClose: () => void;
+}) {
+  const evaluators = useStepEvaluators(step).data?.evaluators ?? [];
+  const { name, rule, check, runInProduction } = proposal.arguments;
+  const accept = useStepEvaluationMutation(step, (values: EvaluatorFormResult) =>
+    mediforce.evaluation.createEvaluator({ ...step, ...values, ...(runInProduction === undefined ? {} : { runInProduction }), origin: 'assistant' }));
+  return (
+    <FormDialog title="Review the proposed Evaluator" description="Edit it if it needs it; Accept creates it as it stands here." testId="evaluator-dialog" onClose={onClose}>
+      <EvaluatorForm
+        initial={{ name, rule, draft: draftFromCheck(check) }}
+        schemaTaken={evaluators.some((evaluator) => evaluator.latest.check.kind === 'schema')}
+        stepOutputSchema={stepOutputSchema}
+        submitLabel="Accept"
+        pending={mayEdit === false || accept.isPending}
+        error={accept.error?.message ?? null}
+        onSubmit={(values) => accept.mutate(values, { onSuccess: onAccepted })}
+        onCancel={onClose}
+      />
+    </FormDialog>
+  );
+}
+
+/**
+ * The proposed version in the form a person edits an Evaluator with, over what
+ * it leaves unchanged; accepting it there saves what differs from the latest
+ * version as the new one, still the assistant's.
+ */
+function ReviewProposedEvaluatorVersion({ step, proposal, evaluator, stepOutputSchema, mayEdit, onAccepted, onClose }: {
+  step: EvaluationSubject;
+  proposal: Proposal<'propose_evaluator_version'>;
+  evaluator: EvaluatorView;
+  stepOutputSchema: AgentOutputSchema | undefined;
+  mayEdit: boolean;
+  onAccepted: () => void;
+  onClose: () => void;
+}) {
+  const { latest } = evaluator;
+  const { rule = latest.rule, check = latest.check } = proposal.arguments;
+  const [unchanged, setUnchanged] = React.useState(false);
+  const accept = useStepEvaluationMutation(step, (changes: Omit<AddEvaluatorVersionInput, 'evaluatorId' | 'origin'>) =>
+    mediforce.evaluation.addEvaluatorVersion({ evaluatorId: evaluator.id, ...changes, origin: 'assistant' }));
+  const onSubmit = (values: EvaluatorFormResult) => {
+    const changes = evaluatorVersionChanges(latest, values);
+    const nothingChanged = Object.keys(changes).length === 0;
+    setUnchanged(nothingChanged);
+    if (nothingChanged === false) accept.mutate(changes, { onSuccess: onAccepted });
+  };
+  return (
+    <FormDialog title={`Review the proposed ${evaluator.name} v${latest.version + 1}`} description={`Edit it if it needs it; Accept saves it as it stands here.${check.kind === 'code' ? ' The new version needs its source approved again before it counts, whatever changed.' : ''}`} testId="evaluator-dialog" onClose={onClose}>
+      <EvaluatorForm
+        initial={{ name: evaluator.name, rule, draft: draftFromCheck(check) }}
+        editing
+        stepOutputSchema={stepOutputSchema}
+        submitLabel="Accept"
+        pending={mayEdit === false || accept.isPending}
+        error={unchanged === true ? 'Nothing changed.' : accept.error?.message ?? null}
+        onSubmit={onSubmit}
+        onCancel={onClose}
+      />
+    </FormDialog>
+  );
 }
 
 function ProposalSummary({ step, proposal }: { step: EvaluationSubject; proposal: DecidableProposal }) {
@@ -143,25 +415,60 @@ function ProposalSummary({ step, proposal }: { step: EvaluationSubject; proposal
         </>
       );
     }
-    case 'propose_eval_case':
-      return <>{[proposal.arguments.name, expectedOutputSummary(proposal.arguments)].filter((line) => line !== null).join('\n')}</>;
-    case 'propose_perturbed_case':
-      return <>{perturbedCaseSummary(proposal.arguments)}</>;
     case 'propose_acceptance_criteria':
       return <>{describeAcceptanceCriteria(proposal.arguments.criteria)}{`\n${proposal.arguments.rationale}`}</>;
   }
 }
 
-export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
+function isCaseProposal(proposal: DecidableProposal): proposal is CaseProposal {
+  return proposal.tool === 'propose_eval_case' || proposal.tool === 'propose_perturbed_case';
+}
+
+function caseLoadError(proposal: CaseProposal, sourceRun: { isError: boolean; error: unknown }): string | null {
+  if (proposal.tool === 'propose_perturbed_case') return proposal.caseInput === undefined ? 'The input its changes make could not be worked out.' : null;
+  if (sourceRun.isError === false) return null;
+  return sourceRun.error instanceof Error ? sourceRun.error.message : 'The run\'s input and output could not be loaded.';
+}
+
+const CASE_LABELS = [
+  { id: 'positive', label: 'Positive' },
+  { id: 'negative', label: 'Negative' },
+  { id: 'none', label: 'No expected output' },
+] as const;
+type CaseLabel = (typeof CASE_LABELS)[number]['id'];
+
+/** The proposal as the person labelled it: its expected output to match, to avoid, or dropped; null leaves it as proposed. */
+function relabelled(proposal: DecidableProposal, label: CaseLabel | null): DecidableProposal {
+  if (label === null) return proposal;
+  if (proposal.tool === 'propose_perturbed_case') {
+    return { ...proposal, arguments: label === 'none' ? { ...proposal.arguments, expectedOutput: null } : { ...proposal.arguments, expectation: label } };
+  }
+  if (proposal.tool !== 'propose_eval_case') return proposal;
+  const { expectation: _expectation, ...args } = proposal.arguments;
+  return { ...proposal, arguments: label === 'none' ? { ...args, expectedOutput: null } : { ...args, expectation: label } };
+}
+
+export function ProposalCard({ step, state, stepOutputSchema, mayEdit, editReason, onDecided }: {
   step: EvaluationSubject;
   state: { proposal: DecidableProposal; status: ProposalStatus };
+  /** The step's `agent.outputSchema`, offered when a reviewed Evaluator becomes a schema check. */
+  stepOutputSchema?: AgentOutputSchema;
   mayEdit: boolean;
   editReason: string | undefined;
   onDecided: (status: ProposalStatus) => void;
 }) {
   const [error, setError] = React.useState<string | null>(null);
   const accept = useStepEvaluationMutation(step, (proposal: DecidableProposal) => acceptProposal(step, proposal));
-  const { proposal } = state;
+  const [caseLabel, setCaseLabel] = React.useState<CaseLabel | null>(null);
+  const [reviewing, setReviewing] = React.useState(false);
+  const proposal = relabelled(state.proposal, caseLabel);
+  const evaluators = useStepEvaluators(step).data?.evaluators;
+  const versionedEvaluator = proposal.tool === 'propose_evaluator_version' ? evaluators?.find((candidate) => candidate.id === proposal.arguments.evaluatorId) : undefined;
+  const sourceRun = useAgentRunIo(state.proposal.tool === 'propose_eval_case' ? state.proposal.arguments.agentRunId ?? null : null, step);
+  const proposedCase = isCaseProposal(state.proposal) ? proposedCaseContent(state.proposal, sourceRun.data) : null;
+  const caseContent = isCaseProposal(proposal) ? proposedCaseContent(proposal, sourceRun.data) : null;
+  const proposedLabel = proposedCase === null || proposedCase.expectedOutput === null ? null : proposedCase.expectation;
+  const shownLabel = caseLabel ?? proposedLabel;
 
   const onAccept = () => {
     setError(null);
@@ -174,10 +481,30 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
   return (
     <div className="rounded-md border bg-background p-2.5 text-xs" data-testid="proposal-card">
       <div className="mb-1 font-medium">Proposed {TITLES[proposal.tool]}</div>
-      {proposal.tool === 'propose_brief'
-        ? <MarkdownPresentation content={proposal.arguments.text} />
-        : <p className="whitespace-pre-wrap text-muted-foreground"><ProposalSummary step={step} proposal={proposal} /></p>}
+      {proposal.tool === 'propose_brief' && <MarkdownPresentation content={proposal.arguments.text} />}
+      {isCaseProposal(proposal) && <ProposedCaseBody
+          proposal={proposal}
+          content={caseContent}
+          loadError={caseLoadError(proposal, sourceRun)}
+          agentChange={proposal.tool === 'propose_eval_case' ? sourceRun.data?.agentChange : undefined}
+        />}
+      {proposal.tool !== 'propose_brief' && isCaseProposal(proposal) === false && (
+        <p className="whitespace-pre-wrap text-muted-foreground"><ProposalSummary step={step} proposal={proposal} /></p>
+      )}
       {proposal.selfTest !== undefined && <SelfTestSummary selfTest={proposal.selfTest} />}
+      {proposedLabel !== null && state.status === 'open' && (
+        <div role="group" aria-label="Expected output" className="mt-2 inline-flex overflow-hidden rounded border">
+          {CASE_LABELS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={shownLabel === option.id}
+              className={cn('px-2 py-0.5', shownLabel === option.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}
+              onClick={() => setCaseLabel(option.id)}
+            >{option.label}</button>
+          ))}
+        </div>
+      )}
       {error !== null && <p className="mt-1 text-destructive">{error}</p>}
       {state.status === 'open' ? (
         <div className="mt-2 flex gap-1.5">
@@ -188,6 +515,11 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
               </button>
             </span>
           </InstantTooltip>
+          {((isCaseProposal(proposal) && caseContent !== null) || proposal.tool === 'propose_evaluator' || versionedEvaluator !== undefined) && (
+            <button type="button" className={buttonClass} onClick={() => setReviewing(true)}>
+              <Eye className="h-3 w-3" />Review
+            </button>
+          )}
           <button type="button" className={buttonClass} onClick={() => onDecided('rejected')}>
             <X className="h-3 w-3" />Reject
           </button>
@@ -196,6 +528,46 @@ export function ProposalCard({ step, state, mayEdit, editReason, onDecided }: {
         <p className={cn('mt-1.5 font-medium', state.status === 'accepted' ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground')}>
           {state.status === 'accepted' ? 'Accepted' : 'Rejected'}
         </p>
+      )}
+      {reviewing && isCaseProposal(proposal) && caseContent !== null && (
+        <ReviewProposedCase
+          step={step}
+          proposal={proposal}
+          content={caseContent}
+          mayEdit={mayEdit}
+          onAccepted={() => {
+            setReviewing(false);
+            onDecided('accepted');
+          }}
+          onClose={() => setReviewing(false)}
+        />
+      )}
+      {reviewing && proposal.tool === 'propose_evaluator_version' && versionedEvaluator !== undefined && (
+        <ReviewProposedEvaluatorVersion
+          step={step}
+          proposal={proposal}
+          evaluator={versionedEvaluator}
+          stepOutputSchema={stepOutputSchema}
+          mayEdit={mayEdit}
+          onAccepted={() => {
+            setReviewing(false);
+            onDecided('accepted');
+          }}
+          onClose={() => setReviewing(false)}
+        />
+      )}
+      {reviewing && proposal.tool === 'propose_evaluator' && (
+        <ReviewProposedEvaluator
+          step={step}
+          proposal={proposal}
+          stepOutputSchema={stepOutputSchema}
+          mayEdit={mayEdit}
+          onAccepted={() => {
+            setReviewing(false);
+            onDecided('accepted');
+          }}
+          onClose={() => setReviewing(false)}
+        />
       )}
     </div>
   );

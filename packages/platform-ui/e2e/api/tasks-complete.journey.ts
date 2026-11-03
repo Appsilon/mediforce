@@ -112,4 +112,131 @@ test.describe('POST /api/tasks/[taskId]/complete — verdict variant', () => {
     // Engine-side companion the user-facing audit log relies on.
     expect(actions).toContain('task.created');
   });
+
+  test('the comment setting of the step decides which verdicts need a comment', async ({ request }) => {
+    const headers = { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' };
+    const wdName = `e2e-complete-comment-${Date.now()}`;
+    const createWdRes = await request.post(
+      `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
+      {
+        headers,
+        data: {
+          name: wdName,
+          title: 'Comment setting E2E',
+          steps: [
+            {
+              id: 'review',
+              name: 'Review',
+              type: 'review',
+              executor: 'human',
+              allowedRoles: ['operator'],
+              comment: { requiredForVerdicts: ['approve'] },
+              verdicts: { approve: { target: 'done' }, revise: { target: 'done' } },
+            },
+            { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+          ],
+          transitions: [],
+        },
+      },
+    );
+    expect(createWdRes.status(), await createWdRes.text()).toBe(201);
+
+    const triggerRes = await request.post('/api/processes', {
+      headers,
+      data: {
+        namespace: TEST_ORG_HANDLE,
+        definitionName: wdName,
+        triggeredBy: 'e2e-test',
+        triggerName: 'Start',
+      },
+    });
+    expect(triggerRes.status(), await triggerRes.text()).toBe(201);
+    const { run } = (await triggerRes.json()) as { run: { id: string } };
+
+    const task = await pollUntil(
+      async () => {
+        const tasksRes = await request.get(`/api/tasks?instanceId=${run.id}`, { headers });
+        const { tasks } = (await tasksRes.json()) as {
+          tasks: Array<{ id: string; verdicts?: Array<{ key: string; requiresComment: boolean }> }>;
+        };
+        return tasks[0] ?? null;
+      },
+      POLL_OPTIONS,
+    );
+    expect(
+      Object.fromEntries(task.verdicts?.map(({ key, requiresComment }) => [key, requiresComment]) ?? []),
+    ).toEqual({ approve: true, revise: false });
+
+    const rejected = await request.post(`/api/tasks/${task.id}/complete`, {
+      headers,
+      data: { kind: 'verdict', verdict: 'approve' },
+    });
+    expect(rejected.ok(), await rejected.text()).toBe(false);
+
+    const accepted = await request.post(`/api/tasks/${task.id}/complete`, {
+      headers,
+      data: { kind: 'verdict', verdict: 'revise' },
+    });
+    expect(accepted.status(), await accepted.text()).toBe(200);
+  });
+
+  test('the comment setting applies to a human step with no verdicts of its own', async ({ request }) => {
+    const headers = { 'X-Api-Key': API_KEY, 'Content-Type': 'application/json' };
+    const wdName = `e2e-complete-comment-no-verdicts-${Date.now()}`;
+    const createWdRes = await request.post(
+      `/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`,
+      {
+        headers,
+        data: {
+          name: wdName,
+          title: 'Comment setting without verdicts E2E',
+          steps: [
+            {
+              id: 'review',
+              name: 'Review',
+              type: 'creation',
+              executor: 'human',
+              allowedRoles: ['operator'],
+              comment: { requiredForVerdicts: [] },
+            },
+            { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+          ],
+          transitions: [{ from: 'review', to: 'done' }],
+        },
+      },
+    );
+    expect(createWdRes.status(), await createWdRes.text()).toBe(201);
+
+    const triggerRes = await request.post('/api/processes', {
+      headers,
+      data: {
+        namespace: TEST_ORG_HANDLE,
+        definitionName: wdName,
+        triggeredBy: 'e2e-test',
+        triggerName: 'Start',
+      },
+    });
+    expect(triggerRes.status(), await triggerRes.text()).toBe(201);
+    const { run } = (await triggerRes.json()) as { run: { id: string } };
+
+    const task = await pollUntil(
+      async () => {
+        const tasksRes = await request.get(`/api/tasks?instanceId=${run.id}`, { headers });
+        const { tasks } = (await tasksRes.json()) as {
+          tasks: Array<{ id: string; verdicts?: Array<{ key: string; requiresComment: boolean }> }>;
+        };
+        return tasks[0] ?? null;
+      },
+      POLL_OPTIONS,
+    );
+    expect(
+      Object.fromEntries(task.verdicts?.map(({ key, requiresComment }) => [key, requiresComment]) ?? []),
+    ).toEqual({ approve: false, revise: false });
+
+    const accepted = await request.post(`/api/tasks/${task.id}/complete`, {
+      headers,
+      data: { kind: 'verdict', verdict: 'revise' },
+    });
+    expect(accepted.status(), await accepted.text()).toBe(200);
+  });
 });

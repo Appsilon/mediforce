@@ -55,6 +55,42 @@ describe('syncFromOpenRouter', () => {
     vi.restoreAllMocks();
   });
 
+  it('records the parameters a model takes, such as whether it can constrain its answer to a JSON Schema', async () => {
+    stubOpenRouter({
+      models: [
+        makeFakeModel({ id: 'test/structured', supported_parameters: ['tools', 'response_format', 'structured_outputs'] }),
+        makeFakeModel({ id: 'test/plain', supported_parameters: ['tools', 'response_format'] }),
+      ],
+    });
+    const written: CreateModelRegistryEntryInput[] = [];
+
+    await syncFromOpenRouter(makeRepo({
+      bulkUpsert: async (items) => {
+        written.push(...items);
+        return items.length;
+      },
+    }));
+
+    expect(written.map((entry) => [entry.id, entry.supportedParameters])).toEqual([
+      ['test/structured', ['tools', 'response_format', 'structured_outputs']],
+      ['test/plain', ['tools', 'response_format']],
+    ]);
+  });
+
+  it('leaves a model\'s parameters unknown when OpenRouter does not list them', async () => {
+    stubOpenRouter({ models: [makeFakeModel({ supported_parameters: undefined })] });
+    const written: CreateModelRegistryEntryInput[] = [];
+
+    await syncFromOpenRouter(makeRepo({
+      bulkUpsert: async (items) => {
+        written.push(...items);
+        return items.length;
+      },
+    }));
+
+    expect(written[0]?.supportedParameters).toBeUndefined();
+  });
+
   it('writes request counts from the rankings feed, which the model catalogue does not carry', async () => {
     stubOpenRouter({
       models: [makeFakeModel()],

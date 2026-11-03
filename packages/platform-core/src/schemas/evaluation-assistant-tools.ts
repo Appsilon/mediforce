@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   AcceptanceCriteriaSchema,
+  CodeCheckSchema,
   EvalCaseComparisonSchema,
   EvalCaseExpectationSchema,
   EvalCaseInputSchema,
@@ -9,12 +10,14 @@ import {
   EvaluatorCheckSchema,
   EvaluatorKindSchema,
   EvaluatorSchema,
+  ExpectedOutputCheckSchema,
+  LlmJudgeCheckSchema,
   PerturbedEvalCaseSpecSchema,
+  SchemaCheckSchema,
   WorkspaceFilePathSchema,
   hasPerturbationChange,
   type EvaluationSubject,
 } from './evaluation';
-import { FALLBACK_PINNED_MODEL } from './model-registry';
 
 /**
  * The Evaluation Assistant's tools (ADR-0023 D14, D15), by what the assistant
@@ -29,17 +32,38 @@ import { FALLBACK_PINNED_MODEL } from './model-registry';
  * verdict: D15 keeps those human, so there is no tool to call.
  */
 
-const AssistantCheckSchema = EvaluatorCheckSchema.describe(
-  'A JSON object, not a string or JSON-encoded string. For code use {"kind":"code","runtime":"python","source":"...script..."}; only source is a string. Choose schema, code or llm_judge and include that kind\'s required fields.',
-).meta({ examples: [
+const SCRIPTED_CHECK_EXAMPLES = [
   { kind: 'schema', schema: { required: ['findings'] } },
   {
     kind: 'code', runtime: 'python',
     source: 'import json\nwith open("/output/input.json") as handle:\n    data = json.load(handle)\nwith open("/output/result.json", "w") as handle:\n    json.dump({"passed": "findings" in data["result"]}, handle)',
   },
-  { kind: 'llm_judge', model: FALLBACK_PINNED_MODEL, rubric: 'Does the result explain its findings?', minConfidence: 0.8 },
-  { kind: 'expected_output', model: FALLBACK_PINNED_MODEL, instructions: 'Wording of free text is trivial; a changed grade or term is not.', minAgreement: 0.9, maxAgreement: 0.1 },
+];
+
+/** A judge's model is the platform's pinned default unless the person asked for one. */
+const AssistantJudgeModelSchema = z.string().min(1).optional()
+  .describe('Leave out: the platform sets the pinned default model. Set it only to the model the person asked for.');
+
+const AssistantCheckSchema = z.discriminatedUnion('kind', [
+  SchemaCheckSchema,
+  CodeCheckSchema,
+  LlmJudgeCheckSchema.extend({ model: AssistantJudgeModelSchema }),
+  ExpectedOutputCheckSchema.extend({ model: AssistantJudgeModelSchema }),
+]).describe(
+  'A JSON object, not a string or JSON-encoded string. For code use {"kind":"code","runtime":"python","source":"...script..."}; only source is a string. Choose schema, code or llm_judge and include that kind\'s required fields.',
+).meta({ examples: [
+  ...SCRIPTED_CHECK_EXAMPLES,
+  { kind: 'llm_judge', rubric: 'Does the result explain its findings?', minConfidence: 0.8 },
+  { kind: 'expected_output', instructions: 'Wording of free text is trivial; a changed grade or term is not.', minAgreement: 0.9, maxAgreement: 0.1 },
 ] });
+
+/** A check the assistant may preview: a judge or an expected-output check is never previewed by it. */
+const PreviewableCheckSchema = z.discriminatedUnion('kind', [SchemaCheckSchema, CodeCheckSchema]).describe(
+  'A JSON object, not a string or JSON-encoded string: schema or code only — a judge is proposed untried. For code use {"kind":"code","runtime":"python","source":"...script..."}; only source is a string.',
+).meta({ examples: SCRIPTED_CHECK_EXAMPLES });
+
+/** A check as the assistant proposes it: a judge may leave its model to the platform. */
+export type AssistantCheck = z.infer<typeof AssistantCheckSchema>;
 
 /** Models name rules in prose or snake_case; an Evaluator's name is kebab-case. */
 const AssistantEvaluatorNameSchema = z.string()
@@ -47,11 +71,11 @@ const AssistantEvaluatorNameSchema = z.string()
   .transform((name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').slice(0, 63).replace(/-+$/, ''))
   .pipe(EvaluatorSchema.shape.name);
 
-/** Propose an Evaluator for the step. */
+/** Propose an Evaluator for the step — as its card holds it, with the check that will be saved. */
 export const ProposeEvaluatorToolSchema = z.object({
   name: AssistantEvaluatorNameSchema,
   rule: z.string().min(1).max(2000),
-  check: AssistantCheckSchema,
+  check: EvaluatorCheckSchema,
   /** Why this check, and what its preview showed. */
   rationale: z.string().max(1000).optional(),
   runInProduction: z.boolean().optional()
@@ -61,8 +85,12 @@ export const ProposeEvaluatorToolSchema = z.object({
 /** Propose an Eval Case: from a production Agent Run, or written out. */
 export const ProposeEvalCaseToolSchema = z.object({
   name: z.string().min(1).max(200),
-  agentRunId: z.string().min(1).optional(),
-  input: EvalCaseInputSchema.optional(),
+  agentRunId: z.string().min(1)
+    .describe('Harvest this production run: the case takes the run\'s own input — do not also send input. Override its expected output with expectedOutput.')
+    .optional(),
+  input: EvalCaseInputSchema
+    .describe('A written input, instead of agentRunId.')
+    .optional(),
   /** The output the step should return — or, for a negative case, must not return. */
   expectedOutput: EvalCaseLabelSchema.shape.expectedOutput.optional(),
   expectation: EvalCaseExpectationSchema.optional(),
@@ -74,7 +102,7 @@ export const ProposeEvalCaseToolSchema = z.object({
     .describe('true when the written input is copied from, or built on, a production run\'s data'),
   rationale: z.string().max(1000).optional(),
 }).refine((value) => (value.agentRunId === undefined) !== (value.input === undefined), {
-  message: 'give exactly one of agentRunId (harvest a production run) or input (a written case)',
+  message: 'give exactly one of agentRunId (harvest a production run) or input (a written case) — to keep a run\'s own input, send its agentRunId and drop input',
 });
 
 /** Propose a new version of the step's Evaluation Brief. */
@@ -105,20 +133,33 @@ export const ProposeEvaluationPlanToolSchema = z.object({
 });
 
 /** Propose a new version of an existing Evaluator — a refined rule or rubric. */
-export const ProposeEvaluatorVersionToolSchema = z.object({
+const EvaluatorVersionProposalSchema = z.object({
   evaluatorId: z.uuid(),
   rule: z.string().min(1).max(2000).optional(),
   check: EvaluatorCheckSchema.optional(),
   /** What changed and why — a judge rationale a person denied, a preview. */
   rationale: z.string().max(1000).optional(),
-}).refine((value) => value.rule !== undefined || value.check !== undefined, {
-  message: 'change at least one of rule or check',
 });
+
+const changesRuleOrCheck = (value: { rule?: string; check?: unknown }) => value.rule !== undefined || value.check !== undefined;
+const CHANGE_RULE_OR_CHECK = { message: 'change at least one of rule or check' };
+
+/** As its card holds it, with the check that will be saved. */
+export const ProposeEvaluatorVersionToolSchema = EvaluatorVersionProposalSchema
+  .refine(changesRuleOrCheck, CHANGE_RULE_OR_CHECK);
+
+/** The Evaluator proposals as the assistant sends them: a judge may leave its model to the platform, which completes the card. */
+const AssistantProposeEvaluatorSchema = ProposeEvaluatorToolSchema.extend({ check: AssistantCheckSchema });
+const AssistantProposeEvaluatorVersionSchema = EvaluatorVersionProposalSchema
+  .extend({ check: AssistantCheckSchema.optional() })
+  .refine(changesRuleOrCheck, CHANGE_RULE_OR_CHECK);
 
 /** Propose a case synthesized from a production run by changing its input or workspace. */
 export const ProposePerturbedCaseToolSchema = PerturbedEvalCaseSpecSchema.extend({
   rationale: z.string().max(1000).optional(),
-}).refine(hasPerturbationChange, { message: 'give at least one inputChanges or fileChanges entry' });
+}).refine(hasPerturbationChange, {
+  message: 'give at least one inputChanges or fileChanges entry — to change only the expected output (an error planted in a run\'s output), use propose_eval_case with agentRunId and expectedOutput',
+});
 
 /**
  * Propose the step's Acceptance Criteria (D10): the minimum pass rate every
@@ -191,8 +232,8 @@ export const ProposeDiagnosisToolSchema = z.object({
 
 export const EVALUATION_ASSISTANT_PROPOSAL_TOOLS = {
   propose_evaluation_plan: ProposeEvaluationPlanToolSchema,
-  propose_evaluator: ProposeEvaluatorToolSchema,
-  propose_evaluator_version: ProposeEvaluatorVersionToolSchema,
+  propose_evaluator: AssistantProposeEvaluatorSchema,
+  propose_evaluator_version: AssistantProposeEvaluatorVersionSchema,
   propose_eval_case: ProposeEvalCaseToolSchema,
   propose_perturbed_case: ProposePerturbedCaseToolSchema,
   propose_brief: ProposeBriefToolSchema,
@@ -202,6 +243,8 @@ export const EVALUATION_ASSISTANT_PROPOSAL_TOOLS = {
 } as const;
 
 const NoArguments = z.object({});
+const WorkspaceMomentSchema = z.enum(['start', 'end']).default('start')
+  .describe('"start": the workspace the run started from. "end": the workspace the run left, with the files it wrote.');
 
 export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
   /**
@@ -218,12 +261,16 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
   get_agent: NoArguments,
   /**
    * The Steps that use the Agent, with what each adds to it, and their recent
-   * finished production Agent Runs — the input each was given and the
-   * reviewer's verdict — to write the Agent's cases from.
+   * finished production Agent Runs — the input each was given, what its Step
+   * changes about the Agent and the reviewer's verdict — to take the Agent's
+   * cases from.
    */
   list_agent_production_runs: z.object({ limit: z.number().int().min(1).max(50).optional() }),
-  /** Recent finished production Agent Runs of the step, with the reviewer's verdict where there was one. */
-  list_step_runs: z.object({ limit: z.number().int().min(1).max(50).optional() }),
+  /** Recent Workflow Runs of the step, each with the step's finished Agent Runs oldest first — one per review round — and the reviewer's verdict on each. */
+  list_step_runs: z.object({
+    limit: z.number().int().min(1).max(50).optional()
+      .describe('How many of the step\'s recent Agent Runs to sample (default 10); each brings every review round of its Workflow Run, so fewer Workflow Runs may come back.'),
+  }),
   /** One Agent Run: status, fallback, input it was given and the result it produced. */
   get_agent_run: z.object({ agentRunId: z.string().min(1) }),
   /** The tool calls and results of one Agent Run. */
@@ -234,10 +281,10 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
     limit: z.number().int().min(1).max(150).default(50)
       .describe('Maximum number of complete entries per page (1–150; default 50). Use a smaller limit for large tool payloads.'),
   }).describe('Read an Agent Run trajectory in stored order, including system and thinking entries, without truncating entry content. Returns { entries, total, nextOffset }; total is the full entry count. Request subsequent pages using nextOffset as offset until nextOffset is null. An offset at or beyond total returns an empty page with nextOffset null.'),
-  /** Files of the workspace an Agent Run started from — what a case from it would start from. */
-  list_workspace_files: z.object({ agentRunId: z.string().min(1) }),
-  /** One text file of that workspace. */
-  read_workspace_file: z.object({ agentRunId: z.string().min(1), path: WorkspaceFilePathSchema }),
+  list_workspace_files: z.object({ agentRunId: z.string().min(1), at: WorkspaceMomentSchema })
+    .describe('List the files of an Agent Run\'s workspace. at "start" (default) is the workspace the run started from — what a case from it starts from; at "end" it also holds the files the run wrote (its changedFiles). Refuses a run that gave no result.'),
+  read_workspace_file: z.object({ agentRunId: z.string().min(1), path: WorkspaceFilePathSchema, at: WorkspaceMomentSchema })
+    .describe('Read one text file of an Agent Run\'s workspace. A file the run wrote (its changedFiles) is there only at "end"; at "start" (default) is the workspace the run started from. Refuses a run that gave no result.'),
   list_evaluators: NoArguments,
   list_eval_cases: NoArguments,
   list_eval_runs: NoArguments,
@@ -249,10 +296,11 @@ export const EVALUATION_ASSISTANT_PLATFORM_TOOLS = {
    * case and the Evaluators that failed or errored on it.
    */
   get_failures: z.object({ evalRunId: z.uuid() }),
-  /** Run a draft check against existing outputs; writes nothing. */
+  /** Run a draft check against the Eval Cases, then a step's recent outputs; writes nothing. */
   preview_evaluator: z.object({
-    check: AssistantCheckSchema,
-    agentRunIds: z.array(z.string().min(1)).min(1).max(10).optional(),
+    check: PreviewableCheckSchema,
+    agentRunIds: z.array(z.string().min(1)).min(1).max(10).optional()
+      .describe('Only these production runs of a step, and no Eval Case; an agent takes none'),
   }),
   /**
    * Prepare an Eval Run of the step as it is over the newest Dataset version,
@@ -297,7 +345,8 @@ const SHARED_PROPOSALS = [
  * executor serve both: a Step reads its own production runs and workspaces,
  * previews checks on them, synthesizes cases from them and recommends a
  * Control Mode; an Agent (ADR-0029) reads itself and the production runs of
- * the Steps that use it, to write its cases from.
+ * the Steps that use it, to write its cases from, and previews checks on its
+ * Eval Cases alone (ADR-0031).
  */
 export const EVALUATION_ASSISTANT_TOOLSETS = {
   step: {
@@ -305,7 +354,7 @@ export const EVALUATION_ASSISTANT_TOOLSETS = {
     proposals: [...SHARED_PROPOSALS, 'propose_perturbed_case', 'propose_control_settings'],
   },
   agent: {
-    platform: ['get_agent', 'list_agent_production_runs', ...READ_RUNS, ...READ_EVALUATION, ...RUN_EVALUATION],
+    platform: ['get_agent', 'list_agent_production_runs', ...READ_RUNS, ...READ_EVALUATION, 'preview_evaluator', ...RUN_EVALUATION],
     proposals: SHARED_PROPOSALS,
   },
 } as const satisfies Record<EvaluationSubject['kind'], EvaluationAssistantToolset>;

@@ -1,7 +1,7 @@
 ---
 status: living
 audience: engineers
-last_reviewed: 2026-10-16
+last_reviewed: 2026-10-30
 ---
 
 # Step Evaluation — manual test guide
@@ -128,23 +128,36 @@ Legend: ✅ expected · 🔍 try to break it · 🧪 in the sandbox workflow
 
 ## 1. The Evaluation tab at a glance
 
-Top to bottom, left column; the **Evaluation Assistant** is the right-hand panel.
+A status strip on top, three tabs under it; the **Evaluation Assistant** is the right-hand panel.
 
-| Section | What it is for |
+A step with nothing set up yet first offers **Guided setup** (Brief → Eval Cases → Evaluators →
+Summary, the assistant drafting each) or **Set up manually** (the tabs below).
+
+- ✅ **Guided setup** → **For some** on *Do you know the correct outputs?* adds `matches-expected-output`; add a case
+  from a run; **Summary** → set 90% → **Save** opens the tabs with criteria ≥ 90% and Dataset v1.
+- 🔍 Pick **For some** twice, or come back to the stage: still one `matches-expected-output`.
+- 🔍 Ask the assistant on **Brief**, then open **Eval Cases**: its conversation starts empty; back on **Brief**,
+  the earlier one is still there.
+- ✅ **Evaluators** → **Propose checks**: Evaluator cards arrive one at a time, each schema or code one already
+  previewed and each judge marked untried, ready to accept — no plan card, no **Draft this check**.
+
+| Part | What it is for |
 |---|---|
 | Drift banner | Amber warning when production quality drops (only shown while an Evaluator drifts) |
-| Validation status | **Validation passed** / **failed** / **Waiting for human approval** / **Not verified**, read from the newest finished Eval Run and its sign-off; click for the signed Step Qualification |
-| Set the threshold | The Acceptance Criteria floor, one slider |
-| Evaluators | The checks that grade an output (schema / code / LLM judge / expected output) |
-| Eval Cases | Test inputs, saved into numbered Datasets |
-| Eval Runs | Run the step on a Dataset, read the report, sign |
+| Validation status (strip) | **Validation passed** / **failed** / **Waiting for human approval** / **Not verified**, read from the newest finished Eval Run and its sign-off; click for the signed Step Qualification |
+| Acceptance Criteria (strip) | The floor in one line; **Edit** opens one slider |
+| Dataset (strip) | The saved Dataset the next Eval Run takes |
+| Unapproved banner | How many Code Evaluators do not count yet; **Review** opens the Evaluators tab |
+| Eval Runs tab | Run the step on a Dataset, read the report, sign — open by default once a run exists |
+| Eval Cases tab | Test inputs, saved into numbered Datasets — open by default before any run |
+| Evaluators tab | The checks that grade an output (schema / code / LLM judge / expected output) |
 
 The Evaluation Brief is behind the file icon in the assistant's header. The natural order is
 **Evaluators → Cases → MCP → Eval Run → Report → Criteria → Qualification → Production**, which is
 the order below.
 
 **Permissions (test once for the whole tab).** 🔍 As the **view-only** user: no *Add / Edit /
-Approve source / Save / Set the threshold / Start / Confirm that evaluation passed·failed / Overwrite the evaluation verdict* controls; assistant
+Approve source / Save / Edit (Acceptance Criteria) / Start / Confirm that evaluation passed·failed / Overwrite the evaluation verdict* controls; assistant
 card *Accept* buttons are disabled with a tooltip.
 
 ---
@@ -173,17 +186,24 @@ save. Every save is a new version. **CLI** `mediforce eval brief-get|brief-set`.
 - `schema` — JSON Schema on the result;
 - `code` — a small Python/JS script reading `/output/input.json` (and the run workspace), writing
   `{passed, comment}`;
-- `llm_judge` — a model grading against a rubric, answering pass/fail with a confidence;
+- `llm_judge` — a model grading against a rubric, from the input, the agent's log, the result and
+  the text files the step wrote (such as a report), answering pass/fail with a confidence;
 - `expected_output` — the output compared with the case's expected output: exact, or an agreement score.
 
 **Counts.** `schema`, `llm_judge` and `expected_output` count at once; `code` counts after a person
 clicks *Approve source*. An `llm_judge` verdict below its minimum confidence is left out of the
 pass rate until a person accepts it (§6.1).
 
-**How.** **Evaluators → Add** → kind, name, rule, and the kind's fields. **Details** shows the
-whole check and its versions; **Edit** saves a new version. *Archive* removes one.
+**How.** **Evaluators → Add** → kind, name, rule, and the kind's fields. The Evaluators are a
+table; **Details** opens the whole check and its versions under the row; **Edit** saves a new
+version. *Archive* removes one.
 
 **Test**
+- ✅ Evaluators are a table: **Evaluator** (name and rule), **Type**, **Version**, **Status**
+  (*Counts* / *Not counted — …*) and **In production** (checkbox, or *never* for
+  `expected_output` and for an Agent's Evaluators).
+- ✅ Clicking a header sorts by it (asc → desc → as listed); the funnel on **Type**, **Status** or
+  **In production** filters the rows, and **Clear filters** brings them back when none match.
 - ✅ schema → **Counts** immediately.
 - ✅ code → *Not counted — …* + **Approve source**; expand *Source*, approve → **Counts**.
 - ✅ llm_judge → **Counts**; the minimum confidence defaults to 0.8.
@@ -193,19 +213,28 @@ whole check and its versions; **Edit** saves a new version. *Archive* removes on
 
 ### 3.1 Evaluators from the assistant (previewed)
 
-**What.** The assistant proposes checks; each one is **tried on recent real outputs** (up to 5)
-before you see it, so the card shows how many passed / failed / errored. A check that errors on
-every output goes back to the assistant instead of to you.
+**What.** The assistant proposes checks; each schema or code check is **tried on up to 2 outputs**
+before you see it — the step's Eval Cases first (each case's expected output, graded as its source
+run's), then recent production outputs that gave a result — so the card shows how many passed /
+failed / errored on each. A check that errors on every output goes back to the assistant instead of
+to you. A judge is not tried: its card says so, on the pinned default model unless you asked for
+another.
 
 **Test**
 - *"Make an evaluation plan for this step"* → ✅ progress lines ("Reading the step", "Previewing a
   check on real runs"…), then a **plan card**: risks highest first, each with a cheapest check.
   *Draft this check* → an **Evaluator** card with the preview summary; *Use as Acceptance Criteria*
   sets the suggested floor.
-- *Accept* → ✅ listed with `· from the assistant`. *Edit* the JSON, then *Accept* → ✅ your edited
+- *Accept* → ✅ listed with `· from the assistant`. *Review*, edit it in the form, then *Accept* → ✅ your edited
   version is saved.
+- With Eval Cases taken from runs → ✅ the summary reads *Tried on N Eval Case(s): … ; M recent
+  output(s): …*, each case by name; a run that escalated or was cancelled is never among them.
 - *"Refine the <name> evaluator"* → ✅ **Proposed Evaluator version** card; accepting bumps to v2.
 - 🔍 As a user without the `run` verb: the card says the check was not tried.
+- *"Add a judge for whether each grade is justified"* → ✅ an **llm_judge** card marked *not tried*,
+  its model the newest Claude Sonnet; no judge call is made. *"…using openai/gpt-5"* → ✅ that model.
+  With the model registry synced, a model it does not list → 🔍 the assistant says so instead of
+  proposing it.
 
 > 🧪 Add the four checks above: `output-schema` → *Counts*; approve the source of the two code
 > checks → *Counts*; `grade-justified` → *Counts*. Ask the assistant for a rule such as *"no
@@ -230,10 +259,17 @@ numbered Dataset; an Eval Run uses exactly that version.
 
 With an expected output, the form also sets whether the output must match it and how it is
 compared; **Checked by** picks **All evaluators** or **Only these**. **Edit** replaces a case
-with a new one; **Archive** takes it out of the next save. Ticking cases and **Set evaluators…** sets them in bulk.
+with a new one; **Remove** takes it out of the next save. Ticking cases and **Set evaluators…** sets them in bulk.
 
 **Test**
-- ✅ Cases show their labels (positive/negative, split, source) and *as run* / *edited*.
+- ✅ Cases are a table: **Case** (with *from run* / *edited from run*), **Type** (positive /
+  negative / input only), **Comparison** (Exact match / By meaning) and
+  **Graded by** (*All N* or a count).
+- ✅ Clicking **Case** sorts by name (asc → desc → as listed); the funnel on **Type** filters, e.g.
+  untick *Positive* → only negative and input-only cases remain; add a positive case → it is
+  still hidden, add an input-only one → it shows.
+- ✅ Clicking **Graded by** opens the Evaluators' names; **Details** opens the input, expected
+  output and source run log under the row.
 - ✅ Editing a production case's input turns it `manual` and keeps its source run.
 - ✅ **Save** → a Dataset version; add or edit one case → the tab marks it *unsaved* and says the
   next run is behind the list; **Save** is disabled while the newest version has every live case.
@@ -259,8 +295,9 @@ one the step must *not* return: it passes when the new output differs (exact) or
 `maxAgreement` or below (agreement).
 
 **Where a negative comes from.** A reviewer who **rejects** a run makes its case negative
-(`case-from-run`; the form starts negative for a rejected run). A run sent back for revision, or
-never reviewed, gives no expected output — choose the expectation yourself
+(`case-from-run`; the form starts negative for a rejected run). A run sent back with `revise` is
+negative too, on the input of the review's first round, compared by meaning with the reviewer's
+comment and any param values as its agreement instructions. A run never reviewed gives no expected output — choose the expectation yourself
 (`case-from-run --expectation`).
 
 **Inputs that produce bad outputs.** Samples 10–16 target gaps in the prompt. Results on Gemma 4
@@ -376,12 +413,12 @@ Open a run with **Details**: **Summary**, **Trials**, **Evaluators**, **Model ve
 graded trials (8 of 10 meets 0.8), and optionally a minimum pass^k. Versioned; an Eval Run
 freezes the version in force when it is prepared. With none set, the default is 100%.
 
-**How.** **Set the threshold** → one slider from 0 to 100% → **Save** (a new version; the slider
+**How.** **Edit** beside Acceptance Criteria in the status strip → one slider from 0 to 100% → **Save** (a new version; the slider
 keeps an existing pass^k, which only the CLI, API and assistant set). Or the assistant: *"Propose
 acceptance criteria"*, or *Use as Acceptance Criteria* on a plan card.
 
 **Test**
-- ✅ The button's tooltip lists the floors in force.
+- ✅ The strip states the floor in force; its tooltip spells it out.
 - ✅ The report says *met*, *missed* or *not judged* and how many counted Evaluators fell below.
 
 > 🧪 Set 0.9. ✅ Even 18/18 passes can read below the floor for *what the sample proves*: the
@@ -390,7 +427,7 @@ acceptance criteria"*, or *Use as Acceptance Criteria* on a plan card.
 
 ## 8. Step Qualification and validation
 
-**What.** **Validation** is the status at the top of the tab. It comes from the newest finished
+**What.** **Validation** is the status at the start of the tab's status strip. It comes from the newest finished
 Eval Run of the version and a person's sign-off on it. **Not verified** when no run has finished or
 something the run rested on changed (Fingerprint, an Evaluator, the live cases, the criteria);
 **Waiting for human approval** once a run finished and nobody signed it (with a link to the run, and *Eval Run xxxx passed* / *missed* — green / red — in the reason);
@@ -461,7 +498,7 @@ before; a drop of ≥ 0.15 shows the amber **"Production Scores are drifting"** 
 Scores are exported to Phoenix / Langfuse.
 
 **Test**
-- ✅ Ticked → the Evaluator view says `production: active` ("in production once it counts" for an
+- ✅ Ticked → the **In production** column says *scoring live runs* ("in production once it counts" for an
   unapproved `code` check). A violating live run → paused for a person with reason *production
   evaluator*, Score recorded. Dry runs and eval trials are never blocked.
 - ✅ Drift banner: it blocks nothing. For a manual test, restart with

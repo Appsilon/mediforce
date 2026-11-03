@@ -6,12 +6,13 @@ import { parseToolArguments } from './tool-arguments';
 import { runPlatformTool } from './platform-tools';
 
 /**
- * What checking one proposal against the platform found: it stands, with
+ * What checking one proposal against the platform found: it stands — as the
+ * platform completed it, when it filled in what the model left to it — with
  * anything the person should see beside it; or it does not, and the model is
  * told why so it can correct it within the same request.
  */
 export type ProposalReview =
-  | { readonly ok: true; readonly evidence?: Readonly<Record<string, unknown>> }
+  | { readonly ok: true; readonly arguments?: unknown; readonly evidence?: Readonly<Record<string, unknown>> }
   | { readonly ok: false; readonly error: string };
 
 export interface ProposalToolLoopConfig<TPlatform extends string> {
@@ -203,8 +204,9 @@ export async function runProposalToolLoop<TPlatform extends string>(
           const review = await reviewProposal(config.reviewProposal, toolName, parsed.data);
           if (review.ok) {
             proposalKeys.add(JSON.stringify([toolName, parsed.data]));
-            proposals.push({ tool: toolName, arguments: parsed.data, ...(review.evidence === undefined ? {} : { evidence: review.evidence }) });
-            result = { ...PROPOSED, ...review.evidence };
+            const proposed = review.arguments ?? parsed.data;
+            proposals.push({ tool: toolName, arguments: proposed, ...(review.evidence === undefined ? {} : { evidence: review.evidence }) });
+            result = { ...PROPOSED, ...(review.arguments === undefined ? {} : { arguments: proposed }), ...review.evidence };
           } else {
             result = { error: review.error };
           }

@@ -30,7 +30,7 @@ import { collectSecretReferences } from '@/lib/preflight-checks';
 import { WorkflowAccessPanel } from '@/components/workflows/workflow-access-panel';
 import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { useWorkflowEditGate } from '@/hooks/use-workflow-access';
-import { EvaluationTab } from '@/components/evaluation/evaluation-tab';
+import { EVALUATION_QUERY_PARAMS, EvaluationTab } from '@/components/evaluation/evaluation-tab';
 import { VersionValidationBadge } from '@/components/evaluation/validation-status';
 import { useWorkflowValidation } from '@/hooks/use-step-evaluation';
 import { TriggersPanel } from './TriggersPanel';
@@ -255,14 +255,13 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const [activeTab, setActiveTab] = React.useState(initialTab);
   const pathname = usePathname();
   // The URL names the tab, so the guide, a reload and a shared link all agree
-  // with what is on screen. `version` and `step` belong to the Evaluation tab.
+  // with what is on screen. Only the Evaluation tab reads its own parameters.
   const selectTab = (tab: string) => {
     setActiveTab(tab);
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', tab);
     if (tab !== 'evaluation') {
-      params.delete('version');
-      params.delete('step');
+      for (const name of EVALUATION_QUERY_PARAMS) params.delete(name);
     }
     router.replace(`${pathname}?${params}`, { scroll: false });
   };

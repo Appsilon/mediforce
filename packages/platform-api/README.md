@@ -89,7 +89,8 @@ authenticated, and only these two may do that.
 
 **Every Score goes through `recordScore`** (`handlers/scores/record-score.ts`),
 which appends its `score.created` audit event. There is no generic Score write
-route: Scores arrive from task completion (Control Mode 3 verdicts), from
+route: Scores arrive from task completion (Control Mode 3 verdicts and human
+steps sending a run back), from
 Evaluators, and from a person accepting or denying a judge verdict or agreement
 score of an Eval Run (`reviewJudgeVerdict`, `judge-reviews.ts`). With
 `MEDIFORCE_SCORE_EXPORT` set, `services/score-export.ts` wraps the Score
@@ -111,8 +112,9 @@ back as the single-step Definition its trials run, carried on each trial's run
 Evaluation holds one (`mcp_eval_policies.env`, set once with
 `setMcpEvalPolicy`; secret templates such as `{{OPENROUTER_API_KEY}}`), which
 each Eval Run freezes at prepare and the auto-runner's pre-flight and executor
-resolve like a Workflow Step's. Production-only features — harvesting, previews, drift,
-production Evaluators — refuse an Agent (`stepOnly`). Agent versions are
+resolve like a Workflow Step's. Production-only features — perturbed cases, drift,
+production Evaluators — refuse an Agent (`stepOnly`); a preview tries a check on
+the Agent's Eval Cases alone. Agent versions are
 recorded by `handlers/agents/_lib/agent-version.ts` on every agent save and
 every Eval Run prepare.
 An Evaluator check that cannot run comes back as `error`, never as a failed
@@ -151,7 +153,8 @@ Fingerprint frozen with the run.
 `getEvalRunFailures` is the assistant's `get_failures` and `mediforce eval failures`.
 `getEvalTrial` is one trial with everything its Evaluators read and gave; a model judge's
 messages are rebuilt with agent-runtime's `llmJudgeMessages` / `outputAgreementMessages`, the
-functions that sent them, so nothing extra is stored on the Score.
+functions that sent them, so nothing extra is stored on the Score — a judge's files are read
+again from the run's commit (`judgedFiles` in `_lib/run-evaluator-check.ts`).
 
 **A Step Qualification binds a Step Fingerprint.** `_lib/step-fingerprint.ts`
 hashes each part of a step that shapes its behaviour on its own, so the badge
@@ -175,7 +178,9 @@ changes are all proposals — the Evaluation Assistant
 (`handlers/evaluation-assistant/`) runs on it. Its `reviewProposal` hook checks
 each proposal against the platform before the person sees it: a refusal goes
 back to the model as a tool error, and what the review found (the Evaluation
-Assistant's self-test of a proposed check) travels with the proposal. The workflow assistant
+Assistant's self-test of a proposed check) travels with the proposal. A review
+may also complete the proposal — the Evaluation Assistant pins a judge's model
+the assistant left out — and the card then carries the completed arguments. The workflow assistant
 (`handlers/workflow-assistant/ask-workflow-assistant.ts`) keeps its own loop,
 interleaved with its graph-completeness gates and truncation salvage. The
 cowork chat (`handlers/cowork/`) is a separate OpenRouter loop and does not use
@@ -189,8 +194,9 @@ system prompt with a shared core (`_lib/system-prompt.ts`). What each subject
 is offered is a selection from the catalog, `EVALUATION_ASSISTANT_TOOLSETS`:
 an Agent reads itself (`get_agent`) and the production runs of the Steps that
 use it (`list_agent_production_runs`, from `evaluation/_lib/agent-production-runs.ts`)
-in place of a Step's own reads, previews, synthesized cases and routing. A
-tool added for both lands in both toolsets; one for a single subject, in its own.
+in place of a Step's own reads, synthesized cases and routing, and previews a
+check on its Eval Cases alone; a case taken from such a run is the Agent's, under the rules of
+[ADR-0031](../../docs/adr/0031-agent-cases-from-workflow-runs.md). A tool added for both lands in both toolsets; one for a single subject, in its own.
 
 A request may grant the Evaluation Assistant an unattended budget
 (`unattendedBudgetUsd`): `start_eval_run` then starts prepared runs of the step

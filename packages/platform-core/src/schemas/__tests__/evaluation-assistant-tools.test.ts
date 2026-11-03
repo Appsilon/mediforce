@@ -24,8 +24,8 @@ describe('Evaluation Assistant toolsets', () => {
 
   it('gives an Agent its own reads and none that need a Step\'s production runs', () => {
     const { platform, proposals } = EVALUATION_ASSISTANT_TOOLSETS.agent;
-    expect(platform).toEqual(expect.arrayContaining(['get_agent', 'list_agent_production_runs', 'get_agent_run', 'get_trajectory']));
-    for (const stepOnly of ['get_step', 'list_step_runs', 'list_workspace_files', 'read_workspace_file', 'preview_evaluator']) {
+    expect(platform).toEqual(expect.arrayContaining(['get_agent', 'list_agent_production_runs', 'get_agent_run', 'get_trajectory', 'preview_evaluator']));
+    for (const stepOnly of ['get_step', 'list_step_runs', 'list_workspace_files', 'read_workspace_file']) {
       expect(platform).not.toContain(stepOnly);
     }
     expect(proposals).not.toContain('propose_perturbed_case');
@@ -99,6 +99,21 @@ describe('propose_perturbed_case', () => {
     expect(ProposePerturbedCaseToolSchema.safeParse(withoutCanary).success).toBe(true);
     expect(ProposePerturbedCaseToolSchema.safeParse({ ...withoutCanary, perturbation: { ...withoutCanary.perturbation, canary: 'CANARY-1234' } }).success).toBe(true);
     expect(ProposePerturbedCaseToolSchema.safeParse({ ...perturbed, perturbation: { kind: 'edge_values', description: 'An empty note.' } }).success).toBe(true);
+  });
+
+  it('refuses a case that changes no input, and points an error planted in the output to propose_eval_case', () => {
+    const unchanged = ProposePerturbedCaseToolSchema.safeParse({ name: 'planted error', baseAgentRunId: RUN, perturbation: { kind: 'other', description: 'One value changed in the output.' } });
+    expect(unchanged.error?.issues[0]?.message).toContain('propose_eval_case with agentRunId and expectedOutput');
+  });
+});
+
+describe('propose_eval_case', () => {
+  it('takes a run or a written input, not both, and says a run keeps its own input', () => {
+    const both = ProposeEvalCaseToolSchema.safeParse({ name: 'planted error', agentRunId: RUN, input: { triggerPayload: {}, previousStepOutputs: {} } });
+    expect(both.error?.issues[0]?.message).toContain('drop input');
+    const properties = z.toJSONSchema(ProposeEvalCaseToolSchema, { io: 'input' }).properties as Record<string, { description?: string }>;
+    expect(properties.agentRunId.description).toContain('do not also send input');
+    expect(properties.input.description).toContain('instead of agentRunId');
   });
 });
 

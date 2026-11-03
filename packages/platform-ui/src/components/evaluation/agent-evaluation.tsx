@@ -57,17 +57,15 @@ export function AgentEvaluation({ handle, agentId }: { handle: string; agentId: 
 
   const subject: EvaluationSubject = { kind: 'agent', namespace: handle, agentId };
   return (
-    <div className="space-y-4">
-      <AgentVersionLine agentId={agentId} />
-      <StepEvaluation
-        step={subject}
-        definitionVersion={null}
-        outputSchema={definition.outputSchema}
-        mayEdit={gates.mayEdit}
-        editReason={gates.editReason}
-        mayRun={gates.mayRun}
-        runReason={gates.runReason}
-      />
-    </div>
+    <StepEvaluation
+      header={<AgentVersionLine agentId={agentId} />}
+      step={subject}
+      definitionVersion={null}
+      outputSchema={definition.outputSchema}
+      mayEdit={gates.mayEdit}
+      editReason={gates.editReason}
+      mayRun={gates.mayRun}
+      runReason={gates.runReason}
+    />
   );
 }

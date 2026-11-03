@@ -21,12 +21,27 @@ export interface LlmMessage {
 export interface LlmResponse {
   content: string;
   model: string;
-  usage: { promptTokens: number; completionTokens: number };
+  /** `completionTokens` includes `reasoningTokens`, which is absent when the client or provider does not report it. */
+  usage: { promptTokens: number; completionTokens: number; reasoningTokens?: number };
+  /** Why the model stopped, as the provider says it; `'length'` means the answer was cut off at the output-token limit. */
+  stopReason?: string | null;
 }
 
 export interface LlmCallOptions {
   /** Defaults to 0.7; a call that must not paraphrase, such as reshaping an output, asks for 0. */
   temperature?: number;
+  /**
+   * The JSON object the answer must be. A client on a model that can
+   * constrain its decoding to it does, so the answer cannot come back as prose
+   * or broken JSON; any other asks as the messages do and returns the text.
+   */
+  answerSchema?: LlmAnswerSchema;
+}
+
+export interface LlmAnswerSchema {
+  name: string;
+  /** JSON Schema of the answer object. */
+  schema: Record<string, unknown>;
 }
 
 export interface LlmClient {

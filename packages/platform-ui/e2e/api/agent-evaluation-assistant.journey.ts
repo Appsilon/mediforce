@@ -83,8 +83,8 @@ test.describe('Agent Evaluation Assistant — API E2E', () => {
     expect((await ask(request, subject, question)).reply).toBe('It grades adverse events.');
     const requests = await openRouterRequests(question);
     const offered = (requests[0]!.tools ?? []).map((tool) => tool.function.name);
-    expect(offered).toEqual(expect.arrayContaining(['get_agent', 'list_agent_production_runs', 'get_agent_run', 'list_evaluators', 'propose_eval_case']));
-    for (const stepTool of ['get_step', 'list_step_runs', 'preview_evaluator', 'propose_perturbed_case', 'propose_control_settings']) {
+    expect(offered).toEqual(expect.arrayContaining(['get_agent', 'list_agent_production_runs', 'get_agent_run', 'list_evaluators', 'preview_evaluator', 'propose_eval_case']));
+    for (const stepTool of ['get_step', 'list_step_runs', 'propose_perturbed_case', 'propose_control_settings']) {
       expect(offered).not.toContain(stepTool);
     }
     expect(toolResult(requests[1]!.messages)).toMatchObject({
@@ -112,29 +112,28 @@ test.describe('Agent Evaluation Assistant — API E2E', () => {
     expect(String(toolResult(requests[3]!.messages).error)).toContain('neither an eval trial of this agent nor a production run of a step that uses it');
   });
 
-  test('proposes a written case from a production run; accepting it flags its production data', async ({ request }) => {
+  test('proposes a case from a run of a step using the Agent; accepting it makes it the Agent\'s, flagged as production data', async ({ request }) => {
     const question = `Add a case like production. ${randomUUID()}`;
-    const proposed = { name: 'Grade 4 neutropenia from production', input: { triggerPayload, previousStepOutputs: {} }, containsProductionData: true };
+    const proposed = { name: 'Grade 4 neutropenia from production', agentRunId: productionRunId };
     await scriptOpenRouter(question, [
-      { toolCalls: [{ name: 'propose_eval_case', arguments: { name: 'Harvested', agentRunId: productionRunId } }] },
-      { toolCalls: [{ name: 'propose_eval_case', arguments: { ...proposed, input: { triggerPayload, previousStepOutputs: { 'extract-aes': {} } } } }] },
+      { toolCalls: [{ name: 'propose_eval_case', arguments: { name: 'Elsewhere', agentRunId: unrelatedRunId } }] },
+      { toolCalls: [{ name: 'propose_eval_case', arguments: { name: 'Written', input: { triggerPayload, previousStepOutputs: { 'extract-aes': {} } } } }] },
       { toolCalls: [{ name: 'propose_eval_case', arguments: proposed }] },
       { content: 'I proposed a case from the production run.' },
     ]);
 
     const answer = await ask(request, subject, question);
     const requests = await openRouterRequests(question);
-    expect(String(toolResult(requests[1]!.messages).error)).toContain('write its input');
+    expect(String(toolResult(requests[1]!.messages).error)).toContain('not a production run of a step that uses');
     expect(String(toolResult(requests[2]!.messages).error)).toContain('trigger payload alone');
     expect(answer.proposals).toEqual([{ tool: 'propose_eval_case', arguments: proposed }]);
 
-    const accepted = await request.post('/api/evaluation/cases', {
+    const accepted = await request.post('/api/evaluation/cases/from-agent-run', {
       headers: JSON_HEADERS,
-      data: { ...subject, ...answer.proposals[0]!.arguments, origin: 'assistant' },
+      data: { agentRunId: productionRunId, agent: subject, name: proposed.name, origin: 'assistant' },
     });
     expect(accepted.status(), await accepted.text()).toBe(201);
-    expect(EvalCaseOutputSchema.parse(await accepted.json()).evalCase).toMatchObject({
-      agentId: subject.agentId, source: 'manual', containsProductionData: true, input: { triggerPayload },
-    });
+    const { evalCase } = EvalCaseOutputSchema.parse(await accepted.json());
+    expect(evalCase).toMatchObject({ agentId: subject.agentId, source: 'production', sourceAgentRunId: productionRunId, containsProductionData: true, input: { previousStepOutputs: {} } });
   });
 });

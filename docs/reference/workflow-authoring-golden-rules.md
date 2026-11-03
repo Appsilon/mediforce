@@ -266,8 +266,19 @@ separate human `type: review` step, which keeps working for existing workflows â
 but per [ADR-0014](../adr/0014-control-mode-ui-concept.md) the designer no longer
 offers that type for new steps, so reach for CM3 when authoring.
 
-Human review steps MUST define explicit `verdicts`. Use `requiresComment: true`
-for revise/reject-style verdicts.
+On an L3 `revise`, the step runs again with its prior output plus `verdict`,
+`reviewerComment` and `reviewerCallToAction` at the top level of its input and
+under `steps.<stepId>`. An L3 step's `params` are collected on its review task:
+their values join that input on a `revise`, named in `reviewerCallToAction`, and
+join the step's output on an `approve`, over any output field of the same name.
+A human step that sends a run back hands over the same
+way through its own output: `reviewerComment` and `reviewerCallToAction` for a
+plain verdict, `comment` and its param values for a verdict with params.
+
+Human review steps MUST define explicit `verdicts`. Require a comment on
+revise/reject-style verdicts: `revise` needs one by default, and `requiresComment`
+or the step's `comment.requiredForVerdicts` sets it for the rest. An agent review
+that lets `revise` go without one re-runs the agent with no feedback.
 
 Default failure behavior SHOULD be fail-fast. Use `continueOnError: true` only
 for non-critical `action` steps that may fail while the run continues â€” it is

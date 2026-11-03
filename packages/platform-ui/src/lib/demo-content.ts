@@ -184,6 +184,13 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
         action: 'Pick an agent step',
       },
       {
+        id: 'setup-choice',
+        title: 'A step with nothing set up first asks how to set it up',
+        body: 'Guided setup walks four stages, the assistant drafting each. Setting it up by hand opens the tabs this guide follows, with the assistant beside them.',
+        target: 'eval-setup-choice',
+        action: 'If you see the choice, pick Set up manually',
+      },
+      {
         id: 'assistant',
         title: 'Start by asking what to check',
         body: 'The assistant reads the step and returns a plan of risks, most important first, each with the cheapest check that catches it. Nothing is created until you Accept a card.',
@@ -193,7 +200,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
       {
         id: 'evaluators',
         title: 'Each check is an Evaluator',
-        body: 'Draft this check on a risk builds one and tries it on real production outputs before showing you. A Code Evaluator stays Not counted until you read the script and approve it.',
+        body: 'Draft this check on a risk builds one. A schema or Code check is tried on the step\'s Eval Cases and production outputs before you see it; an LLM judge comes untried, for an Eval Run to try. On the Evaluators tab, a Code Evaluator stays Not counted until you read the script and approve it.',
         target: 'eval-evaluators',
         action: 'Accept a drafted check',
       },
@@ -202,7 +209,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
         title: 'Cases are inputs the step is re-run on',
         body: 'Starting a case from a production run gives it exactly what the step received, and its output as the expectation. Add a few ordinary ones, a tricky one, and at least one that should fail.',
         target: 'eval-cases',
-        action: 'Add a case from a production run, then Save',
+        action: 'On the Eval Cases tab, add a case from a production run, then Save',
       },
       {
         id: 'bar',
@@ -215,12 +222,12 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
         title: 'An Eval Run re-runs every case several times',
         body: 'Trials per case and the budget set what it costs, and the confirmation shows the estimate before anything is spent. For a first run keep it small: a few cases, one trial each.',
         target: 'eval-runs',
-        action: 'Start an Eval Run',
+        action: 'Start an Eval Run from the Eval Runs tab',
       },
       {
         id: 'sign',
         title: 'A person signs the result off',
-        body: 'Open Details to read the pass rate and review any LLM judge verdicts, then confirm the result or overwrite it with a reason. The status flips to Validation passed or failed on your signature.',
+        body: 'On the Eval Runs tab, open Details to read the pass rate and review any LLM judge verdicts, then confirm the result or overwrite it with a reason. The status flips to Validation passed or failed on your signature.',
         target: 'eval-runs',
         action: 'Open the run and sign it',
       },

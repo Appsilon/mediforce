@@ -9,7 +9,7 @@ export {
 } from './evaluators';
 export { approveEvaluatorSource } from './evaluator-trust';
 export { previewEvaluator } from './preview-evaluator';
-export { listStepAgentRuns } from './step-agent-runs';
+export { listAgentProductionRunsPage, listStepAgentRuns } from './step-agent-runs';
 export {
   listEvalCases,
   createEvalCase,

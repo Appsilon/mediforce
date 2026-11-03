@@ -32,12 +32,50 @@ export const evalCaseListCommand = defineCommand({
   },
 });
 
+/** The Agent a run of a Step that uses it is read for, or made a case of (ADR-0029). */
+const AGENT_CASE_ARGS = {
+  agent: { type: 'string', description: 'Agent id — treat the run as a case of this agent, whose step uses it (with --namespace)' },
+  namespace: { type: 'string', description: 'The agent\'s workspace handle (with --agent)' },
+} as const;
+
+function agentCaseFrom(args: { agent?: string; namespace?: string }): { namespace: string; agentId: string } | null {
+  if ((args.agent === undefined) !== (args.namespace === undefined)) throw new Error('Name an agent with both --agent and --namespace');
+  return args.agent === undefined || args.namespace === undefined ? null : { namespace: args.namespace, agentId: args.agent };
+}
+
+export const evalAgentRunsCommand = defineCommand({
+  name: 'mediforce eval agent-runs',
+  description: 'List the finished production runs of the steps that use an agent, newest first, with what each step changes about it.',
+  args: {
+    namespace: { type: 'string', required: true, description: 'Workspace handle' },
+    agent: { type: 'string', required: true, description: 'Agent id' },
+    cursor: { type: 'string', description: 'The previous page\'s nextCursor' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.listAgentProductionRuns({ namespace: args.namespace, agentId: args.agent, ...(args.cursor === undefined ? {} : { cursor: args.cursor }) });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    if (result.runs.length === 0) output.stdout('No production runs.');
+    for (const { agentRun, change } of result.runs) {
+      const changed = change.changes.length === 0 ? 'as it is' : `changes: ${change.changes.join(', ')}`;
+      output.stdout(`${agentRun.id}  ${agentRun.startedAt.slice(0, 16)}  ${change.workflowName}/${change.stepId} v${change.definitionVersion}  ${changed}${change.outputSchemaDiffers ? '  (other output schema: output withheld)' : ''}`);
+    }
+    if (result.nextCursor !== undefined) output.stdout(`More: --cursor ${result.nextCursor}`);
+    return 0;
+  },
+});
+
 export const evalRunIoCommand = defineCommand({
   name: 'mediforce eval run-io',
   description: 'Show what an Agent Run\'s step was given and what it returned — the pair a case is about.',
-  args: { agentRunId: { type: 'positional', required: true, description: 'Agent Run id' } },
+  args: {
+    agentRunId: { type: 'positional', required: true, description: 'Agent Run id' },
+    ...AGENT_CASE_ARGS,
+  },
   async run({ args, output, mediforce, jsonMode }) {
-    const result = await mediforce.evaluation.getAgentRunIo({ agentRunId: args.agentRunId });
+    const result = await mediforce.evaluation.getAgentRunIo({ agentRunId: args.agentRunId, ...agentCaseFrom(args) });
     if (jsonMode) {
       printJson(output, result);
       return 0;
@@ -65,18 +103,21 @@ export const evalCaseAddCommand = defineCommand({
 
 export const evalCaseFromRunCommand = defineCommand({
   name: 'mediforce eval case-from-run',
-  description: 'Add a production Agent Run to its step\'s eval set — a reviewed run\'s output is the expected output: approved to match, rejected to avoid.',
+  description: 'Add a production Agent Run to its step\'s eval set — a reviewed run\'s output is the expected output: approved to match, rejected or sent back for revision to avoid.',
   args: {
     agentRunId: { type: 'positional', required: true, description: 'Agent Run id' },
+    ...AGENT_CASE_ARGS,
     name: { type: 'string', description: 'Case name' },
     expectation: enumArg(['positive', 'negative'] as const, { description: 'Default: from the review verdict, positive when there is none' }),
-    comparison: enumArg(['exact', 'agreement'] as const, { description: 'How the expected output is compared. Default: exact' }),
+    comparison: enumArg(['exact', 'agreement'] as const, { description: 'How the expected output is compared. Default: agreement for a run sent back for revision, otherwise exact' }),
     split: enumArg(['dev', 'holdout'] as const, { description: 'Default: dev' }),
     inputFile: { type: 'string', description: 'JSON file with the case input to use instead of the run\'s; one that differs makes a manual case that keeps the run' },
   },
   async run({ args, output, mediforce, jsonMode }) {
+    const agent = agentCaseFrom(args);
     const result = await mediforce.evaluation.createCaseFromAgentRun({
       agentRunId: args.agentRunId,
+      ...(agent === null ? {} : { agent }),
       ...(args.name !== undefined ? { name: args.name } : {}),
       ...(args.inputFile !== undefined ? { input: readJsonFile(args.inputFile) as Parameters<typeof mediforce.evaluation.createCaseFromAgentRun>[0]['input'] } : {}),
       ...(args.expectation !== undefined ? { expectation: args.expectation } : {}),

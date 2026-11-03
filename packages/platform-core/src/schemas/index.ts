@@ -1,5 +1,6 @@
 export {
   VerdictSchema,
+  StepCommentSchema,
   StepUiSchema,
   StepParamSchema,
   SelectionSchema,
@@ -17,7 +18,13 @@ export {
 } from './process-definition';
 
 export {
+  AGENT_REVIEW_VERDICT_KEYS,
+  buildAgentReviewTaskVerdicts,
+  buildHumanTaskVerdicts,
   buildTaskVerdicts,
+  commentVerdictKeys,
+  isParamRequired,
+  resolveRequiresComment,
   defaultVerdictIntent,
   defaultVerdictLabel,
   defaultRequiresComment,
@@ -296,6 +303,7 @@ export {
   type EvaluationAssistantProposalToolName,
   type EvaluationAssistantPlatformToolName,
   type EvaluationAssistantProposal,
+  type AssistantCheck,
   type FailureRootCause,
   type FixKind,
 } from './evaluation-assistant-tools';

@@ -16,6 +16,7 @@ import {
   AgentDefinitionNotFoundError,
   RetiredFileSkillError,
   SkillNotFoundError,
+  isBinary,
   listCommitFiles,
   readCommitFile,
   resolveMcpForStep,
@@ -26,16 +27,15 @@ import { NotFoundError, ValidationError } from '../../../errors';
 import { getMcpEvalPolicy } from '../../evaluation/mcp-eval-policy';
 import { listStepAgentRuns } from '../../evaluation/step-agent-runs';
 import { isTrialOfAgent, loadScoredRun, type ScoredRun } from '../../evaluation/_lib/scored-run';
-import { isProductionRunOfAgent, listAgentProductionRuns } from '../../evaluation/_lib/agent-production-runs';
-import { loadCaseSource } from '../../evaluation/_lib/case-source';
+import { agentRunChange, isProductionRunOfAgent, listAgentProductionRuns, loadAgentRunSource } from '../../evaluation/_lib/agent-production-runs';
+import { loadCaseSource, newestVerdict, reviewerParamValues } from '../../evaluation/_lib/case-source';
 import { stepOnly } from '../../evaluation/_lib/evaluation-subject';
 import { loadEvaluator } from '../../evaluation/_lib/evaluator-view';
-import { isBinary } from '../../evaluation/_lib/workspace-seed';
-import { HUMAN_VERDICT_SCORE_NAME } from '../../scores/record-human-verdict';
 import { listEvaluators } from '../../evaluation/evaluators';
 import { listEvalCases } from '../../evaluation/eval-cases';
 import { getEvalRun, listEvalRuns, prepareEvalRun, startEvalRun } from '../../evaluation/eval-runs';
 import { getEvalRunFailures } from '../../evaluation/eval-run-failures';
+import { producedResult } from '../../evaluation/_lib/run-evaluator-check';
 import { previewEvaluator } from '../../evaluation/preview-evaluator';
 import { getAcceptanceCriteria } from '../../evaluation/acceptance-criteria';
 import { getStepQualification } from '../../evaluation/step-qualification';
@@ -154,11 +154,50 @@ async function loadSubjectRun(scope: CallerScope, subject: EvaluationSubject, ag
 
 /** The reviewer's newest verdict on a run, as the assistant reads it. */
 async function reviewVerdict(scope: CallerScope, agentRunId: string) {
-  const [verdict] = await scope.scores.list({ agentRunId, name: HUMAN_VERDICT_SCORE_NAME, limit: 1 });
-  return verdict === undefined ? null : { verdict: verdict.label, comment: verdict.comment };
+  const verdict = await newestVerdict(scope, agentRunId);
+  return verdict === undefined ? null : { verdict: verdict.label, comment: verdict.comment, paramValues: reviewerParamValues(verdict) };
+}
+
+/**
+ * The step's finished Agent Runs in one Workflow Run, oldest first: a reviewer
+ * who requests changes sends the step back to run again, so each run is one
+ * review round and the last is the one approved, or still waiting.
+ */
+async function reviewRounds(scope: CallerScope, workflowRunId: string, stepId: string) {
+  const runs = (await scope.agentRuns.getByInstanceId(workflowRunId))
+    .filter((run) => run.stepId === stepId && run.status !== 'running')
+    .sort((left, right) => left.startedAt.localeCompare(right.startedAt));
+  return Promise.all(runs.map(async (run) => ({
+    agentRunId: run.id,
+    status: run.status,
+    fallbackReason: run.fallbackReason,
+    startedAt: run.startedAt,
+    reviewVerdict: await reviewVerdict(scope, run.id),
+    result: clip(run.envelope?.result ?? null, 600),
+  })));
 }
 
 const MAX_LISTED_FILES = 300;
+
+/**
+ * The commit of a production run's workspace at its start or end, or null
+ * when the run had none. A run that gave no result is refused: what it left
+ * says nothing about the step.
+ */
+async function runWorkspace(
+  scope: CallerScope,
+  subject: EvaluationSubject,
+  agentRunId: string,
+  at: 'start' | 'end',
+): Promise<{ repoPath: string; commit: string } | null> {
+  const source = await loadCaseSource(scope, agentRunId, stepOnly(subject, 'Reading a production workspace'), 'read');
+  if (producedResult(source.subject.agentRun) === false) {
+    throw new ValidationError(`Agent Run '${agentRunId}' gave no result (${source.subject.agentRun.status}); choose a run that completed`);
+  }
+  const commit = at === 'start' ? source.workspaceSeedCommit : source.subject.agentRun.envelope?.gitMetadata?.commitSha ?? null;
+  if (source.bareRepoPath === null || commit === null) return null;
+  return { repoPath: source.bareRepoPath, commit };
+}
 
 /**
  * The unattended budget a person granted for one request (D15), and what it
@@ -239,16 +278,18 @@ export async function executeEvaluationTool(
       if (step.kind !== 'agent') throw new ValidationError('list_agent_production_runs is for an Agent evaluated on its own; a step lists its runs with list_step_runs');
       const { limit } = args as Args<'list_agent_production_runs'>;
       const { usages, runs } = await listAgentProductionRuns(scope, step, limit ?? 10);
-      const reviewed = await Promise.all(runs.map(async ({ usage, agentRun, instance }) => ({
+      const reviewed = await Promise.all(runs.map(async ({ usage, agentRun, instance, change }) => ({
         agentRunId: agentRun.id,
         workflowName: usage.workflowName,
         stepId: usage.stepId,
         status: agentRun.status,
         fallbackReason: agentRun.fallbackReason,
         startedAt: agentRun.startedAt,
-        reviewVerdict: await reviewVerdict(scope, agentRun.id),
+        reviewVerdict: change.outputSchemaDiffers ? null : await reviewVerdict(scope, agentRun.id),
         triggerPayload: clip(instance.triggerPayload ?? {}, 2000),
-        result: clip(agentRun.envelope?.result ?? null, 600),
+        changedFromAgent: change.changes,
+        outputSchemaDiffers: change.outputSchemaDiffers,
+        result: clip(change.outputSchemaDiffers ? null : agentRun.envelope?.result ?? null, 600),
       })));
       return {
         steps: usages.map((usage) => ({
@@ -263,36 +304,48 @@ export async function executeEvaluationTool(
     }
     case 'list_step_runs': {
       const { limit } = args as Args<'list_step_runs'>;
-      const { runs } = await listStepAgentRuns({ ...stepOnly(step, 'Listing production runs'), limit: limit ?? 10 }, scope);
+      const evaluatedStep = stepOnly(step, 'Listing production runs');
+      const { runs } = await listStepAgentRuns({ ...evaluatedStep, limit: limit ?? 10 }, scope);
+      const workflowRunIds = [...new Set(runs.map((run) => run.processInstanceId))];
       return {
-        runs: await Promise.all(runs.map(async (run) => ({
-          agentRunId: run.id,
-          status: run.status,
-          fallbackReason: run.fallbackReason,
-          startedAt: run.startedAt,
-          reviewVerdict: await reviewVerdict(scope, run.id),
-          result: clip(run.envelope?.result ?? null, 600),
+        workflowRuns: await Promise.all(workflowRunIds.map(async (workflowRunId) => ({
+          workflowRunId,
+          rounds: await reviewRounds(scope, workflowRunId, evaluatedStep.stepId),
         }))),
       };
     }
     case 'get_agent_run': {
       const { agentRunId } = args as Args<'get_agent_run'>;
       const subject = await loadSubjectRun(scope, step, agentRunId);
+      const agentSource = step.kind === 'agent' && isTrialOfAgent(subject.agentRun, subject.instance, step) === false
+        ? await loadAgentRunSource(scope, step, agentRunId)
+        : null;
+      const withheld = agentSource?.change.outputSchemaDiffers === true;
       return {
         agentRunId,
         status: subject.agentRun.status,
         fallbackReason: subject.agentRun.fallbackReason,
         triggerPayload: clip(subject.instance.triggerPayload ?? {}, 6000),
         stepInput: clip(subject.stepInput, 6000),
-        result: clip(subject.agentRun.envelope?.result ?? null, 8000),
-        confidence: subject.agentRun.envelope?.confidence ?? null,
-        reasoningSummary: subject.agentRun.envelope?.reasoning_summary ?? null,
+        ...(agentSource === null ? {} : {
+          caseInput: clip(agentSource.input, 6000),
+          workflowName: agentSource.change.workflowName,
+          changedFromAgent: agentSource.change.changes,
+          outputSchemaDiffers: agentSource.change.outputSchemaDiffers,
+        }),
+        result: clip(agentSource === null ? subject.agentRun.envelope?.result ?? null : agentSource.result, 8000),
+        confidence: withheld ? null : subject.agentRun.envelope?.confidence ?? null,
+        reasoningSummary: withheld ? null : subject.agentRun.envelope?.reasoning_summary ?? null,
         changedFiles: subject.agentRun.envelope?.gitMetadata?.changedFiles ?? [],
       };
     }
     case 'get_trajectory': {
       const { agentRunId, offset, limit } = EVALUATION_ASSISTANT_PLATFORM_TOOLS.get_trajectory.parse(args);
       const subject = await loadSubjectRun(scope, step, agentRunId);
+      const change = step.kind === 'agent' ? await agentRunChange(scope, step, subject.agentRun, subject.instance) : null;
+      if (change?.outputSchemaDiffers === true) {
+        return { entries: [], total: 0, nextOffset: null, note: 'This run answered under another output schema than the agent, and its log ends in that output, so it is withheld.' };
+      }
       const entries = subject.trajectory.slice(offset, offset + limit);
       const total = subject.trajectory.length;
       return {
@@ -302,21 +355,24 @@ export async function executeEvaluationTool(
       };
     }
     case 'list_workspace_files': {
-      const { agentRunId } = args as Args<'list_workspace_files'>;
-      const source = await loadCaseSource(scope, agentRunId, stepOnly(step, 'Reading a production workspace'), 'read');
-      if (source.bareRepoPath === null || source.workspaceSeedCommit === null) {
+      const { agentRunId, at } = EVALUATION_ASSISTANT_PLATFORM_TOOLS.list_workspace_files.parse(args);
+      const workspace = await runWorkspace(scope, step, agentRunId, at);
+      if (workspace === null) {
         return { files: [], note: 'This run had no workspace; a case from it starts from an empty one.' };
       }
-      const files = await listCommitFiles(source.bareRepoPath, source.workspaceSeedCommit);
-      return { commit: source.workspaceSeedCommit, files: files.slice(0, MAX_LISTED_FILES), total: files.length };
+      const files = await listCommitFiles(workspace.repoPath, workspace.commit);
+      return { commit: workspace.commit, files: files.slice(0, MAX_LISTED_FILES), total: files.length };
     }
     case 'read_workspace_file': {
-      const { agentRunId, path } = args as Args<'read_workspace_file'>;
-      const source = await loadCaseSource(scope, agentRunId, stepOnly(step, 'Reading a production workspace'), 'read');
-      const content = source.bareRepoPath === null || source.workspaceSeedCommit === null
-        ? null
-        : await readCommitFile(source.bareRepoPath, source.workspaceSeedCommit, path);
-      if (content === null) throw new NotFoundError(`The workspace of Agent Run '${agentRunId}' has no file '${path}'`);
+      const { agentRunId, path, at } = EVALUATION_ASSISTANT_PLATFORM_TOOLS.read_workspace_file.parse(args);
+      const workspace = await runWorkspace(scope, step, agentRunId, at);
+      if (workspace === null) throw new NotFoundError(`Agent Run '${agentRunId}' had no workspace; it has no file '${path}'`);
+      const content = await readCommitFile(workspace.repoPath, workspace.commit, path);
+      if (content === null) {
+        throw new NotFoundError(at === 'start'
+          ? `Agent Run '${agentRunId}' has no file '${path}' in the workspace it started from; a file the run wrote is there only at "end"`
+          : `Agent Run '${agentRunId}' has no file '${path}' in the workspace it left`);
+      }
       if (isBinary(content)) return { path, size: content.length, binary: true };
       return { path, size: content.length, content: clip(content.toString('utf-8'), 20_000) };
     }
@@ -378,7 +434,7 @@ export async function executeEvaluationTool(
     }
     case 'preview_evaluator': {
       const { check, agentRunIds } = args as Args<'preview_evaluator'>;
-      return previewEvaluator({ ...stepOnly(step, 'A preview'), check, limit: 5, ...(agentRunIds === undefined ? {} : { agentRunIds }) }, scope);
+      return previewEvaluator({ ...step, check, limit: 2, ...(agentRunIds === undefined ? {} : { agentRunIds }) }, scope);
     }
     case 'get_qualification': {
       const [qualification, { criteria }] = await Promise.all([

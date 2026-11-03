@@ -193,6 +193,34 @@ describe('WorkflowEngine.completeHumanTask', () => {
     expect(storedTask?.completionData?.verdict).toBe('revise');
   });
 
+  it('L3-revise: hands the reviewer\'s comment to the next iteration, keeping the prior output', async () => {
+    const instance = { ...pausedReviewInstance(), variables: { review: { plan: 'five phases' } } };
+    await instanceRepo.create(instance);
+
+    const task = buildHumanTask({
+      processInstanceId: instance.id,
+      stepId: 'review',
+      status: 'claimed',
+      assignedUserId: 'u-1',
+      creationReason: 'agent_review_l3',
+      completionData: { reviewType: 'agent_output_review', agentOutput: { result: { plan: 'five phases' } } },
+    });
+    await humanTaskRepo.create(task);
+
+    await engine.completeHumanTask(task.id, { kind: 'verdict', verdict: 'revise', comment: 'split it into seven' }, 'u-1');
+
+    const storedInstance = await instanceRepo.getById(instance.id);
+    expect(storedInstance?.variables.review).toMatchObject({
+      plan: 'five phases',
+      verdict: 'revise',
+      reviewerComment: 'split it into seven',
+    });
+    expect(String((storedInstance?.variables.review as Record<string, unknown>).reviewerCallToAction)).toContain('split it into seven');
+
+    const storedTask = await humanTaskRepo.getById(task.id);
+    expect(storedTask?.completionData?.agentOutput).toEqual({ result: { plan: 'five phases' } });
+  });
+
   it('rejects with InvalidTransitionError when task is already terminal', async () => {
     const instance = pausedReviewInstance();
     await instanceRepo.create(instance);

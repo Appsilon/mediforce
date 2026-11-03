@@ -8,6 +8,7 @@ export {
 // Schemas (Zod schema objects + inferred types)
 export {
   VerdictSchema,
+  StepCommentSchema,
   StepUiSchema,
   StepParamSchema,
   SelectionSchema,
@@ -275,7 +276,13 @@ export {
   type ImageBuildStep,
   type ImageLineageFacts,
   type LayeredImage,
+  AGENT_REVIEW_VERDICT_KEYS,
+  buildAgentReviewTaskVerdicts,
+  buildHumanTaskVerdicts,
   buildTaskVerdicts,
+  commentVerdictKeys,
+  isParamRequired,
+  resolveRequiresComment,
   defaultVerdictIntent,
   defaultVerdictLabel,
   defaultRequiresComment,
@@ -376,6 +383,7 @@ export {
   type EvaluationAssistantProposalToolName,
   type EvaluationAssistantPlatformToolName,
   type EvaluationAssistantProposal,
+  type AssistantCheck,
   type FailureRootCause,
   type FixKind,
 } from './schemas/evaluation-assistant-tools';

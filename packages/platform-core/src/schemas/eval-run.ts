@@ -133,6 +133,8 @@ export const JudgeCallSchema = z.object({
   model: z.string(),
   promptTokens: z.number(),
   completionTokens: z.number(),
+  /** How many of `completionTokens` went on reasoning; absent when the provider did not report it. */
+  reasoningTokens: z.number().optional(),
   durationMs: z.number(),
   /** The model's answer, as it gave it. */
   response: z.string(),

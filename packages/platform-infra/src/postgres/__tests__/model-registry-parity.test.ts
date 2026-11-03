@@ -66,6 +66,24 @@ function contract(name: string, factory: () => Promise<ModelRegistryRepository>)
       expect(await repo.getById('missing')).toBeNull();
     });
 
+    it('keeps the parameters a model takes, leaves them out while unknown, and keeps them over an upsert that does not give them', async () => {
+      await repo.bulkUpsert([
+        entryInput({ id: 'a/known', supportedParameters: ['tools', 'structured_outputs'] }),
+        entryInput({ id: 'a/unknown' }),
+      ]);
+      expect((await repo.getById('a/known'))?.supportedParameters).toEqual(['tools', 'structured_outputs']);
+      expect(await repo.getById('a/unknown')).not.toHaveProperty('supportedParameters');
+
+      await repo.update({ id: 'a/unknown', supportedParameters: ['temperature'] });
+      expect((await repo.getById('a/unknown'))?.supportedParameters).toEqual(['temperature']);
+
+      await repo.upsert(entryInput({ id: 'a/known', name: 'renamed' }));
+      expect(await repo.getById('a/known')).toMatchObject({ name: 'renamed', supportedParameters: ['tools', 'structured_outputs'] });
+
+      await repo.bulkUpsert([entryInput({ id: 'a/known', name: 'renamed again' })]);
+      expect(await repo.getById('a/known')).toMatchObject({ name: 'renamed again', supportedParameters: ['tools', 'structured_outputs'] });
+    });
+
     it('upsert + getById round-trips the entry', async () => {
       const created = await repo.upsert(entryInput());
       const got = await repo.getById('anthropic/claude-sonnet-4');

@@ -247,6 +247,20 @@ test.describe('Step Evaluation entities — API E2E', () => {
     });
   });
 
+  test('a draft check is previewed on the step\'s Eval Cases first, each case\'s expected output in place of its run\'s', async ({ request }) => {
+    const { evalCase } = EvalCaseOutputSchema.parse(await post(request, '/api/evaluation/cases/from-agent-run', {
+      agentRunId, step, name: 'Findings expected', expectedOutput: { findings: [] }, expectation: 'negative',
+    }, 201));
+
+    const preview = PreviewEvaluatorOutputSchema.parse(await post(request, '/api/evaluation/evaluators/preview', {
+      ...step,
+      check: { kind: 'schema', schema: { required: ['findings'] } },
+    }));
+    expect(preview.cases).toEqual([expect.objectContaining({ caseId: evalCase.id, caseName: 'Findings expected', agentRunId, passed: true })]);
+    // The run the case was taken from is not tried a second time.
+    expect(preview.results).toEqual([]);
+  });
+
   test('a production run reads as its input/output pair, only inside its workspace', async ({ request }) => {
     const res = await request.get(`/api/evaluation/agent-runs/${agentRunId}/io`, { headers: AUTH_HEADERS });
     expect(res.status(), await res.text()).toBe(200);

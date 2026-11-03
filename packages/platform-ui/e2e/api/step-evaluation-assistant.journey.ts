@@ -67,6 +67,7 @@ test.describe('Evaluation Assistant — API E2E', () => {
     expect(answer.reply).toBe('The recent run has no findings key; I proposed a schema check for it.');
     // The preview ran on the production output before the proposal, and the card carries it.
     const preview = {
+      cases: [],
       results: [{ agentRunId, passed: false, value: 0, label: 'fail', confidence: null, agreement: null, comment: 'missing required keys: findings', error: null }],
     };
     const requests = await openRouterRequests(question);
@@ -90,6 +91,23 @@ test.describe('Evaluation Assistant — API E2E', () => {
     expect(EvaluatorOutputSchema.parse(await accepted.json()).evaluator).toMatchObject({
       name: 'findings-present', latest: { origin: 'assistant' }, trust: { trusted: true },
     });
+  });
+
+  test('proposes a judge untried, on the pinned default model when the assistant names none', async ({ request }) => {
+    const question = `Is every grade justified? ${randomUUID()}`;
+    const judge = { kind: 'llm_judge', rubric: 'Each grade follows from the AE\'s outcome in the input.', minConfidence: 0.8 };
+    await scriptOpenRouter(question, [
+      { toolCalls: [{ name: 'propose_evaluator', arguments: { name: 'grades-justified', rule: 'Each grade is justified.', check: judge } }] },
+      { content: 'I proposed a judge; try it in a small Eval Run.' },
+    ]);
+
+    const answer = await ask(request, step, question);
+
+    expect(answer.proposals).toEqual([{
+      tool: 'propose_evaluator',
+      arguments: { name: 'grades-justified', rule: 'Each grade is justified.', check: { ...judge, model: expect.stringMatching(/^anthropic\/claude-sonnet-[\d.]+$/) } },
+      selfTest: { unavailable: expect.stringMatching(/judge is not tried before it is proposed/i) },
+    }]);
   });
 
   test('streams each round and tool call before the result when asked for NDJSON', async ({ request }) => {

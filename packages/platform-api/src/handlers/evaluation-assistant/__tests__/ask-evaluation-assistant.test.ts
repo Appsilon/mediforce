@@ -86,6 +86,21 @@ describe('askEvaluationAssistant', () => {
     expect(audit).toMatchObject({ action: 'evaluation_assistant.prompt', inputSnapshot: { prompt: 'What should I check first?' } });
   });
 
+  it('self-tests a proposed check on the Eval Cases first, even after the assistant previewed it on chosen runs', async () => {
+    const { evalCase } = await createEvalCaseFromAgentRun({ agentRunId: GRADED_RUN, expectedOutput: { findings: [] }, expectation: 'positive', comparison: 'exact', agreementInstructions: null, evaluatorIds: null, split: 'dev', origin: 'user' }, scope);
+    const check = { kind: 'schema', schema: { required: ['findings'] } };
+    scriptOpenRouter([
+      () => ({ toolCalls: [{ name: 'preview_evaluator', arguments: { check, agentRunIds: [UNGRADED_RUN] } }] }),
+      () => ({ toolCalls: [{ name: 'propose_evaluator', arguments: { name: 'findings-present', rule: 'The result lists findings.', check } }] }),
+      () => ({ content: 'Proposed.' }),
+    ]);
+
+    const result = await askEvaluationAssistant({ ...STEP, messages: [{ role: 'user', content: 'Propose checks.' }] }, scope);
+
+    const [proposal] = result.proposals as Array<{ selfTest: { cases: Array<{ caseId: string }> } }>;
+    expect(proposal!.selfTest.cases.map((outcome) => outcome.caseId)).toEqual([evalCase.id]);
+  });
+
   it('prepares an Eval Run for the person to confirm; its own start is refused', async () => {
     Object.assign(scope.system, { engine: new WorkflowEngine(fixture.processRepo, fixture.instanceRepo, fixture.auditRepo) });
     await createEvaluator({ ...STEP, name: 'findings-present', rule: 'r', check: { kind: 'schema', schema: { required: ['findings'] } }, origin: 'user' }, scope);

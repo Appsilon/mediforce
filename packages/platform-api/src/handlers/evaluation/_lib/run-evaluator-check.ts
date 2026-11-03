@@ -1,14 +1,16 @@
-import { outputDifferences, type EvalCase, type EvaluatorCheck, type JudgeCall } from '@mediforce/platform-core';
+import { outputDifferences, type AgentRun, type EvalCase, type EvaluatorCheck, type JudgeCall } from '@mediforce/platform-core';
 import {
   LlmJudgeReviewPlugin,
   judgeOutputAgreement,
+  readStepFiles,
   runCodeCheck,
   validateOutputSchema,
   type LlmClient,
+  type StepFile,
 } from '@mediforce/agent-runtime';
 import type { EvaluatorOutcome } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
-import { callOpenRouter } from '../../../services/openrouter-client';
+import { callOpenRouter, OpenRouterApiError, type OpenRouterRequest } from '../../../services/openrouter-client';
 import { requireOpenRouterApiKey } from '../../../services/openrouter-key';
 import type { ScoredRun } from './scored-run';
 
@@ -16,23 +18,49 @@ type LlmJudgeCheck = Extract<EvaluatorCheck, { kind: 'llm_judge' }>;
 type ExpectedOutputCheck = Extract<EvaluatorCheck, { kind: 'expected_output' }>;
 
 const CODE_CHECK_TIMEOUT_MS = 2 * 60_000;
-/** Room for a rationale that cites what decided the verdict. */
-const JUDGE_MAX_OUTPUT_TOKENS = 2000;
+/** Room for a model's reasoning, which counts against this too, and a rationale that cites what decided the verdict; a ceiling, so a short answer costs no more. */
+const JUDGE_MAX_OUTPUT_TOKENS = 16_000;
+const JUDGE_RETRY_DELAY_MS = 2000;
 
-/** The judge's model, through the platform's OpenRouter seam (mockable via `OPENROUTER_BASE_URL`). */
-function openRouterJudgeClient(apiKey: string, model: string, onCall: (call: JudgeCall) => void): LlmClient {
+/** A rate limit or a provider failure is asked once more before it errors the check. */
+async function callJudgeModel(request: OpenRouterRequest): ReturnType<typeof callOpenRouter> {
+  try {
+    return await callOpenRouter(request);
+  } catch (err) {
+    if (err instanceof OpenRouterApiError === false || (err.status !== 429 && err.status < 500)) throw err;
+    await new Promise((resolve) => setTimeout(resolve, JUDGE_RETRY_DELAY_MS));
+    return callOpenRouter(request);
+  }
+}
+
+/**
+ * The judge's model, through the platform's OpenRouter seam (mockable via
+ * `OPENROUTER_BASE_URL`). Its answer is constrained to the judge's schema on a
+ * model the registry says takes `structured_outputs`; any other answers in
+ * text, so a judge saved on one still runs. A constrained request reaches only
+ * providers that take every parameter it sends, so it sends `temperature` only
+ * to a model that takes it.
+ */
+async function openRouterJudgeClient(scope: CallerScope, apiKey: string, model: string, onCall: (call: JudgeCall) => void): Promise<LlmClient> {
+  const entry = await scope.models.getById(model);
+  const parameters = entry?.supportedParameters;
+  const maxTokens = Math.min(JUDGE_MAX_OUTPUT_TOKENS, entry?.maxCompletionTokens ?? JUDGE_MAX_OUTPUT_TOKENS);
+  const constrains = parameters?.includes('structured_outputs') === true;
+  const takesTemperature = parameters === undefined || parameters.includes('temperature') === true;
   return {
-    complete: async (messages) => {
+    complete: async (messages, _model, options = {}) => {
       const startedAt = Date.now();
-      const response = await callOpenRouter({
+      const { answerSchema } = options;
+      const response = await callJudgeModel({
         model,
         apiKey,
         messages,
-        temperature: 0,
-        maxTokens: JUDGE_MAX_OUTPUT_TOKENS,
+        temperature: takesTemperature ? 0 : null,
+        maxTokens,
+        ...(answerSchema === undefined || constrains === false ? {} : { answerSchema }),
       });
       onCall({ model, ...response.usage, durationMs: Date.now() - startedAt, response: response.content });
-      return { content: response.content, model, usage: response.usage };
+      return { content: response.content, model, usage: response.usage, stopReason: response.finishReason };
     },
   };
 }
@@ -41,8 +69,14 @@ function binary(agentRunId: string, passed: boolean, comment: string | null): Ev
   return { agentRunId, passed, value: passed ? 1 : 0, label: passed ? 'pass' : 'fail', confidence: null, agreement: null, comment, error: null };
 }
 
+/** The files a run wrote, as its judge reads them; none for a run without a workspace. */
+export async function judgedFiles(agentRun: AgentRun): Promise<StepFile[]> {
+  const git = agentRun.envelope?.gitMetadata ?? null;
+  return git === null ? [] : readStepFiles(git.repoUrl, git.commitSha, git.changedFiles);
+}
+
 /**
- * Asks an `llm_judge` about one Agent Run: its input, its log and its output.
+ * Asks an `llm_judge` about one Agent Run: its input, its log, its output and the files it wrote.
  * A judge that gives no usable verdict comes back as `error`, never as a
  * failed output.
  */
@@ -59,13 +93,14 @@ async function runJudgeCheck(
     rubric: check.rubric,
     stepInput: subject.stepInput,
     trajectory: subject.trajectory,
+    files: await judgedFiles(agentRun),
   });
   const verdict = await judge.review({
     stepId: agentRun.stepId,
     processInstanceId: agentRun.processInstanceId,
     executorOutput: agentRun.envelope!,
     iterationNumber: 0,
-    llm: openRouterJudgeClient(apiKey, check.model, onJudgeCall),
+    llm: await openRouterJudgeClient(scope, apiKey, check.model, onJudgeCall),
   });
   return { ...binary(agentRun.id, verdict.passed, verdict.reasoning), confidence: verdict.confidence };
 }
@@ -98,7 +133,7 @@ async function runExpectedOutputCheck(
     return binary(agentRun.id, matches !== negative, comment);
   }
   const apiKey = await requireOpenRouterApiKey(scope, subject.instance.namespace ?? '');
-  const { agreement, rationale } = await judgeOutputAgreement(openRouterJudgeClient(apiKey, check.model, onJudgeCall), {
+  const { agreement, rationale } = await judgeOutputAgreement(await openRouterJudgeClient(scope, apiKey, check.model, onJudgeCall), {
     model: check.model,
     instructions: check.instructions ?? null,
     caseInstructions: evalCase.agreementInstructions,
@@ -108,6 +143,14 @@ async function runExpectedOutputCheck(
   const passed = negative ? agreement <= check.maxAgreement : agreement >= check.minAgreement;
   const threshold = negative ? `a negative case passes at ${check.maxAgreement} or below` : `passes at ${check.minAgreement} or above`;
   return { ...binary(agentRun.id, passed, `Agreement ${agreement} (${threshold}). ${rationale}`), agreement };
+}
+
+type RunWithResult = AgentRun & { envelope: NonNullable<AgentRun['envelope']> & { result: Record<string, unknown> } };
+
+/** Whether a run gave a result for a check to grade. */
+export function producedResult(agentRun: AgentRun): agentRun is RunWithResult {
+  const result = agentRun.envelope?.result;
+  return result !== null && result !== undefined;
 }
 
 /**
@@ -125,11 +168,11 @@ export async function runEvaluatorCheck(
   onJudgeCall: (call: JudgeCall) => void = () => {},
 ): Promise<EvaluatorOutcome> {
   const { agentRun } = subject;
-  const envelope = agentRun.envelope;
-  const result = envelope?.result;
-  if (envelope === null || result === null || result === undefined) {
+  if (producedResult(agentRun) === false) {
     return binary(agentRun.id, false, `The Agent Run produced no result (status: ${agentRun.status})`);
   }
+  const { envelope } = agentRun;
+  const { result } = envelope;
 
   try {
     switch (check.kind) {

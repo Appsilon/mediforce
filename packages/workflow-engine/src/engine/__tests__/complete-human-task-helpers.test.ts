@@ -213,6 +213,61 @@ describe('shapeCompletion — verdict-with-params variant', () => {
   });
 });
 
+describe('shapeCompletion — agent review with params', () => {
+  const task = baseTask({
+    creationReason: 'agent_review_l3' as never,
+    params: [{ name: 'ctcaeVersion', type: 'string', required: false }] as never,
+    verdicts: [
+      { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+      { key: 'revise', label: 'Request changes', intent: 'warning', requiresComment: false },
+    ],
+    completionData: {
+      reviewType: 'agent_output_review',
+      agentOutput: { result: { grade: 3, ctcaeVersion: 'v4.0' } },
+    },
+  });
+  const complete = (verdict: string, comment?: string, target = task) => shapeCompletion(
+    target,
+    { kind: 'verdict-with-params', verdict, comment, paramValues: { ctcaeVersion: 'v5.0' } },
+    'user-1',
+    '2026-06-03T00:00:00.000Z',
+  );
+
+  it('a revise re-runs the agent and hands it the values, with no comment needed', () => {
+    const result = complete('revise');
+    expect(result.isL3Revise).toBe(true);
+    expect(result.stepOutput).toMatchObject({ grade: 3, ctcaeVersion: 'v5.0', verdict: 'revise' });
+    expect(result.stepOutput.reviewerComment).toBeUndefined();
+    expect(result.stepOutput.reviewerCallToAction).toContain('{"ctcaeVersion":"v5.0"}');
+  });
+
+  it('a revise keeps the comment in the feedback beside the values', () => {
+    const result = complete('revise', 'Grade it again');
+    expect(result.stepOutput.reviewerComment).toBe('Grade it again');
+    expect(result.stepOutput.reviewerCallToAction).toContain('Grade it again');
+    expect(result.stepOutput.reviewerCallToAction).toContain('{"ctcaeVersion":"v5.0"}');
+  });
+
+  it('an approve advances with the agent output and the values, the values winning', () => {
+    const result = complete('approve');
+    expect(result.isL3Revise).toBe(false);
+    expect(result.stepOutput).toMatchObject({ grade: 3, ctcaeVersion: 'v5.0', verdict: 'approve' });
+    expect(result.stepOutput.reviewerCallToAction).toBeUndefined();
+  });
+
+  it('keeps the agent output and the values on the completed task', () => {
+    expect(complete('approve').completionData).toMatchObject({
+      paramValues: { ctcaeVersion: 'v5.0' },
+      agentOutput: { result: { grade: 3, ctcaeVersion: 'v4.0' } },
+    });
+  });
+
+  it('still blocks approving an empty agent run', () => {
+    const emptyRun = { ...task, completionData: { reviewType: 'agent_output_review', agentOutput: { result: null } } };
+    expect(() => complete('approve', undefined, emptyRun)).toThrow(/agent produced no output/);
+  });
+});
+
 describe('shapeCompletion — verdict variant', () => {
   it('builds stepOutput with verdict + reviewer feedback fence on non-empty comment', () => {
     const task = baseTask();

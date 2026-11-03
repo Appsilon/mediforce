@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-14
+last_reviewed: 2026-10-30
 ---
 
 # Choosing an evaluation
@@ -70,7 +70,7 @@ flowchart TD
 | The output matches a known answer | a case with an expected output | `expected_output` Evaluator — exact match, or an agreement score | **Evaluators → Add**; set the expected output on the case |
 | The step behaves on inputs production never sent (missing file, edge values, renamed columns, an injected instruction) | a production run to start from | synthesized case | the assistant's case synthesis, or `mediforce eval case-perturb` |
 | How often the step passes, with a confidence interval | Evaluators and a saved Dataset | Eval Run + report | **Eval Runs**, `mediforce eval run-prepare` |
-| Whether the step is good enough to ship | the above plus a floor | **Acceptance Criteria** judged in the Eval Run report | **Set the threshold**; the assistant proposes a floor; `mediforce eval criteria-set` |
+| Whether the step is good enough to ship | the above plus a floor | **Acceptance Criteria** judged in the Eval Run report | **Edit** beside Acceptance Criteria in the status strip; the assistant proposes a floor; `mediforce eval criteria-set` |
 | Why a run failed | a finished Eval Run with failures | **diagnosis** card | ask the assistant; `mediforce eval failures <evalRunId>` |
 | Whether the step can drop its reviewer | a finished Eval Run | routing recommendation (Control Mode 4 when the criteria were met) | the report; apply it in the workflow editor |
 | Bad outputs stopped in live runs | a `schema` or `code` Evaluator | **Also run in production**; **Escalate** so an outage of the check stops the run too | Evaluator toggle, `mediforce eval evaluator-production` (`--on-error`) |
@@ -93,8 +93,10 @@ flowchart TD
 ```
 
 - Preview any check on real outputs before saving it (`evaluator-preview`, or
-  let the assistant do it — it previews every card it proposes). A `code`
-  preview starts a sandbox per output and a judge preview pays per output.
+  let the assistant do it — it previews every schema or code check it
+  proposes). A `code` preview starts a sandbox per output and a judge preview
+  pays per output, so the assistant proposes a judge untried: try it in a small
+  Eval Run.
   `expected_output` cannot be previewed: a production output has no expected
   output.
 - An `llm_judge` verdict below its `minConfidence` is shown in the report but
@@ -135,8 +137,8 @@ guarded in production needs steps 2 and 7, not a qualification.
 1. **Brief** (optional). Write the Evaluation Brief.
 2. **Evaluators.** Ask the assistant for an evaluation plan and draft a check
    for each risk, cheapest kind first. Approve `code` sources.
-3. **Criteria.** Accept the suggested floor, or set your own with **Set the
-   threshold**.
+3. **Criteria.** Accept the suggested floor, or set your own with **Edit**
+   beside Acceptance Criteria in the status strip.
 4. **Cases.** Harvest from production, add negatives and synthesized cases;
    split dev / holdout; **Save** to save a Dataset.
 5. **Eval Run.** Check the cost estimate, start, confirm the budget. Read the

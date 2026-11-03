@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildAgentReviewTaskVerdicts,
+  buildHumanTaskVerdicts,
   buildTaskVerdicts,
+  commentVerdictKeys,
+  isParamRequired,
   defaultRequiresComment,
   defaultVerdictIntent,
   defaultVerdictLabel,
@@ -103,3 +107,87 @@ describe('buildTaskVerdicts', () => {
   });
 });
 
+describe('step comment requirement', () => {
+  const verdicts = {
+    approve: { target: 'done' },
+    revise: { target: 'scan', requiresComment: true },
+  };
+
+  it('lets comment.requiredForVerdicts decide, over the verdict and its default', () => {
+    const out = buildTaskVerdicts(verdicts, { requiredForVerdicts: ['approve'] });
+    expect(out?.map(({ key, requiresComment }) => [key, requiresComment])).toEqual([
+      ['approve', true],
+      ['revise', false],
+    ]);
+  });
+
+  it('makes no comment required with an empty list', () => {
+    const out = buildTaskVerdicts(verdicts, { requiredForVerdicts: [] });
+    expect(out?.every(({ requiresComment }) => requiresComment === false)).toBe(true);
+  });
+
+  it('builds approve and revise for an agent review with no verdicts of its own', () => {
+    expect(buildAgentReviewTaskVerdicts(undefined, undefined)).toEqual([
+      { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+      { key: 'revise', label: 'Request changes', intent: 'warning', requiresComment: true },
+    ]);
+  });
+
+  it('applies the step comment setting and verdict labels to an agent review', () => {
+    const out = buildAgentReviewTaskVerdicts(
+      { revise: { target: 'scan', label: 'Send back' } },
+      { requiredForVerdicts: [] },
+    );
+    expect(out).toEqual([
+      { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+      { key: 'revise', label: 'Send back', intent: 'warning', requiresComment: false },
+    ]);
+  });
+});
+
+describe('a human step with no verdicts of its own', () => {
+  const comment = { requiredForVerdicts: [] };
+
+  it('offers the approve and revise its verdict form shows', () => {
+    expect(commentVerdictKeys({ executor: 'human' })).toEqual(['approve', 'revise']);
+  });
+
+  it('offers nothing when its form has no comment box', () => {
+    expect(commentVerdictKeys({ executor: 'human', params: [{ name: 'reason' }] })).toEqual([]);
+    expect(commentVerdictKeys({ executor: 'human', ui: { component: 'file-upload' } })).toEqual([]);
+  });
+
+  it('offers the verdicts it declares, or both on an agent review', () => {
+    expect(commentVerdictKeys({ executor: 'human', verdicts: { accept: { target: 'done' } }, params: [{ name: 'reason' }] })).toEqual(['accept']);
+    expect(commentVerdictKeys({ executor: 'agent' })).toEqual(['approve', 'revise']);
+    expect(commentVerdictKeys({ executor: 'agent', selection: 2 })).toEqual(['revise']);
+    expect(commentVerdictKeys({ executor: 'human', selection: 2 })).toEqual(['revise']);
+  });
+
+  it('carries the setting onto the task', () => {
+    expect(buildHumanTaskVerdicts({ executor: 'human', comment })).toEqual([
+      { key: 'approve', label: 'Approve', intent: 'success', requiresComment: false },
+      { key: 'revise', label: 'Request changes', intent: 'warning', requiresComment: false },
+    ]);
+  });
+
+  it('leaves the task as it was with no setting', () => {
+    expect(buildHumanTaskVerdicts({ executor: 'human' })).toBeUndefined();
+  });
+
+  it('never gives a params-only task verdicts, which would change its kind', () => {
+    expect(buildHumanTaskVerdicts({ executor: 'human', comment, params: [{ name: 'reason' }] })).toBeUndefined();
+  });
+});
+
+describe('isParamRequired', () => {
+  it('counts any verdict in requiredForVerdicts as required', () => {
+    expect(isParamRequired({ required: false, requiredForVerdicts: ['revise'] })).toBe(true);
+  });
+
+  it('follows required when no verdict is named', () => {
+    expect(isParamRequired({ required: true })).toBe(true);
+    expect(isParamRequired({ required: false })).toBe(false);
+    expect(isParamRequired({ required: false, requiredForVerdicts: [] })).toBe(false);
+  });
+});

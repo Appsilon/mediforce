@@ -50,9 +50,14 @@ export class OpenRouterLlmClient {
 
         const data = await response.json() as {
           model?: string;
-          choices: Array<{ message: { content: string } }>;
+          choices: Array<{
+            message: { content: string | null };
+            finish_reason?: string | null;
+          }>;
           usage?: { prompt_tokens: number; completion_tokens: number };
         };
+        const choice = data.choices[0];
+        const content = choice.message.content ?? '';
         const answeredBy = data.model ?? model;
         const promptTokens = data.usage?.prompt_tokens ?? 0;
         const completionTokens = data.usage?.completion_tokens ?? 0;
@@ -63,15 +68,16 @@ export class OpenRouterLlmClient {
             model: answeredBy,
             promptTokens,
             completionTokens,
-            content: data.choices[0].message.content,
+            content,
           },
           this.tracingOptions.captureContent === true,
         );
 
         return {
-          content: data.choices[0].message.content,
+          content,
           model: answeredBy,
           usage: { promptTokens, completionTokens },
+          stopReason: choice.finish_reason ?? null,
         };
       },
     );

@@ -10,6 +10,7 @@ import type { CallerScope } from '../../repositories/index';
 import { NotFoundError } from '../../errors';
 import { loadEvaluationSubject, subjectRef, runVersionOf } from './_lib/evaluation-subject';
 import { loadScoredRun, type ScoredRun } from './_lib/scored-run';
+import { judgedFiles, producedResult } from './_lib/run-evaluator-check';
 import {
   checkOutcome,
   evaluatorError,
@@ -25,12 +26,17 @@ import {
  * `llm_judge`'s messages, or an agreement comparison's. Null for a check no
  * model runs, and for a run with no output — no check ran on it.
  */
-function judgePromptOf(check: EvaluatorCheck | null, subject: ScoredRun | null, evalCase: EvalCase | null): JudgeMessage[] | null {
-  const envelope = subject?.agentRun.envelope ?? null;
-  const result = envelope?.result;
-  if (check === null || subject === null || envelope === null || result === null || result === undefined) return null;
+async function judgePromptOf(check: EvaluatorCheck | null, subject: ScoredRun | null, evalCase: EvalCase | null): Promise<JudgeMessage[] | null> {
+  if (check === null || subject === null || producedResult(subject.agentRun) === false) return null;
+  const { envelope } = subject.agentRun;
+  const { result } = envelope;
   if (check.kind === 'llm_judge') {
-    return llmJudgeMessages({ rubric: check.rubric, stepInput: subject.stepInput, trajectory: subject.trajectory }, envelope);
+    return llmJudgeMessages({
+      rubric: check.rubric,
+      stepInput: subject.stepInput,
+      trajectory: subject.trajectory,
+      files: await judgedFiles(subject.agentRun),
+    }, envelope);
   }
   if (check.kind === 'expected_output' && evalCase !== null && evalCase.expectedOutput !== null && evalCase.comparison === 'agreement') {
     return outputAgreementMessages({
@@ -85,7 +91,7 @@ export async function getEvalTrial(input: GetEvalTrialInput, scope: CallerScope)
       review: review === undefined || decision === null
         ? null
         : { decision, reviewedBy: review.createdBy, reviewedAt: review.createdAt, comment: review.comment },
-      judgePrompt: judgePromptOf(check, subject, evalCase),
+      judgePrompt: await judgePromptOf(check, subject, evalCase),
       judgeCalls: score === undefined ? trial.erroredJudgeCalls[evaluator.evaluatorId] ?? null : judgeCallsOf(score),
     };
   }));

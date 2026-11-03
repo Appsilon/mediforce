@@ -3,6 +3,7 @@ export type {
   LlmMessage,
   LlmResponse,
   LlmClient,
+  LlmAnswerSchema,
   AgentContext,
   WorkflowAgentContext,
   AgentOutputGate,

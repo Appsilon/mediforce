@@ -629,6 +629,8 @@ import {
   ListEvalDatasetsOutputSchema,
   ListEvaluatorsInputSchema,
   ListEvaluatorsOutputSchema,
+  ListAgentProductionRunsInputSchema,
+  ListAgentProductionRunsOutputSchema,
   ListStepAgentRunsInputSchema,
   ListStepAgentRunsOutputSchema,
   PreviewEvaluatorInputSchema,
@@ -678,6 +680,8 @@ import {
   type ListEvalDatasetsOutput,
   type ListEvaluatorsInput,
   type ListEvaluatorsOutput,
+  type ListAgentProductionRunsInput,
+  type ListAgentProductionRunsOutput,
   type ListStepAgentRunsInput,
   type ListStepAgentRunsOutput,
   type PreviewEvaluatorInput,
@@ -1136,6 +1140,8 @@ export class Mediforce {
     approveEvaluatorSource: (input: ApproveEvaluatorSourceInput) => Promise<EvaluatorOutput>;
     previewEvaluator: (input: PreviewEvaluatorInput) => Promise<PreviewEvaluatorOutput>;
     listStepAgentRuns: (input: ListStepAgentRunsInput) => Promise<ListStepAgentRunsOutput>;
+    /** The finished production runs of the Steps that use an Agent, each with what its Step changes about it. */
+    listAgentProductionRuns: (input: ListAgentProductionRunsInput) => Promise<ListAgentProductionRunsOutput>;
     /** What one Agent Run's step was given and what it returned. */
     getAgentRunIo: (input: GetAgentRunIoInput) => Promise<GetAgentRunIoOutput>;
     listCases: (input: ListEvalCasesInput) => Promise<ListEvalCasesOutput>;
@@ -2723,8 +2729,14 @@ export class Mediforce {
         PreviewEvaluatorOutputSchema, 'mediforce.evaluation.previewEvaluator',
       ),
       getAgentRunIo: async (input) => {
-        const { agentRunId } = GetAgentRunIoInputSchema.parse(input);
-        return this.getJson(`/api/evaluation/agent-runs/${encodeURIComponent(agentRunId)}/io`, GetAgentRunIoOutputSchema, 'mediforce.evaluation.getAgentRunIo');
+        const { agentRunId, namespace, agentId } = GetAgentRunIoInputSchema.parse(input);
+        const qs = toSearchParams({ namespace, agentId });
+        return this.getJson(`/api/evaluation/agent-runs/${encodeURIComponent(agentRunId)}/io${qs}`, GetAgentRunIoOutputSchema, 'mediforce.evaluation.getAgentRunIo');
+      },
+      listAgentProductionRuns: async (input) => {
+        const validated = ListAgentProductionRunsInputSchema.parse(input);
+        const qs = toSearchParams({ namespace: validated.namespace, agentId: validated.agentId, limit: String(validated.limit), cursor: validated.cursor });
+        return this.getJson(`/api/evaluation/agent-production-runs${qs}`, ListAgentProductionRunsOutputSchema, 'mediforce.evaluation.listAgentProductionRuns');
       },
       listStepAgentRuns: async (input) => {
         const validated = ListStepAgentRunsInputSchema.parse(input);

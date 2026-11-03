@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Bot, Check, Loader2, Send, Settings, Sparkles, User, X } from 'lucide-react';
 import { DEFAULT_MODEL } from '@mediforce/platform-core';
 import type {
+  AgentOutputSchema,
   EvaluationSubject,
   EvaluationAssistantPlatformToolName,
   EvaluationAssistantProposalToolName,
@@ -17,6 +18,7 @@ import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { selectBase } from '@/components/workflows/workflow-editor/step-editor-fields';
 import { StartEvalRunCard } from './step-evaluation-sections';
+import { primaryButtonClass } from './evaluation-styles';
 import { EvaluationBriefField, EvaluationBriefToggle, type BriefQuery } from './evaluation-brief-field';
 import {
   ControlSettingsCard,
@@ -129,6 +131,12 @@ function StepsSummary({ steps }: { steps: ActivityStep[] }) {
   );
 }
 
+/** The jobs a page hands the assistant, each asked with one button in the panel. */
+export interface EvaluationAssistantStarter {
+  intro?: string;
+  actions: { label: string; prompt: string; testId: string }[];
+}
+
 /**
  * The Evaluation Assistant (ADR-0023 D14–D15) beside the Step's evaluation.
  * It reads and previews on its own; everything it would change arrives as a
@@ -136,16 +144,20 @@ function StepsSummary({ steps }: { steps: ActivityStep[] }) {
  * person confirms the budget on the card. The Step's Brief, which it reads on
  * every turn, opens from the header.
  */
-export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEdit, editReason, mayRun, runReason }: {
+export function EvaluationAssistantPanel({ step, definitionVersion, outputSchema, brief, mayEdit, editReason, mayRun, runReason, starter }: {
   step: EvaluationSubject;
   /** The workflow version whose step the assistant reads and runs. */
   /** Null for an Agent evaluated on its own (ADR-0029), which runs as it is now. */
   definitionVersion: number | null;
+  /** The step's `agent.outputSchema`, offered when a proposed Evaluator is reviewed. */
+  outputSchema: AgentOutputSchema | undefined;
   brief: BriefQuery;
   mayEdit: boolean;
   editReason: string | undefined;
   mayRun: boolean;
   runReason: string | undefined;
+  /** Follows the conversation, in place of the general intro, for as long as the page offers it. */
+  starter?: EvaluationAssistantStarter;
 }) {
   const [messages, setMessages] = React.useState<PanelMessage[]>([]);
   const [input, setInput] = React.useState('');
@@ -221,6 +233,7 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
     }
   };
 
+  const hasStarter = starter !== undefined && starter.actions.length > 0;
   return (
     <aside className="flex h-full min-h-0 flex-col rounded-xl border bg-white shadow-lg dark:bg-background" data-testid="evaluation-assistant" data-tour="eval-assistant">
       <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3">
@@ -287,7 +300,7 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
           followLatest.current = element.scrollHeight - element.scrollTop - element.clientHeight < FOLLOW_LATEST_THRESHOLD;
         }}
       >
-        {messages.length === 0 && (
+        {hasStarter === false && messages.length === 0 && (
           <p className="text-xs text-muted-foreground">
             Ask for an evaluation plan, turn a rule into a check tried on real runs,
             synthesize edge cases, prepare an Eval Run or explain a report. It proposes; you decide.
@@ -331,6 +344,7 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
                     key={proposalIndex}
                     step={step}
                     state={{ proposal, status: state.status }}
+                    stepOutputSchema={outputSchema}
                     mayEdit={mayEdit}
                     editReason={editReason}
                     onDecided={(status) => decide(index, proposalIndex, status)}
@@ -363,6 +377,24 @@ export function EvaluationAssistantPanel({ step, definitionVersion, brief, mayEd
           </div>
         )}
         {error !== null && <p className="text-xs text-destructive">{error}</p>}
+        {/* Below the conversation: the next job is asked where the last one ended. */}
+        {hasStarter && (
+          <div className="space-y-2.5 pb-1" data-testid="evaluation-assistant-starter">
+            {starter.intro !== undefined && <p className="text-sm text-muted-foreground">{starter.intro}</p>}
+            <div className="flex flex-wrap gap-2">
+              {starter.actions.map((action) => (
+                <button
+                  key={action.testId}
+                  type="button"
+                  className={primaryButtonClass}
+                  data-testid={action.testId}
+                  disabled={pending}
+                  onClick={() => void send(action.prompt, 'card')}
+                >{action.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       <div className="flex shrink-0 gap-2 border-t p-2">
         <textarea

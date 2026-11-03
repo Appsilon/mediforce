@@ -19,7 +19,7 @@ import type {
   ProcessNotificationConfig,
 } from '@mediforce/platform-core';
 import type { AgentFallbackReason, Selection, TaskVerdict } from '@mediforce/platform-core';
-import { normalizeSelection, buildTaskVerdicts, toProcessDefinition, resolveInstanceAssignee, resolveParamDefaults } from '@mediforce/platform-core';
+import { normalizeSelection, buildHumanTaskVerdicts, toProcessDefinition, resolveInstanceAssignee, resolveParamDefaults } from '@mediforce/platform-core';
 import { validateStepGraph } from '@mediforce/platform-core';
 import { StepExecutor, type StepActor } from './step-executor';
 import { RoutingError, InvalidTransitionError, ParentInstanceNotFoundError } from './errors';
@@ -266,7 +266,7 @@ export class WorkflowEngine {
           // this branch only fires for executor === 'human'. Verdicts are
           // copied onto the task so the form renders without re-reading the WD.
           const verdictsField: { verdicts?: TaskVerdict[] } = {};
-          const resolvedVerdicts = buildTaskVerdicts(nextStep.verdicts);
+          const resolvedVerdicts = buildHumanTaskVerdicts(nextStep);
           if (resolvedVerdicts) verdictsField.verdicts = resolvedVerdicts;
 
           let preAssignedUserId: string | null = null;
@@ -867,6 +867,8 @@ export class WorkflowEngine {
       status: 'running',
       pauseReason: null,
       updatedAt: now,
+      // The step stays put and runs again: its next iteration reads the reviewer's feedback from here.
+      ...(isL3Revise ? { variables: { ...instance.variables, [resolvedTask.stepId]: stepOutput } } : {}),
     });
 
     if (!isL3Revise) {

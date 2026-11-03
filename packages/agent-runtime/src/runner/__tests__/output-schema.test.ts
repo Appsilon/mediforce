@@ -89,6 +89,12 @@ describe('validateOutputSchema', () => {
 });
 
 describe('repairOutput', () => {
+  it('repairs from the last object of an answer that quotes another first', async () => {
+    const llm: LlmClient = { complete: vi.fn<LlmClient['complete']>().mockResolvedValue({ content: 'I kept {"term": "x"} and wrote:\n{"term": "x", "grade": 3}', model: 'repair-model', usage: { promptTokens: 1, completionTokens: 1 } }) };
+    const repair = await repairOutput(llm, 'm', { term: 'x', grade: 3 }, { type: 'object', required: ['term', 'grade'] }, 'missing required keys: grade');
+    expect(repair).toMatchObject({ ok: true, result: { term: 'x', grade: 3 } });
+  });
+
   const schema = {
     type: 'object',
     required: ['grade', 'serious', 'term'],

@@ -1,7 +1,7 @@
 ---
 status: living
 audience: everyone
-last_reviewed: 2026-08-19
+last_reviewed: 2026-11-03
 ---
 
 # Mediforce
@@ -285,73 +285,42 @@ restricts one — a Step may still name any image string.
 
 **Image Catalog Entry**:
 One image the platform offers, identified by its **source**: `built`
-`(repo, dockerfile)`, `referenced` (an untagged image reference — also what an
-image built from an **uploaded build context** lands in, named
-`<workspace>/<name>`, and what an image **pulled from a registry** lands in,
-since the platform keeps none of their inputs), or `carried`
+`(repo, dockerfile)`, `referenced` (an untagged image reference — also where an
+uploaded build context or a registry pull lands), or `carried`
 `(workflow, dockerfile)` for a Dockerfile a Workflow Definition carries in its
-files. Deliberately
-**not** keyed on the commit, so a rebuild is another **Version** of a row the
-author already chose rather than a new row — nor on the **build context** a
-`built` source may name, which is how the Dockerfile is built rather than which
-Dockerfile it is. Every fact on it is derived from the Docker daemon; the one
-thing a human writes is its **Intent**. Any Workspace member may create and edit
-one — an entry executes nothing; deleting one takes its images with it and needs
-Workspace admin.
-
-**Discovered Entry** *(of an Image Catalog)*:
-An Image Catalog Entry the platform derived from an image this namespace built
-and nobody has described yet — keyed on the `(repo, dockerfile)` or, for a
-carried Dockerfile, the `(workflow, dockerfile)` the build labelled, carrying every derived fact and an empty **Intent**. Not a stored row:
-it is recomputed from the daemon on every read, and describing it is what
-registers it, at the same id ([ADR-0022](docs/adr/0022-image-catalog.md)
-decision 7). A **Catalogued Entry** is the opposite — one somebody wrote a
-sentence for. The only difference in what the platform derives is where the
-probe result is kept: a memo in the API process rather than a stored column.
+files. Not keyed on the commit, so a rebuild is another **Version** of the same
+entry. Every fact on it is derived from the Docker daemon except its **Intent**.
+Any Workspace member may create and edit one; deleting one takes its images with
+it and needs Workspace admin.
+_Note_: A **Discovered Entry** is one the platform derived from an image this
+namespace built that nobody has described yet — recomputed on every read, not
+stored; describing it registers it at the same id. A **Catalogued Entry** is one
+somebody wrote an Intent for.
 
 **Version** *(of an Image Catalog Entry)*:
-One built artifact of an entry's source: a commit for a `built` entry, a tag for
-a `referenced` one, a content hash for a `carried` one, carrying the image tag that names it on the daemon. Versions
-are derived on read from the daemon's build labels, never stored.
+One built artifact of an entry's source — a commit (`built`), a tag
+(`referenced`) or a content hash (`carried`) — with the image tag that names it.
+Derived on read from the daemon's build labels, never stored.
 
 **Capability** *(of an Image Catalog Version)*:
-The derived set of `claude`, `opencode`, `bash`, `sh`, `python3`, `Rscript`, and
-`node` binaries that a bounded, network-isolated probe found. It is cached by
-daemon image ID when the entry is registered, so rendering a catalog or picker
-never starts a container. A **Discovered Entry** has no row to cache into, so
-its probe results are memoised in the API process by image id instead — filled
-on the same single-entry read, lost on restart, never a stored fact. A Version is **agent-capable** only when it has
-`bash` and either agent CLI; an unavailable daemon or timed-out probe is
-explicitly `unknown`, which remains selectable without a suitability claim.
-`sh` and `bash` are two members of the set rather than one, because the engine
-runs a `runtime: bash` step as `sh <script>`: an `alpine` carrying only busybox
-`sh` runs one, and only a step needing bash-only syntax needs `bash`.
+The set of `claude`, `opencode`, `bash`, `sh`, `python3`, `Rscript` and `node`
+binaries a network-isolated probe found in the image. A Version is
+**agent-capable** when it has `bash` and either agent CLI; a probe that could not
+run is `unknown`, which stays selectable without a suitability claim. `sh` and
+`bash` are separate because a `runtime: bash` step runs as `sh <script>`.
 
-**Lineage** *(of an Image Catalog Version)*:
-The ancestry relation between images, computed from `RootFS.Layers` prefix
-containment — image X descends from image P exactly when X's layer array starts
-with the whole of P's — never parsed from a `FROM` string, so it holds for
-images the platform did not build. Recomputed on every read; nothing about it
-is stored.
-
-**Base** *(of an Image Catalog Entry or Version)*:
-The nearest ancestor **in the same namespace's catalog**, or `none` for a root.
-Nearest, not the root of the tree: an image built on one that is itself
-catalogued names the closer of the two, and the catalog view groups entries
-under it, roots first. Nothing is special-cased — an entry for `python3.12-slim`
-collects everything built on it exactly as the golden image collects the
-workflow images. A **layer summary** is the steps a Version adds over its base,
-cut at that boundary and read off `docker history` with build-arg values
-redacted; it is never "the Dockerfile" — no file contents, no comments, no
-multi-stage.
+**Lineage** / **Base** *(of an Image Catalog Version)*:
+Lineage is image ancestry computed from layer-prefix containment, never parsed
+from a `FROM` line, so it holds for images the platform did not build. Base is
+the nearest ancestor **in the same namespace's catalog** (`none` for a root);
+the catalog groups entries under it. A **layer summary** is the steps a Version
+adds over its Base — never "the Dockerfile".
 
 **Intent** *(of an Image Catalog Entry)*:
 The single required human sentence: what the image is *for* — "R-based
-interactive exploration of ADaM datasets". Not a description of its contents;
-contents go stale on the next pin bump, intent does not. Required on every
-stored entry, and empty on exactly one thing: a **Discovered Entry**, which no
-build can write it for.
-Labelled **Description** in the Images view.
+interactive exploration of ADaM datasets" — not what it contains (contents go
+stale on the next pin bump). Empty only on a Discovered Entry. Labelled
+**Description** in the Images view.
 
 ### Identity / auth
 
@@ -375,21 +344,14 @@ A secret an owner or admin mints from workspace settings and hands to a room —
 a workshop, a demo, a pilot cohort — for people whose addresses they do not
 have in advance ([ADR-0021](docs/adr/0021-workspace-join-links.md)). Redeeming
 one at `/join/<token>` grants the plain `member` **Membership** and nothing
-else — never `admin`, never `owner`, and never a **Role**. The seat is not a
-property of the link: whoever holds it types an address, so the mailbox check
-controls who gets the *session*, never who gets the *seat*. Promoting someone
-stays a deliberate act by a named admin. It does **not** open a Session:
-redemption seeds the account and sends the same activation email an invite
-does, so a link on a slide, or a photograph of that slide, is not an account.
-Organizations only; a Join Link carries an expiry and an optional use cap, and
-only its hash is stored, so the token is shown once at creation and is never
-recoverable.
+else — never `admin`/`owner`, never a **Role**. It does **not** open a Session:
+redemption sends the same activation email an invite does, so a photograph of
+the link is not an account. Organizations only; carries an expiry and an
+optional use cap; the token is shown once and only its hash is stored.
 _Avoid_: "invite link" — an **Invite** names one address the admin already
-knows and writes that person's rows; a Join Link names nobody and is redeemed
-by whoever holds it. Both end in the same activation email.
+knows; a Join Link names nobody and is redeemed by whoever holds it.
 _Note_: Revoking a Join Link closes the entrance; it removes nobody who already
-walked through it. That is `mediforce namespace remove-member`, as for any
-other member.
+walked through it (`mediforce namespace remove-member` does).
 
 **Roles** *(process-domain, plural)*:
 Functional roles a User holds for workflow purposes — e.g. `reviewer`, `PI`,
@@ -416,28 +378,22 @@ _Note_: Four **Built-in Roles** ship with every deployment — see below.
 `editor`, `executor`, `reviewer` and `workflow-manager`
 ([ADR-0020](docs/adr/0020-built-in-roles-and-default-workflow-access.md)).
 Ordinary Roles in every respect — free-form strings, granted and revoked like
-any other. What makes them built-in is that the platform writes them into the
-ordinary places by default: a Workflow's first version is registered with
-`run: [executor, workflow-manager]` / `edit: [editor, workflow-manager]`, a
-human Step added in the editor starts at `allowedRoles: [reviewer,
-workflow-manager]`, and all four are always offered in the role pick-lists.
+any other; what makes them built-in is that the platform writes them in by
+default: a Workflow's first version gets `run: [executor, workflow-manager]` /
+`edit: [editor, workflow-manager]`, a new human Step gets `allowedRoles:
+[reviewer, workflow-manager]`, and all four are offered in role pick-lists.
 `workflow-manager` is the union of the other three, not a rank above them.
-The defaults are a **floor**. A restricted Workflow verb always admits the
-built-in roles that carry it, so `run: [qa-lead]` is stored as
-`[executor, workflow-manager, qa-lead]` and the Access tab shows those two as
-locked; a restricted Step always admits `workflow-manager`, applied where the
-gate reads rather than written into the Workflow Definition, which travels.
-`reviewer` gets no such standing — it is an ordinary Role that authored
-definitions name, and its `act` verb shows up only as the default a new human
-Step is seeded with. An unrestricted verb or Step stays open to any member.
-_Avoid_: calling them reserved or protected — nothing rejects a Role named
-`editor` from a different source, and nothing in the gate treats these four
-specially. A built-in Role holds a privilege only where a list names it; the
-floor is what puts it there.
-_Note_: A Workspace's owner always holds `workflow-manager` — granted at
-creation and re-established on every write from the Roles table, where its row
-has no Remove control. Whoever registers a Workflow holds it narrowed to that
-Workflow. Both exist so a seeded gate is never one nobody can pass.
+The defaults are a **floor**: a restricted Workflow verb always admits the
+built-in roles that carry it (`run: [qa-lead]` is stored as `[executor,
+workflow-manager, qa-lead]`), and a restricted Step always admits
+`workflow-manager`, applied at the gate rather than written into the Definition.
+`reviewer` has no such floor. An unrestricted verb or Step stays open to any
+member.
+_Avoid_: calling them reserved or protected — nothing in the gate treats these
+four specially; a built-in Role holds a privilege only where a list names it.
+_Note_: A Workspace's owner always holds `workflow-manager`, and whoever
+registers a Workflow holds it narrowed to that Workflow — so a seeded gate is
+never one nobody can pass.
 
 **Workflow Access** *(workflow governance level)*:
 Which **Roles** may `run` a Workflow (start a run) and which may `edit` it
@@ -487,7 +443,9 @@ Namespace Secret with the same key.
 *(Layered model and system-of-record split defined in
 [ADR-0007](docs/adr/0007-llm-evaluation-observability.md); the design of
 Evaluators, Eval Runs and Step Qualification in
-[ADR-0023](docs/adr/0023-step-evaluation.md).)*
+[ADR-0023](docs/adr/0023-step-evaluation.md); Agents as a second subject in
+[ADR-0029](docs/adr/0029-agent-evaluation.md) and
+[ADR-0031](docs/adr/0031-agent-cases-from-workflow-runs.md).)*
 
 **Trace**:
 The telemetry record of one Agent Run's execution — a tree of spans (LLM
@@ -518,15 +476,18 @@ _Avoid_: confusing with **Trace** (external telemetry, may not exist) and
 "transcript" / "log" (the transient activity log it replaces).
 
 **Evaluation**:
-The activity of measuring whether one agent Workflow Step — or one Agent on its
-own, outside any workflow — in one configuration, is trustworthy for its
-context of use.
+The activity of measuring whether one **subject** — an agent Workflow Step, or
+an Agent on its own, outside any workflow — in one configuration, is
+trustworthy for its context of use. Every Evaluator, Eval Case, Eval Dataset,
+Brief and Acceptance Criteria belongs to exactly one subject; production-only
+features (cases perturbed from a run, previews on past outputs, drift) are a
+Step's.
 _Avoid_: "validation" — in pharma that means Computer System Validation of
 the platform itself (GAMP 5, 21 CFR Part 11), and here it already names
 schema-shape checking of a Definition.
 
 **Evaluation Assistant**:
-The AI agent a user works with through a Workflow Step's whole Evaluation — suggesting
+The AI agent a user works with through a subject's whole Evaluation — suggesting
 what to evaluate, drafting Evaluators and Eval Cases, running and explaining
 Eval Runs, and proposing fixes.
 _Avoid_: "validation assistant", "fix assistant" / "plan assistant" (one
@@ -534,21 +495,26 @@ assistant, not several); confusing with the workflow editor's assistant, which
 edits the Workflow Definition.
 
 **Evaluation Brief**:
-A Workflow Step's short, versioned statement of what it is for, who relies on its
+A subject's short, versioned statement of what it is for, who relies on its
 output, and which failures matter most — its context of use.
 _Avoid_: "priorities", "instructions" (the workflow editor's assistant has
-per-user instructions; a Brief belongs to the Workflow Step).
+per-user instructions; a Brief belongs to the subject).
 
 **Evaluator**:
-One rule a Workflow Step's output must satisfy, stated in plain language and backed by
-an executable check that produces Scores.
+One rule a subject's output must satisfy, stated in plain language and backed by
+an executable check (`schema`, `code`, `llm_judge` or `expected_output`) that
+produces Scores.
 _Avoid_: "validation rule", "assertion", "metric", "grader".
 
 **Eval Case**:
-One input fixture for a Workflow Step, optionally with its **expected output** —
-the output to match (a *positive* case) or one the step must not return (a
-*negative* case) — and the Evaluators that grade it (every one of the Step's
-unless it names some).
+One input fixture for a subject, optionally with its **expected output** —
+the output to match (a *positive* case) or one it must not return (a
+*negative* case) — and the Evaluators that grade it (every one of the
+subject's unless it names some). Source: `production` (from a run — for an
+Agent, a run of a Step that used it), `manual`, or `synthesized`. A case from a
+reviewed run is labelled by the review: an output sent back with `revise` is a
+negative case, the reviewer's comment its agreement instructions; the approved
+output a positive one.
 _Avoid_: "test case", "sample", "golden" (an expected output is compared exactly
 or by an agreement score, never assumed to be the only right answer), "notes"
 (cases no longer carry free-text notes).
@@ -569,8 +535,8 @@ judge's confidence; *denied* leaves it out. A denial never reverses the verdict.
 _Avoid_: "label", "override", "calibration" (judges are not calibrated).
 
 **Eval Dataset**:
-A versioned, saved set of Eval Cases for one Workflow Step, drawn from production
-Agent Runs, synthesised, or written by hand. Namespace-scoped.
+A versioned, saved set of one subject's Eval Cases; an Eval Run runs one
+version. Namespace-scoped.
 _Avoid_: "Dataset" alone (collides with generic data-engineering usage),
 "Benchmark" (implies public/academic suites).
 
@@ -641,12 +607,12 @@ the user-facing immutable log.
   many **Agent OAuth Tokens** (per server).
 - An **Agent** has 0..N **Skills**: its own Namespace's, or any `public` one.
   A `public` **Agent** has only `public` **Skills**.
-- An agent **Workflow Step** owns 0..N **Evaluators** and 0..N
-  versioned **Eval Datasets**; neither is shared with another Workflow Step (reuse
-  is by copy). An **Agent** can own its own, evaluated on it alone (ADR-0029).
+- An agent **Workflow Step** or an **Agent** owns 0..N **Evaluators** and 0..N
+  versioned **Eval Datasets**; neither is shared with another subject (reuse is
+  by copy, or by evaluating the Agent itself).
 - An **Agent** has 1..N **Agent versions** once saved; an Agent's **Eval Run**
   assesses exactly one.
-- An agent **Workflow Step** has 0..1 **Evaluation Brief** (versioned); it
+- An agent **Workflow Step** or an **Agent** has 0..1 **Evaluation Brief** (versioned); it
   guides the **Evaluation Assistant** and is not part of an **Eval Run** or a
   **Step Qualification**.
 - An **Evaluation Assistant** proposes **Evaluators**, **Eval Cases** and
@@ -656,7 +622,8 @@ the user-facing immutable log.
 - An **Evaluator** has many versions; a version that has produced a **Score**
   never changes.
 - An **Eval Run** executes one **Eval Dataset** version against one
-  **Workflow Step**; each trial is a single-step **Workflow Run**.
+  **Workflow Step** or **Agent version**; each trial is a single-step
+  **Workflow Run**.
 - A **Step Qualification** cites exactly one **Eval Run**, one
   **Step Fingerprint**, and the **Evaluator** versions it was judged by.
 

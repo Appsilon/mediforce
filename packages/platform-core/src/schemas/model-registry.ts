@@ -62,6 +62,11 @@ export const ModelRegistryEntrySchema = z.object({
   outputModalities: z.array(z.string()),
   supportsTools: z.boolean(),
   supportsVision: z.boolean(),
+  /**
+   * The request parameters some provider of the model takes, as OpenRouter lists
+   * them (`temperature`, `structured_outputs`, …); absent until a sync says.
+   */
+  supportedParameters: z.array(z.string()).optional(),
   source: z.enum(['openrouter', 'manual']),
   requestCount: z.number().nullable(),
   lastSyncedAt: z.string(),

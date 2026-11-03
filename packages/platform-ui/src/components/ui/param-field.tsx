@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { isParamRequired } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
 import { parseJsonObjectText } from '@/lib/trigger-input-payload';
 
@@ -8,6 +9,7 @@ export interface ParamFieldDef {
   name: string;
   type?: string;
   required?: boolean;
+  requiredForVerdicts?: string[];
   description?: string;
   default?: unknown;
   options?: string[];
@@ -104,7 +106,7 @@ export function ParamField({ param, value, onChange, disabled }: ParamFieldProps
     <div className="space-y-1.5">
       <label className="flex items-baseline gap-1.5 text-sm font-medium">
         {param.name}
-        {param.required && <span className="text-destructive">*</span>}
+        {isParamRequired(param) && <span className="text-destructive">*</span>}
       </label>
       {param.description && (
         <p className="text-xs text-muted-foreground">{param.description}</p>

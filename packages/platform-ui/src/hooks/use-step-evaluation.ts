@@ -7,6 +7,7 @@ import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 
 type Section =
+  | 'agent-production-runs'
   | 'brief'
   | 'evaluators'
   | 'evaluators-with-archived'
@@ -27,10 +28,11 @@ function sectionKey(step: EvaluationSubject, section: Section) {
 }
 
 /** What one Agent Run's step was given and what it returned; fetched only while `agentRunId` is set. */
-export function useAgentRunIo(agentRunId: string | null) {
+export function useAgentRunIo(agentRunId: string | null, subject?: EvaluationSubject) {
+  const agent = subject?.kind === 'agent' ? { namespace: subject.namespace, agentId: subject.agentId } : {};
   return useQuery({
-    queryKey: queryKeys.agentRunIo(agentRunId ?? ''),
-    queryFn: () => mediforce.evaluation.getAgentRunIo({ agentRunId: agentRunId! }),
+    queryKey: [...queryKeys.agentRunIo(agentRunId ?? ''), agent] as const,
+    queryFn: () => mediforce.evaluation.getAgentRunIo({ agentRunId: agentRunId!, ...agent }),
     enabled: agentRunId !== null,
     staleTime: Number.POSITIVE_INFINITY,
     retry: stopRetryOn4xx,
@@ -138,7 +140,7 @@ export function useEvalRunEstimate(step: EvaluationSubject, definitionVersion: n
 /**
  * Every read the Evaluation tab shows for one agent Step (ADR-0023), its
  * validation in `definitionVersion` — or for an Agent on its own (ADR-0029),
- * which has no production runs to drift or harvest from, and no version to pick.
+ * which reads the runs of the Steps that use it, has no drift, and no version to pick.
  */
 export function useStepEvaluation(step: EvaluationSubject, definitionVersion: number | null) {
   const options = { retry: stopRetryOn4xx } as const;
@@ -163,6 +165,14 @@ export function useStepEvaluation(step: EvaluationSubject, definitionVersion: nu
       initialPageParam: undefined as string | undefined,
       getNextPageParam: (page) => page.nextCursor,
       enabled: production,
+      ...options,
+    }),
+    agentProductionRuns: useInfiniteQuery({
+      queryKey: sectionKey(step, 'agent-production-runs'),
+      queryFn: ({ pageParam }) => mediforce.evaluation.listAgentProductionRuns({ ...agentOnly(step), limit: STEP_AGENT_RUNS_PAGE, cursor: pageParam }),
+      initialPageParam: undefined as string | undefined,
+      getNextPageParam: (page) => page.nextCursor,
+      enabled: production === false,
       ...options,
     }),
   };
@@ -192,6 +202,12 @@ export function invalidateSubject(queryClient: QueryClient, step: EvaluationSubj
       ? queryClient.invalidateQueries({ queryKey: queryKeys.workflowValidation(step.namespace, step.workflowName) })
       : queryClient.invalidateQueries({ queryKey: queryKeys.agentVersions(step.agentId) }),
   ]);
+}
+
+/** The Agent whose Steps' runs a read is about; a Step never runs one (`enabled` keeps it off). */
+function agentOnly(step: EvaluationSubject): { namespace: string; agentId: string } {
+  if (step.kind === 'step') throw new Error(`Step '${step.stepId}' reads its own production runs`);
+  return { namespace: step.namespace, agentId: step.agentId };
 }
 
 /** The Step a production-only read is about; an Agent's never runs one (`enabled` keeps it off). */

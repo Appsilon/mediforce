@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-16
+last_reviewed: 2026-10-30
 ---
 
 # Step Evaluation
@@ -31,16 +31,60 @@ The **Evaluation** tab of a workflow shows one agent step of one workflow
 version at a time — picked with the **Version** selector (the runnable version
 unless `?version=` names another live one; archived versions are not offered)
 and then the **Step** selector (`?step=`), each option marked with its
-validation (see Validation below) — its Acceptance Criteria with whether it is
-validated against them, Evaluators, Eval Cases and that version's finished Eval
-Runs, plus any prepared or running run of another version, tagged with it —
-beside the Evaluation Assistant (`mediforce eval ask`,
-`POST /api/evaluation/assistant`), whose header holds the step's Brief. The
-assistant reads and prepares runs of the step as the selected version has it
+validation (see Validation below). A status strip names the step's validation,
+its Acceptance Criteria and the Dataset the next Eval Run takes; under it three
+tabs (`?section=runs|cases|evaluators`) hold that version's finished Eval Runs,
+plus any prepared or running run of another version, tagged with it; the Eval
+Cases; and the Evaluators. A step with Eval Runs opens on them, one without on
+its cases. A banner over the tabs counts `code` Evaluators whose source nobody
+approved. Beside the tabs is the Evaluation Assistant (`mediforce eval ask`,
+`POST /api/evaluation/assistant`), whose header holds the step's Brief and
+which is always shown. The assistant reads and prepares runs of the step as
+the selected version has it
 (`definitionVersion`, `mediforce eval ask --version N`; the runnable version
 when absent). A step's Evaluators, cases, Brief and criteria are the step's,
 not a version's: they stay readable and editable from an older version even
 once the runnable version no longer has the step.
+
+A step (or Agent) with nothing yet — no Brief, cases, Evaluators or Eval Runs —
+opens, for a person who may edit it, on a choice: **Guided setup** or **Set up
+manually** (the tabs, until the Evaluation is left — an empty step offers the
+choice again, unless a link or reload names a tab with `?section=`), with how many production runs it has to start cases from.
+The guided setup (`?guided=brief|cases|evaluators|review`, only for a person
+who may edit — anyone else on such a link sees the tabs)
+walks four stages beside the assistant, which holds one conversation per stage
+— a stage opens on its own, and going back to one returns to it: **Brief** (optional; an open field, saved as a new version
+when the person leaves it), **Eval
+Cases** — *Do you know the correct outputs?* **Yes** or **For some** adds one
+`expected_output` Evaluator, `matches-expected-output`, unless the step has one
+(an archived one comes back as a new version) — **Evaluators**, and **Summary**. For each of the first three the assistant's
+panel offers a button that asks it to draft that stage (the Brief; cases from
+runs — for an Agent, the runs of the Steps that use it, as it is first — or edge cases and planted errors; the checks themselves — up to five
+Evaluators, each schema or code one previewed and each judge proposed untried,
+with no plan to pick from first); its proposals arrive as
+cards, as on the tabs. **Cases from runs** follows the answer to *Do you know
+the correct outputs?*: on **No** each run gives a case without an expected
+output (`expectedOutput: null`, which a verdict does not override); otherwise a reviewed run's decisions label its cases — every review
+round sent back with **Request changes** is a negative case (that round's
+own output, compared by meaning with the reviewer's comment and param values as
+its agreement instructions, all taken by the platform from that round's run),
+the output finally approved a positive one, each on the input of the review's
+first round — and an
+unreviewed run's output comes as an expected output for the person to mark.
+`list_step_runs` lists runs grouped by Workflow Run, each with the step's
+rounds oldest first, so a review reads as one chain. Each round carries the
+reviewer's comment and non-blank param values. Summary sums
+up the stages, sets the Acceptance Criteria (minimum pass rate, optionally
+pass^k) and, on **Save**, writes them if changed and saves the cases as a new
+Dataset version if unsaved, then opens the tabs; **Save and start Eval Run**
+saves, then asks for trials and a budget as the Eval Runs tab does. Both need
+a case and an Evaluator, and wait for the stored criteria to load. Summary's
+progress pill is checked after a save until the Brief, cases or Evaluators
+change, for as long as the Evaluation stays open. **Manual
+setup**, beside the Version and Step pickers, opens the tabs without saving
+anything more; **Guided setup** in the same place reopens the setup at any
+time, whatever the step already has.
+
 Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
 
 - **Runs freely:** reading the step (config, agent prompt and system prompt,
@@ -49,14 +93,33 @@ Its authority is tiered ([ADR-0023](../adr/0023-step-evaluation.md) D15):
   configuration production refuses shows as such — and as trials see them,
   SKILL.md, the steps upstream of it), its
   production runs with the reviewer's verdict and their trajectories, the
-  workspace files a run started from, Evaluators, cases, Eval Runs and
+  workspace files of a run that gave a result, as it started or as it left
+  them (with the files it wrote), Evaluators, cases, Eval Runs and
   reports — with every judge verdict's rationale and review — a run's failing trials
   (`get_failures`), the step's qualification and Acceptance
   Criteria (`get_qualification`), and `preview_evaluator` — it
-  tries a check on real outputs before proposing it.
+  tries a schema or code check on the step's Eval Cases and real outputs
+  before proposing it. A judge is not previewed: two outputs say little of how
+  it judges, so the card marks it untried and the assistant suggests a small
+  Eval Run. The assistant leaves a judge's model to the platform, which pins
+  its default (the newest Claude Sonnet in the model registry); it names one
+  only when the person asks, and the platform refuses a model the registry does
+  not list, has retired, or whose supported parameters do not list `structured_outputs`
+  (a registry with no models yet cannot say, so a named model then stands),
+  and an alias whose model changes under the same name. A new version that names
+  no model keeps its Evaluator's, unless the registry retired or dropped it.
 - **Proposes:** Evaluators and new versions of them, Eval Cases (harvested,
   written or synthesized), Brief drafts and Acceptance Criteria come back as
-  cards to accept or reject. Accepting one is the same write the forms
+  cards to accept or reject. An Eval Case card shows the case as it would be
+  stored — its source, the assistant's rationale, and previews of its input and
+  expected output (a harvested case's are the run's own, the output only once
+  a person reviewed the run; a synthesized case's is its run's input with the
+  changes applied, each listed, a file change included). One with an expected output lets
+  the person mark it **Positive** or **Negative**, or drop it (**No expected
+  output**), before accepting. **Review** opens it whole in the Add case form,
+  to edit before accepting; a synthesized case accepted there keeps its file changes.
+  An Evaluator card's **Review** likewise opens the proposed check in the Add
+  Evaluator form, and a new version's in the form that edits its Evaluator. Accepting one is the same write the forms
   make, recorded with `origin: assistant`. A routing recommendation (a Control
   Mode) comes back as a card to apply in the workflow editor. So does a **diagnosis** of an Eval Run's failures
   (`propose_diagnosis`) — see below. Nothing is applied to the step by the
@@ -113,14 +176,14 @@ The step's Brief is sent to the assistant on every turn. What it can help with:
   trial of that run.
 - **Rule to check.** A plain-language rule becomes the cheapest reliable kind —
   `schema`, then `code`, a judge only when a script cannot decide it. Every
-  proposed check is tried by the platform on the step's recent production
-  outputs before the card is shown (reusing the assistant's own preview of the
+  proposed `schema` or `code` check is tried by the platform on up to 2 outputs
+  — the step's Eval Cases first, then recent production outputs that gave a
+  result — before the card is shown (reusing the assistant's own preview of the
   same check), and the card shows what it did. A check that errors on every
   output goes back to the assistant instead of to the person; for a person
-  without the `run` verb the card says it was not tried. The try runs the check on up to 5 outputs, so it is not free: a `code` check
-  starts a sandbox per output, and an `llm_judge` pays for a model call per
-  output — a turn that proposes a judge the assistant did not preview takes
-  longer and costs more. A refined rule is a proposed new version of the
+  without the `run` verb the card says it was not tried. A `code` try starts a
+  sandbox per output. A judge is not tried: its card says so, and a small Eval
+  Run shows how it judges. A refined rule is a proposed new version of the
   Evaluator.
 - **Judges.** It writes a rubric that names what passes, what fails and the
   evidence that decides it. After a run it reads the judge verdicts a person
@@ -132,6 +195,15 @@ The step's Brief is sent to the assistant on every turn. What it can help with:
   knows one: the source run's for a change that keeps the meaning, or a
   negative case's output the agent must not return. A change that does not
   apply to that run goes back to the assistant instead of to the person.
+- **Planted errors.** It red-teams the cases with negative ones, those a step
+  under CM4 has no reviewer to give: a real run's output that looks right,
+  with one obvious error planted in it (a finding dropped, a grade or value
+  changed, a value invented), on that run's own input — the output changes,
+  not the input, so it is not a perturbed case — compared by agreement, its agreement
+  instructions naming the planted error as the one difference that decides.
+  One error per case, named after it. **Suggest edge cases** asks for these
+  along with the edge-case inputs, unless the person answered **No** to *Do you
+  know the correct outputs?*: then nothing compares an expected output.
 
 Every proposal is checked against the platform before it is shown: an Evaluator
 name already taken, or an Evaluator or run of another step, is refused the same
@@ -141,7 +213,8 @@ The assistant pane uses the same model picker as the workflow editor so the mode
 conversation. While it works, the pane lists each step it takes (reading a run,
 previewing a check, drafting a card) as it happens, and keeps that list folded
 under the reply; `mediforce eval ask` prints the same steps to stderr. The pane
-widens by dragging its left edge, and the width is remembered per browser.
+widens by dragging its left edge, on the tabs and in the guided setup alike,
+and the width is remembered per browser.
 
 Each request allows 32 model/tool rounds and up to 8,000 output tokens per
 model call. These application limits are separate from the model's context
@@ -189,14 +262,20 @@ One rule in plain language plus the check behind it. Four kinds:
 |---|---|---|
 | `schema` | `result` against the JSON Schema subset `agent.outputSchema` uses | at once |
 | `code` | a `python` or `javascript` script in the `script-container` sandbox (no network) | after a person approves that version's source |
-| `llm_judge` | a model reads the step's input, the agent's Trajectory and its output, explains its judgment, then answers pass or fail with a confidence 0–1 | at once; each verdict below its `minConfidence` is left out unless a person accepts it |
+| `llm_judge` | a model reads the step's input, the agent's Trajectory, the files it wrote and its output, explains its judgment, then answers pass or fail with a confidence 0–1 | at once; each verdict below its `minConfidence` is left out unless a person accepts it |
 | `expected_output` | `result` against the Eval Case's expected output — an exact match, or an agreement score 0–1 from its model; see [Expected outputs](#expected-outputs) | at once |
 
 A `code` check reads `/output/input.json` — `{ result, stepInput, trajectory,
 case }` — and the step's workspace commit read-only at `/workspace`, and writes
 `/output/result.json` as `{ "passed": boolean, "comment"?: string }`. A check
 that crashes, or a judge that gives no usable verdict, is an *error*, never a
-failed output.
+failed output. A judge's error says when its answer was cut off at its
+output-token limit, when it used up that limit before writing anything, or when
+it came back empty; a rate limit or provider failure is asked once more before
+it errors the check. The limit is 16,000 tokens per call, or the model's own
+limit in the registry when that is lower, and a model's reasoning counts against
+it, so each judge call records its reasoning tokens when the provider reports
+them.
 
 Every change is a new immutable version; a `code` version's source approval
 attaches to it. In the tab's form, what blocks a save — no name, no rule, a
@@ -206,10 +285,30 @@ field it is about, and cleared once that field is edited.
 An `llm_judge` check is `{ kind, model, rubric, minConfidence }`
 (`minConfidence` 0–1, 0.8 when not set). The judge is given the step's input,
 the agent's whole Trajectory — its reasoning, every tool call and tool result,
-numbered, long logs cut in the middle — its output and its own summary. It is
-not told a case's expected output or whether the case is negative. It must explain its judgment — what exactly decided the
-verdict and why, citing the input, the output and log entries by number — and
-answer `{ "rationale", "passed", "confidence" }`. The Score is `1`/`0` with
+numbered, each entry cut at 2,000 characters except a tool call's input (up to
+20,000, so a document the agent wrote arrives whole), long logs cut in the
+middle — the text files the run's commit changed, each cut at 20,000 characters
+and 60,000 in all (a binary, deleted, over-1 MB or unreadable file is named with
+why it is not shown; the step's own `result.json` is left out), its output and
+its own summary. It is not told a case's expected
+output or whether the case is negative. It must explain its judgment — what
+exactly decided the verdict and why, citing the input, the output and log
+entries by number — and answer with one JSON object,
+`{ "rationale", "passed", "confidence" }` (an `expected_output` agreement judge
+answers `{ "rationale", "agreement" }`).
+
+On a model whose model-registry entry lists `structured_outputs` among its
+supported parameters (synced from OpenRouter), the request constrains decoding
+to that object's JSON Schema: `response_format` with `strict`, and
+`provider.require_parameters` so OpenRouter routes only to providers that take
+every parameter sent. The answer cannot come back as prose or broken JSON. The
+request leaves out `temperature: 0` on a model whose supported parameters do
+not list `temperature` — Claude 5.5 does not, and sending it would leave no
+provider to route to. On any
+other model the answer is asked for in text, before and after the material;
+the last whole object in its text that parses to that shape is the answer, so a
+draft gives way to the final answer and prose around it — even prose quoting
+JSON — is skipped. The Score is `1`/`0` with
 label `pass`/`fail`, the rationale as its comment, and
 `metadata.judgeConfidence` and `metadata.judgeMinConfidence`.
 
@@ -270,13 +369,34 @@ In the Evaluation tab, **Evaluators → Add** picks the kind from a dropdown and
 shows its fields — a JSON Schema (started from the step's `agent.outputSchema`,
 or an Agent's `outputSchema`, when it declares one), a language and source, a judge model with the question
 it answers and its minimum confidence — never the check's JSON.
-Each Evaluator's **Details** show the whole check and its versions; **Edit**
-saves a new version with what changed (`POST
-/api/evaluation/evaluators/:id/versions`), keeping its name and kind.
+The Evaluators are a table, one row per Evaluator: **Evaluator** — its name
+and rule, with a bot icon when its latest version is from the assistant —
+**Type**, **Version**, **Status** (*Counts* or *Not counted — reason*) and
+**In production** — the "Also run in production" checkbox with whether it is
+scoring live runs, and *When it cannot run* for a production `schema` or `code`
+check; *never* for an `expected_output` check or an Agent's Evaluators — then
+**Details**, **Approve source** (an unapproved `code` check), **Edit** and
+**Archive**. On narrow screens Version is hidden; Details still lists the
+versions. **Details** opens under the row with the thresholds, the whole check
+and its versions; **Edit** opens the form under the row and saves a new version
+with what changed (`POST /api/evaluation/evaluators/:id/versions`), keeping its
+name and kind. A click on **Evaluator**, **Type**, **Version**, **Status** or
+**In production** sorts by it (ascending, descending, then as listed); the
+funnel by **Type**, **Status** and **In production** (*Yes*, *No*, *Never*)
+filters to the values left ticked; a value that turns up later shows until it
+is unticked too. Both are client-side and reset on reload.
 
 `evaluator-preview` (`POST /api/evaluation/evaluators/preview`) runs a draft
-check against the Step's recent production outputs (dry runs left out) and
-writes nothing — try a check on real outputs before saving it. It runs check
+check on up to `limit` (default 5) outputs and writes nothing — try a check on
+real outputs before saving it. The Step's Eval Cases come first: each case taken
+from a run on its own input, with an expected output, is graded as that run
+with the case's expected output as its result (`cases`) — only the result is
+swapped: the input, log and workspace files stay the run's. The case's expectation
+is not consulted — it only labels the case for `expected_output` checks, and the
+assistant's card marks a negative case as an output to avoid. The
+Step's latest production runs that gave a result fill the rest (`results`),
+leaving out dry runs, runs that ended without one (escalated, cancelled) and
+the runs those cases came from. `--agent-run` tries only the runs named. It runs check
 code and spends the workspace's model key, so it needs the workflow's `run`
 verb.
 
@@ -395,10 +515,21 @@ new output. What a case expects of that output:
   Evaluator that grades its case passed.
 
 A harvested case takes the run's output as its expected output when a person
-reviewed the run: approved, a positive case; rejected, a negative one. A run
-sent back for revision or never reviewed gives none. An `expectedOutput` in the
+reviewed the run: approved, a positive case; rejected, a negative one, both
+compared exactly unless the request says otherwise. A run sent back with the
+`revise` verdict is a negative case too, compared by meaning (`agreement`), with
+the reviewer's comment and non-blank param values in its agreement instructions. So
+is a run a human review step sends back: a verdict routing to an earlier agent
+step, under any key, records a `human_verdict` Score on that step's latest run
+(`metadata.sentBack`). A human step's other verdicts are not recorded. Any
+other verdict (a recheck) or no review gives none. Whatever the round, a case
+holds the input and workspace of the review's first round: a round sent back
+starts from the output it replaces, which the case must not hand over. A run
+after one nobody sent back, such as a loop's next item, keeps its own. An `expectedOutput` in the
 request (`null` for none) replaces the run's output and is positive unless
-`expectation` says otherwise — the verdict labels only the run's own output. `case-from-run` takes `--expectation`, `--comparison` and `--input-file` (a case input other than the run's makes a `manual` case that keeps the run).
+`expectation` says otherwise — the verdict labels only the run's own output, so
+its comparison and instructions apply only to that output under the verdict's
+own expectation; flipping a `revise` run to positive compares exactly. `case-from-run` takes `--expectation`, `--comparison` and `--input-file` (a case input other than the run's makes a `manual` case that keeps the run).
 
 In the Evaluation tab, **Eval Cases → Add case** is the one way to add a case:
 a dialog that starts from a production run, an existing case's input, a `.json`
@@ -406,12 +537,13 @@ file, or an empty input. **Start from** lists the Step's finished production
 runs, newest first and a page at a time (**Load more runs**; `GET
 /api/evaluation/agent-runs` takes the previous page's `nextCursor` as `cursor`),
 marking runs that already have a case; it starts on the newest run that has none. Starting from a run fills the **Input**
-with what its step was given and the **Expected output** with what it returned
+with what its step was first given (a review's first round) and the **Expected output** with what it returned
 (`eval run-io <agentRunId>`, `GET /api/evaluation/agent-runs/:agentRunId/io`; its
 `caseInput` is the same input as an Eval Case made from the run holds it, and its
 `verdictExpectation` is what a person's review makes of the output: approved
-positive, rejected negative, `null` unreviewed). The case then starts positive or
-negative from that review. Each side is marked **As the source run** or
+positive, rejected or `revise` negative, `null` otherwise), with
+`verdictComparison` and `verdictAgreementInstructions` beside it. The case then
+starts from that review. Each side is marked **As the source run** or
 **Edited**, with **Use the source run's input** / **output** to put the run's
 back, and **Source run log** opens the run's execution log inline. It is saved
 with `POST /api/evaluation/cases/from-agent-run` carrying the form's `input`:
@@ -438,11 +570,20 @@ expected output that is not JSON, an input missing `triggerPayload` or
 `previousStepOutputs` — is said in plain words under the field it is about,
 and cleared once that field is edited.
 
-Each case in the list shows its labels (positive or negative, split, source),
-for a case made from a run whether it is **as run** or **edited** — its input
-differs from what the run was given, or its expected output (none included)
-from what the run returned — and **Edit** and **Archive** beside them. Its
-**Details** show only what the case gives the step and what it expects: its
+The cases are a table, one row per case: **Case** — its name and, for a case
+made from a run, whether it is **from run** or **edited from run** (its input
+differs from what the run was given, or its expected output, none included,
+from what the run returned) — **Type** (positive, negative, or input only
+without an expected output; Details shows the expected output), **Comparison**
+(Exact match or By meaning), and **Graded by** — *All N* or a count (*All* while the step has no Evaluators), which opens into the
+Evaluators' names — then **Details**, **Edit** and **Remove** (archives the
+case). On narrow screens Comparison is hidden; Details still has it. Every
+data column sorts (ascending, descending, then as listed); **Type**,
+**Comparison** (*None* without an expected output) and **Graded by** (*All* /
+*Selected*) also filter, to the values left ticked — a value that turns up
+later shows until it is unticked too. A case a filter hides is deselected.
+Sorting and filters are client-side and reset on reload. **Details** opens under the row and shows only what the
+case gives the step and what it expects: its
 input, its expected output and how it is compared, and the Evaluators that grade
 it — plus **Source run log** for a case made from a run, synthesized ones
 included. **Edit** opens the same dialog to
@@ -450,7 +591,7 @@ change its name, split, input, expected output and how it is compared, or the
 Evaluators that grade it (`case-edit <caseId> --file`, `PATCH
 /api/evaluation/cases/:caseId`). Ticking cases in the list and **Set
 evaluators…** sets the Evaluators of all of them at once, one edit per case that
-changes; **Archive** takes it out of the next save (`case-archive`). An edit
+changes; **Remove** takes it out of the next save (`case-archive`). An edit
 is a new case that replaces the old one, which is archived, so a Dataset version
 saved with the old case keeps exactly what it ran. A production case whose input is edited becomes `manual` — production never
 saw that input — and keeps the run it came from. MCP recordings are kept per
@@ -466,7 +607,8 @@ files of the workspace the run started from, and are written as a new commit on
 the workflow's bare repo, kept by the ref `refs/mediforce/eval-seeds/<caseId>`,
 which the case starts from. A change that does not apply — removing what is not
 there, editing a file that is missing or binary, file changes on a run with no
-workspace — is refused. It is built from production data, so it is flagged as
+workspace — is refused. An `input` given with the changes (a person's edit on
+review) is stored in place of what `inputChanges` make. It is built from production data, so it is flagged as
 containing it. It takes the same expected output, expectation, comparison and
 Evaluators as a written case.
 
@@ -700,7 +842,7 @@ person's review, and for a model judge (an `llm_judge`, or an agreement
 comparison) its **Evaluator logs**: the exact messages it was sent, then each
 answer its model gave, with the model, tokens and duration. The messages are
 rebuilt from the Evaluator version frozen into the run and the trial's input,
-log and output by the code that sent them (`llmJudgeMessages`,
+log, written files and output by the code that sent them (`llmJudgeMessages`,
 `outputAgreementMessages`); the answers are kept on the Score
 (`metadata.judgeCalls`), or, for a check that gave no Score, on the trial
 (`erroredJudgeCalls`, by Evaluator id), and returned as `judgeCalls`. A trial
@@ -722,9 +864,10 @@ version in force when it is prepared, so changing them never rejudges a run.
 `mediforce eval criteria-get|criteria-set --file`,
 `GET|POST /api/evaluation/acceptance-criteria`.
 
-In the Evaluation tab, the top row is the step's validation status (see
-Validation below) and **Set the threshold**, whose tooltip lists the floors in
-force. The button opens a dialog with one slider, from 0% to 100%. Nothing is
+In the Evaluation tab, the status strip shows the step's validation status (see
+Validation below) and the floors in force in one line (*Each counted Evaluator
+≥ 90%*), with **Edit** (labelled *Edit Acceptance Criteria* for assistive tech) beside
+them. Edit opens a dialog with one slider, from 0% to 100%. Nothing is
 saved until **Save**, which writes one new version and keeps `minPassHatK`,
 which only the CLI, the API and the assistant set. The tab shows no version.
 
@@ -883,15 +1026,47 @@ Criteria, Eval Runs and Qualification work as above, with these differences:
   workspace (409): its suite lives in the workspace it has now.
 - `mediforce eval qualification --agent <id>` reads the Agent as it is now and
   prints its Agent version; `--version` is for a step.
-- **No production features.** An Agent has no production runs of its own, so
-  harvesting or perturbing cases, previewing a check, drift and production
-  Evaluators are refused. Write cases by hand.
+- **No production features of its own.** An Agent has no production runs of its
+  own, so perturbing cases, previewing a check on production outputs, drift and
+  production Evaluators are refused.
+- **A check is tried on its Eval Cases.** `evaluator-preview --agent` and the
+  assistant's self-test grade the Agent's cases taken from a run, with an expected
+  output, on the case's input with the expected output as the result. The log and
+  workspace stay the production run's, and the card says an Eval Run starts from an
+  empty workspace and names what a workflow altered. A case is skipped when its run
+  went under another output schema or the caller may not run its workflow, and
+  naming a run is refused
+  ([ADR-0031](../adr/0031-agent-cases-from-workflow-runs.md) decision 5). With no
+  case to try, the card says the check is first tried in its next Eval Run.
+- **Its cases can start from runs of the Workflows that use it**
+  ([ADR-0031](../adr/0031-agent-cases-from-workflow-runs.md)). **Add case → Start
+  from** groups those runs under *Workflows running this agent as it is* and
+  *Workflows that alter this agent*, by `agentStepChanges` on the Workflow version
+  each run ran (`mediforce eval agent-runs --agent <id>`, `GET
+  /api/evaluation/agent-production-runs`), and starts on the newest unused run of
+  the first group. Each entry names the workflow and step, the workflow run's id,
+  the Agent Run's local start time and the workflow run's status
+  (`workflowRunStatus`), because an Agent Run that went to review stays `paused`
+  after its workflow run moves on; an Agent Run in any status other than
+  `completed` or `paused` also shows its own. An altered run says which fields it
+  altered. The case holds
+  what the Agent was given as its trigger payload — literal `stepParams`, then the
+  step's input, then its `${…}` mappings — from an empty workspace, keeps the run
+  and is flagged as containing production data (`eval run-io <agentRunId> --agent
+  <id> --namespace <ns>`, `eval case-from-run <agentRunId> --agent <id> --namespace
+  <ns>`).
+- **An output under another output schema is not used.** When the run's step
+  declares an `outputSchema` other than the Agent's, its output and the verdict on
+  it read as null, and that output is refused as an expected output. The input
+  stays usable. The comparison is with the Agent as it is now, so a change to the
+  Agent's own schema after the run is not detected.
 - **Its Evaluation Assistant reads the Steps that use it.** The assistant is the
   Step's, with the Agent's toolset: it reads the Agent (`get_agent`) instead of a
   step, and finds the Steps that use the Agent with their recent production runs
   (`list_agent_production_runs`), reading one as for a step (`get_agent_run`,
-  `get_trajectory`). From what a run was given it proposes a *written* case — the
-  trigger payload carrying what the Agent used, flagged as containing production
-  data. It has no step reads, previews, synthesized cases or routing.
+  `get_trajectory`), each with what its step changed. It proposes a case from a
+  run, or a written one, says when a run came from a workflow that altered the
+  Agent, and its card says so too. It previews a check on the Agent's Eval Cases.
+  It has no step reads, synthesized cases or routing.
 - Only a container agent of the workspace, with a runtime, is evaluated.
 

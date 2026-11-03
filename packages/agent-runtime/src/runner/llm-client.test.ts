@@ -101,6 +101,7 @@ describe('OpenRouterLlmClient endpoint', () => {
       content: '{"findings": []}',
       model: 'anthropic/claude-sonnet-4',
       usage: { promptTokens: 0, completionTokens: 0 },
+      stopReason: null,
     });
   });
 

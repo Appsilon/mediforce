@@ -35,7 +35,7 @@ function subjectContext(step: EvaluationSubject, name: string, version: number):
     return `You are evaluating step '${step.stepId}' ("${name}") of workflow '${step.workflowName}' v${version} in workspace '${step.namespace}'.`;
   }
   return `You are evaluating ${subjectName(step, false)} ("${name}") on its own, outside any workflow, in workspace '${step.namespace}'. `
-    + 'Each Eval Case\'s triggerPayload is its whole input. Its production runs are those of the steps that use it: write cases from what they were given, and a check is first tried in an Eval Run.';
+    + 'Each Eval Case\'s triggerPayload is its whole input. Its production runs are those of the steps that use it: write cases from what they were given.';
 }
 
 function preparedRun(result: unknown): PreparedEvalRun | null {
@@ -89,8 +89,10 @@ export async function askEvaluationAssistant(
   const previewed: PreviewedCheck[] = [];
   const executePlatformTool = async (toolName: EvaluationAssistantPlatformToolName, args: unknown) => {
     const toolResult = await executeEvaluationTool(toolName, args, scope, { step, definition, workflowStep, agent, ...(unattended === undefined ? {} : { unattended }) });
-    if (toolName === 'preview_evaluator') {
-      previewed.push({ check: (args as { check: EvaluatorCheck }).check, results: (toolResult as PreviewEvaluatorOutput).results });
+    // A preview on runs the assistant chose skips the Eval Cases, so it cannot stand in for the card's self-test.
+    const { check, agentRunIds } = args as { check: EvaluatorCheck; agentRunIds?: string[] };
+    if (toolName === 'preview_evaluator' && agentRunIds === undefined) {
+      previewed.push({ check, preview: toolResult as PreviewEvaluatorOutput });
     }
     return toolResult;
   };

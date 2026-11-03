@@ -1,3 +1,5 @@
+import type { LlmAnswerSchema } from '@mediforce/agent-runtime';
+
 /**
  * OpenRouter chat completions client (non-streaming).
  *
@@ -44,8 +46,8 @@ export interface OpenRouterResponse {
    * truncated — callers building large artifacts must treat this as an error.
    */
   finishReason: string | null;
-  /** Token counts as OpenRouter reports them; zero when the response carries none. */
-  usage: { promptTokens: number; completionTokens: number };
+  /** Token counts as OpenRouter reports them; zero when the response carries none. `completionTokens` includes `reasoningTokens`, which is absent when the provider does not report it. */
+  usage: { promptTokens: number; completionTokens: number; reasoningTokens?: number };
 }
 
 export interface OpenRouterRequest {
@@ -53,7 +55,13 @@ export interface OpenRouterRequest {
   messages: OpenRouterChatMessage[];
   apiKey: string;
   tools?: OpenRouterToolDefinition[];
-  temperature?: number;
+  /**
+   * The JSON object the answer must be: decoding is constrained to it, and
+   * OpenRouter routes only to providers that can do that.
+   */
+  answerSchema?: LlmAnswerSchema;
+  /** 0.7 when not given; null sends none, for a model that takes none. */
+  temperature?: number | null;
   maxTokens?: number;
 }
 
@@ -65,8 +73,19 @@ export class OpenRouterNetworkError extends Error {
   }
 }
 
+/** OpenRouter answered with a failing HTTP status; the message says what it means for the person. */
+export class OpenRouterApiError extends Error {
+  constructor(readonly status: number, model: string, body: string) {
+    super(`Model API error ${String(status)}: ${describeModelApiFailure(status, model, body)}`);
+    this.name = 'OpenRouterApiError';
+  }
+}
+
 /** What a failing HTTP status means for the person, and what they can do about it. */
-function describeModelApiFailure(status: number): string {
+function describeModelApiFailure(status: number, model: string, body: string): string {
+  if (status === 404 && body.includes('requested parameters')) {
+    return `No provider of ${model} takes every parameter the request sent, so OpenRouter could not route it. Pick another model, or resync the model registry if its parameters changed.`;
+  }
   if (status === 401 || status === 403) return 'OpenRouter rejected the API key. Check that OPENROUTER_API_KEY in the workspace secrets is valid and not revoked.';
   if (status === 402) return 'The OpenRouter account is out of credits. Top it up, then try again.';
   if (status === 404) return 'OpenRouter does not offer the selected model. Pick another model in the assistant settings.';
@@ -92,10 +111,14 @@ export async function callOpenRouter(req: OpenRouterRequest): Promise<OpenRouter
   const body: Record<string, unknown> = {
     model: req.model,
     messages: req.messages,
-    temperature: req.temperature ?? 0.7,
     max_tokens: req.maxTokens ?? 4096,
   };
+  if (req.temperature !== null) body.temperature = req.temperature ?? 0.7;
   if (req.tools !== undefined) body.tools = req.tools;
+  if (req.answerSchema !== undefined) {
+    body.response_format = { type: 'json_schema', json_schema: { ...req.answerSchema, strict: true } };
+    body.provider = { require_parameters: true };
+  }
 
   const response = await postChatCompletion({
     method: 'POST',
@@ -109,7 +132,7 @@ export async function callOpenRouter(req: OpenRouterRequest): Promise<OpenRouter
   if (!response.ok) {
     const errorText = await response.text();
     console.warn('[openrouter] model API error', { status: response.status, model: req.model, body: errorText.slice(0, 600) });
-    throw new Error(`Model API error ${String(response.status)}: ${describeModelApiFailure(response.status)}`);
+    throw new OpenRouterApiError(response.status, req.model, errorText);
   }
 
   const data = (await response.json()) as {
@@ -120,10 +143,11 @@ export async function callOpenRouter(req: OpenRouterRequest): Promise<OpenRouter
       };
       finish_reason?: string | null;
     }>;
-    usage?: { prompt_tokens?: number; completion_tokens?: number };
+    usage?: { prompt_tokens?: number; completion_tokens?: number; completion_tokens_details?: { reasoning_tokens?: number | null } };
   };
 
   const choice = data.choices?.[0];
+  const reasoningTokens = data.usage?.completion_tokens_details?.reasoning_tokens;
   return {
     content: choice?.message?.content ?? '',
     toolCalls: choice?.message?.tool_calls ?? [],
@@ -131,6 +155,7 @@ export async function callOpenRouter(req: OpenRouterRequest): Promise<OpenRouter
     usage: {
       promptTokens: data.usage?.prompt_tokens ?? 0,
       completionTokens: data.usage?.completion_tokens ?? 0,
+      ...(typeof reasoningTokens === 'number' ? { reasoningTokens } : {}),
     },
   };
 }

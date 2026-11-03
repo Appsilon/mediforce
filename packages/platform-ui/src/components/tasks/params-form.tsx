@@ -86,7 +86,7 @@ export function ParamsForm({
         {params.map((param) => (
           <ParamField
             key={param.name}
-            param={param}
+            param={{ ...param, requiredForVerdicts: undefined }}
             value={values[param.name]}
             onChange={(value) => setValue(param.name, value)}
             disabled={submitting}

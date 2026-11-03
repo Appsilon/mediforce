@@ -67,8 +67,10 @@ export async function createEvaluator(
   const sameName = existing.find((evaluator) => evaluator.name === input.name);
   if (input.check.kind === 'schema') await assertSingleSchemaEvaluator(scope, step);
   if (sameName !== undefined) {
-    const archivedSchema = sameName.archived && (await evaluatorView(scope, sameName)).latest.check.kind === 'schema';
-    if (input.check.kind !== 'schema' || !archivedSchema) {
+    const revives = sameName.archived === true
+      && (input.check.kind === 'schema' || input.check.kind === 'expected_output')
+      && (await evaluatorView(scope, sameName)).latest.check.kind === input.check.kind;
+    if (revives === false) {
       throw new ConflictError(`${subjectName(step)} already has an Evaluator named '${input.name}'`);
     }
     await archiveEvaluator({ evaluatorId: sameName.id, archived: false }, scope);
