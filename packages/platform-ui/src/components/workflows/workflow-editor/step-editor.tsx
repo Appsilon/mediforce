@@ -82,6 +82,21 @@ function stepOutputFields(step: WorkflowStep): { name: string; type: string }[] 
   return [];
 }
 
+/** A completed run's `variables` is the engine's own `{stepId: output}` map
+ *  (see `composeSimpleWhen`'s `variables["id"].field` accessor) — reshaped into
+ *  the same `{name, type}[]` the Conditions builder uses for a declared schema,
+ *  inferring type from the actual value since there's no declared one. */
+function fieldsFromRunVariables(variables: Record<string, unknown> | undefined): Record<string, { name: string; type: string }[]> {
+  const fields: Record<string, { name: string; type: string }[]> = {};
+  if (!variables) return fields;
+  for (const [stepId, output] of Object.entries(variables)) {
+    if (output !== null && typeof output === 'object' && !Array.isArray(output)) {
+      fields[stepId] = Object.entries(output as Record<string, unknown>).map(([name, value]) => ({ name, type: typeof value }));
+    }
+  }
+  return fields;
+}
+
 const TRANSITION_OPERATORS = ['==', '!=', '>', '<', '>=', '<='] as const;
 type TransitionOperator = typeof TRANSITION_OPERATORS[number];
 
@@ -104,20 +119,23 @@ function unquoteValue(raw: string): string {
  *  accessor — every completed step's output already accumulates into
  *  `variables` keyed by step id). Anything else (compound logic, an unknown
  *  field or step) falls back to the raw expression editor. */
-function parseSimpleWhen(when: string, currentStepId: string, allSteps: WorkflowStep[]): SimpleCondition | null {
+function parseSimpleWhen(
+  when: string,
+  currentStepId: string,
+  allSteps: WorkflowStep[],
+  fieldsOf: (stepId: string) => { name: string; type: string }[],
+): SimpleCondition | null {
   const trimmed = when.trim();
   const own = /^output\.([A-Za-z_]\w*)\s*(==|!=|>=|<=|>|<)\s*(.+)$/.exec(trimmed);
   if (own) {
     const [, field, operator, rawValue] = own;
-    const currentStep = allSteps.find((s) => s.id === currentStepId);
-    if (!currentStep || !stepOutputFields(currentStep).some((f) => f.name === field)) return null;
+    if (!allSteps.some((s) => s.id === currentStepId) || !fieldsOf(currentStepId).some((f) => f.name === field)) return null;
     return { stepId: currentStepId, field, operator: operator as TransitionOperator, value: unquoteValue(rawValue) };
   }
   const crossStep = /^variables\["([^"]+)"\]\.([A-Za-z_]\w*)\s*(==|!=|>=|<=|>|<)\s*(.+)$/.exec(trimmed);
   if (crossStep) {
     const [, stepId, field, operator, rawValue] = crossStep;
-    const target = allSteps.find((s) => s.id === stepId);
-    if (!target || !stepOutputFields(target).some((f) => f.name === field)) return null;
+    if (!allSteps.some((s) => s.id === stepId) || !fieldsOf(stepId).some((f) => f.name === field)) return null;
     return { stepId, field, operator: operator as TransitionOperator, value: unquoteValue(rawValue) };
   }
   return null;
@@ -134,10 +152,15 @@ function composeSimpleWhen(condition: SimpleCondition, currentStepId: string, fi
 
 type TransitionMode = 'always' | 'else' | 'field' | 'custom';
 
-function transitionMode(when: string | undefined, currentStepId: string, allSteps: WorkflowStep[]): TransitionMode {
+function transitionMode(
+  when: string | undefined,
+  currentStepId: string,
+  allSteps: WorkflowStep[],
+  fieldsOf: (stepId: string) => { name: string; type: string }[],
+): TransitionMode {
   if (!when) return 'always';
   if (when === 'else') return 'else';
-  return parseSimpleWhen(when, currentStepId, allSteps) ? 'field' : 'custom';
+  return parseSimpleWhen(when, currentStepId, allSteps, fieldsOf) ? 'field' : 'custom';
 }
 
 function friendlyFieldError(message: string): string {
@@ -475,6 +498,27 @@ export function StepEditor({
     }
   }, [handle, workflowName, uid]);
 
+  // Fallback field source for a step with no declared output schema (script,
+  // action, cowork, or an agent that never set one): the fields actually seen
+  // on its most recent completed run, so the Conditions builder isn't a dead
+  // end for them. Best-effort only — the declared schema always wins when set.
+  const [lastRunFields, setLastRunFields] = useState<Record<string, { name: string; type: string }[]>>({});
+  useEffect(() => {
+    if (!workflowName) { setLastRunFields({}); return; }
+    let cancelled = false;
+    mediforce.runs.list({ workflow: workflowName, status: 'completed', limit: 1 })
+      .then((result) => {
+        if (!cancelled) setLastRunFields(fieldsFromRunVariables(result.runs[0]?.variables as Record<string, unknown> | undefined));
+      })
+      .catch((err) => console.error('Failed to load last run output fields:', err));
+    return () => { cancelled = true; };
+  }, [workflowName]);
+  const fieldsForStepId = (stepId: string): { name: string; type: string }[] => {
+    const candidate = allSteps.find((s) => s.id === stepId);
+    const declared = candidate ? stepOutputFields(candidate) : [];
+    return declared.length > 0 ? declared : (lastRunFields[stepId] ?? []);
+  };
+
   const otherSteps = allSteps.filter((s) => s.id !== step.id);
   const isAgent  = step.executor === 'agent'  && step.type !== 'terminal';
   const isHuman  = step.executor === 'human'  && step.type !== 'terminal';
@@ -488,7 +532,7 @@ export function StepEditor({
   const isTerminal = step.type === 'terminal';
   const outgoingTransitions = transitions.filter((t) => t.from === step.id);
   const hasRoutingConfigured = Object.keys(step.verdicts ?? {}).length > 0 || outgoingTransitions.some((t) => t.when);
-  const outputFields = stepOutputFields(step);
+  const outputFields = fieldsForStepId(step.id);
   const upstreamStepIds = computeAncestors(allSteps, transitions).get(step.id) ?? new Set<string>();
   const [transitionErrors, setTransitionErrors] = useState<Record<number, string>>({});
   // A `when` string that happens to parse as a simple field comparison always
@@ -1959,13 +2003,13 @@ export function StepEditor({
           <FieldGroup>
             {outgoingTransitions.map((transition) => {
               const index = transitions.indexOf(transition);
-              const mode = forceCustomMode[index] ? 'custom' : transitionMode(transition.when, step.id, allSteps);
-              const simple = mode === 'field' ? parseSimpleWhen(transition.when ?? '', step.id, allSteps) : null;
-              const fieldsOf = (stepId: string) => stepId === step.id ? outputFields : stepOutputFields(allSteps.find((s) => s.id === stepId) ?? step);
+              const mode = forceCustomMode[index] ? 'custom' : transitionMode(transition.when, step.id, allSteps, fieldsForStepId);
+              const simple = mode === 'field' ? parseSimpleWhen(transition.when ?? '', step.id, allSteps, fieldsForStepId) : null;
+              const fieldsOf = fieldsForStepId;
               const simpleField = simple ? fieldsOf(simple.stepId).find((f) => f.name === simple.field) : undefined;
               const stepsWithFields = [
                 ...(outputFields.length > 0 ? [step] : []),
-                ...otherSteps.filter((s) => upstreamStepIds.has(s.id) && stepOutputFields(s).length > 0),
+                ...otherSteps.filter((s) => upstreamStepIds.has(s.id) && fieldsForStepId(s.id).length > 0),
               ];
               return (
                 <FieldRow key={index} label="When" tooltip={TIP.transitionWhen} error={transitionErrors[index]}>

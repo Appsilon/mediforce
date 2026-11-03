@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DEFAULT_AGENT_IMAGE } from '@mediforce/platform-core';
 import type { AgentDefinition, ImageCommandCheck, ModelRegistryEntry, SkillSummary, ToolCatalogEntry, WorkflowStep } from '@mediforce/platform-core';
 import type { DockerImageInfo, ImageCatalogEntryView } from '@mediforce/platform-api/contract';
+import { mediforce } from '@/lib/mediforce';
 
 // ---- Mocks (must be before component import) ----
 
@@ -463,6 +464,41 @@ describe('StepEditor', () => {
     const modeSelect = screen.getByDisplayValue('None') as HTMLSelectElement;
     const options = Array.from(modeSelect.querySelectorAll('option')).map((o) => o.value);
     expect(options).not.toContain('field');
+  });
+
+  it('falls back to a completed run\'s own fields for a step with no declared output schema', async () => {
+    const listSpy = vi.spyOn(mediforce.runs, 'list').mockResolvedValue({
+      runs: [{ variables: { 'step-1': { count: 3 } } }],
+    } as Awaited<ReturnType<typeof mediforce.runs.list>>);
+
+    function ControlledStepEditor() {
+      const [step] = React.useState(buildStep({ executor: 'script' }));
+      const [transitions, setTransitions] = React.useState([{ from: 'step-1', to: 'next-step' }]);
+      return (
+        <StepEditor
+          step={step}
+          allSteps={[step, buildStep({ id: 'next-step', name: 'Next Step' })]}
+          onChange={noop}
+          workflowName="wf-1"
+          transitions={transitions}
+          onTransitionsChange={setTransitions}
+        />
+      );
+    }
+
+    render(<ControlledStepEditor />);
+    expandCard('Routing');
+
+    await waitFor(() => {
+      const modeSelect = screen.getByDisplayValue('None') as HTMLSelectElement;
+      const options = Array.from(modeSelect.querySelectorAll('option')).map((o) => o.value);
+      expect(options).toContain('field');
+    });
+
+    fireEvent.change(screen.getByDisplayValue('None'), { target: { value: 'field' } });
+    expect(screen.getByDisplayValue('count')).toBeTruthy();
+
+    listSpy.mockRestore();
   });
 
   it('[REGRESSION] adds a second environment variable without renaming the first', () => {
