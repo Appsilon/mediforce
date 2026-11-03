@@ -13,8 +13,9 @@ last_reviewed: 2026-11-03
 - **Amends:** [ADR-0023](./0023-step-evaluation.md) D5 (variants come back, one
   per Eval Run) and D10 (a validation can rest on a run of the same
   Fingerprint); D12 (few-shot examples) and the GEPA amendment of D15 stay
-  deferred (D9 below). Applies to an Agent's Evaluation as
-  [ADR-0029](./0029-agent-evaluation.md) and
+  deferred (D9 below). [ADR-0029](./0029-agent-evaluation.md) D6 (an Agent's
+  validation can rest on a variant run of the version it now has). Applies to
+  an Agent's Evaluation as ADR-0029 and
   [ADR-0031](./0031-agent-cases-from-workflow-runs.md) define it.
 - **Code reference:** challengers, the champion–challenger comparison, applying
   a variant, few-shot examples and the GEPA job were built and then deleted;
@@ -68,7 +69,9 @@ ADR-0023 D5 refuses it for the step itself.
 **D3 — A variant runs as an ordinary Eval Run.** The run records its patch
 (`variant`), its Step Fingerprint is the Fingerprint of the patched step, and
 each trial runs the patched Definition — a Step's through the same
-`evalDefinition` an Agent's trial already carries (ADR-0029 D4). Everything
+`evalDefinition` an Agent's trial already carries (ADR-0029 D4). An Agent's
+variant run keeps the `agentVersion` it patched and also records
+`variantAgentHash`, the ADR-0029 D2 hash of the patched snapshot. Everything
 else — trials, Scores, report, Acceptance Criteria, judge reviews — is the
 Eval Run's as ADR-0023 has it. A run with a patch is never the subject's
 validation while the subject's Fingerprint differs from it, which the
@@ -79,21 +82,25 @@ Comparison holds a baseline Eval Run and one to four variant Eval Runs, all on
 one Eval Dataset version, the same frozen Evaluator versions, trials per case,
 MCP policy and Acceptance Criteria. It is prepared as a whole, its budget is the
 sum of its runs' budgets, and a person confirms that sum once (ADR-0023 D15).
-The baseline may reuse a finished Eval Run of the subject as it is when that
-run has the same Fingerprint, dataset version and Evaluator versions, rather
-than spend on it again.
+The baseline may reuse a finished Eval Run of the subject as it is, rather
+than spend on it again, only when every one of those frozen inputs matches —
+Fingerprint, dataset version, Evaluator versions, trials per case, MCP policy
+and Acceptance Criteria; otherwise the baseline runs again.
 
 **D5 — A difference is called on paired cases.** Every run of a Comparison
 grades the same cases, so the report compares each variant with the baseline
 case by case: per counted Evaluator, a case is a *win* when the variant's pass
 rate over its trials is higher, a *loss* when lower, a *tie* otherwise.
 `better` or `worse` is called only when a two-sided exact sign test over the
-wins and losses gives p < 0.05; otherwise *no clear difference*. Beside it: each
-run's pass rate with its Wilson 95% interval, mean cost per trial (agent and
-judge apart), mean duration and tokens, and whether it met its Acceptance
-Criteria. When the dataset has holdout cases the report reads holdout and dev
-apart, and the recommendation reads holdout. This replaces the 2026-10-01 rule
-of non-overlapping intervals, which on the 10–30 cases a step usually has
+wins and losses gives p < 0.05; otherwise *no clear difference*. Below six
+non-tied cases no outcome reaches p < 0.05, so the report says *too few cases
+to call* instead. Beside it: each run's pass rate with its Wilson 95% interval,
+mean cost per trial (agent and judge apart), mean duration and tokens, and
+whether it met its Acceptance Criteria. When the dataset has holdout cases the
+report reads holdout and dev apart. The recommendation for a prompt Variant
+written from dev cases (D8) reads holdout only; a model Variant was fitted to
+no case, so its recommendation reads every case. This replaces the 2026-10-01
+rule of non-overlapping intervals, which on the 10–30 cases a step usually has
 almost never calls a difference.
 
 **D6 — Applying a variant is a person's act.** A Step's variant is saved as a
@@ -102,21 +109,28 @@ only when the person asks; an Agent's is saved to the Agent, which records a
 new Agent version (ADR-0029 D2). Neither assistant applies one. When the
 subject's Fingerprint after applying equals the variant run's, that run counts
 as the subject's newest finished Eval Run for its validation — it ran exactly
-that configuration — and can be signed as a Step Qualification. This amends
-ADR-0023 D10, which read validation only from runs of the current Definition
-version.
+that configuration — and can be signed as a Step Qualification. For an Agent,
+the run backs the new Agent version when that version's hash equals the run's
+`variantAgentHash`; anything else that changed in the Agent meanwhile (a Skill
+edited in the catalog) gives another hash, and the run backs nothing. This
+amends ADR-0023 D10, which read validation only from runs of the current
+Definition version, and ADR-0029 D6, which read it only from runs that assessed
+the current Agent version.
 
 **D7 — Reviewed runs become Eval Cases in bulk.** A list of a subject's
 reviewed production runs not yet a case — for an Agent, runs of the Steps that
 used it (ADR-0031) — filtered by verdict, version and period, imports the
-chosen ones with ADR-0023 D17's labelling. Imported cases are split into dev
-and holdout, stratified by expectation, about 70/30, and a run round already
-imported is skipped.
+chosen ones with ADR-0023 D17's labelling, and a run round already imported is
+skipped. Imported cases are split into dev and holdout, about 70/30 and
+stratified by expectation, by reviewed run, not by case: every case from one
+run — its negative rounds and its approved output share one input — lands on
+the same side, so no reviewer correction in dev answers a holdout case.
 
 **D8 — The Evaluation Assistant guides optimisation from dev cases only.** It
 gains, within ADR-0023 D14's one assistant:
 - *Runs freely:* a **readiness** check (enough cases; negative cases and an
-  `expected_output` Evaluator to grade them; a holdout split; a baseline run)
+  `expected_output` Evaluator to grade them; a holdout split of at least ten
+  cases before a prompt Variant, so D5 can call a difference; a baseline run)
   and **feedback themes** — reviewer comments on dev cases grouped by what
   they correct, each theme citing its runs.
 - *Proposes:* Variants — a model to try, or a prompt rewritten to address the
@@ -156,11 +170,14 @@ optimisation does not depend on them.
 
 ## Consequences
 
-- `eval_runs` gains `variant` (the patch, null on a run of the subject as it is)
-  and `comparison_id`; a new `eval_comparisons` table groups the runs.
+- `eval_runs` gains `variant` (the patch, null on a run of the subject as it is),
+  `variant_agent_hash` (an Agent's variant run, D3) and `comparison_id`; a new
+  `eval_comparisons` table groups the runs.
   `eval_trials.variant_id` stays a legacy column.
 - The Eval Runs list and the subject's validation leave out runs with a
   patch, except a run whose Fingerprint the subject now has (D6).
+- An Agent's validation also reads a variant run whose `variant_agent_hash`
+  is its current version's hash (D6).
 - An Agent's trial needs a way to run with another `systemPrompt` than the
   Agent's own; today the executor reads it from the Agent by `agentId`.
 - CLI: `mediforce eval run-prepare --variant`, `mediforce eval compare`,

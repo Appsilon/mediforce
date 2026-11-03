@@ -107,6 +107,9 @@ point at.
    validation is read from the newest finished Eval Run of its current version,
    and `not_verified` once the Agent changed since; a Qualification of it
    cites `agentVersion` and is signed as for a Step (ADR-0023 D10, D11).
+   _Amended 2026-11-03 by [ADR-0024](./0024-optimisation.md) D6: an applied
+   Variant's Eval Run also counts for the new version when that version's hash
+   equals the run's `variantAgentHash`._
    Reading and changing an Agent's Evaluation follows the Agent: reading needs
    to see it, editing and running need to be allowed to change it. Its rows
    stay in the Agent's workspace, so an Agent that owns any cannot move to
