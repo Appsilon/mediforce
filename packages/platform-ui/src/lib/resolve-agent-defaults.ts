@@ -18,7 +18,7 @@ export interface AgentDefaults {
  */
 export async function resolveAgentDefaults(
   agentId: string,
-  agentDefinitionRepo: AgentDefinitionRepository,
+  agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>,
 ): Promise<AgentDefaults> {
   const agent = await agentDefinitionRepo.getById(agentId);
   if (!agent) return {};

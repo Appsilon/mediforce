@@ -104,6 +104,7 @@ export {
   EvalRunEvaluatorSchema,
   EvalRunEstimateSchema,
   EvalRunSchema,
+  EvalVariantPatchSchema,
   EvalTrialStatusSchema,
   EvalTrialSchema,
   JudgeCallSchema,
@@ -340,6 +341,7 @@ export type {
   EvalRunEvaluator,
   EvalRunEstimate,
   EvalRun,
+  EvalVariantPatch,
   EvalTrialStatus,
   EvalTrial,
   JudgeCall,
@@ -431,6 +433,11 @@ export {
   parseDriftSettings,
   type DriftSettings,
   type DriftWindows,
+  applyAgentVariant,
+  applyRunVariant,
+  applyStepVariant,
+  isEmptyVariant,
+  withAgentVariant,
 } from './evaluation/index';
 
 // Types (re-exported from schemas for convenience)

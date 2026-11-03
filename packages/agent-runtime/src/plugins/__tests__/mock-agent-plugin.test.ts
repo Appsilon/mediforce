@@ -79,4 +79,28 @@ describe('MockAgentPlugin trajectory', () => {
 
     expect(recorded[0]?.text).toBe("Mock agent working on step 'grade-aes' with MCP servers: meddra.");
   });
+
+  it('names the model and the instructions it was given, so a test can see a Variant take effect', async () => {
+    const recorded: Array<{ text?: string }> = [];
+    const plugin = new MockAgentPlugin();
+    await plugin.initialize({
+      stepId: 'grade-aes',
+      processInstanceId: 'run-1',
+      runNamespace: 'test',
+      definitionVersion: '1',
+      stepInput: {},
+      autonomyLevel: 'L4',
+      workflowDefinition: buildWorkflowDefinition({ steps: [], transitions: [] }),
+      step: { id: 'grade-aes', name: 'Grade', type: 'creation', executor: 'agent', agent: { model: 'openai/gpt-5', prompt: 'Grade each AE.' } },
+      agentIdentityPrompt: '## Agent Identity\n\nYou grade AEs.',
+      llm: { complete: async () => ({ content: '', model: 'mock', usage: { promptTokens: 0, completionTokens: 0 } }) },
+      getPreviousStepOutputs: async () => ({}),
+      trajectory: { record: (entries: Array<{ text?: string }>) => { recorded.push(...entries); }, flush: async () => {} },
+    } as unknown as WorkflowAgentContext);
+    await plugin.run(async () => {});
+
+    expect(recorded[0]?.text).toBe(
+      "Mock agent working on step 'grade-aes' with no MCP servers. Model: openai/gpt-5. Instructions: ## Agent Identity\n\nYou grade AEs. | Grade each AE.",
+    );
+  });
 });

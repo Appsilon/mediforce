@@ -213,6 +213,7 @@ export const evalRuns = pgTable(
     trialsPerCase: integer('trials_per_case').notNull(),
     concurrency: integer('concurrency').notNull(),
     evaluators: jsonb('evaluators').notNull(),
+    variant: jsonb('variant'),
     fingerprint: jsonb('fingerprint'),
     acceptanceCriteria: jsonb('acceptance_criteria'),
     mcpPolicy: jsonb('mcp_policy').notNull(),

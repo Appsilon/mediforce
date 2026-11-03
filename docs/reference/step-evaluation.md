@@ -12,7 +12,8 @@ context of use. The design and its reasons are
 § Evaluation domain. This page is what exists today. Optimisation — Variants,
 Comparisons and learning from reviewed runs — is designed in
 [ADR-0024](../adr/0024-optimisation.md) and being built under epic
-[#1650](https://github.com/Appsilon/mediforce/issues/1650); none of it exists yet.
+[#1650](https://github.com/Appsilon/mediforce/issues/1650); so far an Eval Run
+can run a [Variant](#variants), from the CLI and API only.
 
 Everything below belongs to one agent Step, keyed by
 `(namespace, workflowName, stepId)` — or to one Agent evaluated on its own (see
@@ -852,6 +853,24 @@ place — an edit is a new case — so the trial's case, and an agreement
 comparison's expected output, are what the judge read. Log entries a model
 judge's rationale cites as `[n]` link to the entry (the judge is told to cite one entry per bracket; older rationales' `[7, 8]`, `[9-16]` and `[log entries 8-11]` link too, a range marking every entry in it), which is marked in the log;
 an `[n]` in a code or schema check's comment is left as text.
+
+### Variants
+
+An Eval Run can run its subject with a **Variant** (ADR-0024 D2, D3) — another
+`model`, another `prompt`, or both — without minting a Workflow Definition or
+Agent version: `variant` on `POST /api/evaluation/runs` and
+`/runs/estimate`, `run-prepare` / `run-estimate --model <id> --prompt-file
+<path>`. On a Step the patch replaces `step.agent.model` and
+`step.agent.prompt`; on an Agent, its `foundationModel` and `systemPrompt` for
+the trials only. The run records the patch (`variant`) and the Fingerprint of
+the patched subject, and its trials run the patch: the trial executor applies
+it from the run (`applyRunVariant`), so a saved Workflow cannot set it.
+A Variant's model must be listed in the model registry and not retired, and a
+`~` moving alias is refused as for the step itself. A Variant on another model
+is estimated from that model's registry price, not the step's cost history.
+A run with a Variant is left out of the Eval Runs list and of the subject's
+validation: it assessed another configuration than the subject's. There is no
+UI for Variants yet.
 
 ## Acceptance Criteria
 
