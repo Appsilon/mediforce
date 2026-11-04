@@ -49,13 +49,13 @@ export class MockAgentPlugin implements StepExecutorPlugin {
 
     if (isWorkflowAgentContext(this.context)) {
       const ts = new Date().toISOString();
-      // Names the MCP servers and agent skills the step would have run with, so
-      // a test can see restrictions (an eval trial's MCP policy) take effect.
+      // Names the MCP servers, agent skills, model and instructions the step
+      // would have run with, so a test can see restrictions (an eval trial's
+      // MCP policy) and an Eval Run's Variant take effect.
       const mcpServers = Object.keys(this.context.resolvedMcpConfig?.servers ?? {}).sort();
       const mcpNote = mcpServers.length === 0 ? 'no MCP servers' : `MCP servers: ${mcpServers.join(', ')}`;
       const skills = (this.context.agentSkills ?? []).map((skill) => skill.id);
       const skillsNote = skills.length === 0 ? '' : ` Agent skills: ${skills.join(', ')}.`;
-      // And the model and instructions it was given, so a test can see an Eval Run's Variant take effect.
       const model = this.context.step.agent?.model;
       const modelNote = model === undefined ? '' : ` Model: ${model}.`;
       const instructions = [this.context.agentIdentityPrompt, this.context.step.agent?.prompt].filter((part) => part !== undefined && part !== '');

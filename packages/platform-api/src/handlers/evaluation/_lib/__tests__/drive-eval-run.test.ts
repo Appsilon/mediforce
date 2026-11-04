@@ -83,6 +83,19 @@ describe('driveEvalRun', () => {
     expect(await fixture.instanceRepo.getById(trial!.processInstanceId!)).toMatchObject({ evalRunId: evalRun.id });
   });
 
+  it('starts a Variant\'s trial with the Definition it patched, and a baseline\'s with the stored one', async () => {
+    const variant = { model: 'openai/gpt-5', prompt: 'Grade each AE by CTCAE v5.' };
+    const { evalRun } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5, variant }, scope);
+    const { evalRun: baseline } = await prepareEvalRun({ ...STEP, trialsPerCase: 1, concurrency: 1, budgetUsd: 5 }, scope);
+    await startEvalRun({ evalRunId: evalRun.id, confirmedBudgetUsd: 5 }, scope);
+    await startEvalRun({ evalRunId: baseline.id, confirmedBudgetUsd: 5 }, scope);
+
+    const [variantRun, baselineRun] = await Promise.all(kicker.kicks.map(({ instanceId }) => fixture.instanceRepo.getById(instanceId)));
+    expect(variantRun).toMatchObject({ definitionName: STEP.workflowName, definitionVersion: String(evalRun.definitionVersion) });
+    expect(variantRun!.evalDefinition?.steps.find((step) => step.id === STEP.stepId)?.agent).toMatchObject(variant);
+    expect(baselineRun!.evalDefinition).toBeUndefined();
+  });
+
   it('still kicks a trial\'s run when creating it threw after the run was stored', async () => {
     const engine = new WorkflowEngine(fixture.processRepo, fixture.instanceRepo, fixture.auditRepo);
     Object.assign(scope.system, {

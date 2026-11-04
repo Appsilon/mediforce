@@ -1,17 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import type { APIRequestContext } from '@playwright/test';
-import {
-  EvalRunOutputSchema,
-  GetAgentTrajectoryOutputSchema,
-  GetStepQualificationOutputSchema,
-  ListAgentVersionsOutputSchema,
-  ListEvalRunsOutputSchema,
-  type EvalRunOutput,
-} from '@mediforce/platform-api/contract';
+import type { EvalRunOutput, ListEvalRunsInput, RegisterWorkflowBody } from '@mediforce/platform-api/contract';
+import { ApiError, Mediforce } from '@mediforce/platform-api/client';
 import { test, expect } from '../helpers/test-fixtures';
 import { TEST_ORG_HANDLE } from '../helpers/constants';
 import { pollUntil } from '../helpers/poll-until';
-import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow } from '../helpers/agent-step-runs';
+import { agentStepWorkflow } from '../helpers/agent-step-runs';
 
 /**
  * API E2E for a Variant on an Eval Run (ADR-0024 D2, D3): an Eval Run can run
@@ -26,21 +19,16 @@ import { AUTH_HEADERS, JSON_HEADERS, agentStepWorkflow } from '../helpers/agent-
 
 const BASE_MODEL = 'anthropic/claude-sonnet-4';
 const VARIANT_MODEL = 'openai/gpt-4o';
+// A moving alias, a model the registry does not list, and one it has retired.
+const REFUSED_MODELS = ['~anthropic/claude-sonnet-latest', 'acme/not-a-model', 'openai/gpt-4-0314'];
 
-async function post(request: APIRequestContext, path: string, data: Record<string, unknown>, status = 200) {
-  const res = await request.post(path, { headers: JSON_HEADERS, data });
-  expect(res.status(), await res.text()).toBe(status);
-  return res.json();
+function apiClient(baseURL: string | undefined): Mediforce {
+  if (baseURL === undefined) throw new Error('Playwright baseURL is not configured — cannot build an API client');
+  return new Mediforce({ apiKey: process.env.PLATFORM_API_KEY ?? 'test-api-key', baseUrl: baseURL });
 }
 
-async function getJson(request: APIRequestContext, path: string) {
-  const res = await request.get(path, { headers: AUTH_HEADERS });
-  expect(res.status(), await res.text()).toBe(200);
-  return res.json();
-}
-
-async function createAgent(request: APIRequestContext, name: string): Promise<string> {
-  const { agent } = await post(request, '/api/agents', {
+async function createAgent(mediforce: Mediforce, name: string): Promise<string> {
+  const { agent } = await mediforce.agents.create({
     name,
     iconName: 'Bot',
     description: 'Grades adverse events',
@@ -50,113 +38,135 @@ async function createAgent(request: APIRequestContext, name: string): Promise<st
     inputDescription: 'Extracted AEs',
     outputDescription: 'Graded AEs',
     namespace: TEST_ORG_HANDLE,
-  }, 201) as { agent: { id: string } };
+  });
   return agent.id;
 }
 
 /** A summary-present Evaluator, one written case and a saved Dataset: enough to prepare an Eval Run. */
-async function seedSuite(request: APIRequestContext, subject: Record<string, string>) {
-  await post(request, '/api/evaluation/evaluators', {
+async function seedSuite(mediforce: Mediforce, subject: ListEvalRunsInput) {
+  await mediforce.evaluation.createEvaluator({
     ...subject, name: 'summary-present', rule: 'The result carries a summary.',
     check: { kind: 'schema', schema: { required: ['summary'] } },
-  }, 201);
-  await post(request, '/api/evaluation/cases', {
+  });
+  await mediforce.evaluation.createCase({
     ...subject, name: 'Grade 4 neutropenia', expectation: 'positive',
     input: { triggerPayload: { events: [{ term: 'Neutropenia', anc: 0.4 }] }, previousStepOutputs: {} },
-  }, 201);
-  await post(request, '/api/evaluation/datasets', subject, 201);
+  });
+  await mediforce.evaluation.saveDataset(subject);
 }
 
-async function runToCompletion(request: APIRequestContext, evalRunId: string, budgetUsd: number): Promise<EvalRunOutput> {
-  await post(request, `/api/evaluation/runs/${evalRunId}/start`, { confirmedBudgetUsd: budgetUsd });
+async function expectRefused(mediforce: Mediforce, subject: ListEvalRunsInput, model: string): Promise<void> {
+  const refused = await mediforce.evaluation.prepareRun({ ...subject, trialsPerCase: 1, budgetUsd: 1, variant: { model } })
+    .then(() => null, (error: unknown) => error);
+  expect(refused, `a Variant on '${model}'`).toBeInstanceOf(ApiError);
+  expect((refused as ApiError).status).toBe(400);
+}
+
+async function runToCompletion(mediforce: Mediforce, evalRunId: string): Promise<EvalRunOutput> {
+  await mediforce.evaluation.startRun({ evalRunId, confirmedBudgetUsd: 1 });
   return pollUntil(
     async () => {
-      const body = EvalRunOutputSchema.parse(await getJson(request, `/api/evaluation/runs/${evalRunId}`));
-      return body.evalRun.status === 'completed' ? body : null;
+      const run = await mediforce.evaluation.getRun({ evalRunId });
+      return run.evalRun.status === 'completed' ? run : null;
     },
     { description: `Eval Run ${evalRunId} to complete`, timeoutMs: 90_000 },
   );
 }
 
-async function firstTrajectoryText(request: APIRequestContext, agentRunId: string): Promise<string> {
-  return GetAgentTrajectoryOutputSchema.parse(await getJson(request, `/api/agent-runs/${agentRunId}/trajectory`)).entries[0]?.text ?? '';
+async function firstTrajectoryText(mediforce: Mediforce, agentRunId: string): Promise<string> {
+  return (await mediforce.agentRuns.trajectory({ agentRunId })).entries[0]?.text ?? '';
+}
+
+function changedComponents(variant: EvalRunOutput, baseline: EvalRunOutput): string[] {
+  const before = baseline.evalRun.fingerprint!.components;
+  const after = variant.evalRun.fingerprint!.components;
+  return Object.keys(after).filter((component) => after[component as 'step'] !== before[component as 'step']).sort();
 }
 
 test.describe('Eval Run Variants — API E2E', () => {
-  test('a Step\'s Variant runs another model and prompt, and stays out of its runs list and validation', async ({ request }) => {
-    test.setTimeout(120_000);
+  test('a Step\'s Variant runs another model and prompt, and stays out of its runs list and validation', async ({ baseURL }) => {
+    test.setTimeout(180_000);
+    const mediforce = apiClient(baseURL);
     const suffix = randomUUID().slice(0, 8);
-    const agentId = await createAgent(request, `AE grader ${suffix}`);
+    const agentId = await createAgent(mediforce, `AE grader ${suffix}`);
     const workflowName = `e2e-eval-variant-${suffix}`;
-    const registered = await request.post(`/api/workflow-definitions?namespace=${TEST_ORG_HANDLE}`, {
-      headers: JSON_HEADERS,
-      data: agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agentId, agent: { prompt: 'Grade each AE.' } }),
-    });
-    expect(registered.status(), await registered.text()).toBe(201);
+    await mediforce.workflows.register(
+      agentStepWorkflow(workflowName, { autonomyLevel: 'L4', agentId, agent: { prompt: 'Grade each AE.' } }) as RegisterWorkflowBody,
+      { namespace: TEST_ORG_HANDLE },
+    );
     const step = { namespace: TEST_ORG_HANDLE, workflowName, stepId: 'grade-aes' };
-    await seedSuite(request, step);
+    await seedSuite(mediforce, step);
 
-    const baseline = EvalRunOutputSchema.parse(await post(request, '/api/evaluation/runs', { ...step, trialsPerCase: 1, budgetUsd: 1 }, 201));
+    for (const model of REFUSED_MODELS) await expectRefused(mediforce, step, model);
+
+    const baseline = await mediforce.evaluation.prepareRun({ ...step, trialsPerCase: 1, budgetUsd: 1 });
     expect(baseline.evalRun.variant).toBeNull();
-
-    // A moving alias or a model the registry does not list is refused, as for the step itself.
-    for (const model of ['~anthropic/claude-sonnet-latest', 'acme/not-a-model']) {
-      const refused = await request.post('/api/evaluation/runs', { headers: JSON_HEADERS, data: { ...step, trialsPerCase: 1, budgetUsd: 1, variant: { model } } });
-      expect(refused.status(), await refused.text()).toBe(400);
-    }
+    // An empty patch is a run of the step as it is.
+    const unpatched = await mediforce.evaluation.prepareRun({ ...step, trialsPerCase: 1, budgetUsd: 1, variant: {} });
+    expect(unpatched.evalRun.variant).toBeNull();
+    expect(unpatched.evalRun.fingerprint).toEqual(baseline.evalRun.fingerprint);
+    await runToCompletion(mediforce, baseline.evalRun.id);
 
     const variant = { model: VARIANT_MODEL, prompt: 'Grade each AE by CTCAE v5, citing the criterion.' };
-    const prepared = EvalRunOutputSchema.parse(await post(request, '/api/evaluation/runs', { ...step, trialsPerCase: 2, budgetUsd: 1, variant }, 201));
+    const prepared = await mediforce.evaluation.prepareRun({ ...step, trialsPerCase: 2, budgetUsd: 1, variant });
     expect(prepared.evalRun.variant).toEqual(variant);
     // The Fingerprint is the patched step's: its model and step config differ from the baseline's, nothing else.
     expect(prepared.evalRun.definitionVersion).toBe(baseline.evalRun.definitionVersion);
     expect(prepared.evalRun.fingerprint!.hash).not.toBe(baseline.evalRun.fingerprint!.hash);
-    const changed = Object.keys(prepared.evalRun.fingerprint!.components)
-      .filter((component) => prepared.evalRun.fingerprint!.components[component as 'step'] !== baseline.evalRun.fingerprint!.components[component as 'step']);
-    expect(changed.sort()).toEqual(['model', 'step']);
+    expect(changedComponents(prepared, baseline)).toEqual(['model', 'step']);
 
-    const finished = await runToCompletion(request, prepared.evalRun.id, 1);
+    const finished = await runToCompletion(mediforce, prepared.evalRun.id);
     expect(finished.trials).toHaveLength(2);
     for (const trial of finished.trials) {
       expect(trial.status, trial.error ?? '').toBe('scored');
-      const text = await firstTrajectoryText(request, trial.agentRunId!);
+      // The trial's run records the patched Definition it ran.
+      const trialRun = await mediforce.processes.get({ instanceId: trial.processInstanceId! });
+      expect(trialRun.evalDefinition?.steps.find((candidate) => candidate.id === 'grade-aes')?.agent).toMatchObject(variant);
+      const text = await firstTrajectoryText(mediforce, trial.agentRunId!);
       expect(text).toContain(`Model: ${VARIANT_MODEL}.`);
       expect(text).toContain(`| ${variant.prompt}`);
     }
     expect(finished.report.evaluators[0]).toMatchObject({ name: 'summary-present', passes: 2, failures: 0 });
 
-    // The runs list shows only the step as it is, and validation ignores the Variant.
-    const listed = ListEvalRunsOutputSchema.parse(await getJson(request, `/api/evaluation/runs?namespace=${TEST_ORG_HANDLE}&workflowName=${workflowName}&stepId=grade-aes`));
-    expect(listed.evalRuns.map((run) => run.id)).toEqual([baseline.evalRun.id]);
-    const qualification = GetStepQualificationOutputSchema.parse(
-      await getJson(request, `/api/evaluation/qualification?namespace=${TEST_ORG_HANDLE}&workflowName=${workflowName}&stepId=grade-aes`),
-    );
-    expect(qualification.validation.evalRunId).not.toBe(prepared.evalRun.id);
+    // The runs list shows only the step as it is, and validation reads the baseline, not the newer Variant run.
+    const listed = await mediforce.evaluation.listRuns(step);
+    expect(listed.evalRuns.map((run) => run.id).sort()).toEqual([baseline.evalRun.id, unpatched.evalRun.id].sort());
+    const qualification = await mediforce.evaluation.getQualification(step);
+    expect(qualification.validation.evalRunId).toBe(baseline.evalRun.id);
   });
 
-  test('an Agent\'s Variant replaces its model and system prompt in the trial only', async ({ request }) => {
-    test.setTimeout(120_000);
-    const agentId = await createAgent(request, `AE grader ${randomUUID().slice(0, 8)}`);
+  test('an Agent\'s Variant replaces its model and system prompt in the trial only', async ({ baseURL }) => {
+    test.setTimeout(180_000);
+    const mediforce = apiClient(baseURL);
+    const agentId = await createAgent(mediforce, `AE grader ${randomUUID().slice(0, 8)}`);
     const subject = { namespace: TEST_ORG_HANDLE, agentId };
-    await seedSuite(request, subject);
+    await seedSuite(mediforce, subject);
+
+    for (const model of REFUSED_MODELS) await expectRefused(mediforce, subject, model);
+
+    const baseline = await mediforce.evaluation.prepareRun({ ...subject, trialsPerCase: 1, budgetUsd: 1 });
+    await runToCompletion(mediforce, baseline.evalRun.id);
 
     const variant = { model: VARIANT_MODEL, prompt: 'You grade adverse events by CTCAE v6.' };
-    const prepared = EvalRunOutputSchema.parse(await post(request, '/api/evaluation/runs', { ...subject, trialsPerCase: 1, budgetUsd: 1, variant }, 201));
+    const prepared = await mediforce.evaluation.prepareRun({ ...subject, trialsPerCase: 1, budgetUsd: 1, variant });
     expect(prepared.evalRun).toMatchObject({ variant, agentVersion: 1 });
+    expect(changedComponents(prepared, baseline)).toEqual(['model', 'systemPrompt']);
     // The run assessed version 1 with the patch over it; the patch is not a version.
     expect(prepared.assessedAgentVersion?.config).toMatchObject({ foundationModel: BASE_MODEL, systemPrompt: 'You grade adverse events by CTCAE v5.' });
 
-    const finished = await runToCompletion(request, prepared.evalRun.id, 1);
+    const finished = await runToCompletion(mediforce, prepared.evalRun.id);
     const [trial] = finished.trials;
     expect(trial!.status, trial!.error ?? '').toBe('scored');
-    const text = await firstTrajectoryText(request, trial!.agentRunId!);
+    const text = await firstTrajectoryText(mediforce, trial!.agentRunId!);
     expect(text).toContain(`Model: ${VARIANT_MODEL}.`);
     expect(text).toContain(variant.prompt);
     expect(text).not.toContain('CTCAE v5');
 
-    const versions = ListAgentVersionsOutputSchema.parse(await getJson(request, `/api/agents/${agentId}/versions`));
+    const versions = await mediforce.agents.listVersions({ id: agentId });
     expect(versions.versions.map((version) => version.version)).toEqual([1]);
-    const listed = ListEvalRunsOutputSchema.parse(await getJson(request, `/api/evaluation/runs?namespace=${TEST_ORG_HANDLE}&agentId=${agentId}`));
-    expect(listed.evalRuns).toEqual([]);
+    const listed = await mediforce.evaluation.listRuns(subject);
+    expect(listed.evalRuns.map((run) => run.id)).toEqual([baseline.evalRun.id]);
+    const qualification = await mediforce.evaluation.getQualification(subject);
+    expect(qualification.validation.evalRunId).toBe(baseline.evalRun.id);
   });
 });

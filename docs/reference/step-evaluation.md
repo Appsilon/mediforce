@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-10-30
+last_reviewed: 2026-11-03
 ---
 
 # Step Evaluation
@@ -862,9 +862,12 @@ Agent version: `variant` on `POST /api/evaluation/runs` and
 `/runs/estimate`, `run-prepare` / `run-estimate --model <id> --prompt-file
 <path>`. On a Step the patch replaces `step.agent.model` and
 `step.agent.prompt`; on an Agent, its `foundationModel` and `systemPrompt` for
-the trials only. An empty `prompt` runs the subject without one. The run records the patch (`variant`) and the Fingerprint of
-the patched subject, and its trials run the patch: the trial executor applies
-it from the run (`applyRunVariant`), so a saved Workflow cannot set it.
+the trials only. An empty `prompt` runs the subject without one. The run
+records the patch (`variant`) and the Fingerprint of the patched subject, and
+its trials run the patch. A Step's trial carries the patched Definition on its
+Workflow Run (`eval_definition`), so the run records what ran; an Agent's trial
+reads its Agent through the patch from the run, which a saved Workflow cannot
+set.
 A Variant's model must be listed in the model registry and not retired, and a
 `~` moving alias is refused as for the step itself. A Variant on another model
 is estimated from that model's registry price, not the step's cost history.
