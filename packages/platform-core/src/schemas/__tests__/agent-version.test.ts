@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_AGENT_IMAGE } from '../../utils/container-defaults';
-import { agentEvalDefinition, agentStepChanges } from '../agent-version';
+import { agentEvalDefinition, agentOfEvalDefinition, agentStepChanges } from '../agent-version';
 
 const agent = { runtimeId: 'claude-code-agent', foundationModel: 'anthropic/claude-sonnet-5' };
 
@@ -67,5 +67,22 @@ describe('agentEvalDefinition', () => {
   it('runs an agent that names no image on the host when local execution is allowed', () => {
     expect(agentEvalDefinition(evaluated, 1, {}, { localExecution: true }).steps[0]!.agent).toEqual({});
     expect(agentEvalDefinition({ ...evaluated, image: 'r-tools:2' }, 1, {}, { localExecution: true }).steps[0]!.agent).toEqual({ image: 'r-tools:2' });
+  });
+});
+
+describe('agentOfEvalDefinition', () => {
+  const evaluated = { id: 'ae-grader', name: 'AE grader', namespace: 'team-alpha', runtimeId: 'claude-code-agent' };
+
+  it('names the Agent of the Definition an Agent\'s trial carries', () => {
+    expect(agentOfEvalDefinition(agentEvalDefinition(evaluated, 1))).toBe('ae-grader');
+  });
+
+  it('names none for a run that carries no Definition, or a Step\'s patched one', () => {
+    expect(agentOfEvalDefinition(undefined)).toBeNull();
+    // A workflow whose one step is also called `agent` and runs the same Agent.
+    const stepDefinition = { ...agentEvalDefinition(evaluated, 1), name: 'ae-review' };
+    expect(agentOfEvalDefinition(stepDefinition)).toBeNull();
+    const twoSteps = agentEvalDefinition(evaluated, 1);
+    expect(agentOfEvalDefinition({ ...twoSteps, steps: [...twoSteps.steps, { ...twoSteps.steps[0]!, id: 'review' }] })).toBeNull();
   });
 });

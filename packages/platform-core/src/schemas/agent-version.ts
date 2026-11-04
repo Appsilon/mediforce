@@ -84,6 +84,18 @@ export function agentEvalDefinition(
   };
 }
 
+/**
+ * The Agent whose eval trial carries this Definition (ADR-0029), or null. A
+ * Step's trial run with a Variant carries its patched Definition too (ADR-0024
+ * D3), so carrying one does not make a trial an Agent's: only the Definition
+ * {@link agentEvalDefinition} builds does.
+ */
+export function agentOfEvalDefinition(definition: WorkflowDefinition | undefined): string | null {
+  const step = definition?.steps.length === 1 ? definition.steps[0] : undefined;
+  if (definition === undefined || step?.id !== AGENT_EVAL_STEP_ID || step.agentId === undefined) return null;
+  return definition.name === `agent:${step.agentId}` ? step.agentId : null;
+}
+
 /** A part of an Agent that a Workflow Step running it changes. */
 export type AgentStepChange =
   | 'plugin'

@@ -58,29 +58,25 @@ async function evalRunOutput(scope: CallerScope, evalRunId: string): Promise<Eva
 /**
  * Refuses an Eval Run whose trials the auto-runner's pre-flight would pause —
  * every one of them, before the agent runs — on a model the registry does not
- * list or has retired: the same checks, on the definition.
+ * list or has retired: the same checks, on the definition. A Variant's model
+ * is held to the registry too, though the pre-flight leaves an Agent's own
+ * model unchecked: a person picked it for this run.
  */
 async function assertModelsRunnable(
   scope: CallerScope,
   definition: WorkflowDefinition,
   agents: Pick<AgentDefinitionRepository, 'getById'>,
+  variant: EvalVariantPatch | null,
 ): Promise<void> {
   const allModels = await scope.models.list();
+  if (variant?.model !== undefined) {
+    const listed = allModels.find((model) => model.id === variant.model);
+    if (listed === undefined) throw new ValidationError(`The Variant's model '${variant.model}' is not in the model registry`);
+    if (listed.retiredAt !== null) throw new ValidationError(`The Variant's model '${variant.model}' is retired`);
+  }
   const problem = checkUnknownModels(definition, allModels)
     ?? checkRetiredModels(await resolveDefinitionModels(definition, agents), allModels);
   if (problem !== null) throw new ValidationError(`The step cannot run — ${problem.message}`);
-}
-
-/**
- * A Variant's model must be one the registry lists and has not retired. The
- * pre-flight leaves an Agent's own model unchecked, as it was never held to
- * the registry; a model a person picks for a Variant is.
- */
-async function assertVariantModelListed(scope: CallerScope, variant: EvalVariantPatch | null): Promise<void> {
-  if (variant?.model === undefined) return;
-  const listed = (await scope.models.list()).find((model) => model.id === variant.model);
-  if (listed === undefined) throw new ValidationError(`The Variant's model '${variant.model}' is not in the model registry`);
-  if (listed.retiredAt !== null) throw new ValidationError(`The Variant's model '${variant.model}' is retired`);
 }
 
 /** The subject as a run's Variant has it (ADR-0024 D2); as it is without one. */
@@ -153,8 +149,7 @@ async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, s
   const mcpPolicy: Record<string, McpEvalServerPolicy> = Object.fromEntries(
     agentServers.map((name) => [name, policy?.servers[name] ?? DEFAULT_MCP_EVAL_SERVER_POLICY]),
   );
-  await assertVariantModelListed(scope, variant);
-  await assertModelsRunnable(scope, definition, agents);
+  await assertModelsRunnable(scope, definition, agents, variant);
   const fingerprint = await computeStepFingerprint({ agentDefinitions: agents, toolCatalog: scope.toolCatalog, skills: scope.skills }, definition, workflowStep);
   const caseIds = dataset.caseIds;
   // A Variant on another model makes the step's cost history say nothing of it.
@@ -286,7 +281,7 @@ export async function startEvalRun(input: StartEvalRunInput, scope: CallerScope)
       `Starting this Eval Run spends up to $${run.budgetUsd} (${estimate}); a person must confirm that budget`,
     );
   }
-  await assertModelsRunnable(scope, definition, agents);
+  await assertModelsRunnable(scope, definition, agents, run.variant);
   const started = await scope.evaluation.transitionEvalRun(run.id, 'prepared', {
     status: 'running',
     startedAt: new Date().toISOString(),

@@ -46,8 +46,11 @@ trial with — already `running` at the target step with seeded variables, so th
 auto-runner executes it like any other;
 `finishEvalTrial` ends it after that step. An Agent's trial
 ([ADR-0029](../../docs/adr/0029-agent-evaluation.md)) passes its single-step
-Definition instead of a stored one; the run carries it as `evalDefinition`, and
-`loadDefinitionUnified` reads it from there. The agent step executor calls it for
+Definition instead of a stored one, and a Step's trial run with a Variant
+([ADR-0024](../../docs/adr/0024-optimisation.md) D3) passes its patched one; the
+run carries it as `evalDefinition`, and `loadDefinitionUnified` reads it from
+there. Carrying one does not make a trial an Agent's —
+`agentOfEvalDefinition` says whose it is. The agent step executor calls it for
 any run carrying `evalRunId` instead of routing — nothing downstream of the
 evaluated step ever runs.
 
