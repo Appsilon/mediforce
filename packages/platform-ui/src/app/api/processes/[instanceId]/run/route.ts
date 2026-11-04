@@ -5,7 +5,7 @@ import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { advanceEvalRunOfInstance, checkRetiredModels, checkUnknownModels, settleRunWaits } from '@mediforce/platform-api/handlers';
 import { defaultBuildScope } from '@/lib/route-adapter';
-import { DEFAULT_MODEL, resolveCoworkOutputSchema, resolveDefinitionModels, resolvePreviousStepId, resolveStepTimeoutMs, buildHumanTaskVerdicts, resolveParamDefaults, runInterpolationSources, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
+import { DEFAULT_MODEL, agentOfEvalDefinition, resolveCoworkOutputSchema, resolveDefinitionModels, resolvePreviousStepId, resolveStepTimeoutMs, buildHumanTaskVerdicts, resolveParamDefaults, runInterpolationSources, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -140,7 +140,7 @@ export async function POST(
     // Load WorkflowDefinition — try exact version, fall back to latest
     const versionNum = parseInt(initialInstance.definitionVersion, 10);
     const runNamespace = initialInstance.namespace ?? '';
-    // An Agent's eval trial carries its single-step Definition; no stored Workflow holds it (ADR-0029).
+    // An eval trial may carry the Definition it runs: an Agent's single step (ADR-0029), or a Step's Variant (ADR-0024 D3).
     let workflowDefinition = initialInstance.evalDefinition ?? (!isNaN(versionNum)
       ? await processRepo.getWorkflowDefinition(runNamespace, initialInstance.definitionName, versionNum)
       : null);
@@ -884,7 +884,7 @@ export async function POST(
               ? (instance.variables[previousStepId] as Record<string, unknown>) ?? {}
               : {};
             // An Agent's eval trial is given its case's trigger payload and nothing else (ADR-0029 D4).
-            const agentTrialInput = instance.evalDefinition === undefined ? null : instance.triggerPayload;
+            const agentTrialInput = agentOfEvalDefinition(instance.evalDefinition) === null ? null : instance.triggerPayload;
             const stepInput = agentTrialInput ?? { ...previousStepOutput, steps: instance.variables };
 
             const executionId = crypto.randomUUID();

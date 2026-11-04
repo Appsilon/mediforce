@@ -1,4 +1,5 @@
 import type {
+  AgentDefinitionRepository,
   EvalRunEstimate,
   EvalRunEvaluator,
   EvaluatedStep,
@@ -43,7 +44,9 @@ async function historicalCosts(scope: CallerScope, step: EvaluatedStep): Promise
  * historical cost, or its model's registry price for a nominal turn when it
  * has no history, plus one judge call per `llm_judge` Evaluator and
  * `expected_output` check — for the latter an upper bound, since an exact
- * comparison calls no model.
+ * comparison calls no model. `agents` reads the step's Agent as the run has
+ * it; `useHistory` is false when the run's model is not the one the history
+ * was spent on (a Variant's, ADR-0024).
  */
 export async function estimateEvalRun(
   scope: CallerScope,
@@ -51,11 +54,12 @@ export async function estimateEvalRun(
   workflowStep: WorkflowStep,
   evaluators: ReadonlyArray<{ frozen: EvalRunEvaluator; version: EvaluatorVersion }>,
   trialCount: number,
+  options: { agents: Pick<AgentDefinitionRepository, 'getById'>; useHistory: boolean },
 ): Promise<EvalRunEstimate> {
   // An Agent evaluated on its own has no production history (ADR-0029).
-  const costs = subject.kind === 'step' ? await historicalCosts(scope, subject) : [];
+  const costs = subject.kind === 'step' && options.useHistory ? await historicalCosts(scope, subject) : [];
   const priceOf = await loadModelPrices(scope);
-  const agent = workflowStep.agentId === undefined ? null : await scope.agentDefinitions.getById(workflowStep.agentId);
+  const agent = workflowStep.agentId === undefined ? null : await options.agents.getById(workflowStep.agentId);
   const model = workflowStep.agent?.model ?? agent?.foundationModel;
 
   let judgeCost = 0;

@@ -2860,6 +2860,27 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
       createdAt: oneHourAgo,
       updatedAt: now,
     },
+    // Gone from OpenRouter: listed, but nothing may be set to run on it.
+    'openai__gpt-4-0314': {
+      id: 'openai/gpt-4-0314',
+      name: 'GPT-4 (0314)',
+      provider: 'openai',
+      contextLength: 8192,
+      maxCompletionTokens: 4096,
+      pricing: { input: 0.00003, output: 0.00006 },
+      modality: 'text->text',
+      inputModalities: ['text'],
+      outputModalities: ['text'],
+      supportsTools: true,
+      supportsVision: false,
+      source: 'openrouter',
+      canonicalSlug: null,
+      requestCount: 0,
+      lastSyncedAt: oneHourAgo,
+      createdAt: oneHourAgo,
+      updatedAt: now,
+      retiredAt: oneHourAgo,
+    },
   };
 
   // Match prod write shape — WorkflowEngine.createInstance writes `deleted: false`

@@ -1,5 +1,6 @@
 import {
   AGENT_EVAL_STEP_ID,
+  agentOfEvalDefinition,
   type AgentRun,
   type EvaluationSubject,
   type ProcessInstance,
@@ -22,7 +23,7 @@ export interface ScoredRun {
 export function isTrialOfAgent(agentRun: AgentRun, instance: ProcessInstance, agent: Extract<EvaluationSubject, { kind: 'agent' }>): boolean {
   return (instance.namespace ?? '') === agent.namespace
     && agentRun.stepId === AGENT_EVAL_STEP_ID
-    && instance.evalDefinition?.steps[0]?.agentId === agent.agentId;
+    && agentOfEvalDefinition(instance.evalDefinition) === agent.agentId;
 }
 
 /**
@@ -32,8 +33,8 @@ export function isTrialOfAgent(agentRun: AgentRun, instance: ProcessInstance, ag
  */
 export function runSubjectRef(agentRun: AgentRun, instance: ProcessInstance): EvaluationRef {
   const namespace = instance.namespace ?? '';
-  const trialAgentId = agentRun.stepId === AGENT_EVAL_STEP_ID ? instance.evalDefinition?.steps[0]?.agentId : undefined;
-  return trialAgentId === undefined
+  const trialAgentId = agentRun.stepId === AGENT_EVAL_STEP_ID ? agentOfEvalDefinition(instance.evalDefinition) : null;
+  return trialAgentId === null
     ? { namespace, workflowName: instance.definitionName, stepId: agentRun.stepId }
     : { namespace, agentId: trialAgentId };
 }

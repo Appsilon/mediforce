@@ -29,6 +29,7 @@ describe('reviewJudgeVerdict', () => {
         { evaluatorId: JUDGE, name: 'grades-justified', version: 1, kind: 'llm_judge', counted: true },
         { evaluatorId: SCHEMA_CHECK, name: 'findings-present', version: 1, kind: 'schema', counted: true },
       ],
+      variant: null,
       fingerprint: null,
       acceptanceCriteria: { minPassRate: 1 },
       mcpPolicy: {}, env: {}, estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },

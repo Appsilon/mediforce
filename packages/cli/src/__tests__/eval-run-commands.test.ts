@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { evalRunFailuresCommand, evalRunGetCommand, evalRunPrepareCommand, evalRunStartCommand, evalTrialCommand } from '../commands/eval-runs';
 import { evalAskCommand } from '../commands/eval-ask';
@@ -74,6 +77,19 @@ describe('mediforce eval runs', () => {
     expect(await evalRunPrepareCommand({ argv: [...STEP_ARGV, '--version', 'v1', ...BASE], env: ENV, output })).toBe(2);
     expect(output.stderrLines).toContain('--trials, --concurrency and --version must be positive integers');
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('run-prepare --model --prompt-file prepares a Variant and says which', async () => {
+    const promptFile = join(mkdtempSync(join(tmpdir(), 'eval-variant-')), 'prompt.md');
+    writeFileSync(promptFile, 'Grade every AE by CTCAE v5.\n');
+    const variant = { model: 'anthropic/claude-haiku-4.5', prompt: 'Grade every AE by CTCAE v5.' };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ ...OUTPUT, evalRun: { ...OUTPUT.evalRun, variant } }, 201));
+    const output = captureOutput();
+    const argv = [...STEP_ARGV, '--model', variant.model, '--prompt-file', promptFile, ...BASE];
+    expect(await evalRunPrepareCommand({ argv, env: ENV, output })).toBe(0);
+
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body))).toMatchObject({ stepId: 'grade-aes', variant });
+    expect(output.stdoutLines.join('\n')).toContain('Variant: model anthropic/claude-haiku-4.5, its own prompt');
   });
 
   it('run-start sends the confirmed budget', async () => {

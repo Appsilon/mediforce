@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mcpReplayMissesOf, type AgentOutputSnapshot, type EvalCase, type EvalRun, type EvalTrial, type JudgeCall, type Score, type WorkflowDefinition } from '@mediforce/platform-core';
+import { applyStepVariant, mcpReplayMissesOf, type AgentOutputSnapshot, type EvalCase, type EvalRun, type EvalTrial, type JudgeCall, type Score, type WorkflowDefinition } from '@mediforce/platform-core';
 import type { CallerScope } from '../../../repositories/index';
 import { recordScore } from '../../scores/record-score';
 import { loadScoredRun } from './scored-run';
@@ -198,8 +198,12 @@ async function startTrial(scope: CallerScope, run: EvalRun, trial: EvalTrial, ev
       target = { definition: (await loadEvaluationSubject(scope, subject, 'read', runVersionOf(run), run.env)).definition };
     } else if (run.definitionVersion === null) {
       throw new Error(`Eval Run '${run.id}' of a step froze no workflow version`);
-    } else {
+    } else if (run.variant === null) {
       target = { definitionName: subject.workflowName, version: run.definitionVersion };
+    } else {
+      // A Variant's trial carries the Definition it patched, so its run records what ran (ADR-0024 D3).
+      const loaded = await loadEvaluationSubject(scope, subject, 'read', run.definitionVersion);
+      target = { definition: applyStepVariant(loaded.definition, loaded.step, run.variant).definition };
     }
     await scope.system.engine.createEvalTrial({
       id: processInstanceId,
