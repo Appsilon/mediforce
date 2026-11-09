@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Bot, Cpu, Terminal, BarChart3, Settings, Plus, Search } from 'lucide-react';
+import { Bot, Cpu, Terminal, BarChart3, Settings, Plus, Search, Workflow } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { getModelDisplayName } from '@/lib/agent-models';
 import { mediforce } from '@/lib/mediforce';
 import { cn } from '@/lib/utils';
 import { ConceptPopover } from '@/components/ui/concept-intro';
+import { AgentAssistantPanel } from '@/components/agents/agent-assistant-panel';
 import { VALIDATION_STATUS } from '@/components/evaluation/validation-status';
 import { useStepQualification } from '@/hooks/use-step-evaluation';
 import { routes } from '@/lib/routes';
@@ -81,7 +82,7 @@ function AgentValidationRows({ handle, definitionId }: { handle: string; definit
   );
 }
 
-function AgentCard({ agent, handle }: { agent: AgentEntry; handle: string }) {
+function AgentCard({ agent, handle, scanning, matched }: { agent: AgentEntry; handle: string; scanning: boolean; matched: boolean }) {
   const meta = agent.metadata;
   const { Icon, colorClass, bgClass } = getAgentIcon(agent.name);
   const descRef = useRef<HTMLParagraphElement>(null);
@@ -112,44 +113,63 @@ function AgentCard({ agent, handle }: { agent: AgentEntry; handle: string }) {
   }
 
   return (
-    <div data-testid="agent-card" className="rounded-lg border bg-card shadow-sm overflow-hidden transition-all hover:border-primary/40 hover:shadow-md flex flex-col mb-[10px]">
-      {/* Header: icon + name + description + configure button */}
-      <div className="px-4 py-4 flex items-start gap-3">
-        <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md mt-0.5', bgClass)}>
-          <Icon className={cn('h-3.5 w-3.5', colorClass)} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-base">{meta.name}</h3>
-            {agent.visibility === 'private' && (
-              <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-600">
-                Private
-              </span>
+    <div
+      data-testid="agent-card"
+      className={cn(
+        'rounded-lg border bg-card shadow-sm overflow-hidden transition-all hover:border-primary/40 hover:shadow-md flex flex-col mb-[10px]',
+        scanning && 'border-primary ring-2 ring-primary/20',
+        matched && !scanning && 'border-primary bg-primary/5',
+      )}
+    >
+      {/* Header: icon + name + description, actions on their own row below */}
+      <div className="px-4 py-4">
+        <div className="flex items-start gap-3">
+          <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md mt-0.5', bgClass)}>
+            <Icon className={cn('h-3.5 w-3.5', colorClass)} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-semibold text-base">{meta.name}</h3>
+              {agent.visibility === 'private' && (
+                <span className="shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-600">
+                  Private
+                </span>
+              )}
+            </div>
+            <p
+              ref={descRef}
+              className={cn('mt-1 text-sm text-muted-foreground', !expanded && 'line-clamp-2')}
+            >
+              {meta.description}
+            </p>
+            {(isClamped || expanded) && (
+              <button
+                onClick={() => setExpanded((prev) => !prev)}
+                className="mt-0.5 text-[11px] text-muted-foreground/70 hover:text-primary transition-colors"
+              >
+                {expanded ? 'read less' : 'read more'}
+              </button>
             )}
           </div>
-          <p
-            ref={descRef}
-            className={cn('mt-1 text-sm text-muted-foreground', !expanded && 'line-clamp-2')}
-          >
-            {meta.description}
-          </p>
-          {(isClamped || expanded) && (
-            <button
-              onClick={() => setExpanded((prev) => !prev)}
-              className="mt-0.5 text-[11px] text-muted-foreground/70 hover:text-primary transition-colors"
-            >
-              {expanded ? 'read less' : 'read more'}
-            </button>
-          )}
         </div>
         {agent.definitionId && (
-          <Link
-            href={`/${handle}/agents/definitions/${agent.definitionId}`}
-            className="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
-            <Settings className="h-3 w-3" />
-            Configure
-          </Link>
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <Link
+              href={`/${handle}/workflows/new?agentId=${agent.definitionId}`}
+              title="Start a new workflow with this agent as its first step"
+              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <Workflow className="h-3 w-3" />
+              Start workflow
+            </Link>
+            <Link
+              href={`/${handle}/agents/definitions/${agent.definitionId}`}
+              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <Settings className="h-3 w-3" />
+              Configure
+            </Link>
+          </div>
         )}
       </div>
 
@@ -273,7 +293,7 @@ function agentDefinitionToEntry(def: AgentDefinition, namespace: string): AgentE
   };
 }
 
-function AgentCatalog({ handle }: { handle: string }) {
+function AgentCatalog({ handle, scanningId, matchedId, refreshKey }: { handle: string; scanningId: string | null; matchedId: string | null; refreshKey: number }) {
   const [agents, setAgents] = useState<AgentEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -291,7 +311,7 @@ function AgentCatalog({ handle }: { handle: string }) {
       .finally(() => {
         setLoading(false);
       });
-  }, [handle]);
+  }, [handle, refreshKey]);
 
   const filtered = useMemo(
     () => (query.trim() === '' ? agents : agents.filter((a) => agentMatchesQuery(a, query.trim()))),
@@ -343,7 +363,13 @@ function AgentCatalog({ handle }: { handle: string }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-tour="agents-grid">
           {filtered.map((agent) => (
-            <AgentCard key={agent.definitionId ?? agent.name} agent={agent} handle={handle} />
+            <AgentCard
+              key={agent.definitionId ?? agent.name}
+              agent={agent}
+              handle={handle}
+              scanning={agent.definitionId !== undefined && agent.definitionId === scanningId}
+              matched={agent.definitionId !== undefined && agent.definitionId === matchedId}
+            />
           ))}
         </div>
       )}
@@ -353,42 +379,57 @@ function AgentCatalog({ handle }: { handle: string }) {
 
 export default function AgentsPage() {
   const { handle } = useParams<{ handle: string }>();
+  const [assistantWide, setAssistantWide] = useState(false);
+  const [assistantActivity, setAssistantActivity] = useState<{ scanningId: string | null; matchedId: string | null }>({ scanningId: null, matchedId: null });
+  const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-1.5">
-            <h1 className="text-2xl font-bold" data-tour="agents-header">Custom Agents</h1>
-            <ConceptPopover label="What is an agent?">
-              <p>
-                <strong>An agent is a reusable configuration a workflow step calls by id</strong> — a system prompt
-                plus the MCP servers that step is allowed to reach. One agent can power many steps, and agents are
-                versioned: saving a change to its runtime, image, model, system prompt, output schema, MCP servers or Skills records a new
-                version, and a step that references the agent uses its current one.
-              </p>
-              <p>
-                A run uses the agent&apos;s foundation model unless the workflow step that calls it names its own.
-              </p>
-            </ConceptPopover>
+    <div className={cn('grid gap-4 p-6 lg:items-start', assistantWide ? 'lg:grid-cols-[1fr_640px]' : 'lg:grid-cols-[1fr_380px]')}>
+      <div className="space-y-6 min-w-0">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-2xl font-bold" data-tour="agents-header">Custom Agents</h1>
+              <ConceptPopover label="What is an agent?">
+                <p>
+                  <strong>An agent is a reusable configuration a workflow step calls by id</strong> — a system prompt
+                  plus the MCP servers that step is allowed to reach. One agent can power many steps, and agents are
+                  versioned: saving a change to its runtime, image, model, system prompt, output schema, MCP servers or Skills records a new
+                  version, and a step that references the agent uses its current one.
+                </p>
+                <p>
+                  A run uses the agent&apos;s foundation model unless the workflow step that calls it names its own.
+                </p>
+              </ConceptPopover>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Reusable agent configurations that workflow steps call by id
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Reusable agent configurations that workflow steps call by id
-          </p>
+          <Link
+            href={`/${handle}/agents/new`}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium',
+              'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
+            )}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New Agent
+          </Link>
         </div>
-        <Link
-          href={`/${handle}/agents/new`}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium',
-            'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
-          )}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          New Agent
-        </Link>
+
+        <AgentCatalog handle={handle} scanningId={assistantActivity.scanningId} matchedId={assistantActivity.matchedId} refreshKey={catalogRefreshKey} />
       </div>
 
-      <AgentCatalog handle={handle} />
+      <div className="h-[calc(100dvh-8rem)] lg:sticky lg:top-6">
+        <AgentAssistantPanel
+          namespace={handle}
+          wide={assistantWide}
+          onToggleWide={() => setAssistantWide((current) => !current)}
+          onActivityChange={setAssistantActivity}
+          onAccepted={() => setCatalogRefreshKey((current) => current + 1)}
+        />
+      </div>
     </div>
   );
 }

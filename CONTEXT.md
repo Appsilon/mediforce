@@ -240,6 +240,17 @@ Skills. A skill in git becomes a Skill by import (`mediforce skill import`, or
 workflow import for the skills a package ships).
 _Avoid_: "Step skill" for a Skill a Step adds — that is a Skill.
 
+**Agent Assistant**:
+The AI agent on the Agents page that helps a person find, extend or design an
+Agent for the Namespace's own catalog: matching an existing one, adding a
+catalog Skill to one that is close, drafting a new one, or proposing an
+existing MCP server binding (wired onto the Agent only once a Namespace admin
+approves it). Every change it suggests is a proposal the person accepts,
+through the same create/update their own form makes.
+_Avoid_: confusing with the Evaluation Assistant (proposes Evaluators and Eval
+Cases) or the workflow editor's assistant (edits the Workflow Definition) —
+three assistants, one per subject.
+
 **Agent**:
 A reusable, mutable agent configuration: system prompt, foundation model,
 image, output schema and MCP server bindings. Workflow Steps reference Agents; one Agent can power many

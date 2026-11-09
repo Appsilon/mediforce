@@ -309,6 +309,19 @@ export {
 } from './evaluation-assistant-tools';
 
 export {
+  AGENT_ASSISTANT_PLATFORM_TOOLS,
+  AGENT_ASSISTANT_PROPOSAL_TOOLS,
+  ProposeAgentMatchToolSchema,
+  ProposeAgentChangeToolSchema,
+  ProposeNewAgentToolSchema,
+  ProposeRequirementMatrixToolSchema,
+  AgentAssistantProposalSchema,
+  type AgentAssistantPlatformToolName,
+  type AgentAssistantProposalToolName,
+  type AgentAssistantProposal,
+} from './agent-assistant-tools';
+
+export {
   CreationReasonSchema,
   HumanTaskStatusSchema,
   HumanTaskSchema,

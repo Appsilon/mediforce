@@ -819,6 +819,18 @@ export {
 } from './evaluation-assistant';
 
 export {
+  AskAgentAssistantInputSchema,
+  AskAgentAssistantOutputSchema,
+  AgentAssistantProgressSchema,
+  AgentProposalEvidenceSchema,
+  AgentAssistantProposalViewSchema,
+  type AskAgentAssistantInput,
+  type AskAgentAssistantOutput,
+  type AgentAssistantProgress,
+  type AgentProposalEvidence,
+} from './agent-assistant';
+
+export {
   MonitoringSummaryInputSchema,
   MonitoringSummarySchema,
   GetMonitoringSummaryOutputSchema,

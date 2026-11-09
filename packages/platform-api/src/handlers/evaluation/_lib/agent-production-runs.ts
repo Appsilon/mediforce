@@ -63,7 +63,7 @@ export function expectsWithheldOutput(source: Pick<AgentRunSource, 'agentRun' | 
  * theirs), across every live version of the workflows of its workspace the
  * caller can see.
  */
-async function findStepsUsingAgent(scope: CallerScope, agent: EvaluatedAgent): Promise<AgentStepUsage[]> {
+export async function findStepsUsingAgent(scope: CallerScope, agent: EvaluatedAgent): Promise<AgentStepUsage[]> {
   const usages: AgentStepUsage[] = [];
   for (const group of await scope.workflowDefinitions.listGroups(false)) {
     if (group.namespace !== agent.namespace) continue;

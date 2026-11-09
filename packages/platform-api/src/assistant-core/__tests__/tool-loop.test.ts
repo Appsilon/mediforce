@@ -351,10 +351,10 @@ describe('runProposalToolLoop', () => {
     });
     expect(onProgress.mock.calls.map(([event]) => event)).toEqual([
       { type: 'thinking', round: 1 },
-      { type: 'tool', round: 1, callId: 'call-1-0', tool: 'read_count', status: 'running' },
-      { type: 'tool', round: 1, callId: 'call-1-0', tool: 'read_count', status: 'done' },
-      { type: 'tool', round: 1, callId: 'call-1-1', tool: 'propose_note', status: 'running' },
-      { type: 'tool', round: 1, callId: 'call-1-1', tool: 'propose_note', status: 'failed', error: expect.stringContaining('text') },
+      { type: 'tool', round: 1, callId: 'call-1-0', tool: 'read_count', status: 'running', arguments: {} },
+      { type: 'tool', round: 1, callId: 'call-1-0', tool: 'read_count', status: 'done', arguments: {} },
+      { type: 'tool', round: 1, callId: 'call-1-1', tool: 'propose_note', status: 'running', arguments: { text: '' } },
+      { type: 'tool', round: 1, callId: 'call-1-1', tool: 'propose_note', status: 'failed', error: expect.stringContaining('text'), arguments: { text: '' } },
       { type: 'thinking', round: 2 },
     ]);
   });
