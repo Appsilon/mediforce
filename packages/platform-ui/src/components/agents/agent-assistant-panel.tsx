@@ -200,7 +200,7 @@ export function AgentAssistantPanel({ namespace, wide, onToggleWide, onActivityC
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    scrollRef.current?.scrollTo?.({ top: scrollRef.current.scrollHeight });
   }, [messages.length, pending]);
 
   async function send(message: string) {
