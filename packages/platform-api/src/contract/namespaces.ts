@@ -5,6 +5,8 @@ import {
   NamespaceMemberSchema,
   BrandColorSchema,
   WorkspaceLogoSchema,
+  OutputBudgetSchema,
+  DefaultModelIdSchema,
 } from '@mediforce/platform-core';
 
 export const GetNamespaceInputSchema = z.object({ handle: HandleSchema });
@@ -48,7 +50,8 @@ export type CreateNamespaceOutput = z.infer<typeof CreateNamespaceOutputSchema>;
 /**
  * PATCH /api/namespaces/:handle — workspace metadata edit (owner/admin only).
  * Omitting a field leaves it unchanged; passing an empty string for `bio`
- * clears it.
+ * clears it. `outputBudget: 'default'` clears the workspace output budget;
+ * `defaultModel: null` clears the workspace default model.
  */
 const UpdateNamespaceFieldsSchema = z.object({
   displayName: z.string().min(1).max(128).optional(),
@@ -57,6 +60,8 @@ const UpdateNamespaceFieldsSchema = z.object({
   logo: WorkspaceLogoSchema.optional(),
   brandPrimaryColor: BrandColorSchema.optional(),
   brandAccentColor: BrandColorSchema.optional(),
+  outputBudget: OutputBudgetSchema.optional(),
+  defaultModel: DefaultModelIdSchema.nullable().optional(),
 });
 const atLeastOneUpdateField = (v: z.infer<typeof UpdateNamespaceFieldsSchema>): boolean =>
   v.displayName !== undefined ||
@@ -64,9 +69,11 @@ const atLeastOneUpdateField = (v: z.infer<typeof UpdateNamespaceFieldsSchema>): 
   v.icon !== undefined ||
   v.logo !== undefined ||
   v.brandPrimaryColor !== undefined ||
-  v.brandAccentColor !== undefined;
+  v.brandAccentColor !== undefined ||
+  v.outputBudget !== undefined ||
+  v.defaultModel !== undefined;
 const atLeastOneUpdateFieldMessage =
-  'At least one of displayName, bio, icon, logo, brandPrimaryColor, brandAccentColor must be provided';
+  'At least one of displayName, bio, icon, logo, brandPrimaryColor, brandAccentColor, outputBudget, defaultModel must be provided';
 
 export const UpdateNamespaceBodySchema = UpdateNamespaceFieldsSchema.refine(
   atLeastOneUpdateField,
@@ -79,6 +86,30 @@ export const UpdateNamespaceOutputSchema = z.object({ namespace: NamespaceSchema
 
 export type UpdateNamespaceInput = z.infer<typeof UpdateNamespaceInputSchema>;
 export type UpdateNamespaceOutput = z.infer<typeof UpdateNamespaceOutputSchema>;
+
+/**
+ * PUT /api/namespaces/:handle/model-settings — the caller sets their own model
+ * settings in an organization workspace. Any member may. Omitting a field
+ * leaves it; `null` follows the workspace; any other value overrides it.
+ */
+const MyModelSettingsFieldsSchema = z.object({
+  outputBudget: OutputBudgetSchema.nullable().optional(),
+  defaultModel: DefaultModelIdSchema.nullable().optional(),
+});
+const atLeastOneModelSetting = (v: z.infer<typeof MyModelSettingsFieldsSchema>): boolean =>
+  v.outputBudget !== undefined || v.defaultModel !== undefined;
+const atLeastOneModelSettingMessage = 'At least one of outputBudget, defaultModel must be provided';
+
+export const SetMyModelSettingsBodySchema = MyModelSettingsFieldsSchema.refine(
+  atLeastOneModelSetting,
+  { message: atLeastOneModelSettingMessage },
+);
+export const SetMyModelSettingsInputSchema = MyModelSettingsFieldsSchema
+  .extend({ handle: HandleSchema })
+  .refine(atLeastOneModelSetting, { message: atLeastOneModelSettingMessage });
+export const SetMyModelSettingsOutputSchema = z.object({ member: NamespaceMemberSchema });
+export type SetMyModelSettingsInput = z.infer<typeof SetMyModelSettingsInputSchema>;
+export type SetMyModelSettingsOutput = z.infer<typeof SetMyModelSettingsOutputSchema>;
 
 /**
  * DELETE /api/namespaces/:handle — cascade delete (owner only). Personal

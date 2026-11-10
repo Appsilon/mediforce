@@ -1,10 +1,10 @@
-import type { NamespaceUpdates } from '@mediforce/platform-core';
+import { isUsableDefaultModel, type NamespaceUpdates } from '@mediforce/platform-core';
 import {
   assertCallerIsNamespaceAdmin,
   assertCallerIsNamespaceOwner,
 } from '../../auth';
 import { emitAudit } from '../../audit-helpers';
-import { ForbiddenError, NotFoundError, PreconditionFailedError } from '../../errors';
+import { ForbiddenError, NotFoundError, PreconditionFailedError, ValidationError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
 import { resolvePersonalNamespace } from '../_helpers';
 import { hasHolders, heldSkillConflict } from '../skills/_helpers';
@@ -22,12 +22,16 @@ import type {
   UpdateNamespaceMemberRoleInput,
   UpdateNamespaceMemberRoleOutput,
   UpdateNamespaceOutput,
+  SetMyModelSettingsInput,
+  SetMyModelSettingsOutput,
 } from '../../contract/namespaces';
 
 const BRANDING_FIELDS = ['icon', 'logo', 'brandPrimaryColor', 'brandAccentColor'] as const;
 
 /**
- * Edit workspace `displayName`, `bio`, `icon`, `logo`, and brand colors.
+ * Edit workspace `displayName`, `bio`, `icon`, `logo`, brand colors, and the
+ * model settings: `outputBudget` (`'default'` clears it) and `defaultModel`
+ * (`null` clears it), both allowed on a personal workspace too.
  * Owner/admin only. Two-state semantics: undefined leaves the field untouched,
  * any string overwrites it (empty string is the cleared state for `bio`, `logo`,
  * and the brand colors — cleared branding falls back to the icon + default
@@ -53,6 +57,10 @@ export async function updateNamespace(
     }
   }
 
+  if (input.defaultModel !== undefined && input.defaultModel !== null) {
+    await assertUsableDefaultModel(scope, input.defaultModel);
+  }
+
   const updates: NamespaceUpdates = {
     ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
     ...(input.icon !== undefined ? { icon: input.icon } : {}),
@@ -60,6 +68,10 @@ export async function updateNamespace(
     ...(input.brandPrimaryColor !== undefined ? { brandPrimaryColor: input.brandPrimaryColor } : {}),
     ...(input.brandAccentColor !== undefined ? { brandAccentColor: input.brandAccentColor } : {}),
     ...(input.bio !== undefined ? { bio: input.bio } : {}),
+    ...(input.outputBudget !== undefined
+      ? { outputBudget: input.outputBudget === 'default' ? null : input.outputBudget }
+      : {}),
+    ...(input.defaultModel !== undefined ? { defaultModel: input.defaultModel } : {}),
   };
 
   await scope.workspaces.updateNamespace(input.handle, updates);
@@ -331,6 +343,84 @@ export async function updateNamespaceMemberRole(
     inputSnapshot: { handle: input.handle, uid: input.uid, role: input.role },
     outputSnapshot: { handle: input.handle, uid: input.uid, previousRole: member.role, role: updated.role },
     basis: 'Owner changed member role via API',
+    entityType: 'namespace',
+    entityId: input.handle,
+    namespace: input.handle,
+  });
+
+  return { member: updated };
+}
+
+/**
+ * A default model must be one the registry lists, has not retired, and can call
+ * tools: cowork chat and both assistants always send tools.
+ */
+async function assertUsableDefaultModel(scope: CallerScope, modelId: string): Promise<void> {
+  const entry = await scope.models.getById(modelId);
+  if (isUsableDefaultModel(entry) === false) {
+    throw new ValidationError(
+      `Model "${modelId}" is not a live, tool-capable model in the registry; the assistants and cowork chat need tools`,
+      { defaultModel: modelId },
+    );
+  }
+}
+
+/**
+ * The caller's own model settings in an organization workspace. A personal
+ * workspace has one member, so its workspace settings are already theirs.
+ */
+export async function setMyModelSettings(
+  input: SetMyModelSettingsInput,
+  scope: CallerScope,
+): Promise<SetMyModelSettingsOutput> {
+  if (scope.caller.kind !== 'user') {
+    throw new ForbiddenError(
+      'PUT /api/namespaces/:handle/model-settings requires an authenticated user (no "self" for apiKey callers)',
+    );
+  }
+  const uid = scope.caller.uid;
+
+  const namespace = await scope.workspaces.getNamespace(input.handle);
+  if (namespace === null) throw new NotFoundError(`Namespace "${input.handle}" not found`);
+
+  const member = await scope.workspaces.getMember(input.handle, uid);
+  if (member === null) {
+    // Anti-enum 404: do not leak "namespace exists, you are not a member".
+    throw new NotFoundError(`Namespace "${input.handle}" not found`);
+  }
+
+  if (namespace.type === 'personal') {
+    throw new PreconditionFailedError(
+      'A personal workspace has no member model settings. Set the workspace ones instead.',
+      { handle: input.handle, type: namespace.type },
+    );
+  }
+
+  if (input.defaultModel !== undefined && input.defaultModel !== null) {
+    await assertUsableDefaultModel(scope, input.defaultModel);
+  }
+
+  const settings = {
+    ...(input.outputBudget !== undefined ? { outputBudget: input.outputBudget } : {}),
+    ...(input.defaultModel !== undefined ? { defaultModel: input.defaultModel } : {}),
+  };
+  await scope.workspaces.setMemberModelSettings(input.handle, uid, settings);
+
+  const updated = await scope.workspaces.getMember(input.handle, uid);
+  if (updated === null) throw new NotFoundError(`Namespace "${input.handle}" not found`);
+
+  await emitAudit(scope.system.audit, scope.caller, {
+    action: 'namespace.member_model_settings_changed',
+    description: `Member '${uid}' model settings changed in '${input.handle}'`,
+    inputSnapshot: { handle: input.handle, ...settings },
+    outputSnapshot: {
+      handle: input.handle,
+      uid,
+      previous: { outputBudget: member.outputBudget ?? null, defaultModel: member.defaultModel ?? null },
+      outputBudget: updated.outputBudget ?? null,
+      defaultModel: updated.defaultModel ?? null,
+    },
+    basis: 'Member set their own model settings via API',
     entityType: 'namespace',
     entityId: input.handle,
     namespace: input.handle,

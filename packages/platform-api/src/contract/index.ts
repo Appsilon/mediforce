@@ -932,6 +932,11 @@ export {
   type RoleGrantInput,
   type SetNamespaceMemberRolesInput,
   type SetNamespaceMemberRolesOutput,
+  SetMyModelSettingsBodySchema,
+  SetMyModelSettingsInputSchema,
+  SetMyModelSettingsOutputSchema,
+  type SetMyModelSettingsInput,
+  type SetMyModelSettingsOutput,
 } from './namespaces';
 
 export {

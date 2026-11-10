@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { Bot, Check, Loader2, Send, Settings, Sparkles, User, X } from 'lucide-react';
-import { DEFAULT_MODEL } from '@mediforce/platform-core';
 import type {
   AgentOutputSchema,
   EvaluationSubject,
@@ -16,7 +15,9 @@ import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
 import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
+import { useDefaultModel } from '@/hooks/use-model-registry';
 import { selectBase } from '@/components/workflows/workflow-editor/step-editor-fields';
+import { OutputBudgetNotice } from '@/components/namespace/output-budget-notice';
 import { StartEvalRunCard } from './step-evaluation-sections';
 import { primaryButtonClass } from './evaluation-styles';
 import { EvaluationBriefField, EvaluationBriefToggle, type BriefQuery } from './evaluation-brief-field';
@@ -159,6 +160,7 @@ export function EvaluationAssistantPanel({ step, definitionVersion, outputSchema
   /** Follows the conversation, in place of the general intro, for as long as the page offers it. */
   starter?: EvaluationAssistantStarter;
 }) {
+  const defaultModel = useDefaultModel(step.namespace);
   const [messages, setMessages] = React.useState<PanelMessage[]>([]);
   const [input, setInput] = React.useState('');
   const [pending, setPending] = React.useState(false);
@@ -265,12 +267,13 @@ export function EvaluationAssistantPanel({ step, definitionVersion, outputSchema
           <ModelPicker
             value={assistantModel}
             onChange={setAssistantModel}
-            defaultModel={DEFAULT_MODEL}
+            defaultModel={defaultModel}
             requireToolSupport
             minContextTokens={32000}
             ariaLabel="Evaluation Assistant Model"
             className={selectBase}
           />
+          <OutputBudgetNotice handle={step.namespace} />
           <details>
             <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">Advanced</summary>
             <label className="mt-1.5 block space-y-1 text-xs">

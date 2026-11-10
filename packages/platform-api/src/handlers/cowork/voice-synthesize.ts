@@ -1,5 +1,5 @@
 import {
-  DEFAULT_MODEL,
+  OUTPUT_TOKEN_DEFAULTS,
   type ConversationTurn,
   type CoworkSession,
 } from '@mediforce/platform-core';
@@ -12,9 +12,12 @@ import type {
 } from '../../contract/cowork';
 import { callOpenRouter } from '../../services/openrouter-client';
 import { OPENROUTER_KEY_MISSING_MESSAGE } from '../../services/openrouter-key';
+import { resolveOutputTokens } from '../../services/output-tokens';
+import { resolveDefaultModel } from '../../services/default-model';
+import { callerUserId } from '../../auth';
 
 const SYNTHESIS_TEMPERATURE = 0.3;
-const SYNTHESIS_MAX_TOKENS = 4096;
+const SYNTHESIS_MAX_TOKENS = OUTPUT_TOKEN_DEFAULTS.voiceSynthesis;
 
 export async function synthesizeVoiceArtifact(
   input: SynthesizeVoiceArtifactInput,
@@ -34,6 +37,7 @@ interface SynthesisContext {
   readonly session: CoworkSession;
   readonly openRouterKey: string;
   readonly model: string;
+  readonly maxTokens: number;
 }
 
 async function loadSynthesisContext(
@@ -69,11 +73,15 @@ async function loadSynthesisContext(
     throw new HandlerError('validation', OPENROUTER_KEY_MISSING_MESSAGE);
   }
 
-  return {
-    session,
-    openRouterKey,
-    model: session.voiceConfig?.synthesisModel ?? DEFAULT_MODEL,
-  };
+  const model = session.voiceConfig?.synthesisModel ?? (await resolveDefaultModel(scope, { namespace, userId: callerUserId(scope.caller) }));
+  const maxTokens = await resolveOutputTokens(scope, {
+    namespace,
+    model,
+    defaultTokens: SYNTHESIS_MAX_TOKENS,
+    userId: callerUserId(scope.caller),
+  });
+
+  return { session, openRouterKey, model, maxTokens };
 }
 
 async function callSynthesisLlm(
@@ -90,7 +98,7 @@ async function callSynthesisLlm(
     model: ctx.model,
     apiKey: ctx.openRouterKey,
     temperature: SYNTHESIS_TEMPERATURE,
-    maxTokens: SYNTHESIS_MAX_TOKENS,
+    maxTokens: ctx.maxTokens,
     messages: [
       {
         role: 'system',

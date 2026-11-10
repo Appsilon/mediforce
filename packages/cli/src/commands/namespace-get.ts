@@ -22,12 +22,16 @@ export const namespaceGetCommand = defineCommand({
       ['createdAt', result.namespace.createdAt],
       ['bio', result.namespace.bio ?? undefined],
       ['linkedUserId', result.namespace.linkedUserId ?? undefined],
+      ['outputBudget', result.namespace.outputBudget ?? 'default'],
+      ['defaultModel', result.namespace.defaultModel ?? 'platform'],
     ]);
     output.stdout('');
     output.stdout(`Members (${result.members.length}):`);
     for (const member of result.members) {
       const name = member.displayName !== undefined ? ` (${member.displayName})` : '';
-      output.stdout(`  ${member.role.padEnd(6)} ${member.uid}${name}`);
+      const budget = member.outputBudget !== undefined ? ` [output budget: ${member.outputBudget}]` : '';
+      const model = member.defaultModel !== undefined ? ` [default model: ${member.defaultModel}]` : '';
+      output.stdout(`  ${member.role.padEnd(6)} ${member.uid}${name}${budget}${model}`);
     }
     return 0;
   },

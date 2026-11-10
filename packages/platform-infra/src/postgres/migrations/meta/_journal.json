@@ -638,6 +638,20 @@
       "when": 1789641863700,
       "tag": "0090_agent_run_version",
       "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1789641863800,
+      "tag": "0091_output_budget",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1789641863900,
+      "tag": "0092_default_model",
+      "breakpoints": true
     }
   ]
 }

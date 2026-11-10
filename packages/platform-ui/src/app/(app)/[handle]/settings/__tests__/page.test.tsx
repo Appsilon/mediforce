@@ -65,6 +65,7 @@ vi.mock('@/hooks/use-namespace-mutations', () => {
     useUpdateMemberRole: stub,
     useSetMemberRoles: stub,
     useUpdateNamespace: stub,
+    useSetMyModelSettings: stub,
   };
 });
 

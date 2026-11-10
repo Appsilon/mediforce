@@ -9,7 +9,8 @@ import { runEvaluatorCheck } from '../run-evaluator-check';
 import { loadScoredRun } from '../scored-run';
 import { createEvalCase } from '../../eval-cases';
 import { CreateEvalCaseInputSchema } from '../../../../contract/evaluation';
-import { evaluationFixture, GRADED_RUN, registryEntry, STEP, type EvaluationFixture } from '../../__tests__/fixture';
+import { evaluationFixture, GRADED_RUN, NAMESPACE, registryEntry, STEP, type EvaluationFixture } from '../../__tests__/fixture';
+import { InMemoryNamespaceRepo } from '../../../../testing/in-memory-namespace-repo';
 
 const judge = {
   kind: 'llm_judge' as const,
@@ -236,6 +237,31 @@ describe('runEvaluatorCheck', () => {
     expect(calls[0]).toEqual({
       model: 'anthropic/claude-haiku-4.5', promptTokens: 4000, completionTokens: 500, durationMs: expect.any(Number), response: 'I would rather not choose.',
     });
+  });
+
+  it('sends the workspace output budget as the judge\'s max tokens, within the model limit', async () => {
+    const fixture = await evaluationFixture();
+    await fixture.modelRegistryRepo.upsert(registryEntry(judge.model, { maxCompletionTokens: 64_000 }));
+    const scope = withOpenRouterKey(fixture);
+    const workspaces = new InMemoryNamespaceRepo();
+    workspaces.seedNamespace({ handle: NAMESPACE, type: 'organization', displayName: 'Pharma A', createdAt: '2026-01-01T00:00:00.000Z', outputBudget: 'high' });
+    Object.assign(scope, { workspaces });
+    const subject = await loadScoredRun(scope, GRADED_RUN, STEP);
+
+    const judging = answeringOpenRouter(ANSWER);
+    await runEvaluatorCheck(scope, judge, subject, null);
+    expect(JSON.parse(String(judging.mock.calls[0]![1]!.body))).toMatchObject({ max_tokens: 32000 });
+  });
+
+  it('keeps capping the judge at a model limit below its default', async () => {
+    const fixture = await evaluationFixture();
+    await fixture.modelRegistryRepo.upsert(registryEntry(judge.model, { maxCompletionTokens: 8_192 }));
+    const scope = withOpenRouterKey(fixture);
+    const subject = await loadScoredRun(scope, GRADED_RUN, STEP);
+
+    const judging = answeringOpenRouter(ANSWER);
+    await runEvaluatorCheck(scope, judge, subject, null);
+    expect(JSON.parse(String(judging.mock.calls[0]![1]!.body))).toMatchObject({ max_tokens: 8192 });
   });
 
   it('constrains a judge\'s answer to its schema on a model whose providers can, routed only to those, sending no parameter the model does not take', async () => {

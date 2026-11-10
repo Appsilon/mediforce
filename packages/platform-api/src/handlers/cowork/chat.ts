@@ -2,13 +2,15 @@ import {
   McpClientManager,
   type McpToolDefinition,
 } from '@mediforce/mcp-client';
-import { DEFAULT_MODEL, type ConversationTurn, type CoworkSession, type OutputSchemaShape } from '@mediforce/platform-core';
+import { OUTPUT_TOKEN_DEFAULTS, type ConversationTurn, type CoworkSession, type OutputSchemaShape } from '@mediforce/platform-core';
 import {
   HandlerError,
   PreconditionFailedError,
 } from '../../errors';
 import { loadOr404 } from '../_helpers';
 import { OPENROUTER_KEY_MISSING_MESSAGE } from '../../services/openrouter-key';
+import { resolveOutputTokens } from '../../services/output-tokens';
+import { resolveDefaultModel } from '../../services/default-model';
 import type { CallerScope } from '../../repositories/index';
 import type {
   ChatCoworkSessionInput,
@@ -26,6 +28,7 @@ import {
   type OpenRouterToolCall,
 } from '../../services/openrouter-client';
 import { validateOutputSchema } from '@mediforce/agent-runtime';
+import { callerUserId } from '../../auth';
 
 const MAX_TOOL_LOOP_ITERATIONS = 10;
 /**
@@ -35,13 +38,16 @@ const MAX_TOOL_LOOP_ITERATIONS = 10;
  * there yields invalid JSON and a silently dropped artifact. 16k gives the
  * model room to emit a complete definition in one turn.
  */
-const CHAT_MAX_TOKENS = 16384;
+const CHAT_MAX_TOKENS = OUTPUT_TOKEN_DEFAULTS.coworkChat;
 const COWORK_DEBUG = process.env.COWORK_DEBUG === 'true';
 
-const ARTIFACT_TRUNCATED_MESSAGE =
-  `Artifact update failed: model response truncated at the ${CHAT_MAX_TOKENS}-token limit ` +
-  '(the artifact is too large to emit in one turn). Emit a smaller artifact and build it up ' +
-  'across several update_artifact calls.';
+function artifactTruncatedMessage(maxTokens: number): string {
+  return (
+    `Artifact update failed: model response truncated at the ${maxTokens}-token limit ` +
+    '(the artifact is too large to emit in one turn). Emit a smaller artifact and build it up ' +
+    'across several update_artifact calls.'
+  );
+}
 const ARTIFACT_PARSE_ERROR_MESSAGE = 'Artifact update skipped (parse error).';
 
 /**
@@ -130,7 +136,7 @@ async function loadChatContext(
     openRouterKey,
     secrets,
     stepContext: instance.variables as Record<string, unknown> | undefined,
-    model: session.model ?? DEFAULT_MODEL,
+    model: session.model ?? (await resolveDefaultModel(scope, { namespace, userId: callerUserId(scope.caller) })),
     namespace,
   };
 }
@@ -242,6 +248,12 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
   const toolCallSummaries: ChatCoworkToolCall[] = [];
   let artifact: Record<string, unknown> | undefined;
   let agentText = '';
+  const maxTokens = await resolveOutputTokens(scope, {
+    namespace: ctx.namespace,
+    model: ctx.model,
+    defaultTokens: CHAT_MAX_TOKENS,
+    userId: callerUserId(scope.caller),
+  });
 
   for (let iteration = 0; iteration < MAX_TOOL_LOOP_ITERATIONS; iteration++) {
     const response = await callOpenRouter({
@@ -249,7 +261,7 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
       messages,
       tools,
       apiKey: ctx.openRouterKey,
-      maxTokens: CHAT_MAX_TOKENS,
+      maxTokens,
     });
     agentText = response.content;
     if (COWORK_DEBUG) console.log(`[cowork-chat] LLM response: text=${agentText.length}chars toolCalls=[${response.toolCalls.map(tc => tc.function.name).join(', ')}]`);
@@ -293,7 +305,7 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
         });
       } else {
         const toolResult = response.finishReason === 'length'
-          ? ARTIFACT_TRUNCATED_MESSAGE
+          ? artifactTruncatedMessage(maxTokens)
           : ARTIFACT_PARSE_ERROR_MESSAGE;
         await scope.coworkSessions.updateTurn(ctx.session.id, turn.id, {
           toolResult,
@@ -337,7 +349,7 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
           ? 'Artifact updated and validated.'
           : 'Artifact updated.';
       } else if (response.finishReason === 'length') {
-        validationMsg = ARTIFACT_TRUNCATED_MESSAGE;
+        validationMsg = artifactTruncatedMessage(maxTokens);
       } else {
         validationMsg = ARTIFACT_PARSE_ERROR_MESSAGE;
       }

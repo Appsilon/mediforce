@@ -91,6 +91,9 @@ const stubNamespaceRepo: NamespaceRepository = {
   async setMemberRole() {
     /* no-op */
   },
+  async setMemberModelSettings() {
+    /* no-op */
+  },
   async isAutoJoinBlocked() {
     return false;
   },

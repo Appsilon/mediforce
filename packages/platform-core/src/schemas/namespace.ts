@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { OutputBudgetSchema } from './output-budget';
+import { DefaultModelIdSchema } from './model-registry';
 
 export const NamespaceTypeSchema = z.enum(['personal', 'organization']);
 
@@ -44,6 +46,8 @@ export const NamespaceSchema = z.object({
   brandAccentColor: BrandColorSchema.optional(),
   linkedUserId: z.string().optional(),
   bio: z.string().optional(),
+  outputBudget: OutputBudgetSchema.optional(),
+  defaultModel: DefaultModelIdSchema.optional(),
   createdAt: z.string().datetime(),
 });
 
@@ -52,6 +56,8 @@ export const NamespaceMemberSchema = z.object({
   role: z.enum(['owner', 'admin', 'member']),
   displayName: z.string().optional(),
   avatarUrl: z.string().url().optional(),
+  outputBudget: OutputBudgetSchema.optional(),
+  defaultModel: DefaultModelIdSchema.optional(),
   joinedAt: z.string().datetime(),
 });
 
@@ -64,3 +70,21 @@ export type NamespaceType = z.infer<typeof NamespaceTypeSchema>;
 export type Namespace = z.infer<typeof NamespaceSchema>;
 export type NamespaceMember = z.infer<typeof NamespaceMemberSchema>;
 export type NamespaceMembership = z.infer<typeof NamespaceMembershipSchema>;
+
+/** A member's own model settings in a workspace. `undefined` leaves a field; `null` clears it. */
+export interface MemberModelSettingsUpdate {
+  readonly outputBudget?: NamespaceMember['outputBudget'] | null;
+  readonly defaultModel?: string | null;
+}
+
+export function withMemberModelSettings<Member extends Pick<NamespaceMember, 'outputBudget' | 'defaultModel'>>(
+  member: Member,
+  settings: MemberModelSettingsUpdate,
+): Member {
+  const next: Member = { ...member };
+  if (settings.outputBudget === null) delete next.outputBudget;
+  else if (settings.outputBudget !== undefined) next.outputBudget = settings.outputBudget;
+  if (settings.defaultModel === null) delete next.defaultModel;
+  else if (settings.defaultModel !== undefined) next.defaultModel = settings.defaultModel;
+  return next;
+}

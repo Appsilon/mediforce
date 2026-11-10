@@ -4,8 +4,10 @@ import {
   type Namespace,
   type NamespaceMember,
   type NamespaceMembership,
+  type MemberModelSettingsUpdate,
+  withMemberModelSettings,
 } from '../schemas/namespace';
-import type { NamespaceRepository } from '../interfaces/namespace-repository';
+import type { NamespaceRepository, NamespaceUpdates } from '../interfaces/namespace-repository';
 
 /**
  * In-memory NamespaceRepository double. Mirrors the Firestore + Postgres
@@ -43,10 +45,15 @@ export class InMemoryNamespaceRepository implements NamespaceRepository {
     this.members.set(parsedNs.handle, bucket);
   }
 
-  async updateNamespace(handle: string, updates: Partial<Namespace>): Promise<void> {
+  async updateNamespace(handle: string, updates: NamespaceUpdates): Promise<void> {
     const current = this.namespaces.get(handle);
     if (!current) return;
-    const merged = NamespaceSchema.parse({ ...current, ...updates });
+    const { outputBudget, defaultModel, ...rest } = updates;
+    const merged = NamespaceSchema.parse({ ...current, ...rest });
+    if (outputBudget === null) delete merged.outputBudget;
+    if (outputBudget !== undefined && outputBudget !== null) merged.outputBudget = outputBudget;
+    if (defaultModel === null) delete merged.defaultModel;
+    if (defaultModel !== undefined && defaultModel !== null) merged.defaultModel = defaultModel;
     this.namespaces.set(handle, merged);
   }
 
@@ -85,6 +92,13 @@ export class InMemoryNamespaceRepository implements NamespaceRepository {
 
   async isAutoJoinBlocked(handle: string, uid: string): Promise<boolean> {
     return this.autoJoinBlocks.has(blockKey(handle, uid));
+  }
+
+  async setMemberModelSettings(handle: string, uid: string, settings: MemberModelSettingsUpdate): Promise<void> {
+    const bucket = this.members.get(handle);
+    const current = bucket?.get(uid);
+    if (bucket === undefined || current === undefined) return;
+    bucket.set(uid, withMemberModelSettings(current, settings));
   }
 
   async setMemberRole(

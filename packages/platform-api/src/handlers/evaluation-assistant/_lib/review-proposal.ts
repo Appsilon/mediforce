@@ -3,7 +3,7 @@ import type { z } from 'zod';
 import {
   isMovingModelAlias,
   isOwnedBy,
-  pinDefaultModel,
+  pinDefaultJudgeModel,
   type AssistantCheck,
   type EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   type EvaluationSubject,
@@ -13,6 +13,7 @@ import {
 import type { ProposalReview } from '../../../assistant-core';
 import type { PreviewEvaluatorOutput } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
+import { preferredDefaultModel } from '../../../services/default-model';
 import { HandlerError, ValidationError } from '../../../errors';
 import { AGENT_NOT_PREVIEWED, EXPECTED_OUTPUT_NOT_PREVIEWED, JUDGE_NOT_PREVIEWED, previewEvaluator } from '../../evaluation/preview-evaluator';
 import { expectsWithheldOutput, loadAgentRunSource, WITHHELD_OUTPUT_ERROR } from '../../evaluation/_lib/agent-production-runs';
@@ -21,6 +22,7 @@ import { evaluatorView } from '../../evaluation/_lib/evaluator-view';
 import { stepOnly } from '../../evaluation/_lib/evaluation-subject';
 import { perturbCase } from '../../evaluation/_lib/perturb-case';
 import { loadStepEvaluator } from './run-evaluation-tool';
+import { callerUserId } from '../../../auth';
 
 type Args<Name extends EvaluationAssistantProposalToolName> = z.infer<(typeof EVALUATION_ASSISTANT_PROPOSAL_TOOLS)[Name]>;
 
@@ -35,17 +37,20 @@ export interface PreviewedCheck {
  * it, it is not retired and it can constrain its answer to the judge's schema.
  * Named by no one, a new version keeps the model its Evaluator's check of the
  * same kind has while the registry does not retire or drop it, as a change of
- * rubric is no change of judge; otherwise the platform's pinned default. A
+ * rubric is no change of judge; otherwise the caller's or workspace's default
+ * model while it can judge, else the platform's pinned default. A
  * registry with no models at all cannot say, so a named or kept model then
  * stands; a named model listed without saying what it takes is refused.
  */
-async function resolveCheck(scope: CallerScope, check: AssistantCheck, replaced?: EvaluatorCheck): Promise<EvaluatorCheck> {
+async function resolveCheck(scope: CallerScope, namespace: string, check: AssistantCheck, replaced?: EvaluatorCheck): Promise<EvaluatorCheck> {
   if (check.kind !== 'llm_judge' && check.kind !== 'expected_output') return check;
   const models = await scope.models.list();
   if (check.model === undefined) {
     const kept = (replaced?.kind === 'llm_judge' || replaced?.kind === 'expected_output') && replaced.kind === check.kind ? replaced.model : undefined;
     const keeps = kept !== undefined && (models.length === 0 || models.some((candidate) => candidate.id === kept && candidate.retiredAt === null));
-    return { ...check, model: keeps === true ? kept : pinDefaultModel(models) };
+    if (keeps === true) return { ...check, model: kept };
+    const preferred = await preferredDefaultModel(scope, { namespace, userId: callerUserId(scope.caller) });
+    return { ...check, model: pinDefaultJudgeModel(models, preferred) };
   }
   const { model } = check;
   if (isMovingModelAlias(model)) {
@@ -185,7 +190,7 @@ export async function reviewEvaluationProposal(
           error: `This step has an Evaluator named '${name}' already (${taken.id}${taken.archived ? ', archived' : ''}) — propose a new version of it with propose_evaluator_version, or choose another name.`,
         };
       }
-      const check = await resolveCheck(scope, proposal.check);
+      const check = await resolveCheck(scope, step.namespace, proposal.check);
       const schemaReview = await reviewAgentSchemaCheck(scope, step, check);
       if (schemaReview.ok === false) return schemaReview;
       return withCheck(await selfTest(scope, step, check, previewed), proposal, check);
@@ -195,7 +200,7 @@ export async function reviewEvaluationProposal(
       const evaluator = await loadStepEvaluator(scope, step, proposal.evaluatorId);
       if (evaluator.archived) return { ok: false, error: `Evaluator '${evaluator.name}' is archived` };
       if (proposal.check === undefined) return { ok: true };
-      const check = await resolveCheck(scope, proposal.check, (await evaluatorView(scope, evaluator)).latest.check);
+      const check = await resolveCheck(scope, step.namespace, proposal.check, (await evaluatorView(scope, evaluator)).latest.check);
       const schemaReview = await reviewAgentSchemaCheck(scope, step, check);
       if (schemaReview.ok === false) return schemaReview;
       return withCheck(await selfTest(scope, step, check, previewed), proposal, check);

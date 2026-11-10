@@ -350,6 +350,14 @@ manage other owners; admins can manage members and workspace settings; members
 can use the Workspace.
 _Avoid_: "Role" alone — that's overloaded with process-domain roles below.
 
+**Output budget** *(how much an LLM may write per platform call)*:
+A step — `low | default | high | max` — that scales each platform LLM call's default max output tokens. A Workspace sets one (owners and admins); a member may override it, up or down, for the calls they start in that Workspace. A raise stops at the model's own limit, and doesn't apply to a model the registry doesn't know.
+_Avoid_: "token limit" for the setting — the limit is what the budget resolves to for one call.
+
+**Default model** *(the model a call nobody saved a model for uses)*:
+A concrete registry model a Workspace sets (owners and admins) and a member may override for the calls they start. Assistants, cowork chat and voice synthesis run on it, and new agents, steps and judges start on it; saved ones keep the model they were saved with. Unset, or no longer live in the registry, it falls back to the platform default (the newest Claude Sonnet).
+_Avoid_: "provider" for the vendor part — the settings only filter models by vendor; nothing routes by it.
+
 **Join Link** *(a shared entrance to one Workspace)*:
 A secret an owner or admin mints from workspace settings and hands to a room —
 a workshop, a demo, a pilot cohort — for people whose addresses they do not

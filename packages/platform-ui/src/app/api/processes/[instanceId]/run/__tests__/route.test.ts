@@ -281,7 +281,7 @@ describe('POST /api/processes/[instanceId]/run', () => {
 
       expect(mockExecuteAgentStep).toHaveBeenCalledWith(
         'inst-1', 'gather-data', expect.objectContaining({ id: 'gather-data' }),
-        expect.anything(), expect.any(String), 'exec-stranded', { reapTimedOut: true },
+        expect.anything(), expect.any(String), 'exec-stranded', expect.objectContaining({ reapTimedOut: true }),
       );
       // No fresh execution row created — the stranded one is reaped, not re-run.
       expect(mockInstanceAddStepExecution).not.toHaveBeenCalled();
@@ -335,11 +335,11 @@ describe('POST /api/processes/[instanceId]/run', () => {
       expect(mockExecuteAgentStep).toHaveBeenCalledTimes(2);
       expect(mockExecuteAgentStep).toHaveBeenCalledWith(
         'inst-1', 'gather-data', expect.objectContaining({ id: 'gather-data' }),
-        expect.anything(), expect.any(String), 'exec-stranded-a', { reapTimedOut: true },
+        expect.anything(), expect.any(String), 'exec-stranded-a', expect.objectContaining({ reapTimedOut: true }),
       );
       expect(mockExecuteAgentStep).toHaveBeenCalledWith(
         'inst-1', 'gather-data', expect.objectContaining({ id: 'gather-data' }),
-        expect.anything(), expect.any(String), 'exec-stranded-b', { reapTimedOut: true },
+        expect.anything(), expect.any(String), 'exec-stranded-b', expect.objectContaining({ reapTimedOut: true }),
       );
       expect(mockInstanceAddStepExecution).not.toHaveBeenCalled();
     });
@@ -406,11 +406,11 @@ describe('POST /api/processes/[instanceId]/run', () => {
       expect(mockExecuteAgentStep).toHaveBeenCalledTimes(1);
       expect(mockExecuteAgentStep).not.toHaveBeenCalledWith(
         expect.anything(), expect.anything(), expect.anything(),
-        expect.anything(), expect.anything(), 'exec-interrupted', { reapTimedOut: true },
+        expect.anything(), expect.anything(), 'exec-interrupted', expect.objectContaining({ reapTimedOut: true }),
       );
       const [, , , , , freshExecId, reapOpts] = mockExecuteAgentStep.mock.calls[0];
       expect(freshExecId).not.toBe('exec-interrupted');
-      expect(reapOpts).toBeUndefined();
+      expect(reapOpts).toEqual({ budgetUserId: null });
       // The orphaned AgentRun from the interrupted attempt is terminalized before
       // the fresh dispatch, so it doesn't linger `running` in Agents history.
       expect(mockMarkStepRunsInterrupted).toHaveBeenCalledWith('inst-1', 'gather-data');

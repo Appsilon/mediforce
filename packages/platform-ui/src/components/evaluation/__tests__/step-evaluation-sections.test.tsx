@@ -41,7 +41,10 @@ const evaluation = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock('@/hooks/use-model-registry', () => ({ usePinnedDefaultModel: () => 'anthropic/claude-sonnet-5.5' }));
+vi.mock('@/hooks/use-model-registry', () => ({
+  usePinnedDefaultModel: () => 'anthropic/claude-sonnet-5.5',
+  useModelRegistry: () => ({ data: [], isLoading: false, isError: false, error: null }),
+}));
 
 vi.mock('@/components/agents/agent-log-panel', () => ({
   AgentRunLog: ({ run }: { run: { id: string } }) => <div data-testid="agent-run-log">{run.id}</div>,

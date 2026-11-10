@@ -323,7 +323,7 @@ export function EvaluatorForm({ initial, editing = false, schemaTaken = false, s
   // A schema check keeps the name and rule it came with; a new one takes the fixed ones.
   const schemaName = initial.name === '' ? OUTPUT_SCHEMA_NAME : initial.name;
   const schemaRule = initial.rule === '' ? OUTPUT_SCHEMA_RULE : initial.rule;
-  const judgeModel = usePinnedDefaultModel();
+  const judgeModel = usePinnedDefaultModel({ judge: true });
   const edit = (changes: Partial<EvaluatorFormValues>, cleared: keyof EvaluatorFormProblems) => {
     setValues((current) => ({ ...current, ...changes }));
     setProblems((current) => ({ ...current, [cleared]: undefined }));
