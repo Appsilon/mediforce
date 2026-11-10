@@ -1,13 +1,16 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import {
   InMemoryCoworkSessionRepository,
+  InMemoryModelRegistryRepository,
   InMemoryProcessInstanceRepository,
   buildCoworkSession,
   buildProcessInstance,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import type { NamespaceSecretsRepository } from '@mediforce/platform-core';
+import { DEFAULT_MODEL } from '@mediforce/platform-core';
 import { chatCoworkSession } from '../chat';
+import { InMemoryNamespaceRepo } from '../../../testing/in-memory-namespace-repo';
 import { HandlerError, NotFoundError, PreconditionFailedError } from '../../../errors';
 import {
   createTestScope,
@@ -269,6 +272,58 @@ describe('chatCoworkSession handler', () => {
     ) as Record<string, unknown>;
     expect(typeof body.max_tokens).toBe('number');
     expect(body.max_tokens as number).toBeGreaterThanOrEqual(16384);
+  });
+
+  describe('output budget', () => {
+    async function maxTokensSent(options: { workspaceBudget: 'low' | 'high'; memberBudget?: 'low'; modelLimit?: number }) {
+      await coworkSessionRepo.create(
+        buildCoworkSession({ id: 'sess-1', processInstanceId: 'inst-a', status: 'active', agent: 'chat' }),
+      );
+      fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ choices: [{ message: { content: 'hi', tool_calls: [] } }] }), { status: 200 }),
+      );
+      const namespaceRepo = new InMemoryNamespaceRepo();
+      namespaceRepo.seedNamespace({
+        handle: 'team-alpha', type: 'organization', displayName: 'Team Alpha', createdAt: '2026-01-01T00:00:00.000Z',
+        outputBudget: options.workspaceBudget,
+      });
+      namespaceRepo.seedMember('team-alpha', {
+        uid: 'u-1', role: 'member', joinedAt: '2026-01-01T00:00:00.000Z',
+        ...(options.memberBudget !== undefined ? { outputBudget: options.memberBudget } : {}),
+      });
+      const modelRegistryRepo = new InMemoryModelRegistryRepository();
+      if (options.modelLimit !== undefined) {
+        await modelRegistryRepo.upsert({
+          id: DEFAULT_MODEL, name: DEFAULT_MODEL, provider: 'anthropic', contextLength: 200_000, maxCompletionTokens: options.modelLimit,
+          pricing: { input: 0, output: 0 }, modality: 'text->text', inputModalities: ['text'], outputModalities: ['text'],
+          supportsTools: true, supportsVision: false, source: 'openrouter', canonicalSlug: null, requestCount: null,
+          lastSyncedAt: '2026-10-01T00:00:00Z', retiredAt: null,
+        });
+      }
+      const scope = createTestScope({
+        instanceRepo,
+        coworkSessionRepo,
+        namespaceRepo,
+        modelRegistryRepo,
+        namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+        caller: userCaller('u-1', ['team-alpha']),
+      });
+      await chatCoworkSession({ sessionId: 'sess-1', message: 'Make it' }, scope);
+      const body = JSON.parse((fetchSpy.mock.calls[0]![1] as RequestInit).body as string) as { max_tokens: number };
+      return body.max_tokens;
+    }
+
+    it('sends half the default under a low workspace budget', async () => {
+      expect(await maxTokensSent({ workspaceBudget: 'low' })).toBe(8192);
+    });
+
+    it('sends double the default under a high workspace budget, within the model limit', async () => {
+      expect(await maxTokensSent({ workspaceBudget: 'high', modelLimit: 64_000 })).toBe(32768);
+    });
+
+    it('sends the member\'s lower budget when they make the call', async () => {
+      expect(await maxTokensSent({ workspaceBudget: 'high', memberBudget: 'low', modelLimit: 64_000 })).toBe(8192);
+    });
   });
 
   it('reports truncation (not a parse error) when update_artifact is cut off at the token limit', async () => {

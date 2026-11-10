@@ -92,6 +92,8 @@ prints its real arguments; the tables below name the ones that are required.
 | Command | Does |
 |---|---|
 | `namespace create` / `namespace get --handle` / `namespace update` | Manage workspaces |
+| `namespace update --handle --output-budget low\|default\|high\|max --default-model <id>\|platform` | Set the workspace's LLM output budget and default model (owners and admins) |
+| `namespace set-my-model-settings --handle --output-budget low\|default\|high\|max\|workspace --default-model <id>\|workspace` | Set your own output budget and default model in a workspace, overriding the workspace's |
 | `namespace set-member-role --handle --uid --role` | Change someone's role |
 | `namespace remove-member` / `namespace leave --handle` | Membership |
 | `namespace reset --handle` | Empty a workspace |

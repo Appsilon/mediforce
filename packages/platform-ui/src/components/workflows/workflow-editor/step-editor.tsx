@@ -376,8 +376,8 @@ export function StepEditor({
 }) {
   const isNewStep = step.id.startsWith('new-step-');
   const { plugins } = usePlugins();
-  const pinnedDefaultModel = usePinnedDefaultModel();
   const selectedPluginMetadata = plugins.find((p) => p.name === step.plugin)?.metadata;
+  const pinnedDefaultModel = usePinnedDefaultModel({ providers: selectedPluginMetadata?.modelProviders });
   const selectedPluginDefaultModel = selectedPluginMetadata?.foundationModel;
   // The plugin declares its own io contract; prefer it over the authored
   // fallback so the panel never drifts from what the runtime actually does.

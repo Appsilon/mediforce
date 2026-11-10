@@ -1,9 +1,11 @@
-import type {
-  Namespace,
-  NamespaceMember,
-  NamespaceMembership,
-  NamespaceRepository,
-  NamespaceUpdates,
+import {
+  withMemberModelSettings,
+  type MemberModelSettingsUpdate,
+  type Namespace,
+  type NamespaceMember,
+  type NamespaceMembership,
+  type NamespaceRepository,
+  type NamespaceUpdates,
 } from '@mediforce/platform-core';
 
 /**
@@ -49,6 +51,10 @@ export class InMemoryNamespaceRepo implements NamespaceRepository {
     const merged: Record<string, unknown> = { ...existing };
     for (const [key, value] of Object.entries(updates)) {
       if (value === undefined) continue;
+      if (value === null) {
+        delete merged[key];
+        continue;
+      }
       merged[key] = value;
     }
     this.namespaces.set(handle, merged as Namespace);
@@ -85,6 +91,10 @@ export class InMemoryNamespaceRepo implements NamespaceRepository {
   }
   async isAutoJoinBlocked(handle: string, uid: string): Promise<boolean> {
     return this.autoJoinBlocks.has(`${handle}\u0000${uid}`);
+  }
+  async setMemberModelSettings(handle: string, uid: string, settings: MemberModelSettingsUpdate): Promise<void> {
+    const list = this.members.get(handle) ?? [];
+    this.members.set(handle, list.map((member) => (member.uid === uid ? withMemberModelSettings(member, settings) : member)));
   }
   async setMemberRole(handle: string, uid: string, role: NamespaceMember['role']): Promise<void> {
     const list = this.members.get(handle) ?? [];

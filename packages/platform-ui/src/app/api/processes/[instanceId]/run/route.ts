@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
+import { callerUserId } from '@mediforce/platform-api/auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { advanceEvalRunOfInstance, checkRetiredModels, checkUnknownModels, settleRunWaits } from '@mediforce/platform-api/handlers';
+import { resolveDefaultModel } from '@mediforce/platform-api/services';
 import { defaultBuildScope } from '@/lib/route-adapter';
-import { DEFAULT_MODEL, resolveCoworkOutputSchema, resolveDefinitionModels, resolvePreviousStepId, resolveStepTimeoutMs, buildHumanTaskVerdicts, resolveParamDefaults, runInterpolationSources, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
+import { resolveCoworkOutputSchema, resolveDefinitionModels, resolvePreviousStepId, resolveStepTimeoutMs, buildHumanTaskVerdicts, resolveParamDefaults, runInterpolationSources, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
 import { getWorkflowSecretsForRuntime } from '@/app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '@/app/actions/namespace-secrets';
@@ -277,6 +279,7 @@ export async function POST(
       ?? (initialInstance.triggerPayload as Record<string, unknown>)
       ?? {};
     const triggeredBy = body.triggeredBy;
+    const budgetUserId = callerUserId(caller);
 
     // Return 202 immediately — long-running execution happens in after().
     // Prevents undici/proxy headers timeout from killing the handler on long
@@ -373,7 +376,7 @@ export async function POST(
 
           if (currentStep.executor === 'cowork') {
             // Guard: skip if an active cowork session already exists for this step
-            const { coworkSessionRepo, agentDefinitionRepo, toolCatalogRepo } = getPlatformServices();
+            const { coworkSessionRepo, agentDefinitionRepo, toolCatalogRepo, modelRegistryRepo } = getPlatformServices();
             const existingSessions = await coworkSessionRepo.getByInstanceId(instanceId);
             const hasActiveSession = existingSessions.some(
               (s) => s.stepId === instance.currentStepId && s.status === 'active',
@@ -412,7 +415,10 @@ export async function POST(
             const voiceConfig = agentType === 'voice-realtime'
               ? {
                   voice: currentStep.cowork?.voiceRealtime?.voice ?? 'alloy',
-                  synthesisModel: currentStep.cowork?.voiceRealtime?.synthesisModel ?? DEFAULT_MODEL,
+                  synthesisModel: currentStep.cowork?.voiceRealtime?.synthesisModel ?? await resolveDefaultModel(
+                    { workspaces: namespaceRepo, models: modelRegistryRepo },
+                    { namespace: instance.namespace, userId: budgetUserId },
+                  ),
                   maxDurationSeconds: currentStep.cowork?.voiceRealtime?.maxDurationSeconds ?? 600,
                   idleTimeoutSeconds: currentStep.cowork?.voiceRealtime?.idleTimeoutSeconds ?? 60,
                 }
@@ -846,7 +852,7 @@ export async function POST(
                   appContext,
                   triggeredBy ?? 'auto-runner',
                   stranded.id,
-                  { reapTimedOut: true },
+                  { reapTimedOut: true, budgetUserId },
                 );
               }
               stepsExecuted++;
@@ -944,6 +950,7 @@ export async function POST(
                 mergedAppContext,
                 triggeredBy ?? 'auto-runner',
                 executionId,
+                { budgetUserId },
               );
             } finally {
               clearStepInFlight(instanceId);

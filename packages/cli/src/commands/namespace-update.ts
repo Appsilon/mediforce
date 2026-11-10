@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { extname } from 'node:path';
+import { OutputBudgetSchema } from '@mediforce/platform-core';
 import { defineCommand } from '../define-command';
 import { printJson, printKv } from '../output';
 
@@ -39,7 +40,7 @@ async function resolveLogo(value: string): Promise<string> {
 
 export const namespaceUpdateCommand = defineCommand({
   name: 'mediforce namespace update',
-  description: 'Edit workspace metadata (display name, bio, icon, logo, brand colors).',
+  description: 'Edit workspace metadata (display name, bio, icon, logo, brand colors, output budget).',
   args: {
     handle: { type: 'string', required: true, description: 'Workspace handle' },
     'display-name': { type: 'string', description: 'New display name' },
@@ -58,6 +59,14 @@ export const namespaceUpdateCommand = defineCommand({
       type: 'string',
       description: 'Auxiliary brand color as #rrggbb (organizations only; empty string clears)',
     },
+    'output-budget': {
+      type: 'string',
+      description: 'LLM output budget: low | default | high | max (owners and admins)',
+    },
+    'default-model': {
+      type: 'string',
+      description: 'Default model id, e.g. anthropic/claude-sonnet-5.5, or "platform" to clear it (owners and admins)',
+    },
   },
   async run({ args, output, mediforce, jsonMode }) {
     const input: Parameters<typeof mediforce.namespaces.update>[0] = { handle: args.handle };
@@ -70,6 +79,17 @@ export const namespaceUpdateCommand = defineCommand({
     }
     if (args['brand-accent-color'] !== undefined) {
       input.brandAccentColor = args['brand-accent-color'];
+    }
+    if (args['output-budget'] !== undefined) {
+      const parsed = OutputBudgetSchema.safeParse(args['output-budget']);
+      if (parsed.success === false) {
+        output.stderr(`Invalid output budget '${args['output-budget']}' — expected low, default, high, or max`);
+        return 2;
+      }
+      input.outputBudget = parsed.data;
+    }
+    if (args['default-model'] !== undefined) {
+      input.defaultModel = args['default-model'] === 'platform' ? null : args['default-model'];
     }
 
     const result = await mediforce.namespaces.update(input);
@@ -88,6 +108,8 @@ export const namespaceUpdateCommand = defineCommand({
       ['logo', result.namespace.logo === undefined || result.namespace.logo === '' ? undefined : '(set)'],
       ['brandPrimaryColor', result.namespace.brandPrimaryColor ?? undefined],
       ['brandAccentColor', result.namespace.brandAccentColor ?? undefined],
+      ['outputBudget', result.namespace.outputBudget ?? 'default'],
+      ['defaultModel', result.namespace.defaultModel ?? 'platform'],
     ]);
     return 0;
   },

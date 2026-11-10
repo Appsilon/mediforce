@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { AlertTriangle, Layers, ArrowDownToLine, ArrowUpFromLine, Wrench, Eye, TrendingUp } from 'lucide-react';
-import { apiFetch } from '@/lib/api-fetch';
 import { cn } from '@/lib/utils';
-import type { ModelRegistryEntry } from '@mediforce/platform-core';
+import { useModelRegistry } from '@/hooks/use-model-registry';
+import { modelVendor, type ModelRegistryEntry } from '@mediforce/platform-core';
 
 interface ModelPickerProps {
   value: string | undefined;
@@ -29,11 +29,6 @@ interface ModelPickerProps {
   providers?: readonly string[];
 }
 
-/** `anthropic` for `anthropic/claude-sonnet-4.6` and `~anthropic/claude-sonnet-latest`. */
-function modelProvider(modelId: string): string {
-  return modelId.replace(/^~/, '').split('/')[0];
-}
-
 function formatContext(tokens: number): string {
   if (tokens >= 1_000_000) return `${String(Math.round(tokens / 1_000_000))}M`;
   return `${String(Math.round(tokens / 1000))}K`;
@@ -49,12 +44,13 @@ function formatPrice(perToken: number): string {
 const TOP_PICKS_COUNT = 20;
 
 export function ModelPicker({ value, onChange, defaultModel, defaultLabel = 'Default', ariaLabel, className, requireToolSupport, minContextTokens, showAllModels, providers }: ModelPickerProps) {
-  const [allModels, setModels] = useState<ModelRegistryEntry[]>([]);
+  const registry = useModelRegistry();
+  const allModels = useMemo<ModelRegistryEntry[]>(() => registry.data ?? [], [registry.data]);
   const models = useMemo(
     () => allModels
       .filter((m) => (requireToolSupport ? m.supportsTools : true))
       .filter((m) => (minContextTokens !== undefined ? m.contextLength >= minContextTokens : true))
-      .filter((m) => (providers !== undefined ? providers.includes(modelProvider(m.id)) : true)),
+      .filter((m) => (providers !== undefined ? providers.includes(modelVendor(m.id)) : true)),
     [allModels, requireToolSupport, minContextTokens, providers],
   );
   const hiddenForContext = useMemo(
@@ -62,26 +58,10 @@ export function ModelPicker({ value, onChange, defaultModel, defaultLabel = 'Def
       : allModels.filter((m) => (requireToolSupport ? m.supportsTools : true) && m.contextLength < minContextTokens).length),
     [allModels, requireToolSupport, minContextTokens],
   );
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const loading = registry.isLoading;
+  const loadError = registry.isError === false ? null
+    : registry.error instanceof Error ? registry.error.message : 'Failed to load models';
   const [customInput, setCustomInput] = useState(false);
-
-  useEffect(() => {
-    setLoading(true);
-    apiFetch('/api/model-registry')
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to load models (${String(res.status)})`);
-        return res.json();
-      })
-      .then((data: { models: ModelRegistryEntry[] }) => {
-        setModels(data.models);
-        setLoadError(null);
-      })
-      .catch((err: unknown) => {
-        setLoadError(err instanceof Error ? err.message : 'Failed to load models');
-      })
-      .finally(() => setLoading(false));
-  }, []);
 
   // Prefer models with usage history, but fall back to the full (non-retired)
   // registry when no usage stats exist yet (e.g. a freshly-synced registry) —
@@ -109,7 +89,7 @@ export function ModelPicker({ value, onChange, defaultModel, defaultLabel = 'Def
   const displayDefault = defaultModel ?? 'plugin default';
   const isCustom = value !== undefined && value !== '' && !topPicks.some((m) => m.id === value);
   const unsupportedProvider = value !== undefined && value !== '' && providers !== undefined
-    && providers.includes(modelProvider(value)) === false;
+    && providers.includes(modelVendor(value)) === false;
   const providerWarning = unsupportedProvider && (
     <p className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />

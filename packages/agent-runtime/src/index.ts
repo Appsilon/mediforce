@@ -43,7 +43,7 @@ export type { BuildSource } from './plugins/container-plugin';
 // Runner
 export type { AgentEventLog } from './runner/agent-event-log';
 export { PluginRegistry, PluginNotFoundError } from './runner/plugin-registry';
-export { OpenRouterLlmClient } from './runner/llm-client';
+export { OpenRouterLlmClient, withMaxTokens, DEFAULT_LLM_MAX_OUTPUT_TOKENS } from './runner/llm-client';
 export {
   LlmJudgeReviewPlugin,
   judgeOutputAgreement,

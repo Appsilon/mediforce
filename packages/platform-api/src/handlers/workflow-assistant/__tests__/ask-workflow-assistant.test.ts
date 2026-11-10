@@ -12,6 +12,7 @@ import {
   createTestScope,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope';
+import { InMemoryNamespaceRepo } from '../../../testing/in-memory-namespace-repo';
 
 function fixedModelRegistry(entries: ModelRegistryEntry[]): ModelRegistryRepository {
   return {
@@ -129,6 +130,34 @@ describe('askWorkflowAssistant handler', () => {
 
   afterEach(() => {
     fetchSpy?.mockRestore();
+  });
+
+  it('runs on the member\'s own default model and output budget when no model is picked', async () => {
+    fetchSpy = mockOpenRouterResponse({ choices: [{ message: { content: 'Sure.', tool_calls: [] } }] });
+    const joinedAt = '2026-01-01T00:00:00.000Z';
+    const namespaceRepo = new InMemoryNamespaceRepo();
+    namespaceRepo.seedNamespace({
+      handle: 'team-alpha', type: 'organization', displayName: 'Alpha', createdAt: joinedAt,
+      defaultModel: 'openai/gpt-5.2', outputBudget: 'low',
+    });
+    namespaceRepo.seedMember('team-alpha', {
+      uid: 'u-1', role: 'member', joinedAt, defaultModel: 'anthropic/claude-opus-4.8', outputBudget: 'high',
+    });
+    const scope = createTestScope({
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      caller: userCaller('u-1', ['team-alpha']),
+      namespaceRepo,
+      modelRegistryRepo: fixedModelRegistry([
+        buildModel({ id: 'anthropic/claude-opus-4.8', contextLength: 200_000, maxCompletionTokens: 64_000 }),
+        buildModel({ id: 'openai/gpt-5.2', contextLength: 200_000, maxCompletionTokens: 64_000 }),
+      ]),
+    });
+
+    await askWorkflowAssistant({ ...baseInput, namespace: 'team-alpha' }, scope);
+
+    const request = JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body)) as { model: string; max_tokens: number };
+    expect(request.model).toBe('anthropic/claude-opus-4.8');
+    expect(request.max_tokens).toBe(16_000);
   });
 
   it('returns a plain-text reply when the model makes no tool call', async () => {

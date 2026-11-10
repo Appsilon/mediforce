@@ -217,7 +217,7 @@ widens by dragging its left edge, on the tabs and in the guided setup alike,
 and the width is remembered per browser.
 
 Each request allows 32 model/tool rounds and up to 8,000 output tokens per
-model call. These application limits are separate from the model's context
+model call at the default output budget (see below). These application limits are separate from the model's context
 window. Trajectories are read in pages of complete entries, including generated
 source; the assistant follows `nextOffset` to reach later pages instead of
 seeing only the beginning of a run. A response cut off at the output limit
@@ -272,10 +272,11 @@ that crashes, or a judge that gives no usable verdict, is an *error*, never a
 failed output. A judge's error says when its answer was cut off at its
 output-token limit, when it used up that limit before writing anything, or when
 it came back empty; a rate limit or provider failure is asked once more before
-it errors the check. The limit is 16,000 tokens per call, or the model's own
-limit in the registry when that is lower, and a model's reasoning counts against
+it errors the check. The limit is 16,000 tokens per call at the default output budget, scaled by the workspace's output budget and never more than the model's own limit in the registry (a raise is skipped when the registry doesn't know that limit), and a model's reasoning counts against
 it, so each judge call records its reasoning tokens when the provider reports
 them.
+
+**Output budget.** Owners and admins set a workspace's output budget in Workspace settings → Models, or with `mediforce namespace update --output-budget`: `low`, `default`, `high` or `max` multiplies every platform LLM call's default limit by 0.5, 1, 2 or 4. A member may override it, up or down, for the calls they start (Models, or `mediforce namespace set-my-model-settings`). A new judge starts on the member's or workspace's default model when it can return structured output, else on the pinned platform default. Eval runs driven by a trigger or the heartbeat, and production Evaluators, have no person behind them and use the workspace budget. If judge checks keep erroring at the output-token limit, raise the budget.
 
 Every change is a new immutable version; a `code` version's source approval
 attaches to it. In the tab's form, what blocks a save — no name, no rule, a

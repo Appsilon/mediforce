@@ -13,6 +13,8 @@ import {
   PluginNotFoundError,
   MockAgentPlugin,
   ensureStepImageBuilt,
+  withMaxTokens,
+  DEFAULT_LLM_MAX_OUTPUT_TOKENS,
   type McpTapeContext,
   type ResolveSkillsForStepDeps,
   type StepExecutorPlugin,
@@ -42,7 +44,7 @@ import {
   type WorkflowStep,
 } from '@mediforce/platform-core';
 import { buildProductionOutputGate } from './production-output-gate';
-import { changedFingerprintComponents, computeStepFingerprint } from '@mediforce/platform-api/services';
+import { changedFingerprintComponents, computeStepFingerprint, resolveOutputTokens } from '@mediforce/platform-api/services';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '../app/actions/namespace-secrets';
 import { resolveAgentDefaults } from './resolve-agent-defaults';
@@ -67,7 +69,7 @@ export async function executeAgentStep(
   appContext: Record<string, unknown>,
   triggeredBy: string,
   stepExecutionId?: string,
-  options?: { reapTimedOut?: boolean },
+  options?: { reapTimedOut?: boolean; budgetUserId?: string | null },
 ): Promise<WorkflowAgentStepResult> {
   // Reap mode (ADR-0010): the prior driver died with this step stranded past
   // its timeout. We route the existing execution through the timeout fallback
@@ -85,6 +87,7 @@ export async function executeAgentStep(
     auditRepo,
     humanTaskRepo,
     llmClient,
+    namespaceRepo,
     agentDefinitionRepo,
     toolCatalogRepo,
     oauthProviderRepo,
@@ -255,7 +258,12 @@ export async function executeAgentStep(
     autonomyLevel,
     workflowDefinition,
     step: resolvedStep,
-    llm: llmClient,
+    // The signed-in caller's own output budget, never `triggeredBy`: that comes from the
+    // request body, and a member budget can raise the limit.
+    llm: withMaxTokens(llmClient, (model) => resolveOutputTokens(
+      { workspaces: namespaceRepo, models: modelRegistryRepo },
+      { namespace: instance.namespace, userId: options?.budgetUserId ?? null, model, defaultTokens: DEFAULT_LLM_MAX_OUTPUT_TOKENS },
+    )),
     workflowSecrets,
     namespaceSecretKeys: new Set(Object.keys(namespaceSecrets)),
     resolvedMcpConfig,

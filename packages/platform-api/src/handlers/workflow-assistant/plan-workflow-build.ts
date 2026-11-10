@@ -3,7 +3,7 @@ import {
   type PlanWorkflowBuildInput,
   type PlanWorkflowBuildOutput,
 } from '../../contract/workflow-assistant';
-import { DEFAULT_MODEL } from '@mediforce/platform-core';
+import { resolveDefaultModel } from '../../services/default-model';
 import type { CallerScope } from '../../repositories/index';
 import { HandlerError } from '../../errors';
 import { callOpenRouter } from '../../services/openrouter-client';
@@ -11,6 +11,7 @@ import { buildPlanPrompt } from './_lib/plan-prompt';
 import { callerInstructionMessages } from './_lib/caller-instructions';
 import { parseModelJson } from './_lib/parse-model-json';
 import { requireOpenRouterApiKey } from '../../services/openrouter-key';
+import { callerUserId } from '../../auth';
 
 interface PlanScopedInput extends PlanWorkflowBuildInput {
   namespace: string;
@@ -40,7 +41,7 @@ export async function planWorkflowBuild(
   const apiKey = await requireOpenRouterApiKey(scope, input.namespace);
 
   const response = await callOpenRouter({
-    model: input.model ?? DEFAULT_MODEL,
+    model: input.model ?? (await resolveDefaultModel(scope, { namespace: input.namespace, userId: callerUserId(scope.caller) })),
     apiKey,
     maxTokens: PLAN_MAX_OUTPUT_TOKENS,
     messages: [

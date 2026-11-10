@@ -78,6 +78,11 @@ export function assertNamespaceAccess(
   }
 }
 
+/** The person behind a call, whose own workspace settings apply; null for an apiKey or system caller. */
+export function callerUserId(caller: CallerIdentity): string | null {
+  return caller.kind === 'user' ? caller.uid : null;
+}
+
 /**
  * @deprecated ADR-0004 — handlers should reach data via `CallerScope` wrappers,
  *   which enforce this gate at the call site. Remaining inline callers under

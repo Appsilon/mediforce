@@ -207,8 +207,12 @@ request's prompt audit event. The assistant prepares runs of the step as it is;
 changing the step is the person's, in the workflow editor. A case it proposes may carry an expected output with its expectation;
 one created without an `expectation` is positive.
 
+**Output budget.** Every platform LLM call takes its max output tokens from `resolveOutputTokens` in `src/services/output-tokens.ts`: the call's default from `OUTPUT_TOKEN_DEFAULTS` (platform-core), scaled by the workspace's `outputBudget`, overridden by the calling member's own `outputBudget` when a person makes the call (the handler passes their `userId`), and bounded by the model's `maxCompletionTokens`. An apiKey or system scope has no member, so it gets the workspace budget. Agent steps get the same through `withMaxTokens` (agent-runtime) in `execute-agent-step.ts`. The short fixed limits (workflow build plan 700, the stuck-assistant reply 500, the tool-loop summary 2,000) stay constants on purpose, as does `callOpenRouter`'s `?? 4096` fallback, which no caller reaches because every one passes `maxTokens`. At or below `default` the scaled limit is sent as is, so an unset workspace sends what it always has; above `default` the raise stops at the model's limit and is skipped when the registry doesn't know it. The eval judge, capped at the model's limit before budgets existed, passes `capAtModelLimit` to stay capped at every budget. A member sets their own budget with `setMyModelSettings` (`PUT /api/namespaces/:handle/model-settings`); the workspace budget rides on `updateNamespace`.
+
+**Default model.** A call nobody saved a model for (cowork chat, voice synthesis, both assistants, the workflow build plan) takes it from `resolveDefaultModel` in `src/services/default-model.ts`: the calling member's `defaultModel`, else the workspace's, else `DEFAULT_MODEL`, and `DEFAULT_MODEL` too when the chosen one is no longer live in the registry. A judge the evaluation assistant proposes without a model starts on `preferredDefaultModel` through `pinDefaultJudgeModel` (platform-core), which keeps it only while it supports structured outputs. Both settings take only concrete, live registry ids (`DefaultModelIdSchema` refuses moving aliases; the handlers refuse unknown or retired ids), and ride on the same `updateNamespace` / `setMyModelSettings` calls as the budget.
+
 The Evaluation Assistant allows 32 model/tool rounds with an 8,000-token
-completion budget per call, independent of the selected model's context window.
+completion budget per call at the default output budget, independent of the selected model's context window.
 A response truncated with no tool call in it is answered, once, with a note to
 continue in smaller pieces (`truncatedResponseNotice`; the Evaluation
 Assistant's says to work one check at a time); on round exhaustion or a second
@@ -226,7 +230,7 @@ duplicate.
 Its `get_trajectory` tool returns complete stored entries using zero-based
 `offset` and `limit` (default 50, maximum 150), with `total` and `nextOffset`
 (`null` at the end); it never clips entry contents. The workflow assistant
-retains its separate 12-round, 8,000-token loop. Invalid tool arguments return
+retains its separate 12-round, 8,000-token loop (also at the default output budget). Invalid tool arguments return
 `validationError` and the tool's `expectedArguments` JSON Schema (with examples);
 three consecutive rounds with an identical validation failure and no successful
 call stop the loop through the same partial-summary path.

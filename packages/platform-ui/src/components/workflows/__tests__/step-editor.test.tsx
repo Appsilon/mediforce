@@ -42,6 +42,7 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
 
 vi.mock('@/hooks/use-model-registry', () => ({
   usePinnedDefaultModel: () => 'anthropic/claude-sonnet-5.5',
+  useModelRegistry: () => ({ data: modelState.models, isLoading: false, isError: false, error: null }),
 }));
 
 vi.mock('@/hooks/use-plugins', () => ({
@@ -50,9 +51,6 @@ vi.mock('@/hooks/use-plugins', () => ({
 
 vi.mock('@/lib/api-fetch', () => ({
   apiFetch: (input: string) => {
-    if (input.startsWith('/api/model-registry')) {
-      return Promise.resolve(new Response(JSON.stringify({ models: modelState.models }), { status: 200 }));
-    }
     if (input.startsWith('/api/agents?namespace=test')) {
       agentState.requests.push(input);
       return Promise.resolve(new Response(
