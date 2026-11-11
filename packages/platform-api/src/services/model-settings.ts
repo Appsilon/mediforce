@@ -2,13 +2,14 @@ import {
   DEFAULT_MODEL,
   effectiveModelSettings,
   isUsableDefaultModel,
+  pinDefaultModel,
   resolveMaxOutputTokens,
   type ModelRegistryRepository,
   type NamespaceRepository,
   type OutputBudget,
 } from '@mediforce/platform-core';
 
-type Models = Pick<ModelRegistryRepository, 'getById'>;
+type Models = Pick<ModelRegistryRepository, 'getById' | 'list'>;
 
 /** What one caller's calls in one workspace get: each of their own settings, else the workspace's. */
 export interface ModelSettings {
@@ -53,7 +54,9 @@ export async function resolveOutputTokens(
   settings: ModelSettings,
   request: { model: string; defaultTokens: number; capAtModelLimit?: boolean },
 ): Promise<number> {
-  const entry = await models.getById(request.model);
+  // The registry lists no aliases, so the platform default's limits are its pinned model's.
+  const limitModel = request.model === DEFAULT_MODEL ? pinDefaultModel(await models.list()) : request.model;
+  const entry = await models.getById(limitModel);
   return resolveMaxOutputTokens({
     defaultTokens: request.defaultTokens,
     budget: settings.outputBudget,

@@ -224,7 +224,6 @@ export {
   resolveMaxOutputTokens,
   withMemberModelSettings,
   effectiveModelSettings,
-  scaleOutputTokens,
   HandleSchema,
   HANDLE_REGEX,
   HANDLE_MAX_LENGTH,

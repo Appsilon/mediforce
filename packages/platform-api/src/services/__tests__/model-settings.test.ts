@@ -64,7 +64,14 @@ describe('resolveOutputTokens', () => {
     expect(await resolveOutputTokens(registry, { outputBudget: 'default', defaultModel: undefined }, call)).toBe(8_000);
     expect(await resolveOutputTokens(registry, { outputBudget: 'low', defaultModel: undefined }, call)).toBe(4_000);
     expect(await resolveOutputTokens(registry, { outputBudget: 'high', defaultModel: undefined }, call)).toBe(16_000);
-    expect(await resolveOutputTokens(registry, { outputBudget: 'max', defaultModel: undefined }, { model: 'google/gemini-3-pro', defaultTokens: 8_000 })).toBe(20_000);
+    expect(await resolveOutputTokens(registry, { outputBudget: 'max', defaultModel: undefined }, call)).toBe(64_000);
+    expect(await resolveOutputTokens(registry, { outputBudget: 'high', defaultModel: undefined }, { model: 'google/gemini-3-pro', defaultTokens: 16_000 })).toBe(20_000);
+  });
+
+  it('gives a call on the platform default the limit of the model it stands for today', async () => {
+    const registry = await models();
+    await registry.upsert(registryEntry('anthropic/claude-sonnet-5.5', { maxCompletionTokens: 64_000 }));
+    expect(await resolveOutputTokens(registry, { outputBudget: 'max', defaultModel: undefined }, { model: DEFAULT_MODEL, defaultTokens: 8_000 })).toBe(64_000);
   });
 
   it('does not raise for a model the registry does not know', async () => {

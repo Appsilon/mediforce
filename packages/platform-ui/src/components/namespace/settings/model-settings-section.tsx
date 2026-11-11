@@ -1,7 +1,7 @@
 'use client';
 
 import { Lock } from 'lucide-react';
-import { OUTPUT_TOKEN_DEFAULTS, scaleOutputTokens, type OutputBudget } from '@mediforce/platform-core';
+import { OUTPUT_TOKEN_DEFAULTS, pinDefaultModel, resolveMaxOutputTokens, type OutputBudget } from '@mediforce/platform-core';
 import { useSetMyModelSettings, useUpdateNamespace } from '@/hooks/use-namespace-mutations';
 import { useModelRegistry } from '@/hooks/use-model-registry';
 import { DefaultModelPicker } from './default-model-picker';
@@ -9,8 +9,25 @@ import { OUTPUT_BUDGET_LABELS, OutputBudgetSlider } from './output-budget-slider
 
 const PLATFORM_DEFAULT_LABEL = 'Platform default (Claude Sonnet, latest)';
 
-function tokens(defaultTokens: number, budget: OutputBudget): string {
-  return scaleOutputTokens(defaultTokens, budget).toLocaleString('en-US');
+/** What calls on `model` (the platform default when unset) send at `budget`, as the server resolves it. */
+function BudgetHint({ model, budget }: { model: string | undefined; budget: OutputBudget }) {
+  const registry = useModelRegistry();
+  const models = registry.data ?? [];
+  const entry = models.find((candidate) => candidate.id === (model ?? pinDefaultModel(models)));
+  const limit = entry?.maxCompletionTokens ?? null;
+  const tokens = (defaultTokens: number) =>
+    resolveMaxOutputTokens({ defaultTokens, budget, modelMaxCompletionTokens: limit }).toLocaleString('en-US');
+  const raisesNothing = (budget === 'high' || budget === 'max') && limit === null;
+
+  return (
+    <p className="text-xs text-muted-foreground mt-2">
+      On {entry?.name ?? model ?? 'the platform default'}: assistants {tokens(OUTPUT_TOKEN_DEFAULTS.assistant)} · cowork{' '}
+      {tokens(OUTPUT_TOKEN_DEFAULTS.coworkChat)} · voice {tokens(OUTPUT_TOKEN_DEFAULTS.voiceSynthesis)} tokens.{' '}
+      {raisesNothing
+        ? "The registry doesn't know this model's limit, so High and Max don't raise it."
+        : 'Max gives the model its full limit. Eval judges use their own model.'}
+    </p>
+  );
 }
 
 function useModelName(modelId: string | undefined): string {
@@ -69,11 +86,7 @@ function WorkspaceModelSettings({ handle, workspace, onError }: {
           value={workspace.outputBudget}
           onCommit={(outputBudget) => save({ outputBudget }, 'Failed to save the output budget.')}
         >
-          <p className="text-xs text-muted-foreground mt-2">
-            Eval judge {tokens(OUTPUT_TOKEN_DEFAULTS.evaluationJudge, workspace.outputBudget)} · assistants{' '}
-            {tokens(OUTPUT_TOKEN_DEFAULTS.assistant, workspace.outputBudget)} · cowork{' '}
-            {tokens(OUTPUT_TOKEN_DEFAULTS.coworkChat, workspace.outputBudget)} tokens. A raise stops at the model's own limit, and doesn't apply to models the registry doesn't know.
-          </p>
+          <BudgetHint model={workspace.defaultModel} budget={workspace.outputBudget} />
         </OutputBudgetSlider>
       </div>
     </div>
@@ -128,7 +141,12 @@ function MemberModelSettings({ handle, uid, workspace, member, onError }: {
             { outputBudget: next === workspace.outputBudget ? null : next },
             'Failed to save your output budget.',
           )}
-        />
+        >
+          <BudgetHint
+            model={member.defaultModel ?? workspace.defaultModel}
+            budget={member.outputBudget ?? workspace.outputBudget}
+          />
+        </OutputBudgetSlider>
       </div>
     </div>
   );

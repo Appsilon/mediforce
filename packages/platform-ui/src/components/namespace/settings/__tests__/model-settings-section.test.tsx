@@ -12,8 +12,8 @@ vi.mock('@/hooks/use-namespace-mutations', () => ({
 vi.mock('@/hooks/use-model-registry', () => ({
   useModelRegistry: () => ({
     data: [
-      { id: 'anthropic/claude-sonnet-5.5', name: 'Claude Sonnet 5.5', retiredAt: null, supportsTools: true },
-      { id: 'openai/gpt-5.2', name: 'GPT-5.2', retiredAt: null, supportsTools: true },
+      { id: 'anthropic/claude-sonnet-5.5', name: 'Claude Sonnet 5.5', retiredAt: null, supportsTools: true, maxCompletionTokens: 64_000 },
+      { id: 'openai/gpt-5.2', name: 'GPT-5.2', retiredAt: null, supportsTools: true, maxCompletionTokens: null },
       { id: 'openai/gpt-4', name: 'GPT-4', retiredAt: '2026-01-01T00:00:00.000Z', supportsTools: true },
     ],
   }),
@@ -78,5 +78,20 @@ describe('ModelSettingsSection', () => {
     fireEvent.change(slider, { target: { value: '3' } });
     fireEvent.pointerUp(slider);
     expect(setMyModelSettings).toHaveBeenCalledWith({ handle: 'acme', outputBudget: 'max' }, expect.anything());
+  });
+
+  it('shows what calls on the workspace default model get, with Max at its full limit', () => {
+    render(
+      <ModelSettingsSection handle="acme" workspace={{ outputBudget: 'max', defaultModel: 'anthropic/claude-sonnet-5.5' }} canEditWorkspace onError={vi.fn()} />,
+    );
+    expect(screen.getByText(/On Claude Sonnet 5\.5: assistants 64,000 · cowork 64,000 · voice 64,000 tokens/)).toBeInTheDocument();
+  });
+
+  it('says High and Max raise nothing on a model whose limit the registry does not know', () => {
+    render(
+      <ModelSettingsSection handle="acme" workspace={{ outputBudget: 'high', defaultModel: 'openai/gpt-5.2' }} canEditWorkspace onError={vi.fn()} />,
+    );
+    expect(screen.getByText(/On GPT-5\.2: assistants 8,000 · cowork 16,384 · voice 4,096 tokens/)).toBeInTheDocument();
+    expect(screen.getByText(/doesn't know this model's limit/)).toBeInTheDocument();
   });
 });

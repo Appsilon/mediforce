@@ -351,7 +351,7 @@ can use the Workspace.
 _Avoid_: "Role" alone — that's overloaded with process-domain roles below.
 
 **Output budget** *(how much an LLM may write per platform call)*:
-A step — `low | default | high | max` — that scales each platform LLM call's default max output tokens. A Workspace sets one (owners and admins); a member may override it, up or down, for the calls they start in that Workspace. A raise stops at the model's own limit, and doesn't apply to a model the registry doesn't know.
+A step — `low | default | high | max` — for each platform LLM call's max output tokens: half, the call's own default, double it, or the model's full limit. A Workspace sets one (owners and admins); a member may override it, up or down, for the calls they start in that Workspace. A raise stops at the model's own limit, never drops below the call's default, and doesn't apply to a model the registry doesn't know.
 _Avoid_: "token limit" for the setting — the limit is what the budget resolves to for one call.
 
 **Default model** *(the model a call nobody saved a model for uses)*:
