@@ -19,13 +19,12 @@ import type { PreviewEvaluatorOutput } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { recordAssistantPrompt, runProposalToolLoop } from '../../assistant-core';
 import { requireOpenRouterApiKey } from '../../services/openrouter-key';
-import { resolveOutputTokens } from '../../services/output-tokens';
-import { resolveDefaultModel } from '../../services/default-model';
 import { loadEvaluationSubject, subjectRef, subjectKey, subjectName } from '../evaluation/_lib/evaluation-subject';
 import { EVALUATION_ASSISTANT_SYSTEM_PROMPTS, briefMessage, unattendedBudgetMessage } from './_lib/system-prompt';
 import { executeEvaluationTool, type UnattendedGrant } from './_lib/run-evaluation-tool';
 import { reviewEvaluationProposal, type PreviewedCheck } from './_lib/review-proposal';
 import { callerUserId } from '../../auth';
+import { loadModelSettings, resolveDefaultModel, resolveOutputTokens } from '../../services/model-settings';
 
 // Leave room for paged trajectory reads and preview/repair cycles for several checks.
 const MAX_TOOL_LOOP_ITERATIONS = 32;
@@ -69,7 +68,8 @@ export async function askEvaluationAssistant(
   const step = subjectRef(input);
   const { definition, step: workflowStep, agent } = await loadEvaluationSubject(scope, step, 'read', step.kind === 'step' ? input.definitionVersion : undefined);
   const apiKey = await requireOpenRouterApiKey(scope, step.namespace);
-  const model = input.model ?? (await resolveDefaultModel(scope, { namespace: step.namespace, userId: callerUserId(scope.caller) }));
+  const modelSettings = await loadModelSettings(scope.workspaces, { namespace: step.namespace, userId: callerUserId(scope.caller) });
+  const model = input.model ?? (await resolveDefaultModel(scope.models, modelSettings));
 
   await recordAssistantPrompt(scope, {
     namespace: step.namespace,
@@ -99,12 +99,7 @@ export async function askEvaluationAssistant(
     }
     return toolResult;
   };
-  const maxTokens = await resolveOutputTokens(scope, {
-    namespace: step.namespace,
-    model,
-    defaultTokens: ASSISTANT_MAX_OUTPUT_TOKENS,
-    userId: callerUserId(scope.caller),
-  });
+  const maxTokens = await resolveOutputTokens(scope.models, modelSettings, { model, defaultTokens: ASSISTANT_MAX_OUTPUT_TOKENS });
   const result = await runProposalToolLoop({
     model,
     apiKey,

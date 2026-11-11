@@ -33,5 +33,4 @@ export {
   type CreateJoinLinkRecord,
 } from './join-link';
 export { computeStepFingerprint, changedFingerprintComponents } from '../handlers/evaluation/_lib/step-fingerprint';
-export { resolveOutputTokens } from './output-tokens';
-export { resolveDefaultModel } from './default-model';
+export { loadModelSettings, resolveDefaultModel, resolveOutputTokens, type ModelSettings } from './model-settings';

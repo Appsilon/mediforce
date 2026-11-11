@@ -26,14 +26,6 @@ export const OUTPUT_TOKEN_DEFAULTS = {
   voiceSynthesis: 4_096,
 } as const;
 
-/** A member's own budget overrides the workspace budget. */
-export function effectiveOutputBudget(
-  workspaceBudget: OutputBudget | undefined,
-  memberBudget: OutputBudget | undefined,
-): OutputBudget {
-  return memberBudget ?? workspaceBudget ?? 'default';
-}
-
 export function scaleOutputTokens(defaultTokens: number, budget: OutputBudget): number {
   return Math.round(defaultTokens * OUTPUT_BUDGET_MULTIPLIERS[budget]);
 }
@@ -47,12 +39,12 @@ export function scaleOutputTokens(defaultTokens: number, budget: OutputBudget): 
  */
 export function resolveMaxOutputTokens(input: {
   defaultTokens: number;
-  workspaceBudget?: OutputBudget;
-  memberBudget?: OutputBudget;
+  /** The caller's effective budget (`effectiveModelSettings`); `default` when absent. */
+  budget?: OutputBudget;
   modelMaxCompletionTokens?: number | null;
   capAtModelLimit?: boolean;
 }): number {
-  const budget = effectiveOutputBudget(input.workspaceBudget, input.memberBudget);
+  const budget = input.budget ?? 'default';
   const scaled = scaleOutputTokens(input.defaultTokens, budget);
   const modelLimit = input.modelMaxCompletionTokens ?? 0;
   const knowsModelLimit = modelLimit > 0;

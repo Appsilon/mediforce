@@ -88,3 +88,16 @@ export function withMemberModelSettings<Member extends Pick<NamespaceMember, 'ou
   else if (settings.defaultModel !== undefined) next.defaultModel = settings.defaultModel;
   return next;
 }
+
+type ModelSettingsFields = Pick<NamespaceMember, 'outputBudget' | 'defaultModel'>;
+
+/** What a member's calls in a workspace get: each of their own settings, else the workspace's. */
+export function effectiveModelSettings(
+  workspace: ModelSettingsFields | null | undefined,
+  member: ModelSettingsFields | null | undefined,
+): { outputBudget: NonNullable<NamespaceMember['outputBudget']>; defaultModel: string | undefined } {
+  return {
+    outputBudget: member?.outputBudget ?? workspace?.outputBudget ?? 'default',
+    defaultModel: member?.defaultModel ?? workspace?.defaultModel,
+  };
+}

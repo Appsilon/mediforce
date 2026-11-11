@@ -12,9 +12,9 @@ import type { EvaluatorOutcome } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
 import { callOpenRouter, OpenRouterApiError, type OpenRouterRequest } from '../../../services/openrouter-client';
 import { requireOpenRouterApiKey } from '../../../services/openrouter-key';
-import { resolveOutputTokens } from '../../../services/output-tokens';
 import type { ScoredRun } from './scored-run';
 import { callerUserId } from '../../../auth';
+import { loadModelSettings, resolveOutputTokens } from '../../../services/model-settings';
 
 type LlmJudgeCheck = Extract<EvaluatorCheck, { kind: 'llm_judge' }>;
 type ExpectedOutputCheck = Extract<EvaluatorCheck, { kind: 'expected_output' }>;
@@ -52,13 +52,8 @@ async function openRouterJudgeClient(
 ): Promise<LlmClient> {
   const [entry, maxTokens] = await Promise.all([
     scope.models.getById(model),
-    resolveOutputTokens(scope, {
-      namespace,
-      model,
-      defaultTokens: JUDGE_MAX_OUTPUT_TOKENS,
-      capAtModelLimit: true,
-      userId: callerUserId(scope.caller),
-    }),
+    loadModelSettings(scope.workspaces, { namespace, userId: callerUserId(scope.caller) }).then((settings) =>
+      resolveOutputTokens(scope.models, settings, { model, defaultTokens: JUDGE_MAX_OUTPUT_TOKENS, capAtModelLimit: true })),
   ]);
   const parameters = entry?.supportedParameters;
   const constrains = parameters?.includes('structured_outputs') === true;

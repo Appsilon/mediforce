@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
-import { effectiveOutputBudget } from '@mediforce/platform-core';
+import { effectiveModelSettings } from '@mediforce/platform-core';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
 import { useNamespaceMembers } from '@/hooks/use-namespace-members';
@@ -15,10 +15,7 @@ export function OutputBudgetNotice({ handle }: { handle: string }) {
   const { namespace } = useNamespace(handle);
   const { members } = useNamespaceMembers(handle);
 
-  const effective = effectiveOutputBudget(
-    namespace?.outputBudget,
-    members.find((member) => member.uid === user?.id)?.outputBudget,
-  );
+  const effective = effectiveModelSettings(namespace, members.find((member) => member.uid === user?.id)).outputBudget;
 
   return (
     <div className="flex items-center justify-between gap-2 text-xs" data-testid="output-budget-notice">

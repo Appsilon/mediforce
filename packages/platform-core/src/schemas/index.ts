@@ -625,6 +625,7 @@ export {
   WorkspaceLogoSchema,
   WORKSPACE_LOGO_MAX_CHARS,
   withMemberModelSettings,
+  effectiveModelSettings,
   type MemberModelSettingsUpdate,
   type NamespaceType,
   type Namespace,
@@ -637,7 +638,6 @@ export {
   OUTPUT_BUDGETS,
   OUTPUT_TOKEN_DEFAULTS,
   resolveMaxOutputTokens,
-  effectiveOutputBudget,
   scaleOutputTokens,
   type OutputBudget,
 } from './output-budget';
@@ -709,7 +709,6 @@ export {
   pinDefaultModel,
   pinDefaultJudgeModel,
   modelVendor,
-  effectiveDefaultModel,
   isUsableDefaultModel,
   DefaultModelIdSchema,
   ModelRegistryEntrySchema,

@@ -12,9 +12,8 @@ import type {
 } from '../../contract/cowork';
 import { callOpenRouter } from '../../services/openrouter-client';
 import { OPENROUTER_KEY_MISSING_MESSAGE } from '../../services/openrouter-key';
-import { resolveOutputTokens } from '../../services/output-tokens';
-import { resolveDefaultModel } from '../../services/default-model';
 import { callerUserId } from '../../auth';
+import { loadModelSettings, resolveDefaultModel, resolveOutputTokens } from '../../services/model-settings';
 
 const SYNTHESIS_TEMPERATURE = 0.3;
 const SYNTHESIS_MAX_TOKENS = OUTPUT_TOKEN_DEFAULTS.voiceSynthesis;
@@ -73,13 +72,9 @@ async function loadSynthesisContext(
     throw new HandlerError('validation', OPENROUTER_KEY_MISSING_MESSAGE);
   }
 
-  const model = session.voiceConfig?.synthesisModel ?? (await resolveDefaultModel(scope, { namespace, userId: callerUserId(scope.caller) }));
-  const maxTokens = await resolveOutputTokens(scope, {
-    namespace,
-    model,
-    defaultTokens: SYNTHESIS_MAX_TOKENS,
-    userId: callerUserId(scope.caller),
-  });
+  const modelSettings = await loadModelSettings(scope.workspaces, { namespace, userId: callerUserId(scope.caller) });
+  const model = session.voiceConfig?.synthesisModel ?? (await resolveDefaultModel(scope.models, modelSettings));
+  const maxTokens = await resolveOutputTokens(scope.models, modelSettings, { model, defaultTokens: SYNTHESIS_MAX_TOKENS });
 
   return { session, openRouterKey, model, maxTokens };
 }

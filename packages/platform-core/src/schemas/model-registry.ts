@@ -28,7 +28,7 @@ export function isMovingModelAlias(modelId: string): boolean {
  * to the judge's JSON Schema, else `pinDefaultModel`.
  */
 export function pinDefaultJudgeModel(
-  models: ReadonlyArray<{ id: string; retiredAt: string | null; supportedParameters?: string[] }>,
+  models: ReadonlyArray<{ id: string; retiredAt: string | null; supportsTools?: boolean; supportedParameters?: string[] }>,
   preferred?: string,
 ): string {
   const judgeable = models.find((model) => model.id === preferred && model.supportedParameters?.includes('structured_outputs') === true);
@@ -40,16 +40,11 @@ export function modelVendor(modelId: string): string {
   return modelId.replace(/^~/, '').split('/')[0];
 }
 
-/** The default model a member gets in a workspace: their own, else the workspace's. */
-export function effectiveDefaultModel(workspaceModel: string | undefined, memberModel: string | undefined): string | undefined {
-  return memberModel ?? workspaceModel;
-}
-
 /**
  * Whether a registry entry can be a workspace's or member's default model: live,
  * and able to call tools, which the assistants and cowork chat always send.
  */
-export function isUsableDefaultModel(entry: { retiredAt: string | null; supportsTools: boolean } | null | undefined): boolean {
+export function isUsableDefaultModel(entry: { retiredAt: string | null; supportsTools?: boolean } | null | undefined): boolean {
   return entry !== null && entry !== undefined && entry.retiredAt === null && entry.supportsTools === true;
 }
 
@@ -65,13 +60,13 @@ export const DefaultModelIdSchema = z
  * judge) is pinned to this, so the definition keeps naming the model it was
  * qualified with when the alias moves on. `FALLBACK_PINNED_MODEL` when the
  * registry lists no Sonnet — never the alias. A `preferred` model (a workspace
- * or member default) wins while the registry lists it live.
+ * or member default) wins while `isUsableDefaultModel` holds for it.
  */
 export function pinDefaultModel(
-  models: ReadonlyArray<{ id: string; retiredAt: string | null }>,
+  models: ReadonlyArray<{ id: string; retiredAt: string | null; supportsTools?: boolean }>,
   preferred?: string,
 ): string {
-  if (preferred !== undefined && models.some((model) => model.id === preferred && model.retiredAt === null)) return preferred;
+  if (preferred !== undefined && isUsableDefaultModel(models.find((model) => model.id === preferred))) return preferred;
   let newest: { id: string; major: number; minor: number } | null = null;
   for (const model of models) {
     if (model.retiredAt !== null) continue;
