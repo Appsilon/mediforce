@@ -624,7 +624,6 @@ export {
   OUTPUT_BUDGETS,
   OUTPUT_TOKEN_DEFAULTS,
   resolveMaxOutputTokens,
-  scaleOutputTokens,
   type OutputBudget,
 } from './output-budget';
 

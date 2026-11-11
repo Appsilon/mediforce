@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { resolveMaxOutputTokens } from '../output-budget';
 
 describe('resolveMaxOutputTokens', () => {
+  it('gives the model its own full limit at max, whatever the call\'s default', () => {
+    expect(resolveMaxOutputTokens({ defaultTokens: 4_000, budget: 'max', modelMaxCompletionTokens: 128_000 })).toBe(128_000);
+    expect(resolveMaxOutputTokens({ defaultTokens: 16_000, budget: 'max', modelMaxCompletionTokens: 8_192 })).toBe(16_000);
+  });
+
   it('sends the default unchanged when nothing is set, whatever the model limit', () => {
     expect(resolveMaxOutputTokens({ defaultTokens: 16_384 })).toBe(16_384);
     expect(resolveMaxOutputTokens({ defaultTokens: 16_384, modelMaxCompletionTokens: 8_192 })).toBe(16_384);

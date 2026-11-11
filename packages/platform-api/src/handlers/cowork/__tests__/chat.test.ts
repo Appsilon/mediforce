@@ -8,7 +8,6 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import type { NamespaceSecretsRepository } from '@mediforce/platform-core';
-import { DEFAULT_MODEL } from '@mediforce/platform-core';
 import { chatCoworkSession } from '../chat';
 import { InMemoryNamespaceRepo } from '../../../testing/in-memory-namespace-repo';
 import { HandlerError, NotFoundError, PreconditionFailedError } from '../../../errors';
@@ -294,7 +293,7 @@ describe('chatCoworkSession handler', () => {
       const modelRegistryRepo = new InMemoryModelRegistryRepository();
       if (options.modelLimit !== undefined) {
         await modelRegistryRepo.upsert({
-          id: DEFAULT_MODEL, name: DEFAULT_MODEL, provider: 'anthropic', contextLength: 200_000, maxCompletionTokens: options.modelLimit,
+          id: 'anthropic/claude-sonnet-5.5', name: 'Claude Sonnet 5.5', provider: 'anthropic', contextLength: 200_000, maxCompletionTokens: options.modelLimit,
           pricing: { input: 0, output: 0 }, modality: 'text->text', inputModalities: ['text'], outputModalities: ['text'],
           supportsTools: true, supportsVision: false, source: 'openrouter', canonicalSlug: null, requestCount: null,
           lastSyncedAt: '2026-10-01T00:00:00Z', retiredAt: null,
