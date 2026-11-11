@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/format';
 import { errorMessage } from '@/lib/error-message';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
+import { useDefaultModel } from '@/hooks/use-model-registry';
 import { selectBase } from '@/components/workflows/workflow-editor/step-editor-fields';
 import { selectAgentPatch } from '@/components/workflows/workflow-editor-utils';
 import { buildRegisterBody } from '@/lib/workflow-save-utils';
@@ -223,6 +224,7 @@ export function AgentAssistantPanel({ namespace, open, onToggleOpen, wide, onTog
   onActivityChange?: (activity: { scanningId: string | null; matchedId: string | null }) => void;
   onAccepted?: () => void;
 }) {
+  const defaultModel = useDefaultModel(namespace);
   const [messages, setMessages] = React.useState<PanelMessage[]>([]);
   const [input, setInput] = React.useState('');
   const [pending, setPending] = React.useState(false);
@@ -438,7 +440,7 @@ export function AgentAssistantPanel({ namespace, open, onToggleOpen, wide, onTog
           <ModelPicker
             value={assistantModel}
             onChange={setAssistantModel}
-            defaultModel={DEFAULT_MODEL}
+            defaultModel={defaultModel}
             requireToolSupport
             minContextTokens={32000}
             ariaLabel="Agent Assistant Model"

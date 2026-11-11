@@ -21,6 +21,7 @@ export const OUTPUT_BUDGET_MULTIPLIERS: Record<OutputBudget, number> = {
 export const OUTPUT_TOKEN_DEFAULTS = {
   evaluationJudge: 16_000,
   assistant: 8_000,
+  agentAssistant: 4_000,
   coworkChat: 16_384,
   voiceSynthesis: 4_096,
 } as const;
