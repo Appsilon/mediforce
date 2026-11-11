@@ -34,7 +34,7 @@ export function caseInputOf(instance: ProcessInstance, stepInput: Record<string,
 const SentBackMetadataSchema = z.object({ sentBack: z.literal(true) });
 
 /** Whether a person's verdict sent a run's step back to run again. */
-function sentBack(verdict: Score | undefined): boolean {
+export function sentBack(verdict: Score | undefined): boolean {
   return verdict?.label === 'revise' || SentBackMetadataSchema.safeParse(verdict?.metadata).success;
 }
 

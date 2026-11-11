@@ -67,6 +67,67 @@ export const evalAgentRunsCommand = defineCommand({
   },
 });
 
+export const evalReviewedRunsCommand = defineCommand({
+  name: 'mediforce eval reviewed-runs',
+  description: 'List a subject\'s reviewed production runs — sent back or approved — not yet an Eval Case.',
+  args: {
+    ...SUBJECT_ARGS,
+    verdict: enumArg(['sentBack', 'approved'] as const, { description: 'Only these' }),
+    definitionVersion: { type: 'string', description: 'Only runs of this Workflow Definition version' },
+    since: { type: 'string', description: 'Only runs started at or after this ISO timestamp' },
+    until: { type: 'string', description: 'Only runs started at or before this ISO timestamp' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.listReviewedRuns({
+      ...subjectFrom(args),
+      ...(args.verdict !== undefined ? { verdict: args.verdict } : {}),
+      ...(args.definitionVersion !== undefined ? { definitionVersion: Number(args.definitionVersion) } : {}),
+      ...(args.since !== undefined ? { since: args.since } : {}),
+      ...(args.until !== undefined ? { until: args.until } : {}),
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    if (result.runs.length === 0) output.stdout('No reviewed runs awaiting import.');
+    for (const run of result.runs) {
+      output.stdout(`${run.agentRunId}  ${run.startedAt.slice(0, 16)}  ${run.outcome}${run.definitionVersion === null ? '' : `  v${run.definitionVersion}`}`);
+    }
+    return 0;
+  },
+});
+
+export const evalCasesImportReviewedCommand = defineCommand({
+  name: 'mediforce eval cases-import-reviewed',
+  description: 'Import a subject\'s reviewed production runs as Eval Cases in bulk: each sent-back round a negative case, each approved output a positive one, split dev/holdout by review session. A run round already imported is skipped.',
+  args: {
+    ...SUBJECT_ARGS,
+    verdict: enumArg(['sentBack', 'approved'] as const, { description: 'Only import these' }),
+    definitionVersion: { type: 'string', description: 'Only runs of this Workflow Definition version' },
+    since: { type: 'string', description: 'Only runs started at or after this ISO timestamp' },
+    until: { type: 'string', description: 'Only runs started at or before this ISO timestamp' },
+    runs: { type: 'string', description: 'Comma-separated Agent Run ids to import (default: every matching one not yet imported)' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.importReviewedRuns({
+      ...subjectFrom(args),
+      ...(args.verdict !== undefined ? { verdict: args.verdict } : {}),
+      ...(args.definitionVersion !== undefined ? { definitionVersion: Number(args.definitionVersion) } : {}),
+      ...(args.since !== undefined ? { since: args.since } : {}),
+      ...(args.until !== undefined ? { until: args.until } : {}),
+      ...(args.runs !== undefined ? { agentRunIds: args.runs.split(',') } : {}),
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    const dev = result.imported.filter((evalCase) => evalCase.split === 'dev').length;
+    const holdout = result.imported.filter((evalCase) => evalCase.split === 'holdout').length;
+    output.stdout(`${result.imported.length} Eval Case(s) added (${dev} dev, ${holdout} holdout), ${result.skipped} already imported`);
+    return 0;
+  },
+});
+
 export const evalRunIoCommand = defineCommand({
   name: 'mediforce eval run-io',
   description: 'Show what an Agent Run\'s step was given and what it returned — the pair a case is about.',

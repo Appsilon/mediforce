@@ -12,6 +12,7 @@ type Section =
   | 'evaluators'
   | 'evaluators-with-archived'
   | 'cases'
+  | 'reviewed-runs'
   | 'datasets'
   | 'runs'
   | 'agent-runs'
@@ -63,6 +64,11 @@ export function useStepEvaluatorHistory(step: EvaluationSubject) {
 /** The Agent's eval policy: the step env its trials run with. */
 export function useAgentEvalPolicy(step: EvaluationSubject) {
   return useQuery({ queryKey: sectionKey(step, 'mcp-policy'), queryFn: () => mediforce.evaluation.getMcpPolicy(step), retry: stopRetryOn4xx });
+}
+
+/** The subject's reviewed production runs — sent back or approved — not yet an Eval Case. */
+export function useReviewedRuns(step: EvaluationSubject) {
+  return useQuery({ queryKey: sectionKey(step, 'reviewed-runs'), queryFn: () => mediforce.evaluation.listReviewedRuns(step), retry: stopRetryOn4xx });
 }
 
 /** The Step's saved Dataset versions, newest first. */

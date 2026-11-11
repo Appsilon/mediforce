@@ -299,6 +299,44 @@ export const CreateEvalCaseFromAgentRunInputSchema = z.object({
 });
 export const EvalCaseOutputSchema = z.object({ evalCase: EvalCaseSchema });
 
+/** What a person's review makes of a run O5 may import: sent back for revision, or approved. */
+export const ReviewOutcomeSchema = z.enum(['sentBack', 'approved']);
+
+const ReviewedRunFilterShape = {
+  verdict: ReviewOutcomeSchema.optional(),
+  definitionVersion: z.coerce.number().int().positive().optional(),
+  since: z.string().datetime().optional(),
+  until: z.string().datetime().optional(),
+};
+
+/** A subject's reviewed production runs not yet an Eval Case (ADR-0024 D7). */
+export const ListReviewedRunsInputSchema = EvaluationSubjectRefSchema.extend(ReviewedRunFilterShape);
+export const ReviewedRunCandidateSchema = z.object({
+  agentRunId: z.string().min(1),
+  outcome: ReviewOutcomeSchema,
+  startedAt: z.string().datetime(),
+  definitionVersion: z.number().int().nullable(),
+});
+export const ListReviewedRunsOutputSchema = z.object({ runs: z.array(ReviewedRunCandidateSchema) });
+
+/**
+ * Imports the subject's reviewed production runs as Eval Cases in bulk
+ * (ADR-0024 D7): each sent-back round a negative case, each approved output a
+ * positive one, reusing the single-run labelling. Runs already imported are
+ * skipped; the rest split dev/holdout by review session.
+ */
+export const ImportReviewedRunsInputSchema = EvaluationSubjectRefSchema.extend({
+  ...ReviewedRunFilterShape,
+  /** Only these candidates; every matching one not yet imported when absent. */
+  agentRunIds: z.array(z.string().min(1)).min(1).optional(),
+  origin: EvaluationOriginSchema.default('user'),
+});
+export const ImportReviewedRunsOutputSchema = z.object({
+  imported: z.array(EvalCaseSchema),
+  /** Matching candidates a run round already imported left out. */
+  skipped: z.number().int().min(0),
+});
+
 /**
  * A case synthesized from a production Agent Run: its input and starting
  * workspace with deliberate changes (a missing or extra file, renamed columns,
@@ -727,6 +765,10 @@ export type AgentRunChange = z.infer<typeof AgentRunChangeSchema>;
 export type ListAgentProductionRunsInput = z.input<typeof ListAgentProductionRunsInputSchema>;
 export type ListAgentProductionRunsOutput = z.infer<typeof ListAgentProductionRunsOutputSchema>;
 export type EvalCaseOutput = z.infer<typeof EvalCaseOutputSchema>;
+export type ListReviewedRunsInput = z.input<typeof ListReviewedRunsInputSchema>;
+export type ListReviewedRunsOutput = z.infer<typeof ListReviewedRunsOutputSchema>;
+export type ImportReviewedRunsInput = z.input<typeof ImportReviewedRunsInputSchema>;
+export type ImportReviewedRunsOutput = z.infer<typeof ImportReviewedRunsOutputSchema>;
 export type CreatePerturbedEvalCaseInput = z.input<typeof CreatePerturbedEvalCaseInputSchema>;
 export type ArchiveEvalCaseInput = z.input<typeof ArchiveEvalCaseInputSchema>;
 export type UpdateEvalCaseInput = z.input<typeof UpdateEvalCaseInputSchema>;
