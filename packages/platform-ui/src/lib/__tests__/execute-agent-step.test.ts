@@ -883,7 +883,7 @@ describe('executeAgentStep', () => {
         fallbackReason: 'output_schema',
       });
 
-      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1', 'exec-1');
+      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1', { stepExecutionId: 'exec-1' });
 
       expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
         'inst-wf-001',
@@ -1112,7 +1112,7 @@ describe('executeAgentStep', () => {
   // ---- Step execution persistence ----
 
   it('[DATA] persists agent output to step execution when stepExecutionId provided', async () => {
-    await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1', 'exec-001');
+    await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1', { stepExecutionId: 'exec-001' });
 
     expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith('inst-wf-001', 'exec-001', expect.objectContaining({
       output: { summary: 'gathered data' },
@@ -1207,7 +1207,7 @@ describe('executeAgentStep', () => {
     };
 
     await expect(
-      executeAgentStep('inst-wf-001', 'gather-data', stepWithMapping, {}, 'user-1', 'exec-001'),
+      executeAgentStep('inst-wf-001', 'gather-data', stepWithMapping, {}, 'user-1', { stepExecutionId: 'exec-001' }),
     ).rejects.toThrow('${steps.never_ran.pdfPath}');
     expect(mockAgentRunner.runWithWorkflowStep).not.toHaveBeenCalled();
     expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith('inst-wf-001', 'exec-001', expect.objectContaining({
@@ -1224,7 +1224,7 @@ describe('executeAgentStep', () => {
 
     mockAgentRunner.reapAsTimeout.mockResolvedValue({ status: 'error', envelope: null, appliedToWorkflow: false, fallbackReason: 'timeout' });
 
-    await executeAgentStep('inst-wf-001', 'gather-data', stepWithMapping, {}, 'user-1', 'exec-001', { reapTimedOut: true });
+    await executeAgentStep('inst-wf-001', 'gather-data', stepWithMapping, {}, 'user-1', { stepExecutionId: 'exec-001', reapTimedOut: true });
 
     expect(mockAgentRunner.reapAsTimeout).toHaveBeenCalled();
   });
@@ -1243,7 +1243,7 @@ describe('executeAgentStep', () => {
         fallbackReason: 'error',
       });
 
-      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1', 'exec-001');
+      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1', { stepExecutionId: 'exec-001' });
 
       expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
         'inst-wf-001',
@@ -1260,7 +1260,7 @@ describe('executeAgentStep', () => {
         fallbackReason: 'timeout',
       });
 
-      await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1', 'exec-001');
+      await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1', { stepExecutionId: 'exec-001' });
 
       expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
         'inst-wf-001',
@@ -1277,7 +1277,7 @@ describe('executeAgentStep', () => {
         fallbackReason: 'error',
       });
 
-      await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1', 'exec-001');
+      await executeAgentStep('inst-wf-001', 'gather-data', firstStep, {}, 'user-1', { stepExecutionId: 'exec-001' });
 
       expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
         'inst-wf-001',
@@ -1312,7 +1312,7 @@ describe('executeAgentStep', () => {
         fallbackReason: null,
       });
 
-      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1', 'exec-001');
+      await executeAgentStep('inst-wf-001', 'gather-data', l3Step, {}, 'user-1', { stepExecutionId: 'exec-001' });
 
       expect(mockInstanceRepo.updateStepExecution).toHaveBeenCalledWith(
         'inst-wf-001',

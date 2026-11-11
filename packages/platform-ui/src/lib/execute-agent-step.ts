@@ -68,14 +68,14 @@ export async function executeAgentStep(
   workflowStep: WorkflowStep,
   appContext: Record<string, unknown>,
   triggeredBy: string,
-  stepExecutionId?: string,
-  options?: { reapTimedOut?: boolean; budgetUserId?: string | null },
+  options: { stepExecutionId?: string; reapTimedOut?: boolean; budgetUserId?: string | null } = {},
 ): Promise<WorkflowAgentStepResult> {
+  const { stepExecutionId } = options;
   // Reap mode (ADR-0010): the prior driver died with this step stranded past
   // its timeout. We route the existing execution through the timeout fallback
   // without launching the plugin, so the plugin/MCP/OAuth resolution below is
   // skipped entirely.
-  const reapTimedOut = options?.reapTimedOut === true;
+  const reapTimedOut = options.reapTimedOut === true;
   const {
     engine,
     agentRunner,
@@ -252,7 +252,7 @@ export async function executeAgentStep(
   // The signed-in caller's own model settings, never `triggeredBy`'s: that comes
   // from the request body, and a member budget can raise the limit. Loaded once
   // for the step, not on every LLM call it makes.
-  const modelSettings = await loadModelSettings(namespaceRepo, { namespace: instance.namespace, userId: options?.budgetUserId ?? null });
+  const modelSettings = await loadModelSettings(namespaceRepo, { namespace: instance.namespace, userId: options.budgetUserId ?? null });
   const workflowAgentContext: WorkflowAgentContext = {
     stepId,
     processInstanceId: instanceId,
