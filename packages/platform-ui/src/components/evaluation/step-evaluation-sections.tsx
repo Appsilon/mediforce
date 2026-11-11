@@ -234,6 +234,7 @@ function EvaluatorRow({ step, evaluator, mayEdit, editReason, stepOutputSchema, 
             {check.kind === 'code' && ' The new version needs its source approved again before it counts, whatever changed.'}
           </p>
           <EvaluatorForm
+            namespace={step.namespace}
             initial={{ name: evaluator.name, rule: evaluator.latest.rule, draft: draftFromCheck(check) }}
             editing
             stepOutputSchema={stepOutputSchema}
@@ -301,7 +302,9 @@ interface EvaluatorFormProblems {
  * Name, the kind of check and its fields. The kind comes from the dropdown,
  * never typed. What blocks a save is said under its field until it is edited.
  */
-export function EvaluatorForm({ initial, editing = false, schemaTaken = false, stepOutputSchema, submitLabel, pending, error, onSubmit, onCancel }: {
+export function EvaluatorForm({ namespace, initial, editing = false, schemaTaken = false, stepOutputSchema, submitLabel, pending, error, onSubmit, onCancel }: {
+  /** The workspace whose default model a new judge starts on. */
+  namespace: string;
   initial: EvaluatorFormValues;
   /**
    * Editing an existing Evaluator: its name and type stay. The name is its
@@ -323,7 +326,7 @@ export function EvaluatorForm({ initial, editing = false, schemaTaken = false, s
   // A schema check keeps the name and rule it came with; a new one takes the fixed ones.
   const schemaName = initial.name === '' ? OUTPUT_SCHEMA_NAME : initial.name;
   const schemaRule = initial.rule === '' ? OUTPUT_SCHEMA_RULE : initial.rule;
-  const judgeModel = usePinnedDefaultModel({ judge: true });
+  const judgeModel = usePinnedDefaultModel(namespace, { judge: true });
   const edit = (changes: Partial<EvaluatorFormValues>, cleared: keyof EvaluatorFormProblems) => {
     setValues((current) => ({ ...current, ...changes }));
     setProblems((current) => ({ ...current, [cleared]: undefined }));
@@ -463,6 +466,7 @@ export function EvaluatorsSection({ step, data, mayEdit, editReason, stepOutputS
       {adding === true && (
         <FormDialog title="Add an Evaluator" description="What every output of the step is checked against." testId="evaluator-dialog" onClose={closeAdd}>
           <EvaluatorForm
+            namespace={step.namespace}
             initial={{ name: '', rule: '', draft: emptyCheckDraft(schemaTaken ? 'code' : 'schema', stepOutputSchema) }}
             schemaTaken={schemaTaken}
             stepOutputSchema={stepOutputSchema}

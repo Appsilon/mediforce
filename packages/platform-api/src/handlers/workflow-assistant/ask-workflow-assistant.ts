@@ -34,8 +34,6 @@ import { callerInstructionMessages } from './_lib/caller-instructions';
 import { runWorkflowPlatformTool } from './_lib/run-platform-tool';
 import { LIST_MODELS_TOOL_NAME, runListModelsTool } from './_lib/list-models-tool';
 import { requireOpenRouterApiKey } from '../../services/openrouter-key';
-import { resolveOutputTokens } from '../../services/output-tokens';
-import { resolveDefaultModel } from '../../services/default-model';
 import { parseModelJson } from './_lib/parse-model-json';
 import {
   parseToolArguments,
@@ -44,6 +42,7 @@ import {
   type ToolIssueHint,
 } from '../../assistant-core';
 import { callerUserId } from '../../auth';
+import { loadModelSettings, resolveDefaultModel, resolveOutputTokens } from '../../services/model-settings';
 
 interface AskScopedInput extends AskWorkflowAssistantInput {
   namespace: string;
@@ -282,7 +281,8 @@ export async function askWorkflowAssistant(
   }
 
   const apiKey = await requireOpenRouterApiKey(scope, input.namespace);
-  const model = input.model ?? (await resolveDefaultModel(scope, { namespace: input.namespace, userId: callerUserId(scope.caller) }));
+  const modelSettings = await loadModelSettings(scope.workspaces, { namespace: input.namespace, userId: callerUserId(scope.caller) });
+  const model = input.model ?? (await resolveDefaultModel(scope.models, modelSettings));
 
   await recordAssistantPrompt(scope, {
     namespace: input.namespace,
@@ -309,12 +309,7 @@ export async function askWorkflowAssistant(
 
   let lastErrors: string[] = [];
   const accumulatedToolCalls: WorkflowAssistantToolCall[] = [];
-  const maxTokens = await resolveOutputTokens(scope, {
-    namespace: input.namespace,
-    model,
-    defaultTokens: ASSISTANT_MAX_OUTPUT_TOKENS,
-    userId: callerUserId(scope.caller),
-  });
+  const maxTokens = await resolveOutputTokens(scope.models, modelSettings, { model, defaultTokens: ASSISTANT_MAX_OUTPUT_TOKENS });
 
   for (let iteration = 0; iteration < MAX_TOOL_LOOP_ITERATIONS; iteration++) {
     const response = await callOpenRouter({ model, messages, apiKey, tools, maxTokens });

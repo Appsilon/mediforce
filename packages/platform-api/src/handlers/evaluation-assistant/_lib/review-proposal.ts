@@ -13,7 +13,6 @@ import {
 import type { ProposalReview } from '../../../assistant-core';
 import type { PreviewEvaluatorOutput } from '../../../contract/evaluation';
 import type { CallerScope } from '../../../repositories/index';
-import { preferredDefaultModel } from '../../../services/default-model';
 import { HandlerError, ValidationError } from '../../../errors';
 import { AGENT_NOT_PREVIEWED, EXPECTED_OUTPUT_NOT_PREVIEWED, JUDGE_NOT_PREVIEWED, previewEvaluator } from '../../evaluation/preview-evaluator';
 import { expectsWithheldOutput, loadAgentRunSource, WITHHELD_OUTPUT_ERROR } from '../../evaluation/_lib/agent-production-runs';
@@ -23,6 +22,7 @@ import { stepOnly } from '../../evaluation/_lib/evaluation-subject';
 import { perturbCase } from '../../evaluation/_lib/perturb-case';
 import { loadStepEvaluator } from './run-evaluation-tool';
 import { callerUserId } from '../../../auth';
+import { loadModelSettings } from '../../../services/model-settings';
 
 type Args<Name extends EvaluationAssistantProposalToolName> = z.infer<(typeof EVALUATION_ASSISTANT_PROPOSAL_TOOLS)[Name]>;
 
@@ -49,8 +49,8 @@ async function resolveCheck(scope: CallerScope, namespace: string, check: Assist
     const kept = (replaced?.kind === 'llm_judge' || replaced?.kind === 'expected_output') && replaced.kind === check.kind ? replaced.model : undefined;
     const keeps = kept !== undefined && (models.length === 0 || models.some((candidate) => candidate.id === kept && candidate.retiredAt === null));
     if (keeps === true) return { ...check, model: kept };
-    const preferred = await preferredDefaultModel(scope, { namespace, userId: callerUserId(scope.caller) });
-    return { ...check, model: pinDefaultJudgeModel(models, preferred) };
+    const settings = await loadModelSettings(scope.workspaces, { namespace, userId: callerUserId(scope.caller) });
+    return { ...check, model: pinDefaultJudgeModel(models, settings.defaultModel) };
   }
   const { model } = check;
   if (isMovingModelAlias(model)) {

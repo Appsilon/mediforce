@@ -133,7 +133,7 @@ export function WorkflowEditorCanvas({
   const { toast } = useToast();
   const { images: dockerImages, isAvailable: dockerAvailable } = useDockerImages();
   const { entries: catalogEntries } = useImageCatalogEntries(namespace);
-  const pinnedDefaultModel = usePinnedDefaultModel();
+  const pinnedDefaultModel = usePinnedDefaultModel(namespace ?? '');
   const defaultModel = useDefaultModel(namespace ?? '');
   const warningStepIds = useMemo(() => {
     if (!dockerAvailable) return undefined;

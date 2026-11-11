@@ -194,7 +194,7 @@ function ExpectedOutputsQuestion({ step, evaluation, mayEdit, shown, onChoice }:
   onChoice: (choice: ExpectationChoice) => void;
 }) {
   const hasComparison = hasComparisonEvaluator(evaluation);
-  const model = usePinnedDefaultModel({ judge: true });
+  const model = usePinnedDefaultModel(step.namespace, { judge: true });
   const addComparison = useStepEvaluationMutation(step, () => mediforce.evaluation.createEvaluator({
     ...step,
     name: EXPECTED_OUTPUT_EVALUATOR,

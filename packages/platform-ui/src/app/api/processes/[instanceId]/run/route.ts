@@ -5,7 +5,7 @@ import { callerUserId } from '@mediforce/platform-api/auth';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { flattenResolvedMcpToLegacy, resolveMcpForStep, validateWorkflowEnv, validatePluginRequiredEnv } from '@mediforce/agent-runtime';
 import { advanceEvalRunOfInstance, checkRetiredModels, checkUnknownModels, settleRunWaits } from '@mediforce/platform-api/handlers';
-import { resolveDefaultModel } from '@mediforce/platform-api/services';
+import { loadModelSettings, resolveDefaultModel } from '@mediforce/platform-api/services';
 import { defaultBuildScope } from '@/lib/route-adapter';
 import { resolveCoworkOutputSchema, resolveDefinitionModels, resolvePreviousStepId, resolveStepTimeoutMs, buildHumanTaskVerdicts, resolveParamDefaults, runInterpolationSources, type WorkflowStep, type ProcessInstance, type ProcessInstanceRepository } from '@mediforce/platform-core';
 import { validateActionSecrets, isWaitSentinel, interpolate } from '@mediforce/core-actions';
@@ -416,8 +416,8 @@ export async function POST(
               ? {
                   voice: currentStep.cowork?.voiceRealtime?.voice ?? 'alloy',
                   synthesisModel: currentStep.cowork?.voiceRealtime?.synthesisModel ?? await resolveDefaultModel(
-                    { workspaces: namespaceRepo, models: modelRegistryRepo },
-                    { namespace: instance.namespace, userId: budgetUserId },
+                    modelRegistryRepo,
+                    await loadModelSettings(namespaceRepo, { namespace: instance.namespace, userId: budgetUserId }),
                   ),
                   maxDurationSeconds: currentStep.cowork?.voiceRealtime?.maxDurationSeconds ?? 600,
                   idleTimeoutSeconds: currentStep.cowork?.voiceRealtime?.idleTimeoutSeconds ?? 60,

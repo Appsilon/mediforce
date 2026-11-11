@@ -14,8 +14,7 @@ import {
 import { AgentAssistantProposalViewSchema, type AskAgentAssistantInput, type AskAgentAssistantOutput, type AgentAssistantProgress, type AgentProposalEvidence } from '../../contract/agent-assistant';
 import type { CallerScope } from '../../repositories/index';
 import { assertNamespaceAccess, callerUserId } from '../../auth';
-import { resolveDefaultModel } from '../../services/default-model';
-import { resolveOutputTokens } from '../../services/output-tokens';
+import { loadModelSettings, resolveDefaultModel, resolveOutputTokens } from '../../services/model-settings';
 import { recordAssistantPrompt, runProposalToolLoop, type ProposalReview } from '../../assistant-core';
 import { requireOpenRouterApiKey } from '../../services/openrouter-key';
 import { listAgentValidations } from '../evaluation/step-qualification';
@@ -128,14 +127,9 @@ export async function askAgentAssistant(
 ): Promise<AskAgentAssistantOutput> {
   assertNamespaceAccess(scope.caller, input.namespace);
   const apiKey = await requireOpenRouterApiKey(scope, input.namespace);
-  const userId = callerUserId(scope.caller);
-  const model = input.model ?? (await resolveDefaultModel(scope, { namespace: input.namespace, userId }));
-  const maxTokens = await resolveOutputTokens(scope, {
-    namespace: input.namespace,
-    model,
-    defaultTokens: ASSISTANT_MAX_OUTPUT_TOKENS,
-    userId,
-  });
+  const modelSettings = await loadModelSettings(scope.workspaces, { namespace: input.namespace, userId: callerUserId(scope.caller) });
+  const model = input.model ?? (await resolveDefaultModel(scope.models, modelSettings));
+  const maxTokens = await resolveOutputTokens(scope.models, modelSettings, { model, defaultTokens: ASSISTANT_MAX_OUTPUT_TOKENS });
 
   await recordAssistantPrompt(scope, {
     namespace: input.namespace,

@@ -24,7 +24,7 @@ export default function NewAgentPage() {
   const [inputDescription, setInputDescription] = useState('');
   const [outputDescription, setOutputDescription] = useState('');
   const [outputSchema, setOutputSchema] = useState<AgentOutputSchema | undefined>(undefined);
-  const pinnedDefaultModel = usePinnedDefaultModel();
+  const pinnedDefaultModel = usePinnedDefaultModel(handle);
   const [chosenModelId, setChosenModelId] = useState<string | null>(null);
   const selectedModelId = chosenModelId ?? pinnedDefaultModel;
   const [prompt, setPrompt] = useState('');

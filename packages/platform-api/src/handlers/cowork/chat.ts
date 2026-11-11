@@ -9,8 +9,6 @@ import {
 } from '../../errors';
 import { loadOr404 } from '../_helpers';
 import { OPENROUTER_KEY_MISSING_MESSAGE } from '../../services/openrouter-key';
-import { resolveOutputTokens } from '../../services/output-tokens';
-import { resolveDefaultModel } from '../../services/default-model';
 import type { CallerScope } from '../../repositories/index';
 import type {
   ChatCoworkSessionInput,
@@ -29,6 +27,7 @@ import {
 } from '../../services/openrouter-client';
 import { validateOutputSchema } from '@mediforce/agent-runtime';
 import { callerUserId } from '../../auth';
+import { loadModelSettings, resolveDefaultModel, resolveOutputTokens, type ModelSettings } from '../../services/model-settings';
 
 const MAX_TOOL_LOOP_ITERATIONS = 10;
 /**
@@ -96,6 +95,7 @@ interface ChatContext {
   readonly stepContext: Record<string, unknown> | undefined;
   readonly model: string;
   readonly namespace: string;
+  readonly modelSettings: ModelSettings;
 }
 
 async function loadChatContext(
@@ -131,13 +131,15 @@ async function loadChatContext(
     throw new HandlerError('validation', OPENROUTER_KEY_MISSING_MESSAGE);
   }
 
+  const modelSettings = await loadModelSettings(scope.workspaces, { namespace, userId: callerUserId(scope.caller) });
   return {
     session,
     openRouterKey,
     secrets,
     stepContext: instance.variables as Record<string, unknown> | undefined,
-    model: session.model ?? (await resolveDefaultModel(scope, { namespace, userId: callerUserId(scope.caller) })),
+    model: session.model ?? (await resolveDefaultModel(scope.models, modelSettings)),
     namespace,
+    modelSettings,
   };
 }
 
@@ -248,11 +250,9 @@ async function runToolLoop(args: ToolLoopArgs): Promise<ToolLoopResult> {
   const toolCallSummaries: ChatCoworkToolCall[] = [];
   let artifact: Record<string, unknown> | undefined;
   let agentText = '';
-  const maxTokens = await resolveOutputTokens(scope, {
-    namespace: ctx.namespace,
+  const maxTokens = await resolveOutputTokens(scope.models, ctx.modelSettings, {
     model: ctx.model,
     defaultTokens: CHAT_MAX_TOKENS,
-    userId: callerUserId(scope.caller),
   });
 
   for (let iteration = 0; iteration < MAX_TOOL_LOOP_ITERATIONS; iteration++) {

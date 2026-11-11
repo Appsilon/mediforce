@@ -149,6 +149,7 @@ vi.mock('@/lib/platform-services', () => ({
     oauthProviderRepo,
     agentOAuthTokenRepo,
     modelRegistryRepo: mockModelRegistryRepo,
+    namespaceRepo: { getNamespace: async () => null, getMember: async () => null },
     evaluationRepo,
   }),
 }));

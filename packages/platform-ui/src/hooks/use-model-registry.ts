@@ -6,8 +6,7 @@ import { mediforce } from '@/lib/mediforce';
 import { queryKeys } from '@/lib/query-keys';
 import { stopRetryOn4xx } from '@/lib/retry';
 import { NICE_LIVE_INTERVAL_MS } from '@/lib/polling-cadence';
-import { useParams } from 'next/navigation';
-import { DEFAULT_MODEL, effectiveDefaultModel, isUsableDefaultModel, modelVendor, pinDefaultJudgeModel, pinDefaultModel } from '@mediforce/platform-core';
+import { DEFAULT_MODEL, effectiveModelSettings, isUsableDefaultModel, modelVendor, pinDefaultJudgeModel, pinDefaultModel } from '@mediforce/platform-core';
 import { useAuth } from '@/contexts/auth-context';
 import { useNamespace } from '@/hooks/use-namespace';
 import { useNamespaceMembers } from '@/hooks/use-namespace-members';
@@ -50,10 +49,7 @@ export function usePreferredDefaultModel(handle: string): { model: string | unde
   const { user } = useAuth();
   const { namespace, loading } = useNamespace(handle);
   const { members, loading: membersLoading } = useNamespaceMembers(handle);
-  const model = effectiveDefaultModel(
-    namespace?.defaultModel,
-    members.find((member) => member.uid === user?.id)?.defaultModel,
-  );
+  const model = effectiveModelSettings(namespace, members.find((member) => member.uid === user?.id)).defaultModel;
   return { model, ready: loading === false && membersLoading === false };
 }
 
@@ -71,10 +67,9 @@ export function useDefaultModel(handle: string): string {
  * can return structured output; for a plugin, it is one of `providers`), else
  * the newest Claude Sonnet (`pinDefaultModel`), its fallback until the registry loads.
  */
-export function usePinnedDefaultModel(options: { judge?: boolean; providers?: readonly string[] } = {}): string {
+export function usePinnedDefaultModel(handle: string, options: { judge?: boolean; providers?: readonly string[] } = {}): string {
   const query = useModelRegistry();
-  const { handle } = useParams<{ handle?: string }>();
-  const preferred = usePreferredDefaultModel(handle ?? '').model;
+  const preferred = usePreferredDefaultModel(handle).model;
   const { judge, providers } = options;
   return useMemo(() => {
     const models = query.data ?? [];

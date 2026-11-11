@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { Bot, Check, ChevronLeft, ChevronRight, Loader2, Maximize2, Minimize2, Send, Settings, Sparkles, Square, User, X } from 'lucide-react';
 import Link from 'next/link';
-import { DEFAULT_MODEL } from '@mediforce/platform-core';
 import type { AgentAssistantPlatformToolName, AgentAssistantProposalToolName, WorkflowDefinition } from '@mediforce/platform-core';
 import type { AgentAssistantProgress, AgentProposalEvidence, AskAgentAssistantOutput } from '@mediforce/platform-api/contract';
 import { mediforce } from '@/lib/mediforce';
@@ -12,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/format';
 import { errorMessage } from '@/lib/error-message';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
-import { useDefaultModel } from '@/hooks/use-model-registry';
+import { useDefaultModel, usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { selectBase } from '@/components/workflows/workflow-editor/step-editor-fields';
 import { selectAgentPatch } from '@/components/workflows/workflow-editor-utils';
 import { buildRegisterBody } from '@/lib/workflow-save-utils';
@@ -97,7 +96,8 @@ interface AgentStepOption {
   readonly stepId: string;
 }
 
-function UseInWorkflowStep({ namespace, agentId }: { namespace: string; agentId: string }) {
+export function UseInWorkflowStep({ namespace, agentId }: { namespace: string; agentId: string }) {
+  const pinnedDefaultModel = usePinnedDefaultModel(namespace);
   const [open, setOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [binding, setBinding] = React.useState(false);
@@ -139,7 +139,7 @@ function UseInWorkflowStep({ namespace, agentId }: { namespace: string; agentId:
       const { agent } = await mediforce.agents.get({ id: agentId });
       const step = target.definition.steps.find((candidate) => candidate.id === target.stepId);
       if (step === undefined) return;
-      const patch = selectAgentPatch(step, agent, DEFAULT_MODEL);
+      const patch = selectAgentPatch(step, agent, pinnedDefaultModel);
       const steps = target.definition.steps.map((candidate) => candidate.id === target.stepId ? { ...candidate, ...patch } : candidate);
       await mediforce.workflows.register(buildRegisterBody(target.definition, { steps }), { namespace });
       setBound(target.label);

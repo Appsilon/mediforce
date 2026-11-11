@@ -44,7 +44,7 @@ import {
   type WorkflowStep,
 } from '@mediforce/platform-core';
 import { buildProductionOutputGate } from './production-output-gate';
-import { changedFingerprintComponents, computeStepFingerprint, resolveOutputTokens } from '@mediforce/platform-api/services';
+import { changedFingerprintComponents, computeStepFingerprint, loadModelSettings, resolveOutputTokens } from '@mediforce/platform-api/services';
 import { getWorkflowSecretsForRuntime } from '../app/actions/workflow-secrets';
 import { getNamespaceSecretsForRuntime } from '../app/actions/namespace-secrets';
 import { resolveAgentDefaults } from './resolve-agent-defaults';
@@ -249,6 +249,10 @@ export async function executeAgentStep(
   // Picking an agent picks its model and output schema unless the step deliberately overrides them.
   const resolvedStep = applyAgentOutputSchema(applyAgentModel(workflowStep, agentDefaults.model), agentDefaults.outputSchema);
 
+  // The signed-in caller's own model settings, never `triggeredBy`'s: that comes
+  // from the request body, and a member budget can raise the limit. Loaded once
+  // for the step, not on every LLM call it makes.
+  const modelSettings = await loadModelSettings(namespaceRepo, { namespace: instance.namespace, userId: options?.budgetUserId ?? null });
   const workflowAgentContext: WorkflowAgentContext = {
     stepId,
     processInstanceId: instanceId,
@@ -258,12 +262,7 @@ export async function executeAgentStep(
     autonomyLevel,
     workflowDefinition,
     step: resolvedStep,
-    // The signed-in caller's own output budget, never `triggeredBy`: that comes from the
-    // request body, and a member budget can raise the limit.
-    llm: withMaxTokens(llmClient, (model) => resolveOutputTokens(
-      { workspaces: namespaceRepo, models: modelRegistryRepo },
-      { namespace: instance.namespace, userId: options?.budgetUserId ?? null, model, defaultTokens: DEFAULT_LLM_MAX_OUTPUT_TOKENS },
-    )),
+    llm: withMaxTokens(llmClient, (model) => resolveOutputTokens(modelRegistryRepo, modelSettings, { model, defaultTokens: DEFAULT_LLM_MAX_OUTPUT_TOKENS })),
     workflowSecrets,
     namespaceSecretKeys: new Set(Object.keys(namespaceSecrets)),
     resolvedMcpConfig,
