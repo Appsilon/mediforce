@@ -32,6 +32,7 @@ export {
   advanceEvalRunOfInstance,
   driveOpenEvalRuns,
 } from './eval-runs';
+export { prepareComparison, startComparison, getComparison, listComparisons, cancelComparison } from './comparisons';
 export { getAcceptanceCriteria, setAcceptanceCriteria } from './acceptance-criteria';
 export { getStepQualification, getWorkflowValidation, listAgentValidations, signStepQualification } from './step-qualification';
 export { computeStepFingerprint, changedFingerprintComponents } from './_lib/step-fingerprint';

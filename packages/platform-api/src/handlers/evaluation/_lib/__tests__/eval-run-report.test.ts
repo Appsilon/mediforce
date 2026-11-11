@@ -19,6 +19,7 @@ function run(overrides: Partial<EvalRun> = {}): EvalRun {
     evaluators: [{ evaluatorId: EVALUATOR, name: 'findings-present', version: 1, kind: 'schema', counted: true }],
     variant: null,
     variantAgentHash: null,
+    comparisonId: null,
     fingerprint: null,
     acceptanceCriteria: null,
     mcpPolicy: {}, env: {}, estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },

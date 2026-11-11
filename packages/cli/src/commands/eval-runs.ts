@@ -5,7 +5,7 @@ import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson, type OutputSink } from '../output';
 import { SUBJECT_ARGS, subjectFrom } from './eval-step-args';
 
-function percent(value: number | null): string {
+export function percent(value: number | null): string {
   return value === null ? '   -' : `${(value * 100).toFixed(0).padStart(3)}%`;
 }
 
@@ -39,7 +39,7 @@ function variantFrom(args: { variant?: string; model?: string; 'prompt-file'?: s
   return Object.keys(variant).length === 0 ? {} : { variant };
 }
 
-function describeVariant(variant: EvalVariantPatch): string {
+export function describeVariant(variant: EvalVariantPatch): string {
   const parts = [
     ...(variant.model !== undefined ? [`model ${variant.model}`] : []),
     ...(variant.prompt !== undefined ? ['its own prompt'] : []),

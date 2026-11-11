@@ -97,7 +97,7 @@ function defaultBudget(totalUsd: number): number {
  * live Evaluator versions with whether each counts, the MCP eval policy the
  * trials will run under, and a cost estimate. Reads only.
  */
-async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, scope: CallerScope) {
+export async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, scope: CallerScope) {
   const step = subjectRef(input);
   if (step.kind === 'agent' && input.definitionVersion !== undefined) {
     throw new ValidationError(`${subjectName(step)} runs as it is now; it has no workflow version to pick`);
@@ -187,6 +187,7 @@ export async function estimateEvalRunCost(
 export async function prepareEvalRun(
   input: z.output<typeof PrepareEvalRunInputSchema>,
   scope: CallerScope,
+  placement: { readonly evalRunId?: string; readonly comparisonId?: string } = {},
 ): Promise<EvalRunOutput> {
   const { step, definition, evaluatedAgent, variant, dataset, frozenEvaluators, mcpPolicy, env, fingerprint, caseIds, estimate, suggestedBudgetUsd } = await planEvalRun(input, scope);
   const [criteria] = await scope.evaluation.listAcceptanceCriteria(step);
@@ -206,7 +207,7 @@ export async function prepareEvalRun(
   const now = new Date().toISOString();
   const run: EvalRun = {
     ...evaluationOwnerOf(step),
-    id: randomUUID(),
+    id: placement.evalRunId ?? randomUUID(),
     definitionVersion: agentVersion === null ? definition.version : null,
     agentVersion: agentVersion?.version ?? null,
     datasetVersionId: dataset.id,
@@ -216,6 +217,7 @@ export async function prepareEvalRun(
     evaluators: frozenEvaluators.map(({ frozen }) => frozen),
     variant,
     variantAgentHash,
+    comparisonId: placement.comparisonId ?? null,
     fingerprint,
     acceptanceCriteria: criteria?.criteria ?? DEFAULT_ACCEPTANCE_CRITERIA,
     mcpPolicy,

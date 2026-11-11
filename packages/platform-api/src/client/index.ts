@@ -697,6 +697,13 @@ import {
   GetEvalRunInputSchema,
   CancelEvalRunInputSchema,
   EvalRunOutputSchema,
+  PrepareComparisonInputSchema,
+  StartComparisonInputSchema,
+  GetComparisonInputSchema,
+  CancelComparisonInputSchema,
+  ListComparisonsInputSchema,
+  ComparisonOutputSchema,
+  ListComparisonsOutputSchema,
   ListEvalRunsInputSchema,
   ListEvalRunsOutputSchema,
   type EstimateEvalRunInput,
@@ -706,6 +713,13 @@ import {
   type GetEvalRunInput,
   type CancelEvalRunInput,
   type EvalRunOutput,
+  type PrepareComparisonInput,
+  type StartComparisonInput,
+  type GetComparisonInput,
+  type CancelComparisonInput,
+  type ListComparisonsInput,
+  type ComparisonOutput,
+  type ListComparisonsOutput,
   type ListEvalRunsInput,
   type ListEvalRunsOutput,
   GetEvalRunFailuresInputSchema,
@@ -1174,6 +1188,11 @@ export class Mediforce {
     getRun: (input: GetEvalRunInput) => Promise<EvalRunOutput>;
     listRuns: (input: ListEvalRunsInput) => Promise<ListEvalRunsOutput>;
     cancelRun: (input: CancelEvalRunInput) => Promise<EvalRunOutput>;
+    prepareComparison: (input: PrepareComparisonInput) => Promise<ComparisonOutput>;
+    startComparison: (input: StartComparisonInput) => Promise<ComparisonOutput>;
+    getComparison: (input: GetComparisonInput) => Promise<ComparisonOutput>;
+    listComparisons: (input: ListComparisonsInput) => Promise<ListComparisonsOutput>;
+    cancelComparison: (input: CancelComparisonInput) => Promise<ComparisonOutput>;
     getRunFailures: (input: GetEvalRunFailuresInput) => Promise<GetEvalRunFailuresOutput>;
     /** One trial of an Eval Run with everything its Evaluators read and gave. */
     getTrial: (input: GetEvalTrialInput) => Promise<GetEvalTrialOutput>;
@@ -2845,6 +2864,28 @@ export class Mediforce {
         const { evalRunId } = CancelEvalRunInputSchema.parse(input);
         return this.sendJson('POST', `/api/evaluation/runs/${encodeURIComponent(evalRunId)}/cancel`, undefined,
           EvalRunOutputSchema, 'mediforce.evaluation.cancelRun');
+      },
+      prepareComparison: async (input) => this.sendJson(
+        'POST', '/api/evaluation/comparisons', PrepareComparisonInputSchema.parse(input),
+        ComparisonOutputSchema, 'mediforce.evaluation.prepareComparison',
+      ),
+      startComparison: async (input) => {
+        const { comparisonId, ...body } = StartComparisonInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/comparisons/${encodeURIComponent(comparisonId)}/start`, body,
+          ComparisonOutputSchema, 'mediforce.evaluation.startComparison');
+      },
+      getComparison: async (input) => {
+        const { comparisonId } = GetComparisonInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/comparisons/${encodeURIComponent(comparisonId)}`, ComparisonOutputSchema, 'mediforce.evaluation.getComparison');
+      },
+      listComparisons: async (input) => {
+        const subject = ListComparisonsInputSchema.parse(input);
+        return this.getJson(`/api/evaluation/comparisons${toSearchParams(subject)}`, ListComparisonsOutputSchema, 'mediforce.evaluation.listComparisons');
+      },
+      cancelComparison: async (input) => {
+        const { comparisonId } = CancelComparisonInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/comparisons/${encodeURIComponent(comparisonId)}/cancel`, undefined,
+          ComparisonOutputSchema, 'mediforce.evaluation.cancelComparison');
       },
       getRunFailures: async (input) => {
         const { evalRunId, limit } = GetEvalRunFailuresInputSchema.parse(input);

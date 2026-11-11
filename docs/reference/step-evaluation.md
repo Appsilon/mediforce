@@ -13,7 +13,7 @@ context of use. The design and its reasons are
 Comparisons and learning from reviewed runs — is designed in
 [ADR-0024](../adr/0024-optimisation.md) and being built under epic
 [#1650](https://github.com/Appsilon/mediforce/issues/1650); so far an Eval Run
-can run a [Variant](#variants), from the CLI and API only.
+can run a [Variant](#variants), and a [Comparison](#comparisons) reads Variants against a baseline, from the CLI and API only.
 
 Everything below belongs to one agent Step, keyed by
 `(namespace, workflowName, stepId)` — or to one Agent evaluated on its own (see
@@ -873,6 +873,12 @@ is estimated from that model's registry price, not the step's cost history.
 A run with a Variant is left out of the Eval Runs list and of the subject's
 validation: it assessed another configuration than the subject's. There is no
 UI for Variants yet.
+
+### Comparisons
+
+A **Comparison** (ADR-0024 D4, D5) runs a baseline and one to four Variants on one Eval Dataset version, each an Eval Run with the same frozen Evaluator versions, trials per case, MCP policy and Acceptance Criteria. `POST /api/evaluation/comparisons` (`compare-prepare --variants <file>` with a JSON list of Variants, or `--model <id,…>` for one model Variant each) prepares every run on the baseline's Definition and Eval Dataset versions and sums their budgets, each rounded up to whole cents; `POST /comparisons/:id/start` (`compare-start --confirm-budget`) starts them all on one confirmation of that sum, and refuses any other amount. A Comparison whose runs could not all be prepared alike, or started, is cancelled with them rather than left half-done. The baseline reuses a finished run of the subject as it is when every frozen input and the Fingerprint match — the run named by `baselineEvalRunId` (`--baseline`), refused with what differs when it does not match, or else the newest such run — and then spends nothing; otherwise the Comparison prepares a baseline run of its own. The runs it prepared carry `comparisonId`; a reused baseline does not. `compare-cancel` cancels the Comparison and every run it prepared that has not finished.
+
+`GET /comparisons/:id` (`compare-get`) reports each run's pass rate and Wilson interval per Evaluator, mean agent cost per trial that recorded one and judge cost per scored trial (the report's `judgeCostUsd` is the judges' share of `costUsd`), mean duration, total tokens, and, for each Variant and counted Evaluator, wins, losses and ties against the baseline by case pass rate, a two-sided exact sign test, and `better`, `worse`, `no_clear_difference` (p ≥ 0.05) or `too_few_cases` (under six non-tied cases). When the cases have both dev and holdout splits, each side is called apart too, a side the Evaluator graded no case of as too few cases; a prompt Variant's recommendation reads holdout, a model Variant's every case. A Comparison reads `completed` once every run it prepared has finished, in the list as in `compare-get`; reading it never changes it. There is no UI for Comparisons yet.
 
 ## Acceptance Criteria
 

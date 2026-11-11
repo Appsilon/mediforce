@@ -31,6 +31,7 @@ describe('reviewJudgeVerdict', () => {
       ],
       variant: null,
       variantAgentHash: null,
+      comparisonId: null,
       fingerprint: null,
       acceptanceCriteria: { minPassRate: 1 },
       mcpPolicy: {}, env: {}, estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },

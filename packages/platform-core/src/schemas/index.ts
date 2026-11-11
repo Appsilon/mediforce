@@ -269,6 +269,18 @@ export {
   type EvalRunReport,
   type EvalRunMcpReport,
 } from './eval-run';
+export {
+  EvalComparisonStatusSchema,
+  EvalComparisonSchema,
+  ComparisonScopeSchema,
+  ComparisonCallSchema,
+  ComparisonEvaluatorCallSchema,
+  type EvalComparisonStatus,
+  type EvalComparison,
+  type ComparisonScope,
+  type ComparisonCall,
+  type ComparisonEvaluatorCall,
+} from './eval-comparison';
 
 export {
   QualificationDeviationSchema,

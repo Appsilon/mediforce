@@ -228,6 +228,45 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
       await expect(repo.appendDatasetVersion({ ...base, id: randomUUID(), version: 2, caseIds })).rejects.toThrow();
     });
 
+    it('stores a Comparison, finds the runs it prepared, and moves it only from the expected status', async () => {
+      const dataset = await repo.appendDatasetVersion({
+        ...step, id: randomUUID(), version: 1, caseIds: [randomUUID()], containsProductionData: false,
+        createdBy: 'author-1', createdAt: '2026-11-11T08:00:00.000Z',
+      });
+      const comparison = {
+        ...step,
+        id: randomUUID(),
+        datasetVersionId: dataset.id,
+        trialsPerCase: 2,
+        baselineEvalRunId: randomUUID(),
+        baselineReused: true,
+        status: 'prepared' as const,
+        budgetUsd: 2.5,
+        createdBy: 'author-1',
+        createdAt: '2026-11-11T08:00:00.000Z',
+        startedAt: null,
+        completedAt: null,
+      };
+      await repo.createComparison(comparison);
+      const later = { ...comparison, id: randomUUID(), baselineReused: false, createdAt: '2026-11-11T09:00:00.000Z' };
+      await repo.createComparison(later);
+      await repo.createComparison({ ...comparison, ...agent, id: randomUUID() });
+
+      expect(await repo.getComparison(comparison.id)).toEqual(comparison);
+      expect(await repo.listComparisons(subject(step))).toEqual([later, comparison]);
+
+      const first = { ...storedRun(dataset.id, dataset.caseIds), comparisonId: comparison.id, createdAt: '2026-11-11T08:00:01.000Z' };
+      const second = { ...storedRun(dataset.id, dataset.caseIds), comparisonId: comparison.id, createdAt: '2026-11-11T08:00:02.000Z' };
+      await repo.createEvalRun(second, []);
+      await repo.createEvalRun(first, []);
+      await repo.createEvalRun(storedRun(dataset.id, dataset.caseIds), []);
+      expect(await repo.listEvalRunsOfComparison(comparison.id)).toEqual([first, second]);
+
+      expect(await repo.transitionComparison(comparison.id, 'running', { status: 'completed' })).toBe(false);
+      expect(await repo.transitionComparison(comparison.id, 'prepared', { status: 'running', startedAt: '2026-11-11T08:05:00.000Z' })).toBe(true);
+      expect(await repo.getComparison(comparison.id)).toMatchObject({ status: 'running', startedAt: '2026-11-11T08:05:00.000Z' });
+    });
+
     it('stores an Eval Run with its trials and moves both only from the expected status', async () => {
       const dataset = await repo.appendDatasetVersion({
         ...step, id: randomUUID(), version: 1, caseIds: [randomUUID()], containsProductionData: false,
@@ -246,6 +285,7 @@ function contract(name: string, factory: () => Promise<EvaluationRepository>) {
         evaluators: [{ evaluatorId: randomUUID(), name: 'findings-present', version: 1, kind: 'schema' as const, counted: true }],
         variant: { model: 'anthropic/claude-haiku-4.5', prompt: 'Grade every AE by CTCAE v5.' },
         variantAgentHash: 'a'.repeat(64),
+        comparisonId: null,
         fingerprint: fingerprint('a'),
         acceptanceCriteria: { minPassRate: 0.9, minPassHatK: 0.8 },
         mcpPolicy: { edc: { mode: 'deny' as const } },
@@ -458,6 +498,7 @@ function storedRun(datasetVersionId: string, caseIds: string[]): EvalRun {
     evaluators: [{ evaluatorId: randomUUID(), name: 'findings-present', version: 1, kind: 'schema', counted: true }],
     variant: null,
     variantAgentHash: null,
+    comparisonId: null,
     fingerprint: fingerprint('a'),
     acceptanceCriteria: null,
     mcpPolicy: {},
@@ -510,7 +551,7 @@ describe.skipIf(skipPg)('PostgresEvaluationRepository (parity)', () => {
     await testClient.unsafe(
       `TRUNCATE TABLE "${schemaName}"."evaluation_briefs", "${schemaName}"."evaluators", "${schemaName}"."evaluator_versions", ` +
         `"${schemaName}"."eval_cases", "${schemaName}"."eval_dataset_versions", "${schemaName}"."mcp_eval_policies", ` +
-        `"${schemaName}"."eval_runs", "${schemaName}"."eval_trials", "${schemaName}"."eval_acceptance_criteria", ` +
+        `"${schemaName}"."eval_comparisons", "${schemaName}"."eval_runs", "${schemaName}"."eval_trials", "${schemaName}"."eval_acceptance_criteria", ` +
         `"${schemaName}"."step_qualifications", "${schemaName}"."eval_mcp_recordings"`,
     );
     return new PostgresEvaluationRepository(drizzle(testClient, { schema }));

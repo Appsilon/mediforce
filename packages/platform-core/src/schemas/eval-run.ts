@@ -110,6 +110,8 @@ export const EvalRunSchema = EvaluationOwnerSchema.extend({
   variant: EvalVariantPatchSchema.nullable().default(null),
   /** An Agent's Variant run: the ADR-0029 D2 hash of the patched Agent, which applying the Variant matches against (ADR-0024 D3, D6); null on every other run. */
   variantAgentHash: z.string().regex(/^[0-9a-f]{64}$/).nullable().default(null),
+  /** The Comparison that prepared the run (ADR-0024 D4); null on a run prepared on its own. */
+  comparisonId: z.uuid().nullable().default(null),
   /** The Step's Fingerprint when the run was prepared; null on runs prepared before Fingerprints. */
   fingerprint: StepFingerprintSchema.nullable(),
   /** Frozen at prepare (D10); null when the Step had none, and then the report judges nothing. */
@@ -353,6 +355,8 @@ export const EvalRunReportSchema = z.object({
   /** Every trial's grades, by case and trial. */
   trialResults: z.array(EvalTrialResultSchema),
   costUsd: z.number().nonnegative(),
+  /** The part of `costUsd` the LLM judges spent grading the trials. */
+  judgeCostUsd: z.number().nonnegative().default(0),
   meanCostUsd: z.number().nonnegative().nullable(),
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),

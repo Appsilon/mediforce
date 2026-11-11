@@ -3,6 +3,8 @@ import type {
   AgentDefinitionRepository,
   AgentVersion,
   StepQualification,
+  EvalComparison,
+  EvalComparisonStatus,
   EvalRun,
   EvalRunAcceptance,
   EvalRunStatus,
@@ -194,6 +196,30 @@ export class AuthorizedEvaluationRepository extends AuthorizedScope {
   setEvalRunAcceptance = async (id: string, acceptance: EvalRunAcceptance): Promise<void> => {
     await this.writableRun(id);
     await this.raw.setEvalRunAcceptance(id, acceptance);
+  };
+
+  /** The runs a Comparison prepared; `[]` when the Comparison is not visible. */
+  listEvalRunsOfComparison = async (comparisonId: string): Promise<EvalRun[]> =>
+    (await this.getComparison(comparisonId)) === null ? [] : this.raw.listEvalRunsOfComparison(comparisonId);
+
+  createComparison = async (comparison: EvalComparison): Promise<void> => {
+    this.assertNamespaceWrite(comparison.namespace);
+    await this.raw.createComparison(comparison);
+  };
+
+  getComparison = async (id: string): Promise<EvalComparison | null> => this.visible(await this.raw.getComparison(id));
+
+  listComparisons = async (subject: EvaluationSubject): Promise<EvalComparison[]> =>
+    (await this.canRead(subject)) ? this.raw.listComparisons(subject) : [];
+
+  transitionComparison = async (
+    id: string,
+    from: EvalComparisonStatus,
+    patch: Partial<Pick<EvalComparison, 'status' | 'startedAt' | 'completedAt'>>,
+  ): Promise<boolean> => {
+    const comparison = await this.raw.getComparison(id);
+    this.assertNamespaceWrite(comparison?.namespace);
+    return this.raw.transitionComparison(id, from, patch);
   };
 
   /** A run's trials; `[]` when the run is not visible. */

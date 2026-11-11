@@ -438,7 +438,24 @@ export {
   applyStepVariant,
   isEmptyVariant,
   withAgentVariant,
+  compareToBaseline,
+  recommendationScope,
+  signTestPValue,
+  type CaseSplit,
+  type TrialGrade,
 } from './evaluation/index';
+export {
+  EvalComparisonStatusSchema,
+  EvalComparisonSchema,
+  ComparisonScopeSchema,
+  ComparisonCallSchema,
+  ComparisonEvaluatorCallSchema,
+  type EvalComparisonStatus,
+  type EvalComparison,
+  type ComparisonScope,
+  type ComparisonCall,
+  type ComparisonEvaluatorCall,
+} from './schemas/eval-comparison';
 
 // Types (re-exported from schemas for convenience)
 export type {
