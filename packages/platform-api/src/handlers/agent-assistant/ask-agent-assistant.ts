@@ -1,4 +1,16 @@
-import { DEFAULT_MODEL, AGENT_ASSISTANT_PLATFORM_TOOLS, AGENT_ASSISTANT_PROPOSAL_TOOLS, type AgentAssistantPlatformToolName, type AgentDefinition } from '@mediforce/platform-core';
+import type { z } from 'zod';
+import {
+  DEFAULT_MODEL,
+  AGENT_ASSISTANT_PLATFORM_TOOLS,
+  AGENT_ASSISTANT_PROPOSAL_TOOLS,
+  ProposeAgentMatchToolSchema,
+  ProposeAgentChangeToolSchema,
+  ProposeMcpBindingToolSchema,
+  ProposeNewAgentToolSchema,
+  ProposeRequirementMatrixToolSchema,
+  type AgentAssistantPlatformToolName,
+  type AgentDefinition,
+} from '@mediforce/platform-core';
 import { AgentAssistantProposalViewSchema, type AskAgentAssistantInput, type AskAgentAssistantOutput, type AgentAssistantProgress, type AgentProposalEvidence } from '../../contract/agent-assistant';
 import type { CallerScope } from '../../repositories/index';
 import { assertNamespaceAccess } from '../../auth';
@@ -48,7 +60,7 @@ async function agentEvidence(scope: CallerScope, agent: AgentDefinition): Promis
 
 async function reviewAgentProposal(toolName: string, args: unknown, scope: CallerScope, namespace: string): Promise<ProposalReview> {
   if (toolName === 'propose_requirement_matrix') {
-    const { candidates } = args as { candidates: Array<{ agentId: string }> };
+    const { candidates } = args as z.infer<typeof ProposeRequirementMatrixToolSchema>;
     for (const candidate of candidates) {
       if ((await scope.agentDefinitions.getById(candidate.agentId)) === null) {
         return { ok: false, error: `No agent with id '${candidate.agentId}' is visible to you. Use an id from list_agents.` };
@@ -57,7 +69,7 @@ async function reviewAgentProposal(toolName: string, args: unknown, scope: Calle
     return { ok: true };
   }
   if (toolName === 'propose_new_agent') {
-    const { skills, newSkill } = args as { skills: Array<{ namespace: string; id: string }>; newSkill?: { id: string } };
+    const { skills, newSkill } = args as z.infer<typeof ProposeNewAgentToolSchema>;
     for (const ref of skills) {
       if ((await scope.skills.getById(ref.namespace, ref.id)) === null) {
         return { ok: false, error: `No Skill '${ref.namespace}/${ref.id}' is visible to you. Use search_skill_catalog.` };
@@ -68,11 +80,11 @@ async function reviewAgentProposal(toolName: string, args: unknown, scope: Calle
     }
     return { ok: true };
   }
-  const { agentId } = args as { agentId: string };
+  const { agentId } = args as z.infer<typeof ProposeAgentMatchToolSchema>;
   const agent = await scope.agentDefinitions.getById(agentId);
   if (agent === null) return { ok: false, error: `No agent with id '${agentId}' is visible to you. Use an id from list_agents.` };
   if (toolName === 'propose_agent_change') {
-    const { skill } = args as { skill: { namespace: string; id: string } };
+    const { skill } = args as z.infer<typeof ProposeAgentChangeToolSchema>;
     const found = await scope.skills.getById(skill.namespace, skill.id);
     if (found === null) return { ok: false, error: `No Skill '${skill.namespace}/${skill.id}' is visible to you. Use search_skill_catalog.` };
     if ((agent.skills ?? []).some((ref) => ref.namespace === skill.namespace && ref.id === skill.id)) {
@@ -80,13 +92,19 @@ async function reviewAgentProposal(toolName: string, args: unknown, scope: Calle
     }
   }
   if (toolName === 'propose_mcp_binding') {
-    const { serverId } = args as { serverId: string };
+    const { serverId } = args as z.infer<typeof ProposeMcpBindingToolSchema>;
     if ((await scope.toolCatalog.getById(namespace, serverId)) === null) {
       return { ok: false, error: `No MCP server '${serverId}' is visible to you. Use search_mcp_catalog.` };
     }
   }
   const evidence = await agentEvidence(scope, agent);
   return evidence === undefined ? { ok: true } : { ok: true, evidence };
+}
+
+/** True when every word of `query` appears somewhere in `haystack` — so "pdf extraction" still finds "Extract text from PDF", which a single-substring check would miss. */
+function matchesQuery(haystack: string, query: string): boolean {
+  const text = haystack.toLowerCase();
+  return query.toLowerCase().split(/\s+/).filter((word) => word.length > 0).every((word) => text.includes(word));
 }
 
 function agentSummary(agent: AgentDefinition) {
@@ -128,7 +146,7 @@ export async function askAgentAssistant(
       return agents.map(agentSummary);
     }
     if (toolName === 'read_agent') {
-      const { id } = args as { id: string };
+      const { id } = args as z.infer<typeof AGENT_ASSISTANT_PLATFORM_TOOLS.read_agent>;
       const agent = await scope.agentDefinitions.getById(id);
       if (agent === null) return { error: `No agent with id '${id}' is visible to you.` };
       return {
@@ -140,8 +158,7 @@ export async function askAgentAssistant(
       };
     }
     if (toolName === 'search_skill_catalog') {
-      const { query } = args as { query: string };
-      const q = query.toLowerCase();
+      const { query } = args as z.infer<typeof AGENT_ASSISTANT_PLATFORM_TOOLS.search_skill_catalog>;
       const [ownSkills, publicSkills] = await Promise.all([
         scope.skills.list(input.namespace),
         scope.skills.listPublic(),
@@ -151,7 +168,7 @@ export async function askAgentAssistant(
         const key = `${skill.namespace}/${skill.id}`;
         if (seen.has(key)) return false;
         seen.add(key);
-        return skill.name.toLowerCase().includes(q) || skill.description.toLowerCase().includes(q);
+        return matchesQuery(`${skill.name} ${skill.description}`, query);
       });
       return matches.slice(0, MAX_CATALOG_MATCHES).map((skill) => ({
         namespace: skill.namespace,
@@ -162,11 +179,9 @@ export async function askAgentAssistant(
       }));
     }
     // search_mcp_catalog
-    const { query } = args as { query: string };
-    const q = query.toLowerCase();
+    const { query } = args as z.infer<typeof AGENT_ASSISTANT_PLATFORM_TOOLS.search_mcp_catalog>;
     const entries = await scope.toolCatalog.list(input.namespace);
-    const matches = entries.filter((entry) =>
-      entry.id.toLowerCase().includes(q) || (entry.description ?? '').toLowerCase().includes(q));
+    const matches = entries.filter((entry) => matchesQuery(`${entry.id} ${entry.description ?? ''}`, query));
     return matches.slice(0, MAX_CATALOG_MATCHES).map((entry) => ({
       id: entry.id,
       type: entry.type,

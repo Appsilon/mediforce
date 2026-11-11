@@ -167,6 +167,30 @@ describe('askAgentAssistant', () => {
     expect(await agentDefinitionRepo.listAll()).toHaveLength(1);
   });
 
+  it('search_skill_catalog matches every query word regardless of order, not the query as one literal substring', async () => {
+    const { scope } = buildScope();
+    await scope.skills.create({
+      namespace: 'team-alpha', id: 'pdf-tool', name: 'pdf-tool',
+      description: 'Runs text extraction over PDF documents.', visibility: 'private', contentHash: 'h1',
+      files: [{ path: 'SKILL.md', contents: skillMd('pdf-tool', 'Runs text extraction over PDF documents.') }],
+    });
+
+    const requests = scriptOpenRouter([
+      // Reversed word order versus the stored text — a single-substring check would miss this.
+      () => ({ toolCalls: [{ name: 'search_skill_catalog', arguments: { query: 'extraction pdf' } }] }),
+      () => ({ content: 'pdf-tool already does this.' }),
+    ]);
+
+    await askAgentAssistant(
+      { namespace: 'team-alpha', messages: [{ role: 'user', content: 'Anything that extracts text from a PDF?' }] },
+      scope,
+    );
+
+    expect(lastToolResult(requests[1]!)).toEqual([
+      { namespace: 'team-alpha', id: 'pdf-tool', name: 'pdf-tool', description: 'Runs text extraction over PDF documents.', visibility: 'private' },
+    ]);
+  });
+
   it('proposes adding an existing Skill to a close-fit agent', async () => {
     const { scope } = buildScope();
     const { agent } = await createAgent({

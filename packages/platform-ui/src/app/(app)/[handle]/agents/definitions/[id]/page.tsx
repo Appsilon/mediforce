@@ -5,7 +5,7 @@ import * as Tabs from '@radix-ui/react-tabs';
 import { useState, useEffect } from 'react';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Trash2 } from 'lucide-react';
 import { mediforce, ApiError } from '@/lib/mediforce';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,8 @@ import type { AgentOutputSchema, AgentSkillRef } from '@mediforce/platform-core'
 import { AgentMcpSection } from '@/components/agents/agent-mcp-section';
 import { AgentSkillsSection } from '@/components/agents/agent-skills-section';
 import { AGENT_ICON_OPTIONS, AgentImageField, AgentOutputSchemaField, AgentRuntimeField, RecognitionLabel } from '@/components/agents/agent-form-parts';
+import { DeleteAgentDialog } from '@/components/agents/delete-agent-dialog';
+import { secondaryButtonClass } from '@/components/ui/button-styles';
 import { AgentEvaluation } from '@/components/evaluation/agent-evaluation';
 import { EVALUATION_QUERY_PARAMS } from '@/components/evaluation/evaluation-tab';
 
@@ -70,6 +72,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const [agentNamespace, setAgentNamespace] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     mediforce.agents
@@ -311,18 +314,28 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
 
           {/* 8. Save */}
           <div className="flex flex-col items-start gap-1.5 pt-2 pb-6">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!canSave}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                'bg-primary text-primary-foreground hover:bg-primary/90',
-                !canSave && 'opacity-50 cursor-not-allowed',
-              )}
-            >
-              {saving ? 'Saving…' : 'Save changes'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={!canSave}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-colors',
+                  'bg-primary text-primary-foreground hover:bg-primary/90',
+                  !canSave && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                {saving ? 'Saving…' : 'Save changes'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                className={cn(secondaryButtonClass, 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive')}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </button>
+            </div>
             {error !== null && (
               <p className="text-sm text-destructive" role="alert">
                 {error}
@@ -331,6 +344,9 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
           </div>
 
         </div>
+      )}
+      {deleteOpen && (
+        <DeleteAgentDialog handle={handle} agentId={id} agentName={name} onClose={() => setDeleteOpen(false)} />
       )}
     </div>
   );

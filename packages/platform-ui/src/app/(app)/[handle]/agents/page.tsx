@@ -293,11 +293,10 @@ function agentDefinitionToEntry(def: AgentDefinition, namespace: string): AgentE
   };
 }
 
-function AgentCatalog({ handle, scanningId, matchedId, refreshKey }: { handle: string; scanningId: string | null; matchedId: string | null; refreshKey: number }) {
+function AgentCatalog({ handle, scanningId, matchedId, refreshKey, query }: { handle: string; scanningId: string | null; matchedId: string | null; refreshKey: number; query: string }) {
   const [agents, setAgents] = useState<AgentEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
 
   useEffect(() => {
     mediforce.agents
@@ -320,15 +319,10 @@ function AgentCatalog({ handle, scanningId, matchedId, refreshKey }: { handle: s
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="relative">
-          <div className="h-9 rounded-md bg-muted animate-pulse" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-tour="agents-grid">
-          <AgentSkeletonCard />
-          <AgentSkeletonCard />
-          <AgentSkeletonCard />
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-tour="agents-grid">
+        <AgentSkeletonCard />
+        <AgentSkeletonCard />
+        <AgentSkeletonCard />
       </div>
     );
   }
@@ -345,9 +339,68 @@ function AgentCatalog({ handle, scanningId, matchedId, refreshKey }: { handle: s
     return <p className="text-sm text-muted-foreground">No agents available</p>;
   }
 
+  if (filtered.length === 0) {
+    return <p className="text-sm text-muted-foreground py-8 text-center">No agents match your search.</p>;
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="relative w-full lg:w-1/3" data-tour="agents-search">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-tour="agents-grid">
+      {filtered.map((agent) => (
+        <AgentCard
+          key={agent.definitionId ?? agent.name}
+          agent={agent}
+          handle={handle}
+          scanning={agent.definitionId !== undefined && agent.definitionId === scanningId}
+          matched={agent.definitionId !== undefined && agent.definitionId === matchedId}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default function AgentsPage() {
+  const { handle } = useParams<{ handle: string }>();
+  const [assistantOpen, setAssistantOpen] = useState(true);
+  const [assistantWide, setAssistantWide] = useState(false);
+  const [assistantActivity, setAssistantActivity] = useState<{ scanningId: string | null; matchedId: string | null }>({ scanningId: null, matchedId: null });
+  const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
+  const [query, setQuery] = useState('');
+
+  return (
+    <div className="flex h-full flex-col gap-4 p-6">
+      <div className="shrink-0 flex items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-2xl font-bold" data-tour="agents-header">Custom Agents</h1>
+            <ConceptPopover label="What is an agent?">
+              <p>
+                <strong>An agent is a reusable configuration a workflow step calls by id</strong> — a system prompt
+                plus the MCP servers that step is allowed to reach. One agent can power many steps, and agents are
+                versioned: saving a change to its runtime, image, model, system prompt, output schema, MCP servers or Skills records a new
+                version, and a step that references the agent uses its current one.
+              </p>
+              <p>
+                A run uses the agent&apos;s foundation model unless the workflow step that calls it names its own.
+              </p>
+            </ConceptPopover>
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            Reusable agent configurations that workflow steps call by id
+          </p>
+        </div>
+        <Link
+          href={`/${handle}/agents/new`}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium',
+            'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
+          )}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          New Agent
+        </Link>
+      </div>
+
+      <div className="shrink-0 relative w-full lg:w-1/3" data-tour="agents-search">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <input
           type="text"
@@ -358,77 +411,28 @@ function AgentCatalog({ handle, scanningId, matchedId, refreshKey }: { handle: s
         />
       </div>
 
-      {filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">No agents match your search.</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-tour="agents-grid">
-          {filtered.map((agent) => (
-            <AgentCard
-              key={agent.definitionId ?? agent.name}
-              agent={agent}
-              handle={handle}
-              scanning={agent.definitionId !== undefined && agent.definitionId === scanningId}
-              matched={agent.definitionId !== undefined && agent.definitionId === matchedId}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function AgentsPage() {
-  const { handle } = useParams<{ handle: string }>();
-  const [assistantWide, setAssistantWide] = useState(false);
-  const [assistantActivity, setAssistantActivity] = useState<{ scanningId: string | null; matchedId: string | null }>({ scanningId: null, matchedId: null });
-  const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
-
-  return (
-    <div className={cn('grid gap-4 p-6 lg:items-start', assistantWide ? 'lg:grid-cols-[1fr_640px]' : 'lg:grid-cols-[1fr_380px]')}>
-      <div className="space-y-6 min-w-0">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="text-2xl font-bold" data-tour="agents-header">Custom Agents</h1>
-              <ConceptPopover label="What is an agent?">
-                <p>
-                  <strong>An agent is a reusable configuration a workflow step calls by id</strong> — a system prompt
-                  plus the MCP servers that step is allowed to reach. One agent can power many steps, and agents are
-                  versioned: saving a change to its runtime, image, model, system prompt, output schema, MCP servers or Skills records a new
-                  version, and a step that references the agent uses its current one.
-                </p>
-                <p>
-                  A run uses the agent&apos;s foundation model unless the workflow step that calls it names its own.
-                </p>
-              </ConceptPopover>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Reusable agent configurations that workflow steps call by id
-            </p>
-          </div>
-          <Link
-            href={`/${handle}/agents/new`}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium',
-              'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
-            )}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New Agent
-          </Link>
+      <div className="flex flex-1 min-h-0 flex-col gap-4 lg:flex-row lg:items-stretch">
+        <div className="flex-1 min-w-0 overflow-y-auto">
+          <AgentCatalog handle={handle} scanningId={assistantActivity.scanningId} matchedId={assistantActivity.matchedId} refreshKey={catalogRefreshKey} query={query} />
         </div>
 
-        <AgentCatalog handle={handle} scanningId={assistantActivity.scanningId} matchedId={assistantActivity.matchedId} refreshKey={catalogRefreshKey} />
-      </div>
-
-      <div className="h-[calc(100dvh-8rem)] lg:sticky lg:top-6">
-        <AgentAssistantPanel
-          namespace={handle}
-          wide={assistantWide}
-          onToggleWide={() => setAssistantWide((current) => !current)}
-          onActivityChange={setAssistantActivity}
-          onAccepted={() => setCatalogRefreshKey((current) => current + 1)}
-        />
+        <div
+          className={cn(
+            'shrink-0',
+            assistantOpen ? 'h-[32rem] lg:h-auto' : 'h-auto',
+            !assistantOpen ? 'lg:w-10' : assistantWide ? 'lg:w-[640px]' : 'lg:w-80',
+          )}
+        >
+          <AgentAssistantPanel
+            namespace={handle}
+            open={assistantOpen}
+            onToggleOpen={() => setAssistantOpen((current) => !current)}
+            wide={assistantWide}
+            onToggleWide={() => setAssistantWide((current) => !current)}
+            onActivityChange={setAssistantActivity}
+            onAccepted={() => setCatalogRefreshKey((current) => current + 1)}
+          />
+        </div>
       </div>
     </div>
   );

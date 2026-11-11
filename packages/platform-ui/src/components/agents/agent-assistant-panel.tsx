@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Bot, Check, Loader2, Maximize2, Minimize2, Send, Settings, Sparkles, User, X } from 'lucide-react';
+import { Bot, Check, ChevronLeft, ChevronRight, Loader2, Maximize2, Minimize2, Send, Settings, Sparkles, Square, User, X } from 'lucide-react';
 import Link from 'next/link';
 import { DEFAULT_MODEL } from '@mediforce/platform-core';
 import type { AgentAssistantPlatformToolName, AgentAssistantProposalToolName, WorkflowDefinition } from '@mediforce/platform-core';
@@ -9,11 +9,14 @@ import type { AgentAssistantProgress, AgentProposalEvidence, AskAgentAssistantOu
 import { mediforce } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
+import { formatDuration } from '@/lib/format';
+import { errorMessage } from '@/lib/error-message';
 import { ModelPicker } from '@/components/workflows/workflow-editor/model-picker';
 import { selectBase } from '@/components/workflows/workflow-editor/step-editor-fields';
 import { selectAgentPatch } from '@/components/workflows/workflow-editor-utils';
 import { buildRegisterBody } from '@/lib/workflow-save-utils';
 import { VALIDATION_STATUS } from '@/components/evaluation/validation-status';
+import { MarkdownPresentation } from '@/components/tasks/markdown-presentation';
 
 type Proposal = AskAgentAssistantOutput['proposals'][number];
 
@@ -29,6 +32,8 @@ interface PanelMessage {
   readonly proposals?: {
     proposal: Proposal;
     status: 'pending' | 'accepted' | 'rejected';
+    busy?: boolean;
+    error?: string;
     createdAgentId?: string;
     draft?: { name: string; description: string; systemPrompt: string };
   }[];
@@ -46,6 +51,9 @@ const TOOL_LABELS: Record<AgentAssistantPlatformToolName | AgentAssistantProposa
   propose_mcp_binding: 'Proposing an MCP server',
   propose_requirement_matrix: 'Scoring candidates against requirements',
 };
+
+// Rotates while the turn has no tool call yet, matching the Workflow Assistant pane's status line.
+const THINKING_PHASES = ['Thinking…', 'Reading what you asked for…', 'Searching the catalog…'] as const;
 
 const VERDICT_GLYPH: Record<'y' | 'p' | 'n', { label: string; className: string }> = {
   y: { label: '✓', className: 'text-green-700 dark:text-green-400' },
@@ -91,38 +99,54 @@ interface AgentStepOption {
 function UseInWorkflowStep({ namespace, agentId }: { namespace: string; agentId: string }) {
   const [open, setOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
+  const [binding, setBinding] = React.useState(false);
   const [options, setOptions] = React.useState<AgentStepOption[]>([]);
   const [selected, setSelected] = React.useState('');
   const [bound, setBound] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   async function reveal() {
     setOpen(true);
     if (options.length > 0 || loading) return;
     setLoading(true);
-    const { definitions } = await mediforce.workflows.list({ namespace });
-    const found: AgentStepOption[] = [];
-    for (const group of definitions) {
-      if (group.definition === null) continue;
-      for (const step of group.definition.steps) {
-        if (step.executor === 'agent') {
-          found.push({ key: `${group.name}:${step.id}`, label: `${group.name} — ${step.name}`, definition: group.definition, stepId: step.id });
+    setError(null);
+    try {
+      const { definitions } = await mediforce.workflows.list({ namespace });
+      const found: AgentStepOption[] = [];
+      for (const group of definitions) {
+        if (group.definition === null) continue;
+        for (const step of group.definition.steps) {
+          if (step.executor === 'agent') {
+            found.push({ key: `${group.name}:${step.id}`, label: `${group.name} — ${step.name}`, definition: group.definition, stepId: step.id });
+          }
         }
       }
+      setOptions(found);
+    } catch (err) {
+      setError(errorMessage(err, 'Failed to load workflow steps.'));
+    } finally {
+      setLoading(false);
     }
-    setOptions(found);
-    setLoading(false);
   }
 
   async function bind() {
     const target = options.find((option) => option.key === selected);
     if (target === undefined) return;
-    const { agent } = await mediforce.agents.get({ id: agentId });
-    const step = target.definition.steps.find((candidate) => candidate.id === target.stepId);
-    if (step === undefined) return;
-    const patch = selectAgentPatch(step, agent, DEFAULT_MODEL);
-    const steps = target.definition.steps.map((candidate) => candidate.id === target.stepId ? { ...candidate, ...patch } : candidate);
-    await mediforce.workflows.register(buildRegisterBody(target.definition, { steps }), { namespace });
-    setBound(target.label);
+    setBinding(true);
+    setError(null);
+    try {
+      const { agent } = await mediforce.agents.get({ id: agentId });
+      const step = target.definition.steps.find((candidate) => candidate.id === target.stepId);
+      if (step === undefined) return;
+      const patch = selectAgentPatch(step, agent, DEFAULT_MODEL);
+      const steps = target.definition.steps.map((candidate) => candidate.id === target.stepId ? { ...candidate, ...patch } : candidate);
+      await mediforce.workflows.register(buildRegisterBody(target.definition, { steps }), { namespace });
+      setBound(target.label);
+    } catch (err) {
+      setError(errorMessage(err, 'Failed to bind the step.'));
+    } finally {
+      setBinding(false);
+    }
   }
 
   if (bound !== null) {
@@ -142,9 +166,10 @@ function UseInWorkflowStep({ namespace, agentId }: { namespace: string; agentId:
         <option value="">{loading ? 'Loading steps…' : 'Choose a step…'}</option>
         {options.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
       </select>
-      <button type="button" className="rounded-md bg-primary px-2 py-1 text-primary-foreground disabled:opacity-50" disabled={selected === ''} onClick={() => void bind()}>
-        Bind
+      <button type="button" className="rounded-md bg-primary px-2 py-1 text-primary-foreground disabled:opacity-50" disabled={selected === '' || binding} onClick={() => void bind()}>
+        {binding ? 'Binding…' : 'Bind'}
       </button>
+      {error !== null && <span className="text-destructive">{error}</span>}
     </div>
   );
 }
@@ -173,8 +198,12 @@ function agentIdFromEvent(tool: string, args: unknown): string | undefined {
 
 /** The agent its final proposal names, for the catalog grid to keep highlighted once the turn ends. */
 function matchedAgentId(proposals: Proposal[]): string | null {
-  const proposal = proposals.find((candidate) => candidate.tool === 'propose_agent_match' || candidate.tool === 'propose_agent_change');
-  return proposal === undefined ? null : (proposal.arguments as { agentId: string }).agentId;
+  for (const proposal of proposals) {
+    if (proposal.tool === 'propose_agent_match' || proposal.tool === 'propose_agent_change') {
+      return proposal.arguments.agentId;
+    }
+  }
+  return null;
 }
 
 /**
@@ -182,8 +211,12 @@ function matchedAgentId(proposals: Proposal[]): string | null {
  * searches on its own; everything it would change arrives as a proposal card
  * the person accepts — the same create/update a person's own form makes.
  */
-export function AgentAssistantPanel({ namespace, wide, onToggleWide, onActivityChange, onAccepted }: {
+export function AgentAssistantPanel({ namespace, open, onToggleOpen, wide, onToggleWide, onActivityChange, onAccepted }: {
   namespace: string;
+  /** Whether the pane is expanded — collapsed, it shows as a thin rail, same as the Workflow Assistant. */
+  open: boolean;
+  onToggleOpen: () => void;
+  /** Whether the open pane takes the wider column width — irrelevant while collapsed. */
   wide: boolean;
   onToggleWide: () => void;
   /** Which agent card to glow as "scanning", and which to keep highlighted as the match, while this turn runs. */
@@ -195,13 +228,33 @@ export function AgentAssistantPanel({ namespace, wide, onToggleWide, onActivityC
   const [pending, setPending] = React.useState(false);
   const [steps, setSteps] = React.useState<ActivityStep[]>([]);
   const [error, setError] = React.useState<string | null>(null);
+  const [phase, setPhase] = React.useState(0);
+  const [elapsed, setElapsed] = React.useState(0);
   const [assistantModel, setAssistantModel] = React.useState<string | undefined>(undefined);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const abortRef = React.useRef<AbortController | null>(null);
 
   React.useEffect(() => {
     scrollRef.current?.scrollTo?.({ top: scrollRef.current.scrollHeight });
   }, [messages.length, pending]);
+
+  // Advance the status label and the elapsed counter while a turn is in flight.
+  React.useEffect(() => {
+    if (!pending) return;
+    setPhase(0);
+    setElapsed(0);
+    const started = Date.now();
+    const timer = setInterval(() => {
+      setElapsed(Math.round((Date.now() - started) / 1000));
+      setPhase((current) => Math.min(current + 1, THINKING_PHASES.length - 1));
+    }, 2500);
+    return () => clearInterval(timer);
+  }, [pending]);
+
+  function haltAssistant() {
+    abortRef.current?.abort();
+  }
 
   async function send(message: string) {
     const content = message.trim();
@@ -214,12 +267,15 @@ export function AgentAssistantPanel({ namespace, wide, onToggleWide, onActivityC
     let turnSteps: ActivityStep[] = [];
     setSteps(turnSteps);
     onActivityChange?.({ scanningId: null, matchedId: null });
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const result = await mediforce.agents.askAssistant({
         namespace,
         messages: thread.map((entry) => ({ role: entry.role, content: entry.content })),
         ...(assistantModel === undefined ? {} : { model: assistantModel }),
       }, {
+        signal: controller.signal,
         onProgress: (event: AgentAssistantProgress) => {
           if (event.type !== 'tool') return;
           const existing = turnSteps.find((step) => step.callId === event.callId);
@@ -240,9 +296,15 @@ export function AgentAssistantPanel({ namespace, wide, onToggleWide, onActivityC
       }]);
       onActivityChange?.({ scanningId: null, matchedId: matchedAgentId(result.proposals) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'The assistant did not answer.');
+      // Halted on purpose: said in the thread rather than as an error, same as the Workflow Assistant pane.
+      if (controller.signal.aborted) {
+        setMessages([...thread, { role: 'assistant', content: 'Stopped. Nothing was created or changed.' }]);
+      } else {
+        setError(errorMessage(err, 'The assistant did not answer.'));
+      }
       onActivityChange?.({ scanningId: null, matchedId: null });
     } finally {
+      abortRef.current = null;
       setPending(false);
     }
   }
@@ -254,21 +316,36 @@ export function AgentAssistantPanel({ namespace, wide, onToggleWide, onActivityC
     }));
   }
 
+  /** Runs an accept action with a busy flag and surfaces a failure on the card instead of leaving it silently stuck. */
+  async function runAccept(messageIndex: number, proposalIndex: number, action: () => Promise<Partial<Omit<NonNullable<PanelMessage['proposals']>[number], 'proposal'>>>) {
+    setProposalState(messageIndex, proposalIndex, { busy: true, error: undefined });
+    try {
+      const patch = await action();
+      setProposalState(messageIndex, proposalIndex, { ...patch, status: 'accepted', busy: false });
+    } catch (err) {
+      setProposalState(messageIndex, proposalIndex, { busy: false, error: errorMessage(err, 'Failed to accept this proposal.') });
+    }
+  }
+
   async function acceptChange(messageIndex: number, proposalIndex: number, proposal: Extract<Proposal, { tool: 'propose_agent_change' }>) {
-    const { agent } = await mediforce.agents.get({ id: proposal.arguments.agentId });
-    await mediforce.agents.update({ id: agent.id }, { skills: [...(agent.skills ?? []), proposal.arguments.skill] });
-    setProposalState(messageIndex, proposalIndex, { status: 'accepted' });
-    onAccepted?.();
+    await runAccept(messageIndex, proposalIndex, async () => {
+      const { agent } = await mediforce.agents.get({ id: proposal.arguments.agentId });
+      await mediforce.agents.update({ id: agent.id }, { skills: [...(agent.skills ?? []), proposal.arguments.skill] });
+      onAccepted?.();
+      return {};
+    });
   }
 
   async function acceptMcpBinding(messageIndex: number, proposalIndex: number, proposal: Extract<Proposal, { tool: 'propose_mcp_binding' }>) {
-    const { entry } = await mediforce.toolCatalog.get({ namespace, id: proposal.arguments.serverId });
-    await mediforce.agents.upsertMcpBinding({
-      id: proposal.arguments.agentId,
-      name: proposal.arguments.serverId,
-      binding: { type: entry.type, catalogId: entry.id, status: 'pending' },
+    await runAccept(messageIndex, proposalIndex, async () => {
+      const { entry } = await mediforce.toolCatalog.get({ namespace, id: proposal.arguments.serverId });
+      await mediforce.agents.upsertMcpBinding({
+        id: proposal.arguments.agentId,
+        name: proposal.arguments.serverId,
+        binding: { type: entry.type, catalogId: entry.id, status: 'pending' },
+      });
+      return {};
     });
-    setProposalState(messageIndex, proposalIndex, { status: 'accepted' });
   }
 
   async function acceptNewAgent(
@@ -277,21 +354,43 @@ export function AgentAssistantPanel({ namespace, wide, onToggleWide, onActivityC
     proposal: Extract<Proposal, { tool: 'propose_new_agent' }>,
     draft: { name: string; description: string; systemPrompt: string } | undefined,
   ) {
-    const { newSkill, skills, ...agentFields } = proposal.arguments;
-    const fullSkills = [...skills];
-    if (newSkill !== undefined) {
-      const { skill } = await mediforce.skills.create({
-        namespace,
-        visibility: 'private',
-        files: [{ path: 'SKILL.md', contents: skillManifest(newSkill.id, newSkill.description, newSkill.body) }],
+    await runAccept(messageIndex, proposalIndex, async () => {
+      const { newSkill, skills, ...agentFields } = proposal.arguments;
+      const fullSkills = [...skills];
+      if (newSkill !== undefined) {
+        const existing = await mediforce.skills.get({ namespace, id: newSkill.id }).catch(() => null);
+        const skill = existing?.skill ?? (await mediforce.skills.create({
+          namespace,
+          visibility: 'private',
+          files: [{ path: 'SKILL.md', contents: skillManifest(newSkill.id, newSkill.description, newSkill.body) }],
+        })).skill;
+        fullSkills.push({ namespace: skill.namespace, id: skill.id });
+      }
+      const { agent } = await mediforce.agents.create({
+        ...agentFields, ...draft, namespace, visibility: 'private', skills: fullSkills,
       });
-      fullSkills.push({ namespace: skill.namespace, id: skill.id });
-    }
-    const { agent } = await mediforce.agents.create({
-      ...agentFields, ...draft, namespace, visibility: 'private', skills: fullSkills,
+      onAccepted?.();
+      return { createdAgentId: agent.id };
     });
-    setProposalState(messageIndex, proposalIndex, { status: 'accepted', createdAgentId: agent.id });
-    onAccepted?.();
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={onToggleOpen}
+        className="flex h-full w-10 shrink-0 flex-col items-center justify-between rounded-xl border bg-card py-4 text-muted-foreground shadow-lg transition-colors hover:bg-muted hover:text-foreground"
+        title="Expand Agent Assistant"
+        aria-label="Expand Agent Assistant"
+        data-testid="agent-assistant-rail"
+      >
+        <Sparkles className="h-4 w-4 shrink-0" />
+        <span className="text-[11px] font-semibold tracking-wide [writing-mode:vertical-rl] rotate-180 select-none">
+          Agent Assistant
+        </span>
+        {pending ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <ChevronLeft className="h-4 w-4 shrink-0" />}
+      </button>
+    );
   }
 
   return (
@@ -304,6 +403,16 @@ export function AgentAssistantPanel({ namespace, wide, onToggleWide, onActivityC
         <div className="flex items-center gap-1">
           <button
             type="button"
+            onClick={() => setSettingsOpen((current) => !current)}
+            className={cn('rounded-md p-1 transition-colors hover:bg-muted', settingsOpen ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}
+            title="Assistant settings"
+            aria-label="Assistant settings"
+            aria-expanded={settingsOpen}
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
             onClick={onToggleWide}
             className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             title={wide ? 'Narrow the panel' : 'Widen the panel'}
@@ -313,13 +422,12 @@ export function AgentAssistantPanel({ namespace, wide, onToggleWide, onActivityC
           </button>
           <button
             type="button"
-            onClick={() => setSettingsOpen((current) => !current)}
-            className={cn('rounded-md p-1 transition-colors hover:bg-muted', settingsOpen ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}
-            title="Assistant settings"
-            aria-label="Assistant settings"
-            aria-expanded={settingsOpen}
+            onClick={onToggleOpen}
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            title="Collapse Agent Assistant"
+            aria-label="Collapse Agent Assistant"
           >
-            <Settings className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -365,12 +473,13 @@ export function AgentAssistantPanel({ namespace, wide, onToggleWide, onActivityC
                 </details>
               )}
               {message.content !== '' && (
-                <div className={cn('rounded-lg px-3 py-2 break-words whitespace-pre-wrap', message.role === 'user' ? 'bg-primary/10' : 'bg-muted')}>
-                  {message.content}
+                <div className={cn('rounded-lg px-3 py-2 break-words', message.role === 'user' ? 'bg-primary/10 whitespace-pre-wrap' : 'bg-muted')}>
+                  {/* The model writes markdown; what the person typed is left as plain text, since their newlines are all the structure it has. */}
+                  {message.role === 'user' ? message.content : <MarkdownPresentation content={message.content} />}
                 </div>
               )}
               {message.proposals?.map((state, proposalIndex) => {
-                const { proposal, status, createdAgentId, draft } = state;
+                const { proposal, status, busy, error: proposalError, createdAgentId, draft } = state;
                 if (proposal.tool === 'propose_requirement_matrix') {
                   const { requirements, candidates } = proposal.arguments;
                   return (
@@ -432,14 +541,17 @@ export function AgentAssistantPanel({ namespace, wide, onToggleWide, onActivityC
                         <span className="mt-1.5 inline-flex items-center gap-1 text-muted-foreground"><X className="h-3 w-3" />Rejected</span>
                       )}
                       {status === 'pending' && (
-                        <div className="mt-1.5 flex gap-1.5">
-                          <button type="button" className="rounded-md bg-primary px-2 py-1 text-primary-foreground" onClick={() => void acceptChange(index, proposalIndex, proposal)}>
-                            Accept
-                          </button>
-                          <button type="button" className="rounded-md border px-2 py-1" onClick={() => setProposalState(index, proposalIndex, { status: 'rejected' })}>
-                            Reject
-                          </button>
-                        </div>
+                        <>
+                          {proposalError !== undefined && <p className="mt-1.5 text-destructive">{proposalError}</p>}
+                          <div className="mt-1.5 flex gap-1.5">
+                            <button type="button" disabled={busy === true} className="rounded-md bg-primary px-2 py-1 text-primary-foreground disabled:opacity-50" onClick={() => void acceptChange(index, proposalIndex, proposal)}>
+                              {busy === true ? 'Accepting…' : 'Accept'}
+                            </button>
+                            <button type="button" disabled={busy === true} className="rounded-md border px-2 py-1 disabled:opacity-50" onClick={() => setProposalState(index, proposalIndex, { status: 'rejected' })}>
+                              Reject
+                            </button>
+                          </div>
+                        </>
                       )}
                     </div>
                   );
@@ -456,14 +568,17 @@ export function AgentAssistantPanel({ namespace, wide, onToggleWide, onActivityC
                         <span className="mt-1.5 inline-flex items-center gap-1 text-muted-foreground"><X className="h-3 w-3" />Rejected</span>
                       )}
                       {status === 'pending' && (
-                        <div className="mt-1.5 flex gap-1.5">
-                          <button type="button" className="rounded-md bg-primary px-2 py-1 text-primary-foreground" onClick={() => void acceptMcpBinding(index, proposalIndex, proposal)}>
-                            Submit for approval
-                          </button>
-                          <button type="button" className="rounded-md border px-2 py-1" onClick={() => setProposalState(index, proposalIndex, { status: 'rejected' })}>
-                            Reject
-                          </button>
-                        </div>
+                        <>
+                          {proposalError !== undefined && <p className="mt-1.5 text-destructive">{proposalError}</p>}
+                          <div className="mt-1.5 flex gap-1.5">
+                            <button type="button" disabled={busy === true} className="rounded-md bg-primary px-2 py-1 text-primary-foreground disabled:opacity-50" onClick={() => void acceptMcpBinding(index, proposalIndex, proposal)}>
+                              {busy === true ? 'Submitting…' : 'Submit for approval'}
+                            </button>
+                            <button type="button" disabled={busy === true} className="rounded-md border px-2 py-1 disabled:opacity-50" onClick={() => setProposalState(index, proposalIndex, { status: 'rejected' })}>
+                              Reject
+                            </button>
+                          </div>
+                        </>
                       )}
                     </div>
                   );
@@ -533,25 +648,29 @@ export function AgentAssistantPanel({ namespace, wide, onToggleWide, onActivityC
                       <span className="mt-1.5 inline-flex items-center gap-1 text-muted-foreground"><X className="h-3 w-3" />Rejected</span>
                     )}
                     {status === 'pending' && (
-                      <div className="mt-1.5 flex gap-1.5">
-                        <button type="button" className="rounded-md bg-primary px-2 py-1 text-primary-foreground" onClick={() => void acceptNewAgent(index, proposalIndex, proposal, draft)}>
-                          Create draft agent
-                        </button>
-                        <button
-                          type="button"
-                          className="rounded-md border px-2 py-1"
-                          onClick={() => setProposalState(index, proposalIndex, {
-                            draft: draft === undefined
-                              ? { name: proposal.arguments.name, description: proposal.arguments.description, systemPrompt: proposal.arguments.systemPrompt }
-                              : undefined,
-                          })}
-                        >
-                          {draft === undefined ? 'Edit' : 'Cancel edit'}
-                        </button>
-                        <button type="button" className="rounded-md border px-2 py-1" onClick={() => setProposalState(index, proposalIndex, { status: 'rejected' })}>
-                          Reject
-                        </button>
-                      </div>
+                      <>
+                        {proposalError !== undefined && <p className="mt-1.5 text-destructive">{proposalError}</p>}
+                        <div className="mt-1.5 flex gap-1.5">
+                          <button type="button" disabled={busy === true} className="rounded-md bg-primary px-2 py-1 text-primary-foreground disabled:opacity-50" onClick={() => void acceptNewAgent(index, proposalIndex, proposal, draft)}>
+                            {busy === true ? 'Creating…' : 'Create draft agent'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy === true}
+                            className="rounded-md border px-2 py-1 disabled:opacity-50"
+                            onClick={() => setProposalState(index, proposalIndex, {
+                              draft: draft === undefined
+                                ? { name: proposal.arguments.name, description: proposal.arguments.description, systemPrompt: proposal.arguments.systemPrompt }
+                                : undefined,
+                            })}
+                          >
+                            {draft === undefined ? 'Edit' : 'Cancel edit'}
+                          </button>
+                          <button type="button" disabled={busy === true} className="rounded-md border px-2 py-1 disabled:opacity-50" onClick={() => setProposalState(index, proposalIndex, { status: 'rejected' })}>
+                            Reject
+                          </button>
+                        </div>
+                      </>
                     )}
                   </div>
                 );
@@ -560,9 +679,23 @@ export function AgentAssistantPanel({ namespace, wide, onToggleWide, onActivityC
           </div>
         ))}
         {pending && (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="agent-assistant-activity">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            {steps.length === 0 ? 'Thinking…' : 'Deciding the next step…'}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="agent-assistant-activity">
+            <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+            <span className="min-w-0 flex-1 truncate">
+              {steps.length === 0 ? THINKING_PHASES[phase] ?? THINKING_PHASES[0] : 'Deciding the next step…'}
+            </span>
+            {elapsed > 0 && (
+              <span className="shrink-0 tabular-nums text-muted-foreground/70">{formatDuration(elapsed * 1000)}</span>
+            )}
+            <button
+              type="button"
+              onClick={haltAssistant}
+              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors hover:bg-muted hover:text-foreground"
+              title="Stop the assistant"
+              aria-label="Stop the assistant"
+            >
+              <Square className="h-2 w-2 fill-current" />
+            </button>
           </div>
         )}
         {error !== null && <p className="text-xs text-destructive">{error}</p>}

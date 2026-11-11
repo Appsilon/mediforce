@@ -313,6 +313,7 @@ export {
   AGENT_ASSISTANT_PROPOSAL_TOOLS,
   ProposeAgentMatchToolSchema,
   ProposeAgentChangeToolSchema,
+  ProposeMcpBindingToolSchema,
   ProposeNewAgentToolSchema,
   ProposeRequirementMatrixToolSchema,
   AgentAssistantProposalSchema,
