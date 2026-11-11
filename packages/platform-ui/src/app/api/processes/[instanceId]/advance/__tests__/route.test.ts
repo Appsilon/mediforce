@@ -84,7 +84,6 @@ describe('advance route', () => {
       mockWorkflowStep,
       { studyId: 'S1' },
       'user-1',
-      undefined,
       { budgetUserId: null },
     );
   });
@@ -105,7 +104,7 @@ describe('advance route', () => {
 
     await POST(req, { params: Promise.resolve({ instanceId: 'inst-001' }) });
 
-    const options = mockExecuteAgentStep.mock.calls[0][6];
+    const options = mockExecuteAgentStep.mock.calls[0][5];
     expect(options).toEqual({ budgetUserId: 'member-1' });
   });
 

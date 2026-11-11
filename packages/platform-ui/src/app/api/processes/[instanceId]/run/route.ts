@@ -851,8 +851,7 @@ export async function POST(
                   currentStep,
                   appContext,
                   triggeredBy ?? 'auto-runner',
-                  stranded.id,
-                  { reapTimedOut: true, budgetUserId },
+                  { stepExecutionId: stranded.id, reapTimedOut: true, budgetUserId },
                 );
               }
               stepsExecuted++;
@@ -949,8 +948,7 @@ export async function POST(
                 currentStep,
                 mergedAppContext,
                 triggeredBy ?? 'auto-runner',
-                executionId,
-                { budgetUserId },
+                { stepExecutionId: executionId, budgetUserId },
               );
             } finally {
               clearStepInFlight(instanceId);
