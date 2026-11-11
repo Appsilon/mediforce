@@ -746,13 +746,15 @@ describe('setMyModelSettings handler', () => {
     await expect(setMyModelSettings({ handle: HANDLE, outputBudget: 'low' }, scope)).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it('refuses a personal workspace, whose workspace settings are already its owner\'s', async () => {
+  it('lets a member of a shared personal workspace set their own settings', async () => {
     namespaceRepo.seedNamespace({ handle: 'jane', type: 'personal', displayName: 'Jane', linkedUserId: 'uid-jane', createdAt: '2026-01-01T00:00:00.000Z' });
     namespaceRepo.seedMember('jane', { uid: 'uid-jane', role: 'owner', joinedAt: '2026-01-01T00:00:00.000Z' });
+    namespaceRepo.seedMember('jane', { uid: 'uid-guest', role: 'member', joinedAt: '2026-01-02T00:00:00.000Z' });
     const scope = createTestScope({
       namespaceRepo, auditRepo, modelRegistryRepo: models,
-      caller: userCaller('uid-jane', ['jane'], new Map([['jane', 'owner']])),
+      caller: userCaller('uid-guest', ['jane'], new Map([['jane', 'member']])),
     });
-    await expect(setMyModelSettings({ handle: 'jane', outputBudget: 'low' }, scope)).rejects.toBeInstanceOf(PreconditionFailedError);
+    const result = await setMyModelSettings({ handle: 'jane', outputBudget: 'low' }, scope);
+    expect(result.member).toMatchObject({ uid: 'uid-guest', outputBudget: 'low' });
   });
 });

@@ -102,7 +102,7 @@ export default function WorkspaceConfigPage() {
           handle={handle}
           workspace={{ outputBudget: namespace.outputBudget ?? 'default', defaultModel: namespace.defaultModel }}
           canEditWorkspace={canEditProfile}
-          member={!isPersonal && user !== null && currentUserMember !== undefined
+          member={members.length > 1 && user !== null && currentUserMember !== undefined
             ? { uid: user.id, outputBudget: currentUserMember.outputBudget, defaultModel: currentUserMember.defaultModel }
             : undefined}
           onError={setDangerError}

@@ -4,7 +4,7 @@ import { printJson, printKv } from '../output';
 
 export const namespaceSetMyModelSettingsCommand = defineCommand({
   name: 'mediforce namespace set-my-model-settings',
-  description: 'Set your own default model and LLM output budget in an organization workspace, overriding the workspace.',
+  description: 'Set your own default model and LLM output budget in a workspace you belong to, overriding the workspace.',
   args: {
     handle: { type: 'string', required: true, description: 'Workspace handle' },
     'output-budget': {

@@ -139,7 +139,7 @@ export function ModelSettingsSection({ handle, workspace, canEditWorkspace, memb
   handle: string;
   workspace: WorkspaceSettings;
   canEditWorkspace: boolean;
-  /** The signed-in member of an organization workspace; absent where they have no settings of their own. */
+  /** The signed-in member of a shared workspace; absent when they are its only member, whose settings the workspace's already are. */
   member?: { uid: string; outputBudget: OutputBudget | undefined; defaultModel: string | undefined };
   onError: (message: string | null) => void;
 }) {

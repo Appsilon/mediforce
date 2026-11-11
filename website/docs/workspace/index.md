@@ -15,7 +15,7 @@ Workspace settings covers the profile and branding â€” display name, bio, icon â
 plus preferences, members, secrets and the danger zone. Setting a **default
 workspace** sends you straight there on your next visit instead of the picker.
 
-The **Models** section holds the workspace's default model and output budget. Owners and admins set the workspace's; any member of an organization workspace can override either for the calls they start, and picking the workspace's value again follows it.
+The **Models** section holds the workspace's default model and output budget. Owners and admins set the workspace's; any member of a shared workspace, organization or personal, can override either for the calls they start, and picking the workspace's value again follows it.
 
 - **Default model**: pick a vendor, then one of its live models. Assistants and cowork chat use it, and new agents, steps and judges start on it; saved ones keep their model. Unset, it's the platform default, the newest Claude Sonnet.
 - **Output budget**: how much LLMs can write per call, Low, Default, High or Max. Raise it if eval checks fail because the judge ran out of room. A raise stops at the model's own limit, and doesn't apply to models the registry doesn't know. The evaluation assistant shows the budget in effect, with a link to change it.
