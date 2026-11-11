@@ -388,6 +388,19 @@ export {
   type FixKind,
 } from './schemas/evaluation-assistant-tools';
 export {
+  AGENT_ASSISTANT_PLATFORM_TOOLS,
+  AGENT_ASSISTANT_PROPOSAL_TOOLS,
+  ProposeAgentMatchToolSchema,
+  ProposeAgentChangeToolSchema,
+  ProposeMcpBindingToolSchema,
+  ProposeNewAgentToolSchema,
+  ProposeRequirementMatrixToolSchema,
+  AgentAssistantProposalSchema,
+  type AgentAssistantPlatformToolName,
+  type AgentAssistantProposalToolName,
+  type AgentAssistantProposal,
+} from './schemas/agent-assistant-tools';
+export {
   evaluatorTrust,
   wilsonInterval,
   caseReliability,

@@ -184,6 +184,57 @@ describe('agent MCP binding handlers', () => {
     ).rejects.toThrow(/no namespace/i);
   });
 
+  it('upsertAgentMcpBinding keeps a pending binding pending when a non-admin saves the edit form without a status', async () => {
+    const created = await agentDefinitionRepo.create({
+      kind: 'plugin',
+      name: 'Bob',
+      iconName: 'Bot',
+      description: 'd',
+      foundationModel: 'm',
+      systemPrompt: 'p',
+      inputDescription: 'i',
+      outputDescription: 'o',
+      namespace: 'team-alpha',
+      visibility: 'private',
+      mcpServers: { github: { type: 'http', catalogId: 'example', status: 'pending' } },
+    });
+    const scope = buildScope(); // u-1 is a plain 'member', not admin, of team-alpha
+    const { mcpServers } = await upsertAgentMcpBinding(
+      // The edit form never sends `status` — this mirrors that payload.
+      { id: created.id, name: 'github', binding: { type: 'http', catalogId: 'example' } },
+      scope,
+    );
+    expect(mcpServers.github?.status).toBe('pending');
+  });
+
+  it('upsertAgentMcpBinding lets a namespace admin clear a pending status', async () => {
+    const created = await agentDefinitionRepo.create({
+      kind: 'plugin',
+      name: 'Bob',
+      iconName: 'Bot',
+      description: 'd',
+      foundationModel: 'm',
+      systemPrompt: 'p',
+      inputDescription: 'i',
+      outputDescription: 'o',
+      namespace: 'team-alpha',
+      visibility: 'private',
+      mcpServers: { github: { type: 'http', catalogId: 'example', status: 'pending' } },
+    });
+    const scope = createTestScope({
+      agentDefinitionRepo,
+      auditRepo,
+      namespaceRepo,
+      toolCatalogRepo,
+      caller: userCaller('u-admin', ['team-alpha'], new Map([['team-alpha', 'admin']])),
+    });
+    const { mcpServers } = await upsertAgentMcpBinding(
+      { id: created.id, name: 'github', binding: { type: 'http', catalogId: 'example', status: 'approved' } },
+      scope,
+    );
+    expect(mcpServers.github?.status).toBe('approved');
+  });
+
   it('deleteAgentMcpBinding removes binding', async () => {
     const created = await agentDefinitionRepo.create({
       kind: 'plugin',

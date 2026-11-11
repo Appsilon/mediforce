@@ -220,6 +220,7 @@ export {
   changedFingerprintComponents,
 } from './evaluation/index';
 export { askEvaluationAssistant } from './evaluation-assistant/index';
+export { askAgentAssistant } from './agent-assistant/index';
 export { getMonitoringSummary } from './monitoring/get-monitoring-summary';
 
 export { getConfig, getConfigByPrefix } from './config/index';

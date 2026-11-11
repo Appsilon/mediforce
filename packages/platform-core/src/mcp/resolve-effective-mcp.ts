@@ -157,6 +157,7 @@ export function resolveEffectiveMcp(
   }
 
   for (const [name, binding] of Object.entries(mcpServers)) {
+    if (binding.status === 'pending') continue;
     const restriction = restrictions[name];
     if (restriction?.disable === true) continue;
 

@@ -44,6 +44,8 @@ export type ToolLoopProgress =
     readonly tool: string;
     readonly status: 'running' | 'done' | 'failed';
     readonly error?: string;
+    /** The call's own arguments, once parsed — absent when they failed to parse as JSON. */
+    readonly arguments?: unknown;
   };
 
 export interface ProposalToolLoopResult {
@@ -181,8 +183,6 @@ export async function runProposalToolLoop<TPlatform extends string>(
     let madeProgress = false;
     for (const call of response.toolCalls) {
       const toolName = call.function.name;
-      const progress = { type: 'tool', round: iteration + 1, callId: call.id, tool: toolName } as const;
-      report({ ...progress, status: 'running' });
       let result: unknown;
       let parsedArguments: unknown;
       try {
@@ -190,6 +190,8 @@ export async function runProposalToolLoop<TPlatform extends string>(
       } catch {
         parsedArguments = undefined;
       }
+      const progress = { type: 'tool', round: iteration + 1, callId: call.id, tool: toolName, arguments: parsedArguments } as const;
+      report({ ...progress, status: 'running' });
       if (parsedArguments === undefined) {
         result = { error: response.finishReason === 'length'
           ? `Arguments for '${toolName}' were truncated at the output-token limit. Retry with a shorter check, one proposal at a time. Do not repeat successful calls.`

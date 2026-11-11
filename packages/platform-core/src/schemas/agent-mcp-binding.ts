@@ -46,6 +46,7 @@ export const StdioAgentMcpBindingSchema = z.object({
   type: z.literal('stdio'),
   catalogId: z.string().min(1),
   allowedTools: z.array(z.string()).min(1).optional(),
+  status: z.enum(['pending', 'approved']).optional(),
 }).strict();
 
 export type StdioAgentMcpBinding = z.infer<typeof StdioAgentMcpBindingSchema>;
@@ -57,6 +58,7 @@ export const HttpAgentMcpBindingSchema = z.object({
   type: z.literal('http'),
   catalogId: z.string().min(1),
   allowedTools: z.array(z.string()).min(1).optional(),
+  status: z.enum(['pending', 'approved']).optional(),
 }).strict();
 
 export type HttpAgentMcpBinding = z.infer<typeof HttpAgentMcpBindingSchema>;

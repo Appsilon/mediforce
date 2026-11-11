@@ -729,6 +729,14 @@ import {
   type AskEvaluationAssistantOutput,
   type EvaluationAssistantProgress,
 } from '../contract/evaluation-assistant';
+import {
+  AskAgentAssistantInputSchema,
+  AskAgentAssistantOutputSchema,
+  AgentAssistantProgressSchema,
+  type AskAgentAssistantInput,
+  type AskAgentAssistantOutput,
+  type AgentAssistantProgress,
+} from '../contract/agent-assistant';
 import { BUILD_CONTEXT_MEDIA_TYPE } from '@mediforce/platform-core';
 // SDK consumers reach for one path:
 //   import { Mediforce, ApiError, type ApiErrorCode } from '@mediforce/platform-api/client';
@@ -983,6 +991,11 @@ export class Mediforce {
     deleteOAuthToken: (
       input: DeleteAgentOAuthTokenInput,
     ) => Promise<DeleteAgentOAuthTokenOutput>;
+    // `onProgress` streams the turn's model rounds and tool calls as they happen.
+    askAssistant: (
+      input: AskAgentAssistantInput,
+      options?: { signal?: AbortSignal; onProgress?: (event: AgentAssistantProgress) => void },
+    ) => Promise<AskAgentAssistantOutput>;
   };
 
   readonly models: {
@@ -1949,6 +1962,15 @@ export class Mediforce {
         );
         const body = await parseJsonOrThrow(res, 'mediforce.agents.deleteOAuthToken');
         return DeleteAgentOAuthTokenOutputSchema.parse(body);
+      },
+      askAssistant: async (input, options) => {
+        const body = AskAgentAssistantInputSchema.parse(input);
+        const ctx = 'mediforce.agents.askAssistant';
+        if (options?.onProgress === undefined) {
+          return this.sendJson('POST', '/api/agent-assistant', body, AskAgentAssistantOutputSchema, ctx, options?.signal);
+        }
+        return this.sendWithProgress('/api/agent-assistant', body, AskAgentAssistantOutputSchema,
+          AgentAssistantProgressSchema, options.onProgress, ctx, options.signal);
       },
     };
 

@@ -1,7 +1,7 @@
 'use client';
 
 import * as Dialog from '@radix-ui/react-dialog';
-import { AlertTriangle, Pencil, Plus, Server, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, Pencil, Plus, Server, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AgentMcpBinding, AgentMcpBindingMap, ToolCatalogEntry } from '@mediforce/platform-core';
 import {
@@ -10,6 +10,7 @@ import {
   putAgentBinding,
 } from '@/lib/agent-mcp-client';
 import { mediforce } from '@/lib/mediforce';
+import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { AgentMcpBindingForm } from './agent-mcp-binding-form';
 import { OAuthConnectionStatus } from './oauth-connection-status';
 
@@ -32,6 +33,7 @@ type DialogState =
   | { kind: 'edit'; name: string; binding: AgentMcpBinding };
 
 export function AgentMcpSection({ agentId, handle, draft }: AgentMcpSectionProps) {
+  const { canAdmin } = useNamespaceRole(handle);
   const [persistedBindings, setPersistedBindings] = useState<AgentMcpBindingMap>({});
   const bindings = draft !== undefined ? draft.bindings : persistedBindings;
   const setBindings = useCallback(
@@ -84,6 +86,15 @@ export function AgentMcpSection({ agentId, handle, draft }: AgentMcpSectionProps
       setDialog({ kind: 'closed' });
     },
     [agentId, bindings, setBindings],
+  );
+
+  const handleApprove = useCallback(
+    async (name: string, binding: AgentMcpBinding) => {
+      if (agentId === undefined) return;
+      setError(null);
+      setBindings(await putAgentBinding(agentId, name, { ...binding, status: 'approved' }));
+    },
+    [agentId, setBindings],
   );
 
   const handleDeleteConfirm = useCallback(async () => {
@@ -157,8 +168,10 @@ export function AgentMcpSection({ agentId, handle, draft }: AgentMcpSectionProps
               entry={catalog.find((candidate) => candidate.id === binding.catalogId)}
               agentId={agentId}
               namespace={handle}
+              canAdmin={canAdmin}
               onEdit={() => setDialog({ kind: 'edit', name, binding })}
               onRemove={() => setDeleteTarget({ name })}
+              onApprove={() => void handleApprove(name, binding)}
             />
           ))}
         </ul>
@@ -267,16 +280,20 @@ function BindingRow({
   entry,
   agentId,
   namespace,
+  canAdmin,
   onEdit,
   onRemove,
+  onApprove,
 }: {
   name: string;
   binding: AgentMcpBinding;
   entry: ToolCatalogEntry | undefined;
   agentId: string | undefined;
   namespace: string;
+  canAdmin: boolean;
   onEdit: () => void;
   onRemove: () => void;
+  onApprove: () => void;
 }) {
   const transportLabel = binding.type === 'stdio' ? 'stdio' : 'HTTP';
   const detail =
@@ -297,6 +314,21 @@ function BindingRow({
           <span className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
             {allowedCount} allowlisted
           </span>
+        )}
+        {binding.status === 'pending' && (
+          <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+            Pending approval
+          </span>
+        )}
+        {binding.status === 'pending' && canAdmin && (
+          <button
+            type="button"
+            onClick={onApprove}
+            className="inline-flex items-center gap-1 rounded-md border border-emerald-300 px-2 py-0.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+          >
+            <Check className="h-3 w-3" />
+            Approve
+          </button>
         )}
         {oauthProvider !== null && (
           <span className="inline-flex items-center rounded-full border border-indigo-300 bg-indigo-50 px-2 py-0.5 text-[11px] text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300">

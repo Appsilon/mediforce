@@ -87,6 +87,7 @@ import { agentSetVisibilityCommand } from './commands/agent-set-visibility';
 import { agentSetImageCommand } from './commands/agent-set-image';
 import { agentSetSkillsCommand } from './commands/agent-set-skills';
 import { agentCreateCommand } from './commands/agent-create';
+import { agentAssistantAskCommand } from './commands/agent-assistant-ask';
 import { modelListCommand } from './commands/model-list';
 import { modelGetCommand } from './commands/model-get';
 import { modelSyncCommand } from './commands/model-sync';
@@ -279,6 +280,7 @@ export const TREE: Record<string, BranchEntry> = {
       'set-visibility': { description: 'Set agent visibility (public|private)', fn: agentSetVisibilityCommand },
       'set-skills': { description: 'Replace the Skills an agent holds', fn: agentSetSkillsCommand },
       'set-image': { description: 'Set the image an agent runs in', fn: agentSetImageCommand },
+      'assistant-ask': { description: 'Ask the Agent catalog\'s AI Assistant a single question', fn: agentAssistantAskCommand },
     },
   },
   'tool-catalog': {

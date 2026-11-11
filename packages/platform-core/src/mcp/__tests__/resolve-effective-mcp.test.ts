@@ -169,6 +169,24 @@ describe('resolveEffectiveMcp', () => {
       const github = asStdio(result.servers.github);
       expect(github.allowedTools).toEqual(['search_code', 'get_file']);
     });
+
+    it('omits a binding awaiting admin approval', () => {
+      const catalog = makeCatalog([{ id: 'gh', type: 'stdio', command: 'gh-mcp' }]);
+      const agent = makeAgent({
+        github: { type: 'stdio', catalogId: 'gh', status: 'pending' },
+      });
+      const result = resolveEffectiveMcp(agent, makeStep(), catalog);
+      expect(result.servers).toEqual({});
+    });
+
+    it('resolves a binding once approved', () => {
+      const catalog = makeCatalog([{ id: 'gh', type: 'stdio', command: 'gh-mcp' }]);
+      const agent = makeAgent({
+        github: { type: 'stdio', catalogId: 'gh', status: 'approved' },
+      });
+      const result = resolveEffectiveMcp(agent, makeStep(), catalog);
+      expect(asStdio(result.servers.github).command).toBe('gh-mcp');
+    });
   });
 
   describe('step-level disable', () => {

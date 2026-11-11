@@ -175,7 +175,8 @@ client applies; *platform* tools run here through `CallerScope`. The workspace
 `OPENROUTER_API_KEY` check is `services/openrouter-key.ts`, since non-assistant
 LLM calls need it too. `runProposalToolLoop` is the loop for an assistant whose
 changes are all proposals — the Evaluation Assistant
-(`handlers/evaluation-assistant/`) runs on it. Its `reviewProposal` hook checks
+(`handlers/evaluation-assistant/`) and the Agent Assistant
+(`handlers/agent-assistant/`) both run on it. Its `reviewProposal` hook checks
 each proposal against the platform before the person sees it: a refusal goes
 back to the model as a tool error, and what the review found (the Evaluation
 Assistant's self-test of a proposed check) travels with the proposal. A review

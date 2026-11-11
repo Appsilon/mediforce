@@ -8,6 +8,7 @@ import type {
   ListAgentMcpBindingsOutput,
 } from '../../contract/agents';
 import type { CallerScope } from '../../repositories/index';
+import { callerIsNamespaceAdmin } from '../../auth';
 import { HandlerError, PreconditionFailedError } from '../../errors';
 import { actorFromCaller, loadOr404, resolvePersonalNamespace } from '../_helpers';
 import { recordAgentVersion } from './_lib/agent-version';
@@ -85,7 +86,13 @@ export async function upsertAgentMcpBinding(
 ): Promise<UpsertAgentMcpBindingOutput> {
   const agent = await loadOr404(scope.agentDefinitions.getById(input.id), 'Agent not found');
   await assertBindingsTargetCatalogEntries(scope, agent.namespace, { [input.name]: input.binding });
-  const nextMcpServers = { ...(agent.mcpServers ?? {}), [input.name]: input.binding };
+  // A pending binding stays pending unless a namespace admin lifts it — the
+  // edit form sends no `status` field at all, so a plain save would otherwise
+  // silently drop it and the runtime resolver would treat the binding as approved.
+  const wasPending = agent.mcpServers?.[input.name]?.status === 'pending';
+  const isAdmin = agent.namespace === undefined || callerIsNamespaceAdmin(scope.caller, agent.namespace);
+  const binding = wasPending && !isAdmin ? { ...input.binding, status: 'pending' as const } : input.binding;
+  const nextMcpServers = { ...(agent.mcpServers ?? {}), [input.name]: binding };
   const updated = await scope.agentDefinitions.updateMcpServers(input.id, nextMcpServers);
   await recordAgentVersion(scope, updated);
   const actor = actorFromCaller(scope);
