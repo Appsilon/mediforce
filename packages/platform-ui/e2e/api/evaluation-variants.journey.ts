@@ -110,6 +110,7 @@ test.describe('Eval Run Variants — API E2E', () => {
     const variant = { model: VARIANT_MODEL, prompt: 'Grade each AE by CTCAE v5, citing the criterion.' };
     const prepared = await mediforce.evaluation.prepareRun({ ...step, trialsPerCase: 2, budgetUsd: 1, variant });
     expect(prepared.evalRun.variant).toEqual(variant);
+    expect(prepared.evalRun.variantAgentHash).toBeNull();
     // The Fingerprint is the patched step's: its model and step config differ from the baseline's, nothing else.
     expect(prepared.evalRun.definitionVersion).toBe(baseline.evalRun.definitionVersion);
     expect(prepared.evalRun.fingerprint!.hash).not.toBe(baseline.evalRun.fingerprint!.hash);
@@ -153,6 +154,10 @@ test.describe('Eval Run Variants — API E2E', () => {
     expect(changedComponents(prepared, baseline)).toEqual(['model', 'systemPrompt']);
     // The run assessed version 1 with the patch over it; the patch is not a version.
     expect(prepared.assessedAgentVersion?.config).toMatchObject({ foundationModel: BASE_MODEL, systemPrompt: 'You grade adverse events by CTCAE v5.' });
+    // It records the hash the patched Agent would have, which applying the Variant matches against (ADR-0024 D3, D6).
+    expect(baseline.evalRun.variantAgentHash).toBeNull();
+    expect(prepared.evalRun.variantAgentHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(prepared.evalRun.variantAgentHash).not.toBe(prepared.assessedAgentVersion?.hash);
 
     const finished = await runToCompletion(mediforce, prepared.evalRun.id);
     const [trial] = finished.trials;

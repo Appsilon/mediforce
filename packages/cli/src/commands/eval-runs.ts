@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describeMcpReport, type EvalVariantPatch } from '@mediforce/platform-core';
+import { describeMcpReport, EvalVariantPatchSchema, type EvalVariantPatch } from '@mediforce/platform-core';
 import type { EvalRunOutput } from '@mediforce/platform-api/contract';
 import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson, type OutputSink } from '../output';
@@ -11,12 +11,28 @@ function percent(value: number | null): string {
 
 /** A Variant of the subject to run instead of it as it is (ADR-0024 D2). */
 const VARIANT_ARGS = {
+  variant: { type: 'string', description: 'Run a Variant read from this JSON file ({ "model"?, "prompt"? }); --model and --prompt-file override its fields' },
   model: { type: 'string', description: 'Run a Variant on this model instead of the subject\'s own' },
   'prompt-file': { type: 'string', description: 'Run a Variant with this prompt (a step\'s prompt, an agent\'s system prompt)' },
 } as const;
 
-function variantFrom(args: { model?: string; 'prompt-file'?: string }): { variant?: EvalVariantPatch } {
+function variantFile(path: string): EvalVariantPatch {
+  let json: unknown;
+  try {
+    json = JSON.parse(readFileSync(path, 'utf-8'));
+  } catch (error) {
+    throw new Error(`${path} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const parsed = EvalVariantPatchSchema.safeParse(json);
+  if (parsed.success === false) {
+    throw new Error(`${path} is not a Variant: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`);
+  }
+  return parsed.data;
+}
+
+function variantFrom(args: { variant?: string; model?: string; 'prompt-file'?: string }): { variant?: EvalVariantPatch } {
   const variant: EvalVariantPatch = {
+    ...(args.variant !== undefined ? variantFile(args.variant) : {}),
     ...(args.model !== undefined ? { model: args.model } : {}),
     ...(args['prompt-file'] !== undefined ? { prompt: readFileSync(args['prompt-file'], 'utf-8').trim() } : {}),
   };

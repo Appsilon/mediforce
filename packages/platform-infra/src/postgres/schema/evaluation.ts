@@ -214,6 +214,7 @@ export const evalRuns = pgTable(
     concurrency: integer('concurrency').notNull(),
     evaluators: jsonb('evaluators').notNull(),
     variant: jsonb('variant'),
+    variantAgentHash: text('variant_agent_hash'),
     fingerprint: jsonb('fingerprint'),
     acceptanceCriteria: jsonb('acceptance_criteria'),
     mcpPolicy: jsonb('mcp_policy').notNull(),

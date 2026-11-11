@@ -92,6 +92,42 @@ describe('mediforce eval runs', () => {
     expect(output.stdoutLines.join('\n')).toContain('Variant: model anthropic/claude-haiku-4.5, its own prompt');
   });
 
+  it('run-prepare --variant reads the patch from a JSON file, and --model overrides its model', async () => {
+    const variantFile = join(mkdtempSync(join(tmpdir(), 'eval-variant-')), 'variant.json');
+    writeFileSync(variantFile, JSON.stringify({ model: 'openai/gpt-4o', prompt: 'Grade every AE by CTCAE v5.' }));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(OUTPUT, 201));
+    const argv = [...STEP_ARGV, '--variant', variantFile, '--model', 'anthropic/claude-haiku-4.5', ...BASE];
+    expect(await evalRunPrepareCommand({ argv, env: ENV, output: captureOutput() })).toBe(0);
+
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body))).toMatchObject({
+      variant: { model: 'anthropic/claude-haiku-4.5', prompt: 'Grade every AE by CTCAE v5.' },
+    });
+  });
+
+  it('run-prepare --variant refuses a file that is not a Variant, before calling the API', async () => {
+    const variantFile = join(mkdtempSync(join(tmpdir(), 'eval-variant-')), 'variant.json');
+    writeFileSync(variantFile, JSON.stringify({ model: 'openai/gpt-4o', skills: ['pdf'] }));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const output = captureOutput();
+    const argv = [...STEP_ARGV, '--variant', variantFile, ...BASE];
+    expect(await evalRunPrepareCommand({ argv, env: ENV, output })).not.toBe(0);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(output.stderrLines.join('\n')).toContain(`${variantFile} is not a Variant`);
+  });
+
+  it('run-prepare --variant names the file when it is not valid JSON', async () => {
+    const variantFile = join(mkdtempSync(join(tmpdir(), 'eval-variant-')), 'variant.json');
+    writeFileSync(variantFile, '{ model: openai/gpt-4o');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const output = captureOutput();
+    const argv = [...STEP_ARGV, '--variant', variantFile, ...BASE];
+    expect(await evalRunPrepareCommand({ argv, env: ENV, output })).not.toBe(0);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(output.stderrLines.join('\n')).toContain(`${variantFile} is not valid JSON`);
+  });
+
   it('run-start sends the confirmed budget', async () => {
     const running = { ...OUTPUT.evalRun, status: 'running' };
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ ...OUTPUT, evalRun: running }));

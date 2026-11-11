@@ -108,6 +108,8 @@ export const EvalRunSchema = EvaluationOwnerSchema.extend({
   evaluators: z.array(EvalRunEvaluatorSchema).min(1),
   /** The Variant the run ran (ADR-0024 D3); null on a run of the subject as it is. */
   variant: EvalVariantPatchSchema.nullable().default(null),
+  /** An Agent's Variant run: the ADR-0029 D2 hash of the patched Agent, which applying the Variant matches against (ADR-0024 D3, D6); null on every other run. */
+  variantAgentHash: z.string().regex(/^[0-9a-f]{64}$/).nullable().default(null),
   /** The Step's Fingerprint when the run was prepared; null on runs prepared before Fingerprints. */
   fingerprint: StepFingerprintSchema.nullable(),
   /** Frozen at prepare (D10); null when the Step had none, and then the report judges nothing. */

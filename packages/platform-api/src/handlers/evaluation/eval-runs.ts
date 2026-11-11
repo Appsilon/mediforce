@@ -4,6 +4,7 @@ import {
   DEFAULT_ACCEPTANCE_CRITERIA,
   type AgentDefinitionRepository,
   applyAgentModel,
+  applyAgentVariant,
   applyRunVariant,
   isEmptyVariant,
   evaluationOwnerOf,
@@ -40,7 +41,7 @@ import { driveEvalRun } from './_lib/drive-eval-run';
 import { computeStepFingerprint } from './_lib/step-fingerprint';
 import { DEFAULT_MCP_EVAL_SERVER_POLICY } from './mcp-eval-policy';
 import { checkRetiredModels, checkUnknownModels } from '../workflows/model-checks';
-import { recordAgentVersion } from '../agents/_lib/agent-version';
+import { agentConfigHash, agentConfigOf, recordAgentVersion } from '../agents/_lib/agent-version';
 
 async function loadEvalRun(scope: CallerScope, evalRunId: string): Promise<EvalRun> {
   const run = await scope.evaluation.getEvalRun(evalRunId);
@@ -197,6 +198,10 @@ export async function prepareEvalRun(
 
   // An Agent's run assesses the Agent version it has now, recorded if it is new (ADR-0029).
   const agentVersion = evaluatedAgent === null ? null : await recordAgentVersion(scope, evaluatedAgent);
+  // An Agent's Variant run keeps that version and records the hash the patched Agent would have (ADR-0024 D3).
+  const variantAgentHash = evaluatedAgent === null || variant === null
+    ? null
+    : agentConfigHash(await agentConfigOf(scope, applyAgentVariant(evaluatedAgent, variant)));
 
   const now = new Date().toISOString();
   const run: EvalRun = {
@@ -210,6 +215,7 @@ export async function prepareEvalRun(
     concurrency: input.concurrency,
     evaluators: frozenEvaluators.map(({ frozen }) => frozen),
     variant,
+    variantAgentHash,
     fingerprint,
     acceptanceCriteria: criteria?.criteria ?? DEFAULT_ACCEPTANCE_CRITERIA,
     mcpPolicy,

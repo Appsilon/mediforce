@@ -433,6 +433,7 @@ export {
   parseDriftSettings,
   type DriftSettings,
   type DriftWindows,
+  applyAgentVariant,
   applyRunVariant,
   applyStepVariant,
   isEmptyVariant,

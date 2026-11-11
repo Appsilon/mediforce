@@ -30,6 +30,7 @@ describe('reviewJudgeVerdict', () => {
         { evaluatorId: SCHEMA_CHECK, name: 'findings-present', version: 1, kind: 'schema', counted: true },
       ],
       variant: null,
+      variantAgentHash: null,
       fingerprint: null,
       acceptanceCriteria: { minPassRate: 1 },
       mcpPolicy: {}, env: {}, estimate: { perTrialUsd: null, totalUsd: null, basis: 'unknown', sampleSize: 0 },

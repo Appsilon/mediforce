@@ -859,15 +859,14 @@ an `[n]` in a code or schema check's comment is left as text.
 An Eval Run can run its subject with a **Variant** (ADR-0024 D2, D3) — another
 `model`, another `prompt`, or both — without minting a Workflow Definition or
 Agent version: `variant` on `POST /api/evaluation/runs` and
-`/runs/estimate`, `run-prepare` / `run-estimate --model <id> --prompt-file
-<path>`. On a Step the patch replaces `step.agent.model` and
+`/runs/estimate`, `run-prepare` / `run-estimate --variant <file>` (a JSON `{ "model"?, "prompt"? }`), with `--model <id>` and `--prompt-file <path>` as shortcuts that override the file's fields. On a Step the patch replaces `step.agent.model` and
 `step.agent.prompt`; on an Agent, its `foundationModel` and `systemPrompt` for
 the trials only. An empty `prompt` runs the subject without one. The run
 records the patch (`variant`) and the Fingerprint of the patched subject, and
 its trials run the patch. A Step's trial carries the patched Definition on its
 Workflow Run (`eval_definition`), so the run records what ran; an Agent's trial
 reads its Agent through the patch from the run, which a saved Workflow cannot
-set.
+set. An Agent's Variant run keeps the `agentVersion` it patched and records `variantAgentHash`, the ADR-0029 hash the patched Agent would have.
 A Variant's model must be listed in the model registry and not retired, and a
 `~` moving alias is refused as for the step itself. A Variant on another model
 is estimated from that model's registry price, not the step's cost history.
