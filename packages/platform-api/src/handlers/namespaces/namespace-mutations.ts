@@ -366,8 +366,8 @@ async function assertUsableDefaultModel(scope: CallerScope, modelId: string): Pr
 }
 
 /**
- * The caller's own model settings in an organization workspace. A personal
- * workspace has one member, so its workspace settings are already theirs.
+ * The caller's own model settings in a workspace they belong to, organization
+ * or shared personal one alike.
  */
 export async function setMyModelSettings(
   input: SetMyModelSettingsInput,
@@ -387,13 +387,6 @@ export async function setMyModelSettings(
   if (member === null) {
     // Anti-enum 404: do not leak "namespace exists, you are not a member".
     throw new NotFoundError(`Namespace "${input.handle}" not found`);
-  }
-
-  if (namespace.type === 'personal') {
-    throw new PreconditionFailedError(
-      'A personal workspace has no member model settings. Set the workspace ones instead.',
-      { handle: input.handle, type: namespace.type },
-    );
   }
 
   if (input.defaultModel !== undefined && input.defaultModel !== null) {

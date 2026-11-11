@@ -89,7 +89,7 @@ export type UpdateNamespaceOutput = z.infer<typeof UpdateNamespaceOutputSchema>;
 
 /**
  * PUT /api/namespaces/:handle/model-settings — the caller sets their own model
- * settings in an organization workspace. Any member may. Omitting a field
+ * settings in a workspace they belong to. Any member may. Omitting a field
  * leaves it; `null` follows the workspace; any other value overrides it.
  */
 const MyModelSettingsFieldsSchema = z.object({
