@@ -104,6 +104,7 @@ export {
   EvalRunEvaluatorSchema,
   EvalRunEstimateSchema,
   EvalRunSchema,
+  EvalVariantPatchSchema,
   EvalTrialStatusSchema,
   EvalTrialSchema,
   JudgeCallSchema,
@@ -340,6 +341,7 @@ export type {
   EvalRunEvaluator,
   EvalRunEstimate,
   EvalRun,
+  EvalVariantPatch,
   EvalTrialStatus,
   EvalTrial,
   JudgeCall,
@@ -431,7 +433,29 @@ export {
   parseDriftSettings,
   type DriftSettings,
   type DriftWindows,
+  applyAgentVariant,
+  applyRunVariant,
+  applyStepVariant,
+  isEmptyVariant,
+  withAgentVariant,
+  compareToBaseline,
+  recommendationScope,
+  signTestPValue,
+  type CaseSplit,
+  type TrialGrade,
 } from './evaluation/index';
+export {
+  EvalComparisonStatusSchema,
+  EvalComparisonSchema,
+  ComparisonScopeSchema,
+  ComparisonCallSchema,
+  ComparisonEvaluatorCallSchema,
+  type EvalComparisonStatus,
+  type EvalComparison,
+  type ComparisonScope,
+  type ComparisonCall,
+  type ComparisonEvaluatorCall,
+} from './schemas/eval-comparison';
 
 // Types (re-exported from schemas for convenience)
 export type {
@@ -710,6 +734,7 @@ export {
   AgentVersionSchema,
   AGENT_EVAL_STEP_ID,
   agentEvalDefinition,
+  agentOfEvalDefinition,
   agentStepChanges,
   type AgentConfigSnapshot,
   type AgentStepChange,

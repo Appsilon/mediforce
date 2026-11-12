@@ -228,6 +228,7 @@ export {
   EvalRunEvaluatorSchema,
   EvalRunEstimateSchema,
   EvalRunSchema,
+  EvalVariantPatchSchema,
   EvalTrialStatusSchema,
   EvalTrialSchema,
   JudgeCallSchema,
@@ -260,6 +261,7 @@ export {
   type EvalRunEvaluator,
   type EvalRunEstimate,
   type EvalRun,
+  type EvalVariantPatch,
   type EvalTrialStatus,
   type EvalTrial,
   type JudgeCall,
@@ -267,6 +269,18 @@ export {
   type EvalRunReport,
   type EvalRunMcpReport,
 } from './eval-run';
+export {
+  EvalComparisonStatusSchema,
+  EvalComparisonSchema,
+  ComparisonScopeSchema,
+  ComparisonCallSchema,
+  ComparisonEvaluatorCallSchema,
+  type EvalComparisonStatus,
+  type EvalComparison,
+  type ComparisonScope,
+  type ComparisonCall,
+  type ComparisonEvaluatorCall,
+} from './eval-comparison';
 
 export {
   QualificationDeviationSchema,

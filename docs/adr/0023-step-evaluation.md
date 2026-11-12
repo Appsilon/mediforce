@@ -57,6 +57,11 @@ last_reviewed: 2026-11-02
   agreement. A preview of a `schema` or `code` check tries Eval Cases taken from
   runs first, then production outputs, and skips a run that gave no result. A
   judge reads the text files its run wrote.
+- **Amended 2026-11-03 by [ADR-0024](./0024-optimisation.md) (accepted):**
+  variants return, each as an Eval Run of its own with its own Fingerprint and
+  grouped in a Comparison (D5); a subject's validation may rest on a variant's
+  run whose Fingerprint it now has (D10). D12 and the GEPA amendment of D15
+  stay deferred.
 - **Partially superseded 2026-10-15 by [ADR-0029](./0029-agent-evaluation.md):**
   D2 — an Evaluation is owned by a Step or by an Agent, and an Agent's Eval Run
   assesses one Agent version. Everything else here holds for an Agent's
@@ -239,7 +244,10 @@ Three floors asked the author to grade each check's importance twice, once as
 its severity and once as its floor, and a check not worth the floor does not
 belong in the Evaluation. The default is a 100% floor. Criteria stored per
 severity read as the strictest of them; a Step Qualification signed then keeps
-its per-severity verdicts and deviations as signed._
+its per-severity verdicts and deviations as signed._ _Amended 2026-11-03 by
+[ADR-0024](./0024-optimisation.md) D6: once a Variant is applied, its Eval Run
+counts for the new Definition version's validation when the step's Fingerprint
+equals the run's._
 
 **D11 — Step Qualification is informational.** A badge (Qualified / Stale /
 Not qualified) on the Step and in run views. Nothing is blocked: no Control
@@ -251,8 +259,8 @@ not a gate on qualification — production runs on such a Step are never
 blocked._
 
 **D12 — Few-shot examples are a structured, provenance-tracked field.**
-_Moved 2026-10-01 to [ADR-0024](./0024-optimisation.md) D5; not binding until
-that ADR is accepted._
+_Moved 2026-10-01 to [ADR-0024](./0024-optimisation.md); not binding. ADR-0024,
+accepted 2026-11-03, keeps it deferred (its D9)._
 `agent.examples` holds `{input, output, note?}` pairs rendered as their own
 prompt section and included in the Fingerprint. Each records the Eval Case it
 came from; that case is excluded from scoring in later Eval Runs of the Step.
@@ -314,9 +322,10 @@ same operations.
 
 _Amended 2026-10-01: proposing fixes as challengers (`propose_fix`) and GEPA
 optimisation — the two amendment paragraphs below — moved to
-[ADR-0024](./0024-optimisation.md) and are not binding until it is accepted.
-The assistant no longer has those tools; an unattended budget covers starting
-Eval Runs only._
+[ADR-0024](./0024-optimisation.md) and are not binding. ADR-0024, accepted
+2026-11-03, replaces challengers with Variants the assistant proposes (its D8)
+and keeps GEPA deferred (its D9). An unattended budget covers starting Eval
+Runs only._
 
 _Amended 2026-09-29 (Phase 5): a GEPA optimisation is such an attempt. Its
 budget is granted with the request that starts it — the person's own start, or

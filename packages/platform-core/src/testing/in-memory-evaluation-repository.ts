@@ -9,6 +9,7 @@ import {
   type EvalTrialStatus,
 } from '../schemas/eval-run';
 import { StepQualificationSchema, type StepQualification } from '../schemas/step-qualification';
+import { EvalComparisonSchema, type EvalComparison, type EvalComparisonStatus } from '../schemas/eval-comparison';
 import {
   AcceptanceCriteriaVersionSchema,
   type AcceptanceCriteriaVersion,
@@ -47,6 +48,7 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
   private readonly criteria: AcceptanceCriteriaVersion[] = [];
   private readonly qualifications: StepQualification[] = [];
   private readonly runs = new Map<string, EvalRun>();
+  private readonly comparisons = new Map<string, EvalComparison>();
   private readonly trials = new Map<string, EvalTrial>();
 
   async appendBrief(brief: EvaluationBrief): Promise<EvaluationBrief> {
@@ -245,6 +247,35 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
   async setEvalRunAcceptance(id: string, acceptance: EvalRunAcceptance): Promise<void> {
     const run = this.runs.get(id);
     if (run !== undefined) this.runs.set(id, { ...run, acceptance });
+  }
+
+  async listEvalRunsOfComparison(comparisonId: string): Promise<EvalRun[]> {
+    return [...this.runs.values()]
+      .filter((run) => run.comparisonId === comparisonId)
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id));
+  }
+
+  async createComparison(comparison: EvalComparison): Promise<void> {
+    this.comparisons.set(comparison.id, EvalComparisonSchema.parse(comparison));
+  }
+
+  async getComparison(id: string): Promise<EvalComparison | null> {
+    return this.comparisons.get(id) ?? null;
+  }
+
+  async listComparisons(subject: EvaluationSubject): Promise<EvalComparison[]> {
+    return newestFirst([...this.comparisons.values()].filter((comparison) => isOwnedBy(comparison, subject)));
+  }
+
+  async transitionComparison(
+    id: string,
+    from: EvalComparisonStatus,
+    patch: Partial<Pick<EvalComparison, 'status' | 'startedAt' | 'completedAt'>>,
+  ): Promise<boolean> {
+    const comparison = this.comparisons.get(id);
+    if (comparison === undefined || comparison.status !== from) return false;
+    this.comparisons.set(id, { ...comparison, ...patch });
+    return true;
   }
 
   async listTrials(evalRunId: string): Promise<EvalTrial[]> {

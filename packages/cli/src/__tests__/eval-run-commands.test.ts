@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { evalRunFailuresCommand, evalRunGetCommand, evalRunPrepareCommand, evalRunStartCommand, evalTrialCommand } from '../commands/eval-runs';
 import { evalAskCommand } from '../commands/eval-ask';
@@ -74,6 +77,55 @@ describe('mediforce eval runs', () => {
     expect(await evalRunPrepareCommand({ argv: [...STEP_ARGV, '--version', 'v1', ...BASE], env: ENV, output })).toBe(2);
     expect(output.stderrLines).toContain('--trials, --concurrency and --version must be positive integers');
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('run-prepare --model --prompt-file prepares a Variant and says which', async () => {
+    const promptFile = join(mkdtempSync(join(tmpdir(), 'eval-variant-')), 'prompt.md');
+    writeFileSync(promptFile, 'Grade every AE by CTCAE v5.\n');
+    const variant = { model: 'anthropic/claude-haiku-4.5', prompt: 'Grade every AE by CTCAE v5.' };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ ...OUTPUT, evalRun: { ...OUTPUT.evalRun, variant } }, 201));
+    const output = captureOutput();
+    const argv = [...STEP_ARGV, '--model', variant.model, '--prompt-file', promptFile, ...BASE];
+    expect(await evalRunPrepareCommand({ argv, env: ENV, output })).toBe(0);
+
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body))).toMatchObject({ stepId: 'grade-aes', variant });
+    expect(output.stdoutLines.join('\n')).toContain('Variant: model anthropic/claude-haiku-4.5, its own prompt');
+  });
+
+  it('run-prepare --variant reads the patch from a JSON file, and --model overrides its model', async () => {
+    const variantFile = join(mkdtempSync(join(tmpdir(), 'eval-variant-')), 'variant.json');
+    writeFileSync(variantFile, JSON.stringify({ model: 'openai/gpt-4o', prompt: 'Grade every AE by CTCAE v5.' }));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(OUTPUT, 201));
+    const argv = [...STEP_ARGV, '--variant', variantFile, '--model', 'anthropic/claude-haiku-4.5', ...BASE];
+    expect(await evalRunPrepareCommand({ argv, env: ENV, output: captureOutput() })).toBe(0);
+
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body))).toMatchObject({
+      variant: { model: 'anthropic/claude-haiku-4.5', prompt: 'Grade every AE by CTCAE v5.' },
+    });
+  });
+
+  it('run-prepare --variant refuses a file that is not a Variant, before calling the API', async () => {
+    const variantFile = join(mkdtempSync(join(tmpdir(), 'eval-variant-')), 'variant.json');
+    writeFileSync(variantFile, JSON.stringify({ model: 'openai/gpt-4o', skills: ['pdf'] }));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const output = captureOutput();
+    const argv = [...STEP_ARGV, '--variant', variantFile, ...BASE];
+    expect(await evalRunPrepareCommand({ argv, env: ENV, output })).not.toBe(0);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(output.stderrLines.join('\n')).toContain(`${variantFile} is not a Variant`);
+  });
+
+  it('run-prepare --variant names the file when it is not valid JSON', async () => {
+    const variantFile = join(mkdtempSync(join(tmpdir(), 'eval-variant-')), 'variant.json');
+    writeFileSync(variantFile, '{ model: openai/gpt-4o');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const output = captureOutput();
+    const argv = [...STEP_ARGV, '--variant', variantFile, ...BASE];
+    expect(await evalRunPrepareCommand({ argv, env: ENV, output })).not.toBe(0);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(output.stderrLines.join('\n')).toContain(`${variantFile} is not valid JSON`);
   });
 
   it('run-start sends the confirmed budget', async () => {

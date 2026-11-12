@@ -481,7 +481,7 @@ export async function seedPostgresNamespace(
           id, canonical_slug, name, provider, context_length,
           max_completion_tokens, pricing, modality, input_modalities,
           output_modalities, supports_tools, supports_vision, source,
-          request_count, last_synced_at, created_at, updated_at
+          request_count, last_synced_at, created_at, updated_at, retired_at
         ) VALUES (
           ${model.id as string},
           ${(model.canonicalSlug as string | null) ?? null},
@@ -499,7 +499,8 @@ export async function seedPostgresNamespace(
           ${(model.requestCount as number | null) ?? null},
           ${model.lastSyncedAt as string},
           ${model.createdAt as string},
-          ${model.updatedAt as string}
+          ${model.updatedAt as string},
+          ${(model.retiredAt as string | undefined) ?? null}
         )
         ON CONFLICT (id) DO UPDATE SET
           name = EXCLUDED.name,
@@ -514,7 +515,8 @@ export async function seedPostgresNamespace(
           supports_vision = EXCLUDED.supports_vision,
           request_count = EXCLUDED.request_count,
           last_synced_at = EXCLUDED.last_synced_at,
-          updated_at = EXCLUDED.updated_at
+          updated_at = EXCLUDED.updated_at,
+          retired_at = EXCLUDED.retired_at
       `;
     }
 

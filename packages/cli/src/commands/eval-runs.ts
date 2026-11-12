@@ -1,16 +1,56 @@
-import { describeMcpReport } from '@mediforce/platform-core';
+import { readFileSync } from 'node:fs';
+import { describeMcpReport, EvalVariantPatchSchema, type EvalVariantPatch } from '@mediforce/platform-core';
 import type { EvalRunOutput } from '@mediforce/platform-api/contract';
 import { defineCommand, parsePositiveIntArg } from '../define-command';
 import { printJson, type OutputSink } from '../output';
 import { SUBJECT_ARGS, subjectFrom } from './eval-step-args';
 
-function percent(value: number | null): string {
+export function percent(value: number | null): string {
   return value === null ? '   -' : `${(value * 100).toFixed(0).padStart(3)}%`;
+}
+
+/** A Variant of the subject to run instead of it as it is (ADR-0024 D2). */
+const VARIANT_ARGS = {
+  variant: { type: 'string', description: 'Run a Variant read from this JSON file ({ "model"?, "prompt"? }); --model and --prompt-file override its fields' },
+  model: { type: 'string', description: 'Run a Variant on this model instead of the subject\'s own' },
+  'prompt-file': { type: 'string', description: 'Run a Variant with this prompt (a step\'s prompt, an agent\'s system prompt)' },
+} as const;
+
+function variantFile(path: string): EvalVariantPatch {
+  let json: unknown;
+  try {
+    json = JSON.parse(readFileSync(path, 'utf-8'));
+  } catch (error) {
+    throw new Error(`${path} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const parsed = EvalVariantPatchSchema.safeParse(json);
+  if (parsed.success === false) {
+    throw new Error(`${path} is not a Variant: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`);
+  }
+  return parsed.data;
+}
+
+function variantFrom(args: { variant?: string; model?: string; 'prompt-file'?: string }): { variant?: EvalVariantPatch } {
+  const variant: EvalVariantPatch = {
+    ...(args.variant !== undefined ? variantFile(args.variant) : {}),
+    ...(args.model !== undefined ? { model: args.model } : {}),
+    ...(args['prompt-file'] !== undefined ? { prompt: readFileSync(args['prompt-file'], 'utf-8').trim() } : {}),
+  };
+  return Object.keys(variant).length === 0 ? {} : { variant };
+}
+
+export function describeVariant(variant: EvalVariantPatch): string {
+  const parts = [
+    ...(variant.model !== undefined ? [`model ${variant.model}`] : []),
+    ...(variant.prompt !== undefined ? ['its own prompt'] : []),
+  ];
+  return `Variant: ${parts.join(', ')}`;
 }
 
 function printRun(output: OutputSink, { evalRun, report }: EvalRunOutput): void {
   const estimate = evalRun.estimate.totalUsd === null ? 'no estimate' : `est. $${evalRun.estimate.totalUsd} (${evalRun.estimate.basis})`;
   output.stdout(`${evalRun.id}  ${evalRun.status}  ${evalRun.caseIds.length} case(s) × ${evalRun.trialsPerCase}  budget $${evalRun.budgetUsd}, spent $${evalRun.spentUsd.toFixed(4)}  ${estimate}`);
+  if (evalRun.variant !== null) output.stdout(describeVariant(evalRun.variant));
   output.stdout(`trials: ${report.trials.scored} scored, ${report.trials.failed} failed, ${report.trials.skipped} skipped, ${report.trials.inProgress} in progress`);
   if (evalRun.acceptanceCriteria === null) output.stdout('no Acceptance Criteria frozen into this run');
   output.stdout(describeMcpReport(report.mcp));
@@ -45,6 +85,7 @@ export const evalRunEstimateCommand = defineCommand({
     version: { type: 'string', description: 'Workflow Definition version whose step runs (default: the runnable one)' },
     dataset: { type: 'string', description: 'Eval Dataset version id (default: the newest)' },
     trials: { type: 'string', description: 'Trials per case (default: 3)' },
+    ...VARIANT_ARGS,
   },
   async run({ args, output, mediforce, jsonMode }) {
     const trials = parsePositiveIntArg(args.trials);
@@ -58,6 +99,7 @@ export const evalRunEstimateCommand = defineCommand({
       ...(version !== undefined ? { definitionVersion: version } : {}),
       ...(args.dataset !== undefined ? { datasetVersionId: args.dataset } : {}),
       ...(trials !== undefined ? { trialsPerCase: trials } : {}),
+      ...variantFrom(args),
     });
     if (jsonMode) {
       printJson(output, result);
@@ -80,6 +122,7 @@ export const evalRunPrepareCommand = defineCommand({
     trials: { type: 'string', description: 'Trials per case (default: 3)' },
     concurrency: { type: 'string', description: 'Trials at once (default: 2)' },
     budget: { type: 'string', description: 'Spend cap in USD (default: 1.5× the estimate)' },
+    ...VARIANT_ARGS,
   },
   async run({ args, output, mediforce, jsonMode }) {
     const trials = parsePositiveIntArg(args.trials);
@@ -96,6 +139,7 @@ export const evalRunPrepareCommand = defineCommand({
       ...(trials !== undefined ? { trialsPerCase: trials } : {}),
       ...(concurrency !== undefined ? { concurrency } : {}),
       ...(args.budget !== undefined ? { budgetUsd: Number(args.budget) } : {}),
+      ...variantFrom(args),
     });
     if (jsonMode) {
       printJson(output, result);

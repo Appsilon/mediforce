@@ -2,7 +2,11 @@ import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import {
   DEFAULT_ACCEPTANCE_CRITERIA,
+  type AgentDefinitionRepository,
   applyAgentModel,
+  applyAgentVariant,
+  applyRunVariant,
+  isEmptyVariant,
   evaluationOwnerOf,
   evaluatorTrust,
   isMovingModelAlias,
@@ -11,6 +15,7 @@ import {
   type EvalRun,
   type EvalRunEvaluator,
   type EvalTrial,
+  type EvalVariantPatch,
   type EvaluatedStep,
   type McpEvalServerPolicy,
   type WorkflowDefinition,
@@ -28,7 +33,7 @@ import type {
 } from '../../contract/evaluation';
 import type { CallerScope } from '../../repositories/index';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
-import { loadEvaluationSubject, subjectRef, subjectName, runVersionOf } from './_lib/evaluation-subject';
+import { loadEvaluationSubject, subjectRef, subjectName, runVersionOf, type LoadedSubject } from './_lib/evaluation-subject';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
 import { estimateEvalRun } from './_lib/estimate-eval-run';
 import { buildEvalRunReport, rebuildEvalRunAcceptance, storeEvalRunAcceptance } from './_lib/eval-run-report';
@@ -36,7 +41,7 @@ import { driveEvalRun } from './_lib/drive-eval-run';
 import { computeStepFingerprint } from './_lib/step-fingerprint';
 import { DEFAULT_MCP_EVAL_SERVER_POLICY } from './mcp-eval-policy';
 import { checkRetiredModels, checkUnknownModels } from '../workflows/model-checks';
-import { recordAgentVersion } from '../agents/_lib/agent-version';
+import { agentConfigHash, agentConfigOf, recordAgentVersion } from '../agents/_lib/agent-version';
 
 async function loadEvalRun(scope: CallerScope, evalRunId: string): Promise<EvalRun> {
   const run = await scope.evaluation.getEvalRun(evalRunId);
@@ -54,13 +59,30 @@ async function evalRunOutput(scope: CallerScope, evalRunId: string): Promise<Eva
 /**
  * Refuses an Eval Run whose trials the auto-runner's pre-flight would pause —
  * every one of them, before the agent runs — on a model the registry does not
- * list or has retired: the same checks, on the definition.
+ * list or has retired: the same checks, on the definition. A Variant's model
+ * is held to the registry too, though the pre-flight leaves an Agent's own
+ * model unchecked: a person picked it for this run.
  */
-async function assertModelsRunnable(scope: CallerScope, definition: WorkflowDefinition): Promise<void> {
+async function assertModelsRunnable(
+  scope: CallerScope,
+  definition: WorkflowDefinition,
+  agents: Pick<AgentDefinitionRepository, 'getById'>,
+  variant: EvalVariantPatch | null,
+): Promise<void> {
   const allModels = await scope.models.list();
+  if (variant?.model !== undefined) {
+    const listed = allModels.find((model) => model.id === variant.model);
+    if (listed === undefined) throw new ValidationError(`The Variant's model '${variant.model}' is not in the model registry`);
+    if (listed.retiredAt !== null) throw new ValidationError(`The Variant's model '${variant.model}' is retired`);
+  }
   const problem = checkUnknownModels(definition, allModels)
-    ?? checkRetiredModels(await resolveDefinitionModels(definition, scope.agentDefinitions), allModels);
+    ?? checkRetiredModels(await resolveDefinitionModels(definition, agents), allModels);
   if (problem !== null) throw new ValidationError(`The step cannot run — ${problem.message}`);
+}
+
+/** The subject as a run's Variant has it (ADR-0024 D2); as it is without one. */
+function runSubject(scope: CallerScope, loaded: LoadedSubject, variant: EvalVariantPatch | null) {
+  return applyRunVariant(loaded.subject.kind, { definition: loaded.definition, step: loaded.step, agents: scope.agentDefinitions }, variant);
 }
 
 /** A budget cap with headroom over the estimate, in whole cents. */
@@ -75,13 +97,16 @@ function defaultBudget(totalUsd: number): number {
  * live Evaluator versions with whether each counts, the MCP eval policy the
  * trials will run under, and a cost estimate. Reads only.
  */
-async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, scope: CallerScope) {
+export async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, scope: CallerScope) {
   const step = subjectRef(input);
   if (step.kind === 'agent' && input.definitionVersion !== undefined) {
     throw new ValidationError(`${subjectName(step)} runs as it is now; it has no workflow version to pick`);
   }
   const policy = await scope.evaluation.getMcpPolicy(step);
-  const { definition, step: workflowStep, agent: evaluatedAgent } = await loadEvaluationSubject(scope, step, 'run', input.definitionVersion ?? 'runnable', policy?.env);
+  const loaded = await loadEvaluationSubject(scope, step, 'run', input.definitionVersion ?? 'runnable', policy?.env);
+  const evaluatedAgent = loaded.agent;
+  const variant = input.variant === undefined || isEmptyVariant(input.variant) ? null : input.variant;
+  const { definition, step: workflowStep, agents } = runSubject(scope, loaded, variant);
   if (step.kind === 'step' && definition.archived === true) {
     throw new ValidationError(`'${step.workflowName}' v${definition.version} is archived; evaluate a version still in use`);
   }
@@ -114,7 +139,7 @@ async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, s
   }
   if (frozenEvaluators.length === 0) throw new ValidationError(`${subjectName(step)} has no Evaluators to run`);
 
-  const agent = workflowStep.agentId === undefined ? null : await scope.agentDefinitions.getById(workflowStep.agentId);
+  const agent = workflowStep.agentId === undefined ? null : await agents.getById(workflowStep.agentId);
   const model = applyAgentModel(workflowStep, agent?.foundationModel || undefined).agent?.model;
   if (model !== undefined && isMovingModelAlias(model)) {
     throw new ValidationError(
@@ -125,12 +150,16 @@ async function planEvalRun(input: z.output<typeof EstimateEvalRunInputSchema>, s
   const mcpPolicy: Record<string, McpEvalServerPolicy> = Object.fromEntries(
     agentServers.map((name) => [name, policy?.servers[name] ?? DEFAULT_MCP_EVAL_SERVER_POLICY]),
   );
-  await assertModelsRunnable(scope, definition);
-  const fingerprint = await computeStepFingerprint(scope, definition, workflowStep);
+  await assertModelsRunnable(scope, definition, agents, variant);
+  const fingerprint = await computeStepFingerprint({ agentDefinitions: agents, toolCatalog: scope.toolCatalog, skills: scope.skills }, definition, workflowStep);
   const caseIds = dataset.caseIds;
-  const estimate = await estimateEvalRun(scope, step, workflowStep, frozenEvaluators, caseIds.length * input.trialsPerCase);
+  // A Variant on another model makes the step's cost history say nothing of it.
+  const estimate = await estimateEvalRun(scope, step, workflowStep, frozenEvaluators, caseIds.length * input.trialsPerCase, {
+    agents,
+    useHistory: variant?.model === undefined,
+  });
   const suggestedBudgetUsd = estimate.totalUsd === null ? null : defaultBudget(estimate.totalUsd);
-  return { step, definition, evaluatedAgent, dataset, frozenEvaluators, mcpPolicy, env: policy?.env ?? {}, fingerprint, caseIds, estimate, suggestedBudgetUsd };
+  return { step, definition, evaluatedAgent, variant, dataset, frozenEvaluators, mcpPolicy, env: policy?.env ?? {}, fingerprint, caseIds, estimate, suggestedBudgetUsd };
 }
 
 /**
@@ -158,8 +187,9 @@ export async function estimateEvalRunCost(
 export async function prepareEvalRun(
   input: z.output<typeof PrepareEvalRunInputSchema>,
   scope: CallerScope,
+  placement: { readonly evalRunId?: string; readonly comparisonId?: string } = {},
 ): Promise<EvalRunOutput> {
-  const { step, definition, evaluatedAgent, dataset, frozenEvaluators, mcpPolicy, env, fingerprint, caseIds, estimate, suggestedBudgetUsd } = await planEvalRun(input, scope);
+  const { step, definition, evaluatedAgent, variant, dataset, frozenEvaluators, mcpPolicy, env, fingerprint, caseIds, estimate, suggestedBudgetUsd } = await planEvalRun(input, scope);
   const [criteria] = await scope.evaluation.listAcceptanceCriteria(step);
   const trialCount = caseIds.length * input.trialsPerCase;
   const budgetUsd = input.budgetUsd ?? suggestedBudgetUsd;
@@ -169,11 +199,15 @@ export async function prepareEvalRun(
 
   // An Agent's run assesses the Agent version it has now, recorded if it is new (ADR-0029).
   const agentVersion = evaluatedAgent === null ? null : await recordAgentVersion(scope, evaluatedAgent);
+  // An Agent's Variant run keeps that version and records the hash the patched Agent would have (ADR-0024 D3).
+  const variantAgentHash = evaluatedAgent === null || variant === null
+    ? null
+    : agentConfigHash(await agentConfigOf(scope, applyAgentVariant(evaluatedAgent, variant)));
 
   const now = new Date().toISOString();
   const run: EvalRun = {
     ...evaluationOwnerOf(step),
-    id: randomUUID(),
+    id: placement.evalRunId ?? randomUUID(),
     definitionVersion: agentVersion === null ? definition.version : null,
     agentVersion: agentVersion?.version ?? null,
     datasetVersionId: dataset.id,
@@ -181,6 +215,9 @@ export async function prepareEvalRun(
     trialsPerCase: input.trialsPerCase,
     concurrency: input.concurrency,
     evaluators: frozenEvaluators.map(({ frozen }) => frozen),
+    variant,
+    variantAgentHash,
+    comparisonId: placement.comparisonId ?? null,
     fingerprint,
     acceptanceCriteria: criteria?.criteria ?? DEFAULT_ACCEPTANCE_CRITERIA,
     mcpPolicy,
@@ -224,7 +261,7 @@ export async function prepareEvalRun(
     namespace: step.namespace,
     entityType: 'eval_run',
     entityId: run.id,
-    inputSnapshot: { ...step, definitionVersion: run.definitionVersion, agentVersion: run.agentVersion, datasetVersionId: dataset.id, trialsPerCase: input.trialsPerCase },
+    inputSnapshot: { ...step, definitionVersion: run.definitionVersion, agentVersion: run.agentVersion, datasetVersionId: dataset.id, trialsPerCase: input.trialsPerCase, variant },
     outputSnapshot: {
       evaluators: run.evaluators,
       fingerprint,
@@ -245,14 +282,14 @@ export async function prepareEvalRun(
  */
 export async function startEvalRun(input: StartEvalRunInput, scope: CallerScope): Promise<EvalRunOutput> {
   const run = await loadEvalRun(scope, input.evalRunId);
-  const { definition } = await loadEvaluationSubject(scope, subjectRef(run), 'run', runVersionOf(run));
+  const { definition, agents } = runSubject(scope, await loadEvaluationSubject(scope, subjectRef(run), 'run', runVersionOf(run)), run.variant);
   if (input.confirmedBudgetUsd !== run.budgetUsd) {
     const estimate = run.estimate.totalUsd === null ? 'no estimate' : `estimated $${run.estimate.totalUsd}`;
     throw new ValidationError(
       `Starting this Eval Run spends up to $${run.budgetUsd} (${estimate}); a person must confirm that budget`,
     );
   }
-  await assertModelsRunnable(scope, definition);
+  await assertModelsRunnable(scope, definition, agents, run.variant);
   const started = await scope.evaluation.transitionEvalRun(run.id, 'prepared', {
     status: 'running',
     startedAt: new Date().toISOString(),
@@ -283,7 +320,8 @@ export async function getEvalRun(input: GetEvalRunInput, scope: CallerScope): Pr
  */
 export async function listEvalRuns(input: ListEvalRunsInput, scope: CallerScope): Promise<ListEvalRunsOutput> {
   await loadEvaluationSubject(scope, input, 'read');
-  const runs = await scope.evaluation.listEvalRuns(subjectRef(input));
+  // A Variant's run, and a Comparison's own baseline run, are read under the Comparison, not as a run of the subject as it is (ADR-0024 D1).
+  const runs = (await scope.evaluation.listEvalRuns(subjectRef(input))).filter((run) => run.variant === null && run.comparisonId === null);
   return {
     evalRuns: await Promise.all(runs.map(async (run) => {
       if (run.acceptance !== null || run.status === 'prepared' || run.status === 'running') return run;

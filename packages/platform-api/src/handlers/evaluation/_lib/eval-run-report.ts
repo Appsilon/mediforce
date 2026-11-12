@@ -47,6 +47,13 @@ async function scoresByTrial(scope: CallerScope, run: EvalRun, trials: readonly 
   return new Map(await Promise.all(scored.map(async (trial) => [trial.id, await trialScores(scope, run, trial)] as const)));
 }
 
+/** What the LLM judges spent grading the run's scored trials, as each Score recorded it. */
+function judgeCost(scores: ReadonlyMap<string, TrialScores>): number {
+  return [...scores.values()]
+    .flatMap((recorded) => recorded.checks)
+    .reduce((sum, score) => sum + (typeof score.metadata?.judgeCostUsd === 'number' ? score.metadata.judgeCostUsd : 0), 0);
+}
+
 function trialCounts(trials: readonly EvalTrial[]): EvalRunReport['trials'] {
   return {
     total: trials.length,
@@ -275,6 +282,7 @@ export async function buildEvalRunReport(scope: CallerScope, run: EvalRun, trial
     judgeVerdicts: judgeVerdicts(run, trials, scores, cases),
     trialResults: trialResults(run, trials, scores, cases),
     costUsd: costs.reduce((sum, cost) => sum + cost, 0),
+    judgeCostUsd: judgeCost(scores),
     meanCostUsd: mean(costs),
     inputTokens: trials.reduce((sum, trial) => sum + (trial.inputTokens ?? 0), 0),
     outputTokens: trials.reduce((sum, trial) => sum + (trial.outputTokens ?? 0), 0),

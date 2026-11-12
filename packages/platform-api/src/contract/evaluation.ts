@@ -10,6 +10,11 @@ import {
   EvalCaseSchema,
   EvalCaseSplitSchema,
   EvalDatasetVersionSchema,
+  EvalVariantPatchSchema,
+  EvalComparisonSchema,
+  ComparisonEvaluatorCallSchema,
+  ComparisonScopeSchema,
+  EvalRunAcceptanceSchema,
   EvalRunEstimateSchema,
   EvalRunReportSchema,
   EvalRunSchema,
@@ -406,6 +411,8 @@ export const PrepareEvalRunInputSchema = EvaluationSubjectRefSchema.extend({
   concurrency: z.number().int().min(1).max(8).default(2),
   /** Spend cap; defaults to 1.5× the estimate, and is required when there is no estimate. */
   budgetUsd: z.number().positive().max(10_000).optional(),
+  /** Runs the subject with another model or prompt, minting no version (ADR-0024 D2); absent or empty runs it as it is. */
+  variant: EvalVariantPatchSchema.optional(),
 });
 
 /** What an Eval Run of the step would cost, before it is prepared. */
@@ -445,6 +452,71 @@ export const ListEvalRunsInputSchema = EvaluationSubjectRefSchema;
 
 export const ListEvalRunsOutputSchema = z.object({
   evalRuns: z.array(EvalRunSchema),
+});
+
+/**
+ * Prepares a Comparison (ADR-0024 D4): a baseline and one to four Variants of
+ * the subject on one Eval Dataset version, each an Eval Run, with one budget —
+ * the sum of the runs' — for a person to confirm. The baseline reuses a
+ * finished run of the subject as it is when every frozen input matches: the
+ * named `baselineEvalRunId`, or else the newest such run; otherwise it runs again.
+ */
+export const PrepareComparisonInputSchema = EvaluationSubjectRefSchema.extend({
+  variants: z.array(EvalVariantPatchSchema).min(1).max(4),
+  baselineEvalRunId: z.uuid().optional(),
+  /** The Workflow Definition version whose step runs; its runnable version when absent. */
+  definitionVersion: z.number().int().positive().optional(),
+  datasetVersionId: z.uuid().optional(),
+  trialsPerCase: z.number().int().min(1).max(10).default(3),
+  concurrency: z.number().int().min(1).max(8).default(2),
+  /** Spend cap of each run it prepares; defaults to 1.5× that run's estimate, and is required when there is none. */
+  budgetUsdPerRun: z.number().positive().max(10_000).optional(),
+});
+
+/** Starts a prepared Comparison's runs. `confirmedBudgetUsd` is a person confirming the sum they were shown (ADR-0023 D15). */
+export const StartComparisonInputSchema = z.object({
+  comparisonId: z.uuid(),
+  confirmedBudgetUsd: z.number().positive().optional(),
+});
+
+export const GetComparisonInputSchema = z.object({ comparisonId: z.uuid() });
+export const CancelComparisonInputSchema = GetComparisonInputSchema;
+export const ListComparisonsInputSchema = EvaluationSubjectRefSchema;
+
+/** How one run of a Comparison fared on its own: per Evaluator, its cost per trial, duration and tokens. */
+export const ComparisonRunSchema = z.object({
+  evalRun: EvalRunSchema,
+  evaluators: z.array(z.object({
+    evaluatorId: z.uuid(),
+    name: z.string(),
+    counted: z.boolean(),
+    passRate: z.number().min(0).max(1).nullable(),
+    wilsonLower: z.number().min(0).max(1).nullable(),
+    wilsonUpper: z.number().min(0).max(1).nullable(),
+  })),
+  scoredTrials: z.number().int().nonnegative(),
+  /** Per scored trial: the agent's cost, and the LLM judges' that graded it, apart. */
+  meanAgentCostUsd: z.number().nonnegative().nullable(),
+  meanJudgeCostUsd: z.number().nonnegative().nullable(),
+  meanDurationMs: z.number().nonnegative().nullable(),
+  inputTokens: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+  acceptance: EvalRunAcceptanceSchema.nullable(),
+});
+
+/** A Comparison with each run, and each Variant read against the baseline case by case (ADR-0024 D5). */
+export const ComparisonOutputSchema = z.object({
+  comparison: EvalComparisonSchema,
+  baseline: ComparisonRunSchema,
+  variants: z.array(ComparisonRunSchema.extend({
+    calls: z.array(ComparisonEvaluatorCallSchema),
+    /** The cases the recommendation reads: holdout for a prompt Variant when there is one, otherwise every case. */
+    recommendationScope: ComparisonScopeSchema,
+  })),
+});
+
+export const ListComparisonsOutputSchema = z.object({
+  comparisons: z.array(EvalComparisonSchema),
 });
 
 /** One trial of an Eval Run, with everything its Evaluators read and gave. */
@@ -747,6 +819,14 @@ export type CancelEvalRunInput = z.infer<typeof CancelEvalRunInputSchema>;
 export type EvalRunOutput = z.infer<typeof EvalRunOutputSchema>;
 export type ListEvalRunsInput = z.infer<typeof ListEvalRunsInputSchema>;
 export type ListEvalRunsOutput = z.infer<typeof ListEvalRunsOutputSchema>;
+export type PrepareComparisonInput = z.input<typeof PrepareComparisonInputSchema>;
+export type StartComparisonInput = z.infer<typeof StartComparisonInputSchema>;
+export type GetComparisonInput = z.infer<typeof GetComparisonInputSchema>;
+export type CancelComparisonInput = z.infer<typeof CancelComparisonInputSchema>;
+export type ListComparisonsInput = z.infer<typeof ListComparisonsInputSchema>;
+export type ComparisonRun = z.infer<typeof ComparisonRunSchema>;
+export type ComparisonOutput = z.infer<typeof ComparisonOutputSchema>;
+export type ListComparisonsOutput = z.infer<typeof ListComparisonsOutputSchema>;
 export type GetEvalTrialInput = z.infer<typeof GetEvalTrialInputSchema>;
 export type GetEvalTrialOutput = z.infer<typeof GetEvalTrialOutputSchema>;
 export type EvalTrialEvaluator = z.infer<typeof EvalTrialEvaluatorSchema>;

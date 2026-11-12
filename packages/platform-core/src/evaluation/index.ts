@@ -15,3 +15,5 @@ export { wilsonInterval, caseReliability, cohensKappa, type CaseReliability } fr
 export { DEFAULT_ACCEPTANCE_CRITERIA, describeAcceptanceCriteria, evalRunAcceptance, judgeAcceptanceCriteria } from './acceptance';
 export { calibrateConfidence, recommendControl, type ConfidenceOutcome } from './confidence-calibration';
 export { DEFAULT_DRIFT_SETTINGS, detectDrift, parseDriftSettings, type DriftSettings, type DriftWindows } from './drift';
+export { applyAgentVariant, applyRunVariant, applyStepVariant, isEmptyVariant, withAgentVariant } from './variant';
+export { compareToBaseline, recommendationScope, signTestPValue, type CaseSplit, type TrialGrade } from './comparison';

@@ -84,6 +84,17 @@ export const EvalRunAcceptanceSchema = z.object({
   reason: z.string(),
 });
 
+/**
+ * A Variant (ADR-0024 D2): what an Eval Run changes in its subject as it is.
+ * On a Step, `model` and `prompt` replace `step.agent`'s; on an Agent, its
+ * `foundationModel` and `systemPrompt`; an empty `prompt` tries the subject
+ * without one. Nothing set is the baseline.
+ */
+export const EvalVariantPatchSchema = z.object({
+  model: z.string().trim().min(1).optional(),
+  prompt: z.string().max(64_000).optional(),
+}).strict();
+
 export const EvalRunSchema = EvaluationOwnerSchema.extend({
   id: z.uuid(),
   /** The Workflow Definition version a Step's run ran; null on an Agent's. */
@@ -95,6 +106,12 @@ export const EvalRunSchema = EvaluationOwnerSchema.extend({
   trialsPerCase: z.number().int().min(1).max(10),
   concurrency: z.number().int().min(1).max(8),
   evaluators: z.array(EvalRunEvaluatorSchema).min(1),
+  /** The Variant the run ran (ADR-0024 D3); null on a run of the subject as it is. */
+  variant: EvalVariantPatchSchema.nullable().default(null),
+  /** An Agent's Variant run: the ADR-0029 D2 hash of the patched Agent, which applying the Variant matches against (ADR-0024 D3, D6); null on every other run. */
+  variantAgentHash: z.string().regex(/^[0-9a-f]{64}$/).nullable().default(null),
+  /** The Comparison that prepared the run (ADR-0024 D4); null on a run prepared on its own. */
+  comparisonId: z.uuid().nullable().default(null),
   /** The Step's Fingerprint when the run was prepared; null on runs prepared before Fingerprints. */
   fingerprint: StepFingerprintSchema.nullable(),
   /** Frozen at prepare (D10); null when the Step had none, and then the report judges nothing. */
@@ -338,6 +355,8 @@ export const EvalRunReportSchema = z.object({
   /** Every trial's grades, by case and trial. */
   trialResults: z.array(EvalTrialResultSchema),
   costUsd: z.number().nonnegative(),
+  /** The part of `costUsd` the LLM judges spent grading the trials. */
+  judgeCostUsd: z.number().nonnegative().default(0),
   meanCostUsd: z.number().nonnegative().nullable(),
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
@@ -349,6 +368,7 @@ export type EvalRunStatus = z.infer<typeof EvalRunStatusSchema>;
 export type EvalRunEvaluator = z.infer<typeof EvalRunEvaluatorSchema>;
 export type EvalRunEstimate = z.infer<typeof EvalRunEstimateSchema>;
 export type EvalRun = z.infer<typeof EvalRunSchema>;
+export type EvalVariantPatch = z.infer<typeof EvalVariantPatchSchema>;
 export type EvalTrialStatus = z.infer<typeof EvalTrialStatusSchema>;
 export type EvalTrial = z.infer<typeof EvalTrialSchema>;
 export type JudgeCall = z.infer<typeof JudgeCallSchema>;

@@ -149,6 +149,13 @@ import {
   evalRunStartCommand,
   evalTrialCommand,
 } from './commands/eval-runs';
+import {
+  evalCompareCancelCommand,
+  evalCompareGetCommand,
+  evalCompareListCommand,
+  evalComparePrepareCommand,
+  evalCompareStartCommand,
+} from './commands/eval-compare';
 import { evalAskCommand } from './commands/eval-ask';
 import { evalCriteriaGetCommand, evalCriteriaSetCommand, evalQualificationCommand, evalValidationCommand } from './commands/eval-qualification';
 import { namespaceUpdateCommand } from './commands/namespace-update';
@@ -345,6 +352,11 @@ export const TREE: Record<string, BranchEntry> = {
       'run-start': { description: 'Start a prepared Eval Run, confirming its budget', fn: evalRunStartCommand },
       'run-list': { description: 'List a step\'s Eval Runs', fn: evalRunListCommand },
       'run-cancel': { description: 'Cancel an Eval Run', fn: evalRunCancelCommand },
+      'compare-prepare': { description: 'Prepare a Comparison of a baseline and up to four Variants', fn: evalComparePrepareCommand },
+      'compare-start': { description: 'Start a prepared Comparison, confirming its budget', fn: evalCompareStartCommand },
+      'compare-get': { description: 'Print a Comparison: each Variant against the baseline, case by case', fn: evalCompareGetCommand },
+      'compare-list': { description: 'List a step\'s or an Agent\'s Comparisons', fn: evalCompareListCommand },
+      'compare-cancel': { description: 'Cancel a Comparison and its unfinished runs', fn: evalCompareCancelCommand },
       report: { description: 'Print an Eval Run and its report', fn: evalRunGetCommand },
       failures: { description: 'Print one variant\'s failing trials in an Eval Run', fn: evalRunFailuresCommand },
       trial: { description: 'Print one trial of an Eval Run with every Evaluator\'s grade and what its judge read', fn: evalTrialCommand },

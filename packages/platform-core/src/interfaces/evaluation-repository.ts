@@ -1,4 +1,5 @@
 import type { EvalRun, EvalRunAcceptance, EvalRunStatus, EvalTrial, EvalTrialStatus } from '../schemas/eval-run';
+import type { EvalComparison, EvalComparisonStatus } from '../schemas/eval-comparison';
 import type { StepQualification } from '../schemas/step-qualification';
 import type {
   AcceptanceCriteriaVersion,
@@ -100,6 +101,19 @@ export interface EvaluationRepository {
   /** Atomically adds a trial's cost to the run's spend. */
   addEvalRunSpend(id: string, usd: number): Promise<void>;
   setEvalRunAcceptance(id: string, acceptance: EvalRunAcceptance): Promise<void>;
+  /** The runs a Comparison prepared, oldest first. */
+  listEvalRunsOfComparison(comparisonId: string): Promise<EvalRun[]>;
+
+  createComparison(comparison: EvalComparison): Promise<void>;
+  getComparison(id: string): Promise<EvalComparison | null>;
+  /** Newest first. */
+  listComparisons(subject: EvaluationSubject): Promise<EvalComparison[]>;
+  /** Applies `patch` only while the Comparison is in `from`; true when it did. */
+  transitionComparison(
+    id: string,
+    from: EvalComparisonStatus,
+    patch: Partial<Pick<EvalComparison, 'status' | 'startedAt' | 'completedAt'>>,
+  ): Promise<boolean>;
 
   /** By case, then trial index. */
   listTrials(evalRunId: string): Promise<EvalTrial[]>;

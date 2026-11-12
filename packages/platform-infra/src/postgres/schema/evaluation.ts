@@ -192,6 +192,36 @@ export const evalAcceptanceCriteria = pgTable(
 );
 
 /**
+ * Comparisons (ADR-0024 D4): a baseline and its Variant runs on one Eval
+ * Dataset version. The runs it prepared point back at it (`eval_runs.comparison_id`);
+ * a reused baseline does not, so it is named here.
+ */
+export const evalComparisons = pgTable(
+  'eval_comparisons',
+  {
+    id: uuid('id').primaryKey(),
+    workspace: workspaceColumn(),
+    workflowName: text('workflow_name').notNull(),
+    stepId: text('step_id').notNull(),
+    agentId: agentIdColumn(),
+    datasetVersionId: uuid('dataset_version_id').notNull().references(() => evalDatasetVersions.id),
+    trialsPerCase: integer('trials_per_case').notNull(),
+    baselineEvalRunId: uuid('baseline_eval_run_id').notNull(),
+    baselineReused: boolean('baseline_reused').notNull(),
+    status: text('status').notNull(),
+    budgetUsd: doublePrecision('budget_usd').notNull(),
+    createdBy: text('created_by').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (table) => ({
+    ownerCheck: ownerCheck('eval_comparisons_owner_check', table),
+    subjectIdx: index('eval_comparisons_subject_idx').on(table.workspace, table.workflowName, table.stepId, table.agentId, table.createdAt.desc()),
+  }),
+);
+
+/**
  * Eval Runs (ADR-0023 D4, D10). The frozen parts — cases, Evaluator versions,
  * MCP policy, estimate — are written once at prepare; afterwards only
  * `status`, the timestamps and `spent_usd` change, each by a conditional
@@ -213,6 +243,9 @@ export const evalRuns = pgTable(
     trialsPerCase: integer('trials_per_case').notNull(),
     concurrency: integer('concurrency').notNull(),
     evaluators: jsonb('evaluators').notNull(),
+    variant: jsonb('variant'),
+    variantAgentHash: text('variant_agent_hash'),
+    comparisonId: uuid('comparison_id').references(() => evalComparisons.id, { onDelete: 'set null' }),
     fingerprint: jsonb('fingerprint'),
     acceptanceCriteria: jsonb('acceptance_criteria'),
     mcpPolicy: jsonb('mcp_policy').notNull(),
@@ -231,6 +264,7 @@ export const evalRuns = pgTable(
     ownerCheck: ownerCheck('eval_runs_owner_check', table),
     stepIdx: index('eval_runs_step_idx').on(table.workspace, table.workflowName, table.stepId, table.agentId, table.createdAt.desc()),
     statusIdx: index('eval_runs_status_idx').on(table.status),
+    comparisonIdx: index('eval_runs_comparison_idx').on(table.comparisonId),
   }),
 );
 

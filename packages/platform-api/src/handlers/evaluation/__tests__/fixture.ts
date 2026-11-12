@@ -93,7 +93,7 @@ export async function evaluationFixture(): Promise<EvaluationFixture> {
     name: WORKFLOW,
     namespace: NAMESPACE,
     steps: [
-      { id: 'extract-aes', name: 'Extract AEs', type: 'creation', executor: 'script', script: { runtime: 'python', inlineScript: 'print(1)' } },
+      { id: 'extract-aes', name: 'Extract AEs', type: 'creation', executor: 'script', plugin: 'script-container', script: { runtime: 'python', inlineScript: 'print(1)' } },
       { id: 'grade-aes', name: 'Grade AEs', type: 'creation', executor: 'agent', agentId: 'ae-grader', agent: { prompt: 'Grade each AE.' } },
       { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
     ],

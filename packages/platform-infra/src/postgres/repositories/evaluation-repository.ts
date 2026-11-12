@@ -5,6 +5,9 @@ import {
   type AcceptanceCriteriaVersion,
   type StepQualification,
   EvalRunAcceptanceSchema,
+  EvalComparisonSchema,
+  type EvalComparison,
+  type EvalComparisonStatus,
   EvalRunSchema,
   EvalTrialSchema,
   type EvalRun,
@@ -40,6 +43,7 @@ import type { Database } from '../client';
 import {
   evalAcceptanceCriteria,
   evalCases,
+  evalComparisons,
   evalDatasetVersions,
   evalMcpRecordings,
   evalRuns,
@@ -68,6 +72,14 @@ function ownerColumns(owner: EvaluationOwner): { workspace: string; workflowName
     workflowName: owner.workflowName ?? '',
     stepId: owner.stepId ?? '',
     agentId: owner.agentId ?? '',
+  };
+}
+
+function statusPatch<Status>(patch: { status?: Status; startedAt?: string | null; completedAt?: string | null }) {
+  return {
+    ...(patch.status === undefined ? {} : { status: patch.status }),
+    ...(patch.startedAt === undefined ? {} : { startedAt: patch.startedAt === null ? null : new Date(patch.startedAt) }),
+    ...(patch.completedAt === undefined ? {} : { completedAt: patch.completedAt === null ? null : new Date(patch.completedAt) }),
   };
 }
 
@@ -197,6 +209,9 @@ function toEvalRun(row: typeof evalRuns.$inferSelect): EvalRun {
     trialsPerCase: row.trialsPerCase,
     concurrency: row.concurrency,
     evaluators: row.evaluators,
+    variant: row.variant,
+    variantAgentHash: row.variantAgentHash,
+    comparisonId: row.comparisonId,
     fingerprint: row.fingerprint,
     acceptanceCriteria: row.acceptanceCriteria,
     mcpPolicy: row.mcpPolicy,
@@ -210,6 +225,23 @@ function toEvalRun(row: typeof evalRuns.$inferSelect): EvalRun {
     startedAt: row.startedAt?.toISOString() ?? null,
     completedAt: row.completedAt?.toISOString() ?? null,
     acceptance: row.acceptance,
+  });
+}
+
+function toComparison(row: typeof evalComparisons.$inferSelect): EvalComparison {
+  return EvalComparisonSchema.parse({
+    ...ownerFields(row),
+    id: row.id,
+    datasetVersionId: row.datasetVersionId,
+    trialsPerCase: row.trialsPerCase,
+    baselineEvalRunId: row.baselineEvalRunId,
+    baselineReused: row.baselineReused,
+    status: row.status,
+    budgetUsd: row.budgetUsd,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt.toISOString(),
+    startedAt: row.startedAt?.toISOString() ?? null,
+    completedAt: row.completedAt?.toISOString() ?? null,
   });
 }
 
@@ -507,6 +539,9 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
         trialsPerCase: parsed.trialsPerCase,
         concurrency: parsed.concurrency,
         evaluators: parsed.evaluators,
+        variant: parsed.variant,
+        variantAgentHash: parsed.variantAgentHash,
+        comparisonId: parsed.comparisonId,
         fingerprint: parsed.fingerprint,
         acceptanceCriteria: parsed.acceptanceCriteria,
         mcpPolicy: parsed.mcpPolicy,
@@ -555,11 +590,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     patch: Partial<Pick<EvalRun, 'status' | 'startedAt' | 'completedAt'>>,
   ): Promise<boolean> {
     const rows = await this.db.update(evalRuns)
-      .set({
-        ...(patch.status === undefined ? {} : { status: patch.status }),
-        ...(patch.startedAt === undefined ? {} : { startedAt: patch.startedAt === null ? null : new Date(patch.startedAt) }),
-        ...(patch.completedAt === undefined ? {} : { completedAt: patch.completedAt === null ? null : new Date(patch.completedAt) }),
-      })
+      .set(statusPatch(patch))
       .where(and(eq(evalRuns.id, id), eq(evalRuns.status, from)))
       .returning({ id: evalRuns.id });
     return rows.length === 1;
@@ -573,6 +604,55 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
 
   async setEvalRunAcceptance(id: string, acceptance: EvalRunAcceptance): Promise<void> {
     await this.db.update(evalRuns).set({ acceptance: EvalRunAcceptanceSchema.parse(acceptance) }).where(eq(evalRuns.id, id));
+  }
+
+  async listEvalRunsOfComparison(comparisonId: string): Promise<EvalRun[]> {
+    const rows = await this.db.select().from(evalRuns)
+      .where(eq(evalRuns.comparisonId, comparisonId))
+      .orderBy(asc(evalRuns.createdAt), asc(evalRuns.id));
+    return rows.map(toEvalRun);
+  }
+
+  async createComparison(comparison: EvalComparison): Promise<void> {
+    const parsed = EvalComparisonSchema.parse(comparison);
+    await this.db.insert(evalComparisons).values({
+      id: parsed.id,
+      ...ownerColumns(parsed),
+      datasetVersionId: parsed.datasetVersionId,
+      trialsPerCase: parsed.trialsPerCase,
+      baselineEvalRunId: parsed.baselineEvalRunId,
+      baselineReused: parsed.baselineReused,
+      status: parsed.status,
+      budgetUsd: parsed.budgetUsd,
+      createdBy: parsed.createdBy,
+      createdAt: new Date(parsed.createdAt),
+      startedAt: parsed.startedAt === null ? null : new Date(parsed.startedAt),
+      completedAt: parsed.completedAt === null ? null : new Date(parsed.completedAt),
+    });
+  }
+
+  async getComparison(id: string): Promise<EvalComparison | null> {
+    const [row] = await this.db.select().from(evalComparisons).where(eq(evalComparisons.id, id)).limit(1);
+    return row === undefined ? null : toComparison(row);
+  }
+
+  async listComparisons(subject: EvaluationSubject): Promise<EvalComparison[]> {
+    const rows = await this.db.select().from(evalComparisons)
+      .where(ownedBy(evalComparisons, subject))
+      .orderBy(desc(evalComparisons.createdAt), desc(evalComparisons.id));
+    return rows.map(toComparison);
+  }
+
+  async transitionComparison(
+    id: string,
+    from: EvalComparisonStatus,
+    patch: Partial<Pick<EvalComparison, 'status' | 'startedAt' | 'completedAt'>>,
+  ): Promise<boolean> {
+    const rows = await this.db.update(evalComparisons)
+      .set(statusPatch(patch))
+      .where(and(eq(evalComparisons.id, id), eq(evalComparisons.status, from)))
+      .returning({ id: evalComparisons.id });
+    return rows.length === 1;
   }
 
   async listTrials(evalRunId: string): Promise<EvalTrial[]> {
