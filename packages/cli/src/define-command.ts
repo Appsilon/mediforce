@@ -230,5 +230,11 @@ export function parsePositiveIntArg(raw: unknown): number | undefined | 'invalid
   return Number.isInteger(value) && value > 0 && String(value) === raw.trim() ? value : 'invalid';
 }
 
+export function parsePositiveNumberArg(raw: unknown): number | undefined | 'invalid' {
+  if (typeof raw !== 'string' || raw === '') return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : 'invalid';
+}
+
 export { renderUsage };
 export type { ArgsDef, ParsedArgs };

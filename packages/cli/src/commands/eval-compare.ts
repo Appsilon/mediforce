@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { EvalVariantPatchSchema, type EvalVariantPatch } from '@mediforce/platform-core';
 import type { ComparisonOutput, ComparisonRun } from '@mediforce/platform-api/contract';
-import { defineCommand, parsePositiveIntArg } from '../define-command';
+import { defineCommand, parsePositiveIntArg, parsePositiveNumberArg } from '../define-command';
 import { printJson, type OutputSink } from '../output';
 import { SUBJECT_ARGS, subjectFrom } from './eval-step-args';
 import { describeVariant, percent } from './eval-runs';
@@ -73,6 +73,11 @@ export const evalComparePrepareCommand = defineCommand({
       output.stderr('--trials, --concurrency and --version must be positive integers');
       return 2;
     }
+    const budgetPerRun = parsePositiveNumberArg(args['budget-per-run']);
+    if (budgetPerRun === 'invalid') {
+      output.stderr('--budget-per-run must be a positive number');
+      return 2;
+    }
     const variants = [
       ...(args.variants === undefined ? [] : variantsFile(args.variants)),
       ...(args.model === undefined ? [] : args.model.split(',').map((model) => model.trim()).filter((model) => model !== '').map((model) => ({ model }))),
@@ -89,7 +94,7 @@ export const evalComparePrepareCommand = defineCommand({
       ...(args.dataset !== undefined ? { datasetVersionId: args.dataset } : {}),
       ...(trials !== undefined ? { trialsPerCase: trials } : {}),
       ...(concurrency !== undefined ? { concurrency } : {}),
-      ...(args['budget-per-run'] !== undefined ? { budgetUsdPerRun: Number(args['budget-per-run']) } : {}),
+      ...(budgetPerRun !== undefined ? { budgetUsdPerRun: budgetPerRun } : {}),
     });
     if (jsonMode) {
       printJson(output, result);
@@ -109,9 +114,14 @@ export const evalCompareStartCommand = defineCommand({
     'confirm-budget': { type: 'string', required: true, description: 'The Comparison\'s budget in USD, as compare-prepare printed it' },
   },
   async run({ args, output, mediforce, jsonMode }) {
+    const confirmBudget = parsePositiveNumberArg(args['confirm-budget']);
+    if (confirmBudget === undefined || confirmBudget === 'invalid') {
+      output.stderr('--confirm-budget must be a positive number');
+      return 2;
+    }
     const result = await mediforce.evaluation.startComparison({
       comparisonId: args.comparisonId,
-      confirmedBudgetUsd: Number(args['confirm-budget']),
+      confirmedBudgetUsd: confirmBudget,
     });
     if (jsonMode) printJson(output, result);
     else printComparison(output, result);

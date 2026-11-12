@@ -82,6 +82,13 @@ describe('Comparisons (ADR-0024 D4, D5)', () => {
     expect(variants[0]!.evalRun.datasetVersionId).toBe(baseline.evalRun.datasetVersionId);
   });
 
+  it('keeps a Comparison\'s own baseline run out of the subject\'s plain Eval Runs and its validation', async () => {
+    const { comparison } = await prepareComparison({ ...STEP, variants: [VARIANT], trialsPerCase: 1, concurrency: 2, budgetUsdPerRun: 0.001 }, scope);
+
+    const { evalRuns } = await listEvalRuns(STEP, scope);
+    expect(evalRuns.map((run) => run.id)).not.toContain(comparison.baselineEvalRunId);
+  });
+
   it('refuses an empty or repeated Variant, and a named baseline that differs in a frozen input', async () => {
     await expect(prepareComparison({ ...STEP, variants: [{}], trialsPerCase: 1, concurrency: 1, budgetUsdPerRun: 1 }, scope)).rejects.toThrow(/must change/);
     await expect(prepareComparison({ ...STEP, variants: [VARIANT, VARIANT], trialsPerCase: 1, concurrency: 1, budgetUsdPerRun: 1 }, scope)).rejects.toThrow(/the same/);

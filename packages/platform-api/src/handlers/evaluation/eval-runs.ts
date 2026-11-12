@@ -320,8 +320,8 @@ export async function getEvalRun(input: GetEvalRunInput, scope: CallerScope): Pr
  */
 export async function listEvalRuns(input: ListEvalRunsInput, scope: CallerScope): Promise<ListEvalRunsOutput> {
   await loadEvaluationSubject(scope, input, 'read');
-  // A Variant's run is read under its Comparison, not as a run of the subject as it is (ADR-0024 D1).
-  const runs = (await scope.evaluation.listEvalRuns(subjectRef(input))).filter((run) => run.variant === null);
+  // A Variant's run, and a Comparison's own baseline run, are read under the Comparison, not as a run of the subject as it is (ADR-0024 D1).
+  const runs = (await scope.evaluation.listEvalRuns(subjectRef(input))).filter((run) => run.variant === null && run.comparisonId === null);
   return {
     evalRuns: await Promise.all(runs.map(async (run) => {
       if (run.acceptance !== null || run.status === 'prepared' || run.status === 'running') return run;

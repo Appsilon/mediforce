@@ -75,6 +75,14 @@ function ownerColumns(owner: EvaluationOwner): { workspace: string; workflowName
   };
 }
 
+function statusPatch<Status>(patch: { status?: Status; startedAt?: string | null; completedAt?: string | null }) {
+  return {
+    ...(patch.status === undefined ? {} : { status: patch.status }),
+    ...(patch.startedAt === undefined ? {} : { startedAt: patch.startedAt === null ? null : new Date(patch.startedAt) }),
+    ...(patch.completedAt === undefined ? {} : { completedAt: patch.completedAt === null ? null : new Date(patch.completedAt) }),
+  };
+}
+
 function ownedBy(table: OwnerColumns, subject: EvaluationSubject) {
   const owner = ownerColumns(evaluationOwnerOf(subject));
   return and(
@@ -582,11 +590,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     patch: Partial<Pick<EvalRun, 'status' | 'startedAt' | 'completedAt'>>,
   ): Promise<boolean> {
     const rows = await this.db.update(evalRuns)
-      .set({
-        ...(patch.status === undefined ? {} : { status: patch.status }),
-        ...(patch.startedAt === undefined ? {} : { startedAt: patch.startedAt === null ? null : new Date(patch.startedAt) }),
-        ...(patch.completedAt === undefined ? {} : { completedAt: patch.completedAt === null ? null : new Date(patch.completedAt) }),
-      })
+      .set(statusPatch(patch))
       .where(and(eq(evalRuns.id, id), eq(evalRuns.status, from)))
       .returning({ id: evalRuns.id });
     return rows.length === 1;
@@ -645,11 +649,7 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
     patch: Partial<Pick<EvalComparison, 'status' | 'startedAt' | 'completedAt'>>,
   ): Promise<boolean> {
     const rows = await this.db.update(evalComparisons)
-      .set({
-        ...(patch.status === undefined ? {} : { status: patch.status }),
-        ...(patch.startedAt === undefined ? {} : { startedAt: patch.startedAt === null ? null : new Date(patch.startedAt) }),
-        ...(patch.completedAt === undefined ? {} : { completedAt: patch.completedAt === null ? null : new Date(patch.completedAt) }),
-      })
+      .set(statusPatch(patch))
       .where(and(eq(evalComparisons.id, id), eq(evalComparisons.status, from)))
       .returning({ id: evalComparisons.id });
     return rows.length === 1;

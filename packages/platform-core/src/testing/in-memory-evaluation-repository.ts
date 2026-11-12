@@ -250,7 +250,9 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
   }
 
   async listEvalRunsOfComparison(comparisonId: string): Promise<EvalRun[]> {
-    return newestFirst([...this.runs.values()].filter((run) => run.comparisonId === comparisonId)).reverse();
+    return [...this.runs.values()]
+      .filter((run) => run.comparisonId === comparisonId)
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id));
   }
 
   async createComparison(comparison: EvalComparison): Promise<void> {

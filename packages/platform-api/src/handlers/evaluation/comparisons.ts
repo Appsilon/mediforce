@@ -28,7 +28,7 @@ import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { loadEvaluationSubject, subjectName, subjectRef } from './_lib/evaluation-subject';
 import { appendEvaluationAudit, authorId } from './_lib/audit';
 import { buildEvalRunReport } from './_lib/eval-run-report';
-import { casesOfRun } from './_lib/trial-scores';
+import { casesOfRun, trialScores } from './_lib/trial-scores';
 import { cancelEvalRun, planEvalRun, prepareEvalRun, startEvalRun } from './eval-runs';
 
 type EvalRunPlan = Awaited<ReturnType<typeof planEvalRun>>;
@@ -105,7 +105,8 @@ function withStatus(comparison: EvalComparison, prepared: readonly EvalRun[]): E
 async function abandon(scope: CallerScope, comparison: EvalComparison, from: 'prepared' | 'running'): Promise<void> {
   await scope.evaluation.transitionComparison(comparison.id, from, { status: 'cancelled', completedAt: new Date().toISOString() });
   for (const run of await scope.evaluation.listEvalRunsOfComparison(comparison.id)) {
-    if (run.status === 'prepared' || run.status === 'running') await cancelEvalRun({ evalRunId: run.id }, scope);
+    if (FINISHED_RUN_STATUSES.has(run.status)) continue;
+    await cancelEvalRun({ evalRunId: run.id }, scope).catch(() => undefined);
   }
 }
 
@@ -118,7 +119,12 @@ async function comparisonRun(scope: CallerScope, run: EvalRun): Promise<{ summar
     const caseId = caseOfTrial.get(result.trialId);
     return caseId === undefined ? [] : result.evaluators.map((grade) => ({ caseId, evaluatorId: grade.evaluatorId, outcome: grade.outcome }));
   });
-  const costed = trials.filter((trial) => trial.costUsd !== null).length;
+  const costed = (await Promise.all(trials.map(async (trial) => {
+    if (trial.costUsd === null) return false;
+    const judgeCostOfTrial = (await trialScores(scope, run, trial)).checks
+      .reduce((sum, score) => sum + (typeof score.metadata?.judgeCostUsd === 'number' ? score.metadata.judgeCostUsd : 0), 0);
+    return trial.costUsd > judgeCostOfTrial;
+  }))).filter(Boolean).length;
   const scored = report.trials.scored;
   return {
     grades,

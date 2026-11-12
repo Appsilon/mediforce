@@ -65,8 +65,8 @@ function once<Value>(read: () => Promise<Value>): () => Promise<Value> {
 
 function subjectRows(scope: CallerScope, step: EvaluationSubject): SubjectRows {
   return {
-    // A Variant's run assessed another configuration than the subject's (ADR-0024 D3).
-    runs: once(async () => (await scope.evaluation.listEvalRuns(step)).filter((run) => run.variant === null)),
+    // A Variant's run assessed another configuration than the subject's (ADR-0024 D3); a Comparison's own baseline run is not yet signed for the subject either.
+    runs: once(async () => (await scope.evaluation.listEvalRuns(step)).filter((run) => run.variant === null && run.comparisonId === null)),
     evaluators: once(async () => Promise.all((await scope.evaluation.listEvaluators(step)).map(async (evaluator) => ({
       id: evaluator.id,
       name: evaluator.name,
