@@ -8,7 +8,6 @@ import {
   WorkflowStepSchema,
   TransitionSchema,
   InputForNextRunEntrySchema,
-  DEFAULT_MODEL,
   mergeVerdictTransitions,
   ensureEntryStepFirst,
   uniqueSlug,
@@ -32,7 +31,7 @@ import { unheldStepRoles } from './workflow-editor-utils';
 import { computeMoveEligibility, ensureTerminalConnected, retargetVerdictTargets, bridgeTargetForDeletion, splitPastedDefinition, spliceStepIntoTransitions, retargetCarryOver, pruneCarryOver, withDefaultModel } from './workflow-editor-utils';
 import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 import { useImageCatalogEntries } from '@/hooks/use-image-catalog';
-import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
+import { useDefaultModel, usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { useChildDefinitionExpansion } from '@/hooks/use-child-workflows';
 import { mediforce, mediforceSilent, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
@@ -134,7 +133,8 @@ export function WorkflowEditorCanvas({
   const { toast } = useToast();
   const { images: dockerImages, isAvailable: dockerAvailable } = useDockerImages();
   const { entries: catalogEntries } = useImageCatalogEntries(namespace);
-  const pinnedDefaultModel = usePinnedDefaultModel();
+  const pinnedDefaultModel = usePinnedDefaultModel(namespace ?? '');
+  const defaultModel = useDefaultModel(namespace ?? '');
   const warningStepIds = useMemo(() => {
     if (!dockerAvailable) return undefined;
     const map = new Map<string, string>();
@@ -1143,7 +1143,7 @@ export function WorkflowEditorCanvas({
                   <ModelPicker
                     value={assistantModel}
                     onChange={setAssistantModel}
-                    defaultModel={DEFAULT_MODEL}
+                    defaultModel={defaultModel}
                     requireToolSupport
                     minContextTokens={32000}
                     className={selectBase}

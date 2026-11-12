@@ -14,7 +14,7 @@ import { StartRunButton } from '@/components/processes/start-run-button';
 import { mediforce, mediforceSilent } from '@/lib/mediforce';
 import { validateSteps, toastRegistrationWarnings, handleSaveFailure, DISPLAY_NAME_KEY } from '@/lib/workflow-save-utils';
 import { pastedWorkflowName, withDefaultModel, selectAgentPatch } from '@/components/workflows/workflow-editor-utils';
-import { useModelRegistry } from '@/hooks/use-model-registry';
+import { useModelRegistry, usePreferredDefaultModel } from '@/hooks/use-model-registry';
 import { useToast } from '@/components/command-palette';
 import { cn } from '@/lib/utils';
 import { routes } from '@/lib/routes';
@@ -85,17 +85,20 @@ export default function NewWorkflowPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [canvasDirty, setCanvasDirty] = useState(false);
 
-  // The template's agent step starts on the same pinned default as a block
-  // added by hand. The canvas reads its steps once on mount, so they are fixed
+  // The template's agent step starts on the same default as a block added by
+  // hand: the member's or workspace's, else the pinned platform default. The
+  // canvas reads its steps once on mount, so they are fixed
   // the first time the registry answers, and a later refetch cannot move them.
   // Coming from an agent's "Start a workflow" button (?agentId=…) replaces the
   // generic demo template with a single step bound to that agent.
   const modelRegistry = useModelRegistry();
+  const preferredModel = usePreferredDefaultModel(handle);
   const [template, setTemplate] = useState<{ steps: WorkflowStep[]; transitions: WorkflowDefinition['transitions'] } | null>(null);
   useEffect(() => {
     if (template !== null) return;
     if (modelRegistry.data === undefined && modelRegistry.isError === false) return;
-    const defaultModel = pinDefaultModel(modelRegistry.data ?? []);
+    if (preferredModel.ready === false) return;
+    const defaultModel = pinDefaultModel(modelRegistry.data ?? [], preferredModel.model);
     if (seedAgentId === null) {
       setTemplate({ steps: TEMPLATE_STEPS.map((step) => withDefaultModel(step, defaultModel)), transitions: TEMPLATE_TRANSITIONS });
       return;
@@ -118,7 +121,7 @@ export default function NewWorkflowPage() {
         setTemplate({ steps: TEMPLATE_STEPS.map((step) => withDefaultModel(step, defaultModel)), transitions: TEMPLATE_TRANSITIONS });
       });
     return () => { cancelled = true; };
-  }, [template, modelRegistry.data, modelRegistry.isError, seedAgentId]);
+  }, [template, modelRegistry.data, modelRegistry.isError, seedAgentId, preferredModel.ready, preferredModel.model]);
 
   // Track current canvas state so the header button can trigger save
   const currentStepsRef = useRef<WorkflowStep[]>(TEMPLATE_STEPS);

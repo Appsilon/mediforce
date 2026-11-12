@@ -60,7 +60,7 @@ describe('advance route', () => {
     mockResolveCallerIdentity.mockReturnValue({ kind: 'apiKey', isSystemActor: true });
   });
 
-  it('[AUTH] POST calls executeAgentStep with 4 args (no autonomyLevel)', async () => {
+  it('[AUTH] POST calls executeAgentStep without autonomyLevel, and no budget user for an API key', async () => {
     const body = {
       stepId: 'compliance-check',
       appContext: { studyId: 'S1' },
@@ -84,9 +84,28 @@ describe('advance route', () => {
       mockWorkflowStep,
       { studyId: 'S1' },
       'user-1',
+      { budgetUserId: null },
     );
-    // Verify exactly 5 arguments (instanceId, stepId, workflowStep, appContext, triggeredBy)
-    expect(mockExecuteAgentStep.mock.calls[0]).toHaveLength(5);
+  });
+
+  it('[AUTH] takes the budget user from the signed-in caller, never from triggeredBy', async () => {
+    mockResolveCallerIdentity.mockReturnValue({
+      kind: 'user',
+      uid: 'member-1',
+      namespaces: new Set(['test-ns']),
+      namespaceRoles: new Map([['test-ns', 'member']]),
+      isSystemActor: false,
+    });
+    const req = new Request('http://localhost/api/processes/inst-001/advance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stepId: 'compliance-check', appContext: {}, triggeredBy: 'someone-else' }),
+    });
+
+    await POST(req, { params: Promise.resolve({ instanceId: 'inst-001' }) });
+
+    const options = mockExecuteAgentStep.mock.calls[0][5];
+    expect(options).toEqual({ budgetUserId: 'member-1' });
   });
 
   it('[DATA] POST with autonomyLevel in body ignores it (not passed to executeAgentStep)', async () => {
@@ -108,8 +127,6 @@ describe('advance route', () => {
 
     await POST(req, { params: Promise.resolve({ instanceId: 'inst-001' }) });
 
-    // Should still only be called with 5 args (no autonomyLevel as separate arg)
-    expect(mockExecuteAgentStep.mock.calls[0]).toHaveLength(5);
     // None of the args should be 'L4' or any autonomy level
     const args = mockExecuteAgentStep.mock.calls[0];
     expect(args).not.toContain('L4');

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { trace } from '@opentelemetry/api';
-import { OpenRouterLlmClient } from './llm-client';
+import { OpenRouterLlmClient, withMaxTokens } from './llm-client';
 import { RecordingTracerProvider } from '../testing/index';
 
 describe('OpenRouterLlmClient tracing', () => {
@@ -117,5 +117,41 @@ describe('OpenRouterLlmClient endpoint', () => {
 
     const [, init] = fetchMock.mock.calls[0]!;
     expect(JSON.parse(init.body as string)).toMatchObject({ temperature: 0 });
+  });
+
+  it('posts 16,000 max tokens by default and the limit a call asks for', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '{}' } }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new OpenRouterLlmClient('test-api-key');
+
+    await client.complete([{ role: 'user', content: 'Reshape this.' }], 'anthropic/claude-sonnet-4');
+    await client.complete([{ role: 'user', content: 'Reshape this.' }], 'anthropic/claude-sonnet-4', { maxTokens: 32_000 });
+
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string)).toMatchObject({ max_tokens: 16_000 });
+    expect(JSON.parse(fetchMock.mock.calls[1]![1].body as string)).toMatchObject({ max_tokens: 32_000 });
+  });
+
+  it('withMaxTokens fills in the limit for each call from its model', async () => {
+    const calls: Array<{ model: string; maxTokens: number | undefined }> = [];
+    const inner = {
+      complete: async (_messages: unknown, model: string, options: { maxTokens?: number } = {}) => {
+        calls.push({ model, maxTokens: options.maxTokens });
+        return { content: '', model, usage: { promptTokens: 0, completionTokens: 0 } };
+      },
+    };
+    const client = withMaxTokens(inner, async (model) => (model === 'small' ? 4_000 : 20_000));
+
+    await client.complete([], 'small');
+    await client.complete([], 'big', { temperature: 0 });
+    await client.complete([], 'big', { maxTokens: 1_000 });
+
+    expect(calls).toEqual([
+      { model: 'small', maxTokens: 4_000 },
+      { model: 'big', maxTokens: 20_000 },
+      { model: 'big', maxTokens: 1_000 },
+    ]);
   });
 });

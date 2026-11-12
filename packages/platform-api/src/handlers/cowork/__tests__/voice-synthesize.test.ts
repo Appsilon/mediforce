@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import {
   InMemoryCoworkSessionRepository,
+  InMemoryModelRegistryRepository,
   InMemoryProcessInstanceRepository,
   buildCoworkSession,
   buildProcessInstance,
@@ -16,6 +17,8 @@ import {
   createTestScope,
   userCaller,
 } from '../../../repositories/__tests__/create-test-scope';
+import { InMemoryNamespaceRepo } from '../../../testing/in-memory-namespace-repo';
+import { registryEntry } from '../../evaluation/__tests__/fixture';
 
 function fixedNamespaceSecrets(values: Record<string, string>): NamespaceSecretsRepository {
   return {
@@ -131,6 +134,38 @@ describe('synthesizeVoiceArtifact handler', () => {
       { role: 'agent', content: 'Done\nMore detail' },
       { role: 'human', content: 'ok' },
     ]);
+  });
+
+  it('synthesizes on the workspace default model and output budget when the session names no model', async () => {
+    await coworkSessionRepo.create(
+      buildCoworkSession({ id: 'sess-voice', processInstanceId: 'inst-a', status: 'active', agent: 'voice-realtime' }),
+    );
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }), { status: 200 }),
+    );
+    const createdAt = '2026-01-01T00:00:00.000Z';
+    const models = new InMemoryModelRegistryRepository();
+    await models.upsert(registryEntry('openai/gpt-5.2', { maxCompletionTokens: 64_000 }));
+    const namespaceRepo = new InMemoryNamespaceRepo();
+    namespaceRepo.seedNamespace({
+      handle: 'team-alpha', type: 'organization', displayName: 'Alpha', createdAt,
+      defaultModel: 'openai/gpt-5.2', outputBudget: 'low',
+    });
+    const scope = createTestScope({
+      instanceRepo,
+      coworkSessionRepo,
+      namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+      secretsRepo: emptyWorkflowSecrets(),
+      caller: userCaller('u-1', ['team-alpha']),
+      namespaceRepo,
+      modelRegistryRepo: models,
+    });
+
+    await synthesizeVoiceArtifact({ sessionId: 'sess-voice', transcript: 'User: hi' }, scope);
+
+    const request = JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body)) as { model: string; max_tokens: number };
+    expect(request.model).toBe('openai/gpt-5.2');
+    expect(request.max_tokens).toBe(2_048);
   });
 
   it('extracts JSON from a content blob with surrounding text', async () => {

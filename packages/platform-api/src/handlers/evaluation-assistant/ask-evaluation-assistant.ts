@@ -1,5 +1,5 @@
 import {
-  DEFAULT_MODEL,
+  OUTPUT_TOKEN_DEFAULTS,
   EVALUATION_ASSISTANT_PLATFORM_TOOLS,
   EVALUATION_ASSISTANT_PROPOSAL_TOOLS,
   EVALUATION_ASSISTANT_TOOLSETS,
@@ -23,10 +23,12 @@ import { loadEvaluationSubject, subjectRef, subjectKey, subjectName } from '../e
 import { EVALUATION_ASSISTANT_SYSTEM_PROMPTS, briefMessage, unattendedBudgetMessage } from './_lib/system-prompt';
 import { executeEvaluationTool, type UnattendedGrant } from './_lib/run-evaluation-tool';
 import { reviewEvaluationProposal, type PreviewedCheck } from './_lib/review-proposal';
+import { callerUserId } from '../../auth';
+import { loadModelSettings, resolveDefaultModel, resolveOutputTokens } from '../../services/model-settings';
 
 // Leave room for paged trajectory reads and preview/repair cycles for several checks.
 const MAX_TOOL_LOOP_ITERATIONS = 32;
-const ASSISTANT_MAX_OUTPUT_TOKENS = 8000;
+const ASSISTANT_MAX_OUTPUT_TOKENS = OUTPUT_TOKEN_DEFAULTS.assistant;
 const TRUNCATED_RESPONSE_NOTICE = 'Your last response was cut off at the output-token limit before it finished, and no tool call in it ran. Work one check at a time: a single tool call per response, for one check, and short prose, then the next check once it is done. If you were writing your final answer, give it again more briefly.';
 
 /** Who the assistant is evaluating: a Step of a workflow version, or an Agent on its own (ADR-0029). */
@@ -66,7 +68,8 @@ export async function askEvaluationAssistant(
   const step = subjectRef(input);
   const { definition, step: workflowStep, agent } = await loadEvaluationSubject(scope, step, 'read', step.kind === 'step' ? input.definitionVersion : undefined);
   const apiKey = await requireOpenRouterApiKey(scope, step.namespace);
-  const model = input.model ?? DEFAULT_MODEL;
+  const modelSettings = await loadModelSettings(scope.workspaces, { namespace: step.namespace, userId: callerUserId(scope.caller) });
+  const model = input.model ?? (await resolveDefaultModel(scope.models, modelSettings));
 
   await recordAssistantPrompt(scope, {
     namespace: step.namespace,
@@ -96,6 +99,7 @@ export async function askEvaluationAssistant(
     }
     return toolResult;
   };
+  const maxTokens = await resolveOutputTokens(scope.models, modelSettings, { model, defaultTokens: ASSISTANT_MAX_OUTPUT_TOKENS });
   const result = await runProposalToolLoop({
     model,
     apiKey,
@@ -111,7 +115,7 @@ export async function askEvaluationAssistant(
     executePlatformTool,
     reviewProposal: (toolName, args) => reviewEvaluationProposal(toolName, args, scope, step, previewed),
     maxIterations: MAX_TOOL_LOOP_ITERATIONS,
-    maxTokens: ASSISTANT_MAX_OUTPUT_TOKENS,
+    maxTokens,
     truncatedResponseNotice: TRUNCATED_RESPONSE_NOTICE,
     onProgress,
   });

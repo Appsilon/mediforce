@@ -7,11 +7,11 @@ import {
   WORKFLOW_ASSISTANT_TOOLS,
   WORKFLOW_ASSISTANT_PLATFORM_TOOLS,
   isPlatformToolName,
-  DEFAULT_MODEL,
   toProcessDefinition,
   mergeVerdictTransitions,
   ensureEntryStepFirst,
   validateStepReferences,
+  OUTPUT_TOKEN_DEFAULTS,
   parseWorkflowTemplate,
   applyWorkflowAssistantToolCalls,
   type WorkflowAssistantToolName,
@@ -41,6 +41,8 @@ import {
   toolDefinitions,
   type ToolIssueHint,
 } from '../../assistant-core';
+import { callerUserId } from '../../auth';
+import { loadModelSettings, resolveDefaultModel, resolveOutputTokens } from '../../services/model-settings';
 
 interface AskScopedInput extends AskWorkflowAssistantInput {
   namespace: string;
@@ -56,7 +58,8 @@ const MAX_TOOL_LOOP_ITERATIONS = 12;
 // picker enforces, so a large embedded system prompt still leaves room. Bigger
 // means fewer chunks (each chunk re-sends the prompt), but truncation is
 // recoverable, so this is a throughput knob, not a correctness one.
-const ASSISTANT_MAX_OUTPUT_TOKENS = 8000;
+const ASSISTANT_MAX_OUTPUT_TOKENS = OUTPUT_TOKEN_DEFAULTS.assistant;
+const STUCK_REPLY_MAX_OUTPUT_TOKENS = 500;
 
 function buildToolDefinitions(options: { canSchedule: boolean }): OpenRouterToolDefinition[] {
   // Platform tools run here, as the caller, and their results come back into
@@ -247,6 +250,7 @@ const StuckReplySchema = z.object({
  */
 async function askWhatItCouldNotResolve(
   model: string,
+  maxTokens: number,
   apiKey: string,
   messages: OpenRouterChatMessage[],
   errors: string[],
@@ -255,7 +259,7 @@ async function askWhatItCouldNotResolve(
     const response = await callOpenRouter({
       model,
       apiKey,
-      maxTokens: 500,
+      maxTokens,
       messages: [
         ...messages,
         {
@@ -279,7 +283,8 @@ export async function askWorkflowAssistant(
   }
 
   const apiKey = await requireOpenRouterApiKey(scope, input.namespace);
-  const model = input.model ?? DEFAULT_MODEL;
+  const modelSettings = await loadModelSettings(scope.workspaces, { namespace: input.namespace, userId: callerUserId(scope.caller) });
+  const model = input.model ?? (await resolveDefaultModel(scope.models, modelSettings));
 
   await recordAssistantPrompt(scope, {
     namespace: input.namespace,
@@ -306,9 +311,10 @@ export async function askWorkflowAssistant(
 
   let lastErrors: string[] = [];
   const accumulatedToolCalls: WorkflowAssistantToolCall[] = [];
+  const maxTokens = await resolveOutputTokens(scope.models, modelSettings, { model, defaultTokens: ASSISTANT_MAX_OUTPUT_TOKENS });
 
   for (let iteration = 0; iteration < MAX_TOOL_LOOP_ITERATIONS; iteration++) {
-    const response = await callOpenRouter({ model, messages, apiKey, tools, maxTokens: ASSISTANT_MAX_OUTPUT_TOKENS });
+    const response = await callOpenRouter({ model, messages, apiKey, tools, maxTokens });
     const truncated = response.finishReason === 'length';
 
     if (response.toolCalls.length === 0) {
@@ -445,7 +451,12 @@ export async function askWorkflowAssistant(
     }
   }
 
-  const stuck = await askWhatItCouldNotResolve(model, apiKey, messages, lastErrors);
+  const stuckMaxTokens = await resolveOutputTokens(scope.models, modelSettings, {
+    model,
+    defaultTokens: STUCK_REPLY_MAX_OUTPUT_TOKENS,
+    raiseOnly: true,
+  });
+  const stuck = await askWhatItCouldNotResolve(model, stuckMaxTokens, apiKey, messages, lastErrors);
   if (stuck !== null) {
     return stuck.questions.length > 0
       ? { reply: stuck.reply, questions: stuck.questions }

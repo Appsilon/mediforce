@@ -158,6 +158,7 @@ import { namespaceLeaveCommand } from './commands/namespace-leave';
 import { namespaceRemoveMemberCommand } from './commands/namespace-remove-member';
 import { namespaceSetMemberRoleCommand } from './commands/namespace-set-member-role';
 import { namespaceSetMemberRolesCommand } from './commands/namespace-set-member-roles';
+import { namespaceSetMyModelSettingsCommand } from './commands/namespace-set-my-model-settings';
 import { namespaceCreateJoinLinkCommand } from './commands/namespace-create-join-link';
 import { namespaceListJoinLinksCommand } from './commands/namespace-list-join-links';
 import { namespaceRevokeJoinLinkCommand } from './commands/namespace-revoke-join-link';
@@ -391,13 +392,14 @@ export const TREE: Record<string, BranchEntry> = {
       get: { description: 'Fetch a namespace + member list', fn: namespaceGetCommand },
       'list-members': { description: 'List members with their process roles (reviewer, PI, …)', fn: namespaceListMembersCommand },
       create: { description: 'Create an organization namespace', fn: namespaceCreateCommand },
-      update: { description: 'Edit display name / bio / icon', fn: namespaceUpdateCommand },
+      update: { description: 'Edit display name / bio / icon / branding / output budget', fn: namespaceUpdateCommand },
       delete: { description: 'Delete a workspace (owner only, cascades members; not personal)', fn: namespaceDeleteCommand },
       reset: { description: 'Delete every workflow in a workspace, keep the workspace', fn: namespaceResetCommand },
       leave: { description: 'Leave a workspace (self-remove)', fn: namespaceLeaveCommand },
       'remove-member': { description: 'Remove a member from a workspace', fn: namespaceRemoveMemberCommand },
       'set-member-role': { description: 'Flip a member to admin|member (workspace membership)', fn: namespaceSetMemberRoleCommand },
       'set-member-roles': { description: 'Set a member\'s process roles (reviewer, PI, …)', fn: namespaceSetMemberRolesCommand },
+      'set-my-model-settings': { description: 'Set your own default model and output budget, overriding the workspace', fn: namespaceSetMyModelSettingsCommand },
       'create-join-link': { description: 'Mint a join link (printed once — the token is never recoverable)', fn: namespaceCreateJoinLinkCommand },
       'list-join-links': { description: 'List join links, live and spent', fn: namespaceListJoinLinksCommand },
       'revoke-join-link': { description: 'Revoke a join link (removes nobody who already joined)', fn: namespaceRevokeJoinLinkCommand },

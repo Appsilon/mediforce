@@ -137,6 +137,7 @@ export {
   leaveNamespace,
   removeNamespaceMember,
   updateNamespaceMemberRole,
+  setMyModelSettings,
 } from './namespaces/namespace-mutations';
 export { setNamespaceMemberRoles } from './namespaces/set-member-roles';
 

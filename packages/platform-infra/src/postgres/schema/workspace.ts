@@ -23,6 +23,8 @@ export const workspaces = pgTable('workspaces', {
   brandAccentColor: text('brand_accent_color'),
   linkedUserId: text('linked_user_id'),
   bio: text('bio'),
+  outputBudget: text('output_budget'),
+  defaultModel: text('default_model'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -37,6 +39,8 @@ export const workspaceMembers = pgTable(
     role: text('role').notNull(),
     displayName: text('display_name'),
     avatarUrl: text('avatar_url'),
+    outputBudget: text('output_budget'),
+    defaultModel: text('default_model'),
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({

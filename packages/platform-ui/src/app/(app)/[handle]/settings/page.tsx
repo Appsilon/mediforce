@@ -15,6 +15,7 @@ import { WorkspaceMembersSection } from '@/components/namespace/settings/workspa
 import { WorkspaceProfileSection } from '@/components/namespace/settings/workspace-profile-section';
 import { WorkspaceRolesSection } from '@/components/namespace/settings/workspace-roles-section';
 import { WorkspaceSecretsSection } from '@/components/namespace/settings/workspace-secrets-section';
+import { ModelSettingsSection } from '@/components/namespace/settings/model-settings-section';
 
 export default function WorkspaceConfigPage() {
   const params = useParams();
@@ -96,6 +97,16 @@ export default function WorkspaceConfigPage() {
         {canEditProfile && <WorkspaceProfileSection handle={handle} namespace={namespace} />}
 
         <DefaultWorkspaceSection handle={handle} />
+
+        <ModelSettingsSection
+          handle={handle}
+          workspace={{ outputBudget: namespace.outputBudget ?? 'default', defaultModel: namespace.defaultModel }}
+          canEditWorkspace={canEditProfile}
+          member={members.length > 1 && user !== null && currentUserMember !== undefined
+            ? { uid: user.id, outputBudget: currentUserMember.outputBudget, defaultModel: currentUserMember.defaultModel }
+            : undefined}
+          onError={setDangerError}
+        />
 
         <WorkspaceMembersSection
           handle={handle}

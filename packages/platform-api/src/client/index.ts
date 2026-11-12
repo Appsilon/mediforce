@@ -269,6 +269,9 @@ import {
   UpdateNamespaceMemberRoleInputSchema,
   UpdateNamespaceMemberRoleBodySchema,
   UpdateNamespaceMemberRoleOutputSchema,
+  SetMyModelSettingsInputSchema,
+  SetMyModelSettingsBodySchema,
+  SetMyModelSettingsOutputSchema,
   SetNamespaceMemberRolesInputSchema,
   SetNamespaceMemberRolesBodySchema,
   SetNamespaceMemberRolesOutputSchema,
@@ -300,6 +303,8 @@ import {
   type RemoveNamespaceMemberOutput,
   type UpdateNamespaceMemberRoleInput,
   type UpdateNamespaceMemberRoleOutput,
+  type SetMyModelSettingsInput,
+  type SetMyModelSettingsOutput,
   type SetNamespaceMemberRolesInput,
   type SetNamespaceMemberRolesOutput,
   DeleteDockerImageInputSchema,
@@ -1110,6 +1115,7 @@ export class Mediforce {
     removeMember: (input: RemoveNamespaceMemberInput) => Promise<RemoveNamespaceMemberOutput>;
     updateMemberRole: (input: UpdateNamespaceMemberRoleInput) => Promise<UpdateNamespaceMemberRoleOutput>;
     setMemberRoles: (input: SetNamespaceMemberRolesInput) => Promise<SetNamespaceMemberRolesOutput>;
+    setMyModelSettings: (input: SetMyModelSettingsInput) => Promise<SetMyModelSettingsOutput>;
   };
 
   /**
@@ -3083,6 +3089,17 @@ export class Mediforce {
           body,
           UpdateNamespaceMemberRoleOutputSchema,
           'mediforce.namespaces.updateMemberRole',
+        );
+      },
+      setMyModelSettings: async (input) => {
+        const validated = SetMyModelSettingsInputSchema.parse(input);
+        const body = SetMyModelSettingsBodySchema.parse(validated);
+        return this.sendJson(
+          'PUT',
+          `/api/namespaces/${encodeURIComponent(validated.handle)}/model-settings`,
+          body,
+          SetMyModelSettingsOutputSchema,
+          'mediforce.namespaces.setMyModelSettings',
         );
       },
       setMemberRoles: async (input) => {

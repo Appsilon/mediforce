@@ -3,6 +3,9 @@ import type { NamespaceSecretsRepository } from '@mediforce/platform-core';
 import { planWorkflowBuild } from '../plan-workflow-build';
 import { HandlerError } from '../../../errors';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
+import { InMemoryModelRegistryRepository } from '@mediforce/platform-core/testing';
+import { InMemoryNamespaceRepo } from '../../../testing/in-memory-namespace-repo';
+import { registryEntry } from '../../evaluation/__tests__/fixture';
 
 function fixedNamespaceSecrets(values: Record<string, string>): NamespaceSecretsRepository {
   return {
@@ -41,6 +44,27 @@ const scope = () => createTestScope({
 describe('planWorkflowBuild', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
   afterEach(() => { fetchSpy?.mockRestore(); });
+
+  it('raises the plan\'s limit under a high budget but never lowers it under a low one', async () => {
+    const maxTokensSent = async (outputBudget: 'low' | 'high') => {
+      fetchSpy?.mockRestore();
+      fetchSpy = mockModel({ plan: ['One step'], questions: [], phases: ['Working'] });
+      const namespaceRepo = new InMemoryNamespaceRepo();
+      namespaceRepo.seedNamespace({ handle: 'team-alpha', type: 'organization', displayName: 'Alpha', createdAt: '2026-01-01T00:00:00.000Z', outputBudget });
+      const models = new InMemoryModelRegistryRepository();
+      await models.upsert(registryEntry('openai/gpt-5.2', { maxCompletionTokens: 64_000 }));
+      const budgeted = createTestScope({
+        namespaceSecretsRepo: fixedNamespaceSecrets({ OPENROUTER_API_KEY: 'or-test' }),
+        caller: userCaller('u-1', ['team-alpha']),
+        namespaceRepo,
+        modelRegistryRepo: models,
+      });
+      await planWorkflowBuild({ ...input, model: 'openai/gpt-5.2' }, budgeted);
+      return (JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body)) as { max_tokens: number }).max_tokens;
+    };
+    expect(await maxTokensSent('low')).toBe(700);
+    expect(await maxTokensSent('high')).toBe(1_400);
+  });
 
   it('returns the plan, the questions and the phases for this build', async () => {
     fetchSpy = mockModel({
