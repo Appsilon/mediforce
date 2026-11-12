@@ -519,6 +519,27 @@ export const ListComparisonsOutputSchema = z.object({
   comparisons: z.array(EvalComparisonSchema),
 });
 
+/**
+ * Applies a Comparison's winning Variant for real (ADR-0024 D6): a new
+ * Workflow Definition version for a Step, patched through `registerWorkflow`,
+ * or a new Agent version for an Agent. The chosen run's own Fingerprint (or,
+ * for an Agent, its `variantAgentHash`) then backs the applied version's
+ * validation without a new Eval Run. Refused when the subject changed since
+ * the run was prepared. Never callable by the Evaluation Assistant.
+ */
+export const ApplyVariantInputSchema = z.object({
+  comparisonId: z.uuid(),
+  evalRunId: z.uuid(),
+  /** A Step's new version becomes the one unpinned runs execute. */
+  makeDefault: z.boolean().default(false),
+});
+export const ApplyVariantOutputSchema = z.object({
+  /** The Step's new Workflow Definition version; null for an Agent. */
+  definitionVersion: z.number().int().positive().nullable(),
+  /** The Agent's new version; null for a Step. */
+  agentVersion: z.number().int().positive().nullable(),
+});
+
 /** One trial of an Eval Run, with everything its Evaluators read and gave. */
 export const GetEvalTrialInputSchema = z.object({ evalRunId: z.uuid(), trialId: z.uuid() });
 
@@ -827,6 +848,8 @@ export type ListComparisonsInput = z.infer<typeof ListComparisonsInputSchema>;
 export type ComparisonRun = z.infer<typeof ComparisonRunSchema>;
 export type ComparisonOutput = z.infer<typeof ComparisonOutputSchema>;
 export type ListComparisonsOutput = z.infer<typeof ListComparisonsOutputSchema>;
+export type ApplyVariantInput = z.input<typeof ApplyVariantInputSchema>;
+export type ApplyVariantOutput = z.infer<typeof ApplyVariantOutputSchema>;
 export type GetEvalTrialInput = z.infer<typeof GetEvalTrialInputSchema>;
 export type GetEvalTrialOutput = z.infer<typeof GetEvalTrialOutputSchema>;
 export type EvalTrialEvaluator = z.infer<typeof EvalTrialEvaluatorSchema>;
