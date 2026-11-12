@@ -11,7 +11,7 @@ import { callerInstructionMessages } from './_lib/caller-instructions';
 import { parseModelJson } from './_lib/parse-model-json';
 import { requireOpenRouterApiKey } from '../../services/openrouter-key';
 import { callerUserId } from '../../auth';
-import { loadModelSettings, resolveDefaultModel } from '../../services/model-settings';
+import { loadModelSettings, resolveDefaultModel, resolveOutputTokens } from '../../services/model-settings';
 
 interface PlanScopedInput extends PlanWorkflowBuildInput {
   namespace: string;
@@ -40,13 +40,12 @@ export async function planWorkflowBuild(
 
   const apiKey = await requireOpenRouterApiKey(scope, input.namespace);
 
+  const modelSettings = await loadModelSettings(scope.workspaces, { namespace: input.namespace, userId: callerUserId(scope.caller) });
+  const model = input.model ?? (await resolveDefaultModel(scope.models, modelSettings));
   const response = await callOpenRouter({
-    model: input.model ?? (await resolveDefaultModel(
-      scope.models,
-      await loadModelSettings(scope.workspaces, { namespace: input.namespace, userId: callerUserId(scope.caller) }),
-    )),
+    model,
     apiKey,
-    maxTokens: PLAN_MAX_OUTPUT_TOKENS,
+    maxTokens: await resolveOutputTokens(scope.models, modelSettings, { model, defaultTokens: PLAN_MAX_OUTPUT_TOKENS, raiseOnly: true }),
     messages: [
       { role: 'system', content: buildPlanPrompt() },
       // The plan the person reads has to be the plan the build follows — a

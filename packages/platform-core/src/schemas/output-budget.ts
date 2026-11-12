@@ -32,7 +32,8 @@ export const OUTPUT_TOKEN_DEFAULTS = {
  * it up to the model's own limit; `max` is that limit. A raise never goes below
  * the call's default, and is not taken at all when the registry doesn't know the
  * model's limit. `capAtModelLimit` caps every budget, for a call that has always
- * been capped (the eval judge).
+ * been capped (the eval judge). `raiseOnly` keeps `low` at the default, for a
+ * short fixed-shape reply that a smaller limit would only cut off.
  */
 export function resolveMaxOutputTokens(input: {
   defaultTokens: number;
@@ -40,8 +41,10 @@ export function resolveMaxOutputTokens(input: {
   budget?: OutputBudget;
   modelMaxCompletionTokens?: number | null;
   capAtModelLimit?: boolean;
+  raiseOnly?: boolean;
 }): number {
-  const budget = input.budget ?? 'default';
+  const asked = input.budget ?? 'default';
+  const budget = input.raiseOnly === true && asked === 'low' ? 'default' : asked;
   const modelLimit = input.modelMaxCompletionTokens ?? 0;
   const knowsModelLimit = modelLimit > 0;
 
