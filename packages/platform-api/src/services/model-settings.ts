@@ -52,7 +52,7 @@ export async function resolveDefaultModel(models: Models, settings: ModelSetting
 export async function resolveOutputTokens(
   models: Models,
   settings: ModelSettings,
-  request: { model: string; defaultTokens: number; capAtModelLimit?: boolean },
+  request: { model: string; defaultTokens: number; capAtModelLimit?: boolean; raiseOnly?: boolean },
 ): Promise<number> {
   // The registry lists no aliases, so the platform default's limits are its pinned model's.
   const limitModel = request.model === DEFAULT_MODEL ? pinDefaultModel(await models.list()) : request.model;
@@ -62,5 +62,6 @@ export async function resolveOutputTokens(
     budget: settings.outputBudget,
     modelMaxCompletionTokens: entry?.maxCompletionTokens,
     capAtModelLimit: request.capAtModelLimit,
+    raiseOnly: request.raiseOnly,
   });
 }

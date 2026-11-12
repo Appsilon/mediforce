@@ -59,6 +59,7 @@ const MAX_TOOL_LOOP_ITERATIONS = 12;
 // means fewer chunks (each chunk re-sends the prompt), but truncation is
 // recoverable, so this is a throughput knob, not a correctness one.
 const ASSISTANT_MAX_OUTPUT_TOKENS = OUTPUT_TOKEN_DEFAULTS.assistant;
+const STUCK_REPLY_MAX_OUTPUT_TOKENS = 500;
 
 function buildToolDefinitions(options: { canSchedule: boolean }): OpenRouterToolDefinition[] {
   // Platform tools run here, as the caller, and their results come back into
@@ -249,6 +250,7 @@ const StuckReplySchema = z.object({
  */
 async function askWhatItCouldNotResolve(
   model: string,
+  maxTokens: number,
   apiKey: string,
   messages: OpenRouterChatMessage[],
   errors: string[],
@@ -257,7 +259,7 @@ async function askWhatItCouldNotResolve(
     const response = await callOpenRouter({
       model,
       apiKey,
-      maxTokens: 500,
+      maxTokens,
       messages: [
         ...messages,
         {
@@ -449,7 +451,12 @@ export async function askWorkflowAssistant(
     }
   }
 
-  const stuck = await askWhatItCouldNotResolve(model, apiKey, messages, lastErrors);
+  const stuckMaxTokens = await resolveOutputTokens(scope.models, modelSettings, {
+    model,
+    defaultTokens: STUCK_REPLY_MAX_OUTPUT_TOKENS,
+    raiseOnly: true,
+  });
+  const stuck = await askWhatItCouldNotResolve(model, stuckMaxTokens, apiKey, messages, lastErrors);
   if (stuck !== null) {
     return stuck.questions.length > 0
       ? { reply: stuck.reply, questions: stuck.questions }
