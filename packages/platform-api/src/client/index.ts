@@ -633,6 +633,10 @@ import {
   ListAgentProductionRunsOutputSchema,
   ListStepAgentRunsInputSchema,
   ListStepAgentRunsOutputSchema,
+  ListReviewedRunsInputSchema,
+  ListReviewedRunsOutputSchema,
+  ImportReviewedRunsInputSchema,
+  ImportReviewedRunsOutputSchema,
   PreviewEvaluatorInputSchema,
   PreviewEvaluatorOutputSchema,
   SetEvaluationBriefInputSchema,
@@ -684,6 +688,10 @@ import {
   type ListAgentProductionRunsOutput,
   type ListStepAgentRunsInput,
   type ListStepAgentRunsOutput,
+  type ListReviewedRunsInput,
+  type ListReviewedRunsOutput,
+  type ImportReviewedRunsInput,
+  type ImportReviewedRunsOutput,
   type PreviewEvaluatorInput,
   type PreviewEvaluatorOutput,
   type SetEvaluationBriefInput,
@@ -1167,6 +1175,10 @@ export class Mediforce {
     approveEvaluatorSource: (input: ApproveEvaluatorSourceInput) => Promise<EvaluatorOutput>;
     previewEvaluator: (input: PreviewEvaluatorInput) => Promise<PreviewEvaluatorOutput>;
     listStepAgentRuns: (input: ListStepAgentRunsInput) => Promise<ListStepAgentRunsOutput>;
+    /** A subject's reviewed production runs not yet an Eval Case (ADR-0024 D7). */
+    listReviewedRuns: (input: ListReviewedRunsInput) => Promise<ListReviewedRunsOutput>;
+    /** Imports the subject's reviewed production runs as Eval Cases in bulk, dev/holdout split by review session. */
+    importReviewedRuns: (input: ImportReviewedRunsInput) => Promise<ImportReviewedRunsOutput>;
     /** The finished production runs of the Steps that use an Agent, each with what its Step changes about it. */
     listAgentProductionRuns: (input: ListAgentProductionRunsInput) => Promise<ListAgentProductionRunsOutput>;
     /** What one Agent Run's step was given and what it returned. */
@@ -2790,6 +2802,24 @@ export class Mediforce {
         });
         return this.getJson(`/api/evaluation/agent-runs${qs}`, ListStepAgentRunsOutputSchema, 'mediforce.evaluation.listStepAgentRuns');
       },
+      listReviewedRuns: async (input) => {
+        const validated = ListReviewedRunsInputSchema.parse(input);
+        const qs = toSearchParams({
+          namespace: validated.namespace,
+          workflowName: validated.workflowName,
+          stepId: validated.stepId,
+          agentId: validated.agentId,
+          verdict: validated.verdict,
+          definitionVersion: validated.definitionVersion === undefined ? undefined : String(validated.definitionVersion),
+          since: validated.since,
+          until: validated.until,
+        });
+        return this.getJson(`/api/evaluation/reviewed-runs${qs}`, ListReviewedRunsOutputSchema, 'mediforce.evaluation.listReviewedRuns');
+      },
+      importReviewedRuns: async (input) => this.sendJson(
+        'POST', '/api/evaluation/reviewed-runs/import', ImportReviewedRunsInputSchema.parse(input),
+        ImportReviewedRunsOutputSchema, 'mediforce.evaluation.importReviewedRuns',
+      ),
       listCases: async (input) => {
         const validated = ListEvalCasesInputSchema.parse(input);
         const qs = toSearchParams({

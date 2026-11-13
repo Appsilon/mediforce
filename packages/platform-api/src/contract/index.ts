@@ -815,6 +815,16 @@ export {
   type GetStepDriftInput,
   type GetStepDriftOutput,
   type EvaluatorDrift,
+  ReviewOutcomeSchema,
+  ListReviewedRunsInputSchema,
+  ListReviewedRunsOutputSchema,
+  ReviewedRunCandidateSchema,
+  ImportReviewedRunsInputSchema,
+  ImportReviewedRunsOutputSchema,
+  type ListReviewedRunsInput,
+  type ListReviewedRunsOutput,
+  type ImportReviewedRunsInput,
+  type ImportReviewedRunsOutput,
 } from './evaluation';
 
 export {
