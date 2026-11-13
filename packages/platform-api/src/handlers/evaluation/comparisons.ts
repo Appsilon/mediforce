@@ -78,13 +78,13 @@ function baselineMismatches(
   ];
 }
 
-async function loadComparison(scope: CallerScope, comparisonId: string): Promise<EvalComparison> {
+export async function loadComparison(scope: CallerScope, comparisonId: string): Promise<EvalComparison> {
   const comparison = await scope.evaluation.getComparison(comparisonId);
   if (comparison === null) throw new NotFoundError(`Comparison '${comparisonId}' not found`);
   return comparison;
 }
 
-async function loadRun(scope: CallerScope, evalRunId: string): Promise<EvalRun> {
+export async function loadRun(scope: CallerScope, evalRunId: string): Promise<EvalRun> {
   const run = await scope.evaluation.getEvalRun(evalRunId);
   if (run === null) throw new NotFoundError(`Eval Run '${evalRunId}' not found`);
   return run;
