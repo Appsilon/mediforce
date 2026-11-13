@@ -165,7 +165,13 @@ the file itself. They are text and capped (64 KiB a file, 256 KiB the set) by
 data and installed dependencies belong in an image.
 
 Containers run `--rm -i`, capped at 8 GB / 2 CPUs, named
-`mediforce-<runId>-<stepId>`. Network is unrestricted.
+`mediforce-<runId>-<stepId>`. Network is unrestricted. A **script** step may ask
+for other limits with `script.resources` (`{ "memory": "16g", "cpus": 4 }`;
+memory in whole `m`/`g`), granted up to the deployment's `SCRIPT_MAX_MEMORY` /
+`SCRIPT_MAX_CPUS` — both default to 8g / 2, so a larger request is clamped (and
+says so in the step's activity) unless the deployment raised them
+([`script-resources.ts`](../../packages/agent-runtime/src/plugins/script-resources.ts)).
+Agent steps stay at 8 GB / 2 CPUs.
 
 **A stdio MCP server runs inside the step's image.** The agent's bindings resolve
 to catalog entries whose `command` (`uvx`, `npx`, …) must exist in that image;

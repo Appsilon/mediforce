@@ -261,6 +261,47 @@ describe('WorkflowDefinitionSchema — script step config', () => {
     expect(() => WorkflowDefinitionSchema.parse(wd)).not.toThrow();
   });
 
+  it('accepts script.resources with memory and cpus', () => {
+    const wd = wdWithScanStep({
+      executor: 'script',
+      plugin: 'script-container',
+      script: { command: 'python /scripts/scan.py', image: 'python:3.12-slim', resources: { memory: '16g', cpus: 4 } },
+    });
+    expect(() => WorkflowDefinitionSchema.parse(wd)).not.toThrow();
+  });
+
+  it('accepts script.resources with only one of memory or cpus', () => {
+    const memoryOnly = wdWithScanStep({
+      executor: 'script',
+      plugin: 'script-container',
+      script: { command: 'run', image: 'alpine:3.19', resources: { memory: '512m' } },
+    });
+    const cpusOnly = wdWithScanStep({
+      executor: 'script',
+      plugin: 'script-container',
+      script: { command: 'run', image: 'alpine:3.19', resources: { cpus: 0.5 } },
+    });
+    expect(() => WorkflowDefinitionSchema.parse(memoryOnly)).not.toThrow();
+    expect(() => WorkflowDefinitionSchema.parse(cpusOnly)).not.toThrow();
+  });
+
+  it.each([
+    ['memory without a unit', { memory: '16' }],
+    ['memory in an unsupported unit', { memory: '16gb' }],
+    ['zero memory', { memory: '0g' }],
+    ['zero cpus', { cpus: 0 }],
+    ['negative cpus', { cpus: -1 }],
+    ['memory below docker\'s 6m minimum', { memory: '5m' }],
+    ['cpus below docker\'s 0.01 minimum', { cpus: 0.001 }],
+  ])('rejects script.resources with %s', (_label, resources) => {
+    const wd = wdWithScanStep({
+      executor: 'script',
+      plugin: 'script-container',
+      script: { command: 'run', image: 'alpine:3.19', resources },
+    });
+    expect(WorkflowDefinitionSchema.safeParse(wd).success).toBe(false);
+  });
+
   it('rejects the old shape: executor=script with script config under step.agent', () => {
     const wd = wdWithScanStep({
       executor: 'script',

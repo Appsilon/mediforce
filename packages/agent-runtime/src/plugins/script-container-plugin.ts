@@ -18,6 +18,7 @@ import {
 } from './base-container-agent-plugin';
 import { CONTAINER_ARTIFACTS_MOUNT, materializeArtifacts } from './workflow-artifacts';
 import { RESULT_FILE_NAME, readStepResult } from '../workspace/output-files';
+import { resolveScriptResources } from './script-resources';
 
 // Last-resort for the legacy process-mode path only; the workflow path resolves
 // the timeout via resolveStepTimeoutMinutes. The resolver's own default, so the
@@ -344,11 +345,17 @@ export class ScriptContainerPlugin extends ContainerPlugin {
           envFlags.push('-e', `${key}=${value}`);
         }
 
+        const requestedResources = isWorkflowAgentContext(this.context) ? this.context.step.script?.resources : undefined;
+        const resources = resolveScriptResources(requestedResources, process.env);
+        for (const line of resources.clamped) {
+          emitLine(`[resources] request clamped to the deployment cap: ${line}`);
+        }
+
         const dockerArgs: string[] = [
           'run', '--rm',
           '--name', containerName,
-          '--memory', '8g',
-          '--cpus', '2',
+          '--memory', resources.memory,
+          '--cpus', String(resources.cpus),
           '-v', `${engineDir}:${CONTAINER_ENGINE_MOUNT}:ro`,
           '-v', `${this.runWorkspaceHandle!.path}:/workspace`,
           '-v', `${stepOutputDir}:${CONTAINER_OUTPUT_MOUNT}`,

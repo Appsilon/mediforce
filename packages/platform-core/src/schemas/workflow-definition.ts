@@ -201,6 +201,20 @@ export const WorkflowAgentConfigSchema = z.object({
 }).merge(ContainerSchema);
 
 /**
+ * Container limits a script step asks for. Unset fields keep the platform
+ * default (8g, 2 CPUs); the plugin clamps a request to the deployment's
+ * SCRIPT_MAX_MEMORY / SCRIPT_MAX_CPUS. Lower bounds are docker's own
+ * (--memory 6m, --cpus 0.01), so a value docker would reject fails here.
+ */
+export const ScriptResourcesSchema = z.object({
+  memory: z.string()
+    .regex(/^[1-9]\d*[mg]$/, 'memory must be a whole number of m or g, e.g. "512m" or "16g"')
+    .refine((memory) => memory.endsWith('g') || Number(memory.slice(0, -1)) >= 6, 'memory must be at least 6m')
+    .optional(),
+  cpus: z.number().min(0.01).optional(),
+});
+
+/**
  * Config for deterministic script steps (executor='script', plugin='script-container').
  * Exactly one of `command` (run in `image`) or `inlineScript` (run via `runtime`)
  * must be set. Container image fields (`image`, `dockerfile`, `context`, `repo`, `commit`,
@@ -212,6 +226,7 @@ export const ScriptStepConfigSchema = z.object({
   inlineScript: z.string().min(1).optional(),
   runtime: z.enum(['javascript', 'python', 'r', 'bash']).optional(),
   timeoutMinutes: StepTimeoutMinutesSchema.optional(),
+  resources: ScriptResourcesSchema.optional(),
 }).merge(ContainerSchema).superRefine((config, ctx) => {
   if ((config.command !== undefined) === (config.inlineScript !== undefined)) {
     ctx.addIssue({
