@@ -6,7 +6,7 @@ import { Sparkles } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { AgentOutputSchema, EvaluationSubject } from '@mediforce/platform-core';
 import { cn } from '@/lib/utils';
-import { useStepEvaluation, useWorkflowValidation } from '@/hooks/use-step-evaluation';
+import { useAgentDefinition, useStepEvaluation, useWorkflowValidation } from '@/hooks/use-step-evaluation';
 import { useWorkflowRunGate } from '@/hooks/use-workflow-access';
 import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
 import { VALIDATION_STATUS } from './validation-status';
@@ -14,6 +14,7 @@ import { buttonClass, primaryButtonClass, tabTriggerClass } from './evaluation-s
 import { EvaluationAssistantPanel } from './evaluation-assistant-panel';
 import { AssistantResizeHandle, assistantColumns, useAssistantHeight, useAssistantWidth } from './assistant-width';
 import { GuidedSetup, SETUP_STAGES, SetupChoice, type SetupStage } from './guided-setup';
+import { OptimizationSection } from './optimization-section';
 import {
   EvaluationStatusStrip,
   CasesSection,
@@ -22,7 +23,7 @@ import {
   DriftAlert,
 } from './step-evaluation-sections';
 
-const SECTIONS = ['runs', 'cases', 'evaluators'] as const;
+const SECTIONS = ['runs', 'cases', 'evaluators', 'optimization'] as const;
 type SectionTab = (typeof SECTIONS)[number];
 
 function isSectionTab(value: string | null): value is SectionTab {
@@ -107,11 +108,14 @@ function isEmptySubject(evaluation: ReturnType<typeof useStepEvaluation>): boole
  * page's `header`, which stays over every mode, Guided setup opens the setup
  * from the tabs and Manual setup leaves it for them.
  */
-export function StepEvaluation({ header, step, definitionVersion, outputSchema, mayEdit, editReason, mayRun, runReason, pickedHere = false }: {
+export function StepEvaluation({ header, step, definitionVersion, outputSchema, currentModel, currentPrompt, mayEdit, editReason, mayRun, runReason, pickedHere = false }: {
   header: React.ReactNode;
   step: EvaluationSubject;
   definitionVersion: number | null;
   outputSchema: AgentOutputSchema | undefined;
+  /** The model and prompt a Comparison's baseline runs as it is now; undefined while its Agent is still loading. */
+  currentModel: string | undefined;
+  currentPrompt: string | undefined;
   mayEdit: boolean;
   editReason: string | undefined;
   mayRun: boolean;
@@ -135,6 +139,7 @@ export function StepEvaluation({ header, step, definitionVersion, outputSchema, 
     { value: 'runs', label: 'Eval Runs', count: undefined, tour: 'eval-runs' },
     { value: 'cases', label: 'Eval Cases', count: caseCount, tour: 'eval-cases' },
     { value: 'evaluators', label: 'Evaluators', count: evaluation.evaluators.data === undefined ? undefined : evaluators.length, tour: 'eval-evaluators' },
+    { value: 'optimization', label: 'Optimization', count: undefined, tour: 'eval-optimization' },
   ];
   const switchClass = 'inline-flex items-center gap-1.5 px-3 py-1.5 text-sm';
   const frame = (content: React.ReactNode, switchButton: React.ReactNode) => (
@@ -219,6 +224,17 @@ export function StepEvaluation({ header, step, definitionVersion, outputSchema, 
               stepOutputSchema={outputSchema}
             />
           </Tabs.Content>
+          <Tabs.Content value="optimization" forceMount className="p-4 data-[state=inactive]:hidden">
+            <OptimizationSection
+              step={step}
+              definitionVersion={definitionVersion}
+              datasets={evaluation.datasets}
+              currentModel={currentModel}
+              currentPrompt={currentPrompt}
+              mayRun={mayRun}
+              runReason={runReason}
+            />
+          </Tabs.Content>
         </Tabs.Root>
         <div ref={assistantHeight.ref} className="relative lg:sticky lg:top-6 lg:h-[var(--assistant-height,calc(100dvh-10rem))]" style={{ '--assistant-height': assistantHeight.height === undefined ? undefined : `${assistantHeight.height}px` } as React.CSSProperties}>
           <AssistantResizeHandle {...assistantWidth} />
@@ -267,6 +283,11 @@ export function EvaluationTab({ handle, workflowName, runnableVersion, mayEdit, 
   const requestedVersion = Number(searchParams.get('version'));
   const selectedVersion = liveVersions.some((version) => version.version === requestedVersion) ? requestedVersion : runnableVersion;
   const { definition, loading: definitionLoading, error: definitionError } = useWorkflowVersion(workflowName, handle, selectedVersion);
+  const agentSteps = (definition?.steps ?? []).filter((step) => step.executor === 'agent');
+  const selected = agentSteps.find((step) => step.id === searchParams.get('step')) ?? agentSteps[0];
+  const agentDefinition = useAgentDefinition(selected?.agentId);
+  const currentModel = selected?.agent?.model ?? agentDefinition.data?.agent.foundationModel;
+  const currentPrompt = selected?.agent?.prompt ?? agentDefinition.data?.agent.systemPrompt;
 
   const [pickedHere, setPickedHere] = React.useState(false);
   const select = (next: { version?: number; step?: string }) => {
@@ -294,8 +315,6 @@ export function EvaluationTab({ handle, workflowName, runnableVersion, mayEdit, 
   }
   const versionStatus = new Map((validation.data?.versions ?? []).map((version) => [version.definitionVersion, version]));
   const stepStatus = new Map((versionStatus.get(selectedVersion)?.steps ?? []).map((step) => [step.stepId, step.validation.status]));
-  const agentSteps = definition.steps.filter((step) => step.executor === 'agent');
-  const selected = agentSteps.find((step) => step.id === searchParams.get('step')) ?? agentSteps[0];
 
   const versionOption = (version: number) => {
     const status = versionStatus.get(version);
@@ -351,6 +370,8 @@ export function EvaluationTab({ handle, workflowName, runnableVersion, mayEdit, 
       step={{ kind: 'step', namespace: handle, workflowName, stepId: selected.id }}
       definitionVersion={selectedVersion}
       outputSchema={selected.agent?.outputSchema}
+      currentModel={currentModel}
+      currentPrompt={currentPrompt}
       mayEdit={mayEdit}
       editReason={editReason}
       mayRun={mayRun}

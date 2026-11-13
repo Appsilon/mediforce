@@ -18,8 +18,10 @@ type Section =
   | 'criteria'
   | 'mcp-policy'
   | 'drift'
+  | 'comparisons'
   | `qualification:${number | 'runnable'}`
-  | `estimate:${number}:${number}`;
+  | `estimate:${number}:${number}`
+  | `comparison:${string}`;
 
 const STEP_AGENT_RUNS_PAGE = 20;
 
@@ -263,6 +265,54 @@ export function useEvalTrial(evalRunId: string, trialId: string) {
       const status = query.state.data?.trial.status;
       return status === 'pending' || status === 'running' || status === 'scoring' ? 3000 : false;
     },
+  });
+}
+
+/** The subject's Comparisons, newest first (ADR-0024). */
+export function useComparisons(step: EvaluationSubject) {
+  return useQuery({ queryKey: sectionKey(step, 'comparisons'), queryFn: () => mediforce.evaluation.listComparisons(step), retry: stopRetryOn4xx });
+}
+
+/** Each listed Comparison's full report, in order — the list view's variants/best-call/spend columns. */
+export function useComparisonOutputs(step: EvaluationSubject, comparisons: readonly { id: string }[]) {
+  return useQueries({
+    queries: comparisons.map((comparison) => ({
+      queryKey: sectionKey(step, `comparison:${comparison.id}`),
+      queryFn: () => mediforce.evaluation.getComparison({ comparisonId: comparison.id }),
+      retry: stopRetryOn4xx,
+    })),
+  });
+}
+
+/** Each named Eval Run with its trials and report, in order — a Comparison's per-case drill-down. */
+export function useEvalRuns(evalRunIds: readonly string[]) {
+  return useQueries({
+    queries: evalRunIds.map((evalRunId) => ({
+      queryKey: queryKeys.evalRun(evalRunId),
+      queryFn: () => mediforce.evaluation.getRun({ evalRunId }),
+      retry: stopRetryOn4xx,
+    })),
+  });
+}
+
+/** One Comparison with each run and its report; polled while it is still running. */
+export function useComparison(step: EvaluationSubject, comparisonId: string | null) {
+  return useQuery({
+    queryKey: comparisonId === null ? ['comparison', 'none'] : sectionKey(step, `comparison:${comparisonId}`),
+    queryFn: comparisonId === null ? skipToken : () => mediforce.evaluation.getComparison({ comparisonId }),
+    enabled: comparisonId !== null,
+    retry: stopRetryOn4xx,
+    refetchInterval: (query) => (query.state.data?.comparison.status === 'running' ? 5000 : false),
+  });
+}
+
+/** The Agent definition itself, by id; off while `agentId` is undefined. */
+export function useAgentDefinition(agentId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.agentDefinition(agentId ?? ''),
+    queryFn: () => mediforce.agents.get({ id: agentId! }),
+    enabled: agentId !== undefined,
+    retry: stopRetryOn4xx,
   });
 }
 

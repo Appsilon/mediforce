@@ -68,7 +68,7 @@ import {
   type CheckDraft,
 } from './evaluator-check-editor';
 
-type StepEvaluation = ReturnType<typeof useStepEvaluation>;
+export type StepEvaluation = ReturnType<typeof useStepEvaluation>;
 
 /** One tab of the Evaluation: the tab names it, so its heading is for screen readers only. */
 function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
@@ -1762,14 +1762,14 @@ export function EvaluationStatusStrip({ step, criteria, qualification, datasets,
 }
 
 /** The cap an Eval Run gets when the person sets no budget, as `prepare` sets it. */
-type BudgetChoice = { kind: 'set'; budgetUsd: number } | { kind: 'auto'; suggestedUsd: number | null };
+export type BudgetChoice = { kind: 'set'; budgetUsd: number } | { kind: 'auto'; suggestedUsd: number | null };
 
 /**
  * Asks the person to confirm an Eval Run's budget before it starts (D15): what
  * it is estimated to cost and the cap it spends up to — with a warning when the
  * budget was left on auto.
  */
-function StartEvalRunDialog({ trials, estimatedUsd, budget, starting, error, onStart, onClose }: {
+export function StartEvalRunDialog({ trials, estimatedUsd, budget, starting, error, onStart, onClose }: {
   trials: number | null;
   estimatedUsd: number | null;
   budget: BudgetChoice;
@@ -1863,13 +1863,13 @@ export function StartEvalRunCard({ step, prepared, otherVersion, mayRun, runReas
 }
 
 /** A whole number of trials per case the run accepts, or null. */
-function parseTrialsPerCase(text: string): number | null {
+export function parseTrialsPerCase(text: string): number | null {
   const trials = Number(text);
   return text.trim() !== '' && Number.isInteger(trials) && trials >= 1 && trials <= 10 ? trials : null;
 }
 
 /** The person's spend cap, or null when left on auto (or not a positive amount). */
-function parseBudgetUsd(text: string): number | null {
+export function parseBudgetUsd(text: string): number | null {
   const budget = Number(text);
   return text.trim() !== '' && Number.isFinite(budget) && budget > 0 ? budget : null;
 }

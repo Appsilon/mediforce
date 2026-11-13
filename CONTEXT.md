@@ -592,8 +592,9 @@ _Avoid_: "Experiment" (vague, collides with nothing but explains nothing).
 **Optimisation**:
 The activity of finding a better configuration of an Evaluation's subject — by
 comparing Variants on its Eval Cases, and by learning from the runs reviewers
-sent back. Shares the subject's Eval Cases and Evaluators; is to get its own
-**Optimization** sub-tab (ADR-0024; not built yet).
+sent back. Shares the subject's Eval Cases and Evaluators, on its own
+**Optimization** sub-tab (ADR-0024). Applying a winning Variant for real is not
+built yet.
 _Avoid_: "tuning", "fine-tuning" (no model weights change).
 
 **Variant**:
@@ -605,7 +606,7 @@ _Avoid_: "challenger" (the retired in-run design), "candidate", "config".
 **Comparison**:
 A baseline Eval Run and one to four Variant Eval Runs on the same cases,
 Evaluators and criteria, prepared and confirmed as one, and reported case by
-case against the baseline. Designed in ADR-0024; not built yet.
+case against the baseline (ADR-0024).
 _Avoid_: "Experiment", "A/B test".
 
 ### Audit / observability
