@@ -187,6 +187,13 @@ services:
       # same var; unset on both means the worker enforces no header, which is
       # every estate that has not opted in.
       - CONTAINER_WORKER_SECRET=${CONTAINER_WORKER_SECRET:-}
+      # Largest `script.resources` a script step may ask for (`docker run
+      # --memory/--cpus`). Unset = 8g / 2, the limit every script step had
+      # before, so larger requests are clamped down to it. Raise only as far as
+      # the host can serve: the container-worker runs up to 4 steps at once, and
+      # docker rejects --cpus above the host's CPU count.
+      - SCRIPT_MAX_MEMORY=${SCRIPT_MAX_MEMORY:-}
+      - SCRIPT_MAX_CPUS=${SCRIPT_MAX_CPUS:-}
       - MEDIFORCE_ROOT=/repo
       # Per-run worktrees + bare repos live here. Path must be identical
       # in-container and on the host so `docker run -v <wt>:/workspace` from

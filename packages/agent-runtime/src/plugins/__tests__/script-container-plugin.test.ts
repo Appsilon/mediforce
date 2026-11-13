@@ -733,3 +733,77 @@ describe('ScriptContainerPlugin', () => {
     });
   });
 });
+
+describe('ScriptContainerPlugin — script.resources', () => {
+  let plugin: ScriptContainerPlugin;
+  const originalMaxMemory = process.env.SCRIPT_MAX_MEMORY;
+  const originalMaxCpus = process.env.SCRIPT_MAX_CPUS;
+
+  beforeEach(() => {
+    plugin = new ScriptContainerPlugin({ workspaceManager: createFakeWorkspaceManager() });
+    spawnMock.mockReset();
+    delete process.env.SCRIPT_MAX_MEMORY;
+    delete process.env.SCRIPT_MAX_CPUS;
+  });
+
+  afterEach(() => {
+    if (originalMaxMemory === undefined) delete process.env.SCRIPT_MAX_MEMORY;
+    else process.env.SCRIPT_MAX_MEMORY = originalMaxMemory;
+    if (originalMaxCpus === undefined) delete process.env.SCRIPT_MAX_CPUS;
+    else process.env.SCRIPT_MAX_CPUS = originalMaxCpus;
+  });
+
+  function contextWithResources(resources: { memory?: string; cpus?: number } | undefined): WorkflowAgentContext {
+    return {
+      stepId: 'validate',
+      processInstanceId: 'pi-resources',
+      runNamespace: 'acme',
+      definitionVersion: '1',
+      stepInput: {},
+      autonomyLevel: 'L4',
+      workflowDefinition: buildWorkflowDefinition({ name: 'core', version: 1, namespace: 'acme', steps: [], transitions: [] }),
+      step: {
+        id: 'validate',
+        name: 'Validate',
+        type: 'creation',
+        executor: 'script',
+        script: { command: 'python3 /artifacts/run.py', image: 'python:3.12-slim', ...(resources !== undefined ? { resources } : {}) },
+      },
+      llm: { complete: vi.fn() },
+      getPreviousStepOutputs: vi.fn().mockResolvedValue({}),
+    };
+  }
+
+  function limitArgs(dockerArgs: string[]): { memory: string; cpus: string } {
+    return {
+      memory: dockerArgs[dockerArgs.indexOf('--memory') + 1],
+      cpus: dockerArgs[dockerArgs.indexOf('--cpus') + 1],
+    };
+  }
+
+  it('[DATA] runs a step that asks for nothing with 8g / 2 CPUs', async () => {
+    await plugin.initialize(contextWithResources(undefined));
+    mockSpawnSuccess(createMockChild());
+    await plugin.run(buildEmitSpy().emit);
+    expect(limitArgs(spawnMock.mock.calls[0][1] as string[])).toEqual({ memory: '8g', cpus: '2' });
+  });
+
+  it('[DATA] passes the step\'s requested limits to docker run within the deployment caps', async () => {
+    process.env.SCRIPT_MAX_MEMORY = '32g';
+    process.env.SCRIPT_MAX_CPUS = '8';
+    await plugin.initialize(contextWithResources({ memory: '16g', cpus: 4 }));
+    mockSpawnSuccess(createMockChild());
+    await plugin.run(buildEmitSpy().emit);
+    expect(limitArgs(spawnMock.mock.calls[0][1] as string[])).toEqual({ memory: '16g', cpus: '4' });
+  });
+
+  it('[DATA] clamps a request above the caps and reports it in the activity log', async () => {
+    await plugin.initialize(contextWithResources({ memory: '16g', cpus: 4 }));
+    mockSpawnSuccess(createMockChild());
+    const { emit, events } = buildEmitSpy();
+    await plugin.run(emit);
+    expect(limitArgs(spawnMock.mock.calls[0][1] as string[])).toEqual({ memory: '8g', cpus: '2' });
+    const notice = events.find((event) => event.type === 'assistant' && String(event.payload).includes('SCRIPT_MAX_MEMORY'));
+    expect(notice, 'clamping is visible in the step activity').toBeDefined();
+  });
+});
