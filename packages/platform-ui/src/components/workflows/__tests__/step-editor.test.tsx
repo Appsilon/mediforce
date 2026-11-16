@@ -30,6 +30,14 @@ const qualificationState = vi.hoisted(() => ({
   byAgent: {} as Record<string, 'passed' | 'not_verified'>,
 }));
 
+// The selected agent's versions/current, as useAgentVersions would answer; reset in beforeEach.
+const agentVersionsState = vi.hoisted(() => ({
+  data: undefined as { versions: unknown[]; current: number | null } | undefined,
+}));
+
+// Current version of every agent the picker offers, by id; reset in beforeEach.
+const currentAgentVersionsState = vi.hoisted(() => new Map<string, number | null>());
+
 vi.mock('@/hooks/use-step-evaluation', () => ({
   useStepQualification: (subject: unknown) => ({
     data: subject === null || qualificationState.status === null
@@ -37,7 +45,8 @@ vi.mock('@/hooks/use-step-evaluation', () => ({
       : { agentVersion: 3, validation: { status: qualificationState.status, reason: 'Eval Run 1a2b3c4d met its Acceptance Criteria', evalRunId: null, runInProgress: false } },
   }),
   useAgentValidationStatuses: () => new Map(Object.entries(qualificationState.byAgent)),
-  useAgentVersions: () => ({ data: undefined }),
+  useAgentVersions: () => ({ data: agentVersionsState.data }),
+  useCurrentAgentVersions: () => currentAgentVersionsState,
 }));
 
 vi.mock('@/hooks/use-model-registry', () => ({
@@ -217,6 +226,8 @@ describe('StepEditor', () => {
     agentState.error = false;
     qualificationState.status = null;
     qualificationState.byAgent = {};
+    agentVersionsState.data = undefined;
+    currentAgentVersionsState.clear();
     modelState.models = [];
     mcpState.catalog = [];
     mcpState.checks = {};
@@ -750,6 +761,49 @@ describe('StepEditor', () => {
     fireEvent.change(agentSelect, { target: { value: 'clinical-reviewer' } });
 
     expect(onChange).toHaveBeenCalledWith({ agentId: 'clinical-reviewer', agent: undefined, plugin: 'claude-code-agent' });
+  });
+
+  it('[DATA] picking an agent pins the step to its current version (ADR-0029 epic #1673)', async () => {
+    agentState.response = {
+      agents: [buildAgentDefinition('clinical-reviewer', 'Clinical Reviewer', 'claude-code-agent')],
+    };
+    currentAgentVersionsState.set('clinical-reviewer', 4);
+    const onChange = vi.fn();
+
+    render(<StepEditor step={buildStep({ executor: 'agent' })} allSteps={[]} onChange={onChange} />);
+    expandCard('Prompt & model');
+    const agentSelect = await screen.findByRole('combobox', { name: 'Agent' });
+
+    fireEvent.change(agentSelect, { target: { value: 'clinical-reviewer' } });
+
+    expect(onChange).toHaveBeenCalledWith({ agentId: 'clinical-reviewer', agent: undefined, plugin: 'claude-code-agent', agentVersion: 4 });
+  });
+
+  it('[RENDER] offers every recorded version to pick, flags the pin as stale when the Agent moved past it', async () => {
+    const agent = { ...buildAgentDefinition('clinical-reviewer', 'Clinical Reviewer', 'claude-code-agent'), namespace: 'test' };
+    agentState.response = { agents: [agent] };
+    agentVersionsState.data = { versions: [{ version: 5, config: {} }, { version: 3, config: {} }], current: 5 };
+    const onChange = vi.fn();
+
+    render(
+      <StepEditor
+        step={buildStep({ executor: 'agent', agentId: 'clinical-reviewer', agentVersion: 3 })}
+        allSteps={[]}
+        onChange={onChange}
+      />,
+    );
+    expandCard('Prompt & model');
+    const versionSelect = await screen.findByRole('combobox', { name: 'Agent version' });
+
+    expect(versionSelect).toHaveValue('3');
+    expect(screen.getByRole('option', { name: 'v5 (current)' })).toBeInTheDocument();
+    expect(screen.getByText(/now at v5/)).toBeInTheDocument();
+
+    fireEvent.change(versionSelect, { target: { value: '5' } });
+    expect(onChange).toHaveBeenCalledWith({ agentVersion: 5 });
+
+    fireEvent.change(versionSelect, { target: { value: '' } });
+    expect(onChange).toHaveBeenCalledWith({ agentVersion: undefined });
   });
 
   it('[RENDER] marks the verified agents in the agent picker', async () => {

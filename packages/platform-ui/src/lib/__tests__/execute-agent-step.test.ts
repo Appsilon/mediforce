@@ -638,6 +638,20 @@ describe('executeAgentStep', () => {
       expect(contextArg.agentVersion).toBeNull();
     });
 
+    it('[DATA] keeps the step\'s own pinned version instead of the agent\'s newest one', async () => {
+      mockAgentDefinitionRepo.listVersions.mockResolvedValueOnce([
+        { agentId: 'cdisc-author', version: 3, hash: 'h3', config: {}, createdBy: 'u', createdAt: '2026-01-01T00:00:00.000Z' },
+      ]);
+      const pinnedStep: WorkflowStep = { ...agentStep, agentVersion: 2 };
+
+      await executeAgentStep('inst-wf-001', 'gather-data', pinnedStep, {}, 'user-1');
+
+      expect(mockAgentDefinitionRepo.listVersions).not.toHaveBeenCalled();
+      expect(resolveAgentDefaults).toHaveBeenCalledWith('cdisc-author', expect.anything(), 2);
+      const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
+      expect(contextArg.agentVersion).toBe(2);
+    });
+
     it('[DATA] leaves the agent version null when the step has no agentId', async () => {
       const stepNoAgentId: WorkflowStep = { ...agentStep, agentId: undefined };
 

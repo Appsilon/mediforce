@@ -278,7 +278,7 @@ describe('retryStep handler', () => {
   });
 
   describe('agent drift guard (epic #1673 B1 + B2)', () => {
-    async function buildDriftScope(opts: { ranVersion: number; currentVersion: number }) {
+    async function buildDriftScope(opts: { ranVersion: number; currentVersion: number; pinnedVersion?: number }) {
       const driftInstanceRepo = new InMemoryProcessInstanceRepository();
       const driftAuditRepo = new InMemoryAuditRepository(driftInstanceRepo);
       const agentRunRepo = new InMemoryAgentRunRepository(driftInstanceRepo);
@@ -300,7 +300,7 @@ describe('retryStep handler', () => {
           name: 'deploy-flow',
           version: 7,
           namespace: 'team-alpha',
-          steps: [{ id: 'deploy', name: 'Deploy', type: 'creation', executor: 'agent', agentId: 'ship-it-agent' }],
+          steps: [{ id: 'deploy', name: 'Deploy', type: 'creation', executor: 'agent', agentId: 'ship-it-agent', agentVersion: opts.pinnedVersion }],
         }),
       );
       await agentRunRepo.create(
@@ -380,6 +380,14 @@ describe('retryStep handler', () => {
 
     it('[DATA] retries normally when the Agent has not changed', async () => {
       const { scope, engineStub } = await buildDriftScope({ ranVersion: 3, currentVersion: 3 });
+
+      await retryStep({ runId: 'inst-drift', stepId: 'deploy' }, scope);
+
+      expect(engineStub.calls).toHaveLength(1);
+    });
+
+    it('[DATA] retries normally on a pinned step even though the Agent moved past its pin', async () => {
+      const { scope, engineStub } = await buildDriftScope({ ranVersion: 2, currentVersion: 3, pinnedVersion: 2 });
 
       await retryStep({ runId: 'inst-drift', stepId: 'deploy' }, scope);
 

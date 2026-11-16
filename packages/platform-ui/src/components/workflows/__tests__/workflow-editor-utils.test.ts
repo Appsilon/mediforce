@@ -553,4 +553,10 @@ describe('selectAgentPatch', () => {
     expect(selectAgentPatch({ agent: { model: SONNET }, plugin: 'claude-code-agent' }, undefined, SONNET))
       .toEqual({ agentId: undefined, agent: { model: SONNET }, plugin: 'claude-code-agent' });
   });
+
+  it('pins the version given at pick time; clearing the agent clears the pin too', () => {
+    expect(selectAgentPatch({}, agent, SONNET, { pinVersion: 4 }).agentVersion).toBe(4);
+    expect(selectAgentPatch({}, undefined, SONNET, { pinVersion: 4 }).agentVersion).toBeUndefined();
+    expect(selectAgentPatch({}, agent, SONNET).agentVersion).toBeUndefined();
+  });
 });

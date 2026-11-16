@@ -247,4 +247,46 @@ describe('resolveMcpForStep', () => {
       url: 'https://owner.example.com/mcp',
     });
   });
+
+  it("[DATA] a pinned version resolves the agent's MCP bindings as they were then, not live (ADR-0029 epic #1673)", async () => {
+    await catalogRepo.upsert(NS, { id: 'old-mcp', type: 'stdio', command: 'old-mcp' });
+    await catalogRepo.upsert(NS, { id: 'new-mcp', type: 'stdio', command: 'new-mcp' });
+    await agentRepo.upsert('drift-agent', {
+      kind: 'plugin',
+      runtimeId: 'claude-code-agent',
+      name: 'Drift',
+      iconName: 'Bot',
+      description: '',
+      foundationModel: 'sonnet',
+      systemPrompt: '',
+      inputDescription: '',
+      outputDescription: '',
+      mcpServers: { newServer: { type: 'stdio', catalogId: 'new-mcp' } },
+      visibility: 'private',
+    });
+    await agentRepo.appendVersion({
+      agentId: 'drift-agent',
+      version: 1,
+      hash: 'a'.repeat(64),
+      config: {
+        kind: 'plugin',
+        runtimeId: 'claude-code-agent',
+        foundationModel: 'sonnet',
+        systemPrompt: '',
+        mcpServers: { oldServer: { type: 'stdio', catalogId: 'old-mcp' } },
+        skills: [],
+      },
+      createdBy: 'author-1',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    const step = makeStep({ agentId: 'drift-agent' });
+
+    const result = await resolveMcpForStep(step, {
+      agentDefinitionRepo: agentRepo,
+      toolCatalogRepo: catalogRepo,
+      namespace: NS,
+    }, 1);
+
+    expect(Object.keys(result!.servers)).toEqual(['oldServer']);
+  });
 });

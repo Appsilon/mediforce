@@ -14,10 +14,11 @@ vi.mock('@/lib/mediforce', () => ({
 
 vi.mock('@/hooks/use-agent-runs', () => ({
   useAgentRunsForAgent: vi.fn(),
+  useProcessNameMap: vi.fn(() => new Map()),
 }));
 
 import { mediforce } from '@/lib/mediforce';
-import { useAgentRunsForAgent } from '@/hooks/use-agent-runs';
+import { useAgentRunsForAgent, useProcessNameMap } from '@/hooks/use-agent-runs';
 import { diffConfigs } from '../agent-versions-tab';
 import userEvent from '@testing-library/user-event';
 
@@ -42,6 +43,43 @@ describe('AgentVersionsTab', () => {
 
     await waitFor(() => expect(screen.getByText(/behind/)).toBeInTheDocument());
     expect(screen.getByText('current')).toBeInTheDocument();
+  });
+
+  it('links "Used by" to the workflow run, not a dead agent-eval route', async () => {
+    vi.mocked(mediforce.agents.listVersions).mockResolvedValue({
+      versions: [{ agentId: 'a1', version: 1, hash: 'h'.repeat(64), config: CONFIG, createdBy: 'u', createdAt: '2026-01-01T00:00:00.000Z' }],
+      current: 1,
+    });
+    vi.mocked(useAgentRunsForAgent).mockReturnValue({
+      data: [buildAgentRun({ stepId: 'deploy', agentId: 'a1', agentVersion: 1, processInstanceId: 'inst-0001' })],
+      loading: false,
+    });
+    vi.mocked(useProcessNameMap).mockReturnValue(new Map([['inst-0001', 'demo-flow']]));
+
+    const { wrapper } = createQueryWrapper();
+    render(<AgentVersionsTab handle="acme" agentId="a1" />, { wrapper });
+
+    const link = await screen.findByRole('link', { name: 'demo-flow' });
+    expect(link).toHaveAttribute('href', '/acme/workflows/demo-flow/runs/inst-0001/steps/deploy');
+    expect(screen.getByRole('link', { name: 'View run' })).toHaveAttribute('href', '/acme/workflows/demo-flow/runs/inst-0001/steps/deploy');
+  });
+
+  it('shows "Workflow deleted" when its run can no longer be resolved to a workflow', async () => {
+    vi.mocked(mediforce.agents.listVersions).mockResolvedValue({
+      versions: [{ agentId: 'a1', version: 1, hash: 'h'.repeat(64), config: CONFIG, createdBy: 'u', createdAt: '2026-01-01T00:00:00.000Z' }],
+      current: 1,
+    });
+    vi.mocked(useAgentRunsForAgent).mockReturnValue({
+      data: [buildAgentRun({ stepId: 'deploy', agentId: 'a1', agentVersion: 1, processInstanceId: 'inst-gone' })],
+      loading: false,
+    });
+    vi.mocked(useProcessNameMap).mockReturnValue(new Map());
+
+    const { wrapper } = createQueryWrapper();
+    render(<AgentVersionsTab handle="acme" agentId="a1" />, { wrapper });
+
+    expect(await screen.findByText('Workflow deleted')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'View run' })).not.toBeInTheDocument();
   });
 
   it('does not flag a step already on the current version', async () => {

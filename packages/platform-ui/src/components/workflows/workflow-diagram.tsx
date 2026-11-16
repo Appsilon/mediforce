@@ -171,7 +171,11 @@ type StepNodeData = {
   autonomyLevel?: string;
   plugin?: string;
   agentId?: string;
+  /** The version this step pins — its own `agentVersion`, not the Agent's
+   *  current one (ADR-0029 epic #1673): a running step keeps what it pinned. */
   agentVersion?: number | null;
+  /** The Agent's current version, for flagging the pin as stale; never shown on its own. */
+  agentVersionCurrent?: number | null;
   hasError?: boolean;
   hasWarning?: boolean;
   warningTooltip?: string;
@@ -403,7 +407,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
         )}
 
         {/* Row 1: executor identity + step type, separated by a dot */}
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 pr-7">
           <div className="flex items-center gap-1 min-w-0 shrink-0">
             <ExecutorIcon executor={data.executor} autonomyLevel={data.autonomyLevel} plugin={data.plugin} />
             <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">
@@ -411,12 +415,26 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
             </span>
           </div>
           <span className="text-muted-foreground/40 text-[10px] shrink-0">&middot;</span>
-          <span className={cn('text-[10px] font-semibold truncate', typeConfig.color)}>
+          <span className={cn('text-[10px] font-semibold truncate min-w-0', typeConfig.color)}>
             {typeConfig.label}
           </span>
-          {data.agentVersion != null && (
-            <span className="text-[10px] font-mono text-muted-foreground shrink-0" title={`Runs Agent ${data.agentId} as it is now — currently v${data.agentVersion}`}>
-              v{data.agentVersion}
+          {(data.agentVersion ?? data.agentVersionCurrent) != null && (
+            <span
+              className={cn(
+                'text-[10px] font-mono shrink-0',
+                data.agentVersion != null && data.agentVersionCurrent != null && data.agentVersionCurrent !== data.agentVersion
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-muted-foreground',
+              )}
+              title={
+                data.agentVersion == null
+                  ? `Runs Agent ${data.agentId} as it is now — currently v${data.agentVersionCurrent}`
+                  : data.agentVersionCurrent != null && data.agentVersionCurrent !== data.agentVersion
+                    ? `Pinned to v${data.agentVersion}; Agent ${data.agentId} is now at v${data.agentVersionCurrent} — update the pin in the step editor to move to it`
+                    : `Runs Agent ${data.agentId} pinned to v${data.agentVersion}`
+              }
+            >
+              v{data.agentVersion ?? data.agentVersionCurrent}
             </span>
           )}
           {data.evaluation !== undefined && <StepEvaluationLink evaluation={data.evaluation} />}
@@ -832,6 +850,7 @@ function buildLayout(
         autonomyLevel: step.autonomyLevel,
         plugin: step.plugin,
         agentId: step.agentId,
+        agentVersion: step.agentVersion,
         backBranches: backBranchesByStep.get(step.id),
         expandable: isExpandable(step.id),
         child: framed.get(step.id)?.frame,
@@ -997,7 +1016,8 @@ interface WorkflowDiagramProps {
   warningStepIds?: Map<string, string>;
   /** Per agent step id, its evaluation mark; steps without one show none. */
   stepEvaluation?: Map<string, StepEvaluationMark>;
-  /** Per agent id, its current version (ADR-0029) — shown next to the step's executor label. */
+  /** Per agent id, its current version (ADR-0029) — only to flag a step's pinned
+   *  version as stale; a step always shows and runs its own `agentVersion`. */
   agentVersions?: Map<string, number | null>;
   canMoveUp?: Set<string>;
   canMoveDown?: Set<string>;
@@ -1033,7 +1053,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
           hasWarning: warningStepIds?.has(n.id) ?? false,
           warningTooltip: warningStepIds?.get(n.id),
           evaluation: stepEvaluation?.get(n.id),
-          agentVersion: d.agentId === undefined ? undefined : agentVersions?.get(d.agentId),
+          agentVersionCurrent: d.agentId === undefined ? undefined : agentVersions?.get(d.agentId),
           onDelete: onNodeDelete && d.stepType !== 'terminal' ? () => onNodeDelete(n.id) : undefined,
           onMoveUp: onNodeMoveUp && canMoveUp?.has(n.id) ? () => onNodeMoveUp(n.id) : undefined,
           onMoveDown: onNodeMoveDown && canMoveDown?.has(n.id) ? () => onNodeMoveDown(n.id) : undefined,

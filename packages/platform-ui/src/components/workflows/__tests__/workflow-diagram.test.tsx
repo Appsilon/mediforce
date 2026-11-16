@@ -78,6 +78,21 @@ describe('StepNode (via WorkflowDiagram)', () => {
     expect(screen.queryByText('v3')).not.toBeInTheDocument();
   });
 
+  it('[RENDER] shows the step\'s pinned version, not the agent\'s current one, when they differ', () => {
+    const definition = buildWorkflowDefinition({
+      steps: [
+        { id: 'analyze', name: 'Analyze', type: 'creation', executor: 'agent', agentId: 'digest-agent', agentVersion: 2 },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'analyze', to: 'done' }],
+    });
+
+    render(<WorkflowDiagram definition={definition} agentVersions={new Map([['digest-agent', 5]])} />);
+
+    expect(screen.getByText('v2')).toBeInTheDocument();
+    expect(screen.queryByText('v5')).not.toBeInTheDocument();
+  });
+
   it('[RENDER] both sides of a decision are on the canvas at once', () => {
     const definition = buildWorkflowDefinition({
       steps: [

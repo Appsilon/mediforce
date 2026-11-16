@@ -196,6 +196,13 @@ export async function executeAgentStep(
   ]);
   const workflowSecrets = { ...namespaceSecrets, ...perWorkflowSecrets };
 
+  // The version this run resolves the Agent's identity/model/MCP/Skills from
+  // (ADR-0029 epic #1673): the step's own pin, kept as-is by a later Agent
+  // edit. An eval trial tests the Agent (or a Variant of it) as it is
+  // configured now, never a past pin — ADR-0024's "Agent as it is now" and
+  // ADR-0029's "step keeps what it pinned" apply to different runs.
+  const pinnedVersion = evalTrial === null ? workflowStep.agentVersion : undefined;
+
   // Pre-resolve MCP configuration from the agent definition + step restrictions
   // + tool catalog. undefined when step.agentId is unset. Namespace-scoped
   // catalog lookups use the workflow's namespace.
@@ -207,7 +214,7 @@ export async function executeAgentStep(
         agentDefinitionRepo,
         toolCatalogRepo,
         namespace: workflowDefinition.namespace,
-      })) ?? undefined;
+      }, pinnedVersion)) ?? undefined;
 
   // Load and (lazily) refresh OAuth tokens for every HTTP binding that
   // requested OAuth auth. Done here, not in the runtime, so the runtime
@@ -232,14 +239,15 @@ export async function executeAgentStep(
   // prompt (systemPrompt), the model and the output schema. Empty when the
   // step has no agentId.
   const agentDefaults = !reapTimedOut && workflowStep.agentId !== undefined
-    ? await resolveAgentDefaults(workflowStep.agentId, evalTrial?.agents ?? agentDefinitionRepo)
+    ? await resolveAgentDefaults(workflowStep.agentId, evalTrial?.agents ?? agentDefinitionRepo, pinnedVersion)
     : {};
   const agentIdentityPrompt = agentDefaults.identityPrompt;
 
-  // Pin the Agent's version for this run (ADR-0029): its newest recorded
-  // version right now, so a later edit never changes what a past run shows.
+  // The version this run actually used: the pin resolved above; falls back
+  // to the Agent's current version for a step saved before it had a pin, and
+  // for an eval trial, which always runs the Agent as it is configured now.
   const agentVersion = !reapTimedOut && workflowStep.agentId !== undefined
-    ? (await agentDefinitionRepo.listVersions(workflowStep.agentId))[0]?.version ?? null
+    ? pinnedVersion ?? (await agentDefinitionRepo.listVersions(workflowStep.agentId))[0]?.version ?? null
     : null;
 
   // The Skills offered to the step: its agent's and the ones it adds, each
@@ -248,7 +256,7 @@ export async function executeAgentStep(
   // gone fails the step.
   const agentSkills = reapTimedOut
     ? undefined
-    : (await resolveSkillsForStep(workflowStep, { agentDefinitionRepo, skillRepo: runtimeSkillRepo }, workflowDefinition)) ?? undefined;
+    : (await resolveSkillsForStep(workflowStep, { agentDefinitionRepo, skillRepo: runtimeSkillRepo }, workflowDefinition, pinnedVersion)) ?? undefined;
 
   // Picking an agent picks its model and output schema unless the step deliberately overrides them.
   const resolvedStep = applyAgentOutputSchema(applyAgentModel(workflowStep, agentDefaults.model), agentDefaults.outputSchema);

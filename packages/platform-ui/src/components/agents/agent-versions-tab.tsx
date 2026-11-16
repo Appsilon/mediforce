@@ -5,7 +5,7 @@ import Link from 'next/link';
 import type { AgentConfigSnapshot, AgentRun } from '@mediforce/platform-core';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
-import { useAgentRunsForAgent } from '@/hooks/use-agent-runs';
+import { useAgentRunsForAgent, useProcessNameMap } from '@/hooks/use-agent-runs';
 import { useAgentVersions } from '@/hooks/use-step-evaluation';
 
 interface StepUsage {
@@ -27,6 +27,7 @@ function latestRunPerStep(runs: readonly AgentRun[]): StepUsage[] {
 function UsageList({ handle, agentId, currentVersion }: { handle: string; agentId: string; currentVersion: number | null }) {
   const { data: runs, loading } = useAgentRunsForAgent(agentId);
   const usages = React.useMemo(() => latestRunPerStep(runs), [runs]);
+  const workflowNames = useProcessNameMap(handle);
 
   if (loading) return <p className="text-xs text-muted-foreground">Loading…</p>;
   if (usages.length === 0) return <p className="text-xs text-muted-foreground">No Workflow step has run this agent yet.</p>;
@@ -35,15 +36,28 @@ function UsageList({ handle, agentId, currentVersion }: { handle: string; agentI
     <ul className="divide-y rounded-md border">
       {usages.map(({ stepId, run }) => {
         const stale = currentVersion !== null && run.agentVersion !== null && run.agentVersion !== currentVersion;
+        const workflowName = workflowNames.get(run.processInstanceId);
         return (
           <li key={stepId} className="flex items-center gap-2 px-3 py-2 text-sm">
-            <span className="min-w-0 flex-1 truncate font-mono text-xs">{stepId}</span>
+            <span className="min-w-0 flex-1 truncate text-xs">
+              {workflowName !== undefined ? (
+                <Link href={routes.workflowRunStep(handle, workflowName, run.processInstanceId, stepId)} className="text-primary hover:underline">
+                  {workflowName}
+                </Link>
+              ) : (
+                <span className="text-muted-foreground">Workflow deleted</span>
+              )}
+              <span className="text-muted-foreground"> · step </span>
+              <span className="font-mono">{stepId}</span>
+            </span>
             <span className={cn('w-32 shrink-0 text-xs font-mono', stale ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
               v{run.agentVersion ?? '?'}{stale && ' · behind'}
             </span>
-            <Link href={routes.agent(handle, run.id)} className="w-16 shrink-0 text-right text-xs text-primary hover:underline">
-              View run
-            </Link>
+            {workflowName !== undefined && (
+              <Link href={routes.workflowRunStep(handle, workflowName, run.processInstanceId, stepId)} className="w-16 shrink-0 text-right text-xs text-primary hover:underline">
+                View run
+              </Link>
+            )}
           </li>
         );
       })}
