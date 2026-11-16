@@ -161,7 +161,7 @@ export const queryKeys = {
     /** List slice — namespace + optional `runId`/`stepId` filters. */
     list: (
       handle: string | undefined,
-      filters?: { runId?: string; stepId?: string },
+      filters?: { runId?: string; stepId?: string; agentId?: string },
     ) => ['agent-runs', handle ?? null, { ...filters }] as const,
     /** Keyset-paginated list (Monitoring → Agents) — distinct from `list`
      *  (the unbounded legacy read) since the two coexist. */

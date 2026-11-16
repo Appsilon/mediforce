@@ -31,6 +31,7 @@ export const ListAgentRunsInputSchema = z
     namespace: z.string().min(1).optional(),
     runId: z.string().min(1).optional(),
     stepId: z.string().min(1).optional(),
+    agentId: z.string().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(10_000).optional(),
     cursor: z.string().min(1).optional(),
     /** Raw status filter — the Monitoring → Agents tab's "All Statuses" dropdown. */

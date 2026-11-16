@@ -12,6 +12,9 @@ import { AgentSkillRefSchema } from './agent-definition';
  * form, which records a new Agent version (ADR-0029). `propose_new_agent`:
  * nothing in the catalog covers the need, so a new private Agent is drafted,
  * reusing every existing Skill it can and drafting at most one new one.
+ * `propose_agent_update`: an existing agent is close but its prompt or
+ * model itself needs to change, not just a missing Skill — accepting it
+ * records a new Agent version (ADR-0029), same as `propose_agent_change`.
  * `propose_mcp_binding` names an existing catalog MCP server the agent
  * needs; accepting it submits the binding as pending — it is wired onto
  * the agent, and so actually usable, only once a namespace admin approves
@@ -40,6 +43,15 @@ export const ProposeAgentChangeToolSchema = z.object({
   agentId: z.string().min(1),
   skill: AgentSkillRefSchema.describe('An existing catalog Skill, found with search_skill_catalog — never a new one.'),
   rationale: z.string().min(1).max(1000).describe('What this Skill adds and why the agent needs it.'),
+});
+
+export const ProposeAgentUpdateToolSchema = z.object({
+  agentId: z.string().min(1),
+  systemPrompt: z.string().min(1).optional(),
+  foundationModel: z.string().min(1).optional(),
+  rationale: z.string().min(1).max(1000).describe('What this change fixes or improves and why.'),
+}).refine((value) => value.systemPrompt !== undefined || value.foundationModel !== undefined, {
+  message: 'propose_agent_update needs at least one of systemPrompt or foundationModel',
 });
 
 export const ProposeMcpBindingToolSchema = z.object({
@@ -90,6 +102,7 @@ export const ProposeRequirementMatrixToolSchema = z.object({
 export const AGENT_ASSISTANT_PROPOSAL_TOOLS = {
   propose_agent_match: ProposeAgentMatchToolSchema,
   propose_agent_change: ProposeAgentChangeToolSchema,
+  propose_agent_update: ProposeAgentUpdateToolSchema,
   propose_new_agent: ProposeNewAgentToolSchema,
   propose_mcp_binding: ProposeMcpBindingToolSchema,
   propose_requirement_matrix: ProposeRequirementMatrixToolSchema,
@@ -100,6 +113,7 @@ export type AgentAssistantProposalToolName = keyof typeof AGENT_ASSISTANT_PROPOS
 export const AgentAssistantProposalSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('propose_agent_match'), arguments: ProposeAgentMatchToolSchema }),
   z.object({ tool: z.literal('propose_agent_change'), arguments: ProposeAgentChangeToolSchema }),
+  z.object({ tool: z.literal('propose_agent_update'), arguments: ProposeAgentUpdateToolSchema }),
   z.object({ tool: z.literal('propose_new_agent'), arguments: ProposeNewAgentToolSchema }),
   z.object({ tool: z.literal('propose_mcp_binding'), arguments: ProposeMcpBindingToolSchema }),
   z.object({ tool: z.literal('propose_requirement_matrix'), arguments: ProposeRequirementMatrixToolSchema }),

@@ -51,6 +51,10 @@ export const agentRuns = pgTable(
       .references(() => processInstances.id, { onDelete: 'cascade' }),
     stepId: text('step_id').notNull(),
     pluginId: text('plugin_id').notNull(),
+    // The Agent the step named, and the version it ran, pinned at run time
+    // (ADR-0029). Null when the step names no Agent.
+    agentId: text('agent_id'),
+    agentVersion: integer('agent_version'),
     autonomyLevel: text('autonomy_level').notNull(),
     status: text('status').notNull(),
     fallbackReason: text('fallback_reason'),

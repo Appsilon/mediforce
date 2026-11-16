@@ -46,8 +46,11 @@ export const agentRunListCommand = defineCommand({
     }
     for (const run of result.runs) {
       const icon = STATUS_ICONS[run.status] ?? '?';
+      const agent = run.agentId !== undefined && run.agentId !== null
+        ? `  agent:${run.agentId}@v${run.agentVersion ?? '?'}`
+        : '';
       output.stdout(
-        `${icon} ${run.status.padEnd(14)} ${run.id}  step:${run.stepId}  plugin:${run.pluginId}  instance:${run.processInstanceId}`,
+        `${icon} ${run.status.padEnd(14)} ${run.id}  step:${run.stepId}  plugin:${run.pluginId}  instance:${run.processInstanceId}${agent}`,
       );
     }
     if (result.nextCursor !== undefined) {

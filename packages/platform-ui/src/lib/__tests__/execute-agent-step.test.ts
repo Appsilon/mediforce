@@ -92,6 +92,7 @@ const mockAgentDefinitionRepo = {
   create: vi.fn(),
   update: vi.fn(),
   delete: vi.fn(),
+  listVersions: vi.fn(),
 };
 // HTTP MCP servers the fixture agents below bind to by catalog id.
 const HTTP_CATALOG: Record<string, ToolCatalogEntry> = {
@@ -226,6 +227,7 @@ describe('executeAgentStep', () => {
       fallbackReason: null,
     });
     mockInstanceRepo.getStepExecutions.mockResolvedValue([]);
+    mockAgentDefinitionRepo.listVersions.mockResolvedValue([]);
 
     // Default: L0/L1/L2 completed path needs advanceStep mock
     const updatedInstance = buildProcessInstance({
@@ -614,6 +616,36 @@ describe('executeAgentStep', () => {
       await executeAgentStep('inst-wf-001', 'gather-data', stepNoAgentId, {}, 'user-1');
 
       expect(resolveAgentDefaults).not.toHaveBeenCalled();
+    });
+
+    it('[DATA] pins the agent\'s newest recorded version onto the run context', async () => {
+      mockAgentDefinitionRepo.listVersions.mockResolvedValueOnce([
+        { agentId: 'cdisc-author', version: 3, hash: 'h3', config: {}, createdBy: 'u', createdAt: '2026-01-01T00:00:00.000Z' },
+        { agentId: 'cdisc-author', version: 2, hash: 'h2', config: {}, createdBy: 'u', createdAt: '2026-01-01T00:00:00.000Z' },
+      ]);
+
+      await executeAgentStep('inst-wf-001', 'gather-data', agentStep, {}, 'user-1');
+
+      expect(mockAgentDefinitionRepo.listVersions).toHaveBeenCalledWith('cdisc-author');
+      const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
+      expect(contextArg.agentVersion).toBe(3);
+    });
+
+    it('[DATA] pins null when the agent has no recorded version yet', async () => {
+      await executeAgentStep('inst-wf-001', 'gather-data', agentStep, {}, 'user-1');
+
+      const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
+      expect(contextArg.agentVersion).toBeNull();
+    });
+
+    it('[DATA] leaves the agent version null when the step has no agentId', async () => {
+      const stepNoAgentId: WorkflowStep = { ...agentStep, agentId: undefined };
+
+      await executeAgentStep('inst-wf-001', 'gather-data', stepNoAgentId, {}, 'user-1');
+
+      const contextArg = mockAgentRunner.runWithWorkflowStep.mock.calls[0][1];
+      expect(contextArg.agentVersion).toBeNull();
+      expect(mockAgentDefinitionRepo.listVersions).not.toHaveBeenCalled();
     });
   });
 

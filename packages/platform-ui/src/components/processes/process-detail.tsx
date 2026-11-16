@@ -23,6 +23,7 @@ import { useHandleFromPath } from '@/hooks/use-handle-from-path';
 import { routes } from '@/lib/routes';
 import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 import { useAgentRunsForProcess } from '@/hooks/use-agent-runs';
+import { useCurrentAgentVersions } from '@/hooks/use-step-evaluation';
 import { useRunTreeAuditEvents } from '@/hooks/use-run-tree-audit-events';
 import { useUserDisplayNames } from '@/hooks/use-users';
 import { cn } from '@/lib/utils';
@@ -46,6 +47,37 @@ export interface AgentEventItem {
   type: string;
   payload: unknown;
   sequence: number;
+}
+
+export function agentVersionsByExecution(
+  stepExecutions: StepExecution[],
+  agentRuns: readonly { stepId: string; startedAt: string; agentId?: string | null; agentVersion?: number | null }[],
+): Map<string, { agentId: string; agentVersion: number | null }> {
+  const runsByStep = new Map<string, typeof agentRuns[number][]>();
+  for (const run of agentRuns) {
+    const list = runsByStep.get(run.stepId) ?? [];
+    list.push(run);
+    runsByStep.set(run.stepId, list);
+  }
+  for (const list of runsByStep.values()) list.sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+
+  const execsByStep = new Map<string, StepExecution[]>();
+  for (const exec of stepExecutions) {
+    const list = execsByStep.get(exec.stepId) ?? [];
+    list.push(exec);
+    execsByStep.set(exec.stepId, list);
+  }
+  for (const list of execsByStep.values()) list.sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+
+  const map = new Map<string, { agentId: string; agentVersion: number | null }>();
+  for (const [stepId, execs] of execsByStep) {
+    const runs = runsByStep.get(stepId) ?? [];
+    execs.forEach((exec, i) => {
+      const run = runs[i];
+      if (run?.agentId != null) map.set(exec.id, { agentId: run.agentId, agentVersion: run.agentVersion ?? null });
+    });
+  }
+  return map;
 }
 
 export function ProcessDetail({
@@ -99,6 +131,14 @@ export function ProcessDetail({
     && (sourceInstance === null || sourceInstance.deleted === true);
 
   const { data: agentRuns } = useAgentRunsForProcess(instance.id);
+
+  const agentVersionByExecId = React.useMemo(
+    () => agentVersionsByExecution(stepExecutions, agentRuns),
+    [stepExecutions, agentRuns],
+  );
+  const currentAgentVersions = useCurrentAgentVersions(
+    [...new Set([...agentVersionByExecId.values()].map((v) => v.agentId))],
+  );
 
   const agentLogFiles = React.useMemo(() => {
     const stepExecutorMap = new Map(definitionSteps.map((s) => [s.id, (s as unknown as WorkflowStep).executor]));
@@ -483,6 +523,8 @@ export function ProcessDetail({
             stepExecutions={stepExecutions}
             agentEvents={agentEvents}
             stepConfigMap={stepConfigMap}
+            agentVersionByExecId={agentVersionByExecId}
+            currentAgentVersions={currentAgentVersions}
             outputFiles={outputFiles}
             stepDetailBaseHref={runDetailHref}
             currentTask={blockingTask}

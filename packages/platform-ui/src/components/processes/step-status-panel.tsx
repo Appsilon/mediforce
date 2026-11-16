@@ -49,6 +49,9 @@ interface StepStatusPanelProps {
   stepExecutions: StepExecution[];
   agentEvents?: AgentEventItem[];
   stepConfigMap?: Map<string, StepConfigInfo>;
+  agentVersionByExecId?: Map<string, { agentId: string; agentVersion: number | null }>;
+  /** Each Agent's current version (epic #1673 C1), to flag a run pinned to an older one. */
+  currentAgentVersions?: Map<string, number | null>;
   outputFiles?: RunOutputFileEntry[];
   onAgentLogClick?: (stepId: string) => void;
   stepDetailBaseHref?: string;
@@ -460,6 +463,8 @@ export function StepStatusPanel({
   stepExecutions,
   agentEvents = [],
   stepConfigMap,
+  agentVersionByExecId,
+  currentAgentVersions,
   outputFiles = [],
   onAgentLogClick,
   stepDetailBaseHref,
@@ -559,6 +564,9 @@ export function StepStatusPanel({
           );
           const promptEvent = agentEvents.find((e) => e.stepId === stepId && e.type === 'prompt');
           const assembledPrompt = promptEvent ? String(promptEvent.payload) : undefined;
+          const agentVersionInfo = agentVersionByExecId?.get(execId);
+          const agentVersionCurrent = agentVersionInfo === undefined ? null : currentAgentVersions?.get(agentVersionInfo.agentId) ?? null;
+          const agentVersionStale = agentVersionInfo?.agentVersion != null && agentVersionCurrent !== null && agentVersionInfo.agentVersion !== agentVersionCurrent;
 
           // For review steps: show the verdict that was actually taken.
           const verdicts = step?.verdicts;
@@ -609,6 +617,14 @@ export function StepStatusPanel({
                       plugin={stepConfig?.plugin}
                       runtime={stepConfig?.agentConfig?.runtime}
                     />
+                    {agentVersionInfo && (
+                      <span
+                        className={cn('text-xs font-mono', agentVersionStale ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}
+                        title={agentVersionStale ? `Agent ${agentVersionInfo.agentId} has since changed to v${agentVersionCurrent}` : `Agent ${agentVersionInfo.agentId}`}
+                      >
+                        v{agentVersionInfo.agentVersion ?? '?'}{agentVersionStale && ' · agent updated'}
+                      </span>
+                    )}
                     {status === 'waiting' && (
                       <span className="text-xs text-amber-700 dark:text-amber-300">Waiting for action</span>
                     )}

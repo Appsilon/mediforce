@@ -1,8 +1,37 @@
 import { InvalidTransitionError } from '@mediforce/workflow-engine';
+import type { ProcessInstance } from '@mediforce/platform-core';
 import type { RetryStepInput, RetryStepOutput } from '../../contract/processes';
 import type { CallerScope } from '../../repositories/index';
 import { PreconditionFailedError } from '../../errors';
 import { actorFromCaller, loadOr404 } from '../_helpers';
+
+/**
+ * Refuse a retry that would silently run a different Agent than the one that
+ * last ran this step (ADR-0029 versioning, epic #1673 B1/B2): a retry pinned
+ * to no Agent, or to one with no recorded version yet, has nothing to compare
+ * against and is let through.
+ */
+async function assertNoAgentDrift(scope: CallerScope, run: ProcessInstance, stepId: string): Promise<void> {
+  if (run.namespace === undefined) return;
+  const definition = await scope.workflowDefinitions.get(run.namespace, run.definitionName, Number(run.definitionVersion));
+  const agentId = definition?.steps.find((step) => step.id === stepId)?.agentId;
+  if (agentId === undefined) return;
+
+  const lastAgentRun = (await scope.agentRuns.getByInstanceId(run.id))
+    .filter((agentRun) => agentRun.stepId === stepId)
+    .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
+  const ranVersion = lastAgentRun?.agentVersion;
+  if (ranVersion == null) return;
+
+  const [newest] = await scope.agentDefinitions.listVersions(agentId);
+  if (newest !== undefined && newest.version !== ranVersion) {
+    throw new PreconditionFailedError(
+      `Agent '${agentId}' changed since step '${stepId}' last ran (ran v${ranVersion}, now v${newest.version}); `
+      + 'retrying would not reproduce it. Pass allowAgentDrift to retry on the current Agent anyway.',
+      { agentId, ranVersion, currentVersion: newest.version },
+    );
+  }
+}
 
 // Engine emits `step.retried` (stepExecution-scoped); handler additionally
 // emits `instance.retried` for the processInstance-scoped audit lane.
@@ -11,7 +40,11 @@ export async function retryStep(
   scope: CallerScope,
 ): Promise<RetryStepOutput> {
   // Workspace gate up front — engine.retryStep loads via raw repo.
-  await loadOr404(scope.runs.getById(input.runId), 'Run not found');
+  const run = await loadOr404(scope.runs.getById(input.runId), 'Run not found');
+
+  if (input.allowAgentDrift !== true) {
+    await assertNoAgentDrift(scope, run, input.stepId);
+  }
 
   const actor = actorFromCaller(scope);
 

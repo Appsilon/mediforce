@@ -123,6 +123,8 @@ export class AgentRunner {
         startedAt: new Date(startedAt).toISOString(),
         completedAt: new Date().toISOString(),
         trace: agentRunSpanTrace(span),
+        agentId: context.step.agentId ?? null,
+        agentVersion: context.agentVersion ?? null,
       });
     }
   }
@@ -156,6 +158,8 @@ export class AgentRunner {
           startedAt: new Date(startedAt).toISOString(),
           completedAt: null,
           trace: agentRunSpanTrace(span),
+          agentId: context.step.agentId ?? null,
+          agentVersion: context.agentVersion ?? null,
         });
       }
 

@@ -62,4 +62,64 @@ describe('StepStatusPanel row expand', () => {
     expect(screen.getAllByText('Databricks').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('Script')).not.toBeInTheDocument();
   });
+
+  it('shows the pinned agent version next to an agent step', () => {
+    const instance = buildProcessInstance({ status: 'completed', currentStepId: null });
+    const execution = buildStepExecution({ stepId: 'fetch-data', status: 'completed', output: {} });
+
+    const { wrapper } = createQueryWrapper();
+    render(
+      <StepStatusPanel
+        instance={instance}
+        definitionSteps={steps}
+        stepExecutions={[execution]}
+        stepConfigMap={new Map([['fetch-data', { executorType: 'agent' }]])}
+        agentVersionByExecId={new Map([[execution.id, { agentId: 'digest-agent', agentVersion: 3 }]])}
+      />,
+      { wrapper },
+    );
+
+    expect(screen.getByText('v3')).toBeInTheDocument();
+  });
+
+  it('flags the pinned agent version as stale when the agent has since changed', () => {
+    const instance = buildProcessInstance({ status: 'completed', currentStepId: null });
+    const execution = buildStepExecution({ stepId: 'fetch-data', status: 'completed', output: {} });
+
+    const { wrapper } = createQueryWrapper();
+    render(
+      <StepStatusPanel
+        instance={instance}
+        definitionSteps={steps}
+        stepExecutions={[execution]}
+        stepConfigMap={new Map([['fetch-data', { executorType: 'agent' }]])}
+        agentVersionByExecId={new Map([[execution.id, { agentId: 'digest-agent', agentVersion: 3 }]])}
+        currentAgentVersions={new Map([['digest-agent', 5]])}
+      />,
+      { wrapper },
+    );
+
+    expect(screen.getByText(/agent updated/)).toBeInTheDocument();
+  });
+
+  it('does not flag the pinned agent version when it is still current', () => {
+    const instance = buildProcessInstance({ status: 'completed', currentStepId: null });
+    const execution = buildStepExecution({ stepId: 'fetch-data', status: 'completed', output: {} });
+
+    const { wrapper } = createQueryWrapper();
+    render(
+      <StepStatusPanel
+        instance={instance}
+        definitionSteps={steps}
+        stepExecutions={[execution]}
+        stepConfigMap={new Map([['fetch-data', { executorType: 'agent' }]])}
+        agentVersionByExecId={new Map([[execution.id, { agentId: 'digest-agent', agentVersion: 3 }]])}
+        currentAgentVersions={new Map([['digest-agent', 3]])}
+      />,
+      { wrapper },
+    );
+
+    expect(screen.getByText('v3')).toBeInTheDocument();
+    expect(screen.queryByText(/agent updated/)).not.toBeInTheDocument();
+  });
 });

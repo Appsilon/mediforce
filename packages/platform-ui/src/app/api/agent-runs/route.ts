@@ -13,6 +13,7 @@ import {
  *                            with caller membership; out-of-scope handle → 403)
  *   - `runId`               — filter to one process instance
  *   - `stepId`              — filter to one step within `runId` (requires `runId`)
+ *   - `agentId`             — filter to one Agent definition
  *   - `limit`               — max items (1..200, default 50)
  *   - `cursor`              — opaque token from a prior `nextCursor`
  *   - `status`              — raw AgentRunStatus filter
@@ -28,6 +29,7 @@ export const GET = createRouteAdapter<typeof ListAgentRunsInputSchema, ListAgent
       namespace: params.get('namespace') ?? undefined,
       runId: params.get('runId') ?? undefined,
       stepId: params.get('stepId') ?? undefined,
+      agentId: params.get('agentId') ?? undefined,
       limit: params.get('limit') ?? undefined,
       cursor: params.get('cursor') ?? undefined,
       status: params.get('status') ?? undefined,

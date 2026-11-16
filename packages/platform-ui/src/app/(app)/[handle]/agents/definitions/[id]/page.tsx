@@ -17,6 +17,7 @@ import { DeleteAgentDialog } from '@/components/agents/delete-agent-dialog';
 import { secondaryButtonClass } from '@/components/ui/button-styles';
 import { AgentEvaluation } from '@/components/evaluation/agent-evaluation';
 import { EVALUATION_QUERY_PARAMS } from '@/components/evaluation/evaluation-tab';
+import { AgentVersionsTab } from '@/components/agents/agent-versions-tab';
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 
@@ -41,14 +42,16 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { id } = React.use(params);
-  // The Agent's own Evaluation (ADR-0029) sits beside its configuration.
-  const tab = searchParams.get('tab') === 'evaluation' ? 'evaluation' : 'configuration';
-  const selectTab = (next: 'configuration' | 'evaluation') => {
+  // The Agent's own Evaluation (ADR-0029) and Versions (epic #1673) sit beside its configuration.
+  const rawTab = searchParams.get('tab');
+  const tab = rawTab === 'evaluation' ? 'evaluation' : rawTab === 'versions' ? 'versions' : 'configuration';
+  const selectTab = (next: 'configuration' | 'evaluation' | 'versions') => {
     const query = new URLSearchParams(searchParams.toString());
-    if (next === 'evaluation') query.set('tab', 'evaluation');
-    else {
+    if (next === 'configuration') {
       query.delete('tab');
       for (const name of EVALUATION_QUERY_PARAMS) query.delete(name);
+    } else {
+      query.set('tab', next);
     }
     router.replace(query.size === 0 ? pathname : `${pathname}?${query}`, { scroll: false });
   };
@@ -138,9 +141,12 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   return (
     <div className={cn('flex flex-1 flex-col gap-6 p-6', tab === 'configuration' && 'max-w-2xl')}>
       {notFound === false && (
-        <Tabs.Root value={tab} onValueChange={(next) => selectTab(next === 'evaluation' ? 'evaluation' : 'configuration')}>
+        <Tabs.Root
+          value={tab}
+          onValueChange={(next) => selectTab(next === 'evaluation' ? 'evaluation' : next === 'versions' ? 'versions' : 'configuration')}
+        >
           <Tabs.List className="flex gap-0 border-b" data-tour="agent-tabs">
-            {(['configuration', 'evaluation'] as const).map((value) => (
+            {(['configuration', 'evaluation', 'versions'] as const).map((value) => (
               <Tabs.Trigger
                 key={value}
                 value={value}
@@ -151,7 +157,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
                   'data-[state=active]:border-primary data-[state=active]:font-medium data-[state=active]:text-foreground',
                 )}
               >
-                {value === 'configuration' ? 'Configuration' : 'Evaluation'}
+                {value === 'configuration' ? 'Configuration' : value === 'evaluation' ? 'Evaluation' : 'Versions'}
               </Tabs.Trigger>
             ))}
           </Tabs.List>
@@ -165,6 +171,8 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
         </div>
       ) : tab === 'evaluation' ? (
         <AgentEvaluation handle={handle} agentId={id} />
+      ) : tab === 'versions' ? (
+        <AgentVersionsTab handle={handle} agentId={id} />
       ) : (
         <div className="space-y-6">
 

@@ -98,6 +98,19 @@ function contract(
       expect((await repo.getById(untraced.id))?.trace ?? null).toBeNull();
     });
 
+    it('round-trips the pinned agent id and version, and none', async () => {
+      const instanceId = randomUUID();
+      await registerInstance(instanceId, 'ws-1');
+      const pinned = await repo.create(runFor(instanceId, { agentId: 'digest-agent', agentVersion: 3 }));
+      const unpinned = await repo.create(runFor(instanceId, { agentId: null, agentVersion: null }));
+
+      const fetched = await repo.getById(pinned.id);
+      expect(fetched?.agentId).toBe('digest-agent');
+      expect(fetched?.agentVersion).toBe(3);
+      expect((await repo.getById(unpinned.id))?.agentId ?? null).toBeNull();
+      expect((await repo.getById(unpinned.id))?.agentVersion ?? null).toBeNull();
+    });
+
     it('create supports a null envelope (e.g. running status)', async () => {
       const instanceId = randomUUID();
       await registerInstance(instanceId, 'ws-1');
@@ -308,6 +321,16 @@ function contract(
         [running.id, byInstance.items.find((r) => r.status === 'completed')?.id].sort(),
       );
       expect(byInstance.items.every((r) => r.processInstanceId === instanceA)).toBe(true);
+    });
+
+    it('list filters by agentId', async () => {
+      const instanceId = randomUUID();
+      await registerInstance(instanceId, 'ws-1');
+      const pinned = await repo.create(runFor(instanceId, { agentId: 'digest-agent' }));
+      await repo.create(runFor(instanceId, { agentId: 'other-agent' }));
+
+      const byAgent = await repo.list({ namespace: 'ws-1', limit: 50, agentId: 'digest-agent' });
+      expect(byAgent.items.map((r) => r.id)).toEqual([pinned.id]);
     });
 
     // Exhaustive parity check: the SQL cardStatus filter/aggregation

@@ -2,8 +2,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   InMemoryAuditRepository,
   InMemoryProcessInstanceRepository,
+  InMemoryProcessRepository,
+  InMemoryAgentRunRepository,
+  InMemoryAgentDefinitionRepository,
   buildProcessInstance,
   buildStepExecution,
+  buildWorkflowDefinition,
+  buildAgentRun,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import type { ProcessInstance } from '@mediforce/platform-core';
@@ -270,5 +275,115 @@ describe('retryStep handler', () => {
 
     // Workspace gate trips before engine is invoked.
     expect(engineStub.calls).toHaveLength(0);
+  });
+
+  describe('agent drift guard (epic #1673 B1 + B2)', () => {
+    async function buildDriftScope(opts: { ranVersion: number; currentVersion: number }) {
+      const driftInstanceRepo = new InMemoryProcessInstanceRepository();
+      const driftAuditRepo = new InMemoryAuditRepository(driftInstanceRepo);
+      const agentRunRepo = new InMemoryAgentRunRepository(driftInstanceRepo);
+      const agentDefinitionRepo = new InMemoryAgentDefinitionRepository();
+      const processRepo = new InMemoryProcessRepository();
+
+      await driftInstanceRepo.create(
+        buildProcessInstance({
+          id: 'inst-drift',
+          namespace: 'team-alpha',
+          status: 'failed',
+          currentStepId: 'deploy',
+          definitionName: 'deploy-flow',
+          definitionVersion: '7',
+        }),
+      );
+      await processRepo.saveWorkflowDefinition(
+        buildWorkflowDefinition({
+          name: 'deploy-flow',
+          version: 7,
+          namespace: 'team-alpha',
+          steps: [{ id: 'deploy', name: 'Deploy', type: 'creation', executor: 'agent', agentId: 'ship-it-agent' }],
+        }),
+      );
+      await agentRunRepo.create(
+        buildAgentRun({
+          id: 'agent-run-1',
+          processInstanceId: 'inst-drift',
+          stepId: 'deploy',
+          agentId: 'ship-it-agent',
+          agentVersion: opts.ranVersion,
+        }),
+      );
+      await agentDefinitionRepo.upsert('ship-it-agent', {
+        kind: 'plugin',
+        name: 'Ship It',
+        iconName: 'bot',
+        description: '',
+        foundationModel: 'anthropic/claude-sonnet-4',
+        systemPrompt: 'Ship it.',
+        inputDescription: '',
+        outputDescription: '',
+        namespace: 'team-alpha',
+        visibility: 'private',
+      });
+      await agentDefinitionRepo.appendVersion({
+        agentId: 'ship-it-agent',
+        version: opts.currentVersion,
+        hash: 'a'.repeat(64),
+        config: {
+          kind: 'plugin',
+          runtimeId: null,
+          foundationModel: 'anthropic/claude-sonnet-4',
+          systemPrompt: 'Ship it.',
+          mcpServers: {},
+          skills: [],
+        },
+        createdBy: 'author-1',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      });
+
+      const scope = createTestScope({
+        instanceRepo: driftInstanceRepo,
+        auditRepo: driftAuditRepo,
+        agentRunRepo,
+        agentDefinitionRepo,
+        processRepo,
+        runKicker: noopRunKicker(),
+        caller: userCaller('u-1', ['team-alpha']),
+      });
+      const instanceAfter: ProcessInstance = {
+        ...(await driftInstanceRepo.getById('inst-drift'))!,
+        status: 'running',
+        error: null,
+      };
+      const engineStub = makeEngineStub({ result: instanceAfter });
+      Object.assign(scope.system, { engine: engineStub });
+      return { scope, engineStub };
+    }
+
+    it('[ERROR] refuses to retry when the Agent changed since this step last ran', async () => {
+      const { scope, engineStub } = await buildDriftScope({ ranVersion: 2, currentVersion: 3 });
+
+      const err = await retryStep({ runId: 'inst-drift', stepId: 'deploy' }, scope).catch((e) => e);
+
+      expect(err).toBeInstanceOf(PreconditionFailedError);
+      expect((err as Error).message).toContain('ran v2, now v3');
+      expect(engineStub.calls).toHaveLength(0);
+    });
+
+    it('[DATA] retries on the current Agent when allowAgentDrift is set', async () => {
+      const { scope, engineStub } = await buildDriftScope({ ranVersion: 2, currentVersion: 3 });
+
+      const result = await retryStep({ runId: 'inst-drift', stepId: 'deploy', allowAgentDrift: true }, scope);
+
+      expect(result.run.status).toBe('running');
+      expect(engineStub.calls).toHaveLength(1);
+    });
+
+    it('[DATA] retries normally when the Agent has not changed', async () => {
+      const { scope, engineStub } = await buildDriftScope({ ranVersion: 3, currentVersion: 3 });
+
+      await retryStep({ runId: 'inst-drift', stepId: 'deploy' }, scope);
+
+      expect(engineStub.calls).toHaveLength(1);
+    });
   });
 });

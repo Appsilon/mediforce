@@ -236,6 +236,12 @@ export async function executeAgentStep(
     : {};
   const agentIdentityPrompt = agentDefaults.identityPrompt;
 
+  // Pin the Agent's version for this run (ADR-0029): its newest recorded
+  // version right now, so a later edit never changes what a past run shows.
+  const agentVersion = !reapTimedOut && workflowStep.agentId !== undefined
+    ? (await agentDefinitionRepo.listVersions(workflowStep.agentId))[0]?.version ?? null
+    : null;
+
   // The Skills offered to the step: its agent's and the ones it adds, each
   // from the namespace its reference names (ADR-0025 §4, ADR-0027).
   // undefined when there are none to resolve; a reference to a Skill that is
@@ -268,6 +274,7 @@ export async function executeAgentStep(
       : {}),
     oauthTokens,
     agentIdentityPrompt,
+    agentVersion,
     ...(agentSkills === undefined ? {} : { agentSkills }),
     ...(mcpTapes === undefined ? {} : { mcpTapes }),
     getPreviousStepOutputs: async () => {

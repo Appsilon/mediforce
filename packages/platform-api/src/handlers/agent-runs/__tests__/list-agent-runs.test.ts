@@ -27,6 +27,15 @@ describe('listAgentRuns handler', () => {
     );
   });
 
+  it('filters by agentId', async () => {
+    await agentRunRepo.create(
+      buildAgentRun({ id: 'r-c', processInstanceId: 'inst-alpha', agentId: 'digest-agent' }),
+    );
+    const scope = createTestScope({ agentRunRepo, instanceRepo });
+    const result = await listAgentRuns({ limit: 50, agentId: 'digest-agent' }, scope);
+    expect(result.runs.map((r) => r.id)).toEqual(['r-c']);
+  });
+
   it('returns every run for an apiKey caller, newest first', async () => {
     const scope = createTestScope({ agentRunRepo, instanceRepo });
     const result = await listAgentRuns({ limit: 50 }, scope);

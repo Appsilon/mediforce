@@ -200,6 +200,9 @@ export type ResumeWaitOutput = z.infer<typeof ResumeWaitOutputSchema>;
 export const RetryStepInputSchema = z.object({
   runId: z.string().min(1),
   stepId: z.string().min(1),
+  /** Retry on the Agent as it is now, even if it changed since this step last
+   *  ran (ADR-0029 versioning). Default refuses instead of silently diverging. */
+  allowAgentDrift: z.boolean().optional(),
 });
 
 export const RetryStepOutputSchema = z.object({

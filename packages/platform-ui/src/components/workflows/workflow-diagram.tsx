@@ -170,6 +170,8 @@ type StepNodeData = {
   executor: string;
   autonomyLevel?: string;
   plugin?: string;
+  agentId?: string;
+  agentVersion?: number | null;
   hasError?: boolean;
   hasWarning?: boolean;
   warningTooltip?: string;
@@ -412,6 +414,11 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
           <span className={cn('text-[10px] font-semibold truncate', typeConfig.color)}>
             {typeConfig.label}
           </span>
+          {data.agentVersion != null && (
+            <span className="text-[10px] font-mono text-muted-foreground shrink-0" title={`Runs Agent ${data.agentId} as it is now — currently v${data.agentVersion}`}>
+              v{data.agentVersion}
+            </span>
+          )}
           {data.evaluation !== undefined && <StepEvaluationLink evaluation={data.evaluation} />}
           {data.status !== undefined && <StepStatusMark status={data.status} />}
         </div>
@@ -824,6 +831,7 @@ function buildLayout(
         executor: step.executor,
         autonomyLevel: step.autonomyLevel,
         plugin: step.plugin,
+        agentId: step.agentId,
         backBranches: backBranchesByStep.get(step.id),
         expandable: isExpandable(step.id),
         child: framed.get(step.id)?.frame,
@@ -989,6 +997,8 @@ interface WorkflowDiagramProps {
   warningStepIds?: Map<string, string>;
   /** Per agent step id, its evaluation mark; steps without one show none. */
   stepEvaluation?: Map<string, StepEvaluationMark>;
+  /** Per agent id, its current version (ADR-0029) — shown next to the step's executor label. */
+  agentVersions?: Map<string, number | null>;
   canMoveUp?: Set<string>;
   canMoveDown?: Set<string>;
   onUndo?: () => void;
@@ -1003,7 +1013,7 @@ interface WorkflowDiagramProps {
   childWorkflows?: ChildWorkflowExpansion;
 }
 
-export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, onPaneClick, selectedStepId, errorStepIds, warningStepIds, stepEvaluation, canMoveUp, canMoveDown, onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive, replay, childWorkflows }: WorkflowDiagramProps) {
+export function WorkflowDiagram({ definition, className, style, onNodeClick, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, onPaneClick, selectedStepId, errorStepIds, warningStepIds, stepEvaluation, agentVersions, canMoveUp, canMoveDown, onUndo, onRedo, canUndo, canRedo, onAddBlock, addBlockActive, replay, childWorkflows }: WorkflowDiagramProps) {
   const expandedChildren = childWorkflows?.expanded;
   const expandable = childWorkflows?.expandable;
   const { nodes: layoutNodes, edges: layoutEdges, nestedNodes, nestedEdges, height } = useMemo(
@@ -1023,6 +1033,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
           hasWarning: warningStepIds?.has(n.id) ?? false,
           warningTooltip: warningStepIds?.get(n.id),
           evaluation: stepEvaluation?.get(n.id),
+          agentVersion: d.agentId === undefined ? undefined : agentVersions?.get(d.agentId),
           onDelete: onNodeDelete && d.stepType !== 'terminal' ? () => onNodeDelete(n.id) : undefined,
           onMoveUp: onNodeMoveUp && canMoveUp?.has(n.id) ? () => onNodeMoveUp(n.id) : undefined,
           onMoveDown: onNodeMoveDown && canMoveDown?.has(n.id) ? () => onNodeMoveDown(n.id) : undefined,

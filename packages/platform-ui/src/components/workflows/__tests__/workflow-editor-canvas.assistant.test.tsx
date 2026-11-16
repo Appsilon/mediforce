@@ -69,6 +69,10 @@ vi.mock('@/hooks/use-child-workflows', () => ({
   useChildDefinitionExpansion: () => undefined,
 }));
 
+vi.mock('@/hooks/use-step-evaluation', () => ({
+  useCurrentAgentVersions: () => new Map(),
+}));
+
 vi.mock('../workflow-editor/step-editor', () => ({
   StepEditor: () => <div data-testid="step-editor" />,
 }));
