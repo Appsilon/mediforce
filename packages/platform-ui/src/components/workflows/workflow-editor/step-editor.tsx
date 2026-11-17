@@ -996,7 +996,7 @@ export function StepEditor({
                 <select
                   aria-label="Agent version"
                   value={step.agentVersion == null ? '' : String(step.agentVersion)}
-                  onChange={(e) => onChange({ agentVersion: e.target.value === '' ? undefined : Number(e.target.value) })}
+                  onChange={(e) => onChange({ agentVersion: e.target.value === '' ? null : Number(e.target.value) })}
                   className={rs}
                 >
                   <option value="">Track current (not pinned — changes when the Agent does)</option>

@@ -803,7 +803,7 @@ describe('StepEditor', () => {
     expect(onChange).toHaveBeenCalledWith({ agentVersion: 5 });
 
     fireEvent.change(versionSelect, { target: { value: '' } });
-    expect(onChange).toHaveBeenCalledWith({ agentVersion: undefined });
+    expect(onChange).toHaveBeenCalledWith({ agentVersion: null });
   });
 
   it('[RENDER] marks the verified agents in the agent picker', async () => {
