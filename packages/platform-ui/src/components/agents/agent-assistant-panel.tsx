@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { DEFAULT_MODEL } from '@mediforce/platform-core';
 import type { AgentAssistantPlatformToolName, AgentAssistantProposalToolName, WorkflowDefinition } from '@mediforce/platform-core';
 import type { AgentAssistantProgress, AgentProposalEvidence, AskAgentAssistantOutput } from '@mediforce/platform-api/contract';
-import { mediforce } from '@/lib/mediforce';
+import { mediforce, mediforceSilent } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/format';
@@ -358,7 +358,8 @@ export function AgentAssistantPanel({ namespace, open, onToggleOpen, wide, onTog
       const { newSkill, skills, ...agentFields } = proposal.arguments;
       const fullSkills = [...skills];
       if (newSkill !== undefined) {
-        const existing = await mediforce.skills.get({ namespace, id: newSkill.id }).catch(() => null);
+        // mediforceSilent: a 404 here just means the skill doesn't exist yet, not an error to toast.
+        const existing = await mediforceSilent.skills.get({ namespace, id: newSkill.id }).catch(() => null);
         const skill = existing?.skill ?? (await mediforce.skills.create({
           namespace,
           visibility: 'private',
