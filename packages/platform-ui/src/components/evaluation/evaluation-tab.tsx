@@ -287,7 +287,7 @@ export function EvaluationTab({ handle, workflowName, runnableVersion, mayEdit, 
   const selected = agentSteps.find((step) => step.id === searchParams.get('step')) ?? agentSteps[0];
   const agentDefinition = useAgentDefinition(selected?.agentId);
   const currentModel = selected?.agent?.model ?? agentDefinition.data?.agent.foundationModel;
-  const currentPrompt = selected?.agent?.prompt ?? agentDefinition.data?.agent.systemPrompt;
+  const currentPrompt = selected?.agent?.prompt ?? '';
 
   const [pickedHere, setPickedHere] = React.useState(false);
   const select = (next: { version?: number; step?: string }) => {

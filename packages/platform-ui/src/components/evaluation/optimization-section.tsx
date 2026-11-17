@@ -153,6 +153,7 @@ function NewComparisonDialog({ step, definitionVersion, datasets, currentModel, 
   }));
   const start = useStepEvaluationMutation(step, (comparisonId: string) =>
     mediforce.evaluation.startComparison({ comparisonId, confirmedBudgetUsd: prepared!.comparison.budgetUsd }));
+  const cancel = useStepEvaluationMutation(step, (comparisonId: string) => mediforce.evaluation.cancelComparison({ comparisonId }));
 
   if (prepared !== null) {
     return (
@@ -163,7 +164,7 @@ function NewComparisonDialog({ step, definitionVersion, datasets, currentModel, 
         starting={start.isPending}
         error={start.error instanceof Error ? start.error : null}
         onStart={() => start.mutate(prepared.comparison.id, { onSuccess: onClose })}
-        onClose={onClose}
+        onClose={() => { cancel.mutate(prepared.comparison.id); onClose(); }}
       />
     );
   }
@@ -321,7 +322,7 @@ function CaseDrillDown({ step, baseline, variants }: { step: EvaluationSubject; 
   );
 }
 
-function ComparisonReport({ step, comparisonId, mayRun }: { step: EvaluationSubject; comparisonId: string; mayRun: boolean }) {
+function ComparisonReport({ step, comparisonId }: { step: EvaluationSubject; comparisonId: string }) {
   const query = useComparison(step, comparisonId);
   if (query.data === undefined) return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" data-testid="comparison-report-loading" />;
   const { comparison, baseline, variants } = query.data;
@@ -338,11 +339,6 @@ function ComparisonReport({ step, comparisonId, mayRun }: { step: EvaluationSubj
           <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
             <span>{describeVariant(variant.evalRun.variant ?? {})}</span>
             <AcceptanceBadge acceptance={variant.acceptance} />
-            {mayRun && (
-              <InstantTooltip label="Applies a winning Variant for real once O4 (apply-variant) merges to main.">
-                <span className="inline-flex"><button type="button" className={buttonClass} disabled>Apply</button></span>
-              </InstantTooltip>
-            )}
           </div>
           <EvaluatorCallsTable baseline={baseline} variant={variant} />
         </div>
@@ -418,7 +414,7 @@ export function OptimizationSection({ step, definitionVersion, datasets, current
                     </tr>
                     {openId === comparison.id && (
                       <DetailsRow columns={6} testId="comparison-report-row">
-                        <ComparisonReport step={step} comparisonId={comparison.id} mayRun={mayRun} />
+                        <ComparisonReport step={step} comparisonId={comparison.id} />
                       </DetailsRow>
                     )}
                   </React.Fragment>

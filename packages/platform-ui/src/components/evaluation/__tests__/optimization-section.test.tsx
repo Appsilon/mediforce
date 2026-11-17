@@ -5,6 +5,7 @@ import { OptimizationSection } from '../optimization-section';
 const evaluation = vi.hoisted(() => ({
   prepareComparison: vi.fn(),
   startComparison: vi.fn(),
+  cancelComparison: vi.fn(),
 }));
 vi.mock('@/lib/mediforce', () => ({ mediforce: { evaluation } }));
 
@@ -169,6 +170,20 @@ describe('OptimizationSection — new Comparison', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Start' }));
     await waitFor(() => expect(evaluation.startComparison).toHaveBeenCalledWith({ comparisonId: 'cmp-2', confirmedBudgetUsd: 0.42 }));
+    expect(screen.queryByTestId('start-eval-run-dialog')).toBeNull();
+  });
+
+  it('cancels a prepared Comparison when its start dialog is closed without starting', async () => {
+    evaluation.prepareComparison.mockResolvedValue({ comparison: { ...comparison, id: 'cmp-2', budgetUsd: 0.42, status: 'prepared' }, baseline, variants: [variant] });
+    renderSection();
+
+    fireEvent.click(screen.getByTestId('new-comparison'));
+    fireEvent.click(screen.getByTestId('pick-model'));
+    fireEvent.click(screen.getByTestId('prepare-comparison'));
+    expect(await screen.findByTestId('start-eval-run-dialog')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(evaluation.cancelComparison).toHaveBeenCalledWith({ comparisonId: 'cmp-2' }));
     expect(screen.queryByTestId('start-eval-run-dialog')).toBeNull();
   });
 
