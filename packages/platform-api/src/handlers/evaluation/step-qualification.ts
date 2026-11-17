@@ -384,6 +384,20 @@ export async function signStepQualification(
     throw new ValidationError('No Acceptance Criteria were frozen into this Eval Run; set them and run the step again');
   }
 
+  // A Variant's run is tested on its base version, but may now back the
+  // current live version instead (ADR-0024 D6: applyVariant made one whose
+  // Fingerprint matches it) — the signed Qualification then names that one.
+  let definitionVersion = run.definitionVersion;
+  let agentVersion = run.agentVersion;
+  if (run.variant !== null) {
+    const current = await loadEvaluationSubject(scope, step, 'edit');
+    const currentFingerprint = await computeStepFingerprint(scope, current.definition, current.step);
+    if (currentFingerprint.hash === fingerprint.hash) {
+      definitionVersion = current.agent === null ? current.definition.version : null;
+      agentVersion = current.agent === null ? null : (await currentAgentVersion(scope, current.agent))?.version ?? run.agentVersion;
+    }
+  }
+
   const report = await buildEvalRunReport(scope, run, trials);
   const verdict = report.criteriaVerdict;
   if (verdict === null) throw new ValidationError('No Acceptance Criteria were frozen into this Eval Run; set them and run the step again');
@@ -406,8 +420,8 @@ export async function signStepQualification(
     ...evaluationOwnerOf(step),
     id: randomUUID(),
     evalRunId: run.id,
-    definitionVersion: run.definitionVersion,
-    agentVersion: run.agentVersion,
+    definitionVersion,
+    agentVersion,
     fingerprint,
     evaluators: run.evaluators,
     mcpPolicy: run.mcpPolicy,

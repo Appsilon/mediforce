@@ -10,7 +10,7 @@ import { saveEvalDataset } from '../eval-datasets';
 import { advanceEvalRunOfInstance } from '../eval-runs';
 import { prepareComparison, startComparison } from '../comparisons';
 import { applyVariant } from '../apply-variant';
-import { getWorkflowValidation } from '../step-qualification';
+import { getWorkflowValidation, signStepQualification } from '../step-qualification';
 import { registerWorkflow } from '../../workflows/register-workflow';
 import { evaluationFixture, STEP, WORKFLOW, type EvaluationFixture } from './fixture';
 
@@ -92,7 +92,11 @@ describe('Applying a Comparison\'s Variant (ADR-0024 D6)', () => {
     const applied = versions.find((version) => version.definitionVersion === baseVersion + 1);
     const step = applied?.steps.find((candidate) => candidate.stepId === 'grade-aes');
     expect(step?.validation.evalRunId).toBe(variantRunId);
-    expect(step?.validation.status).not.toBe('not_verified');
+    expect(step?.validation.status).toBe('awaiting_approval');
+
+    // Signing names the applied version, not the Variant's own base version (#1668 review).
+    const { qualification } = await signStepQualification({ evalRunId: variantRunId, decision: 'confirmed' }, scope);
+    expect(qualification.definitionVersion).toBe(baseVersion + 1);
   });
 
   it('refuses a run that is not the Comparison\'s, and the baseline run', async () => {

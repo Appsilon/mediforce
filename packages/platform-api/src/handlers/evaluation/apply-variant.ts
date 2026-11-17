@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import { applyAgentVariant, applyStepVariant, isEmptyVariant } from '@mediforce/platform-core';
 import type { ApplyVariantInputSchema, ApplyVariantOutput } from '../../contract/evaluation';
+import { buildRegisterBody, RegisterWorkflowInputSchema } from '../../contract/workflows';
 import type { CallerScope } from '../../repositories/index';
 import { ForbiddenError, ValidationError } from '../../errors';
 import { loadEvaluationSubject, subjectName, subjectRef } from './_lib/evaluation-subject';
@@ -40,8 +41,8 @@ export async function applyVariant(
     const patched = applyStepVariant(definition, workflowStep, run.variant);
     const fingerprint = await computeStepFingerprint(scope, patched.definition, patched.step);
     if (run.fingerprint === null || fingerprint.hash !== run.fingerprint.hash) throw changedError;
-    const { namespace, version: _version, createdAt: _createdAt, ...body } = patched.definition;
-    const registered = await registerWorkflow({ ...body, namespace }, scope);
+    const { namespace } = patched.definition;
+    const registered = await registerWorkflow({ ...RegisterWorkflowInputSchema.parse(buildRegisterBody(patched.definition, {})), namespace }, scope);
     if (input.makeDefault) await setDefaultWorkflowVersion({ namespace, name: registered.name, version: registered.version }, scope);
     await appendEvaluationAudit(scope, {
       action: 'eval_variant.applied',
