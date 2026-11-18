@@ -5,6 +5,7 @@ export interface ListAgentRunsOptions {
   readonly cursor?: string;
   readonly runId?: string;
   readonly stepId?: string;
+  readonly agentId?: string;
   /** Optional explicit namespace filter (further narrows inside `allowed`). */
   readonly namespace?: string;
   /** Raw status filter — the Monitoring → Agents tab's "All Statuses" dropdown. */

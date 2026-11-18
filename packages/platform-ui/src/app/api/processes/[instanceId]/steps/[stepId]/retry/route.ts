@@ -14,9 +14,10 @@ export const POST = createRouteAdapter<
   RouteContext
 >(
   RetryStepInputSchema,
-  async (_req, ctx) => {
+  async (req, ctx) => {
     const { instanceId, stepId } = await ctx.params;
-    return { runId: instanceId, stepId };
+    const body = await req.json().catch(() => ({})) as { allowAgentDrift?: boolean };
+    return { runId: instanceId, stepId, allowAgentDrift: body.allowAgentDrift };
   },
   retryStep,
 );

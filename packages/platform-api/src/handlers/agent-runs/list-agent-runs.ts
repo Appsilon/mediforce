@@ -24,6 +24,7 @@ export async function listAgentRuns(
     cursor: input.cursor,
     runId: input.runId,
     stepId: input.stepId,
+    agentId: input.agentId,
     namespace: input.namespace,
     status: input.status,
     cardStatus: input.cardStatus,

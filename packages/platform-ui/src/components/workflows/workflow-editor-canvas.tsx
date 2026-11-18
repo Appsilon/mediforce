@@ -34,6 +34,7 @@ import { useDockerImages, isImageAvailable } from '@/hooks/use-docker-images';
 import { useImageCatalogEntries } from '@/hooks/use-image-catalog';
 import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { useChildDefinitionExpansion } from '@/hooks/use-child-workflows';
+import { useCurrentAgentVersions } from '@/hooks/use-step-evaluation';
 import { mediforce, mediforceSilent, ApiError } from '@/lib/mediforce';
 import { validateSteps } from '@/lib/workflow-save-utils';
 import { useToast } from '@/components/command-palette';
@@ -833,6 +834,11 @@ export function WorkflowEditorCanvas({
     transitions: editedTransitions,
   }) as WorkflowDefinition, [editedSteps, editedTransitions]);
   const childWorkflows = useChildDefinitionExpansion(diagramDefinition, namespace);
+  const stepAgentIds = useMemo(
+    () => [...new Set(editedSteps.map((s) => s.agentId).filter((id): id is string => id !== undefined))],
+    [editedSteps],
+  );
+  const agentVersions = useCurrentAgentVersions(stepAgentIds);
 
   const savePanel = renderSavePanel?.(editedSteps, editedTransitions, discardChanges) ?? null;
 
@@ -1050,6 +1056,7 @@ export function WorkflowEditorCanvas({
             errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
             warningStepIds={warningStepIds}
             stepEvaluation={savedStepEvaluation}
+            agentVersions={agentVersions}
             canMoveUp={canMoveUpSet}
             canMoveDown={canMoveDownSet}
             onUndo={undoEdit}

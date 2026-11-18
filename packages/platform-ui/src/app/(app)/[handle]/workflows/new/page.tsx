@@ -101,10 +101,10 @@ export default function NewWorkflowPage() {
       return;
     }
     let cancelled = false;
-    mediforce.agents.get({ id: seedAgentId })
-      .then(({ agent }) => {
+    Promise.all([mediforce.agents.get({ id: seedAgentId }), mediforce.agents.listVersions({ id: seedAgentId })])
+      .then(([{ agent }, { current }]) => {
         if (cancelled) return;
-        const patch = selectAgentPatch({}, agent, defaultModel);
+        const patch = selectAgentPatch({}, agent, defaultModel, { pinVersion: current });
         setTemplate({
           steps: [
             { id: 'start', name: agent.name, type: 'creation', executor: 'agent', ...patch },

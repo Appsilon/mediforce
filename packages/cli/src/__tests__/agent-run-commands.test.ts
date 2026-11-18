@@ -64,6 +64,19 @@ describe('agent-run list command', () => {
     expect(output.stderrLines.join('\n')).toMatch(/--step-id requires --run-id/);
   });
 
+  it('shows the pinned agent and version when present', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ runs: [{ ...SAMPLE_RUN, agentId: 'digest-agent', agentVersion: 3 }] }),
+    );
+    const output = captureOutput();
+    await agentRunListCommand({
+      argv: [],
+      env: { MEDIFORCE_API_KEY: 'k' },
+      output,
+    });
+    expect(output.stdoutLines.join('\n')).toMatch(/agent:digest-agent@v3/);
+  });
+
   it('renders the nextCursor hint when present', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({ runs: [SAMPLE_RUN], nextCursor: 'token-x' }),

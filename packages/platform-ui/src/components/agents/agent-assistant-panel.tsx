@@ -47,6 +47,7 @@ const TOOL_LABELS: Record<AgentAssistantPlatformToolName | AgentAssistantProposa
   search_mcp_catalog: 'Searching the MCP catalog',
   propose_agent_match: 'Proposing a matching agent',
   propose_agent_change: 'Proposing an agent change',
+  propose_agent_update: 'Proposing an agent update',
   propose_new_agent: 'Drafting a new agent',
   propose_mcp_binding: 'Proposing an MCP server',
   propose_requirement_matrix: 'Scoring candidates against requirements',
@@ -135,10 +136,13 @@ function UseInWorkflowStep({ namespace, agentId }: { namespace: string; agentId:
     setBinding(true);
     setError(null);
     try {
-      const { agent } = await mediforce.agents.get({ id: agentId });
+      const [{ agent }, { current }] = await Promise.all([
+        mediforce.agents.get({ id: agentId }),
+        mediforce.agents.listVersions({ id: agentId }),
+      ]);
       const step = target.definition.steps.find((candidate) => candidate.id === target.stepId);
       if (step === undefined) return;
-      const patch = selectAgentPatch(step, agent, DEFAULT_MODEL);
+      const patch = selectAgentPatch(step, agent, DEFAULT_MODEL, { pinVersion: current });
       const steps = target.definition.steps.map((candidate) => candidate.id === target.stepId ? { ...candidate, ...patch } : candidate);
       await mediforce.workflows.register(buildRegisterBody(target.definition, { steps }), { namespace });
       setBound(target.label);
@@ -192,14 +196,14 @@ function FollowUps({ namespace, agentId }: { namespace: string; agentId: string 
 function agentIdFromEvent(tool: string, args: unknown): string | undefined {
   const value = args as Record<string, unknown> | undefined;
   if (tool === 'read_agent' && typeof value?.id === 'string') return value.id;
-  if ((tool === 'propose_agent_match' || tool === 'propose_agent_change') && typeof value?.agentId === 'string') return value.agentId;
+  if ((tool === 'propose_agent_match' || tool === 'propose_agent_change' || tool === 'propose_agent_update') && typeof value?.agentId === 'string') return value.agentId;
   return undefined;
 }
 
 /** The agent its final proposal names, for the catalog grid to keep highlighted once the turn ends. */
 function matchedAgentId(proposals: Proposal[]): string | null {
   for (const proposal of proposals) {
-    if (proposal.tool === 'propose_agent_match' || proposal.tool === 'propose_agent_change') {
+    if (proposal.tool === 'propose_agent_match' || proposal.tool === 'propose_agent_change' || proposal.tool === 'propose_agent_update') {
       return proposal.arguments.agentId;
     }
   }
@@ -331,6 +335,18 @@ export function AgentAssistantPanel({ namespace, open, onToggleOpen, wide, onTog
     await runAccept(messageIndex, proposalIndex, async () => {
       const { agent } = await mediforce.agents.get({ id: proposal.arguments.agentId });
       await mediforce.agents.update({ id: agent.id }, { skills: [...(agent.skills ?? []), proposal.arguments.skill] });
+      onAccepted?.();
+      return {};
+    });
+  }
+
+  async function acceptUpdate(messageIndex: number, proposalIndex: number, proposal: Extract<Proposal, { tool: 'propose_agent_update' }>) {
+    await runAccept(messageIndex, proposalIndex, async () => {
+      const { agentId, systemPrompt, foundationModel } = proposal.arguments;
+      await mediforce.agents.update({ id: agentId }, {
+        ...(systemPrompt === undefined ? {} : { systemPrompt }),
+        ...(foundationModel === undefined ? {} : { foundationModel }),
+      });
       onAccepted?.();
       return {};
     });
@@ -546,6 +562,46 @@ export function AgentAssistantPanel({ namespace, open, onToggleOpen, wide, onTog
                           {proposalError !== undefined && <p className="mt-1.5 text-destructive">{proposalError}</p>}
                           <div className="mt-1.5 flex gap-1.5">
                             <button type="button" disabled={busy === true} className="rounded-md bg-primary px-2 py-1 text-primary-foreground disabled:opacity-50" onClick={() => void acceptChange(index, proposalIndex, proposal)}>
+                              {busy === true ? 'Accepting…' : 'Accept'}
+                            </button>
+                            <button type="button" disabled={busy === true} className="rounded-md border px-2 py-1 disabled:opacity-50" onClick={() => setProposalState(index, proposalIndex, { status: 'rejected' })}>
+                              Reject
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                }
+                if (proposal.tool === 'propose_agent_update') {
+                  return (
+                    <div key={proposalIndex} className="rounded-md border p-2.5 text-xs" data-testid="agent-assistant-update-card">
+                      <p className="font-medium">Update this agent</p>
+                      <p className="mt-0.5 text-muted-foreground">{proposal.arguments.rationale}</p>
+                      {proposal.arguments.foundationModel !== undefined && (
+                        <p className="mt-1 font-mono">Model: {proposal.arguments.foundationModel}</p>
+                      )}
+                      {proposal.arguments.systemPrompt !== undefined && (
+                        <details className="mt-1 text-muted-foreground">
+                          <summary className="cursor-pointer select-none">New system prompt</summary>
+                          <pre className="mt-1 overflow-x-auto rounded bg-muted p-1.5 whitespace-pre-wrap">{proposal.arguments.systemPrompt}</pre>
+                        </details>
+                      )}
+                      <EvidenceRow evidence={proposal.evidence} />
+                      {status === 'accepted' && (
+                        <>
+                          <span className="mt-1.5 inline-flex items-center gap-1 text-green-700 dark:text-green-400"><Check className="h-3 w-3" />Accepted</span>
+                          <FollowUps namespace={namespace} agentId={proposal.arguments.agentId} />
+                        </>
+                      )}
+                      {status === 'rejected' && (
+                        <span className="mt-1.5 inline-flex items-center gap-1 text-muted-foreground"><X className="h-3 w-3" />Rejected</span>
+                      )}
+                      {status === 'pending' && (
+                        <>
+                          {proposalError !== undefined && <p className="mt-1.5 text-destructive">{proposalError}</p>}
+                          <div className="mt-1.5 flex gap-1.5">
+                            <button type="button" disabled={busy === true} className="rounded-md bg-primary px-2 py-1 text-primary-foreground disabled:opacity-50" onClick={() => void acceptUpdate(index, proposalIndex, proposal)}>
                               {busy === true ? 'Accepting…' : 'Accept'}
                             </button>
                             <button type="button" disabled={busy === true} className="rounded-md border px-2 py-1 disabled:opacity-50" onClick={() => setProposalState(index, proposalIndex, { status: 'rejected' })}>

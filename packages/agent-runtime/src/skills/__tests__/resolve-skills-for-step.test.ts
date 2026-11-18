@@ -127,6 +127,29 @@ describe('resolveSkillsForStep', () => {
     const skills = await resolveSkillsForStep(makeStep({ agentId: 'mapper' }), deps, workflow);
     expect(skills?.map((skill) => skill.id)).toEqual(['sdtm-mapping']);
   });
+  it('[DATA] a pinned version offers the Skills it held then, not the agent\'s current ones (ADR-0029 epic #1673)', async () => {
+    store(makeSkill('alpha', 'old-skill'), makeSkill('alpha', 'new-skill'));
+    await holdingAgent([{ namespace: 'alpha', id: 'new-skill' }]);
+    await agentRepo.appendVersion({
+      agentId: 'mapper',
+      version: 1,
+      hash: 'a'.repeat(64),
+      config: {
+        kind: 'plugin',
+        runtimeId: 'claude-code-agent',
+        foundationModel: 'sonnet',
+        systemPrompt: '',
+        mcpServers: {},
+        skills: [{ namespace: 'alpha', id: 'old-skill', contentHash: 'hash-alpha-old-skill' }],
+      },
+      createdBy: 'author-1',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const skills = await resolveSkillsForStep(makeStep({ agentId: 'mapper', agentVersion: 1 }), deps, workflow, 1);
+    expect(skills?.map((skill) => skill.id)).toEqual(['old-skill']);
+  });
+
   describe('skills the step adds', () => {
     const addingStep = (skills: AgentSkillRef[], agentId: string | null = 'mapper') =>
       makeStep({ ...(agentId === null ? {} : { agentId }), agent: { prompt: 'map', skills } });

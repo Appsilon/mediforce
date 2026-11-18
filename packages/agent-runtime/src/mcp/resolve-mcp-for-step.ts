@@ -24,7 +24,7 @@ export class AgentDefinitionNotFoundError extends Error {
 }
 
 export interface ResolveMcpForStepDeps {
-  agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>;
+  agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'> & Partial<Pick<AgentDefinitionRepository, 'getVersion'>>;
   /** Receives the agent whose bindings are resolved, so a caller-scoped
    *  repository can admit a public agent's own workspace entries. */
   toolCatalogRepo: {
@@ -51,17 +51,29 @@ export interface ResolveMcpForStepDeps {
  *     resolveEffectiveMcp.
  *
  *  Only catalog entries actually referenced by the agent's bindings are
- *  fetched (O(#bindings), not O(#catalog)). */
+ *  fetched (O(#bindings), not O(#catalog)).
+ *
+ *  `pinnedVersion` set (ADR-0029 epic #1673) resolves the agent's bindings
+ *  from that version's recorded snapshot instead of its live document, so a
+ *  later edit to the Agent's MCP servers never changes what an already-saved
+ *  step runs. Falls back to the live document when the pin names a version
+ *  with no snapshot, or when unset. */
 export async function resolveMcpForStep(
   step: WorkflowStep,
   deps: ResolveMcpForStepDeps,
+  pinnedVersion?: number | null,
 ): Promise<ResolvedMcpConfig | null> {
   if (step.agentId === undefined) return null;
 
-  const agent = await deps.agentDefinitionRepo.getById(step.agentId);
-  if (agent === null) {
+  const agentDoc = await deps.agentDefinitionRepo.getById(step.agentId);
+  if (agentDoc === null) {
     throw new AgentDefinitionNotFoundError(step.agentId, step.id);
   }
+
+  const pinned = pinnedVersion != null && deps.agentDefinitionRepo.getVersion !== undefined
+    ? await deps.agentDefinitionRepo.getVersion(step.agentId, pinnedVersion)
+    : null;
+  const agent = pinned === null ? agentDoc : { ...agentDoc, mcpServers: pinned.config.mcpServers };
 
   const bindings = agent.mcpServers ?? {};
   const catalogIds = new Set<string>();

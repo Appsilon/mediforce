@@ -164,6 +164,11 @@ export interface WorkflowAgentContext {
   conformResult?: (result: Record<string, unknown>) => Promise<Record<string, unknown>>;
   /** Set by platform-ui's executeAgentStep for an eval trial only. */
   mcpTapes?: McpTapeContext;
+  /** The Agent's version this run pins (ADR-0029), read from its newest
+   *  recorded AgentVersion at step start. Null when the Agent has none yet;
+   *  undefined when the step names no Agent. Set by platform-ui's
+   *  executeAgentStep. */
+  agentVersion?: number | null;
 }
 
 /** What an output gate made of a result. */

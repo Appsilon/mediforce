@@ -10,7 +10,7 @@ import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { useNamespaceMembers } from '@/hooks/use-namespace-members';
 import { useWorkspaceRoles } from '@/hooks/use-workspace-roles';
 import { useAuth } from '@/contexts/auth-context';
-import { useAgentValidationStatuses, useAgentVersions, useStepQualification } from '@/hooks/use-step-evaluation';
+import { useAgentValidationStatuses, useAgentVersions, useCurrentAgentVersions, useStepQualification } from '@/hooks/use-step-evaluation';
 import { mediforce } from '@/lib/mediforce';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
@@ -512,6 +512,13 @@ export function StepEditor({
   const selectedAgentVersions = useAgentVersions(selectedAgent?.id);
   const selectedAgentImages = [selectedAgent ?? {}, ...(selectedAgentVersions.data?.versions ?? []).map((version) => version.config)]
     .map(agentImageOf);
+  // Current version of every agent the picker can choose, so picking one pins
+  // the step to what it is now (ADR-0029 epic #1673) instead of tracking it live.
+  const pickerAgentVersions = useCurrentAgentVersions(agentDefinitions.map((agent) => agent.id));
+  const selectedAgentCurrentVersion = selectedAgentVersions.data?.current ?? null;
+  const agentVersionStale = step.agentVersion != null
+    && selectedAgentCurrentVersion !== null
+    && step.agentVersion !== selectedAgentCurrentVersion;
   // A step that runs a validated agent as it is shares its validation; one
   // that changes it needs a validation of its own (ADR-0029 D8).
   const agentQualification = useStepQualification(
@@ -952,12 +959,17 @@ export function StepEditor({
             <select
               aria-label="Agent"
               value={step.agentId ?? ''}
-              onChange={(e) => onChange(selectAgentPatch(
-                step,
-                e.target.value === '' ? undefined : agentDefinitions.find((agent) => agent.id === e.target.value) ?? { id: e.target.value, kind: 'plugin' },
-                pinnedDefaultModel,
-                { currentAgentImages: selectedAgentImages, artifacts: workflowArtifacts },
-              ))}
+              onChange={(e) => {
+                const pickedAgent = e.target.value === ''
+                  ? undefined
+                  : agentDefinitions.find((agent) => agent.id === e.target.value) ?? { id: e.target.value, kind: 'plugin' as const };
+                onChange(selectAgentPatch(
+                  step,
+                  pickedAgent,
+                  pinnedDefaultModel,
+                  { currentAgentImages: selectedAgentImages, artifacts: workflowArtifacts, pinVersion: pickedAgent === undefined ? undefined : pickerAgentVersions.get(pickedAgent.id) },
+                ));
+              }}
               className={rs}
             >
               <option value="">{agentsLoading ? 'Loading agents…' : 'No agent selected'}</option>
@@ -978,6 +990,32 @@ export function StepEditor({
                 {' · '}
                 <Link href={routes.agentDefinition(handle, selectedAgent.id)} className="underline">Edit agent</Link>
               </p>
+            )}
+            {selectedAgent !== undefined && (
+              <div className="flex items-center gap-2">
+                <select
+                  aria-label="Agent version"
+                  value={step.agentVersion == null ? '' : String(step.agentVersion)}
+                  onChange={(e) => onChange({ agentVersion: e.target.value === '' ? null : Number(e.target.value) })}
+                  className={rs}
+                >
+                  <option value="">Track current (not pinned — changes when the Agent does)</option>
+                  {step.agentVersion != null
+                    && (selectedAgentVersions.data?.versions ?? []).some((version) => version.version === step.agentVersion) === false && (
+                    <option value={step.agentVersion}>v{step.agentVersion} (not found — gone or never recorded)</option>
+                  )}
+                  {(selectedAgentVersions.data?.versions ?? []).map((version) => (
+                    <option key={version.version} value={version.version}>
+                      v{version.version}{version.version === selectedAgentCurrentVersion ? ' (current)' : ''}
+                    </option>
+                  ))}
+                </select>
+                {agentVersionStale && (
+                  <span className="text-xs text-amber-600 dark:text-amber-400">
+                    pinned to v{step.agentVersion}; Agent is now at v{selectedAgentCurrentVersion}
+                  </span>
+                )}
+              </div>
             )}
             {selectedAgent !== undefined && agentValidated && (hasOwnVerdict ? (
               <p data-testid="agent-validation" data-status="own-verdict" className="text-xs text-muted-foreground">

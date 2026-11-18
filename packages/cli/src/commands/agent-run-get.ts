@@ -18,6 +18,8 @@ export const agentRunGetCommand = defineCommand({
     printKv(output, [
       ['status', run.status],
       ['plugin', run.pluginId],
+      ['agent', run.agentId ?? undefined],
+      ['agent version', run.agentVersion ?? undefined],
       ['autonomy', run.autonomyLevel],
       ['instance', run.processInstanceId],
       ['step', run.stepId],

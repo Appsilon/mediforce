@@ -51,7 +51,7 @@ export class RetiredFileSkillError extends Error {
 }
 
 export interface ResolveSkillsForStepDeps {
-  agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'>;
+  agentDefinitionRepo: Pick<AgentDefinitionRepository, 'getById'> & Partial<Pick<AgentDefinitionRepository, 'getVersion'>>;
   skillRepo: { getById(namespace: string, id: string): Promise<Skill | null> };
 }
 
@@ -69,29 +69,47 @@ export interface ResolveSkillsForStepDeps {
  *     Skill replaces the agent's Skill of the same id.
  *
  *  Each Skill resolves in the namespace its reference names, never the
- *  workflow's. */
+ *  workflow's.
+ *
+ *  `pinnedVersion` set (ADR-0029 epic #1673) reads which Skills the agent
+ *  offers from that version's recorded snapshot instead of its live
+ *  document, so a later edit to the Agent's Skills never changes what an
+ *  already-saved step runs. Each Skill's own content is still fetched live —
+ *  Skills themselves are not versioned — so this only freezes which ones are
+ *  offered, not their content. Falls back to the live document when the pin
+ *  names a version with no snapshot, or when unset. */
 export async function resolveSkillsForStep(
   step: WorkflowStep,
   deps: ResolveSkillsForStepDeps,
   workflow: Pick<WorkflowDefinition, 'namespace' | 'visibility'>,
+  pinnedVersion?: number | null,
 ): Promise<Skill[] | null> {
   const retired = step.agent?.retiredFileSkill;
   if (retired !== undefined) throw new RetiredFileSkillError(step.id, retired);
   const stepRefs = step.agent?.skills ?? [];
   if (step.agentId === undefined && stepRefs.length === 0) return null;
 
-  const agentSkills = step.agentId === undefined ? [] : await resolveAgentSkills(step.agentId, step.id, deps);
+  const agentSkills = step.agentId === undefined ? [] : await resolveAgentSkills(step.agentId, step.id, deps, pinnedVersion);
   const stepSkills = await resolveOfferedSkills(stepRefs, workflow, { kind: 'step', id: step.id }, deps);
   const stepIds = new Set(stepSkills.map((skill) => skill.id));
   return [...agentSkills.filter((skill) => stepIds.has(skill.id) === false), ...stepSkills];
 }
 
-async function resolveAgentSkills(agentId: string, stepId: string, deps: ResolveSkillsForStepDeps): Promise<Skill[]> {
+async function resolveAgentSkills(
+  agentId: string,
+  stepId: string,
+  deps: ResolveSkillsForStepDeps,
+  pinnedVersion?: number | null,
+): Promise<Skill[]> {
   const agent = await deps.agentDefinitionRepo.getById(agentId);
   if (agent === null) {
     throw new AgentDefinitionNotFoundError(agentId, stepId);
   }
-  return resolveOfferedSkills(agent.skills ?? [], agent, { kind: 'agent', id: agent.id }, deps);
+  const pinned = pinnedVersion != null && deps.agentDefinitionRepo.getVersion !== undefined
+    ? await deps.agentDefinitionRepo.getVersion(agentId, pinnedVersion)
+    : null;
+  const refs = pinned === null ? agent.skills ?? [] : pinned.config.skills;
+  return resolveOfferedSkills(refs, agent, { kind: 'agent', id: agent.id }, deps);
 }
 
 async function resolveOfferedSkills(

@@ -55,6 +55,11 @@ export const AgentRunSchema = z.object({
   executorType: z.enum(['human', 'agent', 'script']).optional(), // for UI display
   reviewerType: z.enum(['human', 'agent', 'none']).optional(), // for UI display
   trace: AgentRunTraceSchema.nullable().optional(),
+  /** The Agent this run's step named, and the version it ran (ADR-0029's
+   *  versioning, pinned at run time). Null when the step names no Agent or
+   *  the Agent has no recorded version yet. */
+  agentId: z.string().nullable().optional(),
+  agentVersion: z.number().int().positive().nullable().optional(),
 });
 
 export type AgentRunStatus = z.infer<typeof AgentRunStatusSchema>;

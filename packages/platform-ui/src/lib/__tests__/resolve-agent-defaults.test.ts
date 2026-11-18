@@ -80,4 +80,32 @@ describe('resolveAgentDefaults', () => {
     const result = await resolveAgentDefaults('agent-1', repo);
     expect(result.model).toBeUndefined();
   });
+
+  it('reads the pinned version\'s snapshot instead of the live document', async () => {
+    const repo = {
+      ...makeRepo(makeAgent({ systemPrompt: 'live prompt', foundationModel: 'live/model' })),
+      getVersion: vi.fn().mockResolvedValue({
+        agentId: 'agent-1',
+        version: 2,
+        hash: 'h2',
+        config: { kind: 'plugin', runtimeId: null, foundationModel: 'pinned/model', systemPrompt: 'pinned prompt', mcpServers: {}, skills: [] },
+        createdBy: 'u',
+        createdAt: '2026-01-01T00:00:00Z',
+      }),
+    };
+    const result = await resolveAgentDefaults('agent-1', repo, 2);
+    expect(repo.getVersion).toHaveBeenCalledWith('agent-1', 2);
+    expect(repo.getById).not.toHaveBeenCalled();
+    expect(result.model).toBe('pinned/model');
+    expect(result.identityPrompt).toContain('pinned prompt');
+  });
+
+  it('falls back to the live document when the pinned version has no snapshot', async () => {
+    const repo = {
+      ...makeRepo(makeAgent({ foundationModel: 'live/model' })),
+      getVersion: vi.fn().mockResolvedValue(null),
+    };
+    const result = await resolveAgentDefaults('agent-1', repo, 9);
+    expect(result.model).toBe('live/model');
+  });
 });

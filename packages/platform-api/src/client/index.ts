@@ -2192,7 +2192,7 @@ export class Mediforce {
         return this.sendJson(
           'POST',
           `/api/processes/${encodeURIComponent(validated.runId)}/steps/${encodeURIComponent(validated.stepId)}/retry`,
-          undefined,
+          { allowAgentDrift: validated.allowAgentDrift },
           RetryStepOutputSchema,
           'mediforce.runs.retryStep',
         );
@@ -2678,6 +2678,7 @@ export class Mediforce {
           namespace: validated.namespace,
           runId: validated.runId,
           stepId: validated.stepId,
+          agentId: validated.agentId,
           limit: validated.limit !== undefined ? String(validated.limit) : undefined,
           cursor: validated.cursor,
           status: validated.status,

@@ -144,11 +144,12 @@ export class InMemoryAgentRunRepository implements AgentRunRepository {
 
   private applyFilters(
     runs: AgentRun[],
-    opts: Pick<ListAgentRunsOptions, 'runId' | 'stepId' | 'status' | 'processInstanceIds' | 'cardStatus'>,
+    opts: Pick<ListAgentRunsOptions, 'runId' | 'stepId' | 'agentId' | 'status' | 'processInstanceIds' | 'cardStatus'>,
   ): AgentRun[] {
     return runs.filter((r) => {
       if (opts.runId !== undefined && r.processInstanceId !== opts.runId) return false;
       if (opts.stepId !== undefined && r.stepId !== opts.stepId) return false;
+      if (opts.agentId !== undefined && r.agentId !== opts.agentId) return false;
       if (opts.status !== undefined && r.status !== opts.status) return false;
       if (opts.processInstanceIds !== undefined && !opts.processInstanceIds.includes(r.processInstanceId)) {
         return false;

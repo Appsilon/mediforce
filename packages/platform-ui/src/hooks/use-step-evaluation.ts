@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { keepPreviousData, skipToken, useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { EvaluationSubject } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
@@ -324,4 +325,23 @@ export function useAgentVersions(agentId: string | undefined) {
     enabled: agentId !== undefined,
     retry: stopRetryOn4xx,
   });
+}
+
+/** Each Agent's current version (ADR-0029) — so a run pinned to an older one can be flagged, wherever it's shown. */
+export function useCurrentAgentVersions(agentIds: readonly string[]): Map<string, number | null> {
+  const distinct = [...new Set(agentIds)];
+  const results = useQueries({
+    queries: distinct.map((agentId) => ({
+      queryKey: queryKeys.agentVersions(agentId),
+      queryFn: () => mediforce.agents.listVersions({ id: agentId }),
+      retry: stopRetryOn4xx,
+    })),
+  });
+  const fingerprint = distinct.map((id, i) => `${id}:${results[i]?.data?.current ?? ''}`).join(',');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => {
+    const map = new Map<string, number | null>();
+    distinct.forEach((agentId, i) => map.set(agentId, results[i]?.data?.current ?? null));
+    return map;
+  }, [fingerprint]);
 }

@@ -57,6 +57,8 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
       processInstanceId: parsed.processInstanceId,
       stepId: parsed.stepId,
       pluginId: parsed.pluginId,
+      agentId: parsed.agentId ?? null,
+      agentVersion: parsed.agentVersion ?? null,
       autonomyLevel: parsed.autonomyLevel,
       status: parsed.status,
       fallbackReason: parsed.fallbackReason,
@@ -116,6 +118,8 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
         processInstanceId: parsed.processInstanceId,
         stepId: parsed.stepId,
         pluginId: parsed.pluginId,
+        agentId: parsed.agentId ?? null,
+        agentVersion: parsed.agentVersion ?? null,
         autonomyLevel: parsed.autonomyLevel,
         status: parsed.status,
         fallbackReason: parsed.fallbackReason,
@@ -214,7 +218,7 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
   }
 
   private baseConditions(
-    opts: Pick<ListAgentRunsOptions, 'namespace' | 'runId' | 'stepId' | 'status' | 'processInstanceIds' | 'excludeExecutorType'>,
+    opts: Pick<ListAgentRunsOptions, 'namespace' | 'runId' | 'stepId' | 'agentId' | 'status' | 'processInstanceIds' | 'excludeExecutorType'>,
     allowed: readonly string[] | undefined,
   ): SQL[] {
     const conditions: SQL[] = [isNull(agentRuns.evalRunId)];
@@ -232,6 +236,9 @@ export class PostgresAgentRunRepository implements AgentRunRepository {
     }
     if (opts.stepId !== undefined) {
       conditions.push(eq(agentRuns.stepId, opts.stepId));
+    }
+    if (opts.agentId !== undefined) {
+      conditions.push(eq(agentRuns.agentId, opts.agentId));
     }
     if (opts.status !== undefined) {
       conditions.push(eq(agentRuns.status, opts.status));
@@ -426,6 +433,8 @@ function toAgentRun(row: typeof agentRuns.$inferSelect): AgentRun {
     processInstanceId: row.processInstanceId,
     stepId: row.stepId,
     pluginId: row.pluginId,
+    agentId: row.agentId,
+    agentVersion: row.agentVersion,
     autonomyLevel: row.autonomyLevel,
     status: row.status,
     envelope,

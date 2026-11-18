@@ -275,16 +275,18 @@ export function withDefaultModel(step: WorkflowStep, defaultModel: string): Work
  * the step on save, so it is dropped too and the next save gives the step the
  * new agent's image. A plugin agent names the
  * runtime it runs on, so the step's plugin is filled from it; the author may
- * still change it afterwards.
+ * still change it afterwards. `pinVersion` is the agent's current version at
+ * the moment of picking it — this is the one place a step's pinned version is
+ * allowed to move, since it is a manual choice, not the agent changing under it.
  */
 export function selectAgentPatch(
   step: Pick<WorkflowStep, 'agent' | 'plugin'>,
   agent: Pick<AgentDefinition, 'id' | 'kind' | 'runtimeId'> | undefined,
   defaultModel: string,
-  { currentAgentImages = [agentImageOf({})], artifacts }: { currentAgentImages?: readonly string[]; artifacts?: WorkflowDefinition['artifacts'] } = {},
-): Pick<WorkflowStep, 'agentId' | 'agent' | 'plugin'> {
+  { currentAgentImages = [agentImageOf({})], artifacts, pinVersion }: { currentAgentImages?: readonly string[]; artifacts?: WorkflowDefinition['artifacts']; pinVersion?: number | null } = {},
+): Pick<WorkflowStep, 'agentId' | 'agent' | 'plugin' | 'agentVersion'> {
   const plugin = agent?.kind === 'plugin' && agent.runtimeId !== undefined ? agent.runtimeId : step.plugin;
-  if (agent === undefined) return { agentId: undefined, agent: step.agent, plugin };
+  if (agent === undefined) return { agentId: undefined, agent: step.agent, plugin, agentVersion: undefined };
   const { model, image, ...rest } = step.agent ?? {};
   const givenByCurrentAgent = image !== undefined
     && currentAgentImages.some((agentImage) => normalizeImageRef(agentImage) === normalizeImageRef(image))
@@ -294,5 +296,5 @@ export function selectAgentPatch(
     ...(image === undefined || givenByCurrentAgent ? {} : { image }),
     ...rest,
   };
-  return { agentId: agent.id, agent: Object.keys(kept).length > 0 ? kept : undefined, plugin };
+  return { agentId: agent.id, agent: Object.keys(kept).length > 0 ? kept : undefined, plugin, agentVersion: pinVersion ?? undefined };
 }

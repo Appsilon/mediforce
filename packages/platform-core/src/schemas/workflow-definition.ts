@@ -341,6 +341,13 @@ export const WorkflowStepSchema = z.object({
    *  and runtime identity. Step-level mcpRestrictions narrow further.
    *  When unset, no MCP resolution runs for this step. */
   agentId: z.string().optional(),
+  /** The Agent version this step pins (ADR-0029 epic #1673): set when an
+   *  editor picks the Agent, changed only by a later manual edit. An Agent
+   *  that gets a new version never moves this pointer on its own, so a
+   *  running instance keeps the behaviour it started with. Unset on a step
+   *  saved before this field existed — falls back to the Agent's current
+   *  version (its old, unpinned behaviour). */
+  agentVersion: z.number().int().positive().nullable().optional(),
   allowedRoles: z.array(z.string()).optional(),
   /** Pre-assigns the created human task to a specific user. Supports `${...}`
    *  interpolation against the run's trigger payload / step outputs

@@ -229,6 +229,54 @@ describe('askAgentAssistant', () => {
     expect(await scope.agentDefinitions.listVersions(agent.id)).toHaveLength(2);
   });
 
+  it('proposes updating the system prompt of a close-fit agent, and accepting it records a new version', async () => {
+    const { scope } = buildScope();
+    const { agent } = await createAgent({
+      kind: 'plugin', name: 'SDTM Mapper', iconName: 'Table', description: 'Maps SDTM to ADaM.',
+      foundationModel: 'claude-sonnet-5-5', systemPrompt: 'p', inputDescription: 'in', outputDescription: 'out',
+      namespace: 'team-alpha', visibility: 'private',
+    }, scope);
+
+    scriptOpenRouter([
+      () => ({ toolCalls: [{ name: 'propose_agent_update', arguments: { agentId: agent.id, systemPrompt: 'Map carefully and flag missing domains.', rationale: 'Adds a missing-domain check.' } }] }),
+      () => ({ content: 'Update SDTM Mapper\'s prompt.' }),
+    ]);
+
+    const result = await askAgentAssistant(
+      { namespace: 'team-alpha', messages: [{ role: 'user', content: 'Make SDTM Mapper also flag missing domains.' }] },
+      scope,
+    );
+
+    expect(result).toEqual({
+      reply: 'Update SDTM Mapper\'s prompt.',
+      proposals: [{
+        tool: 'propose_agent_update',
+        arguments: { agentId: agent.id, systemPrompt: 'Map carefully and flag missing domains.', rationale: 'Adds a missing-domain check.' },
+        evidence: { qualification: null, usedIn: [] },
+      }],
+    });
+
+    const updated = await updateAgent({ id: agent.id, body: { systemPrompt: 'Map carefully and flag missing domains.' } }, scope);
+    expect(updated.agent.systemPrompt).toBe('Map carefully and flag missing domains.');
+    expect(await scope.agentDefinitions.listVersions(agent.id)).toHaveLength(2);
+  });
+
+  it('refuses an update proposal naming an agent the caller cannot see', async () => {
+    const { scope } = buildScope();
+    scriptOpenRouter([
+      () => ({ toolCalls: [{ name: 'propose_agent_update', arguments: { agentId: 'made-up-id', foundationModel: 'claude-opus-5-5', rationale: 'r' } }] }),
+      (request) => ({ content: JSON.stringify(lastToolResult(request)) }),
+    ]);
+
+    const result = await askAgentAssistant(
+      { namespace: 'team-alpha', messages: [{ role: 'user', content: 'Switch its model.' }] },
+      scope,
+    );
+
+    expect(result.proposals).toEqual([]);
+    expect(result.reply).toContain('is visible to you');
+  });
+
   it('refuses a change proposal naming a Skill the agent already holds', async () => {
     const { scope } = buildScope();
     await scope.skills.create({
