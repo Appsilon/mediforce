@@ -704,6 +704,10 @@ import {
   ListComparisonsInputSchema,
   ComparisonOutputSchema,
   ListComparisonsOutputSchema,
+  ApplyVariantInputSchema,
+  ApplyVariantOutputSchema,
+  type ApplyVariantInput,
+  type ApplyVariantOutput,
   ListEvalRunsInputSchema,
   ListEvalRunsOutputSchema,
   type EstimateEvalRunInput,
@@ -1193,6 +1197,8 @@ export class Mediforce {
     getComparison: (input: GetComparisonInput) => Promise<ComparisonOutput>;
     listComparisons: (input: ListComparisonsInput) => Promise<ListComparisonsOutput>;
     cancelComparison: (input: CancelComparisonInput) => Promise<ComparisonOutput>;
+    /** Applies a Comparison's winning Variant for real: a new Workflow Definition or Agent version, backed by the chosen run's own validation. */
+    applyVariant: (input: ApplyVariantInput) => Promise<ApplyVariantOutput>;
     getRunFailures: (input: GetEvalRunFailuresInput) => Promise<GetEvalRunFailuresOutput>;
     /** One trial of an Eval Run with everything its Evaluators read and gave. */
     getTrial: (input: GetEvalTrialInput) => Promise<GetEvalTrialOutput>;
@@ -2886,6 +2892,11 @@ export class Mediforce {
         const { comparisonId } = CancelComparisonInputSchema.parse(input);
         return this.sendJson('POST', `/api/evaluation/comparisons/${encodeURIComponent(comparisonId)}/cancel`, undefined,
           ComparisonOutputSchema, 'mediforce.evaluation.cancelComparison');
+      },
+      applyVariant: async (input) => {
+        const { comparisonId, ...body } = ApplyVariantInputSchema.parse(input);
+        return this.sendJson('POST', `/api/evaluation/comparisons/${encodeURIComponent(comparisonId)}/apply-variant`, body,
+          ApplyVariantOutputSchema, 'mediforce.evaluation.applyVariant');
       },
       getRunFailures: async (input) => {
         const { evalRunId, limit } = GetEvalRunFailuresInputSchema.parse(input);

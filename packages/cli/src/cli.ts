@@ -150,6 +150,7 @@ import {
   evalTrialCommand,
 } from './commands/eval-runs';
 import {
+  evalApplyVariantCommand,
   evalCompareCancelCommand,
   evalCompareGetCommand,
   evalCompareListCommand,
@@ -357,6 +358,7 @@ export const TREE: Record<string, BranchEntry> = {
       'compare-get': { description: 'Print a Comparison: each Variant against the baseline, case by case', fn: evalCompareGetCommand },
       'compare-list': { description: 'List a step\'s or an Agent\'s Comparisons', fn: evalCompareListCommand },
       'compare-cancel': { description: 'Cancel a Comparison and its unfinished runs', fn: evalCompareCancelCommand },
+      'apply-variant': { description: 'Apply a Comparison\'s winning Variant for real', fn: evalApplyVariantCommand },
       report: { description: 'Print an Eval Run and its report', fn: evalRunGetCommand },
       failures: { description: 'Print one variant\'s failing trials in an Eval Run', fn: evalRunFailuresCommand },
       trial: { description: 'Print one trial of an Eval Run with every Evaluator\'s grade and what its judge read', fn: evalTrialCommand },

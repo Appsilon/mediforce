@@ -159,6 +159,29 @@ export const evalCompareListCommand = defineCommand({
   },
 });
 
+export const evalApplyVariantCommand = defineCommand({
+  name: 'mediforce eval apply-variant',
+  description: 'Apply a Comparison\'s winning Variant for real: a new Workflow Definition version for a Step, or a new Agent version for an Agent, backed by the run\'s own validation.',
+  args: {
+    comparisonId: { type: 'positional', required: true, description: 'Comparison id' },
+    run: { type: 'string', required: true, description: 'The Variant\'s Eval Run id to apply' },
+    'make-default': { type: 'boolean', description: 'A Step\'s new version becomes the one unpinned runs execute' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const result = await mediforce.evaluation.applyVariant({
+      comparisonId: args.comparisonId,
+      evalRunId: args.run,
+      makeDefault: args['make-default'] === true,
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    output.stdout(result.definitionVersion !== null ? `Applied as Workflow Definition v${result.definitionVersion}` : `Applied as Agent v${result.agentVersion}`);
+    return 0;
+  },
+});
+
 export const evalCompareCancelCommand = defineCommand({
   name: 'mediforce eval compare-cancel',
   description: 'Cancel a Comparison and every run it prepared that has not finished.',

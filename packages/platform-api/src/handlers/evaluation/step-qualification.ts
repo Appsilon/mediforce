@@ -52,6 +52,7 @@ interface StepEvaluator {
  */
 interface SubjectRows {
   readonly runs: () => Promise<readonly EvalRun[]>;
+  readonly variantRuns: () => Promise<readonly EvalRun[]>;
   readonly evaluators: () => Promise<readonly StepEvaluator[]>;
   readonly liveCaseIds: () => Promise<readonly string[]>;
   readonly criteria: () => Promise<AcceptanceCriteria>;
@@ -67,6 +68,7 @@ function subjectRows(scope: CallerScope, step: EvaluationSubject): SubjectRows {
   return {
     // A Variant's run assessed another configuration than the subject's (ADR-0024 D3); a Comparison's own baseline run is not yet signed for the subject either.
     runs: once(async () => (await scope.evaluation.listEvalRuns(step)).filter((run) => run.variant === null && run.comparisonId === null)),
+    variantRuns: once(async () => (await scope.evaluation.listEvalRuns(step)).filter((run) => run.variant !== null)),
     evaluators: once(async () => Promise.all((await scope.evaluation.listEvaluators(step)).map(async (evaluator) => ({
       id: evaluator.id,
       name: evaluator.name,
@@ -133,13 +135,17 @@ async function stepValidation(
   }
   const runs = await rows.runs();
   const runInProgress = runs.some((run) => run.status === 'running');
-  const run = runs.find((candidate) => version.ran(candidate) && FINISHED_RUN_STATUSES.has(candidate.status));
+  const fingerprint = await stepFingerprint();
+  const ownRun = runs.find((candidate) => version.ran(candidate) && FINISHED_RUN_STATUSES.has(candidate.status));
+  const appliedVariantRun = ownRun?.fingerprint?.hash === fingerprint.hash
+    ? undefined
+    : (await rows.variantRuns()).find((candidate) => FINISHED_RUN_STATUSES.has(candidate.status) && candidate.fingerprint?.hash === fingerprint.hash);
+  const run = appliedVariantRun ?? ownRun;
   if (run === undefined) {
     return { status: 'not_verified', evalRunId: null, reason: `No Eval Run of ${version.label} has finished yet.`, runInProgress };
   }
   const notVerified = (reason: string): StepValidation => ({ status: 'not_verified', evalRunId: run.id, reason, runInProgress });
   const since = `since Eval Run ${run.id.slice(0, 8)}`;
-  const fingerprint = await stepFingerprint();
 
   if (run.fingerprint === null || run.fingerprint.hash !== fingerprint.hash) {
     const changed = (run.fingerprint === null ? [] : changedFingerprintComponents(run.fingerprint, fingerprint))
@@ -378,6 +384,20 @@ export async function signStepQualification(
     throw new ValidationError('No Acceptance Criteria were frozen into this Eval Run; set them and run the step again');
   }
 
+  // A Variant's run is tested on its base version, but may now back the
+  // current live version instead (ADR-0024 D6: applyVariant made one whose
+  // Fingerprint matches it) — the signed Qualification then names that one.
+  let definitionVersion = run.definitionVersion;
+  let agentVersion = run.agentVersion;
+  if (run.variant !== null) {
+    const current = await loadEvaluationSubject(scope, step, 'edit');
+    const currentFingerprint = await computeStepFingerprint(scope, current.definition, current.step);
+    if (currentFingerprint.hash === fingerprint.hash) {
+      definitionVersion = current.agent === null ? current.definition.version : null;
+      agentVersion = current.agent === null ? null : (await currentAgentVersion(scope, current.agent))?.version ?? run.agentVersion;
+    }
+  }
+
   const report = await buildEvalRunReport(scope, run, trials);
   const verdict = report.criteriaVerdict;
   if (verdict === null) throw new ValidationError('No Acceptance Criteria were frozen into this Eval Run; set them and run the step again');
@@ -400,8 +420,8 @@ export async function signStepQualification(
     ...evaluationOwnerOf(step),
     id: randomUUID(),
     evalRunId: run.id,
-    definitionVersion: run.definitionVersion,
-    agentVersion: run.agentVersion,
+    definitionVersion,
+    agentVersion,
     fingerprint,
     evaluators: run.evaluators,
     mcpPolicy: run.mcpPolicy,

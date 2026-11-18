@@ -210,6 +210,7 @@ export {
   getComparison,
   listComparisons,
   cancelComparison,
+  applyVariant,
   advanceEvalRunOfInstance,
   driveOpenEvalRuns,
   getAcceptanceCriteria,
