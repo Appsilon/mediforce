@@ -1,12 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useQuery } from '@tanstack/react-query';
 import type { EvaluationSubject } from '@mediforce/platform-core';
-import { mediforce } from '@/lib/mediforce';
-import { queryKeys } from '@/lib/query-keys';
-import { stopRetryOn4xx } from '@/lib/retry';
-import { useAgentVersions } from '@/hooks/use-step-evaluation';
+import { useAgentDefinition, useAgentVersions } from '@/hooks/use-step-evaluation';
 import { useAgentEvaluationGates } from '@/hooks/use-evaluation-gates';
 import { StepEvaluation } from './evaluation-tab';
 
@@ -35,11 +31,7 @@ function AgentVersionLine({ agentId }: { agentId: string }) {
  * had when prepared. Only a container agent of this workspace is evaluated.
  */
 export function AgentEvaluation({ handle, agentId }: { handle: string; agentId: string }) {
-  const agent = useQuery({
-    queryKey: queryKeys.agentDefinition(agentId),
-    queryFn: () => mediforce.agents.get({ id: agentId }),
-    retry: stopRetryOn4xx,
-  });
+  const agent = useAgentDefinition(agentId);
   const gates = useAgentEvaluationGates(handle, agentId);
 
   if (agent.error instanceof Error) return <p className="text-sm text-destructive">{agent.error.message}</p>;
@@ -62,6 +54,8 @@ export function AgentEvaluation({ handle, agentId }: { handle: string; agentId: 
       step={subject}
       definitionVersion={null}
       outputSchema={definition.outputSchema}
+      currentModel={definition.foundationModel}
+      currentPrompt={definition.systemPrompt}
       mayEdit={gates.mayEdit}
       editReason={gates.editReason}
       mayRun={gates.mayRun}

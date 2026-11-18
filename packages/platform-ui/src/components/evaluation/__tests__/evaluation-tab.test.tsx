@@ -15,7 +15,9 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/use-step-evaluation', () => ({
   useStepEvaluation: () => stepEvaluation.current,
   useWorkflowValidation: () => ({ data: undefined }),
+  useAgentDefinition: () => ({ data: undefined }),
 }));
+vi.mock('../optimization-section', () => ({ OptimizationSection: () => null }));
 vi.mock('@/hooks/use-workflow-access', () => ({ useWorkflowRunGate: () => ({ mayRun: true, reason: undefined }) }));
 vi.mock('@/hooks/use-workflow-versions', () => ({
   useWorkflowVersion: () => ({ definition: workflowDefinition.current, loading: false, error: null }),
@@ -38,7 +40,7 @@ vi.mock('../step-evaluation-sections', () => ({
 const step = { kind: 'step' as const, namespace: 'acme', workflowName: 'safety', stepId: 'extract-aes' };
 
 function renderEvaluation(mayEdit: boolean) {
-  render(<StepEvaluation header={<span />} step={step} definitionVersion={1} outputSchema={undefined} mayEdit={mayEdit} editReason={undefined} mayRun runReason={undefined} />);
+  render(<StepEvaluation header={<span />} step={step} definitionVersion={1} outputSchema={undefined} currentModel={undefined} currentPrompt={undefined} mayEdit={mayEdit} editReason={undefined} mayRun runReason={undefined} />);
 }
 
 beforeEach(() => {
