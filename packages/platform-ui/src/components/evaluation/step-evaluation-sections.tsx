@@ -45,7 +45,7 @@ import { InstantTooltip } from '@/components/ui/instant-tooltip';
 import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { AgentRunLog } from '@/components/agents/agent-log-panel';
 import { useAgentRun } from '@/hooks/use-agent-runs';
-import { useAgentEvalPolicy, useAgentRunIo, useEvalRunEstimate, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
+import { useAgentEvalPolicy, useAgentRunIo, useEvalRunEstimate, useReviewedRuns, useStepEvaluation, useStepEvaluationMutation } from '@/hooks/use-step-evaluation';
 import { usePinnedDefaultModel } from '@/hooks/use-model-registry';
 import { formatCostUsd } from '@/lib/format';
 import { routes } from '@/lib/routes';
@@ -1366,6 +1366,91 @@ function SetCaseEvaluators({ step, cases, evaluators, onDone }: {
   );
 }
 
+/**
+ * Imports the subject's reviewed production runs as Eval Cases in bulk
+ * (ADR-0024 D7): each sent-back round a negative case, each approved output a
+ * positive one, split dev/holdout by review session. A run round already
+ * imported never shows up again.
+ */
+function ImportReviewedRuns({ step, onClose }: { step: EvaluationSubject; onClose: () => void }) {
+  const { data, isLoading } = useReviewedRuns(step);
+  const runs = data?.runs ?? [];
+  const [selectedIds, setSelectedIds] = React.useState<ReadonlySet<string>>(new Set());
+  React.useEffect(() => {
+    if (data !== undefined) setSelectedIds(new Set(data.runs.map((run) => run.agentRunId)));
+  }, [data]);
+  const importRuns = useStepEvaluationMutation(step, (agentRunIds: string[]) =>
+    mediforce.evaluation.importReviewedRuns({ ...step, agentRunIds }));
+
+  if (importRuns.data !== undefined) {
+    const dev = importRuns.data.imported.filter((evalCase) => evalCase.split === 'dev').length;
+    const holdout = importRuns.data.imported.length - dev;
+    return (
+      <div className="space-y-3 text-xs" data-testid="import-reviewed-runs-done">
+        <p>
+          {pluralCases(importRuns.data.imported.length)} added ({dev} dev, {holdout} holdout)
+          {importRuns.data.skipped > 0 ? `, ${importRuns.data.skipped} already imported` : ''}.
+        </p>
+        <div className="flex justify-end"><button type="button" className={primaryButtonClass} onClick={onClose}>Done</button></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 text-xs" data-testid="import-reviewed-runs">
+      <p className="text-muted-foreground">Each sent-back round becomes a negative case, each approved output a positive one.</p>
+      {isLoading ? <Loading /> : runs.length === 0 ? (
+        <p className="text-muted-foreground">No reviewed runs awaiting import.</p>
+      ) : (
+        <div className={tableWrapperClass}>
+          <table className="w-full text-sm" data-testid="reviewed-runs-table">
+            <thead className={tableHeaderRowClass}>
+              <tr>
+                <th className="w-0 pl-3 pr-0"><span className="sr-only">Select</span></th>
+                <th className="px-3 py-2 text-left">Run</th>
+                <th className="px-3 py-2 text-left">Reviewed</th>
+                <th className="px-3 py-2 text-left">Outcome</th>
+              </tr>
+            </thead>
+            <tbody>
+              {runs.map((run) => (
+                <tr key={run.agentRunId} className="border-b last:border-0">
+                  <td className="py-2 pl-3">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select run ${run.agentRunId}`}
+                      checked={selectedIds.has(run.agentRunId)}
+                      onChange={(event) => setSelectedIds((current) => {
+                        const next = new Set(current);
+                        if (event.target.checked) next.add(run.agentRunId);
+                        else next.delete(run.agentRunId);
+                        return next;
+                      })}
+                    />
+                  </td>
+                  <td className="px-3 py-2">{run.agentRunId.slice(0, 8)}{run.definitionVersion === null ? '' : ` · v${run.definitionVersion}`}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{new Date(run.startedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' })}</td>
+                  <td className="px-3 py-2">{run.outcome === 'sentBack' ? 'Sent back' : 'Approved'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {importRuns.error !== null && <p className="text-destructive">{importRuns.error.message}</p>}
+      <div className="flex justify-end gap-2">
+        <button type="button" className={buttonClass} onClick={onClose}>Cancel</button>
+        <button
+          type="button"
+          className={primaryButtonClass}
+          disabled={selectedIds.size === 0 || importRuns.isPending}
+          onClick={() => importRuns.mutate([...selectedIds])}
+        >{importRuns.isPending ? 'Importing…' : `Import ${selectedIds.size} selected`}</button>
+      </div>
+    </div>
+  );
+}
+
 const CASE_COLUMNS: readonly TableColumn<EvalCase>[] = [
   { key: 'select', label: <span className="sr-only">Select</span>, className: 'w-0 pl-3 pr-0' },
   { key: 'case', label: 'Case', value: (evalCase) => evalCase.name },
@@ -1400,6 +1485,7 @@ export function CasesSection({ step, evaluation, mayEdit }: {
   const { unsaved, dropped } = datasetDrift(cases, latest);
   const hasUnsavedChanges = hasUnsavedCases(cases, latest);
   const [adding, setAdding] = React.useState(false);
+  const [importingRuns, setImportingRuns] = React.useState(false);
   const evaluators = evaluation.evaluators.data?.evaluators ?? [];
   const columns = React.useMemo(() => mayEdit === true ? CASE_COLUMNS : CASE_COLUMNS.filter((column) => column.key !== 'select'), [mayEdit]);
   const view = useTableView(cases, columns);
@@ -1418,6 +1504,7 @@ export function CasesSection({ step, evaluation, mayEdit }: {
       action={mayEdit === false ? undefined : (
         <div className="flex gap-1.5">
           <button type="button" className={buttonClass} onClick={() => setAdding(true)}>Add case</button>
+          <button type="button" className={buttonClass} onClick={() => setImportingRuns(true)}>Import reviewed runs</button>
           <InstantTooltip label={hasUnsavedChanges ? `Save as Dataset v${(latest?.version ?? 0) + 1} for the next Eval Run.` : 'No unsaved changes.'}>
             <span className="inline-flex">
               <button type="button" className={primaryButtonClass} disabled={save.isPending || !hasUnsavedChanges} onClick={() => save.mutate(undefined)}>{save.isPending ? 'Saving…' : 'Save'}</button>
@@ -1442,6 +1529,16 @@ export function CasesSection({ step, evaluation, mayEdit }: {
           onClose={() => setAdding(false)}
         >
           <AddCase step={step} evaluation={evaluation} cases={cases} evaluators={evaluators} onClose={() => setAdding(false)} />
+        </FormDialog>
+      )}
+      {importingRuns && (
+        <FormDialog
+          title="Import reviewed runs"
+          description="Production runs a reviewer sent back or approved, as Eval Cases."
+          testId="import-reviewed-runs-dialog"
+          onClose={() => setImportingRuns(false)}
+        >
+          <ImportReviewedRuns step={step} onClose={() => setImportingRuns(false)} />
         </FormDialog>
       )}
       {mayEdit && selectedCases.length > 0 && !settingEvaluators && (

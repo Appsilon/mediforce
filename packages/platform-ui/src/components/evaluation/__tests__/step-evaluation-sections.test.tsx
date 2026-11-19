@@ -3,9 +3,11 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { AgentRunChangeNote, EvaluationStatusStrip, CasesSection, EvalRunsSection, DriftAlert, EvaluatorsSection, caseFromFile, datasetDrift, toEvaluatorName } from '../step-evaluation-sections';
 
 const verdicts = vi.hoisted((): Record<string, 'positive' | 'negative'> => ({}));
+const reviewedRunsMock = vi.hoisted(() => vi.fn(() => ({ data: { runs: [] }, isLoading: false })));
 
 vi.mock('@/hooks/use-step-evaluation', () => ({
   useEvalRunEstimate: () => ({ data: undefined, isError: false, isPlaceholderData: false, error: null }),
+  useReviewedRuns: reviewedRunsMock,
   useAgentRunIo: (agentRunId: string | null) => ({
     isError: false,
     error: null,
@@ -34,6 +36,7 @@ const evaluation = vi.hoisted(() => ({
   createEvaluator: vi.fn(),
   addEvaluatorVersion: vi.fn(),
   createCaseFromAgentRun: vi.fn(),
+  importReviewedRuns: vi.fn(),
   setAcceptanceCriteria: vi.fn(),
   updateCase: vi.fn(),
   createCase: vi.fn(),
@@ -675,6 +678,48 @@ describe('Eval Case view and edit', () => {
 
     expect(screen.getByTestId('case-name-error').textContent).toBe('Give the case a name.');
     expect(evaluation.updateCase).not.toHaveBeenCalled();
+  });
+});
+
+describe('Importing reviewed runs as Eval Cases', () => {
+  const step = { kind: 'step', namespace: 'acme', workflowName: 'safety', stepId: 'grade-aes' } as const;
+  const noCases = {
+    cases: { isLoading: false, data: { cases: [] } },
+    agentRuns: { data: { pages: [] }, hasNextPage: false },
+    datasets: { data: { datasets: [] } },
+    evaluators: { data: { evaluators: [] } },
+  } as never;
+  const openDialog = () => fireEvent.click(screen.getByRole('button', { name: 'Import reviewed runs' }));
+
+  it('lists reviewed runs with every one selected, and imports only the ones left checked', () => {
+    reviewedRunsMock.mockReturnValue({
+      data: {
+        runs: [
+          { agentRunId: 'run-a', outcome: 'sentBack', startedAt: '2026-09-24T08:00:00.000Z', definitionVersion: 1 },
+          { agentRunId: 'run-b', outcome: 'approved', startedAt: '2026-09-24T09:00:00.000Z', definitionVersion: 1 },
+        ],
+      },
+      isLoading: false,
+    });
+    evaluation.importReviewedRuns.mockClear();
+    render(<CasesSection step={step} evaluation={noCases} mayEdit={true} />);
+    openDialog();
+
+    const checkboxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
+    expect(checkboxes.every((checkbox) => checkbox.checked)).toBe(true);
+    fireEvent.click(screen.getByLabelText('Select run run-b'));
+    fireEvent.click(screen.getByRole('button', { name: 'Import 1 selected' }));
+
+    expect(evaluation.importReviewedRuns).toHaveBeenCalledWith({ ...step, agentRunIds: ['run-a'] });
+  });
+
+  it('says there is nothing to import when none is awaiting it', () => {
+    reviewedRunsMock.mockReturnValue({ data: { runs: [] }, isLoading: false });
+    render(<CasesSection step={step} evaluation={noCases} mayEdit={true} />);
+    openDialog();
+
+    expect(screen.getByText('No reviewed runs awaiting import.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Import 0 selected' })).toHaveProperty('disabled', true);
   });
 });
 

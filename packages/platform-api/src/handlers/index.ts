@@ -187,6 +187,8 @@ export {
   previewEvaluator,
   listAgentProductionRunsPage,
   listStepAgentRuns,
+  listReviewedRunsForImport,
+  importReviewedRuns,
   listEvalCases,
   createEvalCase,
   createEvalCaseFromAgentRun,
