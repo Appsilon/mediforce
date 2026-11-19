@@ -68,7 +68,7 @@
       "qs": "6.16.1",
       "serialize-javascript": "7.1.2",
       "sharp": "0.35.5",
-      "shell-quote": "1.11.0",
+      "shell-quote": "1.12.0",
       "source-map-js": "1.2.2",
       "svgo": "3.3.5",
       "undici@7.29.0": "7.29.1",
