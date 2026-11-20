@@ -19,8 +19,10 @@ Agent once records its version, and a re-run pins them.
 The workflow's latest live version is rewritten, and a default that pointed at
 it moves to the new version, as "save and set as default" does. A workflow whose
 default is an older live version is reported and skipped, so what runs never
-changes silently; an archived default stays as it is. Runs already started
-keep the version they started on.
+changes silently, and so is one whose head is pinned but whose older live
+default is not; an archived default stays as it is. A workflow saved or
+re-defaulted after it was listed is skipped rather than overwritten; re-run to
+pick it up. Runs already started keep the version they started on.
 
     # Rehearse: writes the rewritten definitions and validates them against the
     # local schema only; server checks (Skill access, retired models) never run.
@@ -48,7 +50,9 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-NOT_REGISTERABLE_FIELDS = ("version", "createdAt", "namespace", "legacyDefinition")
+# Assigned server-side, or lifecycle that belongs to the version it was set on:
+# the rewrite is neither archived nor imported from the git commit `source` names.
+NOT_REGISTERABLE_FIELDS = ("version", "createdAt", "namespace", "legacyDefinition", "source", "archived", "deleted")
 
 
 class BackfillError(Exception):
@@ -95,6 +99,22 @@ def is_unpinned(step: dict) -> bool:
     return step.get("agentId") is not None and "agentVersion" not in step
 
 
+def has_unpinned(definition: dict) -> bool:
+    return any(map(is_unpinned, definition["steps"]))
+
+
+def changed_since_listed(namespace: str, name: str, listed_version: int, listed_default: int | None) -> str | None:
+    """Why the workflow moved on since `workflow list`, or None when it has not."""
+    current = mediforce_json("workflow", "list-versions", name, "--namespace", namespace)
+    newer = [entry["version"] for entry in current["versions"]
+             if entry["version"] > listed_version and entry.get("archived") is not True]
+    if len(newer) > 0:
+        return f"v{max(newer)} was saved since it was listed"
+    if current["defaultVersion"] != listed_default:
+        return f"its default moved to v{current['defaultVersion']} since it was listed"
+    return None
+
+
 def pin_steps(definition: dict, agents: AgentVersions) -> tuple[list[str], list[str]]:
     """Pin each unpinned step in place; returns what was pinned and what could not be."""
     pinned: list[str] = []
@@ -135,7 +155,7 @@ def main() -> int:
         latest = group["definition"]
         if len(args.namespace) > 0 and namespace not in args.namespace:
             continue
-        if latest is None or any(map(is_unpinned, latest["steps"])) is False:
+        if latest is None:
             continue
         label = f"{namespace}/{name} v{latest['version']}"
         default_version = group["defaultVersion"]
@@ -143,8 +163,14 @@ def main() -> int:
             if default_version is not None and default_version != latest["version"]:
                 default = mediforce_json("workflow", "get", name, "--namespace", namespace, "--version", str(default_version))
                 if default.get("archived") is not True:
-                    failures.append(f"{label}: skipped, its default v{default_version} is older; pin the version that should run by hand")
+                    if has_unpinned(latest) is True:
+                        failures.append(f"{label}: skipped, its default v{default_version} is older; pin the version that should run by hand")
+                    elif has_unpinned(default) is True:
+                        failures.append(f"{label}: its default v{default_version} still has unpinned steps; "
+                                        f"set the default to a pinned version by hand")
                     continue
+            if has_unpinned(latest) is False:
+                continue
 
             definition = {key: value for key, value in latest.items() if key not in NOT_REGISTERABLE_FIELDS}
             pinned, unpinnable = pin_steps(definition, agents)
@@ -164,6 +190,10 @@ def main() -> int:
                 backfilled += 1
                 continue
 
+            moved_on = changed_since_listed(namespace, name, latest["version"], default_version)
+            if moved_on is not None:
+                failures.append(f"{label}: skipped, {moved_on}; re-run")
+                continue
             registered = mediforce_json("workflow", "register", "--file", str(target), "--namespace", namespace)["version"]
             print(f"    registered v{registered}")
             backfilled += 1
