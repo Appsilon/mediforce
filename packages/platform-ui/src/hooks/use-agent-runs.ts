@@ -55,26 +55,6 @@ export function useAgentRunsForStep(
   };
 }
 
-/** Every recorded run of one Agent, newest first — used to show which
- *  Workflows/Steps ran it, and at which version (epic #1673 C2). */
-export function useAgentRunsForAgent(agentId: string | null): { data: AgentRun[]; loading: boolean } {
-  const enabled = agentId !== null;
-  const query = useQuery({
-    queryKey: queryKeys.agentRuns.list(undefined, { agentId: agentId ?? undefined }),
-    queryFn: async () => {
-      const result = await mediforce.agentRuns.list({ agentId: agentId as string, limit: 200 });
-      return result.runs;
-    },
-    enabled,
-    retry: stopRetryOn4xx,
-  });
-
-  return {
-    data: enabled ? query.data ?? [] : [],
-    loading: enabled && query.isLoading,
-  };
-}
-
 export function useAgentRunsForProcess(processInstanceId: string | null): { data: AgentRun[]; loading: boolean } {
   const enabled = processInstanceId !== null;
   const query = useQuery({
