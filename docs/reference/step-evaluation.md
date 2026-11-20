@@ -1051,6 +1051,13 @@ Criteria, Eval Runs and Qualification work as above, with these differences:
   Evaluation — every workspace, for a public Agent; only its own workspace can
   change it or run it. An Agent that owns an Evaluation cannot move to another
   workspace (409): its suite lives in the workspace it has now.
+- **A workflow step pins the Agent version it runs.** Picking an Agent in the
+  step editor sets the step's `agentVersion` to the Agent's current version; a new
+  Agent version never moves it. *Track current* saves `null`, and the step runs
+  whatever version is current. A step saved before pinning has no `agentVersion`
+  key and also tracks current. To pin those, run
+  `scripts/migrations/backfill_step_agent_versions.py` (rehearse with `--dry-run`;
+  its docstring covers which versions it rewrites and which it skips).
 - `mediforce eval qualification --agent <id>` reads the Agent as it is now and
   prints its Agent version; `--version` is for a step.
 - **No production features of its own.** An Agent has no production runs of its

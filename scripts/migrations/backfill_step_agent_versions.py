@@ -3,40 +3,40 @@
 Pin workflow steps saved before step-level Agent version pinning (ADR-0029) to
 their Agent's current version.
 
-A step saved before pinning names an `agentId` with no `agentVersion` key, so it
-keeps tracking its Agent live. A step saved since carries the version picked
-with its Agent, or `null` when its author chose "Track current"; both are left
-alone. Steps are immutable per Workflow Definition version, so each affected
-workflow gets a new version registered through `mediforce workflow register`,
-the normal save path.
+A step saved before pinning (#1674) names an `agentId` with no `agentVersion`
+key, so it keeps tracking its Agent live. A step saved since carries the version
+picked with its Agent, or `null` when its author chose "Track current"; both are
+left alone. A step saved since whose Agent had no current version also lacks the
+key, so this script cannot tell it from an old one and pins it. Steps are
+immutable per Workflow Definition version, so each affected workflow gets a new
+version registered through `mediforce workflow register`, the normal save path.
 
 The version pinned is the one the step editor would pin on picking the Agent
 today: the Agent's current version. An Agent edited since its newest recorded
 version has none, so its steps stay unpinned and are reported; saving that
 Agent once records its version, and a re-run pins them.
 
-The version rewritten is the workflow's latest live one, so the new version
-only adds pins on top of what editors already see. A default that pointed at it
-moves to the new version; an archived default is left, since runs already fall
-back to the newest live version. A workflow whose default is a live version
-older than its latest is reported and skipped: pinning the default would bury
-the newer version, pinning the latest would not change what runs. Runs already
-started keep the version they started on.
+The workflow's latest live version is rewritten, and a default that pointed at
+it moves to the new version, as "save and set as default" does. A workflow whose
+default is an older live version is reported and skipped, so what runs never
+changes silently; an archived default stays as it is. Runs already started
+keep the version they started on.
 
-    # Rehearse: validates and writes the rewritten definitions, registers nothing.
+    # Rehearse: writes the rewritten definitions and validates them against the
+    # local schema only; server checks (Skill access, retired models) never run.
     MEDIFORCE_BASE_URL=https://staging.mediforce.ai MEDIFORCE_API_KEY=... \\
         python3 scripts/migrations/backfill_step_agent_versions.py \\
         --out-dir /tmp/agent-version-backfill --dry-run
 
-    # Apply. --namespace (repeatable) limits it to some workspaces.
+    # Apply.
     MEDIFORCE_BASE_URL=https://staging.mediforce.ai MEDIFORCE_API_KEY=... \\
         python3 scripts/migrations/backfill_step_agent_versions.py \\
         --out-dir /tmp/agent-version-backfill
 
-It covers only the workflows the API key's user can see, so run it with a key
-whose user is a member of every workspace to cover them all. Re-runnable: a
-workflow whose steps are all pinned or deliberately live is skipped, and a
-workflow that fails is reported without stopping the others.
+An API key acts as the system, so it covers every workspace; --namespace
+(repeatable) narrows it. Re-runnable: a workflow whose steps are all pinned or
+deliberately live is skipped, and a workflow that fails is reported without
+stopping the others.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SERVER_MANAGED_FIELDS = ("version", "createdAt", "namespace", "archived", "deleted", "copiedFrom")
+NOT_REGISTERABLE_FIELDS = ("version", "createdAt", "namespace", "legacyDefinition")
 
 
 class BackfillError(Exception):
@@ -58,30 +58,36 @@ class BackfillError(Exception):
 def mediforce_json(*arguments: str) -> dict:
     result = subprocess.run(["pnpm", "--silent", "exec", "mediforce", *arguments, "--json"],
                             cwd=REPO_ROOT, capture_output=True, text=True)
+    command = f"mediforce {' '.join(arguments[:2])}"
+    try:
+        output = json.loads(result.stdout)
+    except ValueError:
+        output = None
     if result.returncode != 0:
-        message = result.stderr.strip() or result.stdout.strip()
-        try:
-            message = json.loads(message)["error"]
-        except (ValueError, KeyError, TypeError):
-            pass
-        raise BackfillError(f"mediforce {' '.join(arguments[:2])}: {message}")
-    return json.loads(result.stdout)
+        if isinstance(output, dict) and "error" in output:
+            message = output["error"]
+        else:
+            message = result.stdout.strip() or result.stderr.strip()
+        raise BackfillError(f"{command}: {message}")
+    if isinstance(output, dict) is False:
+        raise BackfillError(f"{command}: unreadable output: {result.stdout.strip()[:200]}")
+    return output
 
 
 class AgentVersions:
     """Each Agent's current version, read once, or why it has none."""
 
     def __init__(self) -> None:
-        self.cache: dict[str, int | str] = {}
+        self.cache: dict[str, tuple[int | None, str]] = {}
 
-    def of(self, agent_id: str) -> int | str:
+    def of(self, agent_id: str) -> tuple[int | None, str]:
         if agent_id not in self.cache:
             try:
                 current = mediforce_json("agent", "versions", agent_id)["current"]
+                reason = "changed since its newest recorded version; save it once, then re-run"
             except BackfillError as error:
-                current = str(error)
-            self.cache[agent_id] = current if current is not None else \
-                "changed since its newest recorded version; save it once, then re-run"
+                current, reason = None, str(error)
+            self.cache[agent_id] = (current, reason)
         return self.cache[agent_id]
 
 
@@ -97,9 +103,9 @@ def pin_steps(definition: dict, agents: AgentVersions) -> tuple[list[str], list[
         if is_unpinned(step) is False:
             continue
         agent_id = step["agentId"]
-        version = agents.of(agent_id)
-        if isinstance(version, str):
-            unpinnable.append(f"{step['id']} ({agent_id}: {version})")
+        version, reason = agents.of(agent_id)
+        if version is None:
+            unpinnable.append(f"{step['id']} ({agent_id}: {reason})")
             continue
         step["agentVersion"] = version
         pinned.append(f"{step['id']} -> {agent_id} v{version}")
@@ -109,8 +115,8 @@ def pin_steps(definition: dict, agents: AgentVersions) -> tuple[list[str], list[
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--out-dir", required=True, help="Where rewritten definitions are written")
-    parser.add_argument("--namespace", action="append", default=[], help="Limit to a workspace (repeatable; default: all visible)")
-    parser.add_argument("--dry-run", action="store_true", help="Rewrite and validate only; register nothing")
+    parser.add_argument("--namespace", action="append", default=[], help="Limit to a workspace (repeatable; default: all)")
+    parser.add_argument("--dry-run", action="store_true", help="Rewrite and validate locally only; register nothing")
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -140,7 +146,7 @@ def main() -> int:
                     failures.append(f"{label}: skipped, its default v{default_version} is older; pin the version that should run by hand")
                     continue
 
-            definition = {key: value for key, value in latest.items() if key not in SERVER_MANAGED_FIELDS}
+            definition = {key: value for key, value in latest.items() if key not in NOT_REGISTERABLE_FIELDS}
             pinned, unpinnable = pin_steps(definition, agents)
             if len(unpinnable) > 0:
                 failures.append(f"{label}: left unpinned: " + "; ".join(unpinnable))
@@ -153,7 +159,7 @@ def main() -> int:
             print(f"{label} -> {target}")
             for change in pinned:
                 print(f"    {change}")
-            if args.dry_run:
+            if args.dry_run is True:
                 mediforce_json("workflow", "register", "--file", str(target), "--namespace", namespace, "--dry-run")
                 backfilled += 1
                 continue
