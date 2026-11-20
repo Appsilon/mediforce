@@ -2,62 +2,61 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import type { AgentConfigSnapshot, AgentRun } from '@mediforce/platform-core';
+import type { AgentConfigSnapshot } from '@mediforce/platform-core';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
-import { useAgentRunsForAgent, useProcessNameMap } from '@/hooks/use-agent-runs';
+import { useWorkflowsByAgent } from '@/hooks/use-workflows-by-agent';
 import { useAgentVersions } from '@/hooks/use-step-evaluation';
 
-interface StepUsage {
-  stepId: string;
-  run: AgentRun;
-}
+const BARE_VERSION_TITLE = /^v\d+$/i;
 
-function latestRunPerStep(runs: readonly AgentRun[]): StepUsage[] {
-  const byStep = new Map<string, AgentRun>();
-  for (const run of runs) {
-    const existing = byStep.get(run.stepId);
-    if (existing === undefined || run.startedAt > existing.startedAt) byStep.set(run.stepId, run);
-  }
-  return [...byStep.entries()]
-    .map(([stepId, run]) => ({ stepId, run }))
-    .sort((a, b) => b.run.startedAt.localeCompare(a.run.startedAt));
+/** A workflow's stable name over its own `title` when the title is just a
+ *  bare version string (e.g. a workflow titled "v1") — rendered next to this
+ *  row's agent-version badge, it would otherwise read as two conflicting
+ *  version numbers. */
+function workflowLabel(workflow: { title: string | undefined; name: string }): string {
+  if (workflow.title === undefined || BARE_VERSION_TITLE.test(workflow.title)) return workflow.name;
+  return workflow.title;
 }
 
 function UsageList({ handle, agentId, currentVersion }: { handle: string; agentId: string; currentVersion: number | null }) {
-  const { data: runs, loading } = useAgentRunsForAgent(agentId);
-  const usages = React.useMemo(() => latestRunPerStep(runs), [runs]);
-  const workflowNames = useProcessNameMap(handle);
+  const { workflows, loading, error } = useWorkflowsByAgent(agentId);
+  const rows = React.useMemo(
+    () => (workflows ?? []).flatMap((workflow) => workflow.steps.map((step) => ({ workflow, step }))),
+    [workflows],
+  );
 
   if (loading) return <p className="text-xs text-muted-foreground">Loading…</p>;
-  if (usages.length === 0) return <p className="text-xs text-muted-foreground">No Workflow step has run this agent yet.</p>;
+  if (error !== null) return <p className="text-xs text-destructive">Could not load usage.</p>;
+  if (rows.length === 0) return <p className="text-xs text-muted-foreground">No workflow references this agent.</p>;
 
   return (
     <ul className="divide-y rounded-md border">
-      {usages.map(({ stepId, run }) => {
-        const stale = currentVersion !== null && run.agentVersion !== null && run.agentVersion !== currentVersion;
-        const workflowName = workflowNames.get(run.processInstanceId);
+      {rows.map(({ workflow, step }) => {
+        const stale =
+          currentVersion !== null && step.pinnedVersion !== null && step.pinnedVersion !== currentVersion;
+        const sameNamespace = workflow.namespace === handle;
         return (
-          <li key={stepId} className="flex items-center gap-2 px-3 py-2 text-sm">
+          <li key={`${workflow.namespace}:${workflow.name}:${step.stepId}`} className="flex items-center gap-2 px-3 py-2 text-sm">
             <span className="min-w-0 flex-1 truncate text-xs">
-              {workflowName !== undefined ? (
-                <Link href={routes.workflowRunStep(handle, workflowName, run.processInstanceId, stepId)} className="text-primary hover:underline">
-                  {workflowName}
+              {sameNamespace ? (
+                <Link
+                  href={routes.workflowDefinition(workflow.namespace, workflow.name, workflow.version)}
+                  className="text-primary hover:underline"
+                >
+                  {workflowLabel(workflow)}
                 </Link>
               ) : (
-                <span className="text-muted-foreground">Workflow deleted</span>
+                <span title={`This workflow lives in @${workflow.namespace}, not in @${handle}`}>
+                  {workflowLabel(workflow)}
+                </span>
               )}
               <span className="text-muted-foreground"> · step </span>
-              <span className="font-mono">{stepId}</span>
+              <span className="font-mono">{step.stepId}</span>
             </span>
-            <span className={cn('w-32 shrink-0 text-xs font-mono', stale ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
-              v{run.agentVersion ?? '?'}{stale && ' · behind'}
+            <span className={cn('w-36 shrink-0 text-right text-xs font-mono', stale ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
+              v{step.pinnedVersion ?? 'latest'}{stale && ' · behind'}
             </span>
-            {workflowName !== undefined && (
-              <Link href={routes.workflowRunStep(handle, workflowName, run.processInstanceId, stepId)} className="w-16 shrink-0 text-right text-xs text-primary hover:underline">
-                View run
-              </Link>
-            )}
           </li>
         );
       })}
@@ -125,7 +124,10 @@ export function AgentVersionsTab({ handle, agentId }: { handle: string; agentId:
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h3 className="text-sm font-medium">Used by</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium">Used by</h3>
+          <span className="w-36 shrink-0 text-right text-xs text-muted-foreground">Agent Version</span>
+        </div>
         <UsageList handle={handle} agentId={agentId} currentVersion={current} />
       </div>
 
