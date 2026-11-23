@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { buildAgentRun } from '@mediforce/platform-core/testing';
 import { createQueryWrapper } from '@/test/react-query';
 import { AgentVersionsTab } from '../agent-versions-tab';
 
@@ -12,13 +11,12 @@ vi.mock('@/lib/mediforce', () => ({
   },
 }));
 
-vi.mock('@/hooks/use-agent-runs', () => ({
-  useAgentRunsForAgent: vi.fn(),
-  useProcessNameMap: vi.fn(() => new Map()),
+vi.mock('@/hooks/use-workflows-by-agent', () => ({
+  useWorkflowsByAgent: vi.fn(),
 }));
 
 import { mediforce } from '@/lib/mediforce';
-import { useAgentRunsForAgent, useProcessNameMap } from '@/hooks/use-agent-runs';
+import { useWorkflowsByAgent } from '@/hooks/use-workflows-by-agent';
 import { diffConfigs } from '../agent-versions-tab';
 import userEvent from '@testing-library/user-event';
 
@@ -33,9 +31,10 @@ describe('AgentVersionsTab', () => {
       ],
       current: 2,
     });
-    vi.mocked(useAgentRunsForAgent).mockReturnValue({
-      data: [buildAgentRun({ stepId: 'deploy', agentId: 'a1', agentVersion: 1 })],
+    vi.mocked(useWorkflowsByAgent).mockReturnValue({
+      workflows: [{ namespace: 'acme', name: 'demo-flow', title: undefined, version: 1, steps: [{ stepId: 'deploy', pinnedVersion: 1 }] }],
       loading: false,
+      error: null,
     });
 
     const { wrapper } = createQueryWrapper();
@@ -45,41 +44,72 @@ describe('AgentVersionsTab', () => {
     expect(screen.getByText('current')).toBeInTheDocument();
   });
 
-  it('links "Used by" to the workflow run, not a dead agent-eval route', async () => {
+  it('links "Used by" to the exact workflow definition version that uses it, not a run', async () => {
     vi.mocked(mediforce.agents.listVersions).mockResolvedValue({
       versions: [{ agentId: 'a1', version: 1, hash: 'h'.repeat(64), config: CONFIG, createdBy: 'u', createdAt: '2026-01-01T00:00:00.000Z' }],
       current: 1,
     });
-    vi.mocked(useAgentRunsForAgent).mockReturnValue({
-      data: [buildAgentRun({ stepId: 'deploy', agentId: 'a1', agentVersion: 1, processInstanceId: 'inst-0001' })],
+    vi.mocked(useWorkflowsByAgent).mockReturnValue({
+      workflows: [{ namespace: 'acme', name: 'demo-flow', title: undefined, version: 3, steps: [{ stepId: 'deploy', pinnedVersion: 1 }] }],
       loading: false,
+      error: null,
     });
-    vi.mocked(useProcessNameMap).mockReturnValue(new Map([['inst-0001', 'demo-flow']]));
 
     const { wrapper } = createQueryWrapper();
     render(<AgentVersionsTab handle="acme" agentId="a1" />, { wrapper });
 
     const link = await screen.findByRole('link', { name: 'demo-flow' });
-    expect(link).toHaveAttribute('href', '/acme/workflows/demo-flow/runs/inst-0001/steps/deploy');
-    expect(screen.getByRole('link', { name: 'View run' })).toHaveAttribute('href', '/acme/workflows/demo-flow/runs/inst-0001/steps/deploy');
+    expect(link).toHaveAttribute('href', '/acme/workflows/demo-flow/definitions/3');
+    expect(screen.getByText('Agent Version')).toBeInTheDocument();
   });
 
-  it('shows "Workflow deleted" when its run can no longer be resolved to a workflow', async () => {
+  it('shows the workflow name instead of a title that is just a bare version like "v1"', async () => {
     vi.mocked(mediforce.agents.listVersions).mockResolvedValue({
       versions: [{ agentId: 'a1', version: 1, hash: 'h'.repeat(64), config: CONFIG, createdBy: 'u', createdAt: '2026-01-01T00:00:00.000Z' }],
       current: 1,
     });
-    vi.mocked(useAgentRunsForAgent).mockReturnValue({
-      data: [buildAgentRun({ stepId: 'deploy', agentId: 'a1', agentVersion: 1, processInstanceId: 'inst-gone' })],
+    vi.mocked(useWorkflowsByAgent).mockReturnValue({
+      workflows: [{ namespace: 'acme', name: 'dwdd', title: 'v2', version: 2, steps: [{ stepId: 'deploy', pinnedVersion: 1 }] }],
       loading: false,
+      error: null,
     });
-    vi.mocked(useProcessNameMap).mockReturnValue(new Map());
 
     const { wrapper } = createQueryWrapper();
     render(<AgentVersionsTab handle="acme" agentId="a1" />, { wrapper });
 
-    expect(await screen.findByText('Workflow deleted')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'View run' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'dwdd' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'v2' })).not.toBeInTheDocument();
+  });
+
+  it('shows a workflow from another namespace as plain text, not a link', async () => {
+    vi.mocked(mediforce.agents.listVersions).mockResolvedValue({
+      versions: [{ agentId: 'a1', version: 1, hash: 'h'.repeat(64), config: CONFIG, createdBy: 'u', createdAt: '2026-01-01T00:00:00.000Z' }],
+      current: 1,
+    });
+    vi.mocked(useWorkflowsByAgent).mockReturnValue({
+      workflows: [{ namespace: 'other-team', name: 'shared-flow', title: undefined, version: 1, steps: [{ stepId: 'deploy', pinnedVersion: 1 }] }],
+      loading: false,
+      error: null,
+    });
+
+    const { wrapper } = createQueryWrapper();
+    render(<AgentVersionsTab handle="acme" agentId="a1" />, { wrapper });
+
+    expect(await screen.findByText('shared-flow')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'shared-flow' })).not.toBeInTheDocument();
+  });
+
+  it('shows "No workflow references this agent" when nothing uses it', async () => {
+    vi.mocked(mediforce.agents.listVersions).mockResolvedValue({
+      versions: [{ agentId: 'a1', version: 1, hash: 'h'.repeat(64), config: CONFIG, createdBy: 'u', createdAt: '2026-01-01T00:00:00.000Z' }],
+      current: 1,
+    });
+    vi.mocked(useWorkflowsByAgent).mockReturnValue({ workflows: [], loading: false, error: null });
+
+    const { wrapper } = createQueryWrapper();
+    render(<AgentVersionsTab handle="acme" agentId="a1" />, { wrapper });
+
+    expect(await screen.findByText('No workflow references this agent.')).toBeInTheDocument();
   });
 
   it('does not flag a step already on the current version', async () => {
@@ -87,15 +117,37 @@ describe('AgentVersionsTab', () => {
       versions: [{ agentId: 'a1', version: 1, hash: 'h'.repeat(64), config: CONFIG, createdBy: 'u', createdAt: '2026-01-01T00:00:00.000Z' }],
       current: 1,
     });
-    vi.mocked(useAgentRunsForAgent).mockReturnValue({
-      data: [buildAgentRun({ stepId: 'deploy', agentId: 'a1', agentVersion: 1 })],
+    vi.mocked(useWorkflowsByAgent).mockReturnValue({
+      workflows: [{ namespace: 'acme', name: 'demo-flow', title: undefined, version: 1, steps: [{ stepId: 'deploy', pinnedVersion: 1 }] }],
       loading: false,
+      error: null,
     });
 
     const { wrapper } = createQueryWrapper();
     render(<AgentVersionsTab handle="acme" agentId="a1" />, { wrapper });
 
     await waitFor(() => expect(screen.getByText('current')).toBeInTheDocument());
+    expect(screen.queryByText(/behind/)).not.toBeInTheDocument();
+  });
+
+  it('does not flag an unpinned step, which falls back to the current version', async () => {
+    vi.mocked(mediforce.agents.listVersions).mockResolvedValue({
+      versions: [
+        { agentId: 'a1', version: 2, hash: 'h'.repeat(64), config: CONFIG, createdBy: 'u', createdAt: '2026-01-02T00:00:00.000Z' },
+        { agentId: 'a1', version: 1, hash: 'g'.repeat(64), config: CONFIG, createdBy: 'u', createdAt: '2026-01-01T00:00:00.000Z' },
+      ],
+      current: 2,
+    });
+    vi.mocked(useWorkflowsByAgent).mockReturnValue({
+      workflows: [{ namespace: 'acme', name: 'demo-flow', title: undefined, version: 1, steps: [{ stepId: 'deploy', pinnedVersion: null }] }],
+      loading: false,
+      error: null,
+    });
+
+    const { wrapper } = createQueryWrapper();
+    render(<AgentVersionsTab handle="acme" agentId="a1" />, { wrapper });
+
+    expect(await screen.findByText('vlatest')).toBeInTheDocument();
     expect(screen.queryByText(/behind/)).not.toBeInTheDocument();
   });
 
@@ -108,7 +160,7 @@ describe('AgentVersionsTab', () => {
       ],
       current: 2,
     });
-    vi.mocked(useAgentRunsForAgent).mockReturnValue({ data: [], loading: false });
+    vi.mocked(useWorkflowsByAgent).mockReturnValue({ workflows: [], loading: false, error: null });
 
     const { wrapper } = createQueryWrapper();
     render(<AgentVersionsTab handle="acme" agentId="a1" />, { wrapper });

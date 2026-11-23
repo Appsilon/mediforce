@@ -45,6 +45,7 @@ export {
 
 export { findWorkflowImagePins, type WorkflowImagePin } from './workflows/_image-pins';
 export { findWorkflowSkillUsage, type WorkflowSkillUsage } from './workflows/_skill-usage';
+export { findWorkflowAgentUsage, type WorkflowAgentUsage } from './workflows/_agent-usage';
 export { listWorkflows } from './workflows/list-workflows';
 export { listWorkflowVersions } from './workflows/list-workflow-versions';
 export { getWorkflow } from './workflows/get-workflow';
