@@ -1,4 +1,4 @@
-import { outputDifferences, type AgentRun, type EvalCase, type EvaluatorCheck, type JudgeCall } from '@mediforce/platform-core';
+import { OUTPUT_TOKEN_DEFAULTS, outputDifferences, type AgentRun, type EvalCase, type EvaluatorCheck, type JudgeCall } from '@mediforce/platform-core';
 import {
   LlmJudgeReviewPlugin,
   judgeOutputAgreement,
@@ -13,13 +13,15 @@ import type { CallerScope } from '../../../repositories/index';
 import { callOpenRouter, OpenRouterApiError, type OpenRouterRequest } from '../../../services/openrouter-client';
 import { requireOpenRouterApiKey } from '../../../services/openrouter-key';
 import type { ScoredRun } from './scored-run';
+import { callerUserId } from '../../../auth';
+import { loadModelSettings, resolveOutputTokens } from '../../../services/model-settings';
 
 type LlmJudgeCheck = Extract<EvaluatorCheck, { kind: 'llm_judge' }>;
 type ExpectedOutputCheck = Extract<EvaluatorCheck, { kind: 'expected_output' }>;
 
 const CODE_CHECK_TIMEOUT_MS = 2 * 60_000;
 /** Room for a model's reasoning, which counts against this too, and a rationale that cites what decided the verdict; a ceiling, so a short answer costs no more. */
-const JUDGE_MAX_OUTPUT_TOKENS = 16_000;
+const JUDGE_MAX_OUTPUT_TOKENS = OUTPUT_TOKEN_DEFAULTS.evaluationJudge;
 const JUDGE_RETRY_DELAY_MS = 2000;
 
 /** A rate limit or a provider failure is asked once more before it errors the check. */
@@ -41,10 +43,19 @@ async function callJudgeModel(request: OpenRouterRequest): ReturnType<typeof cal
  * providers that take every parameter it sends, so it sends `temperature` only
  * to a model that takes it.
  */
-async function openRouterJudgeClient(scope: CallerScope, apiKey: string, model: string, onCall: (call: JudgeCall) => void): Promise<LlmClient> {
-  const entry = await scope.models.getById(model);
+async function openRouterJudgeClient(
+  scope: CallerScope,
+  namespace: string | null,
+  apiKey: string,
+  model: string,
+  onCall: (call: JudgeCall) => void,
+): Promise<LlmClient> {
+  const [entry, maxTokens] = await Promise.all([
+    scope.models.getById(model),
+    loadModelSettings(scope.workspaces, { namespace, userId: callerUserId(scope.caller) }).then((settings) =>
+      resolveOutputTokens(scope.models, settings, { model, defaultTokens: JUDGE_MAX_OUTPUT_TOKENS, capAtModelLimit: true })),
+  ]);
   const parameters = entry?.supportedParameters;
-  const maxTokens = Math.min(JUDGE_MAX_OUTPUT_TOKENS, entry?.maxCompletionTokens ?? JUDGE_MAX_OUTPUT_TOKENS);
   const constrains = parameters?.includes('structured_outputs') === true;
   const takesTemperature = parameters === undefined || parameters.includes('temperature') === true;
   return {
@@ -100,7 +111,7 @@ async function runJudgeCheck(
     processInstanceId: agentRun.processInstanceId,
     executorOutput: agentRun.envelope!,
     iterationNumber: 0,
-    llm: await openRouterJudgeClient(scope, apiKey, check.model, onJudgeCall),
+    llm: await openRouterJudgeClient(scope, subject.instance.namespace ?? null, apiKey, check.model, onJudgeCall),
   });
   return { ...binary(agentRun.id, verdict.passed, verdict.reasoning), confidence: verdict.confidence };
 }
@@ -133,7 +144,7 @@ async function runExpectedOutputCheck(
     return binary(agentRun.id, matches !== negative, comment);
   }
   const apiKey = await requireOpenRouterApiKey(scope, subject.instance.namespace ?? '');
-  const { agreement, rationale } = await judgeOutputAgreement(await openRouterJudgeClient(scope, apiKey, check.model, onJudgeCall), {
+  const { agreement, rationale } = await judgeOutputAgreement(await openRouterJudgeClient(scope, subject.instance.namespace ?? null, apiKey, check.model, onJudgeCall), {
     model: check.model,
     instructions: check.instructions ?? null,
     caseInstructions: evalCase.agreementInstructions,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformServices } from '@/lib/platform-services';
 import { executeAgentStep } from '@/lib/execute-agent-step';
 import { resolveCallerIdentity, requireNamespaceAccess } from '@/lib/api-auth';
+import { callerUserId } from '@mediforce/platform-api/auth';
 
 interface AdvanceStepBody {
   stepId: string;
@@ -50,6 +51,7 @@ export async function POST(
       workflowStep,
       body.appContext,
       body.triggeredBy,
+      { budgetUserId: callerUserId(caller) },
     );
 
     return NextResponse.json(result);

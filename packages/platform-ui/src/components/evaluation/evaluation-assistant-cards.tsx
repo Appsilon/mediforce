@@ -337,6 +337,7 @@ function ReviewProposedEvaluator({ step, proposal, stepOutputSchema, mayEdit, on
   return (
     <FormDialog title="Review the proposed Evaluator" description="Edit it if it needs it; Accept creates it as it stands here." testId="evaluator-dialog" onClose={onClose}>
       <EvaluatorForm
+        namespace={step.namespace}
         initial={{ name, rule, draft: draftFromCheck(check) }}
         schemaTaken={evaluators.some((evaluator) => evaluator.latest.check.kind === 'schema')}
         stepOutputSchema={stepOutputSchema}
@@ -378,6 +379,7 @@ function ReviewProposedEvaluatorVersion({ step, proposal, evaluator, stepOutputS
   return (
     <FormDialog title={`Review the proposed ${evaluator.name} v${latest.version + 1}`} description={`Edit it if it needs it; Accept saves it as it stands here.${check.kind === 'code' ? ' The new version needs its source approved again before it counts, whatever changed.' : ''}`} testId="evaluator-dialog" onClose={onClose}>
       <EvaluatorForm
+        namespace={step.namespace}
         initial={{ name: evaluator.name, rule, draft: draftFromCheck(check) }}
         editing
         stepOutputSchema={stepOutputSchema}

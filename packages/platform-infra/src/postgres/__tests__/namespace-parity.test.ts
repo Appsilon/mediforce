@@ -180,6 +180,29 @@ function contract(name: string, factory: () => Promise<NamespaceRepository>) {
       expect(await repo.getMember('appsilon', 'ghost')).toBeNull();
     });
 
+    it('setMemberModelSettings sets, keeps and clears member settings; no-op when absent', async () => {
+      await repo.createNamespace(nsBase());
+      await repo.addMember('appsilon', memberBase({ uid: 'user-1' }));
+      await repo.setMemberModelSettings('appsilon', 'user-1', { outputBudget: 'low', defaultModel: 'openai/gpt-5.2' });
+      await repo.setMemberModelSettings('appsilon', 'user-1', { outputBudget: 'high' });
+      const member = await repo.getMember('appsilon', 'user-1');
+      expect(member?.outputBudget).toBe('high');
+      expect(member?.defaultModel).toBe('openai/gpt-5.2');
+      await repo.setMemberModelSettings('appsilon', 'user-1', { outputBudget: null, defaultModel: null });
+      expect(await repo.getMember('appsilon', 'user-1')).toEqual(memberBase({ uid: 'user-1' }));
+      await expect(repo.setMemberModelSettings('appsilon', 'ghost', { outputBudget: 'high' })).resolves.toBeUndefined();
+      expect(await repo.getMember('appsilon', 'ghost')).toBeNull();
+    });
+
+    it('updateNamespace sets the workspace model settings and clears them with null', async () => {
+      await repo.createNamespace(nsBase());
+      await repo.updateNamespace('appsilon', { outputBudget: 'max', defaultModel: 'openai/gpt-5.2' });
+      expect((await repo.getNamespace('appsilon'))?.outputBudget).toBe('max');
+      expect((await repo.getNamespace('appsilon'))?.defaultModel).toBe('openai/gpt-5.2');
+      await repo.updateNamespace('appsilon', { outputBudget: null, defaultModel: null });
+      expect(await repo.getNamespace('appsilon')).toEqual(nsBase());
+    });
+
     it('deleteNamespaceCascade removes the namespace and all members', async () => {
       await repo.createNamespace(nsBase());
       await repo.createNamespace(nsBase({ handle: 'survivor', displayName: 'Survivor' }));

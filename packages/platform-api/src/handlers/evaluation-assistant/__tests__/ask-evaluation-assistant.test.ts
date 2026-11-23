@@ -7,9 +7,11 @@ import { saveEvalDataset } from '../../evaluation/eval-datasets';
 import { setEvaluationBrief } from '../../evaluation/briefs';
 import { askEvaluationAssistant } from '../ask-evaluation-assistant';
 import { evalScenario } from '../../evaluation/__tests__/finished-eval-run';
-import { evaluationFixture, GRADED_RUN, STEP, UNGRADED_RUN, type EvaluationFixture } from '../../evaluation/__tests__/fixture';
+import { evaluationFixture, GRADED_RUN, NAMESPACE, registryEntry, STEP, UNGRADED_RUN, type EvaluationFixture } from '../../evaluation/__tests__/fixture';
+import { InMemoryNamespaceRepo } from '../../../testing/in-memory-namespace-repo';
+import { userCaller } from '../../../repositories/__tests__/create-test-scope';
 
-type Request = { messages: Array<{ role: string; content: string }> };
+type Request = { messages: Array<{ role: string; content: string }>; model?: string; max_tokens?: number };
 type Turn = (request: Request) => { content?: string; toolCalls?: Array<{ name: string; arguments: unknown }> };
 
 function scriptOpenRouter(turns: Turn[]): Request[] {
@@ -52,6 +54,22 @@ describe('askEvaluationAssistant', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('runs on the workspace default model and output budget when no model is picked', async () => {
+    const createdAt = '2026-01-01T00:00:00.000Z';
+    const namespaceRepo = new InMemoryNamespaceRepo();
+    namespaceRepo.seedNamespace({ handle: NAMESPACE, type: 'organization', displayName: 'Pharma A', createdAt, defaultModel: 'openai/gpt-5.2', outputBudget: 'high' });
+    namespaceRepo.seedMember(NAMESPACE, { uid: 'author-1', role: 'member', joinedAt: createdAt });
+    await fixture.modelRegistryRepo.upsert(registryEntry('openai/gpt-5.2', { maxCompletionTokens: 64_000 }));
+    const budgeted = fixture.scope(userCaller('author-1', [NAMESPACE]), { namespaceRepo });
+    Object.assign(budgeted, { workspaceSecrets: { getSecrets: async () => ({ OPENROUTER_API_KEY: 'sk-test' }) } });
+    const requests = scriptOpenRouter([() => ({ content: 'Start with a schema check.' })]);
+
+    await askEvaluationAssistant({ ...STEP, messages: [{ role: 'user', content: 'What should I check first?' }] }, budgeted);
+
+    expect(requests[0]?.model).toBe('openai/gpt-5.2');
+    expect(requests[0]?.max_tokens).toBe(16_000);
   });
 
   it('previews a check on real outputs, then proposes it — creating nothing', async () => {

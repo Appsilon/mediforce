@@ -1,4 +1,4 @@
-import type { LlmCallOptions, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
+import type { LlmCallOptions, LlmClient, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
 import {
   annotateOpenRouterLlmSpan,
   type OpenTelemetryTracingOptions,
@@ -7,6 +7,19 @@ import {
 
 // Re-export the interface defined in interfaces/ for barrel convenience
 export type { LlmCallOptions, LlmClient, LlmMessage, LlmResponse } from '../interfaces/step-executor-plugin';
+
+export const DEFAULT_LLM_MAX_OUTPUT_TOKENS = 16_000;
+
+/** A client whose calls get `maxTokens` from `resolve` for their model, unless a call names its own. */
+export function withMaxTokens(inner: LlmClient, resolve: (model: string) => Promise<number>): LlmClient {
+  return {
+    complete: async (messages, model, options = {}) =>
+      inner.complete(messages, model, {
+        ...options,
+        maxTokens: options.maxTokens ?? (await resolve(model)),
+      }),
+  };
+}
 
 // OpenRouterLlmClient: wraps the OpenRouter API for LLM access.
 // Platform provides this to agents — agents never call OpenRouter directly.
@@ -39,7 +52,7 @@ export class OpenRouterLlmClient {
             model,
             messages,
             temperature: options.temperature ?? 0.7,
-            max_tokens: 16_000,
+            max_tokens: options.maxTokens ?? DEFAULT_LLM_MAX_OUTPUT_TOKENS,
           }),
         });
 

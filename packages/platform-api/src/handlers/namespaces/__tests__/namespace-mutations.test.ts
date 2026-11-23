@@ -3,6 +3,7 @@ import type { AuditEvent } from '@mediforce/platform-core';
 import {
   InMemoryAgentDefinitionRepository,
   InMemoryAuditRepository,
+  InMemoryModelRegistryRepository,
   InMemoryProcessRepository,
   buildWorkflowDefinition,
   resetFactorySequence,
@@ -12,10 +13,12 @@ import {
   leaveNamespace,
   removeNamespaceMember,
   resetNamespace,
+  setMyModelSettings,
   updateNamespace,
   updateNamespaceMemberRole,
 } from '../namespace-mutations';
-import { ConflictError, ForbiddenError, NotFoundError, PreconditionFailedError } from '../../../errors';
+import { ConflictError, ForbiddenError, NotFoundError, PreconditionFailedError, ValidationError } from '../../../errors';
+import { registryEntry } from '../../evaluation/__tests__/fixture';
 import { agentInput } from '../../skills/__tests__/fixtures';
 import { InMemoryNamespaceRepo, createTestScope, userCaller } from '../../../testing/index';
 
@@ -671,5 +674,87 @@ describe('updateNamespaceMemberRole handler', () => {
     const scope = createTestScope({ namespaceRepo, auditRepo: recording, caller: ownerCaller });
     await updateNamespaceMemberRole({ handle: HANDLE, uid: 'uid-member', role: 'admin' }, scope);
     expect(recording.appendedNamespaces).toEqual([HANDLE]);
+  });
+});
+
+async function modelRegistry(): Promise<InMemoryModelRegistryRepository> {
+  const models = new InMemoryModelRegistryRepository();
+  await models.upsert(registryEntry('openai/gpt-5.2'));
+  await models.upsert(registryEntry('openai/gpt-4', { retiredAt: '2026-01-01T00:00:00.000Z' }));
+  await models.upsert(registryEntry('acme/text-only', { supportsTools: false }));
+  return models;
+}
+
+describe('updateNamespace default model', () => {
+  it('sets the workspace default model and clears it with null', async () => {
+    const namespaceRepo = seededRepo();
+    const scope = createTestScope({ namespaceRepo, modelRegistryRepo: await modelRegistry(), caller: ownerCaller });
+    expect((await updateNamespace({ handle: HANDLE, defaultModel: 'openai/gpt-5.2' }, scope)).namespace.defaultModel).toBe('openai/gpt-5.2');
+    expect((await updateNamespace({ handle: HANDLE, defaultModel: null }, scope)).namespace.defaultModel).toBeUndefined();
+  });
+
+  it('refuses an unknown, retired or tool-less model', async () => {
+    const scope = createTestScope({ namespaceRepo: seededRepo(), modelRegistryRepo: await modelRegistry(), caller: ownerCaller });
+    for (const defaultModel of ['nobody/no-such-model', 'openai/gpt-4', 'acme/text-only']) {
+      await expect(updateNamespace({ handle: HANDLE, defaultModel }, scope)).rejects.toBeInstanceOf(ValidationError);
+    }
+  });
+});
+
+describe('setMyModelSettings handler', () => {
+  let namespaceRepo: InMemoryNamespaceRepo;
+  let auditRepo: InMemoryAuditRepository;
+  let models: InMemoryModelRegistryRepository;
+  beforeEach(async () => {
+    namespaceRepo = seededRepo();
+    auditRepo = new InMemoryAuditRepository();
+    models = await modelRegistry();
+  });
+
+  it('sets one setting without touching the other, then clears both, and audits it', async () => {
+    const scope = createTestScope({ namespaceRepo, auditRepo, modelRegistryRepo: models, caller: memberCaller });
+    await setMyModelSettings({ handle: HANDLE, outputBudget: 'max' }, scope);
+    const set = await setMyModelSettings({ handle: HANDLE, defaultModel: 'openai/gpt-5.2' }, scope);
+    expect(set.member).toMatchObject({ uid: 'uid-member', outputBudget: 'max', defaultModel: 'openai/gpt-5.2' });
+
+    const cleared = await setMyModelSettings({ handle: HANDLE, outputBudget: null, defaultModel: null }, scope);
+    expect(cleared.member.outputBudget).toBeUndefined();
+    expect(cleared.member.defaultModel).toBeUndefined();
+    expect((await auditRepo.getAll()).map((event) => event.action)).toEqual([
+      'namespace.member_model_settings_changed',
+      'namespace.member_model_settings_changed',
+      'namespace.member_model_settings_changed',
+    ]);
+  });
+
+  it('refuses a retired or tool-less default model', async () => {
+    const scope = createTestScope({ namespaceRepo, auditRepo, modelRegistryRepo: models, caller: memberCaller });
+    await expect(setMyModelSettings({ handle: HANDLE, defaultModel: 'openai/gpt-4' }, scope)).rejects.toBeInstanceOf(ValidationError);
+    await expect(setMyModelSettings({ handle: HANDLE, defaultModel: 'acme/text-only' }, scope)).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('refuses an API key, which has no member settings of its own', async () => {
+    const scope = createTestScope({ namespaceRepo, auditRepo, modelRegistryRepo: models });
+    await expect(setMyModelSettings({ handle: HANDLE, outputBudget: 'low' }, scope)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('answers 404 to a non-member, so the workspace is not revealed', async () => {
+    const scope = createTestScope({
+      namespaceRepo, auditRepo, modelRegistryRepo: models,
+      caller: userCaller('uid-stranger', ['other'], new Map([['other', 'member']])),
+    });
+    await expect(setMyModelSettings({ handle: HANDLE, outputBudget: 'low' }, scope)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('lets a member of a shared personal workspace set their own settings', async () => {
+    namespaceRepo.seedNamespace({ handle: 'jane', type: 'personal', displayName: 'Jane', linkedUserId: 'uid-jane', createdAt: '2026-01-01T00:00:00.000Z' });
+    namespaceRepo.seedMember('jane', { uid: 'uid-jane', role: 'owner', joinedAt: '2026-01-01T00:00:00.000Z' });
+    namespaceRepo.seedMember('jane', { uid: 'uid-guest', role: 'member', joinedAt: '2026-01-02T00:00:00.000Z' });
+    const scope = createTestScope({
+      namespaceRepo, auditRepo, modelRegistryRepo: models,
+      caller: userCaller('uid-guest', ['jane'], new Map([['jane', 'member']])),
+    });
+    const result = await setMyModelSettings({ handle: 'jane', outputBudget: 'low' }, scope);
+    expect(result.member).toMatchObject({ uid: 'uid-guest', outputBudget: 'low' });
   });
 });

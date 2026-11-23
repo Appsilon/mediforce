@@ -624,11 +624,22 @@ export {
   BrandColorSchema,
   WorkspaceLogoSchema,
   WORKSPACE_LOGO_MAX_CHARS,
+  withMemberModelSettings,
+  effectiveModelSettings,
+  type MemberModelSettingsUpdate,
   type NamespaceType,
   type Namespace,
   type NamespaceMember,
   type NamespaceMembership,
 } from './namespace';
+
+export {
+  OutputBudgetSchema,
+  OUTPUT_BUDGETS,
+  OUTPUT_TOKEN_DEFAULTS,
+  resolveMaxOutputTokens,
+  type OutputBudget,
+} from './output-budget';
 
 export {
   HandleSchema,
@@ -695,6 +706,10 @@ export {
   FALLBACK_PINNED_MODEL,
   isMovingModelAlias,
   pinDefaultModel,
+  pinDefaultJudgeModel,
+  modelVendor,
+  isUsableDefaultModel,
+  DefaultModelIdSchema,
   ModelRegistryEntrySchema,
   ModelRegistryMetaSchema,
   CreateModelRegistryEntryInputSchema,

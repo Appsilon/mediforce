@@ -97,6 +97,7 @@ export async function seedPostgresNamespace(
       'role-gate-org-2',
       'member-roles-labs',
       'personal-manager',
+      'model-settings-org',
     ];
     await sql`
       DELETE FROM workspaces

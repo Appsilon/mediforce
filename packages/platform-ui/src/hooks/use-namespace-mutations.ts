@@ -15,11 +15,14 @@ import type {
   ResetNamespaceOutput,
   SetNamespaceMemberRolesInput,
   SetNamespaceMemberRolesOutput,
+  SetMyModelSettingsInput,
+  SetMyModelSettingsOutput,
   UpdateNamespaceInput,
   UpdateNamespaceMemberRoleInput,
   UpdateNamespaceMemberRoleOutput,
   UpdateNamespaceOutput,
 } from '@mediforce/platform-api/contract';
+import { withMemberModelSettings } from '@mediforce/platform-core';
 import { mediforce } from '@/lib/mediforce';
 import { snapshotCache } from '@/lib/optimistic';
 import { queryKeys } from '@/lib/query-keys';
@@ -41,24 +44,27 @@ export function useUpdateNamespace(handle: string) {
     UpdateNamespaceInput,
     { restore: () => void }
   >({
+    mutationKey: ['namespace-update', handle],
     mutationFn: (input) => mediforce.namespaces.update(input),
     onMutate: async (input) => {
       await qc.cancelQueries({ queryKey: queryKeys.namespace(handle) });
       const { restore } = snapshotCache(qc, [queryKeys.namespace(handle), queryKeys.users.me()]);
       qc.setQueryData<GetNamespaceOutput | undefined>(queryKeys.namespace(handle), (prev) => {
         if (prev === undefined) return prev;
-        return {
-          ...prev,
-          namespace: {
-            ...prev.namespace,
-            ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
-            ...(input.icon !== undefined ? { icon: input.icon } : {}),
-            ...(input.logo !== undefined ? { logo: input.logo } : {}),
-            ...(input.brandPrimaryColor !== undefined ? { brandPrimaryColor: input.brandPrimaryColor } : {}),
-            ...(input.brandAccentColor !== undefined ? { brandAccentColor: input.brandAccentColor } : {}),
-            ...(input.bio !== undefined ? { bio: input.bio } : {}),
-          },
+        const namespace = {
+          ...prev.namespace,
+          ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
+          ...(input.icon !== undefined ? { icon: input.icon } : {}),
+          ...(input.logo !== undefined ? { logo: input.logo } : {}),
+          ...(input.brandPrimaryColor !== undefined ? { brandPrimaryColor: input.brandPrimaryColor } : {}),
+          ...(input.brandAccentColor !== undefined ? { brandAccentColor: input.brandAccentColor } : {}),
+          ...(input.bio !== undefined ? { bio: input.bio } : {}),
+          ...(input.outputBudget !== undefined ? { outputBudget: input.outputBudget } : {}),
+          ...(input.defaultModel !== undefined ? { defaultModel: input.defaultModel ?? undefined } : {}),
         };
+        if (namespace.outputBudget === 'default') delete namespace.outputBudget;
+        if (namespace.defaultModel === undefined) delete namespace.defaultModel;
+        return { ...prev, namespace };
       });
       return { restore };
     },
@@ -66,6 +72,9 @@ export function useUpdateNamespace(handle: string) {
       ctx?.restore();
     },
     onSuccess: (data) => {
+      // A later edit still in flight holds the newer optimistic value; this
+      // echo is older, so writing it would flick the field back for a moment.
+      if (qc.isMutating({ mutationKey: ['namespace-update', handle] }) > 1) return;
       qc.setQueryData<GetNamespaceOutput | undefined>(queryKeys.namespace(handle), (prev) => {
         if (prev === undefined) return { namespace: data.namespace, members: [], adminContact: null };
         return { ...prev, namespace: data.namespace };
@@ -308,6 +317,44 @@ export function useResetNamespace() {
       void qc.invalidateQueries({ queryKey: queryKeys.runs.all() });
       void qc.invalidateQueries({ queryKey: queryKeys.tasks.all() });
       void qc.invalidateQueries({ queryKey: queryKeys.namespace(data.handle) });
+    },
+  });
+}
+
+/**
+ * PUT /api/namespaces/:handle/model-settings — the caller's own model settings.
+ * Optimistic patch on the caller's row in `['namespace-members', handle]`, the
+ * roster the settings page reads; the entity-echo replaces it on success.
+ */
+export function useSetMyModelSettings(handle: string, uid: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    SetMyModelSettingsOutput,
+    Error,
+    SetMyModelSettingsInput,
+    { restore: () => void }
+  >({
+    mutationKey: ['namespace-model-settings', handle],
+    mutationFn: (input) => mediforce.namespaces.setMyModelSettings(input),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: queryKeys.namespaceMembers(handle) });
+      const { restore } = snapshotCache(qc, [queryKeys.namespaceMembers(handle)]);
+      qc.setQueryData<ListNamespaceMembersOutput | undefined>(queryKeys.namespaceMembers(handle), (prev) => {
+        if (prev === undefined) return prev;
+        return {
+          ...prev,
+          members: prev.members.map((member) => (member.uid === uid ? withMemberModelSettings(member, input) : member)),
+        };
+      });
+      return { restore };
+    },
+    onError: (_err, _input, ctx) => {
+      ctx?.restore();
+    },
+    onSettled: () => {
+      // Refetch once the last of a quick run of changes lands, not after each.
+      if (qc.isMutating({ mutationKey: ['namespace-model-settings', handle] }) > 1) return;
+      void qc.invalidateQueries({ queryKey: queryKeys.namespaceMembers(handle) });
     },
   });
 }

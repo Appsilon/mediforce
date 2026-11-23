@@ -7,6 +7,8 @@ import {
   type NamespaceMember,
   type NamespaceMembership,
   type NamespaceRepository,
+  type NamespaceUpdates,
+  type MemberModelSettingsUpdate,
 } from '@mediforce/platform-core';
 import type { Database } from '../client';
 import { workspaces, workspaceMembers, workspaceAutojoinBlocks } from '../schema/workspace';
@@ -52,6 +54,8 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       brandAccentColor: parsed.brandAccentColor ?? null,
       linkedUserId: parsed.linkedUserId ?? null,
       bio: parsed.bio ?? null,
+      outputBudget: parsed.outputBudget ?? null,
+      defaultModel: parsed.defaultModel ?? null,
       createdAt: new Date(parsed.createdAt),
     });
   }
@@ -76,6 +80,8 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
         brandAccentColor: parsedNs.brandAccentColor ?? null,
         linkedUserId: parsedNs.linkedUserId ?? null,
         bio: parsedNs.bio ?? null,
+        outputBudget: parsedNs.outputBudget ?? null,
+        defaultModel: parsedNs.defaultModel ?? null,
         createdAt: new Date(parsedNs.createdAt),
       });
       await tx.insert(workspaceMembers).values({
@@ -84,12 +90,14 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
         role: parsedMember.role,
         displayName: parsedMember.displayName ?? null,
         avatarUrl: parsedMember.avatarUrl ?? null,
+        outputBudget: parsedMember.outputBudget ?? null,
+        defaultModel: parsedMember.defaultModel ?? null,
         joinedAt: new Date(parsedMember.joinedAt),
       });
     });
   }
 
-  async updateNamespace(handle: string, updates: Partial<Namespace>): Promise<void> {
+  async updateNamespace(handle: string, updates: NamespaceUpdates & Partial<Omit<Namespace, 'outputBudget' | 'defaultModel'>>): Promise<void> {
     const set: Record<string, unknown> = {};
     if (updates.type !== undefined) set.type = updates.type;
     if (updates.displayName !== undefined) set.displayName = updates.displayName;
@@ -100,6 +108,8 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
     if (updates.brandAccentColor !== undefined) set.brandAccentColor = updates.brandAccentColor;
     if (updates.linkedUserId !== undefined) set.linkedUserId = updates.linkedUserId;
     if (updates.bio !== undefined) set.bio = updates.bio;
+    if (updates.outputBudget !== undefined) set.outputBudget = updates.outputBudget;
+    if (updates.defaultModel !== undefined) set.defaultModel = updates.defaultModel;
     if (updates.createdAt !== undefined) set.createdAt = new Date(updates.createdAt);
     if (Object.keys(set).length === 0) return;
     await this.db.update(workspaces).set(set).where(eq(workspaces.handle, handle));
@@ -220,6 +230,26 @@ export class PostgresNamespaceRepository implements NamespaceRepository {
       )
       .limit(1);
     return rows.length > 0;
+  }
+
+  async setMemberModelSettings(
+    handle: string,
+    uid: string,
+    settings: MemberModelSettingsUpdate,
+  ): Promise<void> {
+    const set: { outputBudget?: string | null; defaultModel?: string | null } = {};
+    if (settings.outputBudget !== undefined) set.outputBudget = settings.outputBudget;
+    if (settings.defaultModel !== undefined) set.defaultModel = settings.defaultModel;
+    if (Object.keys(set).length === 0) return;
+    await this.db
+      .update(workspaceMembers)
+      .set(set)
+      .where(
+        and(
+          eq(workspaceMembers.workspace, handle),
+          eq(workspaceMembers.uid, uid),
+        ),
+      );
   }
 
   async setMemberRole(
@@ -348,6 +378,8 @@ function toNamespace(row: typeof workspaces.$inferSelect): Namespace {
     brandAccentColor: row.brandAccentColor ?? undefined,
     linkedUserId: row.linkedUserId ?? undefined,
     bio: row.bio ?? undefined,
+    outputBudget: row.outputBudget ?? undefined,
+    defaultModel: row.defaultModel ?? undefined,
   });
 }
 
@@ -358,5 +390,7 @@ function toMember(row: typeof workspaceMembers.$inferSelect): NamespaceMember {
     joinedAt: row.joinedAt.toISOString(),
     displayName: row.displayName ?? undefined,
     avatarUrl: row.avatarUrl ?? undefined,
+    outputBudget: row.outputBudget ?? undefined,
+    defaultModel: row.defaultModel ?? undefined,
   });
 }

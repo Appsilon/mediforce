@@ -207,8 +207,14 @@ request's prompt audit event. The assistant prepares runs of the step as it is;
 changing the step is the person's, in the workflow editor. A case it proposes may carry an expected output with its expectation;
 one created without an `expectation` is positive.
 
+**Model settings.** `src/services/model-settings.ts` owns both settings. A handler calls `loadModelSettings` once per request with the caller's `userId` (`callerUserId`): it reads the workspace and the member and returns `effectiveModelSettings` (platform-core), each of the member's own settings, else the workspace's. An apiKey or system caller has no member, so it gets the workspace's. Agent steps load them once per step in `execute-agent-step.ts`, from the signed-in caller, never the request body's `triggeredBy`.
+
+**Output budget.** Every platform LLM call takes its max output tokens from `resolveOutputTokens`: the call's default from `OUTPUT_TOKEN_DEFAULTS` (platform-core), scaled by the settings' `outputBudget` (`low` ×0.5, `high` ×2, `max` the model's whole `maxCompletionTokens`) and bounded by that limit. A call on `DEFAULT_MODEL` takes the limits of the model the alias pins to today, since the registry lists no aliases. Agent steps get the same through `withMaxTokens` (agent-runtime). The two short fixed-shape replies, the workflow build plan (700) and the stuck-assistant question (500), pass `raiseOnly`: High and Max raise them, Low leaves them at their default rather than cut their JSON off. The tool-loop summary cap (2,000) stays a constant, as does `callOpenRouter`'s `?? 4096` fallback, which no caller reaches because every one passes `maxTokens`. At or below `default` the scaled limit is sent as is, so an unset workspace sends what it always has; above `default` the raise stops at the model's limit, never drops below the call's default, and is skipped when the registry doesn't know the limit. The eval judge, capped at the model's limit before budgets existed, passes `capAtModelLimit` to stay capped at every budget. A member sets their own budget with `setMyModelSettings` (`PUT /api/namespaces/:handle/model-settings`); the workspace budget rides on `updateNamespace`.
+
+**Default model.** A call nobody saved a model for (cowork chat, voice synthesis, the evaluation, workflow and agent assistants, the workflow build plan) takes it from `resolveDefaultModel`: the settings' `defaultModel` while `isUsableDefaultModel` (platform-core) holds for it, live and tool-capable, else `DEFAULT_MODEL`. New agents, steps and judges start on it through `pinDefaultModel` and `pinDefaultJudgeModel` (platform-core), which apply the same check, plus structured outputs for a judge. A default model must be a concrete, live, tool-capable registry id (`DefaultModelIdSchema` refuses moving aliases; the handlers refuse the rest), and ride on the same `updateNamespace` / `setMyModelSettings` calls as the budget.
+
 The Evaluation Assistant allows 32 model/tool rounds with an 8,000-token
-completion budget per call, independent of the selected model's context window.
+completion budget per call at the default output budget, independent of the selected model's context window.
 A response truncated with no tool call in it is answered, once, with a note to
 continue in smaller pieces (`truncatedResponseNotice`; the Evaluation
 Assistant's says to work one check at a time); on round exhaustion or a second
@@ -226,7 +232,7 @@ duplicate.
 Its `get_trajectory` tool returns complete stored entries using zero-based
 `offset` and `limit` (default 50, maximum 150), with `total` and `nextOffset`
 (`null` at the end); it never clips entry contents. The workflow assistant
-retains its separate 12-round, 8,000-token loop. Invalid tool arguments return
+retains its separate 12-round, 8,000-token loop (also at the default output budget). Invalid tool arguments return
 `validationError` and the tool's `expectedArguments` JSON Schema (with examples);
 three consecutive rounds with an identical validation failure and no successful
 call stop the loop through the same partial-summary path.

@@ -36,6 +36,8 @@ export interface LlmCallOptions {
    * or broken JSON; any other asks as the messages do and returns the text.
    */
   answerSchema?: LlmAnswerSchema;
+  /** Max output tokens for this call; the client's default when absent. */
+  maxTokens?: number;
 }
 
 export interface LlmAnswerSchema {

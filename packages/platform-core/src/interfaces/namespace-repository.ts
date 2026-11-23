@@ -1,4 +1,4 @@
-import type { Namespace, NamespaceMember, NamespaceMembership } from '../schemas/index';
+import type { MemberModelSettingsUpdate, Namespace, NamespaceMember, NamespaceMembership, OutputBudget } from '../schemas/index';
 
 /**
  * Patch shape for `updateNamespace`. `undefined` means "leave unchanged";
@@ -13,6 +13,10 @@ export interface NamespaceUpdates {
   readonly brandAccentColor?: string;
   readonly bio?: string;
   readonly avatarUrl?: string;
+  /** `null` clears it back to the default. */
+  readonly outputBudget?: OutputBudget | null;
+  /** `null` clears it back to the platform default. */
+  readonly defaultModel?: string | null;
 }
 
 export interface NamespaceRepository {
@@ -57,6 +61,8 @@ export interface NamespaceRepository {
    * Used by PATCH /api/namespaces/:handle/members/:uid.
    */
   setMemberRole(handle: string, uid: string, role: NamespaceMember['role']): Promise<void>;
+  /** The member's own model settings in `handle`. No-op without a member row. */
+  setMemberModelSettings(handle: string, uid: string, settings: MemberModelSettingsUpdate): Promise<void>;
   /**
    * Whether `uid` was previously removed from `handle`, which bars them from
    * being re-added by domain-based auto-join (`AUTO_JOIN_WORKSPACES`).

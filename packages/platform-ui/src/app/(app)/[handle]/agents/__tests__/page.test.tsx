@@ -4,6 +4,11 @@ import userEvent from '@testing-library/user-event';
 
 const listAgentsMock = vi.fn();
 
+vi.mock('@/hooks/use-model-registry', () => ({
+  useDefaultModel: () => '~anthropic/claude-sonnet-latest',
+  useModelRegistry: () => ({ data: [], isLoading: false, isError: false, error: null }),
+}));
+
 vi.mock('@/lib/mediforce', () => ({
   mediforce: { agents: { list: (...args: unknown[]) => listAgentsMock(...args) } },
 }));
