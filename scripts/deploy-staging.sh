@@ -66,4 +66,7 @@ nohup bash -c "
   echo \"[\$(date -Iseconds)] Agent images ready\" >> /var/log/mediforce-deploy.log
 " >> /var/log/mediforce-deploy.log 2>&1 &
 
+echo "==> Installing host cron jobs"
+python3 -u scripts/cron-jobs.py install
+
 echo "==> Done — agent images building in background"
