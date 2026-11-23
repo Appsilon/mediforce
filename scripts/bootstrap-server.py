@@ -533,6 +533,8 @@ def step_target_server(ctx: Context) -> None:
 BASE_PACKAGES = [
     "git", "curl", "ca-certificates", "gnupg", "lsb-release",
     "ufw", "jq", "unzip",
+    # Every deploy installs host cron jobs (scripts/cron-jobs.py).
+    "cron",
 ]
 
 APT_ENV = "export DEBIAN_FRONTEND=noninteractive"

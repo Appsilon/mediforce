@@ -61,8 +61,9 @@ Nobody triggers it by hand. `syncRegistryIfStale` runs it whenever the registry
 has gone 24h without a sync, from two places: `getPlatformServices()` once per
 app process (so every deploy), and the cron heartbeat's registry sweep
 (`platform-api`'s `heartbeat` handler), which is what keeps a deployment that
-has not been redeployed in weeks current — on a host whose crontab posts to
-`/api/cron/heartbeat` ([`scripts/setup-cron.py`](../../scripts/setup-cron.py)).
+has not been redeployed in weeks current — every deploy installs the host
+crontab entry that posts to `/api/cron/heartbeat`
+([`scripts/cron-jobs.py`](../../scripts/cron-jobs.py)).
 `POST /api/model-registry/sync` (`pnpm exec mediforce model sync`) forces one.
 
 `ENABLE_MODEL_SYNC=false` turns the unattended path off — for an estate with no

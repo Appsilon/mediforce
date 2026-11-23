@@ -82,11 +82,13 @@ mails you exactly when something is wrong. Set `MEDIFORCE_ALERT_WEBHOOK` in
 `.env` to also POST them; both Slack and Discord incoming-webhook URLs work
 unchanged. With no webhook configured the probe still runs and still logs.
 
-Install it (and the heartbeat) with:
+Every deploy installs it, with the heartbeat: `deploy.sh` and
+`deploy-staging.sh` run `scripts/cron-jobs.py install`, which rewrites the
+`# mediforce-<job>` lines of the deploy user's crontab from the checked-out
+release. To install without deploying:
 
 ```bash
-python3 scripts/setup-cron.py deploy@<host>
-python3 scripts/setup-cron.py deploy@<host> --job redis-probe   # just this one
+ssh deploy@<host> 'python3 /opt/mediforce/scripts/cron-jobs.py install'
 ```
 
 Run it by hand to see the current state of a host:

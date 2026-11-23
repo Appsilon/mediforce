@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Probe Redis and host disk, and alert before writes become unavailable.
 
-Runs on the deployment host (cron, every 5 min — see setup-cron.py). It watches
+Runs on the deployment host (cron, every 5 min — see cron-jobs.py). It watches
 the five things that, in that order, took production down on 2026-09-15: Redis
 outgrew its container limit, the kernel killed it mid-RDB-save, the failed saves
 left orphaned `temp-*.rdb` files that filled the root filesystem, and every save

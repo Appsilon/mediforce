@@ -92,4 +92,9 @@ nohup bash -c "
   echo \"[\$(date -Iseconds)] Agent images ready\" >> '$LOG_FILE'
 " >> "$LOG_FILE" 2>&1 &
 
+# Host cron jobs (heartbeat, redis-probe) come from this checkout on every
+# deploy, so no server depends on a manual install step.
+log "Installing host cron jobs"
+python3 -u "$DEPLOY_DIR/scripts/cron-jobs.py" install 2>&1 | tee -a "$LOG_FILE"
+
 log "Deployment complete — agent images still building in background"

@@ -18,7 +18,15 @@ if [[ "$(date +%u)" != "1" ]]; then
   rm -f "$LOG.rotated-this-week"
 fi
 
-HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" -X POST "$URL" \
+# bootstrap-server.py's "no domain" option sets DOMAIN to the server IP, and
+# Caddy then serves its own self-signed cert. The request goes to this host
+# itself, so skip verification only in that case.
+CURL_TLS="--no-insecure"
+if [[ "$DOMAIN" =~ ^[0-9.]+$ || "$DOMAIN" == *:* ]]; then
+  CURL_TLS="--insecure"
+fi
+
+HTTP_CODE=$(curl -sf "$CURL_TLS" -o /dev/null -w "%{http_code}" -X POST "$URL" \
   -H "X-Api-Key: $PLATFORM_API_KEY" \
   -H "Content-Type: application/json" 2>/dev/null) || HTTP_CODE="FAIL"
 
