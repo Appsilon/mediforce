@@ -165,45 +165,6 @@ describe('WorkflowEngine — task_assigned notification dispatch', () => {
     });
   });
 
-  it('notifies the fallback assignee (instance creator) when the notified roles are empty', async () => {
-    const emptyRolesDef: WorkflowDefinition = {
-      ...humanProcessDef,
-      name: 'human-process-empty-roles',
-      notifications: [{ event: 'task_assigned', roles: [] }],
-    };
-    await processRepo.saveWorkflowDefinition(emptyRolesDef);
-
-    const userDirectoryService = directoryWith(['creator', 'user-1', 'creator@example.com']);
-
-    const engine = new WorkflowEngine(
-      processRepo,
-      instanceRepo,
-      auditRepo,
-      undefined,
-      notificationService,
-      humanTaskRepo,
-      undefined,
-      userDirectoryService,
-    );
-
-    const instance = await engine.createInstance(
-      'test',
-      'human-process-empty-roles',
-      1,
-      'user-1',
-      'manual',
-      {},
-    );
-    await engine.startInstance(instance.id);
-    await engine.advanceStep(instance.id, { result: 'done' }, actor);
-
-    expect(notificationService.sent).toHaveLength(1);
-    expect(notificationService.sent[0].targets).toContainEqual({
-      channel: 'email',
-      address: 'creator@example.com',
-    });
-  });
-
   it('does not dispatch task_assigned when the workflow declares no such notification', async () => {
     const userDirectoryService = directoryWith(['reviewer', 'uid-r1', 'reviewer@example.com']);
 
@@ -416,4 +377,39 @@ describe('WorkflowEngine — task_assigned notification dispatch', () => {
     expect(tasks[0].status).toBe('claimed');
   });
 });
+
+  // A step without `assignedTo` used to fall back to the run's `createdBy`.
+  // For a run fired by a parent's spawn step, cron or a webhook that is a
+  // system label, so the task was pinned to a user that does not exist and
+  // nobody could pick it up. Unassigned, it shows in the Actions tab of every
+  // workspace member allowed by the step's roles.
+  describe('step without assignedTo', () => {
+    async function runStartedBy(createdBy: string) {
+      const engine = new WorkflowEngine(
+        processRepo,
+        instanceRepo,
+        auditRepo,
+        undefined,
+        notificationService,
+        humanTaskRepo,
+        undefined,
+        directoryWith(['reviewer', 'uid-r1', 'reviewer@example.com']),
+      );
+      const instance = await engine.createInstance('test', 'human-process', 1, createdBy, 'manual', {});
+      await engine.startInstance(instance.id);
+      await engine.advanceStep(instance.id, { result: 'done' }, actor);
+      return humanTaskRepo.getAll();
+    }
+
+    it.each(['spawn', 'cron-heartbeat', 'webhook', 'uid-r1'])(
+      'leaves the task unassigned for anyone to claim when the run was created by %s',
+      async (createdBy) => {
+        const tasks = await runStartedBy(createdBy);
+
+        expect(tasks).toHaveLength(1);
+        expect(tasks[0].assignedUserId).toBeNull();
+        expect(tasks[0].status).toBe('pending');
+      },
+    );
+  });
 });
