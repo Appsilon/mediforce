@@ -279,16 +279,10 @@ export class WorkflowEngine {
             preAssignedEmail = assignee?.email ?? null;
             unresolvedAssignee = assignee?.unresolved ?? null;
           }
-          // The creator fallback puts a run's own tasks in the starter's inbox,
-          // which is the right default for a step that named nobody. It is the
-          // wrong answer when the step named someone specific and they could
-          // not be found: handing the review to whoever started the run is a
-          // different decision than the author wrote, and in a review step it
-          // is the one that removes the second pair of eyes. Left unassigned so
-          // a holder of the step's role claims it.
-          const taskAssignedUserId = unresolvedAssignee !== null
-            ? null
-            : preAssignedUserId ?? updatedInstance.createdBy ?? null;
+          // Only a step's `assignedTo` pins a task. A step that names nobody, or
+          // names someone who cannot be found, leaves it unassigned so anyone
+          // holding the step's role in the workspace can claim it.
+          const taskAssignedUserId = preAssignedUserId;
           const taskStatus: 'pending' | 'claimed' = taskAssignedUserId ? 'claimed' : 'pending';
 
           const task: HumanTask = {
@@ -903,7 +897,7 @@ export class WorkflowEngine {
   // Resolve a notification config's roles to email targets and dispatch the
   // event. No-op when notification/user-directory services are not injected.
   // `assigneeUserId`/`assigneeEmail` additionally target the person the task is
-  // claimed for, so a pre-assigned (or fallback-to-creator) task still notifies
+  // claimed for, so a task pre-assigned by `assignedTo` still notifies
   // whoever is responsible even when they are outside the configured roles.
   private async resolveAndSendNotification(
     event: 'task_assigned' | 'agent_escalation',
