@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Layers, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, EyeOff, Copy, Link2, ShieldCheck, FlaskConical } from 'lucide-react';
+import { ArrowLeft, Layers, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, EyeOff, Copy, Link2, ShieldCheck, FlaskConical, Pencil } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useWorkflowVersion, useWorkflowVersions } from '@/hooks/use-workflow-versions';
@@ -543,6 +543,21 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
           </div>
 
           <div className="flex items-center gap-2">
+            {latest && (
+              <InstantTooltip label={editReason}>
+                <Link
+                  href={`/${handle}/workflows/${encodeURIComponent(decodedName)}/definitions/${latest.version}`}
+                  aria-disabled={!mayEdit}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors',
+                    !mayEdit && 'opacity-50 pointer-events-none',
+                  )}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit Workflow
+                </Link>
+              </InstantTooltip>
+            )}
             {!isPrivate && (
               <CopyWorkflowLinkButton handle={handle} workflowName={decodedName} />
             )}
