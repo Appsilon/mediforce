@@ -1434,8 +1434,8 @@ def step_env_local(ctx: Context) -> None:
 def step_postgres_dir(ctx: Context) -> None:
     """Create the Postgres bind-mount data dir at /var/lib/mediforce/postgres-data.
 
-    docker-compose.staging.yml bind-mounts the host path into the postgres
-    container so `docker compose down -v` cannot wipe staging data. The dir
+    docker-compose.prod.yml bind-mounts the host path into the postgres
+    container so `docker compose down -v` cannot wipe the database. The dir
     must exist and be owned by UID 999 (postgres-alpine's postgres user)
     before the container starts, or initdb fails.
 

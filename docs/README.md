@@ -57,6 +57,7 @@ Every engineering doc, what it is for, and how far to trust it.
 | Pass the four verification gates | [`guides/verify-a-workflow.md`](guides/verify-a-workflow.md) | workflow-authors | living |
 | Onboard a landing zone | [`guides/landing-zone-onboarding.md`](guides/landing-zone-onboarding.md) | operators | living |
 | Keep Redis inside its limits, or recover it | [`guides/redis-operations.md`](guides/redis-operations.md) | operators | living |
+| Move a server's Postgres from the named volume to the bind mount | [`guides/postgres-bind-mount-migration.md`](guides/postgres-bind-mount-migration.md) | operators | living |
 | Look up what a workflow *can* do | [`reference/workflow-capabilities.md`](reference/workflow-capabilities.md) | workflow-authors | living |
 | Choose which part of Step Evaluation to use | [`guides/choose-an-evaluation.md`](guides/choose-an-evaluation.md) | workflow-authors | living |
 | Walk through Step Evaluation by hand on a sandbox workflow | [`guides/step-evaluation-manual-test.md`](guides/step-evaluation-manual-test.md) | engineers | living |

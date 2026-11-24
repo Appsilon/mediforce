@@ -57,8 +57,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-mediforce}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-mediforce}
+    # A bind mount, not a named volume, so `docker compose down -v` cannot
+    # delete the database. bootstrap-server.py creates the dir; servers set up
+    # before this change move into it via docs/guides/postgres-bind-mount-migration.md.
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - /var/lib/mediforce/postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mediforce} -d ${POSTGRES_DB:-mediforce}"]
       interval: 10s
@@ -271,4 +274,3 @@ volumes:
   redis-data:
   caddy-data:
   caddy-config:
-  postgres-data:

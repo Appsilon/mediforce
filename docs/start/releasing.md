@@ -57,6 +57,10 @@ Release often. Small releases are what make the numbers mean something.
 `1.3.1`. It refuses versions released before this process existed (v1.2.0 and
 older): their `deploy.sh` ignores the version and would redeploy `main`.
 
+Don't roll back to v1.4.0 or older once a host's Postgres has moved to the bind
+mount. Those releases read the database from the named volume `postgres-data`
+([runbook](../guides/postgres-bind-mount-migration.md)).
+
 ## If publishing fails after the merge
 
 `main` then has the bump but no tag, and re-running the job fails the same way.
