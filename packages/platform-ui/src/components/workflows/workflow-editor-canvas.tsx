@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { X, HelpCircle, Save, KeyRound, Code2, FileCode, GitBranch, Sparkles, ChevronRight, ChevronLeft, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Bell, Check, AlertTriangle, Square } from 'lucide-react';
+import { X, HelpCircle, Save, KeyRound, Code2, FileCode, GitBranch, Sparkles, ChevronRight, Send, Loader2, Bot, User, Settings, SlidersHorizontal, Bell, Check, AlertTriangle, Square } from 'lucide-react';
 import { WorkflowDiagram, type StepEvaluationMark } from '@/components/workflows/workflow-diagram';
 import { cn } from '@/lib/utils';
 import {
@@ -117,7 +117,7 @@ export function WorkflowEditorCanvas({
   const [editedSteps, setEditedSteps] = useState<WorkflowStep[]>(() => structuredClone(initialSteps));
   const [rightPanelView, setRightPanelView] = useState<'json' | 'secrets' | 'settings' | 'notifications' | 'files' | 'repo' | 'add-block' | null>(null);
   const [addBlockContext, setAddBlockContext] = useState<{ fromId: string; toId: string } | null>(null);
-  const [aiPaneOpen, setAiPaneOpen] = useState(false);
+  const [aiPaneOpen, setAiPaneOpen] = useState(true);
   const [editedTransitions, setEditedTransitions] = useState<WorkflowDefinition['transitions']>(() => structuredClone(initialTransitions));
   const [editedInputForNextRun, setEditedInputForNextRun] = useState<WorkflowDefinition['inputForNextRun']>(() => structuredClone(initialInputForNextRun));
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
@@ -1033,6 +1033,24 @@ export function WorkflowEditorCanvas({
               <p>Edits here, on the canvas, and from the AI Assistant all write the same definition.</p>
             </span>
           </span>
+
+          <button
+            onClick={() => { setAiPaneOpen((prev) => !prev); setAssistantUnread(false); }}
+            aria-label={aiPaneOpen ? 'Collapse AI Assistant' : 'Expand AI Assistant'}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors hover:bg-muted text-foreground',
+              aiPaneOpen && 'bg-muted',
+              assistantUnread && !aiPaneOpen && 'border-primary/40 text-primary',
+            )}
+          >
+            {assistantLoading || assistantPlanning ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5" />
+            )}
+            AI Assistant
+            {assistantUnread && !aiPaneOpen && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+          </button>
         </div>
       </div>
 
@@ -1099,7 +1117,7 @@ export function WorkflowEditorCanvas({
           </div>
         )}
 
-        {aiPaneOpen ? (
+        {aiPaneOpen && (
           <div
             data-tour="assistant-pane"
             className="w-80 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col min-h-0"
@@ -1287,34 +1305,6 @@ export function WorkflowEditorCanvas({
               </div>
             </div>
           </div>
-        ) : (
-          <button
-            onClick={() => { setAiPaneOpen(true); setAssistantUnread(false); }}
-            className={cn(
-              'w-10 shrink-0 my-3 mr-3 rounded-xl border shadow-lg bg-white dark:bg-background flex flex-col items-center justify-between py-4 transition-colors',
-              assistantUnread
-                ? 'border-primary/40 text-primary hover:bg-primary/5'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-            )}
-            data-tour="assistant-rail"
-            title={assistantUnread ? 'The AI Assistant has something for you' : 'Expand AI Assistant'}
-            aria-label={assistantUnread ? 'Expand AI Assistant — it has something for you' : 'Expand AI Assistant'}
-          >
-            <span className="relative inline-flex shrink-0">
-              <Sparkles className="h-4 w-4" />
-              {assistantUnread && (
-                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-white dark:ring-background" />
-              )}
-            </span>
-            <span className="text-[11px] font-semibold tracking-wide [writing-mode:vertical-rl] rotate-180 select-none">
-              AI Assistant
-            </span>
-            {assistantLoading || assistantPlanning ? (
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-            ) : (
-              <ChevronLeft className="h-4 w-4 shrink-0" />
-            )}
-          </button>
         )}
 
       </div>

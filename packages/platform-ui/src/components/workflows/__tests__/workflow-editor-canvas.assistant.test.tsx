@@ -106,7 +106,6 @@ function openAssistant(): void {
       workflowName="cdisc"
     />,
   );
-  fireEvent.click(screen.getByRole('button', { name: /expand ai assistant/i }));
 }
 
 async function ask(text: string): Promise<void> {
