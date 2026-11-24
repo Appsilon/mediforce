@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-24
+
+### Changed
+
+- **Unassigned Human Tasks:** Starting a run by hand no longer claims its human tasks for you. A human step without an assignee waits in the Actions tab of every member its roles allow, and the first to claim it takes it ([#1701](https://github.com/Appsilon/mediforce/pull/1701)).
+
+### Fixed
+
+- Human tasks in runs started by a parent workflow, a cron trigger or a webhook are no longer stuck as claimed by a user that doesn't exist, so someone can pick them up ([#1701](https://github.com/Appsilon/mediforce/pull/1701)).
+- Self-hosted servers now install their scheduled jobs on every deploy, so cron triggers fire, stuck runs are swept, and the Redis disk probe runs. The heartbeat needs `PLATFORM_API_KEY` and `DOMAIN` in the server's `.env` and is skipped with a warning without them. `scripts/setup-cron.py` is gone; run `scripts/cron-jobs.py install` on the host to install the jobs without deploying ([#1687](https://github.com/Appsilon/mediforce/pull/1687)).
+
 ## [1.4.0] - 2026-11-23
 
 ### Added
