@@ -157,6 +157,11 @@ The host needs two things before `platform-ui` will start:
 Already-bootstrapped deployments — the current staging — are never re-bootstrapped:
 add the variable and create the directory over ssh.
 
+Hetzner's server Backups skip the attached volume, so they don't hold this
+data. Production's off-host backup is the opt-in `backup` service
+(`COMPOSE_PROFILES=backup`), described in
+[`guides/backup-and-restore.md`](../guides/backup-and-restore.md).
+
 ### Environment variables per deployment
 
 [`.env.example`](../../.env.example) is the annotated source of truth for every

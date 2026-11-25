@@ -1,0 +1,57 @@
+# Nightly off-host backup of production data. Runbook:
+# docs/guides/backup-and-restore.md. Every ${VAR} comes from the `backup`
+# service's environment in docker-compose.prod.yml.
+
+# The sources are mounted read-only at their host paths, so an archive restores
+# to the same paths it came from.
+source_directories:
+    - /var/lib/mediforce/bare-repos
+    - /var/lib/mediforce/attachments
+    - /opt/mediforce/.env
+    - /opt/mediforce/caddy.d
+
+repositories:
+    - path: ${BORG_REPO}
+      label: offsite
+      encryption: repokey-blake2
+
+encryption_passphrase: ${BORG_PASSPHRASE}
+
+# The default `{hostname}-{now}` ties `latest`, pruning and checks to the
+# container's hostname, which changes on every recreate: old archives would
+# never be pruned, and a restore from another container would find none.
+archive_name_format: mediforce-{now:%Y-%m-%dT%H:%M:%S}
+
+# Streamed into the archive by pg_dump over the compose network. pg_dump's
+# snapshot is taken before borg reads the files, and run branches only gain
+# commits, so the files hold every commit the dump refers to.
+#
+# The client tools must match the server's major version (postgres:16-alpine):
+# the image's own v18 pg_dump writes an archive pg_restore 16 cannot read, and
+# its pg_restore sends settings Postgres 16 rejects. The `backup` service
+# installs postgresql16-client via EXTRA_PKGS; a Postgres major upgrade changes
+# both places.
+postgresql_databases:
+    - name: ${POSTGRES_DB}
+      hostname: postgres
+      username: ${POSTGRES_USER}
+      password: ${POSTGRES_PASSWORD}
+      format: custom
+      pg_dump_command: /usr/libexec/postgresql16/pg_dump
+      pg_restore_command: /usr/libexec/postgresql16/pg_restore
+      psql_command: /usr/libexec/postgresql16/psql
+
+keep_daily: 7
+keep_weekly: 4
+keep_monthly: 6
+
+checks:
+    - name: repository
+      frequency: 1 month
+    - name: archives
+      frequency: 1 month
+
+# Pings start, finish and fail. The check's own period catches a scheduler
+# that stopped running altogether.
+healthchecks:
+    ping_url: ${BACKUP_PING_URL}
