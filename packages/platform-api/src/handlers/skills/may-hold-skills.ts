@@ -39,7 +39,7 @@ async function skillIssues(
 
 function refuse(issues: Issue[]): void {
   if (issues.length > 0) {
-    throw new ValidationError(`Invalid skills: ${issues.map((issue) => issue.message).join('; ')}`, issues);
+    throw new ValidationError(`Invalid references: ${issues.map((issue) => issue.message).join('; ')}`, issues);
   }
 }
 
@@ -62,6 +62,37 @@ export async function assertStepsMayAddSkills(
   const perStep = await Promise.all(workflow.steps.map(async (step, stepIndex) => {
     const issues = await skillIssues(workflow, 'workflow', step.agent?.skills ?? [], ['steps', stepIndex, 'agent', 'skills'], scope);
     return issues.map((issue) => ({ ...issue, message: `step '${step.id}': ${issue.message}` }));
+  }));
+  refuse(perStep.flat());
+}
+
+/** Refuse a Workflow whose Steps run an Agent it may not reach: same rule as
+ *  Skills (ADR-0025 decision 3) — a private Agent only by its own Namespace,
+ *  a public one by every Workflow. */
+export async function assertStepsMayUseAgents(
+  workflow: Pick<WorkflowDefinition, 'namespace' | 'visibility' | 'steps'>,
+  scope: CallerScope,
+): Promise<void> {
+  const perStep = await Promise.all(workflow.steps.map(async (step, stepIndex) => {
+    if (step.executor !== 'agent' || step.agentId === undefined) return [];
+    const agent = await scope.agentDefinitions.getById(step.agentId);
+    if (agent === null) {
+      return [{
+        code: 'custom' as const,
+        path: ['steps', stepIndex, 'agentId'],
+        message: `step '${step.id}': agent '${step.agentId}' does not exist`,
+      }];
+    }
+    const reachable = agent.visibility === 'public'
+      || (workflow.visibility === 'private' && workflow.namespace === agent.namespace);
+    if (reachable === false) {
+      return [{
+        code: 'custom' as const,
+        path: ['steps', stepIndex, 'agentId'],
+        message: `step '${step.id}': agent '${step.agentId}' is private to workspace '${agent.namespace}'`,
+      }];
+    }
+    return [];
   }));
   refuse(perStep.flat());
 }

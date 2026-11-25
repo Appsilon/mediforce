@@ -188,7 +188,9 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
                 router.push(`/${copyTarget}/workflows/${encodeURIComponent(copyName)}`);
               } else {
                 const data = await res.json().catch(() => null);
-                setCopyError(data?.error ?? 'Copy failed');
+                setCopyError(typeof data?.error === 'object' && data.error !== null
+                  ? (data.error.message ?? 'Copy failed')
+                  : (data?.error ?? 'Copy failed'));
               }
             } finally {
               setCopying(false);
@@ -362,6 +364,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const [transferOpen, setTransferOpen] = React.useState(false);
   const [transferTarget, setTransferTarget] = React.useState('');
   const [transferring, setTransferring] = React.useState(false);
+  const [transferError, setTransferError] = React.useState('');
   const [togglingVisibility, setTogglingVisibility] = React.useState(false);
   const [shareDialogOpen, setShareDialogOpen] = React.useState(false);
   const [copyOpen, setCopyOpen] = React.useState(false);
@@ -624,6 +627,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 <button
                   onClick={() => {
                     setMenuOpen(false);
+                    setTransferError('');
                     setTransferOpen(true);
                   }}
                   disabled={!mayEdit}
@@ -853,7 +857,9 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 router.push(`/${copyTarget}/workflows/${encodeURIComponent(copyName)}`);
               } else {
                 const data = await res.json().catch(() => null);
-                setCopyError(data?.error ?? 'Copy failed');
+                setCopyError(typeof data?.error === 'object' && data.error !== null
+                  ? (data.error.message ?? 'Copy failed')
+                  : (data?.error ?? 'Copy failed'));
               }
             } finally {
               setCopying(false);
@@ -872,9 +878,9 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
             </p>
             <select
               value={transferTarget}
-              onChange={(e) => setTransferTarget(e.target.value)}
+              onChange={(e) => { setTransferTarget(e.target.value); setTransferError(''); }}
               className={cn(
-                'w-full rounded-md border bg-background px-3 py-1.5 text-sm outline-none mb-4',
+                'w-full rounded-md border bg-background px-3 py-1.5 text-sm outline-none mb-1',
                 'focus:ring-1 focus:ring-ring focus:border-ring',
               )}
             >
@@ -885,11 +891,15 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 </option>
               ))}
             </select>
-            <div className="flex items-center justify-end gap-2">
+            {transferError && (
+              <p className="text-xs text-destructive mb-3">{transferError}</p>
+            )}
+            <div className="flex items-center justify-end gap-2 mt-3">
               <button
                 onClick={() => {
                   setTransferOpen(false);
                   setTransferTarget('');
+                  setTransferError('');
                 }}
                 className="rounded-md px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
               >
@@ -899,6 +909,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 onClick={async () => {
                   if (!transferTarget) return;
                   setTransferring(true);
+                  setTransferError('');
                   try {
                     await mediforce.workflows.transferNamespace({
                       name: decodedName,
@@ -910,7 +921,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                   } catch (err) {
                     const message = err instanceof ApiError ? err.message
                       : err instanceof Error ? err.message : 'Unknown error';
-                    alert(`Failed to transfer workflow: ${message}`);
+                    setTransferError(message);
                   } finally {
                     setTransferring(false);
                   }
