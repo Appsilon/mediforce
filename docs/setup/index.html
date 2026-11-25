@@ -265,7 +265,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 git clone https://github.com/Appsilon/mediforce.git
 cd mediforce
 python3 scripts/bootstrap-server.py --host <span class="placeholder">YOUR_SERVER_IP</span></code></pre>
-          <p>It works through seventeen steps: system packages, Docker and its builder GC cap, a <code>deploy</code> user, the clone into <code>/opt/mediforce</code>, your API keys, the domain, sign-in, the env files, the Postgres data directory, the firewall, the first deploy, and a smoke test.</p>
+          <p>It works through seventeen steps: system packages, Docker with its builder GC cap and log rotation, a <code>deploy</code> user, the clone into <code>/opt/mediforce</code>, your API keys, the domain, sign-in, the env files, the Postgres data directory, the firewall, the first deploy, and a smoke test.</p>
           <p>Two things make it pleasant to use. It <strong>detects before it asks</strong>, so anything already on the box is offered back rather than redone, and it <strong>saves its state</strong> in <code>~/.mediforce/</code>, so a Ctrl-C or a dropped connection costs you nothing. Re-run the same command and it picks up where it stopped.</p>
           <div class="note"><strong>Deploying a private fork?</strong> Pass <code>--repo Org/Name</code>. The script generates a deploy key on the server, shows you the public half and waits while you add it under that repo's <strong>Settings → Deploy keys</strong> with read access.</div>
           <p>Useful flags: <code>--dry-run</code> describes every action without making changes, <code>--only-step docker_gc</code> runs a single step, and <code>--from-step N</code> skips ahead.</p>

@@ -142,5 +142,21 @@ All three are deliberately narrow:
   is why [`scripts/deploy-staging.sh`](../../scripts/deploy-staging.sh) does the
   aggressive `builder prune -af` only above 80% disk.
 
+The Docker daemon itself is capped by the `docker_gc` step of
+[`scripts/bootstrap-server.py`](../../scripts/bootstrap-server.py), which merges
+two settings into `/etc/docker/daemon.json`:
+
+- `"log-driver": "local"` — container logs are compressed and rotated
+  (5 × 20 MB per container) instead of growing forever under `json-file`.
+  A container switches driver only when it is recreated, which the next deploy
+  does.
+- A 10 GB BuildKit GC cap (`builder.gc.defaultKeepStorage`).
+
+The step restarts Docker only when the file changed, so re-running it is a
+no-op on a configured host. To apply it to an existing host, run
+`python3 scripts/bootstrap-server.py --host <host> --only-step docker_gc` in a quiet window (the
+restart is a short outage), then deploy, and check that
+`docker info --format '{{.LoggingDriver}}'` prints `local`.
+
 The probe's disk check is the backstop: if artifacts still accumulate past 75%,
 it tells you before a snapshot fails.
