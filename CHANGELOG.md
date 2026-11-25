@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-11-25
+
+### Added
+
+- **Nightly Backups:** Self-hosted servers can back up the database, workflow repositories, attachments, `.env` and `caddy.d` every night to an encrypted, off-site store such as a Hetzner Storage Box, keeping 7 daily, 4 weekly and 6 monthly copies. It is off until you set `COMPOSE_PROFILES=backup`, `BORG_REPO`, `BORG_PASSPHRASE` and `BACKUP_PING_URL` in the server's `.env`; `BACKUP_CRON` changes the time, 02:00 UTC by default. Setup and restore steps are in `docs/guides/backup-and-restore.md` ([#1705](https://github.com/Appsilon/mediforce/pull/1705)).
+
+### Fixed
+
+- Self-hosted servers no longer fill their disk with old release images. Each deploy keeps the two newest versions and the one running, so rolling back one version starts at once and older versions are downloaded first ([#1706](https://github.com/Appsilon/mediforce/pull/1706)).
+- Container logs on self-hosted servers are now compressed and rotated instead of growing forever, and the Docker build cache is capped at 10 GB. Existing servers get this by running `python3 scripts/bootstrap-server.py --host <host> --only-step docker_gc` in a quiet window, since it restarts Docker, and then deploying ([#1709](https://github.com/Appsilon/mediforce/pull/1709)).
+
 ## [1.4.1] - 2026-11-24
 
 ### Changed
