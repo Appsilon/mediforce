@@ -81,6 +81,28 @@ docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
 log "Platform deployed"
 docker compose -f "$COMPOSE_FILE" ps
 
+# Each release pulls ~5 GB and `docker image prune` never removes tagged
+# images. Keep the two newest X.Y.Z versions of each platform image plus the
+# running one; GHCR keeps every version for a deeper rollback. `latest` and
+# other tags are never touched. The background prune below frees the layers.
+remove_old_release_images() {
+  local image tag
+  for image in ghcr.io/appsilon/mediforce-{platform-ui,migrate,container-worker}; do
+    docker image ls "$image" --format '{{.Tag}}' \
+      | { grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true; } \
+      | sort -rV | tail -n +3 \
+      | while read -r tag; do
+          if [ "$tag" = "$VERSION" ]; then continue; fi
+          log "Removing old release image $image:$tag"
+          docker image rm "$image:$tag" 2>&1 | tee -a "$LOG_FILE" \
+            || log "WARNING: could not remove $image:$tag"
+        done
+  done
+}
+if [ "$VERSION" != "latest" ]; then
+  remove_old_release_images
+fi
+
 # Build agent images in the background — platform is already serving.
 # Workflows that need a container will fail until images are ready;
 # that's fine because the user still needs to set up workflows first.

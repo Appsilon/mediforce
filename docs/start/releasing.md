@@ -57,6 +57,13 @@ Release often. Small releases are what make the numbers mean something.
 `1.3.1`. It refuses versions released before this process existed (v1.2.0 and
 older): their `deploy.sh` ignores the version and would redeploy `main`.
 
+The server keeps only the two newest versions of the platform images, plus the
+running one: after each versioned deploy, `deploy.sh` removes the other `X.Y.Z`
+tags of `mediforce-{platform-ui,migrate,container-worker}`. Rolling back to the
+previous version starts at once, because its images are still local. Rolling
+back further pulls them from GHCR first, where every version stays published.
+Staging runs `:latest`, which this never touches.
+
 ## If publishing fails after the merge
 
 `main` then has the bump but no tag, and re-running the job fails the same way.
