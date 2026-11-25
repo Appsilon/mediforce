@@ -1,0 +1,61 @@
+# Nightly off-host backup of production data. Runbook:
+# docs/guides/backup-and-restore.md. Every ${VAR} comes from the `backup`
+# service's environment in docker-compose.prod.yml.
+
+# The sources are mounted read-only at their host paths, so an archive restores
+# to the same paths it came from.
+#
+# Postgres and each bare repo's objects and refs come from backup-staging, which
+# snapshot.py writes first (dump, then git bundles). Walking a live repo can
+# capture a ref without its objects. The rest of each bare repo (config with
+# its remotes, info/exclude, HEAD) is small and read directly.
+source_directories:
+    - /var/lib/mediforce/backup-staging
+    - /var/lib/mediforce/bare-repos
+    - /var/lib/mediforce/attachments
+    - /opt/mediforce/.env
+    - /opt/mediforce/caddy.d
+
+exclude_patterns:
+    - sh:/var/lib/mediforce/bare-repos/*/*.git/objects
+    - sh:/var/lib/mediforce/bare-repos/*/*.git/refs
+    - sh:/var/lib/mediforce/bare-repos/*/*.git/packed-refs
+    - sh:/var/lib/mediforce/bare-repos/*/*.git/worktrees
+
+commands:
+    - before: action
+      when: [create]
+      run:
+          - python3 /etc/borgmatic/snapshot.py create
+    - after: action
+      when: [create]
+      run:
+          - rm -rf /var/lib/mediforce/backup-staging
+
+repositories:
+    - path: ${BORG_REPO}
+      label: offsite
+      encryption: repokey-blake2
+
+encryption_passphrase: ${BORG_PASSPHRASE}
+
+# The default `{hostname}-{now}` ties `latest`, pruning and checks to the
+# container's hostname, which changes on every recreate: old archives would
+# never be pruned, and a restore from another container would find none.
+# `latest`, prune and checks only see archives with this deployment's prefix.
+archive_name_format: ${BACKUP_NAME}-{now:%Y-%m-%dT%H:%M:%S}
+
+keep_daily: 7
+keep_weekly: 4
+keep_monthly: 6
+
+checks:
+    - name: repository
+      frequency: 1 month
+    - name: archives
+      frequency: 1 month
+
+# Pings start, finish and fail. The check's own period catches a night the
+# host cron didn't run or the service was down.
+healthchecks:
+    ping_url: ${BACKUP_PING_URL}
