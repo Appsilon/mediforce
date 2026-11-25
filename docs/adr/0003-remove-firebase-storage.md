@@ -152,6 +152,9 @@ decision, not a storage-infra necessity.
 - A deployment that standardizes on its own S3-compatible storage points the
   `BlobStore` at it via env — no Mediforce-bundled object store to vendor-review.
 - `pg_dump` + volume snapshot is the whole backup story; PITR covers metadata.
+  (Hetzner volumes have no snapshots. Production's backup is a nightly borgmatic
+  archive of the dump and the files:
+  [`backup-and-restore.md`](../guides/backup-and-restore.md).)
 - Regulated-file handling (Veeva as system of record) returns later as an
   optional reference-link feature if a customer's QA process requires it.
 

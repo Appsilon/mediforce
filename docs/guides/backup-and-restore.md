@@ -6,9 +6,10 @@ last_reviewed: 2026-11-25
 
 # Backup and restore
 
-Production keeps everything that matters on one attached Hetzner volume. A
-nightly [borgmatic](https://torsion.org/borgmatic/) job copies it, encrypted, to
-a Hetzner Storage Box. This guide covers setting that up, checking it still
+Production keeps everything that matters on one attached Hetzner volume, once
+[`move-data-to-volume.md`](move-data-to-volume.md) has been followed on the
+host. A nightly [borgmatic](https://torsion.org/borgmatic/) job copies it,
+encrypted, to a Hetzner Storage Box. This guide covers setting that up, checking it still
 works, and restoring from it.
 
 ## What is backed up
@@ -41,18 +42,25 @@ The `backup` service in
 [`docker-compose.prod.yml`](../../docker-compose.prod.yml) runs the
 `ghcr.io/borgmatic-collective/borgmatic` image, configured entirely by
 [`ops/borgmatic/config.yaml`](../../ops/borgmatic/config.yaml). It has no custom
-image, no custom script and no Docker socket. Its built-in cron runs one
-borgmatic pass a night, which does create, prune, compact and then the monthly
-`repository` + `archives` checks.
+image, no custom script and no Docker socket.
+
+The schedule is the host crontab, next to the other host jobs:
+[`scripts/cron-jobs.py`](../../scripts/cron-jobs.py) installs a `mediforce-backup`
+line on every deploy when `.env` sets `BORG_REPO`, and leaves it out otherwise.
+At 02:00 host time it runs `borgmatic` inside the `backup` service, which does
+create, prune, compact and then the monthly `repository` + `archives` checks.
+Output goes to `/opt/mediforce/logs/backup.log`. The image's own cron is off.
 
 - **Retention:** 7 daily, 4 weekly and 6 monthly archives.
 - **Encryption:** `repokey-blake2`. The key is stored in the repository and
   locked by `BORG_PASSPHRASE`.
 - **Monitoring:** healthchecks.io is pinged on start, success and failure. The
-  check's period also catches a scheduler that stopped running.
+  check's period also catches a night the cron line didn't run or the service
+  was down.
 - **Off by default.** The service exists only when `.env` has
-  `COMPOSE_PROFILES=backup`. Without it, `docker compose up` behaves exactly as
-  before, so forks and staging deploy unchanged.
+  `COMPOSE_PROFILES=backup`, and the cron line only when it has `BORG_REPO`.
+  Without them, a deploy behaves exactly as before, so forks and staging deploy
+  unchanged.
 
 | Variable | Default | Notes |
 |---|---|---|
@@ -60,7 +68,7 @@ borgmatic pass a night, which does create, prune, compact and then the monthly
 | `BORG_REPO` | — | Required. `ssh://uNNNNN@uNNNNN.your-storagebox.de:23/./mediforce`. Borg on a Storage Box uses port 23. |
 | `BORG_PASSPHRASE` | — | Required. Also stored in the password manager. Without it, no archive can be read. |
 | `BACKUP_PING_URL` | — | Required. The healthchecks.io ping URL. If it's unset, the backup still runs, but every ping fails and nothing reports a missed night. |
-| `BACKUP_CRON` | `0 2 * * *` | Cron schedule, in UTC. `false` disables the schedule; the restore drill needs that. |
+| `BACKUP_NAME` | `mediforce` | Archive name prefix. `latest`, prune and checks only see archives with it, so two deployments sharing one repository need different names. |
 | `BACKUP_SSH_KEY_PATH` | `/home/deploy/.ssh/backup_key` | Private key the Storage Box accepts. |
 | `BACKUP_KNOWN_HOSTS_PATH` | `/home/deploy/.ssh/backup_known_hosts` | The Storage Box's host key. An unknown host fails the backup instead of trusting it. |
 | `BACKUP_MEM_LIMIT` | `512m` | Container memory limit. |
@@ -72,10 +80,17 @@ calls those binaries by path. **A Postgres major upgrade changes both
 `EXTRA_PKGS` and the three `*_command` paths in the config.** If the package
 fails to install, the backup fails loudly rather than falling back to v18.
 
-Run every manual command from `/opt/mediforce` as `deploy`. Use
-`docker compose -f docker-compose.prod.yml exec backup …` rather than `run`:
-the image's init doesn't pass the container env to a `run` command. The
-examples below shorten that to `dc exec backup …`.
+Run every manual command from `/opt/mediforce` as `deploy`, with this set once
+per shell:
+
+```bash
+cd /opt/mediforce
+COMPOSE="docker compose -f docker-compose.prod.yml"
+```
+
+Use `$COMPOSE exec backup …` rather than `run`: only the running service has
+the v16 client its init installs. The restore's file extract is the exception,
+because it doesn't touch Postgres.
 
 ## One-time setup
 
@@ -95,36 +110,41 @@ examples below shorten that to `dc exec backup …`.
 3. **Start it and create the repository.**
 
    ```bash
-   docker compose -f docker-compose.prod.yml up -d backup
-   dc exec backup borgmatic repo-create --encryption repokey-blake2
+   $COMPOSE up -d backup
+   $COMPOSE exec backup borgmatic repo-create
    ```
+
+   The encryption mode, `repokey-blake2`, comes from the config.
 
 4. **Export the repository key** and store it in the password manager next to
    the passphrase. The key also lives inside the repository, but a damaged
    repository can't then be opened without the exported copy.
 
    ```bash
-   dc exec backup borgmatic key export
+   $COMPOSE exec backup borgmatic key export
    ```
 
-5. **First backup, by hand:** `dc exec backup borgmatic --stats -v 1`, then
-   `dc exec backup borgmatic list`.
+5. **First backup, by hand:** `$COMPOSE exec backup borgmatic --stats -v 1`,
+   then `$COMPOSE exec backup borgmatic list`.
 
 6. **healthchecks.io.** Set the check's period to 1 day and its grace to 2
    hours, with email to the ops list. Stopping the `backup` service for a day
    must send that email. Test it once.
 
+7. **Schedule.** Run `python3 scripts/cron-jobs.py install` (or deploy), then
+   check that `crontab -l` has a `# mediforce-backup` line.
+
 Later deploys need nothing extra: `scripts/deploy.sh` runs `docker compose up`,
-which reads `COMPOSE_PROFILES` from `.env`.
+which reads `COMPOSE_PROFILES` from `.env`, and reinstalls the crontab.
 
 ## Day to day
 
 | Task | Command |
 |---|---|
-| List archives | `dc exec backup borgmatic list` |
-| Back up now | `dc exec backup borgmatic --stats -v 1` |
-| See what ran overnight | `dc logs --since 24h backup` |
-| Repository size | `dc exec backup borgmatic repo-info` |
+| List archives | `$COMPOSE exec backup borgmatic list` |
+| Back up now | `$COMPOSE exec backup borgmatic --stats -v 1` |
+| See what ran overnight | `tail -n 50 logs/backup.log` |
+| Repository size | `$COMPOSE exec backup borgmatic repo-info` |
 
 ## Secrets a restore needs from outside the host
 
@@ -140,68 +160,80 @@ The host may be gone, so all of these live in the password manager:
 | `POSTGRES_PASSWORD` | The restored `.env` carries it too. Keep a copy anyway. |
 
 The restored `.env` holds all of these as well, but it's encrypted inside the
-archive, so it's no help without the passphrase.
+archive, so it's no help without the passphrase. That also means the passphrase
+alone opens every production secret: keep it only in the password manager and
+the host's `.env`.
 
 ## Restore
 
 The steps are the same for a real recovery and for the drill. The drill must
-never write to the production repository, so it sets `BACKUP_CRON=false`. With
-the schedule on, the drill server would back itself up into the production
-repository and its prune would run there.
+never write to the production repository. Nothing is scheduled until step 7's
+deploy installs the crontab, and the drill blanks `BORG_REPO` before that.
+Otherwise the drill server would back itself up into the production repository
+every night, and its prune would run there.
 
 1. **Server.** Bring up a host with `scripts/bootstrap-server.py`, or check out
-   the release into `/opt/mediforce` by hand and create
-   `/var/lib/mediforce/{bare-repos,attachments}`. If bootstrap already
-   started the stack, run `docker compose -f docker-compose.prod.yml down -v`
-   first. Postgres initialised with bootstrap's generated password, and step 4
-   brings back production's. A fresh host has nothing in those volumes to lose.
+   the release into `/opt/mediforce` by hand. If bootstrap already started the
+   stack, run `$COMPOSE down -v` first. Postgres initialised with bootstrap's
+   generated password, and step 4 brings back production's. A fresh host has
+   nothing in those volumes to lose. Step 4's extract creates
+   `/var/lib/mediforce/{bare-repos,attachments}`.
 2. **SSH access to the Storage Box** for this host's key, as in setup step 1.
 3. **Minimal `.env`:** `COMPOSE_PROFILES=backup`, `BORG_REPO`,
    `BORG_PASSPHRASE`, `BACKUP_PING_URL=` (empty for a drill),
-   `BACKUP_CRON=false` and `POSTGRES_PASSWORD` (any value for now).
+   `POSTGRES_PASSWORD` (any value for now) and `BACKUP_NAME` if production
+   sets one.
 4. **Restore the files.** A one-off container gets a writable mount, because the
    service's own source mounts are read-only:
 
    ```bash
-   docker compose -f docker-compose.prod.yml run --rm --no-deps \
+   $COMPOSE run --rm --no-deps \
      --entrypoint borgmatic -v /var/lib/mediforce:/restore backup \
      extract --archive latest \
        --path var/lib/mediforce/bare-repos --path var/lib/mediforce/attachments \
        --destination /restore --strip-components 3
 
-   docker compose -f docker-compose.prod.yml run --rm --no-deps \
+   $COMPOSE run --rm --no-deps \
      --entrypoint borgmatic -v /opt/mediforce:/restore backup \
      extract --archive latest \
        --path opt/mediforce/.env --path opt/mediforce/caddy.d \
        --destination /restore --strip-components 2
    ```
 
-   This replaces `.env` with the production one. **For a drill**, add
-   `BACKUP_CRON=false` to it again and blank `BACKUP_PING_URL`, then change
-   `DOMAIN` and `NEXT_PUBLIC_APP_URL` to the drill host.
+   This replaces `.env` with the production one. **For a drill**, blank
+   `BACKUP_PING_URL` and change `DOMAIN` and `NEXT_PUBLIC_APP_URL` to the drill
+   host. Leave `BORG_REPO` until step 5 is done.
 5. **Restore Postgres.** `up -d backup` starts only `postgres` and `backup`.
    The restore is `pg_restore --clean --if-exists` into `POSTGRES_DB`.
 
    ```bash
-   docker compose -f docker-compose.prod.yml up -d backup
-   dc exec backup borgmatic restore --archive latest
+   $COMPOSE up -d backup
+   $COMPOSE exec backup borgmatic restore --archive latest
    ```
 
-6. **Start everything:** `scripts/deploy.sh <version>`, using the version from
+6. **For a drill, blank `BORG_REPO` in `.env` now.** The deploy then installs
+   no backup cron line, and the recreated `backup` service can't reach the
+   repository.
+7. **Start everything:** `scripts/deploy.sh <version>`, using the version from
    the restored `.env`'s `MEDIFORCE_VERSION`. The `migrate` container applies
-   any migration newer than the dump.
+   any migration newer than the dump. On a drill host, `crontab -l` must show
+   no `# mediforce-backup` line.
+8. **After a drill**, remove the drill host's key from the Storage Box's
+   `.ssh/authorized_keys` before tearing the server down.
 
 ### Checking a restore
 
 - Row counts match the source. Run this on both hosts:
 
   ```bash
-  dc exec postgres psql -U mediforce -c "select
+  $COMPOSE exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
+  select
     (select count(*) from process_instances) runs,
     (select count(*) from human_tasks) tasks,
     (select count(*) from audit_events) audit,
     (select count(*) from task_attachments) attachments,
-    (select count(*) from auth_users) users"
+    (select count(*) from auth_users) users;
+  SQL
   ```
 
 - An old run's page lists its Output Files, and one of them opens.
@@ -212,4 +244,4 @@ repository and its prune would run there.
 
 | Date | Archive | Who | Result |
 |---|---|---|---|
-| — | — | — | Not yet run. The first drill is part of #1683's acceptance. |
+| — | — | — | Not yet run. |

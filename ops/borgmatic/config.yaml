@@ -20,17 +20,15 @@ encryption_passphrase: ${BORG_PASSPHRASE}
 # The default `{hostname}-{now}` ties `latest`, pruning and checks to the
 # container's hostname, which changes on every recreate: old archives would
 # never be pruned, and a restore from another container would find none.
-archive_name_format: mediforce-{now:%Y-%m-%dT%H:%M:%S}
+# `latest`, prune and checks only see archives with this deployment's prefix.
+archive_name_format: ${BACKUP_NAME}-{now:%Y-%m-%dT%H:%M:%S}
 
 # Streamed into the archive by pg_dump over the compose network. pg_dump's
 # snapshot is taken before borg reads the files, and run branches only gain
 # commits, so the files hold every commit the dump refers to.
 #
-# The client tools must match the server's major version (postgres:16-alpine):
-# the image's own v18 pg_dump writes an archive pg_restore 16 cannot read, and
-# its pg_restore sends settings Postgres 16 rejects. The `backup` service
-# installs postgresql16-client via EXTRA_PKGS; a Postgres major upgrade changes
-# both places.
+# v16 client tools, installed by the service's EXTRA_PKGS, to match
+# postgres:16-alpine. Why, and what a Postgres upgrade changes: the runbook.
 postgresql_databases:
     - name: ${POSTGRES_DB}
       hostname: postgres
@@ -51,7 +49,7 @@ checks:
     - name: archives
       frequency: 1 month
 
-# Pings start, finish and fail. The check's own period catches a scheduler
-# that stopped running altogether.
+# Pings start, finish and fail. The check's own period catches a night the
+# host cron didn't run or the service was down.
 healthchecks:
     ping_url: ${BACKUP_PING_URL}
