@@ -1053,7 +1053,9 @@ export function WorkflowEditorCanvas({
             onRequestAddStep={handleRequestAddStep}
             onPaneClick={() => setSelectedStepId(null)}
             selectedStepId={selectedStepId}
-            errorStepIds={stepErrors ? new Set(Object.keys(stepErrors)) : undefined}
+            errorStepIds={stepErrors
+              ? new Map(Object.entries(stepErrors).map(([stepId, fields]) => [stepId, Object.values(fields).join('\n')]))
+              : undefined}
             warningStepIds={warningStepIds}
             stepEvaluation={savedStepEvaluation}
             agentVersions={agentVersions}

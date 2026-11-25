@@ -58,7 +58,14 @@ export async function registerWorkflow(
   const allModels = await scope.models.list();
   const retired = checkRetiredModels(parsed.data, allModels);
   if (retired !== null) {
-    throw new ValidationError(retired.message.replace('Cannot run', 'Cannot save'));
+    const retiredDetails = retired.refs.flatMap((ref) => ref.steps.flatMap(({ stepId }) => {
+      const index = parsed.data.steps.findIndex((s) => s.id === stepId);
+      return index === -1 ? [] : [{ path: ['steps', index, 'id'], message: retired.message }];
+    }));
+    throw new ValidationError(
+      retired.message.replace('Cannot run', 'Cannot save'),
+      retiredDetails.length > 0 ? retiredDetails : undefined,
+    );
   }
 
   // Every agent step must carry an image so the saved definition is deployable
@@ -87,7 +94,14 @@ export async function registerWorkflow(
 
   const { errors: validationErrors, referenceIssues } = validateWorkflowGraphAndReferences(definition);
   if (validationErrors.length > 0) {
-    throw new ValidationError(validationErrors[0]);
+    const stepIds = new Set(definition.steps.map((s) => s.id));
+    const graphDetails = [...new Set([...validationErrors[0].matchAll(/"([^"]+)"/g)].map((m) => m[1]))]
+      .flatMap((stepId) => {
+        if (!stepIds.has(stepId)) return [];
+        const index = definition.steps.findIndex((s) => s.id === stepId);
+        return [{ path: ['steps', index, 'id'], message: validationErrors[0] }];
+      });
+    throw new ValidationError(validationErrors[0], graphDetails.length > 0 ? graphDetails : undefined);
   }
 
   try {

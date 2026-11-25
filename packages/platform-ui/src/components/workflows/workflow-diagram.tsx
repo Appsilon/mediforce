@@ -22,7 +22,8 @@ import {
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { User, Bot, Terminal, Trash2, Plus, Search, ArrowUp, ArrowDown, ArrowRight, AlertTriangle, Zap, Wand2, Undo2, Redo2, ChevronDown, ChevronUp } from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { User, Bot, Terminal, Trash2, Plus, Search, ArrowUp, ArrowDown, ArrowRight, AlertTriangle, AlertCircle, X, Zap, Wand2, Undo2, Redo2, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import type { StepExecutionStatus, WorkflowDefinition, WorkflowStep } from '@mediforce/platform-core';
@@ -177,6 +178,7 @@ type StepNodeData = {
   /** The Agent's current version, for flagging the pin as stale; never shown on its own. */
   agentVersionCurrent?: number | null;
   hasError?: boolean;
+  errorTooltip?: string;
   hasWarning?: boolean;
   warningTooltip?: string;
   evaluation?: StepEvaluationMark;
@@ -302,6 +304,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
   // is anchored to the visual center of the revise row, not a pixel estimate.
   const branchSectionRef = useRef<HTMLDivElement>(null);
   const [branchSectionTop, setBranchSectionTop] = useState(NODE_INNER_HEIGHT);
+  const [errorModalOpen, setErrorModalOpen] = useState(false);
   useLayoutEffect(() => {
     if (branchSectionRef.current) {
       const top = branchSectionRef.current.offsetTop;
@@ -360,7 +363,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
           selected
             ? `${style.activeBorder} ${style.activeRing} shadow-lg`
             : data.hasError
-              ? 'border-red-400 ring-2 ring-red-200 dark:ring-red-900/50'
+              ? 'border-red-400 ring-2 ring-red-200 dark:ring-red-900/50 shadow-[0_0_12px_2px_rgba(248,113,113,0.55)]'
               : data.hasWarning
                 ? 'border-amber-400 ring-2 ring-amber-200 dark:ring-amber-900/50'
                 : style.border,
@@ -441,10 +444,22 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
           {data.status !== undefined && <StepStatusMark status={data.status} />}
         </div>
 
-        {/* Row 2: step name, max 2 lines */}
-        <p className="text-[12px] font-semibold leading-snug text-foreground mt-3 line-clamp-2">
-          {data.label}
-        </p>
+        {/* Row 2: step name, max 2 lines, plus the error trigger when present */}
+        <div className="flex items-start gap-1.5 mt-3">
+          {data.hasError && (
+            <button
+              type="button"
+              onClick={(event) => { event.stopPropagation(); setErrorModalOpen(true); }}
+              aria-label="Show step error"
+              className="nodrag shrink-0 mt-0.5 text-red-500 hover:text-red-600"
+            >
+              <AlertCircle className="h-3.5 w-3.5" strokeWidth={2} />
+            </button>
+          )}
+          <p className="text-[12px] font-semibold leading-snug text-foreground line-clamp-2 min-w-0">
+            {data.label}
+          </p>
+        </div>
 
         {data.hasWarning && (
           <div className="flex items-center gap-1 mt-1" title={data.warningTooltip}>
@@ -452,6 +467,31 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
             <span className="text-[10px] text-amber-600 dark:text-amber-400 truncate">Image not found</span>
           </div>
         )}
+
+        <Dialog.Root open={errorModalOpen} onOpenChange={setErrorModalOpen}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+            <Dialog.Content
+              onClick={(event) => event.stopPropagation()}
+              className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-6 shadow-lg"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <Dialog.Title className="text-sm font-semibold flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                  {data.label}
+                </Dialog.Title>
+                <Dialog.Close asChild>
+                  <button className="rounded-sm p-1 text-muted-foreground hover:text-foreground transition-colors">
+                    <X className="h-4 w-4" />
+                  </button>
+                </Dialog.Close>
+              </div>
+              <Dialog.Description className="text-sm text-red-600 dark:text-red-400 whitespace-pre-line">
+                {data.errorTooltip ?? 'This step has a validation error.'}
+              </Dialog.Description>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
 
         {data.backBranches && data.backBranches.length > 0 && (
           <div ref={branchSectionRef} className="-mx-4 mt-3 border-t border-border/40">
@@ -1012,7 +1052,7 @@ interface WorkflowDiagramProps {
   onRequestAddStep?: (fromStepId: string, toStepId: string) => void;
   onPaneClick?: () => void;
   selectedStepId?: string | null;
-  errorStepIds?: Set<string>;
+  errorStepIds?: Map<string, string>;
   warningStepIds?: Map<string, string>;
   /** Per agent step id, its evaluation mark; steps without one show none. */
   stepEvaluation?: Map<string, StepEvaluationMark>;
@@ -1050,6 +1090,7 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
         data: {
           ...d,
           hasError: errorStepIds?.has(n.id) ?? false,
+          errorTooltip: errorStepIds?.get(n.id),
           hasWarning: warningStepIds?.has(n.id) ?? false,
           warningTooltip: warningStepIds?.get(n.id),
           evaluation: stepEvaluation?.get(n.id),
@@ -1088,8 +1129,16 @@ export function WorkflowDiagram({ definition, className, style, onNodeClick, onN
       }
       return e;
     });
+    const styledNested = nestedNodes.map((n) => ({
+      ...n,
+      data: {
+        ...(n.data as StepNodeData),
+        hasError: errorStepIds?.has(n.id) ?? false,
+        errorTooltip: errorStepIds?.get(n.id),
+      },
+    }));
     // Sub-nodes after their parents: XYFlow positions a child against a parent it has already placed.
-    return { nodes: [...(styledNodes as Node[]), ...nestedNodes], edges: [...styledEdges, ...nestedEdges] };
+    return { nodes: [...(styledNodes as Node[]), ...styledNested], edges: [...styledEdges, ...nestedEdges] };
   }, [layoutNodes, layoutEdges, nestedNodes, nestedEdges, selectedStepId, errorStepIds, warningStepIds, stepEvaluation, onNodeDelete, onNodeMoveUp, onNodeMoveDown, onRequestAddStep, canMoveUp, canMoveDown, replay, childWorkflows]);
 
   // Controlled node state, lazily seeded from computedNodes so XYFlow never sees an
