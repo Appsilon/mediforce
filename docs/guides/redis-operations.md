@@ -126,12 +126,17 @@ evicting policy. Each one turns a visible outage into silent data loss.
 ## Docker artifact retention
 
 A successful deploy prunes conservatively — [`scripts/deploy.sh`](../../scripts/deploy.sh)
-runs `docker image prune -f` and `docker builder prune -f --keep-storage=5GB`
-after the agent images rebuild. Both are deliberately narrow:
+removes old release tags, then runs `docker image prune -f` and
+`docker builder prune -f --keep-storage=5GB` after the agent images rebuild.
+All three are deliberately narrow:
 
+- On a versioned deploy, only the two newest `X.Y.Z` tags of each platform
+  image (`platform-ui`, `migrate`, `container-worker`) stay on the host, plus
+  the running version. `latest` and other tags are never touched, and the step
+  is skipped for `latest` deploys. Rolling back to the previous release needs
+  no registry pull; anything older is pulled from GHCR first.
 - `image prune -f` removes only **dangling** images — layers orphaned by a
-  rebuild. Every tagged image survives, so the previous release stays on the
-  host and a rollback needs no registry pull.
+  rebuild or by the tag removal above.
 - `--keep-storage=5GB` keeps the layer cache that makes the next agent-image
   build fast. Evicting it wholesale is what made staging deploys time out, which
   is why [`scripts/deploy-staging.sh`](../../scripts/deploy-staging.sh) does the
