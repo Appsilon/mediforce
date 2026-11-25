@@ -58,6 +58,7 @@ Every engineering doc, what it is for, and how far to trust it.
 | Onboard a landing zone | [`guides/landing-zone-onboarding.md`](guides/landing-zone-onboarding.md) | operators | living |
 | Keep Redis inside its limits, or recover it | [`guides/redis-operations.md`](guides/redis-operations.md) | operators | living |
 | Back up production, or restore it | [`guides/backup-and-restore.md`](guides/backup-and-restore.md) | operators | living |
+| Move Docker and Mediforce data onto an attached volume | [`guides/move-data-to-volume.md`](guides/move-data-to-volume.md) | operators | living |
 | Look up what a workflow *can* do | [`reference/workflow-capabilities.md`](reference/workflow-capabilities.md) | workflow-authors | living |
 | Choose which part of Step Evaluation to use | [`guides/choose-an-evaluation.md`](guides/choose-an-evaluation.md) | workflow-authors | living |
 | Walk through Step Evaluation by hand on a sandbox workflow | [`guides/step-evaluation-manual-test.md`](guides/step-evaluation-manual-test.md) | engineers | living |
