@@ -4,11 +4,33 @@
 
 # The sources are mounted read-only at their host paths, so an archive restores
 # to the same paths it came from.
+#
+# Postgres and each bare repo's objects and refs come from backup-staging, which
+# snapshot.py writes first (dump, then git bundles). Walking a live repo can
+# capture a ref without its objects. The rest of each bare repo (config with
+# its remotes, info/exclude, HEAD) is small and read directly.
 source_directories:
+    - /var/lib/mediforce/backup-staging
     - /var/lib/mediforce/bare-repos
     - /var/lib/mediforce/attachments
     - /opt/mediforce/.env
     - /opt/mediforce/caddy.d
+
+exclude_patterns:
+    - sh:/var/lib/mediforce/bare-repos/*/*.git/objects
+    - sh:/var/lib/mediforce/bare-repos/*/*.git/refs
+    - sh:/var/lib/mediforce/bare-repos/*/*.git/packed-refs
+    - sh:/var/lib/mediforce/bare-repos/*/*.git/worktrees
+
+commands:
+    - before: action
+      when: [create]
+      run:
+          - python3 /etc/borgmatic/snapshot.py create
+    - after: action
+      when: [create]
+      run:
+          - rm -rf /var/lib/mediforce/backup-staging
 
 repositories:
     - path: ${BORG_REPO}
@@ -22,22 +44,6 @@ encryption_passphrase: ${BORG_PASSPHRASE}
 # never be pruned, and a restore from another container would find none.
 # `latest`, prune and checks only see archives with this deployment's prefix.
 archive_name_format: ${BACKUP_NAME}-{now:%Y-%m-%dT%H:%M:%S}
-
-# Streamed into the archive by pg_dump over the compose network. pg_dump's
-# snapshot is taken before borg reads the files, and run branches only gain
-# commits, so the files hold every commit the dump refers to.
-#
-# v16 client tools, installed by the service's EXTRA_PKGS, to match
-# postgres:16-alpine. Why, and what a Postgres upgrade changes: the runbook.
-postgresql_databases:
-    - name: ${POSTGRES_DB}
-      hostname: postgres
-      username: ${POSTGRES_USER}
-      password: ${POSTGRES_PASSWORD}
-      format: custom
-      pg_dump_command: /usr/libexec/postgresql16/pg_dump
-      pg_restore_command: /usr/libexec/postgresql16/pg_restore
-      psql_command: /usr/libexec/postgresql16/psql
 
 keep_daily: 7
 keep_weekly: 4

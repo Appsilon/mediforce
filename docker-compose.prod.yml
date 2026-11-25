@@ -284,7 +284,7 @@ services:
       - CRON=false
       - TZ=UTC
       # Must match the postgres image's major version; see the runbook.
-      - EXTRA_PKGS=postgresql16-client
+      - EXTRA_PKGS=postgresql16-client git
       - BACKUP_NAME=${BACKUP_NAME:-mediforce}
       - BORG_REPO=${BORG_REPO:-}
       - BORG_PASSPHRASE=${BORG_PASSPHRASE:-}
@@ -294,6 +294,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-mediforce}
     volumes:
       - ./ops/borgmatic/config.yaml:/etc/borgmatic.d/config.yaml:ro
+      - ./ops/borgmatic/snapshot.py:/etc/borgmatic/snapshot.py:ro
       - /var/lib/mediforce/bare-repos:/var/lib/mediforce/bare-repos:ro
       - /var/lib/mediforce/attachments:/var/lib/mediforce/attachments:ro
       - ./.env:/opt/mediforce/.env:ro

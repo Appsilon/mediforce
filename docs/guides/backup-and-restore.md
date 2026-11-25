@@ -16,8 +16,8 @@ works, and restoring from it.
 
 | Data | Where | In the archive as |
 |---|---|---|
-| Postgres: runs, tasks, audit trail, users, encrypted secrets, evaluation data, attachment metadata | `postgres` service | `pg_dump` custom format, streamed in by the `postgresql_databases` hook |
-| Output Files (commits on `run/<runId>` branches, ADR-0015 / ADR-0030) | `/var/lib/mediforce/bare-repos` | files at the same path |
+| Postgres: runs, tasks, audit trail, users, encrypted secrets, evaluation data, attachment metadata | `postgres` service | `backup-staging/postgres.dump` (`pg_dump` custom format) |
+| Output Files (commits on `run/<runId>` branches, ADR-0015 / ADR-0030) | `/var/lib/mediforce/bare-repos` | objects and refs: one `backup-staging/git-bundles/<namespace>/<name>.bundle` per repo. The rest of the repo (`config` with its remotes, `HEAD`, `info/exclude`): files at the same path |
 | Task attachments (`FilesystemBlobStore`, ADR-0003) | `/var/lib/mediforce/attachments` | files at the same path |
 | Deployment config | `/opt/mediforce/.env`, `/opt/mediforce/caddy.d` | files at the same path |
 
@@ -25,8 +25,16 @@ These are **not** backed up, because each can be rebuilt or pulled again:
 Docker images, per-run worktrees, Redis (in-flight queue only), and Caddy
 certificates.
 
-`pg_dump` takes its snapshot before borg reads the files. Run branches only gain
-commits, so the files always hold every commit the dump refers to.
+Runs commit to their bare repo while the backup runs, so borg doesn't read the
+repos' `objects/` and `refs/` directly. A directory walk can pick up a ref the
+moment it moves, while missing the objects it now points to, and that branch
+would be broken after a restore. Instead, before borg starts,
+[`ops/borgmatic/snapshot.py`](../../ops/borgmatic/snapshot.py) dumps Postgres
+and then writes a `git bundle --all` for each repo into
+`/var/lib/mediforce/backup-staging`. A bundle reads the refs first and then
+packs what they reach, so it is always complete. The dump comes first because a
+step's commit is made before the database records its SHA: every commit the
+dump names is in a bundle. A repo with no refs yet gets no bundle.
 
 ### Hetzner Backups are not the data backup
 
@@ -40,9 +48,14 @@ quick rebuild of the OS and `/opt/mediforce`, nothing more.
 
 The `backup` service in
 [`docker-compose.prod.yml`](../../docker-compose.prod.yml) runs the
-`ghcr.io/borgmatic-collective/borgmatic` image, configured entirely by
-[`ops/borgmatic/config.yaml`](../../ops/borgmatic/config.yaml). It has no custom
-image, no custom script and no Docker socket.
+`ghcr.io/borgmatic-collective/borgmatic` image, configured by
+[`ops/borgmatic/config.yaml`](../../ops/borgmatic/config.yaml), whose pre-create
+hook runs `snapshot.py`. It has no custom image and no Docker socket.
+
+The staging copy lives in the container's own filesystem only for the length of
+a pass and is deleted afterwards, whether the pass succeeds or fails. During a
+pass, the host's root disk needs free space for about one dump plus one copy of
+the repos.
 
 The schedule is the host crontab, next to the other host jobs:
 [`scripts/cron-jobs.py`](../../scripts/cron-jobs.py) installs a `mediforce-backup`
@@ -75,10 +88,10 @@ Output goes to `/opt/mediforce/logs/backup.log`. The image's own cron is off.
 
 The image ships `pg_dump` 18. Its archives can't be read by `pg_restore` 16,
 and its `pg_restore` sends settings that Postgres 16 rejects. The service
-therefore installs `postgresql16-client` at start (`EXTRA_PKGS`), and the config
-calls those binaries by path. **A Postgres major upgrade changes both
-`EXTRA_PKGS` and the three `*_command` paths in the config.** If the package
-fails to install, the backup fails loudly rather than falling back to v18.
+therefore installs `postgresql16-client` (and `git`) at start (`EXTRA_PKGS`),
+and `snapshot.py` calls those binaries by path (`PG_BIN`). **A Postgres major
+upgrade changes both `EXTRA_PKGS` and `PG_BIN`.** If the package fails to
+install, the backup fails loudly rather than falling back to v18.
 
 Run every manual command from `/opt/mediforce` as `deploy`, with this set once
 per shell:
@@ -89,8 +102,9 @@ COMPOSE="docker compose -f docker-compose.prod.yml"
 ```
 
 Use `$COMPOSE exec backup …` rather than `run`: only the running service has
-the v16 client its init installs. The restore's file extract is the exception,
-because it doesn't touch Postgres.
+the v16 client and `git` that its init installs. The restore's one-off
+containers are the exception. They need writable mounts, and the one that
+needs the packages installs them itself.
 
 ## One-time setup
 
@@ -125,7 +139,7 @@ because it doesn't touch Postgres.
    ```
 
 5. **First backup, by hand:** `$COMPOSE exec backup borgmatic --stats -v 1`,
-   then `$COMPOSE exec backup borgmatic list`.
+   then `$COMPOSE exec backup borgmatic repo-list`.
 
 6. **healthchecks.io.** Set the check's period to 1 day and its grace to 2
    hours, with email to the ops list. Stopping the `backup` service for a day
@@ -141,7 +155,8 @@ which reads `COMPOSE_PROFILES` from `.env`, and reinstalls the crontab.
 
 | Task | Command |
 |---|---|
-| List archives | `$COMPOSE exec backup borgmatic list` |
+| List archives | `$COMPOSE exec backup borgmatic repo-list` |
+| List files in the latest archive | `$COMPOSE exec backup borgmatic list --archive latest` |
 | Back up now | `$COMPOSE exec backup borgmatic --stats -v 1` |
 | See what ran overnight | `tail -n 50 logs/backup.log` |
 | Repository size | `$COMPOSE exec backup borgmatic repo-info` |
@@ -177,7 +192,7 @@ every night, and its prune would run there.
    stack, run `$COMPOSE down -v` first. Postgres initialised with bootstrap's
    generated password, and step 4 brings back production's. A fresh host has
    nothing in those volumes to lose. Step 4's extract creates
-   `/var/lib/mediforce/{bare-repos,attachments}`.
+   `/var/lib/mediforce/{bare-repos,attachments,backup-staging}`.
 2. **SSH access to the Storage Box** for this host's key, as in setup step 1.
 3. **Minimal `.env`:** `COMPOSE_PROFILES=backup`, `BORG_REPO`,
    `BORG_PASSPHRASE`, `BACKUP_PING_URL=` (empty for a drill),
@@ -191,6 +206,7 @@ every night, and its prune would run there.
      --entrypoint borgmatic -v /var/lib/mediforce:/restore backup \
      extract --archive latest \
        --path var/lib/mediforce/bare-repos --path var/lib/mediforce/attachments \
+       --path var/lib/mediforce/backup-staging \
        --destination /restore --strip-components 3
 
    $COMPOSE run --rm --no-deps \
@@ -203,12 +219,17 @@ every night, and its prune would run there.
    This replaces `.env` with the production one. **For a drill**, blank
    `BACKUP_PING_URL` and change `DOMAIN` and `NEXT_PUBLIC_APP_URL` to the drill
    host. Leave `BORG_REPO` until step 5 is done.
-5. **Restore Postgres.** `up -d backup` starts only `postgres` and `backup`.
-   The restore is `pg_restore --clean --if-exists` into `POSTGRES_DB`.
+5. **Rebuild the repos and restore Postgres.** `snapshot.py restore` fetches
+   each bundle into its repo's extracted skeleton and gives the files that
+   repo's owner. It then runs `pg_restore --clean --if-exists` into
+   `POSTGRES_DB` and deletes `/var/lib/mediforce/backup-staging`. The one-off
+   container installs the `EXTRA_PKGS` itself, because the image's init (which
+   normally installs them) doesn't run with a custom entrypoint.
 
    ```bash
-   $COMPOSE up -d backup
-   $COMPOSE exec backup borgmatic restore --archive latest
+   $COMPOSE up -d postgres
+   $COMPOSE run --rm --no-deps --entrypoint sh -v /var/lib/mediforce:/restore backup \
+     -c 'apk add -q --no-cache $EXTRA_PKGS && python3 /etc/borgmatic/snapshot.py restore /restore'
    ```
 
 6. **For a drill, blank `BORG_REPO` in `.env` now.** The deploy then installs
