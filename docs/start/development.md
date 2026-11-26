@@ -147,10 +147,14 @@ The host needs two things before `platform-ui` will start:
 
 1. `POSTGRES_PASSWORD` in `/opt/mediforce/.env` — no default. `POSTGRES_USER` and
    `POSTGRES_DB` default to `mediforce`.
-2. `/var/lib/mediforce/postgres-data`, owned by UID 999 (the postgres-alpine
-   user). `docker-compose.staging.yml` bind-mounts that path so
+2. `/var/lib/mediforce/postgres-data`, owned by UID 70 (the postgres-alpine
+   user). `docker-compose.prod.yml` bind-mounts that path so
    `docker compose down -v` cannot wipe data — only an explicit `rm -rf` removes
    it. Local dev keeps a named volume, where `down -v` stays a normal reset.
+   Hosts set up when production still used the named volume `postgres-data`
+   must move their data once
+   ([runbook](../guides/postgres-bind-mount-migration.md)); `deploy.sh` refuses
+   to deploy until they do.
 
 `bootstrap-server.py` does both on a fresh host (`step_env_local` +
 `step_postgres_dir`: auto-generated password, correct directory ownership).

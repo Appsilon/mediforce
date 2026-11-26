@@ -1,7 +1,7 @@
 ---
 status: living
 audience: operators
-last_reviewed: 2026-11-25
+last_reviewed: 2026-11-26
 ---
 
 # Backup and restore
@@ -189,9 +189,18 @@ every night, and its prune would run there.
 
 1. **Server.** Bring up a host with `scripts/bootstrap-server.py`, or check out
    the release into `/opt/mediforce` by hand. If bootstrap already started the
-   stack, run `$COMPOSE down -v` first. Postgres initialised with bootstrap's
-   generated password, and step 4 brings back production's. A fresh host has
-   nothing in those volumes to lose. Step 4's extract creates
+   stack, stop it and empty the Postgres data dir. Postgres initialised with
+   bootstrap's generated password, and step 4 brings back production's. The
+   data dir is a bind mount, so `down -v` doesn't clear it. A fresh host has
+   nothing there to lose:
+
+   ```bash
+   $COMPOSE down -v
+   docker run --rm -v /var/lib/mediforce:/host alpine:latest \
+     sh -c 'rm -rf /host/postgres-data && mkdir /host/postgres-data && chown 70:70 /host/postgres-data'
+   ```
+
+   Step 4's extract creates
    `/var/lib/mediforce/{bare-repos,attachments,backup-staging}`.
 2. **SSH access to the Storage Box** for this host's key, as in setup step 1.
 3. **Minimal `.env`:** `COMPOSE_PROFILES=backup`, `BORG_REPO`,

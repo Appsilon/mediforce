@@ -46,6 +46,17 @@ else
   VERSION=latest
 fi
 
+# docker-compose.prod.yml keeps Postgres in a bind mount, which used to be the
+# named volume postgres-data. Starting on an empty bind dir while the data still
+# sits in that volume would init a blank database and serve it with no error.
+# The deploy user can't read the 0700 data dir, so the check runs in a container.
+if [ -n "$(docker volume ls -q --filter label=com.docker.compose.volume=postgres-data)" ] \
+  && ! docker run --rm -v /var/lib/mediforce:/host:ro alpine:latest test -e /host/postgres-data/PG_VERSION; then
+  log "ERROR: Postgres data is still in the named volume postgres-data and /var/lib/mediforce/postgres-data is empty."
+  log "Move it first: docs/guides/postgres-bind-mount-migration.md"
+  exit 1
+fi
+
 # docker-compose.prod.yml pins its images to MEDIFORCE_VERSION. Keeping it in
 # .env means a later manual `docker compose up` stays on this version.
 if grep -q '^MEDIFORCE_VERSION=' .env 2>/dev/null; then

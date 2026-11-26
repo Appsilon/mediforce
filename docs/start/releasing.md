@@ -64,6 +64,10 @@ previous version starts at once, because its images are still local. Rolling
 back further pulls them from GHCR first, where every version stays published.
 Staging runs `:latest`, which this never touches.
 
+Don't roll back to v1.4.2 or older once a host's Postgres has moved to the bind
+mount. Those releases read the database from the named volume `postgres-data`
+([runbook](../guides/postgres-bind-mount-migration.md)).
+
 ## If publishing fails after the merge
 
 `main` then has the bump but no tag, and re-running the job fails the same way.

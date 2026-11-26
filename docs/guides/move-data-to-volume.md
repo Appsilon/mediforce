@@ -1,7 +1,7 @@
 ---
 status: living
 audience: operators
-last_reviewed: 2026-11-23
+last_reviewed: 2026-11-26
 ---
 
 # Move server data onto an attached volume
@@ -12,8 +12,8 @@ root disk by default:
 | Directory | What lives there | Typical size |
 |---|---|---|
 | `/var/lib/containerd` | Docker image layers, when Docker uses the containerd image store | tens of GB (agent images are large) |
-| `/var/lib/docker` | containers, named volumes (Postgres, Redis, Caddy), build cache; image layers too on the classic `overlay2` store | GB to tens of GB |
-| `/var/lib/mediforce` | run worktrees, bare repos, Output File attachments | grows with every run |
+| `/var/lib/docker` | containers, named volumes (Redis, Caddy; Postgres before the [bind-mount migration](postgres-bind-mount-migration.md)), build cache; image layers too on the classic `overlay2` store | GB to tens of GB |
+| `/var/lib/mediforce` | Postgres data, run worktrees, bare repos, Output File attachments | grows with every run |
 
 Hetzner servers come with a small root disk, and a volume you attach is not
 used until you point something at it. This guide moves those three
@@ -78,8 +78,10 @@ docker builder prune -f
 
 ## 3. Back up Postgres and record row counts
 
-Postgres lives in the `mediforce_postgres-data` named volume inside
-`/var/lib/docker`, so it moves with that directory. Take a dump first:
+Postgres lives in `/var/lib/mediforce/postgres-data` (or, on a host not yet
+through [the bind-mount migration](postgres-bind-mount-migration.md), in the
+`mediforce_postgres-data` named volume inside `/var/lib/docker`). Either way it
+moves with its directory. Take a dump first:
 
 ```bash
 sudo mkdir -p "$V/backups" && sudo chown "$USER" "$V/backups"
