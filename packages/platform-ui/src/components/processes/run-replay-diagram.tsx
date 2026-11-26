@@ -39,7 +39,7 @@ export function RunReplayDiagram({
 }) {
   // A completed run also rides the arrow into the terminal step it reached.
   const completed = run.status === 'completed';
-  const childWorkflows = useChildRunExpansion(definition, run);
+  const childWorkflows = useChildRunExpansion(definition, run, stepExecutions);
   const edgeIds = React.useMemo(
     () => new Set(graphEdgesOf(definition).map((edge) => edgeIdOf(edge.from, edge.to))),
     [definition],
