@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-11-26
+
+### Added
+
+- **Search And Sort Workflows:** The workflows dashboard has a search box and a Sort by menu (Date Created, Run Date or Alphabetical, each ascending or descending). Manual order stays the default, and drag handles hide while another sort is picked ([#1692](https://github.com/Appsilon/mediforce/pull/1692)).
+
+### Changed
+
+- **Breaking:** Self-hosted servers now keep the Postgres database in `/var/lib/mediforce/postgres-data` on the host instead of a Docker volume, so `docker compose down -v` can no longer delete it. A server set up before this release has its data in the old volume, and deploying this release stops before touching the running containers until you move it. Follow `docs/guides/postgres-bind-mount-migration.md` once per server, then deploy again. Don't roll back below this version afterwards ([#1693](https://github.com/Appsilon/mediforce/pull/1693)).
+- **Name Your Workflow On Save:** Save, Save & Dry Run and Save & Start Run stay clickable when the workflow has no name or description, and open a prompt to fill them in instead of doing nothing ([#1689](https://github.com/Appsilon/mediforce/pull/1689)).
+
+### Fixed
+
+- Workflow cards on the dashboard show the name the workflow was saved with, instead of a name made up from its ID ([#1692](https://github.com/Appsilon/mediforce/pull/1692)).
+- The placeholder text in the workflow name and description fields is easier to read, especially in dark mode ([#1689](https://github.com/Appsilon/mediforce/pull/1689)).
+
 ## [1.4.2] - 2026-11-25
 
 ### Added
