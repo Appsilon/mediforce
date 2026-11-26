@@ -44,7 +44,10 @@ built-in exporters, with no custom ones:
 
 Alloy scrapes every 60 seconds. Every series is labelled
 `instance=<DOMAIN>`, so staging and production can share one stack. A server
-sends about 3,000 series, and the free tier allows 10,000.
+sends about 2,000 series, and the free tier allows 10,000. Postgres and Redis
+pass through a keep-list: their exporters emit a series per table, setting and
+command, which alone came to about 2,900 on staging. To use another of their
+metrics, add it to the `keep` rule in `config.alloy`.
 
 **Container logs are never shipped.** They can contain clinical or personal
 content. Only numeric metrics leave the server.
@@ -91,6 +94,8 @@ On the server, set:
 ```bash
 cd /opt/mediforce
 COMPOSE="docker compose -f docker-compose.prod.yml"
+# On staging, add the staging overlay:
+# COMPOSE="docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml"
 ```
 
 ### 1. Turn on the service
@@ -115,8 +120,12 @@ The rules live in
 format Grafana's own export produces. Grafana Cloud can't load provisioning
 files, so
 [`ops/grafana/apply-alert-rules.py`](../../ops/grafana/apply-alert-rules.py)
-pushes them through the provisioning API. Run it from a laptop with a service
-account token (Editor role):
+pushes them through the provisioning API. Run it once per stack, not per
+server, from a laptop. It needs a service account token with the **Editor**
+basic role plus the **Alerting → Provisioning writer** fixed role (or the
+**Admin** basic role); Editor alone gets a 403 on the rule groups. Keep this
+token off the servers: one that can rewrite alerts must not live on a host
+those alerts watch.
 
 ```bash
 GRAFANA_URL=https://<stack>.grafana.net GRAFANA_TOKEN=glsa_... \
