@@ -252,6 +252,34 @@ groups:
           summary: '{{ $labels.instance }}: Postgres is not accepting connections'
           runbook_url: https://github.com/Appsilon/mediforce/blob/main/docs/guides/monitoring.md#postgres-down
 
+      # The snapshot and memory rules below see no data once Redis is gone;
+      # redis_up stays and drops to 0.
+      - uid: mediforce-redis-down
+        title: Redis down
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              expr: redis_up
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: lt, params: [1] } }]
+        for: 2m
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: critical }
+        annotations:
+          summary: '{{ $labels.instance }}: Redis is not answering. Runs cannot be queued'
+          runbook_url: https://github.com/Appsilon/mediforce/blob/main/docs/guides/monitoring.md#redis-down
+
       - uid: mediforce-redis-bgsave-failing
         title: Redis snapshot failing
         condition: C

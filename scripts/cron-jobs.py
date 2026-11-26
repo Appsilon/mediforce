@@ -57,7 +57,7 @@ class CronJob:
 JOBS = (
     CronJob(
         name="heartbeat",
-        command="/bin/bash {deploy_dir}/scripts/heartbeat.sh",
+        command="/usr/bin/python3 {deploy_dir}/scripts/heartbeat.py",
         schedule="*/15 * * * *",
         required_env=("PLATFORM_API_KEY", "DOMAIN"),
     ),

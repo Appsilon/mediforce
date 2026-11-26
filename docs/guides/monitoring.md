@@ -17,7 +17,7 @@ Three things watch a server, each from outside it:
 |---|---|---|
 | Grafana Alloy → Grafana Cloud alert rules | full disk, low memory, OOM kills, restart loops, Postgres and Redis trouble, a host that stopped reporting | [`ops/alloy/config.alloy`](../../ops/alloy/config.alloy), [`ops/grafana/alert-rules.yaml`](../../ops/grafana/alert-rules.yaml) |
 | Grafana Cloud Synthetic Monitoring | the public URL is unreachable, or its TLS certificate expires soon | the Grafana Cloud UI, once per domain |
-| healthchecks.io heartbeat check | the platform's clock stopped: the heartbeat cron isn't running, or `/api/cron/heartbeat` fails | [`scripts/heartbeat.sh`](../../scripts/heartbeat.sh) |
+| healthchecks.io heartbeat check | the platform's clock stopped: the heartbeat cron isn't running, or `/api/cron/heartbeat` fails | [`scripts/heartbeat.py`](../../scripts/heartbeat.py) |
 
 **Recipients.** Each tool notifies the ops mailing list, and nothing else. To
 add or remove a person, change the list's membership. No tool's configuration
@@ -214,6 +214,13 @@ firing for a day, then that host drops out of the rule.
 The exporter can't connect to Postgres. The platform can't serve requests.
 First check: `$COMPOSE ps postgres` and `$COMPOSE logs --tail 100 postgres`. A
 full disk is the most common cause (see *Filesystem full*).
+
+### Redis down
+
+The exporter can't connect to Redis for 2 minutes. Runs can't be queued, and
+the snapshot and memory alerts go quiet because their metrics are gone. First
+check: `$COMPOSE ps redis` and `$COMPOSE logs --tail 100 redis`, then follow
+[redis-operations.md → Recovery](redis-operations.md#recovery).
 
 ### Redis snapshot failing
 
