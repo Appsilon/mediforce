@@ -128,5 +128,5 @@ v1.4.2 again. It mounts the untouched volume:
 ```bash
 docker compose -f docker-compose.prod.yml down    # never -v
 docker run --rm -v /var/lib/mediforce:/host alpine:latest \
-  sh -c 'rm -rf /host/postgres-data && mkdir /host/postgres-data && chown 999:999 /host/postgres-data'
+  sh -c 'rm -rf /host/postgres-data && mkdir /host/postgres-data && chown 70:70 /host/postgres-data'
 ```

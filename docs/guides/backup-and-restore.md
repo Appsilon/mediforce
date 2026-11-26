@@ -197,7 +197,7 @@ every night, and its prune would run there.
    ```bash
    $COMPOSE down -v
    docker run --rm -v /var/lib/mediforce:/host alpine:latest \
-     sh -c 'rm -rf /host/postgres-data && mkdir /host/postgres-data && chown 999:999 /host/postgres-data'
+     sh -c 'rm -rf /host/postgres-data && mkdir /host/postgres-data && chown 70:70 /host/postgres-data'
    ```
 
    Step 4's extract creates

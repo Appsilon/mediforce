@@ -1443,13 +1443,13 @@ def step_postgres_dir(ctx: Context) -> None:
     """Create the Postgres bind-mount data dir at /var/lib/mediforce/postgres-data.
 
     docker-compose.prod.yml bind-mounts the host path into the postgres
-    container so `docker compose down -v` cannot wipe the database. The dir
-    must exist and be owned by UID 999 (postgres-alpine's postgres user)
-    before the container starts, or initdb fails.
+    container so `docker compose down -v` cannot wipe the database. A missing
+    dir is created owned by UID 70 (postgres:16-alpine's postgres user). An
+    existing dir is never touched: it may hold the live database, and the
+    image's entrypoint fixes PGDATA ownership itself on start.
 
-    Idempotent — verifies existing ownership and exits early if already
-    correct. Uses the same rootful-alpine trick as deploy-staging.sh
-    because the deploy user lacks sudo.
+    Uses the same rootful-alpine trick as deploy.sh because the deploy user
+    lacks sudo.
     """
     host_dir = "/var/lib/mediforce/postgres-data"
     probe = ssh(
@@ -1457,28 +1457,23 @@ def step_postgres_dir(ctx: Context) -> None:
         f"if [ -d {shlex.quote(host_dir)} ]; then stat -c '%u:%g' {shlex.quote(host_dir)}; else echo MISSING; fi",
     )
     current = probe.stdout.strip()
-    if current == "999:999":
-        ok(f"{host_dir} exists with correct ownership (999:999)")
+    if current != "MISSING":
+        ok(f"{host_dir} exists (owner {current}), leaving it untouched")
         return
 
-    info(f"{host_dir} state: {current!r} — needs mkdir or chown to 999:999")
-
     if ctx.dry_run:
-        if current == "MISSING":
-            info(f"[dry-run] would mkdir -p {host_dir} && chown -R 999:999 {host_dir}")
-        else:
-            info(f"[dry-run] would chown -R 999:999 {host_dir}")
+        info(f"[dry-run] would mkdir {host_dir} owned by 70:70")
         return
 
     # Rootful alpine elevates without sudo — deploy is in the docker group.
     fix_cmd = (
         "docker run --rm -v /var/lib:/host/var/lib alpine:latest "
         "sh -c 'mkdir -p /host/var/lib/mediforce/postgres-data && "
-        "chown -R 999:999 /host/var/lib/mediforce/postgres-data'"
+        "chown 70:70 /host/var/lib/mediforce/postgres-data'"
     )
     result = ssh(ctx, fix_cmd, check=True)
     if result.rc == 0:
-        ok(f"created {host_dir} owned by 999:999")
+        ok(f"created {host_dir} owned by 70:70")
 
 
 def step_firewall(ctx: Context) -> None:
