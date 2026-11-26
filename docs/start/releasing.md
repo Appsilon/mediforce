@@ -57,7 +57,14 @@ Release often. Small releases are what make the numbers mean something.
 `1.3.1`. It refuses versions released before this process existed (v1.2.0 and
 older): their `deploy.sh` ignores the version and would redeploy `main`.
 
-Don't roll back to v1.4.0 or older once a host's Postgres has moved to the bind
+The server keeps only the two newest versions of the platform images, plus the
+running one: after each versioned deploy, `deploy.sh` removes the other `X.Y.Z`
+tags of `mediforce-{platform-ui,migrate,container-worker}`. Rolling back to the
+previous version starts at once, because its images are still local. Rolling
+back further pulls them from GHCR first, where every version stays published.
+Staging runs `:latest`, which this never touches.
+
+Don't roll back to v1.4.2 or older once a host's Postgres has moved to the bind
 mount. Those releases read the database from the named volume `postgres-data`
 ([runbook](../guides/postgres-bind-mount-migration.md)).
 

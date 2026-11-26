@@ -1,12 +1,12 @@
 ---
 status: living
 audience: operators
-last_reviewed: 2026-11-24
+last_reviewed: 2026-11-26
 ---
 
 # Move Postgres from the named volume to the bind mount
 
-Up to v1.4.0, `docker-compose.prod.yml` kept Postgres in the named volume
+Up to v1.4.2, `docker-compose.prod.yml` kept Postgres in the named volume
 `postgres-data`, and `docker compose down -v` deleted it along with the whole
 database. Newer releases bind-mount `/var/lib/mediforce/postgres-data`, as
 staging already did, so only an explicit `rm -rf` removes the data.
@@ -37,7 +37,17 @@ up empty on the root disk:
 findmnt -T /var/lib/mediforce
 ```
 
-Take a dump, and record the row count of every table:
+If the host runs the `backup` profile, take an off-host backup now and check it
+reached the repository
+([backup-and-restore.md](backup-and-restore.md#day-to-day)):
+
+```bash
+COMPOSE="docker compose -f docker-compose.prod.yml"
+$COMPOSE exec backup borgmatic --stats -v 1
+$COMPOSE exec backup borgmatic repo-list | tail -n 1
+```
+
+Take a local dump too, and write the row-count query:
 
 ```bash
 docker exec mediforce-postgres-1 pg_dump -U mediforce -Fc mediforce > ~/pre-bind-mount.dump
@@ -54,7 +64,6 @@ SQL
 ## 2. Stop writers, then Postgres
 
 ```bash
-COMPOSE="docker compose -f docker-compose.prod.yml"
 $COMPOSE stop platform-ui container-worker
 docker exec -i mediforce-postgres-1 psql -U mediforce -d mediforce -At < ~/row-counts.sql > ~/row-counts-before.txt
 $COMPOSE stop postgres
@@ -103,7 +112,7 @@ docker run --rm -v mediforce_postgres-data:/from:ro -v /var/lib/mediforce:/out \
 docker volume rm mediforce_postgres-data
 ```
 
-Don't leave the volume in place as a fallback. A rollback to v1.4.0 or older
+Don't leave the volume in place as a fallback. A rollback to v1.4.2 or older
 would mount it again and serve the stale copy as the live database, while the
 writes made since the migration sit unused in the bind directory. With the
 volume gone, such a rollback starts on an empty database instead. That is
@@ -114,7 +123,7 @@ Delete the tarball and `~/pre-bind-mount.dump` after a week.
 ## Undo
 
 If step 5 doesn't match, stop the stack, empty the bind directory, and deploy
-v1.4.0 again. It mounts the untouched volume:
+v1.4.2 again. It mounts the untouched volume:
 
 ```bash
 docker compose -f docker-compose.prod.yml down    # never -v

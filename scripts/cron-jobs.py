@@ -10,13 +10,15 @@ deploy, so every server (forks included) runs the same jobs with no manual step
     redis-probe  Watches Redis persistence, memory, restarts, orphaned RDB
                  snapshots and host disk, and alerts before Redis starts
                  refusing writes (issue #1359).
+    backup       Nightly borgmatic pass in the `backup` service, only where
+                 .env sets BORG_REPO (docs/guides/backup-and-restore.md).
 
 Usage (on the host, as the deploy user):
     python3 /opt/mediforce/scripts/cron-jobs.py install
     python3 /opt/mediforce/scripts/cron-jobs.py remove
 
 `install` rewrites every `# mediforce-<job>` crontab line, so a changed
-interval or command, or a job dropped from JOBS, takes effect on the next
+schedule or command, or a job dropped from JOBS, takes effect on the next
 deploy. Lines without that marker are left alone. A job whose required env is
 missing from .env is skipped with a warning instead of failing the deploy.
 """
@@ -38,7 +40,7 @@ MANAGED_LINE = re.compile(r"# mediforce-[a-z0-9-]+\s*$")
 class CronJob:
     name: str
     command: str
-    interval_minutes: int
+    schedule: str
     required_env: tuple[str, ...] = ()
 
     @property
@@ -47,14 +49,14 @@ class CronJob:
 
     def cron_line(self, deploy_dir: Path) -> str:
         command = self.command.format(deploy_dir=deploy_dir)
-        return f"*/{self.interval_minutes} * * * * {command} # {self.marker}"
+        return f"{self.schedule} {command} # {self.marker}"
 
 
 JOBS = (
     CronJob(
         name="heartbeat",
         command="/bin/bash {deploy_dir}/scripts/heartbeat.sh",
-        interval_minutes=15,
+        schedule="*/15 * * * *",
         required_env=("PLATFORM_API_KEY", "DOMAIN"),
     ),
     CronJob(
@@ -62,7 +64,19 @@ JOBS = (
         # Findings go to the probe's own log and, when MEDIFORCE_ALERT_WEBHOOK
         # is set, to that webhook. Anything it still prints, cron mails.
         command="/usr/bin/python3 {deploy_dir}/scripts/redis-host-probe.py",
-        interval_minutes=5,
+        schedule="*/5 * * * *",
+    ),
+    CronJob(
+        name="backup",
+        # `exec`, not `run`: only the running service has the v16 Postgres
+        # client its init installs. A stopped service fails the exec, and
+        # healthchecks.io reports the missing ping.
+        command=(
+            "cd {deploy_dir} && /usr/bin/docker compose -f docker-compose.prod.yml "
+            "exec -T backup borgmatic --stats >> {deploy_dir}/logs/backup.log 2>&1"
+        ),
+        schedule="0 2 * * *",
+        required_env=("BORG_REPO",),
     ),
 )
 
@@ -110,7 +124,7 @@ def install(deploy_dir: Path) -> None:
             print(f"[cron] WARN: skipping {job.name} — {', '.join(missing)} not set in {deploy_dir}/.env")
             continue
         managed.append(job.cron_line(deploy_dir))
-        print(f"[cron] {job.name}: every {job.interval_minutes} min")
+        print(f"[cron] {job.name}: {job.schedule}")
 
     write_crontab(unmanaged_lines(read_crontab()) + managed)
 

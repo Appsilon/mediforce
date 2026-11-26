@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useAllUserNamespaces } from '@/hooks/use-all-user-namespaces';
 import { WorkflowEditorCanvas } from '@/components/workflows/workflow-editor-canvas';
 import { SaveVersionDialog } from '@/components/workflows/save-version-dialog';
+import { NameWorkflowDialog } from '@/components/workflows/name-workflow-dialog';
 import { UnsavedChangesGuard } from '@/components/unsaved-changes-guard';
 import { StartRunButton } from '@/components/processes/start-run-button';
 import { mediforce, mediforceSilent } from '@/lib/mediforce';
@@ -83,6 +84,7 @@ export default function NewWorkflowPage() {
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
   const [stepErrors, setStepErrors] = useState<Record<string, Record<string, string>>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [nameDialogOpen, setNameDialogOpen] = useState(false);
   const [canvasDirty, setCanvasDirty] = useState(false);
 
   // The template's agent step starts on the same default as a block added by
@@ -241,13 +243,14 @@ export default function NewWorkflowPage() {
     }
   }, [registerCurrentCanvas, router]);
 
-  const handleDialogClose = useCallback(() => {
-    setDialogOpen(false);
+  const resolvePendingStart = useCallback(() => {
     if (startAfterSaveResolverRef.current) {
       startAfterSaveResolverRef.current(undefined);
       startAfterSaveResolverRef.current = null;
     }
   }, []);
+  const handleDialogClose = useCallback(() => { setDialogOpen(false); resolvePendingStart(); }, [resolvePendingStart]);
+  const handleNameDialogClose = useCallback(() => { setNameDialogOpen(false); resolvePendingStart(); }, [resolvePendingStart]);
 
   const wdJsonFields: Record<string, unknown> = {
     name: toWorkflowId(workflowName) || 'my-workflow',
@@ -255,13 +258,20 @@ export default function NewWorkflowPage() {
     description: description || undefined,
   };
 
-  const canSave = saveState.status !== 'saving' && !!toWorkflowId(workflowName) && !!description.trim();
-  const missingFieldReason = !toWorkflowId(workflowName)
-    ? 'Enter a workflow name to save'
-    : !description.trim()
-      ? 'Add a description to save'
-      : undefined;
+  const isSaving = saveState.status === 'saving';
+  const canSave = !isSaving && !!toWorkflowId(workflowName) && !!description.trim();
   const hasUnsavedChanges = canvasDirty || workflowName.trim() !== '' || description.trim() !== '';
+
+  const openSaveOrNameDialog = useCallback(() => {
+    if (canSave) setDialogOpen(true); else setNameDialogOpen(true);
+  }, [canSave]);
+
+  const handleNameDialogConfirm = useCallback((name: string, desc: string) => {
+    setWorkflowName(name);
+    setDescription(desc);
+    setNameDialogOpen(false);
+    setDialogOpen(true);
+  }, []);
 
   return (
     <div className="flex h-full flex-col relative bg-white dark:bg-background">
@@ -279,7 +289,7 @@ export default function NewWorkflowPage() {
                 onChange={(e) => setWorkflowName(e.target.value)}
                 placeholder="Add a Workflow Name…"
                 aria-required="true"
-                className="flex-1 min-w-0 bg-transparent text-xl font-bold tracking-tight text-foreground placeholder:text-muted-foreground/30 border-0 outline-none px-0 py-0"
+                className="flex-1 min-w-0 bg-transparent text-xl font-bold tracking-tight text-foreground placeholder:text-muted-foreground/60 border-0 outline-none px-0 py-0"
               />
             </div>
             <div className="flex items-baseline gap-1">
@@ -291,7 +301,7 @@ export default function NewWorkflowPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Add a workflow description…"
                 aria-required="true"
-                className="flex-1 min-w-0 bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/40 placeholder:italic border-0 outline-none px-0 py-0"
+                className="flex-1 min-w-0 bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/70 placeholder:italic border-0 outline-none px-0 py-0"
               />
             </div>
             {/* Secondary metadata row */}
@@ -338,30 +348,27 @@ export default function NewWorkflowPage() {
                 {saveState.message}
               </span>
             )}
-            <span title={missingFieldReason}>
-              <button
-                onClick={() => setDialogOpen(true)}
-                disabled={!canSave}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors whitespace-nowrap',
-                  !canSave && 'opacity-50 cursor-not-allowed',
-                )}
-              >
-                <Save className="h-3.5 w-3.5" />
-                {saveState.status === 'saving' ? 'Saving…' : 'Save'}
-              </button>
-            </span>
+            <button
+              onClick={openSaveOrNameDialog}
+              disabled={isSaving}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors whitespace-nowrap',
+                isSaving && 'opacity-50 cursor-not-allowed',
+              )}
+            >
+              <Save className="h-3.5 w-3.5" />
+              {isSaving ? 'Saving…' : 'Save'}
+            </button>
             <StartRunButton
               workflowName={toWorkflowId(workflowName) || 'workflow'}
               hasManualTrigger
               label="Save & Dry Run"
               mode="dry-run"
-              disabled={!canSave}
-              disabledTooltip={missingFieldReason}
+              disabled={isSaving}
               preflightEnabled={false}
               onBeforeStart={() => new Promise<{ version: number; namespace: string } | undefined>((resolve) => {
                 startAfterSaveResolverRef.current = resolve;
-                setDialogOpen(true);
+                openSaveOrNameDialog();
               })}
             />
             <StartRunButton
@@ -369,12 +376,11 @@ export default function NewWorkflowPage() {
               hasManualTrigger
               label="Save & Start Run"
               mode="production"
-              disabled={!canSave}
-              disabledTooltip={missingFieldReason}
+              disabled={isSaving}
               preflightEnabled={false}
               onBeforeStart={() => new Promise<{ version: number; namespace: string } | undefined>((resolve) => {
                 startAfterSaveResolverRef.current = resolve;
-                setDialogOpen(true);
+                openSaveOrNameDialog();
               })}
             />
           </div>
@@ -413,6 +419,14 @@ export default function NewWorkflowPage() {
       )}
 
       <UnsavedChangesGuard when={hasUnsavedChanges} />
+
+      <NameWorkflowDialog
+        open={nameDialogOpen}
+        name={workflowName}
+        description={description}
+        onClose={handleNameDialogClose}
+        onConfirm={handleNameDialogConfirm}
+      />
 
       <SaveVersionDialog
         suggestedTitle={typeof settingsDraft.title === 'string' ? settingsDraft.title : undefined}

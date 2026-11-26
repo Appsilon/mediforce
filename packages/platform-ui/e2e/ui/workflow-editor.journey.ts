@@ -772,26 +772,24 @@ test.describe('Workflow Editor Journey', () => {
     // Template canvas already has three steps: draft, ai-review, done
     await expect(page.locator('.react-flow__node')).toHaveCount(3, { timeout: 8_000 });
 
-    // Save button starts disabled (all required fields empty). The header shows
-    // a plain "Save"; "Publish workflow" is the dialog's confirm label.
+    // Save is always clickable — clicking it before name + description are
+    // filled in opens a naming prompt instead of doing nothing (#1632).
     const saveButton = page.getByRole('button', { name: 'Save', exact: true });
-    await expect(saveButton).toBeDisabled();
-
-    // Fill Workflow name
-    await page.getByPlaceholder('Add a Workflow Name…').fill('e2e-test-workflow');
-
-    // Still disabled — description missing
-    await expect(saveButton).toBeDisabled();
-
-    // Fill Description
-    await page.getByPlaceholder('Add a workflow description…').fill('End-to-end test workflow created by Playwright');
-
-    // Name + description filled → save enabled
     await expect(saveButton).toBeEnabled();
-
-    // Clicking Save opens the version-name dialog
     await saveButton.click();
+    await expect(page.getByRole('heading', { name: /name your workflow/i })).toBeVisible({ timeout: 5_000 });
+
+    // Fill both fields in the prompt and confirm
+    await page.getByPlaceholder(/clinical trials workflow/i).fill('e2e-test-workflow');
+    await page.getByPlaceholder(/short description of your workflow/i).fill('End-to-end test workflow created by Playwright');
+    await page.getByRole('button', { name: /save workflow/i }).click();
+
+    // Confirming hands off to the version-title dialog, and the header now
+    // carries the name + description entered in the prompt.
     await expect(page.getByRole('heading', { name: /name this version/i })).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByPlaceholder('Add a Workflow Name…')).toHaveValue('e2e-test-workflow');
+    await expect(page.getByPlaceholder('Add a workflow description…'))
+      .toHaveValue('End-to-end test workflow created by Playwright');
 
     // Fill version title in dialog — live preview updates
     await page.getByPlaceholder(/e\.g\. Added AI review step/i).fill('v1 — initial');
@@ -994,7 +992,7 @@ test.describe('Workflow Editor Journey', () => {
     await page.waitForURL(new RegExp(`/${TEST_ORG_HANDLE}/workflows/${unique}/runs/`), { timeout: 30_000 });
   });
 
-  test('new workflow save blocked when workflow name slugifies to empty', async ({ page }) => {
+  test('save with a name that slugifies to empty reopens the naming prompt', async ({ page }) => {
     trackPageErrors(page);
     await page.goto(`/${TEST_ORG_HANDLE}/workflows/new`);
 
@@ -1004,12 +1002,12 @@ test.describe('Workflow Editor Journey', () => {
 
     // Workflow name that slugifies to empty (only special chars → '')
     await page.getByPlaceholder('Add a Workflow Name…').fill('---');
-
-    // Fill description — button still disabled because name slugifies to empty
     await page.getByPlaceholder('Add a workflow description…').fill('Some description');
 
-    // Button must remain disabled — toWorkflowId('---') === ''
-    await expect(saveButton).toBeDisabled();
+    // toWorkflowId('---') === '', so this still isn't a valid save target —
+    // clicking Save opens the naming prompt rather than the version dialog.
+    await saveButton.click();
+    await expect(page.getByRole('heading', { name: /name your workflow/i })).toBeVisible({ timeout: 5_000 });
   });
 
   // ── Save failure message ─────────────────────────────────────────────────

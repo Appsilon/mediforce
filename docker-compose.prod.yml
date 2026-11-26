@@ -270,7 +270,51 @@ services:
       redis:
         condition: service_healthy
 
+  # Nightly encrypted off-host backup (docs/guides/backup-and-restore.md).
+  # Exists only with COMPOSE_PROFILES=backup in .env, so an estate that has
+  # not set up a borg repository deploys without it. The host crontab
+  # (scripts/cron-jobs.py) runs each pass with `exec`; the image's own cron
+  # stays off so there is one scheduler.
+  backup:
+    image: ghcr.io/borgmatic-collective/borgmatic:2.1.10
+    profiles: [backup]
+    restart: unless-stopped
+    mem_limit: ${BACKUP_MEM_LIMIT:-512m}
+    # A deploy during a pass would otherwise kill borg mid-write and leave a
+    # lock the next container (new hostname) can't break on its own.
+    stop_grace_period: 5m
+    environment:
+      - CRON=false
+      - TZ=UTC
+      # Must match the postgres image's major version; see the runbook.
+      - EXTRA_PKGS=postgresql16-client git
+      - BACKUP_NAME=${BACKUP_NAME:-mediforce}
+      - BORG_REPO=${BORG_REPO:-}
+      - BORG_PASSPHRASE=${BORG_PASSPHRASE:-}
+      - BACKUP_PING_URL=${BACKUP_PING_URL:-}
+      - POSTGRES_USER=${POSTGRES_USER:-mediforce}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-mediforce}
+    volumes:
+      - ./ops/borgmatic/config.yaml:/etc/borgmatic.d/config.yaml:ro
+      - ./ops/borgmatic/snapshot.py:/etc/borgmatic/snapshot.py:ro
+      - /var/lib/mediforce/bare-repos:/var/lib/mediforce/bare-repos:ro
+      - /var/lib/mediforce/attachments:/var/lib/mediforce/attachments:ro
+      - ./.env:/opt/mediforce/.env:ro
+      - ./caddy.d:/opt/mediforce/caddy.d:ro
+      - ${BACKUP_SSH_KEY_PATH:-/home/deploy/.ssh/backup_key}:/root/.ssh/id_ed25519:ro
+      - ${BACKUP_KNOWN_HOSTS_PATH:-/home/deploy/.ssh/backup_known_hosts}:/root/.ssh/known_hosts:ro
+      - borg-config:/root/.config/borg
+      - borg-cache:/root/.cache/borg
+      - borgmatic-state:/root/.local/state/borgmatic
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   redis-data:
   caddy-data:
   caddy-config:
+  borg-config:
+  borg-cache:
+  borgmatic-state:

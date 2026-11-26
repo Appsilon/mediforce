@@ -172,7 +172,7 @@ describe('WorkflowEngine integration: full execution loop', () => {
     const tasks = await humanTaskRepo.getByInstanceId(instance.id);
     expect(tasks).toHaveLength(1);
     expect(tasks[0].stepId).toBe('review');
-    expect(tasks[0].status).toBe('claimed');
+    expect(tasks[0].status).toBe('pending');
 
     // review (human) → finalize (agent): completing the human task resumes the
     // instance and advances past the review step.

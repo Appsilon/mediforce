@@ -610,41 +610,49 @@ systemctl enable --now docker
 
 
 def step_docker_gc(ctx: Context) -> None:
-    """Cap BuildKit cache so it cannot fill the Docker data volume.
+    """Cap BuildKit cache and rotate container logs so neither fills the disk.
 
-    Without this cap, the builder keeps cache indefinitely (we've seen 85GB+
+    Without a cap, the builder keeps cache indefinitely (we've seen 85GB+
     build cache pile up in under a week, filling the 98GB Hetzner volume and
-    breaking deploys with ENOSPC). A 20GB cap is plenty for one working set
-    and leaves headroom for images + containers on typical volumes.
+    breaking deploys with ENOSPC). A 10GB cap is plenty for one working set.
+    The default `json-file` log driver never rotates; `local` compresses and
+    rotates (5 x 20MB per container). Containers pick up the new driver when
+    they are recreated, which the next deploy does.
+
+    Merges the wanted keys into daemon.json and restarts Docker only when the
+    file changed, so re-running on a configured host is a no-op.
     """
     if ctx.dry_run:
-        info("[dry-run] would write /etc/docker/daemon.json and restart docker")
+        info("[dry-run] would merge docker settings into /etc/docker/daemon.json "
+             "and restart docker if it changed")
         return
-    info("Configuring Docker builder GC (cap cache at 20GB)")
+    info("Configuring Docker daemon (builder GC cap 10GB, local log driver)")
 
-    # Remote python script — checks for existing config, writes + restarts
-    # docker only if needed. Base64-encoded so we pass it as a single argv
+    # Remote python script — merges the wanted keys, writes + restarts docker
+    # only if the config changed. Base64-encoded so we pass it as a single argv
     # token with no escaping landmines (heredoc, quotes, backslashes).
     remote_py = textwrap.dedent('''
-        import json, os, sys
+        import json, os
         path = "/etc/docker/daemon.json"
         try:
             with open(path) as f:
                 cfg = json.load(f)
         except (FileNotFoundError, ValueError):
             cfg = {}
-        if cfg.get("builder", {}).get("gc", {}).get("defaultKeepStorage"):
-            print("ALREADY_CONFIGURED")
-            sys.exit(0)
-        cfg.setdefault("builder", {}).setdefault("gc", {}).update({
+        wanted = json.loads(json.dumps(cfg))
+        wanted["log-driver"] = "local"
+        wanted.setdefault("builder", {}).setdefault("gc", {}).update({
             "enabled": True,
-            "defaultKeepStorage": "20GB",
-            "policy": [{"keepStorage": "20GB", "all": True}],
+            "defaultKeepStorage": "10GB",
+            "policy": [{"keepStorage": "10GB", "all": True}],
         })
-        os.makedirs("/etc/docker", exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(cfg, f, indent=2)
-        print("WROTE")
+        if wanted == cfg:
+            print("UNCHANGED")
+        else:
+            os.makedirs("/etc/docker", exist_ok=True)
+            with open(path, "w") as f:
+                json.dump(wanted, f, indent=2)
+            print("WROTE")
     ''').strip()
     b64 = base64.b64encode(remote_py.encode()).decode()
 
@@ -660,14 +668,14 @@ def step_docker_gc(ctx: Context) -> None:
     )
     result = ssh(ctx, remote_cmd, capture=True)
     if result.rc != 0:
-        raise RuntimeError(f"docker GC config failed (rc={result.rc}): {result.stderr}")
+        raise RuntimeError(f"docker daemon config failed (rc={result.rc}): {result.stderr}")
     out = result.stdout.strip()
-    if "ALREADY_CONFIGURED" in out:
-        ok("docker builder GC already configured")
+    if "UNCHANGED" in out:
+        ok("docker daemon already configured")
     elif "RESTARTED" in out:
-        ok("docker builder GC: 20GB cap set, daemon restarted")
+        ok("docker daemon: 10GB builder GC cap + local log driver set, daemon restarted")
     else:
-        raise RuntimeError(f"unexpected output from docker GC step: {out!r}")
+        raise RuntimeError(f"unexpected output from docker daemon config step: {out!r}")
 
 
 def step_deploy_user(ctx: Context) -> None:
@@ -1647,7 +1655,7 @@ STEPS: list[tuple[str, str, Callable[[Context], None]]] = [
     ("target_server",    "Target server + SSH access",           step_target_server),
     ("system_packages",  "System packages (apt)",                step_system_packages),
     ("docker",           "Docker CE + compose plugin",           step_docker),
-    ("docker_gc",        "Docker builder GC cap (20GB)",         step_docker_gc),
+    ("docker_gc",        "Docker builder GC cap + log rotation", step_docker_gc),
     ("deploy_user",      "deploy user",                          step_deploy_user),
     ("github_access",    "GitHub deploy key",                    step_github_access),
     ("clone_repo",       "Clone repo to /opt/mediforce",         step_clone_repo),
