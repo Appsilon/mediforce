@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """POST /api/cron/heartbeat, the platform's only clock, and log the result.
 
-Runs on the deployment host (cron, every 15 min — see cron-jobs.py). After each
+Runs on the deployment host from cron (schedule in cron-jobs.py). After each
 successful POST it pings HEARTBEAT_PING_URL, when set: healthchecks.io mails the
 ops list when the pings stop, whether the platform failed the heartbeat or the
 cron line never ran (docs/guides/monitoring.md).
@@ -13,28 +13,30 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import http.client
 import re
 import ssl
-import sys
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime
 from pathlib import Path
 
+from deploy_env import read_env_file
+
 DEFAULT_DEPLOY_DIR = Path("/opt/mediforce")
+HEARTBEAT_TIMEOUT_SECONDS = 120
 PING_TIMEOUT_SECONDS = 10
 PING_ATTEMPTS = 4
+PING_RETRY_PAUSE_SECONDS = 5
+REQUEST_ERRORS = (urllib.error.URLError, http.client.HTTPException, OSError)
 
 
-def read_env_file(path: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    for line in path.read_text().splitlines():
-        stripped = line.strip()
-        if stripped == "" or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, _, value = stripped.partition("=")
-        values[key.removeprefix("export ").strip()] = value.strip().strip("'\"")
-    return values
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Report a redirect as its own status, like curl without -L."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 def rotate_weekly(log: Path, previous_log: Path) -> None:
@@ -51,7 +53,10 @@ def tls_context(domain: str) -> ssl.SSLContext:
     # Caddy then serves its own self-signed cert. The request goes to this host
     # itself, so skip verification only in that case.
     if re.fullmatch(r"[0-9.]+", domain) is not None or ":" in domain:
-        return ssl._create_unverified_context()
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        return context
     return ssl.create_default_context()
 
 
@@ -62,21 +67,35 @@ def post_heartbeat(domain: str, api_key: str) -> str:
         method="POST",
         headers={"X-Api-Key": api_key, "Content-Type": "application/json"},
     )
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPSHandler(context=tls_context(domain)), NoRedirect()
+    )
     try:
-        with urllib.request.urlopen(request, context=tls_context(domain)) as response:
+        with opener.open(request, timeout=HEARTBEAT_TIMEOUT_SECONDS) as response:
             return str(response.status)
-    except (urllib.error.URLError, OSError):
+    except urllib.error.HTTPError as error:
+        return str(error.code) if error.code < 400 else "FAIL"
+    except REQUEST_ERRORS:
         return "FAIL"
 
 
-def ping(url: str) -> None:
+def ping(url: str) -> str | None:
+    """None on success, else the last attempt's error."""
+    last_error = ""
     for attempt in range(1, PING_ATTEMPTS + 1):
         try:
             with urllib.request.urlopen(url, timeout=PING_TIMEOUT_SECONDS):
-                return
-        except (urllib.error.URLError, OSError) as error:
-            if attempt == PING_ATTEMPTS:
-                print(f"[heartbeat] ping failed: {error}", file=sys.stderr)
+                return None
+        except REQUEST_ERRORS as error:
+            last_error = str(error)
+            if attempt < PING_ATTEMPTS:
+                time.sleep(PING_RETRY_PAUSE_SECONDS)
+    return last_error
+
+
+def append_log(log: Path, message: str) -> None:
+    with log.open("a") as log_file:
+        log_file.write(f"[{datetime.now().astimezone().isoformat(timespec='seconds')}] {message}\n")
 
 
 def main() -> None:
@@ -89,12 +108,13 @@ def main() -> None:
     rotate_weekly(log, args.deploy_dir / "logs" / "heartbeat.last-week.log")
 
     status = post_heartbeat(env["DOMAIN"], env["PLATFORM_API_KEY"])
-    with log.open("a") as log_file:
-        log_file.write(f"[{datetime.now().astimezone().isoformat(timespec='seconds')}] {status}\n")
+    append_log(log, status)
 
     ping_url = env.get("HEARTBEAT_PING_URL", "")
     if status == "200" and ping_url != "":
-        ping(ping_url)
+        ping_error = ping(ping_url)
+        if ping_error is not None:
+            append_log(log, f"ping failed: {ping_error}")
 
 
 if __name__ == "__main__":

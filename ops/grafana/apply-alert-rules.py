@@ -23,7 +23,6 @@ Without uv: `pip install pyyaml`, then `python3 ops/grafana/apply-alert-rules.py
 
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import re
@@ -87,17 +86,13 @@ class Grafana:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Apply Mediforce alert rules to Grafana Cloud")
-    parser.add_argument("--file", type=Path, default=RULES_FILE)
-    args = parser.parse_args()
-
     base_url = os.environ.get("GRAFANA_URL", "")
     token = os.environ.get("GRAFANA_TOKEN", "")
     if base_url == "" or token == "":
         sys.exit("Set GRAFANA_URL and GRAFANA_TOKEN")
 
     grafana = Grafana(base_url, token)
-    document = yaml.safe_load(args.file.read_text())
+    document = yaml.safe_load(RULES_FILE.read_text())
     try:
         for group in document["groups"]:
             uid = folder_uid(group["folder"])

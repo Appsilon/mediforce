@@ -19,9 +19,10 @@ Three things watch a server, each from outside it:
 | Grafana Cloud Synthetic Monitoring | the public URL is unreachable, or its TLS certificate expires soon | the Grafana Cloud UI, once per domain |
 | healthchecks.io heartbeat check | the platform's clock stopped: the heartbeat cron isn't running, or `/api/cron/heartbeat` fails | [`scripts/heartbeat.py`](../../scripts/heartbeat.py) |
 
-**Recipients.** Each tool notifies the ops mailing list, and nothing else. To
-add or remove a person, change the list's membership. No tool's configuration
-changes.
+**Recipients.** Each tool notifies the ops mailing list's address, and nothing
+else: it is the Grafana email contact point and the healthchecks.io email
+integration. To add or remove a person, change the membership in the list's own
+admin, where the list is hosted. No tool's configuration changes.
 
 ## How it runs
 
@@ -67,9 +68,25 @@ A wrong or missing Grafana Cloud value makes Alloy log `remote_write` errors
 
 ## Set up
 
-The Grafana Cloud stack, its token, the email contact point and the
-healthchecks.io checks already exist (#1694). Their values are in the password
-manager. On the server, set:
+### 0. Once per estate
+
+One Grafana Cloud stack and one healthchecks.io project serve every server; the
+`instance` label keeps them apart. If your estate already has them, take the
+values from wherever it keeps its secrets and skip to step 1. Otherwise:
+
+- **Grafana Cloud stack.** Create one at `https://grafana.com/auth/sign-up`;
+  the free tier is enough. Its **Prometheus** details page gives the remote-write
+  URL and the user ID. Create an access policy token with the `metrics:write`
+  scope for `GRAFANA_CLOUD_TOKEN`.
+- **Contact point.** At
+  `https://<stack>.grafana.net/alerting/notifications`, add an email contact
+  point with the ops list's address and make it the default policy's contact
+  point. The rules route through that default.
+- **healthchecks.io check**, one per server: period 15 minutes, grace 15
+  minutes, notifying the ops list by email. Its ping URL is
+  `HEARTBEAT_PING_URL`.
+
+On the server, set:
 
 ```bash
 cd /opt/mediforce
@@ -252,5 +269,6 @@ at the server, or ports 80/443 are blocked.
 No successful heartbeat ping for 30 minutes. Cron triggers and the
 stranded-run sweep have stopped. First check: `crontab -l | grep mediforce-heartbeat`
 and `tail /opt/mediforce/logs/heartbeat.log`. `FAIL` lines mean the platform
-rejected or never answered the POST. No new lines mean cron isn't running the
+rejected or never answered the POST. `ping failed` lines mean the heartbeat
+worked but healthchecks.io was unreachable. No new lines mean cron isn't running the
 job.

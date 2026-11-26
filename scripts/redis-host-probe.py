@@ -31,6 +31,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from deploy_env import read_env_file
+
 DEFAULT_DEPLOY_DIR = Path("/opt/mediforce")
 
 # Redis memory as a share of its own `maxmemory`, and the root filesystem as a
@@ -68,20 +70,6 @@ def run(command: list[str]) -> tuple[int, str]:
     except subprocess.TimeoutExpired:
         return 124, ""
     return result.returncode, result.stdout.strip()
-
-
-def read_env_file(path: Path) -> dict[str, str]:
-    """Parse the deployment .env for the handful of values the probe needs."""
-    if not path.is_file():
-        return {}
-    values: dict[str, str] = {}
-    for line in path.read_text().splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, _, value = stripped.partition("=")
-        values[key.strip()] = value.strip().strip("'\"")
-    return values
 
 
 def threshold(env: dict[str, str], name: str) -> float:

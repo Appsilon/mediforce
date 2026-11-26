@@ -338,16 +338,13 @@ services:
       - ./ops/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      - /:/rootfs:ro
+      - /:/rootfs:ro,rslave
       - /var/run/docker.sock:/var/run/docker.sock:ro
       # cAdvisor's docker factory reads container details from containerd too.
       - /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro
       - alloy-data:/var/lib/alloy/data
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    # No depends_on: the "Postgres down" and "Redis down" alerts must still
+    # fire when those services never become healthy.
 
 volumes:
   alloy-data:
