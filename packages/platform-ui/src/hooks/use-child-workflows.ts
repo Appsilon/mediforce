@@ -179,7 +179,9 @@ export function useChildRunExpansion(
     const children = childrenQuery.data ?? [];
     return open.map(({ stepId, target }) => {
       const spawnedIds = spawnedIdsByStep.get(stepId);
-      const candidates = spawnedIds === undefined ? [] : children.filter((child) => spawnedIds.has(child.id));
+      const candidates = spawnedIds === undefined
+        ? children.filter((child) => child.definitionName === target.definitionName)
+        : children.filter((child) => spawnedIds.has(child.id));
       const selectedId = selectedByStep.get(stepId);
       const selected = candidates.find((child) => child.id === selectedId) ?? candidates[candidates.length - 1];
       return { stepId, target, candidates, selected };
