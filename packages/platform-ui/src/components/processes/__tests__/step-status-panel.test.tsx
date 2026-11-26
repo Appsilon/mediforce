@@ -122,4 +122,50 @@ describe('StepStatusPanel row expand', () => {
     expect(screen.getByText('v3')).toBeInTheDocument();
     expect(screen.queryByText(/agent updated/)).not.toBeInTheDocument();
   });
+
+  it('shows a spawn step\'s cost as the sum of the children it started', () => {
+    const instance = buildProcessInstance({ status: 'completed', currentStepId: null });
+    const execution = buildStepExecution({
+      stepId: 'fetch-data',
+      status: 'completed',
+      output: { spawned: [{ instanceId: 'child-1' }, { instanceId: 'child-2' }], errors: [] },
+    });
+
+    const { wrapper } = createQueryWrapper();
+    render(
+      <StepStatusPanel
+        instance={instance}
+        definitionSteps={steps}
+        stepExecutions={[execution]}
+        stepConfigMap={new Map([['fetch-data', { executorType: 'action' }]])}
+        childRunCostByInstanceId={new Map([['child-1', 0.5], ['child-2', 0.25]])}
+      />,
+      { wrapper },
+    );
+
+    expect(screen.getByText('$0.750')).toBeInTheDocument();
+  });
+
+  it('shows a resolved run_workflow step\'s cost as the child it waited on', () => {
+    const instance = buildProcessInstance({ status: 'completed', currentStepId: null });
+    const execution = buildStepExecution({
+      stepId: 'fetch-data',
+      status: 'completed',
+      output: { instanceId: 'child-1', definitionName: 'child-wf', status: 'completed', error: null, output: null },
+    });
+
+    const { wrapper } = createQueryWrapper();
+    render(
+      <StepStatusPanel
+        instance={instance}
+        definitionSteps={steps}
+        stepExecutions={[execution]}
+        stepConfigMap={new Map([['fetch-data', { executorType: 'action' }]])}
+        childRunCostByInstanceId={new Map([['child-1', 1.5]])}
+      />,
+      { wrapper },
+    );
+
+    expect(screen.getByText('$1.50')).toBeInTheDocument();
+  });
 });

@@ -57,6 +57,35 @@ interface StepStatusPanelProps {
   stepDetailBaseHref?: string;
   /** Active human task for the current step — provides createdAt and assignedUserId for virtual rows. */
   currentTask?: HumanTask | null;
+  /** Child runs' totalCostUsd by instanceId, so a spawn/run_workflow step (no
+   *  agentOutput of its own) can show what the child(ren) it started cost. */
+  childRunCostByInstanceId?: ReadonlyMap<string, number>;
+}
+
+/** A spawn step's output lists `spawned: [{instanceId}]`; a resolved
+ *  run_workflow step's output IS a `CollectedChild` (`{instanceId}`) directly.
+ *  Either way, sum whatever of those instanceIds we have a child cost for. */
+function childStepCost(
+  output: Record<string, unknown> | null,
+  byId: ReadonlyMap<string, number> | undefined,
+): number | undefined {
+  if (!output || !byId) return undefined;
+  const spawned = output.spawned;
+  if (Array.isArray(spawned)) {
+    let total = 0;
+    let found = false;
+    for (const entry of spawned) {
+      const instanceId = (entry as { instanceId?: unknown } | null)?.instanceId;
+      const cost = typeof instanceId === 'string' ? byId.get(instanceId) : undefined;
+      if (cost !== undefined) {
+        total += cost;
+        found = true;
+      }
+    }
+    return found ? total : undefined;
+  }
+  const instanceId = output.instanceId;
+  return typeof instanceId === 'string' ? byId.get(instanceId) : undefined;
 }
 
 /** One entry in the execution history. */
@@ -469,6 +498,7 @@ export function StepStatusPanel({
   onAgentLogClick,
   stepDetailBaseHref,
   currentTask,
+  childRunCostByInstanceId,
 }: StepStatusPanelProps) {
   // Key expanded state by execution ID so loop revisits of the same step each
   // have independent expand/collapse.
@@ -578,6 +608,8 @@ export function StepStatusPanel({
             ? (definitionSteps.find((s) => s.id === takenVerdictTarget)?.name ?? takenVerdictTarget)
             : undefined;
 
+          const execCost = execution.agentOutput?.estimatedCostUsd ?? childStepCost(execution.output, childRunCostByInstanceId);
+
           const hasOutputContent = execution.output !== null || Boolean(execution.error) || Boolean(takenVerdict && takenVerdictTargetName);
           const showDetails = stepConfig !== undefined && hasConfigDetail(stepConfig, hasAgentLog, assembledPrompt);
 
@@ -667,9 +699,9 @@ export function StepStatusPanel({
                       {formatDuration(new Date(execution.completedAt).getTime() - new Date(execution.startedAt).getTime())}
                     </span>
                   )}
-                  {execution.completedAt && execution.agentOutput?.estimatedCostUsd != null && (
+                  {execution.completedAt && execCost != null && (
                     <span className="font-medium text-foreground">
-                      {formatCostUsd(execution.agentOutput.estimatedCostUsd)}
+                      {formatCostUsd(execCost)}
                     </span>
                   )}
                   <ExecutorText
