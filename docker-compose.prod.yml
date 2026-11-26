@@ -311,7 +311,43 @@ services:
       postgres:
         condition: service_healthy
 
+  # Host, container, Postgres and Redis metrics to Grafana Cloud, where the
+  # alert rules run off the box (docs/guides/monitoring.md). Exists only with
+  # COMPOSE_PROFILES=monitoring in .env. Ships metrics only, never logs:
+  # container output can hold clinical or personal content.
+  monitoring:
+    image: grafana/alloy:v1.21.3
+    profiles: [monitoring]
+    restart: unless-stopped
+    mem_limit: ${MONITORING_MEM_LIMIT:-256m}
+    command: ["run", "--storage.path=/var/lib/alloy/data", "/etc/alloy/config.alloy"]
+    # cAdvisor reads every container's cgroup, which a private cgroup
+    # namespace would hide.
+    cgroup: host
+    environment:
+      - GRAFANA_CLOUD_PROM_URL=${GRAFANA_CLOUD_PROM_URL:-}
+      - GRAFANA_CLOUD_PROM_USER=${GRAFANA_CLOUD_PROM_USER:-}
+      - GRAFANA_CLOUD_TOKEN=${GRAFANA_CLOUD_TOKEN:-}
+      # Every series is labelled instance=<DOMAIN>, so staging and production
+      # share one Grafana Cloud stack without mixing.
+      - DOMAIN=${DOMAIN:-localhost}
+      - POSTGRES_DSN=postgresql://${POSTGRES_USER:-mediforce}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mediforce}?sslmode=disable
+      # Empty on production; the staging overlay's Redis needs it.
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    volumes:
+      - ./ops/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro,rslave
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # cAdvisor's docker factory reads container details from containerd too.
+      - /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro
+      - alloy-data:/var/lib/alloy/data
+    # No depends_on: the "Postgres down" and "Redis down" alerts must still
+    # fire when those services never become healthy.
+
 volumes:
+  alloy-data:
   redis-data:
   caddy-data:
   caddy-config:

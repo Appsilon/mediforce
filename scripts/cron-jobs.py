@@ -7,6 +7,8 @@ deploy, so every server (forks included) runs the same jobs with no manual step
 
     heartbeat    POSTs /api/cron/heartbeat, the platform's only clock: cron
                  triggers, the stranded-run sweep, the model-registry sweep.
+                 Pings HEARTBEAT_PING_URL after each success, when set
+                 (docs/guides/monitoring.md).
     redis-probe  Watches Redis persistence, memory, restarts, orphaned RDB
                  snapshots and host disk, and alerts before Redis starts
                  refusing writes (issue #1359).
@@ -32,6 +34,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from deploy_env import read_env_file
+
 DEFAULT_DEPLOY_DIR = Path("/opt/mediforce")
 MANAGED_LINE = re.compile(r"# mediforce-[a-z0-9-]+\s*$")
 
@@ -55,7 +59,7 @@ class CronJob:
 JOBS = (
     CronJob(
         name="heartbeat",
-        command="/bin/bash {deploy_dir}/scripts/heartbeat.sh",
+        command="/usr/bin/python3 {deploy_dir}/scripts/heartbeat.py",
         schedule="*/15 * * * *",
         required_env=("PLATFORM_API_KEY", "DOMAIN"),
     ),
@@ -83,17 +87,7 @@ JOBS = (
 
 def read_env_keys(env_path: Path) -> set[str]:
     """Keys that .env sets to a non-empty value."""
-    if env_path.is_file() is False:
-        return set()
-    keys: set[str] = set()
-    for raw_line in env_path.read_text().splitlines():
-        line = raw_line.strip()
-        if line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        if value.strip().strip("'\"") != "":
-            keys.add(key.removeprefix("export ").strip())
-    return keys
+    return {key for key, value in read_env_file(env_path).items() if value != ""}
 
 
 def read_crontab() -> list[str]:

@@ -1,0 +1,81 @@
+// Grafana Alloy for the `monitoring` service in docker-compose.prod.yml.
+// Collects host, container, Postgres and Redis metrics and remote-writes them
+// to Grafana Cloud, where the alert rules in ops/grafana/alert-rules.yaml run.
+// Runbook: docs/guides/monitoring.md.
+//
+// Metrics only. Container logs are never collected: they can hold clinical or
+// personal content.
+
+prometheus.exporter.unix "host" {
+  procfs_path = "/host/proc"
+  sysfs_path  = "/host/sys"
+  rootfs_path = "/rootfs"
+}
+
+prometheus.exporter.cadvisor "containers" {
+  docker_only            = true
+  store_container_labels = false
+  // The compose service name is what the dashboards and alerts group by.
+  allowlisted_container_labels = ["com.docker.compose.service"]
+  // Alloy's defaults plus "disk": per-layer disk usage needs /var/lib/docker
+  // and errors every scrape without it. Host disk comes from the unix exporter.
+  disabled_metrics = [
+    "advtcp", "cpu_topology", "cpuset", "disk", "hugetlb", "memory_numa",
+    "percpu", "referenced_memory", "resctrl", "tcp", "udp",
+  ]
+}
+
+prometheus.exporter.postgres "db" {
+  data_source_names = [sys.env("POSTGRES_DSN")]
+}
+
+prometheus.exporter.redis "queue" {
+  redis_addr     = "redis:6379"
+  redis_password = sys.env("REDIS_PASSWORD")
+}
+
+// One `instance` per host, so staging and production stay apart in one stack.
+// It also replaces the Postgres exporter's DSN-derived instance label.
+discovery.relabel "instance" {
+  targets = array.concat(
+    prometheus.exporter.unix.host.targets,
+    prometheus.exporter.cadvisor.containers.targets,
+    prometheus.exporter.postgres.db.targets,
+    prometheus.exporter.redis.queue.targets,
+  )
+
+  rule {
+    target_label = "instance"
+    replacement  = sys.env("DOMAIN")
+  }
+}
+
+prometheus.scrape "all" {
+  targets         = discovery.relabel.instance.output
+  scrape_interval = "60s"
+  forward_to      = [prometheus.relabel.containers.receiver]
+}
+
+// Keeps the free tier's series budget: only the compose services, not every
+// agent container a run starts and throws away. Host OOM kills are counted by
+// node_vmstat_oom_kill, which covers agent containers too.
+prometheus.relabel "containers" {
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+
+  rule {
+    source_labels = ["job", "container_label_com_docker_compose_service"]
+    regex         = "integrations/cadvisor;"
+    action        = "drop"
+  }
+}
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_PROM_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_PROM_USER")
+      password = sys.env("GRAFANA_CLOUD_TOKEN")
+    }
+  }
+}
