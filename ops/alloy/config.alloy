@@ -67,6 +67,15 @@ prometheus.relabel "containers" {
     regex         = "integrations/cadvisor;"
     action        = "drop"
   }
+
+  // Postgres and Redis export a series per table, per setting and per command,
+  // which grows with the schema and passed 2,900 series on staging. Keep only
+  // what the alert rules and the runbook use; host and container metrics pass.
+  rule {
+    source_labels = ["job", "__name__"]
+    regex         = "integrations/(unix|cadvisor);.*|integrations/postgres;(pg_up|pg_database_size_bytes|pg_settings_max_connections|pg_stat_activity_count|pg_stat_activity_max_tx_duration|pg_stat_database_(numbackends|deadlocks|xact_commit|xact_rollback))|integrations/redis;(redis_up|redis_uptime_in_seconds|redis_rdb_(last_bgsave_status|changes_since_last_save|last_save_timestamp_seconds)|redis_memory_(used_bytes|max_bytes)|redis_(connected|blocked)_clients|redis_db_keys|redis_(evicted_keys|rejected_connections|commands_processed)_total)"
+    action        = "keep"
+  }
 }
 
 prometheus.remote_write "grafana_cloud" {
