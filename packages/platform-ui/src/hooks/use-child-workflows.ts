@@ -6,11 +6,13 @@ import {
   pickRunnableVersion,
   type InstanceStatus,
   type ProcessInstance,
+  type StepExecution,
   type WorkflowDefinition,
 } from '@mediforce/platform-core';
 import {
   childWorkflowTargetOf,
   latestStepStatus,
+  spawnedInstanceIdsOf,
   type ChildWorkflowExpansion,
   type ChildWorkflowTarget,
   type ExpandedChildWorkflow,
@@ -144,15 +146,15 @@ export function useChildDefinitionExpansion(
 const isTerminal = (status: InstanceStatus) => TERMINAL_STATUSES.has(status);
 
 /**
- * Run view: an open step draws the child runs it started — matched by the
- * workflow they run — each at the version it pinned, with its steps' live
- * statuses. One child is drawn at a time; the frame lists the others.
- * A run does not record which step spawned it, so two steps starting the
- * same workflow each list the children of both.
+ * Run view: an open step draws the child runs it started — the exact ones
+ * its own step execution(s) recorded as spawned, each at the version it
+ * pinned, with its steps' live statuses. One child is drawn at a time; the
+ * frame lists the others.
  */
 export function useChildRunExpansion(
   definition: WorkflowDefinition,
   run: Pick<ProcessInstance, 'id' | 'status' | 'namespace'>,
+  stepExecutions: ReadonlyArray<Pick<StepExecution, 'stepId' | 'output'>>,
 ): ChildWorkflowExpansion | undefined {
   const { open, expandable, onToggle } = useOpenSteps(definition);
   const [selectedByStep, setSelectedByStep] = useState<ReadonlyMap<string, string>>(() => new Map());
@@ -161,15 +163,28 @@ export function useChildRunExpansion(
 
   const childrenError = childrenQuery.error;
 
+  const spawnedIdsByStep = useMemo(() => {
+    const byStep = new Map<string, Set<string>>();
+    for (const execution of stepExecutions) {
+      for (const instanceId of spawnedInstanceIdsOf(execution.output)) {
+        const ids = byStep.get(execution.stepId);
+        if (ids) ids.add(instanceId);
+        else byStep.set(execution.stepId, new Set([instanceId]));
+      }
+    }
+    return byStep;
+  }, [stepExecutions]);
+
   const shown = useMemo(() => {
     const children = childrenQuery.data ?? [];
     return open.map(({ stepId, target }) => {
-      const candidates = children.filter((child) => child.definitionName === target.definitionName);
+      const spawnedIds = spawnedIdsByStep.get(stepId);
+      const candidates = spawnedIds === undefined ? [] : children.filter((child) => spawnedIds.has(child.id));
       const selectedId = selectedByStep.get(stepId);
       const selected = candidates.find((child) => child.id === selectedId) ?? candidates[candidates.length - 1];
       return { stepId, target, candidates, selected };
     });
-  }, [open, childrenQuery.data, selectedByStep]);
+  }, [open, childrenQuery.data, selectedByStep, spawnedIdsByStep]);
 
   const definitions = useQueries({
     queries: shown.map(({ selected }) => {

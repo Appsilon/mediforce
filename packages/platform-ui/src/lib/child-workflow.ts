@@ -26,6 +26,22 @@ export function childWorkflowTargetOf(step: WorkflowStep): ChildWorkflowTarget |
   };
 }
 
+/** The instanceId(s) a step's own output recorded as spawned: a `spawn`
+ *  step's `{spawned: [{instanceId}]}`, or a resolved `run-workflow` step's
+ *  `{instanceId}` directly. */
+export function spawnedInstanceIdsOf(output: Record<string, unknown> | null): string[] {
+  if (!output) return [];
+  const spawned = output.spawned;
+  if (Array.isArray(spawned)) {
+    return spawned.flatMap((entry) => {
+      const instanceId = (entry as { instanceId?: unknown } | null)?.instanceId;
+      return typeof instanceId === 'string' ? [instanceId] : [];
+    });
+  }
+  const instanceId = output.instanceId;
+  return typeof instanceId === 'string' ? [instanceId] : [];
+}
+
 /** One run of the child workflow, as the expanded group lists it. */
 export interface ChildRunChoice {
   id: string;

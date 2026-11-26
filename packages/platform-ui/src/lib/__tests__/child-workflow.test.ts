@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { WorkflowStep } from '@mediforce/platform-core';
-import { childWorkflowTargetOf, latestStepStatus } from '../child-workflow';
+import { childWorkflowTargetOf, latestStepStatus, spawnedInstanceIdsOf } from '../child-workflow';
 
 const actionStep = (action: WorkflowStep['action']): WorkflowStep =>
   ({ id: 'phase', name: 'Phase', type: 'creation', executor: 'action', action }) as WorkflowStep;
@@ -27,6 +27,22 @@ describe('childWorkflowTargetOf', () => {
     expect(childWorkflowTargetOf(several)).toBeNull();
     expect(childWorkflowTargetOf(actionStep({ kind: 'collect', config: {} }))).toBeNull();
     expect(childWorkflowTargetOf({ id: 'h', name: 'H', type: 'creation', executor: 'human' } as WorkflowStep)).toBeNull();
+  });
+});
+
+describe('spawnedInstanceIdsOf', () => {
+  it('[UNIT] reads every instanceId out of a spawn step\'s fan-out', () => {
+    const output = { spawned: [{ instanceId: 'a' }, { instanceId: 'b' }], errors: [] };
+    expect(spawnedInstanceIdsOf(output)).toEqual(['a', 'b']);
+  });
+
+  it('[UNIT] reads the instanceId of a resolved run-workflow step', () => {
+    expect(spawnedInstanceIdsOf({ instanceId: 'a', definitionName: 'child', status: 'completed', error: null, output: null })).toEqual(['a']);
+  });
+
+  it('[UNIT] has nothing to report for a step with no output or no spawn', () => {
+    expect(spawnedInstanceIdsOf(null)).toEqual([]);
+    expect(spawnedInstanceIdsOf({ recordCount: 42 })).toEqual([]);
   });
 });
 
