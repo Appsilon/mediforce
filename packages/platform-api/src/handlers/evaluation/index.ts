@@ -10,6 +10,7 @@ export {
 export { approveEvaluatorSource } from './evaluator-trust';
 export { previewEvaluator } from './preview-evaluator';
 export { listAgentProductionRunsPage, listStepAgentRuns } from './step-agent-runs';
+export { listReviewedRunsForImport, importReviewedRuns } from './reviewed-runs-import';
 export {
   listEvalCases,
   createEvalCase,
