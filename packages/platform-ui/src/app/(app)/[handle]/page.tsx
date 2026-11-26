@@ -5,13 +5,14 @@ import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { Pencil, Check, X, Settings, GitBranch, Plus, Download, BookOpen } from 'lucide-react';
+import { Pencil, Check, X, Settings, GitBranch, Plus, Download, BookOpen, Search } from 'lucide-react';
 import { getWorkspaceIcon } from '@/lib/workspace-icons';
 import { WorkspaceAvatar } from '@/components/workspace-avatar';
 import { useNamespaceRole } from '@/hooks/use-namespace-role';
 import { useNamespace } from '@/hooks/use-namespace';
 import { useUserProfiles } from '@/hooks/use-users';
-import { useProcessDefinitions } from '@/hooks/use-process-definitions';
+import { useProcessDefinitions, type DefinitionGroup } from '@/hooks/use-process-definitions';
+import { workflowDisplayName } from '@/lib/workflow-save-utils';
 import { useWorkflowDefinitionsApi } from '@/hooks/use-workflows-api';
 import { useMyActionableTasks } from '@/hooks/use-tasks';
 import { useQueryClient } from '@tanstack/react-query';
@@ -437,6 +438,32 @@ function isActiveDefinition(definition: { runSummary: { active: number } }): boo
   return definition.runSummary.active > 0;
 }
 
+type SortOption = 'manual' | 'created-desc' | 'created-asc' | 'run-desc' | 'run-asc' | 'name-asc' | 'name-desc';
+
+function timeMs(iso: string | undefined): number {
+  return iso ? new Date(iso).getTime() : 0;
+}
+
+function sortDefinitions(definitions: DefinitionGroup[], sortBy: SortOption): DefinitionGroup[] {
+  const sorted = [...definitions];
+  switch (sortBy) {
+    case 'created-desc':
+      return sorted.sort((a, b) => timeMs(b.createdAt) - timeMs(a.createdAt));
+    case 'created-asc':
+      return sorted.sort((a, b) => timeMs(a.createdAt) - timeMs(b.createdAt));
+    case 'run-desc':
+      return sorted.sort((a, b) => timeMs(b.runSummary.latest[0]?.createdAt) - timeMs(a.runSummary.latest[0]?.createdAt));
+    case 'run-asc':
+      return sorted.sort((a, b) => timeMs(a.runSummary.latest[0]?.createdAt) - timeMs(b.runSummary.latest[0]?.createdAt));
+    case 'name-asc':
+      return sorted.sort((a, b) => workflowDisplayName(a).localeCompare(workflowDisplayName(b)));
+    case 'name-desc':
+      return sorted.sort((a, b) => workflowDisplayName(b).localeCompare(workflowDisplayName(a)));
+    default:
+      return sorted;
+  }
+}
+
 function WorkflowCatalogMember({ handle }: { handle: string }) {
   const searchParams = useSearchParams();
   // `?import=source` opens the importer on arrival: the authoring-paths popover
@@ -444,6 +471,8 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
   const importParam = searchParams.get('import');
   const [showCompleted, setShowCompleted] = React.useState(true);
   const [showArchived, setShowArchived] = React.useState(false);
+  const [search, setSearch] = React.useState('');
+  const [sortBy, setSortBy] = React.useState<SortOption>('manual');
   const [importOpen, setImportOpen] = React.useState(importParam === 'source');
   const [importEntry, setImportEntry] = React.useState<ImportEntry>('source');
   const queryClient = useQueryClient();
@@ -477,13 +506,24 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
     [namespacedDefinitions, showArchived],
   );
 
+  const searchedDefinitions = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (query === '') return visibleDefinitions;
+    return visibleDefinitions.filter((d) => workflowDisplayName(d).toLowerCase().includes(query));
+  }, [visibleDefinitions, search]);
+
   const [savedOrder, saveOrder] = useWorkflowOrder(handle);
   const [draggedName, setDraggedName] = React.useState<string | null>(null);
   const [dropTargetName, setDropTargetName] = React.useState<string | null>(null);
 
   const sortedDefinitions = useMemo(
-    () => applyWorkflowOrder(visibleDefinitions, savedOrder, isActiveDefinition),
-    [visibleDefinitions, savedOrder],
+    () => applyWorkflowOrder(searchedDefinitions, savedOrder, isActiveDefinition),
+    [searchedDefinitions, savedOrder],
+  );
+
+  const displayDefinitions = useMemo(
+    () => (sortBy === 'manual' ? sortedDefinitions : sortDefinitions(searchedDefinitions, sortBy)),
+    [sortedDefinitions, searchedDefinitions, sortBy],
   );
 
   function handleDragEnd() {
@@ -517,9 +557,18 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
       <OpenRouterCreditsIndicator handle={handle} />
       <WorkflowProblems handle={handle} latestDocs={latestDocs} loading={defsLoading} />
 
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Workflows</h2>
-        <div className="flex items-center gap-2" data-tour="workflow-actions">
+      <div className="flex items-center gap-3 flex-wrap">
+        <h2 className="text-lg font-semibold shrink-0">Workflows</h2>
+        <div className="relative w-80 shrink-0">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search workflows..."
+            className="w-full rounded-md border bg-background py-2 pl-9 pr-3 text-sm outline-none transition-colors focus:ring-2 focus:ring-ring"
+          />
+        </div>
+        <div className="flex items-center gap-2 ml-auto" data-tour="workflow-actions">
           <DisplayPopover
             showCompleted={showCompleted}
             onToggleCompleted={() => setShowCompleted((prev) => !prev)}
@@ -527,6 +576,20 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
             onToggleArchived={() => setShowArchived((prev) => !prev)}
             hasArchivedDefinitions={hasArchivedDefinitions}
           />
+          <select
+            aria-label="Sort by"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className="rounded-md border bg-background px-3 py-1.5 text-sm font-medium outline-none transition-colors hover:bg-muted"
+          >
+            <option value="manual">Sort by: Manual order</option>
+            <option value="created-desc">Date Created (Latest)</option>
+            <option value="created-asc">Date Created (Oldest)</option>
+            <option value="run-desc">Run Date (Latest)</option>
+            <option value="run-asc">Run Date (Oldest)</option>
+            <option value="name-asc">Alphabetical (Asc.)</option>
+            <option value="name-desc">Alphabetical (Desc.)</option>
+          </select>
           <button
             onClick={() => openImport('source')}
             className={cn(
@@ -594,16 +657,20 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
             </Link>
           </div>
         </div>
-      ) : sortedDefinitions.length === 0 ? (
+      ) : displayDefinitions.length === 0 && search.trim() !== '' ? (
+        <div className="text-center py-16 text-sm text-muted-foreground">
+          No workflows match &ldquo;{search.trim()}&rdquo;.
+        </div>
+      ) : displayDefinitions.length === 0 ? (
         <div className="text-center py-16 text-sm text-muted-foreground">
           All workflows are archived.{' '}
           <button onClick={() => setShowArchived(true)} className="text-primary hover:underline">
             Show archived
           </button>
         </div>
-      ) : (
+      ) : sortBy === 'manual' ? (
         <div className="grid gap-4 md:grid-cols-2" data-tour="workflow-list">
-          {sortedDefinitions.map((definition) => (
+          {displayDefinitions.map((definition) => (
             <SortableWorkflowCard
               key={definition.name}
               name={definition.name}
@@ -626,6 +693,20 @@ function WorkflowCatalogMember({ handle }: { handle: string }) {
                 isMember={true}
               />
             </SortableWorkflowCard>
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2" data-tour="workflow-list">
+          {displayDefinitions.map((definition) => (
+            <ProcessCard
+              key={definition.name}
+              definition={definition}
+              runSummary={definition.runSummary}
+              steps={stepsByDefinition.get(definition.name)}
+              handle={handle}
+              activeTaskByInstance={activeTaskByInstance}
+              isMember={true}
+            />
           ))}
         </div>
       )}

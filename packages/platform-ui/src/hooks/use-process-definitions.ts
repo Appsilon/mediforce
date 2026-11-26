@@ -37,6 +37,8 @@ export interface DefinitionGroup {
   namespace?: string;
   visibility?: string;
   runSummary: WorkflowRunSummary;
+  createdAt?: string;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -105,6 +107,8 @@ export function useProcessDefinitions(includeCompletedRuns: boolean = true) {
           namespace: g.namespace,
           visibility: def.visibility,
           runSummary: g.runSummary,
+          createdAt: def.createdAt,
+          metadata: def.metadata,
         };
       });
   }, [groups]);
