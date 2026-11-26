@@ -7,6 +7,8 @@ deploy, so every server (forks included) runs the same jobs with no manual step
 
     heartbeat    POSTs /api/cron/heartbeat, the platform's only clock: cron
                  triggers, the stranded-run sweep, the model-registry sweep.
+                 Pings HEARTBEAT_PING_URL after each success, when set
+                 (docs/guides/monitoring.md).
     redis-probe  Watches Redis persistence, memory, restarts, orphaned RDB
                  snapshots and host disk, and alerts before Redis starts
                  refusing writes (issue #1359).

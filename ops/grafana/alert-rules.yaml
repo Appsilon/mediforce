@@ -1,0 +1,367 @@
+# Grafana-managed alert rules for every Mediforce host that runs the
+# `monitoring` service. Grafana's own provisioning format (what "Export" in the
+# alert-rules UI produces). Grafana Cloud can't load provisioning files, so
+# ops/grafana/apply-alert-rules.py pushes this file through the provisioning
+# API. Edit here, never in the UI: applied rules are read-only there.
+#
+# Every rule notifies the stack's default policy, the ops mailing list.
+# Each rule links its section of docs/guides/monitoring.md as runbook_url.
+#
+# Each rule queries the Grafana Cloud Prometheus data source (A) and compares
+# A's value in a threshold expression (C), the alert condition.
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: host
+    folder: Mediforce
+    interval: 1m
+    rules:
+      - uid: mediforce-disk-warning
+        title: Filesystem above 75%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              # One series per device: the volume's bind mounts share its device.
+              expr: >-
+                topk by (instance, device) (1,
+                  100 * (1 - node_filesystem_avail_bytes{fstype=~"ext4|xfs|btrfs"}
+                           / node_filesystem_size_bytes{fstype=~"ext4|xfs|btrfs"}))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: within_range, params: [75, 85] } }]
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: warning }
+        annotations:
+          summary: '{{ $labels.instance }}: {{ $labels.mountpoint }} ({{ $labels.device }}) is {{ printf "%.0f" $values.A.Value }}% full'
+          runbook_url: https://github.com/Appsilon/mediforce/blob/main/docs/guides/monitoring.md#filesystem-full
+
+      - uid: mediforce-disk-critical
+        title: Filesystem above 85%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                topk by (instance, device) (1,
+                  100 * (1 - node_filesystem_avail_bytes{fstype=~"ext4|xfs|btrfs"}
+                           / node_filesystem_size_bytes{fstype=~"ext4|xfs|btrfs"}))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: gt, params: [85] } }]
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: critical }
+        annotations:
+          summary: '{{ $labels.instance }}: {{ $labels.mountpoint }} ({{ $labels.device }}) is {{ printf "%.0f" $values.A.Value }}% full'
+          runbook_url: https://github.com/Appsilon/mediforce/blob/main/docs/guides/monitoring.md#filesystem-full
+
+      - uid: mediforce-disk-full-7d
+        title: Filesystem predicted full within 7 days
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 21600, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              # Predicted free bytes in 7 days, from the last 6 hours' trend.
+              # Only devices already over half full: on a roomy disk, one large
+              # image pull extrapolates to "full in a week".
+              expr: >-
+                topk by (instance, device) (1,
+                  predict_linear(node_filesystem_avail_bytes{fstype=~"ext4|xfs|btrfs"}[6h], 7 * 86400)
+                  and node_filesystem_avail_bytes{fstype=~"ext4|xfs|btrfs"}
+                    / node_filesystem_size_bytes{fstype=~"ext4|xfs|btrfs"} < 0.5)
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: lt, params: [0] } }]
+        for: 1h
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: warning }
+        annotations:
+          summary: '{{ $labels.instance }}: {{ $labels.mountpoint }} ({{ $labels.device }}) fills up within 7 days at the current rate'
+          runbook_url: https://github.com/Appsilon/mediforce/blob/main/docs/guides/monitoring.md#filesystem-predicted-full
+
+      - uid: mediforce-memory-low
+        title: Available memory below 10%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              expr: 100 * node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: lt, params: [10] } }]
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: critical }
+        annotations:
+          summary: '{{ $labels.instance }}: {{ printf "%.0f" $values.A.Value }}% of memory available'
+          runbook_url: https://github.com/Appsilon/mediforce/blob/main/docs/guides/monitoring.md#memory-low
+
+      - uid: mediforce-oom-kill
+        title: Process OOM-killed
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              # The kernel's host-wide counter: it also sees agent containers
+              # and kills that restart a container (which resets cAdvisor's).
+              expr: increase(node_vmstat_oom_kill[10m])
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: gt, params: [0] } }]
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: critical }
+        annotations:
+          summary: '{{ $labels.instance }}: the kernel OOM-killed a process in the last 10 minutes'
+          runbook_url: https://github.com/Appsilon/mediforce/blob/main/docs/guides/monitoring.md#oom-kill
+
+      - uid: mediforce-container-restarting
+        title: Container restarting in a loop
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                max by (instance, container_label_com_docker_compose_service) (
+                  changes(container_start_time_seconds[15m]))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: gt, params: [2] } }]
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: critical }
+        annotations:
+          summary: '{{ $labels.instance }}: {{ $labels.container_label_com_docker_compose_service }} started {{ $values.A.Value }} times in 15 minutes'
+          runbook_url: https://github.com/Appsilon/mediforce/blob/main/docs/guides/monitoring.md#container-restarting
+
+      - uid: mediforce-host-absent
+        title: Host metrics absent
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 86400, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              # Hosts seen in the last day that sent nothing for 5 minutes
+              # (Prometheus' lookback). Keeps firing for a day, then the host
+              # drops out; by then the heartbeat check has mailed too.
+              expr: >-
+                group by (instance) (max_over_time(node_uname_info[1d]))
+                unless group by (instance) (node_uname_info)
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: gt, params: [0] } }]
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: critical }
+        annotations:
+          summary: '{{ $labels.instance }}: no metrics for 5 minutes. The host or the monitoring service is down'
+          runbook_url: https://github.com/Appsilon/mediforce/blob/main/docs/guides/monitoring.md#host-metrics-absent
+
+  - orgId: 1
+    name: services
+    folder: Mediforce
+    interval: 1m
+    rules:
+      - uid: mediforce-postgres-down
+        title: Postgres down
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              expr: pg_up
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: lt, params: [1] } }]
+        for: 2m
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: critical }
+        annotations:
+          summary: '{{ $labels.instance }}: Postgres is not accepting connections'
+          runbook_url: https://github.com/Appsilon/mediforce/blob/main/docs/guides/monitoring.md#postgres-down
+
+      - uid: mediforce-redis-bgsave-failing
+        title: Redis snapshot failing
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              expr: redis_rdb_last_bgsave_status
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: lt, params: [1] } }]
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: critical }
+        annotations:
+          summary: '{{ $labels.instance }}: the last Redis RDB save failed. Redis refuses writes until one succeeds'
+          runbook_url: https://github.com/Appsilon/mediforce/blob/main/docs/guides/monitoring.md#redis-snapshot-failing
+
+      - uid: mediforce-redis-memory-high
+        title: Redis memory above 85% of maxmemory
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              expr: 100 * redis_memory_used_bytes / (redis_memory_max_bytes > 0)
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: gt, params: [85] } }]
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: critical }
+        annotations:
+          summary: '{{ $labels.instance }}: Redis uses {{ printf "%.0f" $values.A.Value }}% of maxmemory'
+          runbook_url: https://github.com/Appsilon/mediforce/blob/main/docs/guides/monitoring.md#redis-memory-high
+
+  # Metrics written by the Synthetic Monitoring check on the public URL
+  # (created in the Grafana Cloud UI, see the runbook). `instance` is the
+  # checked URL, `job` the check's name.
+  - orgId: 1
+    name: synthetic
+    folder: Mediforce
+    interval: 1m
+    rules:
+      - uid: mediforce-public-url-down
+        title: Public URL check failing
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              # 0 only when every probe location fails, so one flaky probe
+              # does not page.
+              expr: max by (instance, job) (max_over_time(probe_success[5m]))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: lt, params: [1] } }]
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: critical }
+        annotations:
+          summary: '{{ $labels.instance }} has failed every external check for 5 minutes'
+          runbook_url: https://github.com/Appsilon/mediforce/blob/main/docs/guides/monitoring.md#public-url-down
+
+      - uid: mediforce-tls-expiring
+        title: TLS certificate expires within 14 days
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: grafanacloud-prom
+            model:
+              refId: A
+              instant: true
+              expr: min by (instance, job) (probe_ssl_earliest_cert_expiry - time()) / 86400
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: lt, params: [14] } }]
+        for: 1h
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: warning }
+        annotations:
+          summary: '{{ $labels.instance }}: TLS certificate expires in {{ printf "%.0f" $values.A.Value }} days'
+          runbook_url: https://github.com/Appsilon/mediforce/blob/main/docs/guides/monitoring.md#tls-expiring

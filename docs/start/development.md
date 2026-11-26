@@ -165,6 +165,9 @@ Production data lives on an attached volume, which Hetzner's server Backups
 skip. Production's off-host backup is the opt-in `backup` service
 (`COMPOSE_PROFILES=backup`), described in
 [`guides/backup-and-restore.md`](../guides/backup-and-restore.md).
+Metrics and alerting are the opt-in `monitoring` service
+(`COMPOSE_PROFILES=monitoring`, comma-separated with `backup`), described in
+[`guides/monitoring.md`](../guides/monitoring.md).
 
 ### Environment variables per deployment
 

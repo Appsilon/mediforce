@@ -62,6 +62,11 @@ this reason. If you ever start services by hand, do the same.
 
 ## The probe
 
+Servers with the `monitoring` service get the same Redis and disk checks as
+Grafana Cloud alerts, which mail the ops list even when the host is down
+([monitoring.md](monitoring.md)). The probe stays until those alerts are live on
+production, then goes.
+
 [`scripts/redis-host-probe.py`](../../scripts/redis-host-probe.py) runs on the
 deployment host every 5 minutes and checks the five things that failed in
 sequence during the incident:

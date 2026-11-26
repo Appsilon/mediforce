@@ -31,3 +31,10 @@ HTTP_CODE=$(curl -sf "$CURL_TLS" -o /dev/null -w "%{http_code}" -X POST "$URL" \
   -H "Content-Type: application/json" 2>/dev/null) || HTTP_CODE="FAIL"
 
 printf "[%s] %s\n" "$(date -Iseconds)" "$HTTP_CODE" >> "$LOG"
+
+# Dead-man's switch (docs/guides/monitoring.md): healthchecks.io mails the ops
+# list when the pings stop, whether the platform failed the heartbeat or the
+# cron line never ran. Unset = no ping.
+if [[ "$HTTP_CODE" == "200" && -n "${HEARTBEAT_PING_URL:-}" ]]; then
+  curl -fsS -m 10 --retry 3 -o /dev/null "$HEARTBEAT_PING_URL" || true
+fi
