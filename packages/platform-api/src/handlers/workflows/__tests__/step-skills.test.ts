@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { WorkflowStep } from '@mediforce/platform-core';
 import {
+  InMemoryAgentDefinitionRepository,
   InMemoryAuditRepository,
   InMemoryProcessInstanceRepository,
   InMemoryProcessRepository,
@@ -9,10 +10,12 @@ import {
   buildWorkflowDefinition,
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
+import type { ReferenceIssue } from '../../../contract/skills';
 import { ValidationError } from '../../../errors';
 import { createTestScope, userCaller } from '../../../repositories/__tests__/create-test-scope';
+import { createAgent } from '../../agents/create-agent';
 import { createSkill } from '../../skills/create-skill';
-import { skillMd } from '../../skills/__tests__/fixtures';
+import { agentInput, skillMd } from '../../skills/__tests__/fixtures';
 import { copyWorkflow } from '../copy-workflow';
 import { registerWorkflow } from '../register-workflow';
 import { setWorkflowVisibility } from '../set-visibility';
@@ -32,17 +35,19 @@ const skillFiles = (name: string) => [{ path: 'SKILL.md', contents: skillMd(name
 describe('step skills on workflow writes (ADR-0027 decision 4)', () => {
   let processRepo: InMemoryProcessRepository;
   let skillRepo: InMemorySkillRepository;
+  let agentRepo: InMemoryAgentDefinitionRepository;
   let auditRepo: InMemoryAuditRepository;
   let triggerRepo: InMemoryTriggerRepository;
 
   const scopeFor = (namespaces: string[]) => createTestScope({
-    processRepo, skillRepo, auditRepo, triggerRepo, caller: userCaller('u-member', namespaces),
+    processRepo, skillRepo, agentDefinitionRepo: agentRepo, auditRepo, triggerRepo, caller: userCaller('u-member', namespaces),
   });
 
   beforeEach(async () => {
     resetFactorySequence();
     processRepo = new InMemoryProcessRepository();
     skillRepo = new InMemorySkillRepository();
+    agentRepo = new InMemoryAgentDefinitionRepository();
     auditRepo = new InMemoryAuditRepository(new InMemoryProcessInstanceRepository());
     triggerRepo = new InMemoryTriggerRepository();
     await createSkill({ namespace: 'alpha', files: skillFiles('own-private') }, scopeFor(['alpha']));
@@ -113,5 +118,30 @@ describe('step skills on workflow writes (ADR-0027 decision 4)', () => {
 
     await expect(copyWorkflow({ name: 'mapping', sourceNamespace: 'alpha', targetNamespace: 'alpha', targetName: 'mapping-2' }, both))
       .resolves.toMatchObject({ name: 'mapping-2' });
+  });
+
+  it('names both the private skill and the private agent a copy or transfer cannot reach, with namespace and step', async () => {
+    const { agent } = await createAgent(agentInput({ namespace: 'alpha', name: 'Mastery planner' }), scopeFor(['alpha']));
+    const { agentStepId, ...input } = workflowInput('mastery', [{ namespace: 'alpha', id: 'own-private' }]);
+    const agentStep = input.steps.find((step) => step.id === agentStepId) as WorkflowStep;
+    agentStep.agentId = agent.id;
+    await registerWorkflow(input, scopeFor(['alpha']));
+    const both = scopeFor(['alpha', 'beta']);
+
+    for (const result of [
+      await copyWorkflow({ name: 'mastery', sourceNamespace: 'alpha', targetNamespace: 'beta' }, both).catch((e) => e),
+      await transferWorkflowNamespace({ name: 'mastery', sourceNamespace: 'alpha', targetNamespace: 'beta' }, both).catch((e) => e),
+    ]) {
+      expect(result).toBeInstanceOf(ValidationError);
+      const issues = (result as ValidationError).details as ReferenceIssue[];
+      expect(issues).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'skill', reason: 'private', id: 'own-private', namespace: 'alpha', name: 'own-private', stepId: agentStepId,
+        }),
+        expect.objectContaining({
+          kind: 'agent', reason: 'private', id: agent.id, namespace: 'alpha', name: 'Mastery planner', stepId: agentStepId,
+        }),
+      ]));
+    }
   });
 });

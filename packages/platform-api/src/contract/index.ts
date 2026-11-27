@@ -537,6 +537,8 @@ export {
   ImportSkillsInputSchema,
   ImportSkillsOutputSchema,
   ImportedSkillSchema,
+  ReferenceIssueSchema,
+  type ReferenceIssue,
   type ListSkillsInput,
   type ListSkillsOutput,
   type GetSkillInput,

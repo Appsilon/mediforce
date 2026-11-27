@@ -6,7 +6,7 @@ import type {
 import type { CallerScope } from '../../repositories/index';
 import { actorFromCaller } from '../_helpers';
 import { assertCallerMayEditWorkflow } from './_access-gate';
-import { assertStepsMayAddSkills } from '../skills/may-hold-skills';
+import { assertStepsMayUseReferences } from '../skills/may-hold-skills';
 
 /**
  * Move all versions of a workflow definition between workspaces. Transfer
@@ -29,7 +29,9 @@ export async function transferWorkflowNamespace(
   // fail at run time and name the Step.
   const latestVersion = await scope.workflowDefinitions.getLatestVersion(input.sourceNamespace, input.name);
   const latest = latestVersion === 0 ? null : await scope.workflowDefinitions.get(input.sourceNamespace, input.name, latestVersion);
-  if (latest !== null) await assertStepsMayAddSkills({ ...latest, namespace: input.targetNamespace }, scope);
+  if (latest !== null) {
+    await assertStepsMayUseReferences({ ...latest, namespace: input.targetNamespace }, scope);
+  }
 
   await scope.workflowDefinitions.transferNamespace(
     input.name,
