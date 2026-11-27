@@ -198,7 +198,10 @@ At 100%, Postgres stops accepting writes and Redis can't save its snapshot. See
 First check: `df -h`, then
 `sudo du -xh --max-depth=2 /var/lib | sort -h | tail`. Usually the culprit is
 images or build cache, and `docker image prune -f` plus
-`docker builder prune -f --keep-storage=5GB` clears it. Otherwise it's run
+`docker builder prune -f --keep-storage=5GB` clears it. Old workflow images
+(`mediforce-artifacts:*`, `mediforce-built:*`) go daily on their own; to clear
+them now, run `mediforce system prune-images`
+([docker-image-setup](docker-image-setup.md#pruning-images-nothing-needs)). Otherwise it's run
 worktrees under `/var/lib/mediforce`.
 
 ### Filesystem predicted full

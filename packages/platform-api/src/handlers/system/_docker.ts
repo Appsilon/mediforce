@@ -20,6 +20,7 @@ import {
   ImageCapabilitiesSchema,
   parseImageCapabilities,
   parseImageHistory,
+  parseDockerCreatedAt,
   parseImageInspect,
   readProvenanceLabels,
   resolveImageLineage,
@@ -475,6 +476,7 @@ async function localImageRows(exec: Exec): Promise<DockerImageInfo[] | null> {
       id: parsed.ID,
       size: parsed.Size,
       created: parsed.CreatedSince,
+      createdAt: parseDockerCreatedAt(parsed.CreatedAt),
       ...readProvenanceLabels(inspected.get(id)?.labels),
       ...lineage.get(id),
     };

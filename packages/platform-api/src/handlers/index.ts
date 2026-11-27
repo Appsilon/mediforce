@@ -115,6 +115,7 @@ export { getOpenRouterCredits } from './system/get-openrouter-credits';
 export { getEmailStatus } from './admin/email-status';
 
 export { deleteDockerImage } from './docker-images/delete-image';
+export { pruneDockerImages } from './docker-images/prune-images';
 
 export { listOAuthProviders } from './oauth-providers/list-providers';
 export { getOAuthProvider } from './oauth-providers/get-provider';

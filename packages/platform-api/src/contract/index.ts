@@ -498,6 +498,14 @@ export {
   DeleteDockerImageOutputSchema,
   type DeleteDockerImageInput,
   type DeleteDockerImageOutput,
+  DEFAULT_IMAGE_PRUNE_MIN_AGE_DAYS,
+  ImagePruneKeepReasonSchema,
+  PruneDockerImagesInputSchema,
+  PruneDockerImagesOutputSchema,
+  type ImagePruneKeepReason,
+  type PruneDockerImagesInput,
+  type PruneDockerImagesInputApi,
+  type PruneDockerImagesOutput,
 } from './docker-images';
 
 export {

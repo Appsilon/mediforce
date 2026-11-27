@@ -234,6 +234,22 @@ export function shortImageId(id: string): string {
   return id.replace(/^sha256:/, '').slice(0, 12);
 }
 
+const DOCKER_CREATED_AT = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) ([+-]\d{2})(\d{2})\b/;
+
+/**
+ * The ISO timestamp in a `docker images` row's `CreatedAt`, which Go prints as
+ * `2026-11-18 22:32:45 +0100 CET`. `undefined` for anything else — an image's
+ * age is then unknown, never guessed.
+ */
+export function parseDockerCreatedAt(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const match = DOCKER_CREATED_AT.exec(raw);
+  if (match === null) return undefined;
+  const [, date, time, offsetHours, offsetMinutes] = match;
+  const parsed = new Date(`${date}T${time}${offsetHours}:${offsetMinutes}`);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
+
 /** Provenance read back off an image, as the daemon listing exposes it. */
 export interface ReadImageProvenance {
   buildRepo?: string;

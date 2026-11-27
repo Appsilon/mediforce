@@ -72,7 +72,9 @@ names are close enough to be worth stating: `images` is the per-namespace
 **Image Catalog** — the images a workspace offers for steps, one row per source
 with a sentence saying what each is for ([ADR-0022](../../docs/adr/0022-image-catalog.md)).
 `system images` is the raw, deployment-wide Docker daemon listing an admin uses
-to hunt disk, `postgres` and dangling layers included. `images list` indents each
+to hunt disk, `postgres` and dangling layers included; `system prune-images`
+clears the workflow-built images nothing needs any more
+([docker-image-setup](../../docs/guides/docker-image-setup.md#pruning-images-nothing-needs)). `images list` indents each
 entry under the one its images were built on — computed from image layers, not
 from a `FROM` string — and `images show` prints, per version, that base and the
 layer summary the version adds over it. A row reading *"built here, not

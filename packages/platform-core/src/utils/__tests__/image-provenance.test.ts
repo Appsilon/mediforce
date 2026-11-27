@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildProvenanceLabelArgs,
   carriedImageLabelArgs,
+  parseDockerCreatedAt,
   readProvenanceLabels,
   uploadedImageLabelArgs,
 } from '../image-provenance';
@@ -177,5 +178,16 @@ describe('readProvenanceLabels', () => {
         buildNamespace: undefined,
       });
     }
+  });
+});
+
+describe('parseDockerCreatedAt', () => {
+  it('reads the time Go prints for an image, offset applied', () => {
+    expect(parseDockerCreatedAt('2026-11-18 22:32:45 +0100 CET')).toBe('2026-11-18T21:32:45.000Z');
+  });
+
+  it('is undefined for anything else, so an age is never guessed', () => {
+    expect(parseDockerCreatedAt('8 days ago')).toBeUndefined();
+    expect(parseDockerCreatedAt(undefined)).toBeUndefined();
   });
 });

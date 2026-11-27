@@ -215,6 +215,10 @@ services:
       # no outbound route to openrouter.ai; the Models page's "Sync Now" button
       # is unaffected either way.
       - ENABLE_MODEL_SYNC=${ENABLE_MODEL_SYNC:-}
+      # The cron heartbeat's daily sweep of mediforce-artifacts:* and
+      # mediforce-built:* images no workflow, agent or live run names (#1698).
+      # On unless set to `false`; `mediforce system prune-images` still works.
+      - ENABLE_IMAGE_PRUNE=${ENABLE_IMAGE_PRUNE:-}
       # Boot refuses to start without an email provider unless this is true.
       - MEDIFORCE_DISABLE_EMAIL=${MEDIFORCE_DISABLE_EMAIL:-}
       - EMAIL_PROVIDER=${EMAIL_PROVIDER:-}

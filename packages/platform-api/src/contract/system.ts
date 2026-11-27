@@ -13,6 +13,9 @@ export const DockerImageInfoSchema = z.object({
   id: z.string(),
   size: z.string(),
   created: z.string(),
+  /** ISO time the image was created, for the prune sweep's age gate. Absent
+   *  when the daemon's `CreatedAt` does not parse: the age is then unknown. */
+  createdAt: z.string().optional(),
   /** Git repo the image was built from (`mediforce.build.repo`). */
   buildRepo: z.string().optional(),
   /** Commit the build context was checked out at (`mediforce.build.commit`). */

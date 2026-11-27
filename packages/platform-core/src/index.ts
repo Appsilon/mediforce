@@ -956,6 +956,7 @@ export {
   carriedImageLabelArgs,
   imageInspectArgs,
   imageTagTakenMessage,
+  parseDockerCreatedAt,
   parseImageInspect,
   readProvenanceLabels,
   shortImageId,

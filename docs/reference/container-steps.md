@@ -314,6 +314,13 @@ build-mode steps with the runtime's own `resolveStepImage`, so a
 steps that use it — matching only the stored `image` string would be blind to
 exactly the steps that leave it unset.
 
+Because both kinds rebuild on demand, the cron heartbeat deletes the ones
+nothing needs any more once a day — no runnable version, agent or live run names
+them and they are older than 14 days — with the same `resolveStepImage` scan
+deciding what is named. A superseded version made the default again rebuilds
+its image on its first run
+([docker-image-setup](../guides/docker-image-setup.md#pruning-images-nothing-needs)).
+
 ## Where the container runs
 
 `getDockerSpawnStrategy()` picks one
