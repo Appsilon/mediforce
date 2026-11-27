@@ -332,8 +332,6 @@ services:
       # share one Grafana Cloud stack without mixing.
       - DOMAIN=${DOMAIN:-localhost}
       - POSTGRES_DSN=postgresql://${POSTGRES_USER:-mediforce}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mediforce}?sslmode=disable
-      # Empty on production; the staging overlay's Redis needs it.
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
     volumes:
       - ./ops/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /proc:/host/proc:ro

@@ -29,6 +29,9 @@ HEARTBEAT_TIMEOUT_SECONDS = 120
 PING_TIMEOUT_SECONDS = 10
 PING_ATTEMPTS = 4
 PING_RETRY_PAUSE_SECONDS = 5
+# Cloudflare in front of production refuses Python's default User-Agent with
+# 403 "error code: 1010".
+USER_AGENT = "mediforce-heartbeat/1"
 REQUEST_ERRORS = (urllib.error.URLError, http.client.HTTPException, OSError)
 
 
@@ -61,11 +64,15 @@ def tls_context(domain: str) -> ssl.SSLContext:
 
 
 def post_heartbeat(domain: str, api_key: str) -> str:
-    """The HTTP status code, or FAIL when the platform errored or never answered."""
+    """The HTTP status code, FAIL <code> on an error status, or FAIL when nothing answered."""
     request = urllib.request.Request(
         f"https://{domain}/api/cron/heartbeat",
         method="POST",
-        headers={"X-Api-Key": api_key, "Content-Type": "application/json"},
+        headers={
+            "X-Api-Key": api_key,
+            "Content-Type": "application/json",
+            "User-Agent": USER_AGENT,
+        },
     )
     opener = urllib.request.build_opener(
         urllib.request.HTTPSHandler(context=tls_context(domain)), NoRedirect()
@@ -74,7 +81,7 @@ def post_heartbeat(domain: str, api_key: str) -> str:
         with opener.open(request, timeout=HEARTBEAT_TIMEOUT_SECONDS) as response:
             return str(response.status)
     except urllib.error.HTTPError as error:
-        return str(error.code) if error.code < 400 else "FAIL"
+        return str(error.code) if error.code < 400 else f"FAIL {error.code}"
     except REQUEST_ERRORS:
         return "FAIL"
 
@@ -84,7 +91,8 @@ def ping(url: str) -> str | None:
     last_error = ""
     for attempt in range(1, PING_ATTEMPTS + 1):
         try:
-            with urllib.request.urlopen(url, timeout=PING_TIMEOUT_SECONDS):
+            request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            with urllib.request.urlopen(request, timeout=PING_TIMEOUT_SECONDS):
                 return None
         except REQUEST_ERRORS as error:
             last_error = str(error)
