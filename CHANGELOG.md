@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.4.5] - 2026-11-27
+
+### Fixed
+
+- Self-hosted servers behind Cloudflare run cron triggers and sweep stuck runs again, and their healthchecks.io check stops reporting the server as down. Since 1.4.4 Cloudflare had been refusing every heartbeat. A failed heartbeat in `heartbeat.log` now shows the status code it got back ([#1720](https://github.com/Appsilon/mediforce/pull/1720)).
+- With host monitoring on, a server whose Redis has no password no longer raises a false Redis down alert ([#1720](https://github.com/Appsilon/mediforce/pull/1720)).
+
 ## [1.4.4] - 2026-11-27
 
 ### Added
