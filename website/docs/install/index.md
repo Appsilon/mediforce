@@ -112,7 +112,7 @@ sends, so everyone who ends up in the workspace has a mailbox they control.
 
 Everyone joins as a plain **member**. A link cannot grant admin: it controls who
 gets a session, not who you trust, so promoting someone stays a separate
-decision (`mediforce namespace set-member-role acme <uid> admin`).
+decision (`mediforce namespace set-member-role --handle acme --uid <uid> --role admin`).
 
 `mediforce namespace list-join-links acme` shows which links are still live and
 how many people used each; `mediforce namespace revoke-join-link acme <id>`
