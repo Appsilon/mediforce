@@ -70,3 +70,26 @@ export async function seedOutputFiles(
     await rm(workDir, { recursive: true, force: true });
   }
 }
+
+/** Where the server keeps the worktree of a run of `workflowName` in the test workspace. */
+export function runWorktreePath(workflowName: string, runId: string): string {
+  return join(SERVER_DATA_DIR, 'worktrees', TEST_ORG_HANDLE, workflowName, runId);
+}
+
+/** Remove every run worktree of `workflowName`, and git's records of them. */
+export async function removeRunWorktrees(workflowName: string): Promise<void> {
+  await rm(join(SERVER_DATA_DIR, 'worktrees', TEST_ORG_HANDLE, workflowName), { recursive: true, force: true });
+  await git(['--git-dir', join(SERVER_DATA_DIR, 'bare-repos', TEST_ORG_HANDLE, `${workflowName}.git`), 'worktree', 'prune']).catch(() => {});
+}
+
+/**
+ * Check a run's branch out as its worktree, as the runtime does for a run's
+ * first step. Seed the branch with `seedOutputFiles` first.
+ */
+export async function seedRunWorktree(workflowName: string, runId: string): Promise<string> {
+  const bareRepoPath = join(SERVER_DATA_DIR, 'bare-repos', TEST_ORG_HANDLE, `${workflowName}.git`);
+  const worktreePath = runWorktreePath(workflowName, runId);
+  await mkdir(dirname(worktreePath), { recursive: true });
+  await git(['--git-dir', bareRepoPath, 'worktree', 'add', worktreePath, `run/${runId}`]);
+  return worktreePath;
+}

@@ -1,6 +1,7 @@
 import type {
   ProcessInstance,
   RunDefinitionPin,
+  RunLifecycle,
   RunNameEntry,
   WorkflowDisplayStatus,
 } from '../schemas/process-instance';
@@ -186,6 +187,13 @@ export interface ProcessInstanceRepository {
     instanceIds: readonly string[],
     allowed: readonly string[],
   ): Promise<RunDefinitionPin[]>;
+
+  /**
+   * Projected `RunLifecycle` view of the named runs, system actor only: the
+   * heartbeat's worktree sweep reads the status of every run with a worktree
+   * on disk in one query. Missing ids are absent from the result.
+   */
+  getLifecyclesAll(instanceIds: readonly string[]): Promise<RunLifecycle[]>;
 
   /** `updatedSince` keeps only runs updated after that instant, filtered in
    *  storage — for a status like `failed` whose history only grows. */

@@ -34,6 +34,14 @@ bind-mounts the worktree at `/workspace`.
 path and branch conventions live in `workspace-paths.ts` so the read-only
 `WorkspaceReader` can never drift from it.
 
+The worktree is a disposable checkout; the run branch is the record. The cron
+heartbeat removes the worktree of a `completed` run, and of a `failed` run 24
+hours after it last changed, at most 25 per beat. The branch stays in the bare
+repo, so Output Files, step history and Eval Cases, which all read the branch,
+are unaffected. A failed run retried or resumed later checks its branch out
+again with every earlier step's committed files. Only what was never committed
+is lost: the leftovers of a step whose commit the secret scan refused.
+
 ## Mounts
 
 | Path | Mode | Lifetime | Carries |

@@ -19,8 +19,10 @@ import {
 import {
   RunNameEntrySchema,
   RunDefinitionPinSchema,
+  RunLifecycleSchema,
   type RunNameEntry,
   type RunDefinitionPin,
+  type RunLifecycle,
 } from '../schemas/process-instance';
 
 const ACTIVE_STATUSES: ReadonlySet<InstanceStatus> = new Set([
@@ -282,6 +284,13 @@ export class InMemoryProcessInstanceRepository
   ): Promise<RunDefinitionPin[]> {
     const pins = await this.getDefinitionPinsAll(instanceIds);
     return pins.filter((pin) => allowed.includes(pin.namespace ?? ''));
+  }
+
+  async getLifecyclesAll(instanceIds: readonly string[]): Promise<RunLifecycle[]> {
+    return instanceIds
+      .map((id) => this.instances.get(id))
+      .filter((instance): instance is ProcessInstance => instance !== undefined)
+      .map((instance) => RunLifecycleSchema.parse(instance));
   }
 
   private applyListFilters(

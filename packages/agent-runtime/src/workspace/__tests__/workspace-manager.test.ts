@@ -291,6 +291,32 @@ describe('WorkspaceManager', () => {
       const branches = listBareBranches(ws.bareRepoPath);
       expect(branches).toContain('run/run-dispose');
     });
+
+    it('removes a worktree named by its listRunWorktrees entry', async () => {
+      const wd = { name: 'wd-dispose-listed', workspace: {} as WorkflowWorkspace };
+      await manager.createRunWorkspace(wd, 'run-dispose-listed');
+      const [listed] = await manager.listRunWorktrees();
+
+      await manager.disposeRunWorkspace(listed);
+
+      expect(await manager.listRunWorktrees()).toEqual([]);
+      const registered = execFileSync('git', ['--git-dir', listed.bareRepoPath, 'worktree', 'list'], { encoding: 'utf-8' });
+      expect(registered).not.toContain(listed.path);
+    });
+
+    it('lets a later step re-attach the run with every earlier step\'s files', async () => {
+      const wd = { name: 'wd-dispose-reattach', workspace: {} as WorkflowWorkspace };
+      const ws = await manager.createRunWorkspace(wd, 'run-dispose-reattach');
+      await writeFile(join(ws.path, 'data.csv'), 'a,b');
+      await manager.commitStep(ws, { stepId: 'extract', status: 'failed', error: 'boom' });
+      await manager.disposeRunWorkspace(ws);
+
+      const retried = await manager.createRunWorkspace(wd, 'run-dispose-reattach');
+
+      expect(retried.path).toBe(ws.path);
+      expect(await readFile(join(retried.path, 'data.csv'), 'utf-8')).toBe('a,b');
+      expect(await manager.listStepFiles(retried)).toEqual([{ stepId: 'extract', files: ['data.csv'] }]);
+    });
   });
 
   describe('secret defense', () => {

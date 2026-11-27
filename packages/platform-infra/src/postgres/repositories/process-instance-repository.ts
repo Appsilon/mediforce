@@ -5,6 +5,7 @@ import {
   AgentEventSchema,
   RunNameEntrySchema,
   RunDefinitionPinSchema,
+  RunLifecycleSchema,
   parseRow,
   encodeProcessInstanceCursor,
   decodeProcessInstanceCursor,
@@ -22,6 +23,7 @@ import {
   type RunNameEntry,
   type RunDefinitionPin,
   type RunStatusQueryOptions,
+  type RunLifecycle,
 } from '@mediforce/platform-core';
 import type { Database } from '../client';
 import {
@@ -494,6 +496,21 @@ export class PostgresProcessInstanceRepository
         ...row,
         createdAt: row.createdAt.toISOString(),
       }),
+    );
+  }
+
+  async getLifecyclesAll(instanceIds: readonly string[]): Promise<RunLifecycle[]> {
+    if (instanceIds.length === 0) return [];
+    const rows = await this.db
+      .select({
+        id: processInstances.id,
+        status: processInstances.status,
+        updatedAt: processInstances.updatedAt,
+      })
+      .from(processInstances)
+      .where(inArray(processInstances.id, [...instanceIds]));
+    return rows.map((row) =>
+      parseRow(RunLifecycleSchema, { ...row, updatedAt: row.updatedAt.toISOString() }),
     );
   }
 

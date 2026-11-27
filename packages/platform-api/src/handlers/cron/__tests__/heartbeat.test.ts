@@ -9,7 +9,12 @@ import {
   resetFactorySequence,
 } from '@mediforce/platform-core/testing';
 import { syncRegistryIfStale } from '@mediforce/platform-infra';
-import { heartbeat, STRANDED_RUNNING_THRESHOLD_MS } from '../heartbeat';
+import {
+  FAILED_RUN_WORKTREE_GRACE_MS,
+  RUN_WORKTREE_DISPOSALS_PER_BEAT,
+  STRANDED_RUNNING_THRESHOLD_MS,
+  heartbeat,
+} from '../heartbeat';
 import { ForbiddenError } from '../../../errors';
 import {
   createTestScope,
@@ -760,5 +765,124 @@ describe('heartbeat handler', () => {
     Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
 
     await expect(heartbeat({}, scope)).resolves.toEqual({ triggered: [], skipped: [] });
+  });
+
+  describe('run worktree sweep', () => {
+    const NOW = Date.now();
+    const hoursAgo = (hours: number): string => new Date(NOW - hours * 60 * 60 * 1000).toISOString();
+
+    function fakeRunWorktrees(
+      runIds: readonly string[],
+      failingRunIds: readonly string[] = [],
+      beforeDispose: (runId: string) => Promise<void> = async () => {},
+    ) {
+      const onDisk = new Set(runIds);
+      const worktreePath = (runId: string): string => `/data/worktrees/team-alpha/wd/${runId}`;
+      return {
+        onDisk,
+        listRunWorktrees: async () =>
+          [...onDisk].map((runId) => ({
+            namespace: 'team-alpha',
+            workflowName: 'wd',
+            runId,
+            path: worktreePath(runId),
+            bareRepoPath: '/data/bare-repos/team-alpha/wd.git',
+          })),
+        disposeRunWorkspace: async (worktree: { path: string; bareRepoPath: string }) => {
+          const runId = [...onDisk].find((candidate) => worktreePath(candidate) === worktree.path);
+          if (runId === undefined) return;
+          await beforeDispose(runId);
+          if (failingRunIds.includes(runId)) throw new Error(`git worktree remove failed for ${runId}`);
+          onDisk.delete(runId);
+        },
+      };
+    }
+
+    async function seedRun(id: string, status: 'created' | 'running' | 'paused' | 'completed' | 'failed', updatedAt: string): Promise<void> {
+      await instanceRepo.create(
+        buildProcessInstance({
+          id,
+          namespace: 'team-alpha',
+          status,
+          currentStepId: status === 'completed' ? null : 'step-1',
+          pauseReason: status === 'paused' ? 'waiting_for_human' : null,
+          updatedAt,
+        }),
+      );
+    }
+
+    function scopeWith(runWorktrees: ReturnType<typeof fakeRunWorktrees>) {
+      const scope = createTestScope({ processRepo, instanceRepo, auditRepo, triggerRepo, runWorktrees });
+      Object.assign(scope.system, { cronTrigger: { fireWorkflow: vi.fn() } });
+      return scope;
+    }
+
+    it('removes the worktree of a completed run and keeps those of active runs', async () => {
+      await seedRun('run-completed', 'completed', hoursAgo(0));
+      await seedRun('run-created', 'created', hoursAgo(0));
+      await seedRun('run-running', 'running', hoursAgo(0));
+      await seedRun('run-paused', 'paused', hoursAgo(72));
+      const runWorktrees = fakeRunWorktrees(['run-completed', 'run-created', 'run-running', 'run-paused']);
+
+      await heartbeat({}, scopeWith(runWorktrees));
+
+      expect([...runWorktrees.onDisk].sort()).toEqual(['run-created', 'run-paused', 'run-running']);
+    });
+
+    it('keeps a failed run\'s worktree for the retry grace period, then removes it', async () => {
+      const graceHours = FAILED_RUN_WORKTREE_GRACE_MS / (60 * 60 * 1000);
+      await seedRun('run-failed-recent', 'failed', hoursAgo(graceHours - 1));
+      await seedRun('run-failed-stale', 'failed', hoursAgo(graceHours + 1));
+      const runWorktrees = fakeRunWorktrees(['run-failed-recent', 'run-failed-stale']);
+
+      await heartbeat({}, scopeWith(runWorktrees));
+
+      expect([...runWorktrees.onDisk]).toEqual(['run-failed-recent']);
+    });
+
+    it('keeps a worktree whose run is not in the database', async () => {
+      const runWorktrees = fakeRunWorktrees(['run-unknown']);
+
+      await heartbeat({}, scopeWith(runWorktrees));
+
+      expect([...runWorktrees.onDisk]).toEqual(['run-unknown']);
+    });
+
+    it('removes at most a bounded number per beat and leaves the rest for the next one', async () => {
+      const runIds = Array.from({ length: RUN_WORKTREE_DISPOSALS_PER_BEAT + 3 }, (_, index) => `run-done-${index}`);
+      for (const runId of runIds) await seedRun(runId, 'completed', hoursAgo(0));
+      const runWorktrees = fakeRunWorktrees(runIds);
+      const scope = scopeWith(runWorktrees);
+
+      await heartbeat({}, scope);
+      expect(runWorktrees.onDisk.size).toBe(3);
+
+      await heartbeat({}, scope);
+      expect(runWorktrees.onDisk.size).toBe(0);
+    });
+
+    it('keeps a worktree whose run was retried after the sweep read its status', async () => {
+      await seedRun('run-done', 'completed', hoursAgo(0));
+      await seedRun('run-retried', 'failed', hoursAgo(48));
+      const runWorktrees = fakeRunWorktrees(['run-done', 'run-retried'], [], async (runId) => {
+        if (runId === 'run-done') {
+          await instanceRepo.update('run-retried', { status: 'running', updatedAt: new Date().toISOString() });
+        }
+      });
+
+      await heartbeat({}, scopeWith(runWorktrees));
+
+      expect([...runWorktrees.onDisk]).toEqual(['run-retried']);
+    });
+
+    it('completes the beat and removes the others when one removal fails', async () => {
+      await seedRun('run-broken', 'completed', hoursAgo(0));
+      await seedRun('run-done', 'completed', hoursAgo(0));
+      const runWorktrees = fakeRunWorktrees(['run-broken', 'run-done'], ['run-broken']);
+
+      await expect(heartbeat({}, scopeWith(runWorktrees))).resolves.toEqual({ triggered: [], skipped: [] });
+
+      expect([...runWorktrees.onDisk]).toEqual(['run-broken']);
+    });
   });
 });

@@ -201,8 +201,10 @@ images or build cache, and `docker image prune -f` plus
 `docker builder prune -f --keep-storage=5GB` clears it. Old workflow images
 (`mediforce-artifacts:*`, `mediforce-built:*`) go daily on their own; to clear
 them now, run `mediforce system prune-images`
-([docker-image-setup](docker-image-setup.md#pruning-images-nothing-needs)). Otherwise it's run
-worktrees under `/var/lib/mediforce`.
+([docker-image-setup](docker-image-setup.md#pruning-images-nothing-needs)).
+Otherwise look under `/var/lib/mediforce`. The heartbeat removes finished runs'
+worktrees, so a growing `worktrees/` there means the heartbeat isn't running or
+its sweep is failing: `$COMPOSE logs platform-ui | grep "worktree"`.
 
 ### Filesystem predicted full
 
@@ -282,8 +284,8 @@ at the server, or ports 80/443 are blocked.
 
 ### Heartbeat (healthchecks.io)
 
-No successful heartbeat ping for 30 minutes. Cron triggers and the
-stranded-run sweep have stopped. First check: `crontab -l | grep mediforce-heartbeat`
+No successful heartbeat ping for 30 minutes. Cron triggers, the
+stranded-run sweep and the removal of finished runs' worktrees have stopped. First check: `crontab -l | grep mediforce-heartbeat`
 and `tail /opt/mediforce/logs/heartbeat.log`. `FAIL <code>` lines mean the POST
 got an error status, and a bare `FAIL` means nothing answered. Behind Cloudflare,
 a `FAIL 403` that `platform-ui`'s logs don't explain is usually Cloudflare's

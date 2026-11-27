@@ -55,7 +55,7 @@ import type {
 } from '@mediforce/platform-core';
 import { DEFAULT_DRIFT_SETTINGS } from '@mediforce/platform-core';
 import type { CallerIdentity } from '../../auth';
-import type { CallerScope } from '../caller-scope';
+import type { CallerScope, RunWorktreeStore } from '../caller-scope';
 import { createCallerScope, type CallerScopeServices } from '../create-caller-scope';
 import { createStubRepoFileReader, type RepoFileReader } from '../../runtime/repo-file-reader';
 import { noopRunKicker, type RunKicker } from '../../runtime/run-kicker';
@@ -215,6 +215,7 @@ export interface TestScopeOverrides {
   readonly namespaceSecretsRepo?: NamespaceSecretsRepository;
   readonly runKicker?: RunKicker;
   readonly repoFileReader?: RepoFileReader;
+  readonly runWorktrees?: RunWorktreeStore;
   readonly inviteService?: InviteService | null;
   readonly joinLinkService?: JoinLinkService | null;
   readonly inviteNotificationService?: InviteNotificationService | null;
@@ -290,6 +291,7 @@ export function createTestScope(overrides: TestScopeOverrides = {}): CallerScope
     agentRunner: null as unknown as CallerScopeServices['agentRunner'],
     runKicker: overrides.runKicker ?? noopRunKicker(),
     repoFileReader: overrides.repoFileReader ?? createStubRepoFileReader(),
+    runWorktrees: overrides.runWorktrees ?? { listRunWorktrees: async () => [], disposeRunWorkspace: async () => {} },
     inviteService: overrides.inviteService ?? null,
     joinLinkService: overrides.joinLinkService ?? null,
     inviteNotificationService: overrides.inviteNotificationService ?? null,
