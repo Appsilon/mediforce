@@ -194,7 +194,7 @@ test.describe('Workflow Access tab journey', () => {
     await signIn(page, MEMBER_EMAIL, MEMBER_PASSWORD);
     await page.goto(`/${HANDLE}/workflows/${WORKFLOW}`);
     await page.getByRole('tab', { name: 'Definitions' }).click();
-    await expect(page.getByRole('link', { name: 'Edit' })).toHaveAttribute(
+    await expect(page.getByRole('link', { name: 'Edit', exact: true })).toHaveAttribute(
       'aria-disabled',
       'true',
       { timeout: 30_000 },
