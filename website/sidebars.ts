@@ -23,6 +23,7 @@ const sidebars: SidebarsConfig = {
       items: ['run/verify', 'run/triggers'],
     },
     'agents/index',
+    'evaluate/index',
     'workspace/index',
     'gotchas/index',
     {

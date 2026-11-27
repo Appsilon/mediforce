@@ -1,7 +1,7 @@
 ---
 status: living
 audience: workflow-authors
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-27
 ---
 
 # Step Evaluation
@@ -9,11 +9,7 @@ last_reviewed: 2026-11-03
 How an author checks that one agent Workflow Step can be trusted for its
 context of use. The design and its reasons are
 [ADR-0023](../adr/0023-step-evaluation.md); the vocabulary is `CONTEXT.md`
-§ Evaluation domain. This page is what exists today. Optimisation — Variants,
-Comparisons and learning from reviewed runs — is designed in
-[ADR-0024](../adr/0024-optimisation.md) and being built under epic
-[#1650](https://github.com/Appsilon/mediforce/issues/1650); so far an Eval Run
-can run a [Variant](#variants), and a [Comparison](#comparisons) reads Variants against a baseline, from the CLI and API only.
+§ Evaluation domain. This page is what exists today. Optimisation is designed in [ADR-0024](../adr/0024-optimisation.md) and being built under epic [#1650](https://github.com/Appsilon/mediforce/issues/1650). So far an Eval Run can run a [Variant](#variants) (CLI and API only), a [Comparison](#comparisons) reads Variants against a baseline on the **Optimization** sub-tab or from the CLI, and a winning Variant can be [applied](#applying-a-variant) through the API by a signed-in person. Learning from the runs reviewers sent back (ADR-0024 D7) is not built yet.
 
 Everything below belongs to one agent Step, keyed by
 `(namespace, workflowName, stepId)` — or to one Agent evaluated on its own (see
@@ -33,8 +29,8 @@ version at a time — picked with the **Version** selector (the runnable version
 unless `?version=` names another live one; archived versions are not offered)
 and then the **Step** selector (`?step=`), each option marked with its
 validation (see Validation below). A status strip names the step's validation,
-its Acceptance Criteria and the Dataset the next Eval Run takes; under it three
-tabs (`?section=runs|cases|evaluators`) hold that version's finished Eval Runs,
+its Acceptance Criteria and the Dataset the next Eval Run takes; under it four
+tabs (`?section=runs|cases|evaluators|optimization`) hold that version's finished Eval Runs,
 plus any prepared or running run of another version, tagged with it; the Eval
 Cases; and the Evaluators. A step with Eval Runs opens on them, one without on
 its cases. A banner over the tabs counts `code` Evaluators whose source nobody
@@ -872,14 +868,19 @@ A Variant's model must be listed in the model registry and not retired, and a
 `~` moving alias is refused as for the step itself. A Variant on another model
 is estimated from that model's registry price, not the step's cost history.
 A run with a Variant is left out of the Eval Runs list and of the subject's
-validation: it assessed another configuration than the subject's. There is no
-UI for Variants yet.
+validation: it assessed another configuration than the subject's. The UI builds Variants only inside a Comparison; a single Variant run is CLI and API only.
 
 ### Comparisons
 
 A **Comparison** (ADR-0024 D4, D5) runs a baseline and one to four Variants on one Eval Dataset version, each an Eval Run with the same frozen Evaluator versions, trials per case, MCP policy and Acceptance Criteria. `POST /api/evaluation/comparisons` (`compare-prepare --variants <file>` with a JSON list of Variants, or `--model <id,…>` for one model Variant each) prepares every run on the baseline's Definition and Eval Dataset versions and sums their budgets, each rounded up to whole cents; `POST /comparisons/:id/start` (`compare-start --confirm-budget`) starts them all on one confirmation of that sum, and refuses any other amount. A Comparison whose runs could not all be prepared alike, or started, is cancelled with them rather than left half-done. The baseline reuses a finished run of the subject as it is when every frozen input and the Fingerprint match — the run named by `baselineEvalRunId` (`--baseline`), refused with what differs when it does not match, or else the newest such run — and then spends nothing; otherwise the Comparison prepares a baseline run of its own. The runs it prepared carry `comparisonId`; a reused baseline does not. `compare-cancel` cancels the Comparison and every run it prepared that has not finished.
 
-`GET /comparisons/:id` (`compare-get`) reports each run's pass rate and Wilson interval per Evaluator, mean agent cost per trial that recorded one and judge cost per scored trial (the report's `judgeCostUsd` is the judges' share of `costUsd`), mean duration, total tokens, and, for each Variant and counted Evaluator, wins, losses and ties against the baseline by case pass rate, a two-sided exact sign test, and `better`, `worse`, `no_clear_difference` (p ≥ 0.05) or `too_few_cases` (under six non-tied cases). When the cases have both dev and holdout splits, each side is called apart too, a side the Evaluator graded no case of as too few cases; a prompt Variant's recommendation reads holdout, a model Variant's every case. A Comparison reads `completed` once every run it prepared has finished, in the list as in `compare-get`; reading it never changes it. There is no UI for Comparisons yet.
+`GET /comparisons/:id` (`compare-get`) reports each run's pass rate and Wilson interval per Evaluator, mean agent cost per trial that recorded one and judge cost per scored trial (the report's `judgeCostUsd` is the judges' share of `costUsd`), mean duration, total tokens, and, for each Variant and counted Evaluator, wins, losses and ties against the baseline by case pass rate, a two-sided exact sign test, and `better`, `worse`, `no_clear_difference` (p ≥ 0.05) or `too_few_cases` (under six non-tied cases). When the cases have both dev and holdout splits, each side is called apart too, a side the Evaluator graded no case of as too few cases; a prompt Variant's recommendation reads holdout, a model Variant's every case. A Comparison reads `completed` once every run it prepared has finished, in the list as in `compare-get`; reading it never changes it.
+
+The **Optimization** sub-tab is the same thing in the app, for a Step and an Agent alike, and needs the `run` verb. **New Comparison** opens one to four Variant editors, each a model picker (defaulting to the baseline's model) and a **Change the prompt** checkbox that shows a diff against the current prompt, plus the Dataset version, trials per case (3 by default) and the budget per run. **Prepare** leads to a dialog confirming the summed budget; closing it cancels the Comparison. The table lists each Comparison's status, Variants, best call and spend, and **Report** opens a quality against cost scatter, the per-Variant calls with wins, losses, ties and p, and a case-by-case view whose trial badges open the trial. For a Step the baseline prompt is the step's own prompt, not its Agent's system prompt.
+
+### Applying a Variant
+
+`POST /api/evaluation/comparisons/:id/apply-variant` (ADR-0024 D6, `mediforce eval apply-variant <comparisonId> --run <evalRunId> [--make-default]`) keeps a Variant for real. A Step gets a new Workflow Definition version with the patch, registered as any save is, and `makeDefault` makes it the default version; an Agent gets its foundation model or system prompt replaced, which records a new Agent version. It is refused when the named run ran the baseline, and when the subject changed since the Comparison was prepared (prepare it again). The Variant's run then counts toward the new version's validation and can be signed. It is audited as `eval_variant.applied`. Applying is a person's act: the handler refuses an API key, so the CLI command, which only authenticates with one, fails today, and there is no button for it in the app yet.
 
 ## Acceptance Criteria
 

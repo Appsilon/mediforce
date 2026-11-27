@@ -577,7 +577,7 @@ for one Step Fingerprint; it qualifies the step only when it leaves the verdict
 passed, and goes stale when the Workflow Step's current Fingerprint differs.
 The step's **validation** — passed, failed, waiting for human approval or not
 verified — is read from the newest finished Eval Run of the workflow version
-(or, once ADR-0024 D6 is built, of an applied **Variant** whose Fingerprint the step now has)
+(or of an applied **Variant** whose Fingerprint the step now has)
 and that sign-off — or, for a step with no verdict of its own that runs a
 validated Agent as it is, the Agent's (ADR-0029 D8).
 _Avoid_: "validated", "certified", "approved step".
@@ -592,8 +592,8 @@ _Avoid_: "validated version", "qualified version" (only a step is qualified).
 One execution of an Eval Dataset against a Workflow Step — or an Agent, as one
 Agent version — repeated per case, producing Scores judged against Acceptance
 Criteria; it carries the Step Fingerprint it ran, and an Agent's run the Agent
-version it assessed. A run of a **Variant** carries its patch; once
-Comparisons are built it belongs to one (ADR-0024). Fits the existing Run family (Workflow
+version it assessed. A run of a **Variant** carries its patch and may belong to a
+Comparison (ADR-0024). Fits the existing Run family (Workflow
 Run, Agent Run).
 _Avoid_: "Experiment" (vague, collides with nothing but explains nothing).
 
@@ -601,8 +601,8 @@ _Avoid_: "Experiment" (vague, collides with nothing but explains nothing).
 The activity of finding a better configuration of an Evaluation's subject — by
 comparing Variants on its Eval Cases, and by learning from the runs reviewers
 sent back. Shares the subject's Eval Cases and Evaluators, on its own
-**Optimization** sub-tab (ADR-0024). Applying a winning Variant for real is not
-built yet.
+**Optimization** sub-tab (ADR-0024). Applying a winning Variant creates a new
+Workflow Definition or Agent version; learning from sent-back runs is not built yet.
 _Avoid_: "tuning", "fine-tuning" (no model weights change).
 
 **Variant**:
