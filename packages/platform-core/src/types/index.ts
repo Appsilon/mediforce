@@ -30,6 +30,7 @@ export type {
   ProcessInstance,
   RunNameEntry,
   RunDefinitionPin,
+  RunLifecycle,
   WorkflowDisplayStatus,
 } from '../schemas/process-instance';
 

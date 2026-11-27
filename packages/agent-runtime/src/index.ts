@@ -122,6 +122,7 @@ export type {
   WorkspaceManagerInit,
   BareRepoHandle,
   RunWorkspaceHandle,
+  RunWorktree,
   CommitStepOptions,
   CommitStepResult,
 } from './workspace/workspace-manager';

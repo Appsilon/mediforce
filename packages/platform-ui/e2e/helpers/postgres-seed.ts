@@ -838,6 +838,45 @@ export async function backdatePostgresTriggerCursor(
 }
 
 /**
+ * Put a run straight into a status at a given `updatedAt`. Nothing on the API
+ * surface finishes or fails a run on demand, nor backdates one, and the
+ * heartbeat's worktree sweep decides on exactly those two fields. The
+ * `set_updated_at` trigger stamps `now()` over any `updated_at` an UPDATE
+ * writes, so triggers are off for this one transaction (`SET LOCAL`, which
+ * needs the superuser role the E2E database runs as).
+ *
+ * Throws when the update matches no row, so a mistyped id cannot turn the
+ * assertion it supports into a silent pass.
+ */
+export async function setPostgresRunStatus(
+  runId: string,
+  status: 'completed' | 'failed',
+  updatedAt: Date,
+): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL must be set to set a run status for E2E.');
+  }
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    const updated = await sql.begin(async (transaction) => {
+      await transaction`SET LOCAL session_replication_role = replica`;
+      return transaction`
+        UPDATE process_instances
+        SET status = ${status}, pause_reason = NULL, updated_at = ${updatedAt.toISOString()}
+        WHERE id = ${runId}
+        RETURNING id
+      `;
+    });
+    if (updated.length !== 1) {
+      throw new Error(`Expected to update 1 run, updated ${String(updated.length)} (${runId})`);
+    }
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
  * Delete a single `agent_oauth_tokens` row (workspace, agent_id, server_name).
  * Replaces the former Firestore `deleteDocument` of the per-agent OAuth token
  * doc. Missing rows are a no-op, so the OAuth journey can call it to stay

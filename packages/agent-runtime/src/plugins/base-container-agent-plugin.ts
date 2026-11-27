@@ -1150,7 +1150,7 @@ export abstract class BaseContainerAgentPlugin extends ContainerPlugin {
         await cleanupTempDir(tempDir);
       }
       // Worktree is NOT disposed here — steps of the same run re-attach to it.
-      // A separate sweeper handles cleanup of worktrees from completed runs (out of v1 scope).
+      // The cron heartbeat removes it once the run has finished.
     }
   }
 

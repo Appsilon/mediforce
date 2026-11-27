@@ -277,6 +277,24 @@ function contract(
       });
     });
 
+    it('getLifecyclesAll projects status and updatedAt for many runs in one read', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      await registerWorkspace('ws-2');
+      const done = await repo.create(instanceFor('ws-1', { status: 'completed' }));
+      const failed = await repo.create(instanceFor('ws-2', { status: 'failed' }));
+
+      const lifecycles = await repo.getLifecyclesAll([done.id, failed.id, 'inst-missing']);
+
+      expect(lifecycles.sort((left, right) => left.id.localeCompare(right.id))).toEqual(
+        [
+          { id: done.id, status: 'completed', updatedAt: done.updatedAt },
+          { id: failed.id, status: 'failed', updatedAt: failed.updatedAt },
+        ].sort((left, right) => left.id.localeCompare(right.id)),
+      );
+      expect(await repo.getLifecyclesAll([])).toEqual([]);
+    });
+
     it('getDefinitionPinsInNamespaces drops runs outside the allowed set', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');
