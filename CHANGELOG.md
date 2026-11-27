@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-11-27
+
+### Added
+
+- **Server Monitoring And Alerts:** Self-hosted servers can send host, container, Postgres and Redis metrics to Grafana Cloud, where alert rules email you about a full disk, low memory, OOM kills, restart loops, Postgres or Redis trouble, or a server that stopped reporting. Only metrics leave the server, never logs, and a server stays well inside Grafana Cloud's free tier. It is off until you add `monitoring` to `COMPOSE_PROFILES` and set `GRAFANA_CLOUD_PROM_URL`, `GRAFANA_CLOUD_PROM_USER` and `GRAFANA_CLOUD_TOKEN` in the server's `.env`. Setting `HEARTBEAT_PING_URL` also pings a healthchecks.io check from the heartbeat, with or without monitoring. Setup and what to check for each alert are in `docs/guides/monitoring.md` ([#1715](https://github.com/Appsilon/mediforce/pull/1715), [#1717](https://github.com/Appsilon/mediforce/pull/1717)).
+
+### Changed
+
+- **AI Assistant Open By Default:** The workflow editor opens with the AI Assistant showing, and its show/hide button sits in the top toolbar next to Workflow source code instead of a rail on the right edge ([#1690](https://github.com/Appsilon/mediforce/pull/1690)).
+
 ## [1.4.3] - 2026-11-26
 
 ### Added
