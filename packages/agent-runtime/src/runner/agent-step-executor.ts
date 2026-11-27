@@ -14,6 +14,7 @@ import type {
   StepExecutorServices,
   StepExecutorMeta,
   StepExecutionResult,
+  StepExecutorInstanceRepo,
 } from './step-executor';
 
 /** How a run's error names what stopped the step, after `Agent step '<id>'`. */
@@ -144,17 +145,18 @@ export class AgentStepExecutor implements StepExecutor {
     if (agentOutput !== null || stepCost !== undefined) {
       const freshInstance = await instanceRepo.getById(instanceId);
       if (freshInstance) {
-        await instanceRepo.update(instanceId, {
-          ...(agentOutput !== null ? {
+        if (agentOutput !== null) {
+          await instanceRepo.update(instanceId, {
             variables: {
               ...freshInstance.variables,
               [stepId]: agentOutput,
             },
-          } : {}),
-          ...(stepCost !== undefined ? {
-            totalCostUsd: (freshInstance.totalCostUsd ?? 0) + stepCost,
-          } : {}),
-        });
+          });
+        }
+        if (stepCost !== undefined) {
+          await instanceRepo.incrementCost(instanceId, stepCost, { ownCost: true });
+          await propagateCostToAncestors(instanceRepo, freshInstance.parentInstanceId, stepCost);
+        }
       }
     }
 
@@ -451,6 +453,21 @@ export class AgentStepExecutor implements StepExecutor {
       fallbackReason: runResult.fallbackReason,
       executorType: 'agent',
     };
+  }
+}
+
+/** Fans a completed step's cost up the whole `parentInstanceId` chain (not
+ *  just the immediate parent), so an orchestrator's `treeCostUsd` covers
+ *  every descendant, however deep. */
+async function propagateCostToAncestors(
+  instanceRepo: StepExecutorInstanceRepo,
+  parentInstanceId: string | undefined,
+  deltaUsd: number,
+): Promise<void> {
+  let ancestorId = parentInstanceId;
+  while (ancestorId !== undefined) {
+    await instanceRepo.incrementCost(ancestorId, deltaUsd, { ownCost: false });
+    ancestorId = (await instanceRepo.getById(ancestorId))?.parentInstanceId;
   }
 }
 

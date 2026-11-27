@@ -15,6 +15,7 @@ const mockInstanceRepo = {
   update: vi.fn(),
   updateStepExecution: vi.fn(),
   getStepExecutions: vi.fn().mockResolvedValue([]),
+  incrementCost: vi.fn(),
 };
 const mockEngine = {
   advanceStep: vi.fn(),

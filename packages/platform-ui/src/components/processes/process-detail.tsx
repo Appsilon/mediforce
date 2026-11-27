@@ -25,6 +25,7 @@ import { useActiveTaskForInstance } from '@/hooks/use-tasks';
 import { useAgentRunsForProcess } from '@/hooks/use-agent-runs';
 import { useCurrentAgentVersions } from '@/hooks/use-step-evaluation';
 import { useRunTreeAuditEvents } from '@/hooks/use-run-tree-audit-events';
+import { useChildRuns } from '@/hooks/use-child-runs';
 import { useUserDisplayNames } from '@/hooks/use-users';
 import { cn } from '@/lib/utils';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -267,21 +268,39 @@ export function ProcessDetail({
     return end - start;
   }, [instance.createdAt, instance.updatedAt]);
 
-  // Computed from step executions (source of truth on detail page).
+  // Children this run spawned — for the orchestrator's aggregate cost and for
+  // attributing cost to the spawn/run_workflow step that started each one.
+  // `treeCostUsd` (own + every descendant, server-maintained) rather than
+  // `totalCostUsd` (own only), so a grandchild's cost isn't dropped.
+  const childrenQuery = useChildRuns(instance, true);
+  const childRunCostByInstanceId = React.useMemo(() => {
+    const byId = new Map<string, number>();
+    for (const child of childrenQuery.data ?? []) {
+      const cost = child.treeCostUsd ?? child.totalCostUsd;
+      if (cost != null) byId.set(child.id, cost);
+    }
+    return byId;
+  }, [childrenQuery.data]);
+
+  // Computed from step executions (source of truth on detail page) plus every
+  // child run's cost, so an orchestrator's total reflects its whole tree.
   // List views use the denormalized instance.totalCostUsd instead —
   // the two can briefly diverge after retries until the next step completes.
   const totalCostUsd = React.useMemo(() => {
-    if (!stepExecutions || stepExecutions.length === 0) return null;
     let total = 0;
     let hasCost = false;
-    for (const exec of stepExecutions) {
+    for (const exec of stepExecutions ?? []) {
       if (exec.agentOutput?.estimatedCostUsd != null) {
         total += exec.agentOutput.estimatedCostUsd;
         hasCost = true;
       }
     }
+    for (const childCost of childRunCostByInstanceId.values()) {
+      total += childCost;
+      hasCost = true;
+    }
     return hasCost ? total : null;
-  }, [stepExecutions]);
+  }, [stepExecutions, childRunCostByInstanceId]);
 
   const isTerminal = instance.status === 'completed' || instance.status === 'failed';
 
@@ -528,6 +547,7 @@ export function ProcessDetail({
             outputFiles={outputFiles}
             stepDetailBaseHref={runDetailHref}
             currentTask={blockingTask}
+            childRunCostByInstanceId={childRunCostByInstanceId}
             onAgentLogClick={(stepId: string) => {
               setAgentLogStepId(stepId);
               if (agentLogFiles.length > 0) setRightTab('agent-log');

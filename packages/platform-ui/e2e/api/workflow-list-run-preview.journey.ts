@@ -20,6 +20,7 @@ const PREVIEW_KEYS = [
   'pauseReason',
   'status',
   'totalCostUsd',
+  'treeCostUsd',
 ];
 
 test.describe('GET /api/workflow-definitions — run preview', () => {

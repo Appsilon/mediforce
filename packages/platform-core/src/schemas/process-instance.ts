@@ -79,6 +79,9 @@ export const ProcessInstanceSchema = z.object({
   /** ID of the ProcessInstance whose outputs populated `previousRun`. */
   previousRunSourceId: z.string().optional(),
   totalCostUsd: z.number().optional(),
+  /** This run's own cost plus every descendant's, recursively — kept in sync
+   *  server-side as each step's cost is fanned up the `parentInstanceId` chain. */
+  treeCostUsd: z.number().optional(),
   parentInstanceId: z.string().min(1).optional(),
   parentDefinitionName: z.string().min(1).optional(),
   dryRun: z.boolean().default(false),

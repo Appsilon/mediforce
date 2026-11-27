@@ -62,6 +62,7 @@ export class StubProcessInstanceRepository implements ProcessInstanceRepository 
   async getChildrenAll(): Promise<ProcessInstance[]> { throw new Error('stub'); }
   async getChildrenInNamespaces(): Promise<ProcessInstance[]> { throw new Error('stub'); }
   async update(): Promise<void> { throw new Error('stub'); }
+  async incrementCost(): Promise<void> { throw new Error('stub'); }
   async updateIfPaused(): Promise<boolean> { throw new Error('stub'); }
   async getByDefinition(): Promise<ProcessInstance[]> { throw new Error('stub'); }
   async getLastCompletedByDefinitionName(): Promise<ProcessInstance | null> { throw new Error('stub'); }

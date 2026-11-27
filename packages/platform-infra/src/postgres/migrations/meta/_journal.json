@@ -652,6 +652,13 @@
       "when": 1789641863900,
       "tag": "0092_default_model",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1789641864000,
+      "tag": "0093_process_instance_tree_cost",
+      "breakpoints": true
     }
   ]
 }

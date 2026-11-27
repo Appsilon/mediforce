@@ -32,6 +32,7 @@ export const GetRunOutputSchema = z.object({
    *  servers that don't include the field. */
   definitionNamespace: z.string().min(1).nullable().optional(),
   totalCostUsd: z.number().optional(),
+  treeCostUsd: z.number().optional(),
   dryRun: z.boolean().optional(),
 });
 

@@ -95,6 +95,7 @@ export const WorkflowRunPreviewSchema = ProcessInstanceSchema.pick({
   pauseReason: true,
   error: true,
   totalCostUsd: true,
+  treeCostUsd: true,
   createdAt: true,
 });
 

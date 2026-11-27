@@ -165,6 +165,7 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
     ? routes.workflowRunStep(handle, instance.definitionName, instance.id, instance.currentStepId)
     : null;
   const wfStatus = getWorkflowStatus(instance);
+  const displayCostUsd = instance.treeCostUsd ?? instance.totalCostUsd;
 
   return (
     <Link
@@ -225,9 +226,9 @@ export function ProcessInstanceRow({ instance, showProcess = false, steps, stepS
           )}
         </>
       )}
-      {instance.totalCostUsd != null && (
+      {displayCostUsd != null && (
         <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 text-right">
-          {formatCostUsd(instance.totalCostUsd)}{instance.status !== 'completed' && instance.status !== 'failed' ? '+' : ''}
+          {formatCostUsd(displayCostUsd)}{instance.status !== 'completed' && instance.status !== 'failed' ? '+' : ''}
         </span>
       )}
       <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 w-[48px] text-right" title={fullTimeAgo}>
