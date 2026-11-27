@@ -1,8 +1,7 @@
 """Read the deployment .env the way `source .env` and Docker Compose do.
 
-Shared by the host scripts cron runs (heartbeat.py, redis-host-probe.py,
-cron-jobs.py). Python puts the script's directory on sys.path, so they import
-it as `deploy_env`.
+Shared by the host scripts (heartbeat.py, cron-jobs.py). Python puts the
+script's directory on sys.path, so they import it as `deploy_env`.
 """
 
 from __future__ import annotations
