@@ -1,7 +1,7 @@
 ---
 status: living
 audience: operators
-last_reviewed: 2026-09-18
+last_reviewed: 2026-11-27
 ---
 
 # Redis capacity and recovery
@@ -60,47 +60,36 @@ container with no prompt, exiting 0 rather than failing. Both deploy scripts
 bring `container-worker` up in its own `up -d` ahead of the rest for exactly
 this reason. If you ever start services by hand, do the same.
 
-## The probe
+## What warns you
 
-Servers with the `monitoring` service get the same Redis and disk checks as
-Grafana Cloud alerts, which mail the ops list even when the host is down
-([monitoring.md](monitoring.md)). Retiring the probe is tracked in
-[#1716](https://github.com/Appsilon/mediforce/issues/1716).
+Servers with the `monitoring` service run these checks as Grafana Cloud alerts,
+which mail the ops list even when the host is down. Each alert's runbook is in
+[monitoring.md](monitoring.md#alerts).
 
-[`scripts/redis-host-probe.py`](../../scripts/redis-host-probe.py) runs on the
-deployment host every 5 minutes and checks the five things that failed in
-sequence during the incident:
+| What fails | Alert |
+|---|---|
+| RDB snapshots | [Redis snapshot failing](monitoring.md#redis-snapshot-failing) (`redis_rdb_last_bgsave_status`) |
+| Redis memory vs `maxmemory` | [Redis memory high](monitoring.md#redis-memory-high), above 85% |
+| Redis restarts or is killed | [Container restarting](monitoring.md#container-restarting), [OOM kill](monitoring.md#oom-kill), [Redis down](monitoring.md#redis-down) |
+| Host disk | [Filesystem full](monitoring.md#filesystem-full) at 75% / 85%, [Filesystem predicted full](monitoring.md#filesystem-predicted-full) within 7 days |
 
-| Check | Warns at | Critical at |
-|---|---|---|
-| `rdb_last_bgsave_status` | — | anything but `ok` |
-| Redis memory vs `maxmemory` | 70% | 80% |
-| Redis restart count | — | any increase since the last probe |
-| orphaned `temp-*.rdb` in `/data` | — | any present |
-| root filesystem usage | 75% | 85% |
+Orphaned `temp-*.rdb` snapshots have no alert of their own: what they do is
+fill the disk, which the filesystem alerts catch. Step 2 of
+[Recovery](#recovery) removes them.
 
-Thresholds are overridable per host in `.env` (`REDIS_MEM_WARN_PCT`,
-`REDIS_MEM_CRIT_PCT`, `DISK_WARN_PCT`, `DISK_CRIT_PCT`). The probe exits `0`,
-`1` or `2` on the worst finding, appends every check to
-`/opt/mediforce/logs/redis-probe.log`, and prints only the findings — so cron
-mails you exactly when something is wrong. Set `MEDIFORCE_ALERT_WEBHOOK` in
-`.env` to also POST them; both Slack and Discord incoming-webhook URLs work
-unchanged. With no webhook configured the probe still runs and still logs.
-
-Every deploy installs it, with the heartbeat: `deploy.sh` and
-`deploy-staging.sh` run `scripts/cron-jobs.py install`, which rewrites the
-`# mediforce-<job>` lines of the deploy user's crontab from the checked-out
-release. To install without deploying:
+To see the same state by hand on a host (`<redis>` is the Redis container,
+`docker ps --filter label=com.docker.compose.service=redis`):
 
 ```bash
-ssh deploy@<host> 'python3 /opt/mediforce/scripts/cron-jobs.py install'
+docker exec <redis> redis-cli info persistence | grep rdb_last_bgsave_status
+docker exec <redis> redis-cli info memory | grep -E '^(used_memory|maxmemory):'
+docker inspect -f '{{.RestartCount}} {{.State.OOMKilled}}' <redis>
+docker exec <redis> ls -la /data
+df -h /
 ```
 
-Run it by hand to see the current state of a host:
-
-```bash
-ssh deploy@<host> 'python3 /opt/mediforce/scripts/redis-host-probe.py --verbose'
-```
+Staging's Redis requires a password: pass it as
+`docker exec -e REDISCLI_AUTH=<REDIS_PASSWORD from /opt/mediforce/.env> <redis> redis-cli …`.
 
 ## Recovery
 
@@ -122,7 +111,8 @@ When Redis is refusing writes (`MISCONF Errors writing to the RDB snapshot`):
 5. **Force a save and confirm it worked:** `docker exec <redis> redis-cli bgsave`,
    then check `rdb_last_bgsave_status:ok` in `redis-cli info persistence`.
    Writes resume on their own once a save succeeds.
-6. **Re-run the probe** to confirm every check is back to `ok`.
+6. **Re-run the checks** under [What warns you](#what-warns-you) and confirm
+   the alerts resolve.
 
 What not to do, in any order of desperation: do not delete `dump.rdb`, do not
 set `stop-writes-on-bgsave-error no`, and do not switch `maxmemory-policy` to an
@@ -163,5 +153,5 @@ no-op on a configured host. To apply it to an existing host, run
 restart is a short outage), then deploy, and check that
 `docker info --format '{{.LoggingDriver}}'` prints `local`.
 
-The probe's disk check is the backstop: if artifacts still accumulate past 75%,
-it tells you before a snapshot fails.
+The [filesystem alerts](monitoring.md#filesystem-full) are the backstop: if
+artifacts still accumulate past 75%, they tell you before a snapshot fails.

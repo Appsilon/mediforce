@@ -110,7 +110,7 @@ scripts also bring `container-worker` up
 in its own `up -d` before everything else; keep that ordering if you touch them,
 and keep any new payload field readable by a worker one release behind.
 
-Host capacity, the probe that watches it, and recovery are in
+Host capacity, the alerts that watch it, and recovery are in
 [`docs/guides/redis-operations.md`](../../docs/guides/redis-operations.md).
 
 **Host paths in a job must resolve on the worker too, so the worker shares the

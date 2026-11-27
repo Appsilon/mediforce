@@ -9,9 +9,6 @@ deploy, so every server (forks included) runs the same jobs with no manual step
                  triggers, the stranded-run sweep, the model-registry sweep.
                  Pings HEARTBEAT_PING_URL after each success, when set
                  (docs/guides/monitoring.md).
-    redis-probe  Watches Redis persistence, memory, restarts, orphaned RDB
-                 snapshots and host disk, and alerts before Redis starts
-                 refusing writes (issue #1359).
     backup       Nightly borgmatic pass in the `backup` service, only where
                  .env sets BORG_REPO (docs/guides/backup-and-restore.md).
 
@@ -62,13 +59,6 @@ JOBS = (
         command="/usr/bin/python3 {deploy_dir}/scripts/heartbeat.py",
         schedule="*/15 * * * *",
         required_env=("PLATFORM_API_KEY", "DOMAIN"),
-    ),
-    CronJob(
-        name="redis-probe",
-        # Findings go to the probe's own log and, when MEDIFORCE_ALERT_WEBHOOK
-        # is set, to that webhook. Anything it still prints, cron mails.
-        command="/usr/bin/python3 {deploy_dir}/scripts/redis-host-probe.py",
-        schedule="*/5 * * * *",
     ),
     CronJob(
         name="backup",
