@@ -1,4 +1,4 @@
-import { resolveStepImage } from '@mediforce/agent-runtime';
+import { resolveBuildSource, resolveCarriedBuild, resolveStepImage } from '@mediforce/agent-runtime';
 import type { CallerIdentity } from '../../auth';
 import { ConflictError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
@@ -56,14 +56,22 @@ export interface WorkflowImagePin {
 /** Every image one version's steps resolve to, agent and script alike, by the
  *  rule the runtime resolves them with. A build-mode step carries no `image`,
  *  so its tag is derived — otherwise the scan is blind to exactly the
- *  `mediforce-built:*` and `mediforce-artifacts:*` rows that need naming. */
-function stepImages(definition: WorkflowDefinition): { stepId: string; image: string }[] {
-  const resolved: { stepId: string; image: string }[] = [];
+ *  `mediforce-built:*` and `mediforce-artifacts:*` rows that need naming.
+ *
+ *  `rebuildable` is whether the runtime builds the image at step start when it
+ *  is missing — from a repo and commit, or from files the workflow carries —
+ *  rather than failing because nobody can make it again. */
+export function stepImages(
+  definition: WorkflowDefinition,
+): { stepId: string; image: string; rebuildable: boolean }[] {
+  const resolved: { stepId: string; image: string; rebuildable: boolean }[] = [];
   for (const step of definition.steps) {
-    const image =
-      resolveStepImage(step.agent, definition) ?? resolveStepImage(step.script, definition);
-    if (typeof image !== 'string') continue;
-    resolved.push({ stepId: step.id, image });
+    const config = resolveStepImage(step.agent, definition) !== undefined ? step.agent : step.script;
+    const image = resolveStepImage(config, definition);
+    if (config === undefined || typeof image !== 'string') continue;
+    const rebuildable =
+      resolveCarriedBuild(config, definition) !== undefined || resolveBuildSource(config) !== undefined;
+    resolved.push({ stepId: step.id, image, rebuildable });
   }
   return resolved;
 }
@@ -74,7 +82,9 @@ function stepImages(definition: WorkflowDefinition): { stepId: string; image: st
  * One place, because the callers ask the same question for opposite reasons:
  * `GET /api/workflow-definitions/by-image` renders "used by", and
  * `assertNoLiveImagePins` below refuses to destroy an image a live version
- * needs. They must not be allowed to disagree about what counts as a pin.
+ * needs. They must not be allowed to disagree about what counts as a pin —
+ * nor may the prune sweep (`docker-images/prune-images.ts`), which asks the
+ * reverse question through the same `stepImages` and `pickRunnableVersion`.
  *
  * **Every version, not just the latest.** The read this replaced looked at
  * `latestVersion` alone and skipped archived workflows entirely, so "what

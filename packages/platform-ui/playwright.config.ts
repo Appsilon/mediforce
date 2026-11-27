@@ -118,6 +118,9 @@ const primaryWebServer = {
     // whatever OpenRouter is serving that day. That is what pushed the seeded
     // models off page one of `model-registry.journey.ts`.
     ENABLE_MODEL_SYNC: 'false',
+    // The heartbeat's daily image sweep would delete the developer's own
+    // unneeded images on the first beat; image-prune.journey drives it directly.
+    ENABLE_IMAGE_PRUNE: 'false',
     AUTH_SECRET: process.env.AUTH_SECRET ?? E2E_AUTH_SECRET,
     // Domain auto-join fixture for `auto-join-workspace.journey.ts`. The
     // domain is deliberately NOT `mediforce.dev` (every other fixture user's
@@ -159,6 +162,9 @@ const passwordOffWebServer = {
   env: {
     ENABLE_PASSWORD_AUTH: 'false',
     ENABLE_MODEL_SYNC: 'false',
+    // The heartbeat's daily image sweep would delete the developer's own
+    // unneeded images on the first beat; image-prune.journey drives it directly.
+    ENABLE_IMAGE_PRUNE: 'false',
     GOOGLE_CLIENT_ID: 'e2e-password-off-google-client-id',
     GOOGLE_CLIENT_SECRET: 'e2e-password-off-google-client-secret',
     ALLOWED_EMAIL_DOMAINS: 'mediforce.dev',

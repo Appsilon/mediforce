@@ -1,4 +1,4 @@
-import type { DockerInfoResponse } from '@mediforce/platform-api/contract';
+import { DEFAULT_IMAGE_PRUNE_MIN_AGE_DAYS, type DockerInfoResponse } from '@mediforce/platform-api/contract';
 import { defineCommand } from '../define-command';
 import { printJson, type OutputSink } from '../output';
 
@@ -107,6 +107,44 @@ export const systemDiskCommand = defineCommand({
       return 0;
     }
     printDisk(output, data);
+    return 0;
+  },
+});
+
+export const systemPruneImagesCommand = defineCommand({
+  name: 'mediforce system prune-images',
+  description:
+    'Delete the mediforce-artifacts:* and mediforce-built:* images nothing needs any more: no workflow, agent, catalog entry or live run names them and they are older than --min-age-days. The runtime rebuilds either kind when a step needs it again. The cron heartbeat runs this daily; requires an API key.',
+  args: {
+    'dry-run': { type: 'boolean', description: 'List what would be deleted and delete nothing' },
+    'min-age-days': { type: 'string', description: `Minimum image age in days (default: ${String(DEFAULT_IMAGE_PRUNE_MIN_AGE_DAYS)})` },
+    images: { type: 'string', description: 'Comma-separated repository:tag list to narrow the sweep to' },
+  },
+  async run({ args, output, mediforce, jsonMode }) {
+    const images = args.images?.split(',').map((image) => image.trim()).filter((image) => image !== '');
+    const result = await mediforce.dockerImages.prune({
+      dryRun: args['dry-run'] === true,
+      ...(args['min-age-days'] === undefined ? {} : { minAgeDays: Number(args['min-age-days']) }),
+      ...(images === undefined ? {} : { images }),
+    });
+    if (jsonMode) {
+      printJson(output, result);
+      return 0;
+    }
+    if (result.available === false) {
+      output.stdout('Docker unavailable — nothing pruned.');
+      return 0;
+    }
+    const verb = result.dryRun ? 'Would delete' : 'Deleted';
+    output.stdout(`${verb} ${String(result.pruned.length)} image(s):`);
+    for (const row of result.pruned) output.stdout(`  ${padRight(row.image, 50)} ${padLeft(row.size, 10)}`);
+    output.stdout(`\nKept ${String(result.kept.length)} image(s):`);
+    for (const row of result.kept) output.stdout(`  ${padRight(row.image, 50)} ${row.reason}`);
+    if (result.failed.length > 0) {
+      output.stdout(`\nFailed to delete ${String(result.failed.length)} image(s):`);
+      for (const row of result.failed) output.stdout(`  ${row.image}: ${row.error}`);
+      return 1;
+    }
     return 0;
   },
 });

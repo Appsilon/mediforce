@@ -571,6 +571,50 @@ deployment — and the daemon is shared, so removing `python` from a workspace
 minutes old would break all of them
 ([ADR-0022](../adr/0022-image-catalog.md) decision 8).
 
+## Pruning images nothing needs
+
+Every carried-file edit and every new commit a build step names leaves a new
+`mediforce-artifacts:<hash>` or `mediforce-built:<hash>` image behind, and
+nothing else removes the old ones. The cron heartbeat sweeps them once a day:
+
+```bash
+pnpm exec mediforce system prune-images --dry-run   # what would go, and why the rest stays
+pnpm exec mediforce system prune-images             # delete them now
+```
+
+Only those two repositories are candidates, because the runtime rebuilds either
+kind at step start when it is missing — from the repo and commit, or from the
+files the workflow carries. An uploaded, pulled or published image, an agent
+image and the golden image have no such source and are never touched. The
+repository name alone is not proof — anything can be pulled or tagged into it —
+so a candidate must also carry the builder's `mediforce.build.commit` or
+`mediforce.build.artifacts` label.
+
+A candidate is **kept**, with the first reason that holds:
+
+| Reason | When |
+|---|---|
+| `workflow` | The version runs start from names it — or any version, superseded or archived, names it outright with nothing to rebuild it from, since that version can become the default again |
+| `agent` | An agent definition names it |
+| `catalog` | It is the newest version of an Image Catalog entry, in any workspace — what a user picking that entry gets. Older versions of the entry are not kept; they can be built again from the same source |
+| `run` | A run that is not finished, or failed in the last 14 days (so it can still be resumed), is on a version that names it. An eval trial counts by the definition it carries, not the stored version |
+| `provenance-unknown` | It lacks the builder's labels, so it may have been pulled or tagged in with nothing to rebuild it from |
+| `age-unknown` | The daemon did not report when it was created |
+| `recent` | It is younger than `--min-age-days` (default 14) |
+
+What is left is an image only superseded versions name, and that they can
+rebuild. Making such a version the default again costs one rebuild on its first
+run — which fails if the repo has since lost that commit or the step's
+repository token no longer works. The same holds for a run that failed more than
+14 days ago and is then resumed: its first step rebuilds the image. A container
+still using an image makes `docker rmi` refuse it; the sweep reports it under
+`failed` and moves on.
+
+The sweep is system-actor only (an API key): who needs an image depends on
+every workspace's workflows and runs. Set `ENABLE_IMAGE_PRUNE=false` to turn
+the daily sweep off; the command still works. A run narrowed with `--images`
+inspected only those images, so it does not count as the day's sweep.
+
 ## Backfilling an existing deployment
 
 For those hand-built and pulled images, `scripts/migrations/adopt_daemon_images.py`

@@ -13,6 +13,9 @@ export interface ImageCatalogRepository {
   getById(namespace: string, entryId: string): Promise<ImageCatalogEntry | null>;
   /** Return all entries in the namespace, in no guaranteed order. */
   list(namespace: string): Promise<ImageCatalogEntry[]>;
+  /** Every workspace's entries, for the deployment-wide image prune sweep —
+   *  the daemon is shared, so a sweep must see every workspace's catalog. */
+  listAllForImageAudit(): Promise<{ namespace: string; entry: ImageCatalogEntry }[]>;
   /** Create or replace an entry. */
   upsert(namespace: string, entry: ImageCatalogEntry): Promise<ImageCatalogEntry>;
   /** Remove an entry. No-op when id is absent. */

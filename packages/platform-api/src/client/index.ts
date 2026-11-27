@@ -311,6 +311,10 @@ import {
   DeleteDockerImageOutputSchema,
   type DeleteDockerImageInput,
   type DeleteDockerImageOutput,
+  PruneDockerImagesInputSchema,
+  PruneDockerImagesOutputSchema,
+  type PruneDockerImagesBody,
+  type PruneDockerImagesOutput,
   type ListOAuthProvidersInput,
   type ListOAuthProvidersOutput,
   type GetOAuthProviderInput,
@@ -1065,6 +1069,7 @@ export class Mediforce {
 
   readonly dockerImages: {
     delete: (input: DeleteDockerImageInput) => Promise<DeleteDockerImageOutput>;
+    prune: (input: PruneDockerImagesBody) => Promise<PruneDockerImagesOutput>;
   };
 
   readonly toolCatalog: {
@@ -2416,6 +2421,16 @@ export class Mediforce {
         });
         const body = await parseJsonOrThrow(res, 'mediforce.dockerImages.delete');
         return DeleteDockerImageOutputSchema.parse(body);
+      },
+      prune: async (input) => {
+        const validated = PruneDockerImagesInputSchema.parse(input);
+        const res = await this.request('/api/admin/docker-images/prune', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validated),
+        });
+        const body = await parseJsonOrThrow(res, 'mediforce.dockerImages.prune');
+        return PruneDockerImagesOutputSchema.parse(body);
       },
     };
 

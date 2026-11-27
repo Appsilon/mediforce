@@ -42,6 +42,11 @@ export class PostgresImageCatalogRepository implements ImageCatalogRepository {
     return rows.map((r) => toEntry(r));
   }
 
+  async listAllForImageAudit(): Promise<{ namespace: string; entry: ImageCatalogEntry }[]> {
+    const rows = await this.db.select().from(imageCatalogEntries);
+    return rows.map((row) => ({ namespace: row.workspace, entry: toEntry(row) }));
+  }
+
   async upsert(namespace: string, entry: ImageCatalogEntry): Promise<ImageCatalogEntry> {
     const parsed = ImageCatalogEntrySchema.parse(entry);
     const values = {

@@ -86,6 +86,16 @@ function contract(name: string, factory: () => Promise<ImageCatalogRepository>) 
       expect((await repo.list('other-ws')).map((e) => e.intent)).toEqual(['other']);
     });
 
+    it('listAllForImageAudit returns the entries of every workspace, each with its workspace', async () => {
+      await repo.upsert('appsilon', entry({ id: 'a' }));
+      await repo.upsert('other-ws', entry({ id: 'a', intent: 'other' }));
+
+      const all = await repo.listAllForImageAudit();
+      expect(
+        all.map((row) => `${row.namespace}:${row.entry.id}:${row.entry.intent}`).sort(),
+      ).toEqual([`appsilon:a:${entry().intent}`, 'other-ws:a:other']);
+    });
+
     it('delete removes the entry and is a no-op on missing id', async () => {
       await repo.upsert('appsilon', entry());
       await repo.delete('appsilon', 'tealflow-1a2b3c4d');

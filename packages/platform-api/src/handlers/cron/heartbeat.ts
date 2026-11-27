@@ -21,8 +21,37 @@ import { ForbiddenError, PreconditionFailedError } from '../../errors';
 import { resumeWait } from '../processes/resume-wait';
 import { settleRunWaits } from '../processes/settle-run-waits';
 import { driveOpenEvalRuns } from '../evaluation/eval-runs';
+import { IMAGE_PRUNE_AUDIT_ENTITY, pruneDockerImages } from '../docker-images/prune-images';
+import { DEFAULT_IMAGE_PRUNE_MIN_AGE_DAYS } from '../../contract/docker-images';
 
 type Evaluation = { fire: true } | { fire: false; reason: string };
+
+const IMAGE_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Prune unneeded workflow images once a day. The last sweep's audit
+ * event is the clock, so a redeploy neither skips a day nor runs two. On unless
+ * `ENABLE_IMAGE_PRUNE=false`, and skipped where nothing can delete an image.
+ */
+async function pruneImagesIfDue(scope: CallerScope, now: Date): Promise<void> {
+  if (process.env.ENABLE_IMAGE_PRUNE === 'false' || scope.system.dockerImages === null) return;
+  const sweeps = await scope.system.audit.getByEntity(
+    IMAGE_PRUNE_AUDIT_ENTITY.entityType,
+    IMAGE_PRUNE_AUDIT_ENTITY.entityId,
+  );
+  const lastSweep = sweeps[0];
+  if (lastSweep !== undefined && now.getTime() - new Date(lastSweep.timestamp).getTime() < IMAGE_PRUNE_INTERVAL_MS) {
+    return;
+  }
+  const result = await pruneDockerImages({ dryRun: false, minAgeDays: DEFAULT_IMAGE_PRUNE_MIN_AGE_DAYS }, scope);
+  if (result.available === false) {
+    console.warn('[cron-heartbeat] Image prune skipped: Docker daemon unavailable, retrying next tick');
+    return;
+  }
+  console.log(
+    `[cron-heartbeat] Image prune: ${String(result.pruned.length)} deleted, ${String(result.kept.length)} kept, ${String(result.failed.length)} failed`,
+  );
+}
 
 // A firing tick also carries the payload it fires with — the row's static input
 // resolved against the contract's defaults, not the raw config (ADR-0012).
@@ -372,6 +401,13 @@ export async function heartbeat(
     await syncRegistryIfStale(scope.models, { auditRepo: scope.system.audit });
   } catch (err) {
     console.error('[cron-heartbeat] Model registry sweep failed:', err);
+  }
+
+  // Sweep: delete workflow images nothing needs any more, once a day.
+  try {
+    await pruneImagesIfDue(scope, now);
+  } catch (err) {
+    console.error('[cron-heartbeat] Image prune sweep failed:', err);
   }
 
   try {

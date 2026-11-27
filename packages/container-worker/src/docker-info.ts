@@ -12,6 +12,7 @@ import {
   parseImageCapabilities,
   parseImageHistory,
   unknownImageCapabilities,
+  parseDockerCreatedAt,
   parseImageInspect,
   readProvenanceLabels,
   resolveImageLineage,
@@ -36,6 +37,8 @@ export interface DockerImage extends ReadImageProvenance, Partial<ImageLineageFa
   id: string;
   size: string;
   created: string;
+  /** ISO time the image was created; absent when the daemon's `CreatedAt` does not parse. */
+  createdAt?: string;
 }
 
 export interface DockerDiskUsage {
@@ -80,6 +83,7 @@ export async function listImages(): Promise<DockerImage[]> {
       id: parsed.ID,
       size: parsed.Size,
       created: parsed.CreatedSince,
+      createdAt: parseDockerCreatedAt(parsed.CreatedAt),
       ...readProvenanceLabels(inspected.get(id)?.labels),
       ...lineage.get(id),
     };

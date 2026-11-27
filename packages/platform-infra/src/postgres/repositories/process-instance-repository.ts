@@ -22,6 +22,7 @@ import {
   type WorkflowRunSummaryResult,
   type RunNameEntry,
   type RunDefinitionPin,
+  type RunStatusQueryOptions,
   type RunLifecycle,
 } from '@mediforce/platform-core';
 import type { Database } from '../client';
@@ -513,11 +514,19 @@ export class PostgresProcessInstanceRepository
     );
   }
 
-  async getByStatusAll(status: InstanceStatus): Promise<ProcessInstance[]> {
+  async getByStatusAll(
+    status: InstanceStatus,
+    options: RunStatusQueryOptions = {},
+  ): Promise<ProcessInstance[]> {
     const rows = await this.db
       .select()
       .from(processInstances)
-      .where(eq(processInstances.status, status))
+      .where(
+        and(
+          eq(processInstances.status, status),
+          options.updatedSince === undefined ? undefined : gt(processInstances.updatedAt, options.updatedSince),
+        ),
+      )
       .orderBy(desc(processInstances.createdAt));
     return rows.map((r) => toInstance(r));
   }
@@ -525,6 +534,7 @@ export class PostgresProcessInstanceRepository
   async getByStatusInNamespaces(
     status: InstanceStatus,
     allowed: readonly string[],
+    options: RunStatusQueryOptions = {},
   ): Promise<ProcessInstance[]> {
     if (allowed.length === 0) return [];
     const rows = await this.db
@@ -534,6 +544,7 @@ export class PostgresProcessInstanceRepository
         and(
           eq(processInstances.status, status),
           inArray(processInstances.workspace, [...allowed]),
+          options.updatedSince === undefined ? undefined : gt(processInstances.updatedAt, options.updatedSince),
         ),
       )
       .orderBy(desc(processInstances.createdAt));

@@ -53,6 +53,7 @@ import {
   systemImagesCommand,
   systemDiskCommand,
   systemRmiCommand,
+  systemPruneImagesCommand,
 } from './commands/system-status';
 import {
   imagesListCommand,
@@ -434,6 +435,7 @@ export const TREE: Record<string, BranchEntry> = {
       status: { description: 'Full infrastructure status', fn: systemStatusCommand },
       images: { description: 'List raw Docker images on the host (ops view; see `mediforce images` for the catalog)', fn: systemImagesCommand },
       rmi: { description: 'Remove a Docker image by ID or name:tag', fn: systemRmiCommand },
+      'prune-images': { description: 'Delete workflow images nothing needs any more (--dry-run to preview)', fn: systemPruneImagesCommand },
       disk: { description: 'Docker disk usage breakdown', fn: systemDiskCommand },
       credits: { description: 'OpenRouter credit balance for a workspace', fn: systemCreditsCommand },
     },

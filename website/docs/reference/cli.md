@@ -124,6 +124,7 @@ See [Container images](../images/) for which path to take.
 | `cowork chat <id>` | Talk in a session |
 | `system status` | Docker health, images and disk |
 | `system images` / `system rmi <id>` / `system disk` | Inspect and prune step images |
+| `system prune-images [--dry-run]` | Delete workflow-built images nothing needs any more (also run daily by the heartbeat) |
 | `system credits --namespace` | Model credit remaining |
 | `email status` | Which mail transport is configured, and its from address |
 | `assistant ask <message> --definition` | Ask the workflow assistant about a canvas |

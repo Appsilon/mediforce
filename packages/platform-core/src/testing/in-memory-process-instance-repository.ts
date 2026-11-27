@@ -12,6 +12,7 @@ import {
   type ListInstancesOptions,
   type ListInstancesPageOptions,
   type ListInstancesPage,
+  type RunStatusQueryOptions,
   type WorkflowDisplayStatusCounts,
   type WorkflowRunSummaryResult,
 } from '../index';
@@ -42,6 +43,10 @@ const TERMINAL_STATUSES: ReadonlySet<InstanceStatus> = new Set([
 /** A run the listings show: not deleted, and not an eval trial (ADR-0023 D4). */
 function isListedRun(instance: ProcessInstance): boolean {
   return instance.deleted !== true && instance.evalRunId === undefined;
+}
+
+function updatedAfter(instance: ProcessInstance, since: Date | undefined): boolean {
+  return since === undefined || new Date(instance.updatedAt).getTime() > since.getTime();
 }
 
 export class InMemoryProcessInstanceRepository
@@ -312,16 +317,25 @@ export class InMemoryProcessInstanceRepository
     return results.slice(0, options.limit ?? 20);
   }
 
-  async getByStatusAll(status: InstanceStatus): Promise<ProcessInstance[]> {
-    return [...this.instances.values()].filter((i) => i.status === status);
+  async getByStatusAll(
+    status: InstanceStatus,
+    options: RunStatusQueryOptions = {},
+  ): Promise<ProcessInstance[]> {
+    return [...this.instances.values()].filter(
+      (instance) => instance.status === status && updatedAfter(instance, options.updatedSince),
+    );
   }
 
   async getByStatusInNamespaces(
     status: InstanceStatus,
     allowed: readonly string[],
+    options: RunStatusQueryOptions = {},
   ): Promise<ProcessInstance[]> {
     return [...this.instances.values()].filter(
-      (i) => i.status === status && allowed.includes(i.namespace ?? ''),
+      (instance) =>
+        instance.status === status &&
+        allowed.includes(instance.namespace ?? '') &&
+        updatedAfter(instance, options.updatedSince),
     );
   }
 
