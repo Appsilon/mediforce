@@ -162,6 +162,10 @@ Import two community dashboards at `https://<stack>.grafana.net/dashboard/import
 
 Pick the `grafanacloud-<stack>-prom` data source. They need no other changes.
 
+Node Exporter Full picks a server with two dropdowns: **Nodename** is the
+server's hostname (`uts: host` on the service), and **Instance** is its
+domain.
+
 ## Check that alerting works
 
 Run these on staging, never on production:
