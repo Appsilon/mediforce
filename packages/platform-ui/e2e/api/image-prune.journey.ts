@@ -13,9 +13,11 @@ import {
  * `pruneDockerImages` → workflow definitions in Postgres + the real Docker
  * daemon.
  *
- * Every image here is a tag on `alpine`, which is months old, so it is "old"
- * without waiting; the recent one is a `docker commit`, created now. The sweep
- * is narrowed to this test's own tags, so it never touches what a parallel
+ * The runtime-built images are one `docker build` carrying the builder's
+ * commit label, created now: recent under the default age, prunable under
+ * `minAgeDays: 0`. The unlabelled one is a bare tag on `alpine` — what a pull
+ * into `mediforce-built` looks like — old, yet never a candidate. The sweep is
+ * narrowed to this test's own tags, so it never touches what a parallel
  * journey — or the developer — has on the daemon.
  */
 
@@ -51,15 +53,14 @@ function imageExists(tag: string): boolean {
   }
 }
 
-/** An image created now, so it is younger than any minimum age. */
-function commitRecentImage(tag: string): void {
-  const container = `mediforce-e2e-prune-${tag.replace(/[^a-z0-9]/gi, '-')}`;
-  docker('run', '--name', container, OLD_BASE_IMAGE, 'true');
-  try {
-    docker('commit', container, tag);
-  } finally {
-    docker('rm', '-f', container);
-  }
+/** An image created now, labelled the way the runtime's builder labels a repo build. */
+function buildRuntimeImage(tags: readonly string[], commit: string): void {
+  execFileSync(
+    'docker',
+    ['build', '--label', `mediforce.build.commit=${commit}`, ...tags.flatMap((tag) => ['-t', tag]), '-'],
+    // A label-only build inherits the base's creation time; a layer makes it new.
+    { stdio: 'pipe', input: `FROM ${OLD_BASE_IMAGE}\nRUN echo ${commit} > /e2e-build\n` },
+  );
 }
 
 async function registerVersion(
@@ -91,7 +92,7 @@ async function registerVersion(
 
 async function prune(
   request: APIRequestContext,
-  body: { dryRun: boolean; images: string[] },
+  body: { dryRun: boolean; images: string[]; minAgeDays?: number },
 ): Promise<PruneResult> {
   const response = await request.post('/api/admin/docker-images/prune', {
     headers: apiKeyHeaders(),
@@ -107,7 +108,7 @@ test.describe('image prune API journey', () => {
     test.setTimeout(90_000);
   });
 
-  test('deletes an old unreferenced image and keeps referenced or recent ones', async ({ request }) => {
+  test('deletes an unreferenced runtime-built image and keeps referenced, recent or foreign ones', async ({ request }) => {
     test.skip(!dockerAvailable(), 'Docker daemon not available');
     if (imageExists(OLD_BASE_IMAGE) === false) docker('pull', OLD_BASE_IMAGE);
 
@@ -115,14 +116,12 @@ test.describe('image prune API journey', () => {
     const unreferenced = `mediforce-artifacts:e2e-prune-orphan-${stamp}`;
     const livePinned = `mediforce-built:e2e-prune-live-${stamp}`;
     const supersededPinned = `mediforce-built:e2e-prune-superseded-${stamp}`;
-    const recent = `mediforce-artifacts:e2e-prune-recent-${stamp}`;
+    const foreign = `mediforce-built:e2e-prune-pulled-${stamp}`;
     const workflowName = `e2e-prune-${stamp}`;
-    const tags = [unreferenced, livePinned, supersededPinned, recent];
+    const tags = [unreferenced, livePinned, supersededPinned, foreign];
 
-    docker('tag', OLD_BASE_IMAGE, unreferenced);
-    docker('tag', OLD_BASE_IMAGE, livePinned);
-    docker('tag', OLD_BASE_IMAGE, supersededPinned);
-    commitRecentImage(recent);
+    buildRuntimeImage([unreferenced, livePinned, supersededPinned], `e2e-${String(stamp)}`);
+    docker('tag', OLD_BASE_IMAGE, foreign);
 
     try {
       // v1 names the superseded image, v2 — the version runs start from — the
@@ -134,22 +133,26 @@ test.describe('image prune API journey', () => {
       const plan = await prune(request, { dryRun: true, images: tags });
       expect(plan.available).toBe(true);
       expect(plan.dryRun).toBe(true);
-      expect(plan.pruned.map((row) => row.image)).toEqual([unreferenced]);
+      expect(plan.pruned).toEqual([]);
       expect(Object.fromEntries(plan.kept.map((row) => [row.image, row.reason]))).toEqual({
+        [unreferenced]: 'recent',
         [livePinned]: 'workflow',
         [supersededPinned]: 'workflow',
-        [recent]: 'recent',
+        [foreign]: 'provenance-unknown',
       });
+
+      const dryRun = await prune(request, { dryRun: true, images: tags, minAgeDays: 0 });
+      expect(dryRun.pruned.map((row) => row.image)).toEqual([unreferenced]);
       // A dry run destroys nothing.
       expect(imageExists(unreferenced)).toBe(true);
 
-      const swept = await prune(request, { dryRun: false, images: tags });
+      const swept = await prune(request, { dryRun: false, images: tags, minAgeDays: 0 });
       expect(swept.failed).toEqual([]);
       expect(swept.pruned.map((row) => row.image)).toEqual([unreferenced]);
       expect(imageExists(unreferenced)).toBe(false);
       expect(imageExists(livePinned)).toBe(true);
       expect(imageExists(supersededPinned)).toBe(true);
-      expect(imageExists(recent)).toBe(true);
+      expect(imageExists(foreign)).toBe(true);
     } finally {
       for (const tag of tags) {
         try {

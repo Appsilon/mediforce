@@ -310,6 +310,21 @@ function contract(
       expect(scopedIds).not.toContain(r2.id);
     });
 
+    it('getByStatusAll / InNamespaces keep only runs updated after updatedSince', async () => {
+      const { repo, registerWorkspace } = await factory();
+      await registerWorkspace('ws-1');
+      const stale = await repo.create(instanceFor('ws-1', { status: 'failed', updatedAt: '2026-05-01T00:00:00.000Z' }));
+      const fresh = await repo.create(instanceFor('ws-1', { status: 'failed', updatedAt: '2026-05-27T00:00:00.000Z' }));
+      const updatedSince = new Date('2026-05-20T00:00:00.000Z');
+
+      const all = (await repo.getByStatusAll('failed', { updatedSince })).map((run) => run.id);
+      expect(all).toContain(fresh.id);
+      expect(all).not.toContain(stale.id);
+
+      const scoped = (await repo.getByStatusInNamespaces('failed', ['ws-1'], { updatedSince })).map((run) => run.id);
+      expect(scoped).toEqual([fresh.id]);
+    });
+
     it('getChildren reads the runs a parent spawned, oldest first, round-tripping the parent link', async () => {
       const { repo, registerWorkspace } = await factory();
       await registerWorkspace('ws-1');

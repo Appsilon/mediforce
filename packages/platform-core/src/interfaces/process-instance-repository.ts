@@ -61,6 +61,11 @@ export interface ListInstancesPage {
   readonly nextCursor?: string;
 }
 
+export interface RunStatusQueryOptions {
+  /** Only runs updated strictly after this instant. */
+  readonly updatedSince?: Date;
+}
+
 /** Per-`WorkflowDisplayStatus` counts for the Workflows tab's KPI cards —
  *  computed as a single grouped COUNT in Postgres, not by fetching rows and
  *  tallying in JS. Respects the same `namespace`/`dryRun`/`archived` filters
@@ -182,8 +187,14 @@ export interface ProcessInstanceRepository {
     allowed: readonly string[],
   ): Promise<RunDefinitionPin[]>;
 
-  getByStatusAll(status: InstanceStatus): Promise<ProcessInstance[]>;
-  getByStatusInNamespaces(status: InstanceStatus, allowed: readonly string[]): Promise<ProcessInstance[]>;
+  /** `updatedSince` keeps only runs updated after that instant, filtered in
+   *  storage — for a status like `failed` whose history only grows. */
+  getByStatusAll(status: InstanceStatus, options?: RunStatusQueryOptions): Promise<ProcessInstance[]>;
+  getByStatusInNamespaces(
+    status: InstanceStatus,
+    allowed: readonly string[],
+    options?: RunStatusQueryOptions,
+  ): Promise<ProcessInstance[]>;
 
   /**
    * Every non-deleted run a `spawn` step fired from `parentInstanceId`,

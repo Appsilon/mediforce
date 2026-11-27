@@ -650,6 +650,7 @@ export type {
   ListInstancesOptions,
   ListInstancesPageOptions,
   ListInstancesPage,
+  RunStatusQueryOptions,
   WorkflowDisplayStatusCounts,
   WorkflowRunSummaryResult,
   HumanTaskRepository,

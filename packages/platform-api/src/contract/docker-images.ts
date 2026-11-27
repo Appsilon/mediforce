@@ -37,10 +37,20 @@ export const PruneDockerImagesInputSchema = z.object({
  * - `agent`: an agent definition names it.
  * - `run`: a run that is not finished — or failed recently enough to be
  *   resumed — is on a version that names it.
- * - `recent`: younger than `minAgeDays`.
+ * - `provenance-unknown`: it lacks the labels the runtime's builder writes, so
+ *   it may have been pulled or tagged into the repository and have nothing to
+ *   rebuild it from.
  * - `age-unknown`: the daemon did not report when it was created.
+ * - `recent`: younger than `minAgeDays`.
  */
-export const ImagePruneKeepReasonSchema = z.enum(['workflow', 'agent', 'run', 'recent', 'age-unknown']);
+export const ImagePruneKeepReasonSchema = z.enum([
+  'workflow',
+  'agent',
+  'run',
+  'provenance-unknown',
+  'age-unknown',
+  'recent',
+]);
 
 const PruneImageRowSchema = z.object({
   image: z.string(),

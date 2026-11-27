@@ -586,7 +586,10 @@ pnpm exec mediforce system prune-images             # delete them now
 Only those two repositories are candidates, because the runtime rebuilds either
 kind at step start when it is missing — from the repo and commit, or from the
 files the workflow carries. An uploaded, pulled or published image, an agent
-image and the golden image have no such source and are never touched.
+image and the golden image have no such source and are never touched. The
+repository name alone is not proof — anything can be pulled or tagged into it —
+so a candidate must also carry the builder's `mediforce.build.commit` or
+`mediforce.build.artifacts` label.
 
 A candidate is **kept**, with the first reason that holds:
 
@@ -594,9 +597,10 @@ A candidate is **kept**, with the first reason that holds:
 |---|---|
 | `workflow` | The version runs start from names it — or any version, superseded or archived, names it outright with nothing to rebuild it from, since that version can become the default again |
 | `agent` | An agent definition names it |
-| `run` | A run that is not finished, or failed in the last `--min-age-days` (so it can still be resumed), is on a version that names it |
-| `recent` | It is younger than `--min-age-days` (default 14) |
+| `run` | A run that is not finished, or failed in the last `--min-age-days` (so it can still be resumed), is on a version that names it. An eval trial counts by the definition it carries, not the stored version |
+| `provenance-unknown` | It lacks the builder's labels, so it may have been pulled or tagged in with nothing to rebuild it from |
 | `age-unknown` | The daemon did not report when it was created |
+| `recent` | It is younger than `--min-age-days` (default 14) |
 
 What is left is an image only superseded versions name, and that they can
 rebuild. Making such a version the default again costs one rebuild on its first
@@ -606,7 +610,8 @@ repository token no longer works. A container still using an image makes
 
 The sweep is system-actor only (an API key): who needs an image depends on
 every workspace's workflows and runs. Set `ENABLE_IMAGE_PRUNE=false` to turn
-the daily sweep off; the command still works.
+the daily sweep off; the command still works. A run narrowed with `--images`
+inspected only those images, so it does not count as the day's sweep.
 
 ## Backfilling an existing deployment
 

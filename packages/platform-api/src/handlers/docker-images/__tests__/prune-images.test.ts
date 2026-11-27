@@ -1,9 +1,18 @@
-import { describe, it, expect } from 'vitest';
-import { buildProcessInstance, buildWorkflowDefinition } from '@mediforce/platform-core/testing';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  InMemoryAuditRepository,
+  InMemoryProcessInstanceRepository,
+  buildProcessInstance,
+  buildWorkflowDefinition,
+} from '@mediforce/platform-core/testing';
 import type { AgentDefinition, WorkflowDefinitionGroup } from '@mediforce/platform-core';
 import { resolveStepImage } from '@mediforce/agent-runtime';
 import type { DockerImageInfo } from '../../../contract/system';
-import { planImagePrune, type ImagePruneFacts } from '../prune-images';
+import { createTestScope } from '../../../repositories/__tests__/create-test-scope';
+import { fetchDaemonImages } from '../../system/_docker';
+import { IMAGE_PRUNE_AUDIT_ENTITY, planImagePrune, pruneDockerImages, type ImagePruneFacts } from '../prune-images';
+
+vi.mock('../../system/_docker', () => ({ fetchDaemonImages: vi.fn() }));
 
 const NOW = new Date('2026-11-27T12:00:00Z');
 const OLD = '2026-10-01T00:00:00.000Z';
@@ -17,8 +26,9 @@ function builtTag(commit: string): string {
 const BUILT_V1 = builtTag('aaa111');
 const BUILT_V2 = builtTag('bbb222');
 
-/** A daemon row; `createdAt: null` is a row whose age the daemon did not report. */
-function image(reference: string, createdAt: string | null = OLD): DockerImageInfo {
+/** A daemon row the runtime's builder made; `createdAt: null` is a row whose
+ *  age the daemon did not report, `labelled: false` one without build labels. */
+function image(reference: string, createdAt: string | null = OLD, labelled = true): DockerImageInfo {
   const [repository, tag] = reference.split(':');
   return {
     repository: repository ?? '',
@@ -27,6 +37,7 @@ function image(reference: string, createdAt: string | null = OLD): DockerImageIn
     size: '1GB',
     created: '2 months ago',
     ...(createdAt === null ? {} : { createdAt }),
+    ...(labelled === true ? { buildCommit: 'aaa111' } : {}),
   };
 }
 
@@ -130,6 +141,32 @@ describe('planImagePrune', () => {
     expect(reasons(result)).toEqual({ [BUILT_V1]: 'run' });
   });
 
+  it('keeps what an unfinished eval trial carries in its own definition', () => {
+    const evalDefinition = buildWorkflowDefinition({
+      name: 'sdtm-qc',
+      namespace: 'acme',
+      version: 1,
+      steps: [
+        { id: 'analyse', name: 'Analyse', type: 'creation', executor: 'agent', autonomyLevel: 'L2', agent: { image: 'mediforce-built:variant' } },
+        { id: 'done', name: 'Done', type: 'terminal', executor: 'human' },
+      ],
+      transitions: [{ from: 'analyse', to: 'done' }],
+    });
+    const result = plan({
+      images: [image('mediforce-built:variant')],
+      groups: [workflow([{ image: 'mediforce-built:current' }])],
+      runs: [
+        buildProcessInstance({ namespace: 'acme', definitionName: 'sdtm-qc', definitionVersion: '1', status: 'created', evalDefinition }),
+      ],
+    });
+    expect(reasons(result)).toEqual({ 'mediforce-built:variant': 'run' });
+  });
+
+  it('keeps an image in a prunable repository that the runtime did not build', () => {
+    const result = plan({ images: [image('mediforce-built:pulled', OLD, false)] });
+    expect(reasons(result)).toEqual({ 'mediforce-built:pulled': 'provenance-unknown' });
+  });
+
   it('keeps an image an agent names', () => {
     const agent = { image: 'mediforce-built:agent' } as AgentDefinition;
     const result = plan({ images: [image('mediforce-built:agent')], agents: [agent] });
@@ -152,5 +189,32 @@ describe('planImagePrune', () => {
       only: ['mediforce-artifacts:b'],
     });
     expect(result.pruned.map((row) => row.image)).toEqual(['mediforce-artifacts:b']);
+  });
+});
+
+describe('pruneDockerImages audit clock', () => {
+  beforeEach(() => {
+    vi.mocked(fetchDaemonImages).mockResolvedValue({ available: true, images: [image('mediforce-artifacts:orphan')] });
+  });
+
+  async function sweepAuditCount(input: { images?: string[] }): Promise<number> {
+    const instanceRepo = new InMemoryProcessInstanceRepository();
+    const auditRepo = new InMemoryAuditRepository(instanceRepo);
+    const scope = createTestScope({
+      instanceRepo,
+      auditRepo,
+      dockerImages: { delete: async (imageId) => ({ deleted: imageId }) },
+    });
+    await pruneDockerImages({ dryRun: false, minAgeDays: 14, ...input }, scope);
+    const sweeps = await scope.system.audit.getByEntity(IMAGE_PRUNE_AUDIT_ENTITY.entityType, IMAGE_PRUNE_AUDIT_ENTITY.entityId);
+    return sweeps.length;
+  }
+
+  it('a full sweep advances the daily clock', async () => {
+    expect(await sweepAuditCount({})).toBe(1);
+  });
+
+  it('a sweep narrowed to some images leaves the daily clock alone', async () => {
+    expect(await sweepAuditCount({ images: ['mediforce-artifacts:orphan'] })).toBe(0);
   });
 });

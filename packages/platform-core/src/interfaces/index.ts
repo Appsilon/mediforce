@@ -6,6 +6,7 @@ export type {
   ListInstancesOptions,
   ListInstancesPageOptions,
   ListInstancesPage,
+  RunStatusQueryOptions,
   WorkflowDisplayStatusCounts,
   WorkflowRunSummaryResult,
 } from './process-instance-repository';

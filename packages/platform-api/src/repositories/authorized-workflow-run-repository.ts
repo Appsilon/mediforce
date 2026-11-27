@@ -8,6 +8,7 @@ import type {
   WorkflowRunSummaryResult,
   ListInstancesPageOptions,
   ListInstancesPage,
+  RunStatusQueryOptions,
   WorkflowDisplayStatusCounts,
 } from '@mediforce/platform-core';
 import type { ListInstancesOptions } from '@mediforce/platform-core';
@@ -87,10 +88,13 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
       ? this.raw.getDefinitionPinsAll(instanceIds)
       : this.raw.getDefinitionPinsInNamespaces(instanceIds, [...this.caller.namespaces]);
 
-  getByStatus = async (status: InstanceStatus): Promise<ProcessInstance[]> =>
+  getByStatus = async (
+    status: InstanceStatus,
+    options?: RunStatusQueryOptions,
+  ): Promise<ProcessInstance[]> =>
     this.caller.isSystemActor
-      ? this.raw.getByStatusAll(status)
-      : this.raw.getByStatusInNamespaces(status, [...this.caller.namespaces]);
+      ? this.raw.getByStatusAll(status, options)
+      : this.raw.getByStatusInNamespaces(status, [...this.caller.namespaces], options);
 
   /** The runs a `spawn` step fired from `parentInstanceId`, oldest first. */
   getChildren = async (parentInstanceId: string): Promise<ProcessInstance[]> =>

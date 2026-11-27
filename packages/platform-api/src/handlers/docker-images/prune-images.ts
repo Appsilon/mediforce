@@ -22,12 +22,17 @@ import { stepImages } from '../workflows/_image-pins';
  * makes itself at step start — from a repo and commit, or from files the
  * workflow carries — so a deleted one costs a rebuild, never a workflow that
  * can no longer run. An uploaded, pulled or published image, the agent images
- * and the golden image have no such source and are never candidates.
+ * and the golden image have no such source and are never candidates. The name
+ * alone proves nothing — anyone can pull or tag into it — so a candidate must
+ * also carry the builder's own labels (`isRuntimeBuilt`).
  */
 export const PRUNABLE_IMAGE_REPOSITORIES: readonly string[] = ['mediforce-artifacts', 'mediforce-built'];
 
-/** Audit key of a sweep that deleted for real; the heartbeat reads it to run once a day. */
+/** Audit key of a full sweep that deleted for real; the heartbeat reads it to
+ *  run once a day. A sweep narrowed with `images` inspected only those, so it
+ *  is audited under `TARGETED_IMAGE_PRUNE_AUDIT_ENTITY` and leaves the clock. */
 export const IMAGE_PRUNE_AUDIT_ENTITY = { entityType: 'docker_image_prune', entityId: 'sweep' } as const;
+const TARGETED_IMAGE_PRUNE_AUDIT_ENTITY = { entityType: 'docker_image_prune', entityId: 'targeted' } as const;
 
 /** Run statuses a run can still continue from. `failed` joins them while it is
  *  recent: a failed run is resumed from its current step. */
@@ -78,7 +83,8 @@ function workflowReferences(groups: readonly WorkflowDefinitionGroup[]): Set<str
 
 /** Every image a run's own version names, whatever it could be rebuilt from:
  *  the run is about to need it, and a rebuild mid-run is a step stalled for
- *  minutes or failed on a repo that moved. */
+ *  minutes or failed on a repo that moved. An eval trial carries its own
+ *  definition, which the runtime prefers over the stored version. */
 function runReferences(
   runs: readonly ProcessInstance[],
   groups: readonly WorkflowDefinitionGroup[],
@@ -93,11 +99,18 @@ function runReferences(
   );
   const referenced = new Set<string>();
   for (const run of runs) {
-    const definition = definitions.get(`${run.namespace ?? ''}\0${run.definitionName}\0${run.definitionVersion}`);
+    const definition =
+      run.evalDefinition ?? definitions.get(`${run.namespace ?? ''}\0${run.definitionName}\0${run.definitionVersion}`);
     if (definition === undefined) continue;
     for (const step of stepImages(definition)) referenced.add(normalizeImageRef(step.image));
   }
   return referenced;
+}
+
+/** Whether the runtime's own builder made the image: it labels a repo build
+ *  with its commit and a carried-files build with their hash. */
+function isRuntimeBuilt(row: DockerImageInfo): boolean {
+  return row.buildCommit !== undefined || row.buildArtifacts !== undefined;
 }
 
 /**
@@ -137,7 +150,9 @@ export function planImagePrune(facts: ImagePruneFacts): {
         ? 'agent'
         : byRun.has(needle)
           ? 'run'
-          : Number.isNaN(createdMs)
+          : isRuntimeBuilt(row) === false
+            ? 'provenance-unknown'
+            : Number.isNaN(createdMs)
             ? 'age-unknown'
             : createdMs > cutoff
               ? 'recent'
@@ -153,9 +168,7 @@ export function planImagePrune(facts: ImagePruneFacts): {
 async function liveRuns(scope: CallerScope, minAgeDays: number, now: Date): Promise<ProcessInstance[]> {
   const unfinished = await Promise.all(UNFINISHED_RUN_STATUSES.map((status) => scope.runs.getByStatus(status)));
   const cutoff = now.getTime() - minAgeDays * DAY_MS;
-  const recentlyFailed = (await scope.runs.getByStatus('failed')).filter(
-    (run) => new Date(run.updatedAt).getTime() > cutoff,
-  );
+  const recentlyFailed = await scope.runs.getByStatus('failed', { updatedSince: new Date(cutoff) });
   return [...unfinished.flat(), ...recentlyFailed];
 }
 
@@ -217,7 +230,7 @@ export async function pruneDockerImages(
     action: 'docker_image.pruned',
     namespace: '_system',
     description: `Image prune sweep deleted ${String(pruned.length)} image(s), kept ${String(plan.kept.length)}, failed on ${String(failed.length)}`,
-    ...IMAGE_PRUNE_AUDIT_ENTITY,
+    ...(input.images === undefined ? IMAGE_PRUNE_AUDIT_ENTITY : TARGETED_IMAGE_PRUNE_AUDIT_ENTITY),
     basis: 'Image prune sweep: images no workflow, agent or live run names',
     inputSnapshot: { minAgeDays: input.minAgeDays, ...(input.images === undefined ? {} : { images: input.images }) },
     outputSnapshot: { pruned: pruned.map((row) => row.image), failed },
