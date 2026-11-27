@@ -61,6 +61,46 @@ async function strandedBudgetMs(
   }
 }
 
+// A failed run can still be retried or resumed. Retry checks the run branch out
+// again when its worktree is gone, so the grace period is not needed for
+// correctness: it keeps the sweep from removing a worktree in the moment
+// someone retries the run.
+export const FAILED_RUN_WORKTREE_GRACE_MS = 24 * 60 * 60 * 1000;
+
+// The first sweep on a deployment meets every finished run's worktree at once,
+// and the heartbeat's caller gives up on the request after 120 s. The rest go
+// on the next beats.
+export const RUN_WORKTREE_DISPOSALS_PER_BEAT = 25;
+
+function isWorktreeDisposable(run: ProcessInstance, now: Date): boolean {
+  if (run.status === 'completed') return true;
+  if (run.status !== 'failed') return false;
+  return now.getTime() - new Date(run.updatedAt).getTime() >= FAILED_RUN_WORKTREE_GRACE_MS;
+}
+
+// Remove the worktrees of finished runs. Output Files, step history and
+// Eval Cases read the run branch in the bare repo, which stays. A worktree whose
+// run is not in the database is kept: nothing says that run is finished.
+async function sweepRunWorktrees(scope: CallerScope, now: Date): Promise<void> {
+  const worktrees = await scope.system.runWorktrees.listRunWorktrees();
+  let disposed = 0;
+  for (const worktree of worktrees) {
+    if (disposed === RUN_WORKTREE_DISPOSALS_PER_BEAT) {
+      console.log(`[cron-heartbeat] Worktree sweep reached ${String(RUN_WORKTREE_DISPOSALS_PER_BEAT)} removals; the rest wait for the next beat`);
+      return;
+    }
+    try {
+      const run = await scope.runs.getById(worktree.runId);
+      if (run === null || isWorktreeDisposable(run, now) === false) continue;
+      await scope.system.runWorktrees.disposeRunWorkspace(worktree);
+      disposed += 1;
+    } catch (err) {
+      console.error(`[cron-heartbeat] Failed to remove the worktree of run '${worktree.runId}':`, err);
+    }
+  }
+  if (disposed > 0) console.log(`[cron-heartbeat] Removed ${String(disposed)} worktree(s) of finished runs`);
+}
+
 function evaluateTrigger(
   trigger: CronTriggerResource,
   definitionCreatedAt: string | undefined,
@@ -321,6 +361,12 @@ export async function heartbeat(
     await syncRegistryIfStale(scope.models, { auditRepo: scope.system.audit });
   } catch (err) {
     console.error('[cron-heartbeat] Model registry sweep failed:', err);
+  }
+
+  try {
+    await sweepRunWorktrees(scope, now);
+  } catch (err) {
+    console.error('[cron-heartbeat] Run worktree sweep failed:', err);
   }
 
   return { triggered, skipped };

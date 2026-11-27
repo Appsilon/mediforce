@@ -1,4 +1,4 @@
-import type { AgentRunner, PluginRegistry } from '@mediforce/agent-runtime';
+import { WorkspaceManager, type AgentRunner, type PluginRegistry } from '@mediforce/agent-runtime';
 import type {
   AgentDefinitionRepository,
   AgentEventRepository,
@@ -45,7 +45,7 @@ import type { RunKicker } from '../runtime/run-kicker';
 import type { DockerImagesService } from '../services/docker-images-service';
 import type { InviteNotificationService, InviteService } from '../services/invite-notification';
 import type { JoinLinkService } from '../services/join-link';
-import type { CallerScope } from './caller-scope';
+import type { CallerScope, RunWorktreeStore } from './caller-scope';
 import { AuthorizedAgentDefinitionRepository } from './authorized-agent-definition-repository';
 import { AuthorizedAgentEventRepository } from './authorized-agent-event-repository';
 import { AuthorizedAgentOAuthTokenRepository } from './authorized-agent-oauth-token-repository';
@@ -111,6 +111,8 @@ export interface CallerScopeServices {
   readonly runKicker: RunKicker;
   /** Optional so every existing caller keeps working; defaults to a real clone. */
   readonly repoFileReader?: RepoFileReader;
+  /** Optional so every existing caller keeps working; defaults to the real data dir. */
+  readonly runWorktrees?: RunWorktreeStore;
   readonly inviteService: InviteService | null;
   readonly joinLinkService: JoinLinkService | null;
   readonly inviteNotificationService: InviteNotificationService | null;
@@ -198,6 +200,7 @@ export function createCallerScope(
       imageCatalog: services.imageCatalogRepo,
       runKicker: services.runKicker,
       repoFileReader: services.repoFileReader ?? createGitRepoFileReader(),
+      runWorktrees: services.runWorktrees ?? new WorkspaceManager(),
       inviteService: services.inviteService,
       joinLinkService: services.joinLinkService,
       inviteNotificationService: services.inviteNotificationService,

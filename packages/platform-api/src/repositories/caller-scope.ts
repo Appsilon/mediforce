@@ -1,4 +1,4 @@
-import type { AgentRunner, PluginRegistry } from '@mediforce/agent-runtime';
+import type { AgentRunner, PluginRegistry, WorkspaceManager } from '@mediforce/agent-runtime';
 import type {
   AuditRepository,
   AutoJoinRule,
@@ -114,6 +114,9 @@ export interface CallerScope {
  *  spin up the real registry). */
 export type PluginsRegistryView = Pick<PluginRegistry, 'list'>;
 
+/** Structural view of `agent-runtime`'s `WorkspaceManager`, for the worktree sweep. */
+export type RunWorktreeStore = Pick<WorkspaceManager, 'listRunWorktrees' | 'disposeRunWorkspace'>;
+
 /**
  * System-actor handles exposed to handlers that genuinely need them. Use
  * sparingly: every reach into `scope.system` is a workspace-gate bypass and
@@ -159,6 +162,11 @@ export interface SystemServices {
   readonly runKicker: RunKicker;
   /** Reads named files out of a repository at a commit, for the file preview. */
   readonly repoFileReader: RepoFileReader;
+  /**
+   * Run worktrees on disk, for the heartbeat's sweep of finished runs. Only
+   * the worktree goes; the run branch in the bare repo stays.
+   */
+  readonly runWorktrees: RunWorktreeStore;
   /**
    * Invite-flow surface (seed an `auth_users` row + workspace membership).
    * `null` when not wired; handlers throw `PreconditionFailedError` in that

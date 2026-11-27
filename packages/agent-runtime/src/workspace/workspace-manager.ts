@@ -15,12 +15,18 @@
  *   Bare repo fetch uses a lock directory to serialize concurrent runs updating the mirror.
  *   Worktrees of different runs are independent (different branches, different paths).
  *
+ * Retention:
+ *   A worktree is a disposable checkout of its run branch. The cron heartbeat
+ *   removes those of finished runs (`disposeRunWorkspace`); the branch stays,
+ *   and a retried run checks it out again.
+ *
  * Not covered here (v1 scope):
  *   - GC / retention of old run branches
  *   - automatic merges back to main
  *   - shallow clones (we keep full history for audit)
  */
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import { mkdir, rm, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -119,6 +125,16 @@ export interface RunWorkspaceHandle {
   bareRepoPath: string;
   /** Resolved remote URL (may be null). */
   remoteUrl: string | null;
+}
+
+/** A run worktree found on disk by `listRunWorktrees`. */
+export interface RunWorktree {
+  namespace: string;
+  workflowName: string;
+  /** The worktree's directory name: the run id, filesystem-sanitized. */
+  runId: string;
+  path: string;
+  bareRepoPath: string;
 }
 
 export interface CommitStepOptions {
@@ -298,6 +314,13 @@ function gitEnv(sshCmd: string): NodeJS.ProcessEnv {
 // 256 MiB — high enough for any realistic step delta, low enough that
 // runaway output still surfaces as a process failure rather than OOM.
 const GIT_MAX_BUFFER = 256 * 1024 * 1024;
+
+const execFileAsync = promisify(execFile);
+
+/** `runGit` without blocking the event loop, for work that runs inside a request. */
+async function runGitAsync(args: string[], opts: { cwd: string }): Promise<void> {
+  await execFileAsync('git', args, { cwd: opts.cwd, maxBuffer: GIT_MAX_BUFFER });
+}
 
 function runGit(args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv; capture?: boolean } = {}): string {
   const out = execFileSync('git', args, {
@@ -808,17 +831,19 @@ export class WorkspaceManager {
   }
 
   /**
-   * Remove the worktree from disk. The branch stays in the bare repo.
-   * Safe to call on a non-existent worktree.
+   * Remove the worktree from disk. The branch stays in the bare repo, so a
+   * later `createRunWorkspace` for the same run checks it out again.
+   * Safe to call on a non-existent worktree. Runs git asynchronously: the
+   * heartbeat sweep removes many large worktrees in one request.
    */
-  async disposeRunWorkspace(ws: RunWorkspaceHandle): Promise<void> {
+  async disposeRunWorkspace(ws: Pick<RunWorkspaceHandle, 'path' | 'bareRepoPath'>): Promise<void> {
     if (!(await pathExists(ws.path))) return;
     try {
-      runGit(['worktree', 'remove', '--force', ws.path], { cwd: ws.bareRepoPath });
+      await runGitAsync(['worktree', 'remove', '--force', ws.path], { cwd: ws.bareRepoPath });
     } catch {
       // Fall back to rm if git complains (e.g., worktree metadata already gone)
       await rm(ws.path, { recursive: true, force: true });
-      runGit(['worktree', 'prune'], { cwd: ws.bareRepoPath });
+      await runGitAsync(['worktree', 'prune'], { cwd: ws.bareRepoPath });
     }
   }
 
@@ -829,23 +854,11 @@ export class WorkspaceManager {
    * Callers decide which to dispose — policy (e.g. "only terminal runs")
    * lives where the run state does, not in filesystem plumbing.
    */
-  async listRunWorktrees(): Promise<Array<{
-    namespace: string;
-    workflowName: string;
-    runId: string;
-    path: string;
-    bareRepoPath: string;
-  }>> {
+  async listRunWorktrees(): Promise<RunWorktree[]> {
     const worktreesRoot = join(this.dataDir, 'worktrees');
     if (!(await pathExists(worktreesRoot))) return [];
 
-    const result: Array<{
-      namespace: string;
-      workflowName: string;
-      runId: string;
-      path: string;
-      bareRepoPath: string;
-    }> = [];
+    const result: RunWorktree[] = [];
 
     for (const namespace of await readdir(worktreesRoot).catch(() => [])) {
       const nsDir = join(worktreesRoot, namespace);
