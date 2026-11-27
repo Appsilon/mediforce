@@ -277,7 +277,9 @@ at the server, or ports 80/443 are blocked.
 
 No successful heartbeat ping for 30 minutes. Cron triggers and the
 stranded-run sweep have stopped. First check: `crontab -l | grep mediforce-heartbeat`
-and `tail /opt/mediforce/logs/heartbeat.log`. `FAIL` lines mean the platform
-rejected or never answered the POST. `ping failed` lines mean the heartbeat
+and `tail /opt/mediforce/logs/heartbeat.log`. `FAIL <code>` lines mean the POST
+got an error status, and a bare `FAIL` means nothing answered. Behind Cloudflare,
+a `FAIL 403` that `platform-ui`'s logs don't explain is usually Cloudflare's
+Browser Integrity Check (`error code: 1010`) rejecting the User-Agent. `ping failed` lines mean the heartbeat
 worked but healthchecks.io was unreachable. No new lines mean cron isn't running the
 job.

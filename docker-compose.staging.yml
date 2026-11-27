@@ -13,6 +13,13 @@ services:
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
 
+  # Only staging's Redis has a password. bootstrap-server.py writes
+  # REDIS_PASSWORD into every .env, so forwarding it in the base file made
+  # Alloy send AUTH to production's password-less Redis, which refuses it.
+  monitoring:
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+
   stunnel:
     image: alpine:3.24
     restart: unless-stopped
