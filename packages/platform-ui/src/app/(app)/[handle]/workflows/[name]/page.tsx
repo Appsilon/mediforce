@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { z } from 'zod';
 import Link from 'next/link';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Layers, ExternalLink, Archive, ArchiveRestore, MoreVertical, Play, Clock, Zap, Trash2, ArrowRightLeft, KeyRound, EyeOff, Copy, Link2, ShieldCheck, FlaskConical } from 'lucide-react';
@@ -13,8 +14,9 @@ import { AllRunsPanel } from '@/components/processes/all-runs-panel';
 import { type DryRunFilter, dryRunFilterToQuery } from '@/components/processes/dry-run-filter';
 import { DefinitionsList } from '@/components/workflows/definitions-list';
 import { StartRunButton } from '@/components/processes/start-run-button';
-import { mediforce, ApiError } from '@/lib/mediforce';
+import { mediforce } from '@/lib/mediforce';
 import { apiFetch } from '@/lib/api-fetch';
+import { ReferenceIssueSchema, type ReferenceIssue } from '@mediforce/platform-api/contract';
 import { pickRunnableVersion, type WorkflowDefinition } from '@mediforce/platform-core';
 import { VersionLabel } from '@/components/ui/version-label';
 import { workflowDisplayName } from '@/lib/workflow-save-utils';
@@ -34,6 +36,53 @@ import { EVALUATION_QUERY_PARAMS, EvaluationTab } from '@/components/evaluation/
 import { VersionValidationBadge } from '@/components/evaluation/validation-status';
 import { useWorkflowValidation } from '@/hooks/use-step-evaluation';
 import { TriggersPanel } from './TriggersPanel';
+
+type WorkflowActionError = { message: string; issues: ReferenceIssue[] };
+const NO_ACTION_ERROR: WorkflowActionError = { message: '', issues: [] };
+
+function parseWorkflowActionError(error: unknown, fallback: string): WorkflowActionError {
+  if (typeof error !== 'object' || error === null) {
+    return { message: typeof error === 'string' ? error : fallback, issues: [] };
+  }
+  const { message, details } = error as { message?: unknown; details?: unknown };
+  const issues = z.array(ReferenceIssueSchema).safeParse(details);
+  return { message: typeof message === 'string' ? message : fallback, issues: issues.success ? issues.data : [] };
+}
+
+function referenceIssueHref(issue: ReferenceIssue): string | null {
+  if (issue.namespace === undefined) return null;
+  return issue.kind === 'agent'
+    ? `/${issue.namespace}/agents/definitions/${issue.id}`
+    : `/${issue.namespace}/skills/${issue.namespace}/${issue.id}`;
+}
+
+/** Renders a blocked copy/transfer: either the issues the server found (named,
+ *  linked, with a fix hint) or a plain fallback message for any other error. */
+function WorkflowActionErrorView({ error, hint }: { error: WorkflowActionError; hint: string }) {
+  if (error.issues.length > 0) {
+    return (
+      <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+        <p className="mb-2">{hint}</p>
+        <ul className="list-disc space-y-1 pl-4">
+          {error.issues.map((issue, index) => {
+            const href = referenceIssueHref(issue);
+            const label = `${issue.kind === 'agent' ? 'Agent' : 'Skill'} "${issue.name ?? issue.id}"`;
+            return (
+              <li key={index}>
+                {href !== null ? (
+                  <Link href={href} className="underline" target="_blank" rel="noreferrer">{label}</Link>
+                ) : label}
+                {issue.stepName && <>, used in step &ldquo;{issue.stepName}&rdquo;</>}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  }
+  if (error.message === '') return null;
+  return <p className="text-xs text-destructive mb-3">{error.message}</p>;
+}
 
 export default function ProcessDefinitionPage() {
   const { name, handle } = useParams<{ name: string; handle: string }>();
@@ -77,7 +126,7 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
   const [copyTarget, setCopyTarget] = React.useState('');
   const [copyName, setCopyName] = React.useState('');
   const [copying, setCopying] = React.useState(false);
-  const [copyError, setCopyError] = React.useState('');
+  const [copyError, setCopyError] = React.useState<WorkflowActionError>(NO_ACTION_ERROR);
 
   if (loading) {
     return (
@@ -139,7 +188,7 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
               <button
                 onClick={() => {
                   setCopyName(decodedName);
-                  setCopyError('');
+                  setCopyError(NO_ACTION_ERROR);
                   setCopyOpen(true);
                 }}
                 className={cn(
@@ -161,16 +210,16 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
           decodedName={decodedName}
           namespaces={namespaces}
           copyTarget={copyTarget}
-          setCopyTarget={(v) => { setCopyTarget(v); setCopyError(''); }}
+          setCopyTarget={(v) => { setCopyTarget(v); setCopyError(NO_ACTION_ERROR); }}
           copyName={copyName}
-          setCopyName={(v) => { setCopyName(v); setCopyError(''); }}
+          setCopyName={(v) => { setCopyName(v); setCopyError(NO_ACTION_ERROR); }}
           copyError={copyError}
           copying={copying}
-          onCancel={() => { setCopyOpen(false); setCopyTarget(''); setCopyName(''); setCopyError(''); }}
+          onCancel={() => { setCopyOpen(false); setCopyTarget(''); setCopyName(''); setCopyError(NO_ACTION_ERROR); }}
           onCopy={async () => {
             if (!copyTarget || !copyName.trim()) return;
             setCopying(true);
-            setCopyError('');
+            setCopyError(NO_ACTION_ERROR);
             try {
               const qs = new URLSearchParams({ targetNamespace: copyTarget, namespace: handle });
               const body: Record<string, unknown> = {};
@@ -188,9 +237,7 @@ function ProcessDefinitionPagePublic({ name, handle }: { name: string; handle: s
                 router.push(`/${copyTarget}/workflows/${encodeURIComponent(copyName)}`);
               } else {
                 const data = await res.json().catch(() => null);
-                setCopyError(typeof data?.error === 'object' && data.error !== null
-                  ? (data.error.message ?? 'Copy failed')
-                  : (data?.error ?? 'Copy failed'));
+                setCopyError(parseWorkflowActionError(data?.error, 'Copy failed'));
               }
             } finally {
               setCopying(false);
@@ -364,7 +411,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const [transferOpen, setTransferOpen] = React.useState(false);
   const [transferTarget, setTransferTarget] = React.useState('');
   const [transferring, setTransferring] = React.useState(false);
-  const [transferError, setTransferError] = React.useState('');
+  const [transferError, setTransferError] = React.useState<WorkflowActionError>(NO_ACTION_ERROR);
   const [togglingVisibility, setTogglingVisibility] = React.useState(false);
   const [shareDialogOpen, setShareDialogOpen] = React.useState(false);
   const [copyOpen, setCopyOpen] = React.useState(false);
@@ -372,7 +419,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
   const [copyName, setCopyName] = React.useState('');
   const [copyVersion, setCopyVersion] = React.useState<number | null>(null);
   const [copying, setCopying] = React.useState(false);
-  const [copyError, setCopyError] = React.useState('');
+  const [copyError, setCopyError] = React.useState<WorkflowActionError>(NO_ACTION_ERROR);
   const [visibilityOverride, setVisibilityOverride] = React.useState<'public' | 'private' | null>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
@@ -627,7 +674,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 <button
                   onClick={() => {
                     setMenuOpen(false);
-                    setTransferError('');
+                    setTransferError(NO_ACTION_ERROR);
                     setTransferOpen(true);
                   }}
                   disabled={!mayEdit}
@@ -647,7 +694,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                     setMenuOpen(false);
                     setCopyName(decodedName);
                     setCopyVersion(null);
-                    setCopyError('');
+                    setCopyError(NO_ACTION_ERROR);
                     setCopyOpen(true);
                   }}
                   className={cn(
@@ -824,19 +871,19 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
           decodedName={decodedName}
           namespaces={namespaces}
           copyTarget={copyTarget}
-          setCopyTarget={(v) => { setCopyTarget(v); setCopyError(''); }}
+          setCopyTarget={(v) => { setCopyTarget(v); setCopyError(NO_ACTION_ERROR); }}
           copyName={copyName}
-          setCopyName={(v) => { setCopyName(v); setCopyError(''); }}
+          setCopyName={(v) => { setCopyName(v); setCopyError(NO_ACTION_ERROR); }}
           copyError={copyError}
           copying={copying}
           versions={versions}
           copyVersion={copyVersion}
           setCopyVersion={setCopyVersion}
-          onCancel={() => { setCopyOpen(false); setCopyTarget(''); setCopyName(''); setCopyError(''); }}
+          onCancel={() => { setCopyOpen(false); setCopyTarget(''); setCopyName(''); setCopyError(NO_ACTION_ERROR); }}
           onCopy={async () => {
             if (!copyTarget || !copyName.trim()) return;
             setCopying(true);
-            setCopyError('');
+            setCopyError(NO_ACTION_ERROR);
             try {
               const qs = new URLSearchParams({ targetNamespace: copyTarget, namespace: handle });
               const body: Record<string, unknown> = {};
@@ -857,9 +904,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 router.push(`/${copyTarget}/workflows/${encodeURIComponent(copyName)}`);
               } else {
                 const data = await res.json().catch(() => null);
-                setCopyError(typeof data?.error === 'object' && data.error !== null
-                  ? (data.error.message ?? 'Copy failed')
-                  : (data?.error ?? 'Copy failed'));
+                setCopyError(parseWorkflowActionError(data?.error, 'Copy failed'));
               }
             } finally {
               setCopying(false);
@@ -878,7 +923,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
             </p>
             <select
               value={transferTarget}
-              onChange={(e) => { setTransferTarget(e.target.value); setTransferError(''); }}
+              onChange={(e) => { setTransferTarget(e.target.value); setTransferError(NO_ACTION_ERROR); }}
               className={cn(
                 'w-full rounded-md border bg-background px-3 py-1.5 text-sm outline-none mb-1',
                 'focus:ring-1 focus:ring-ring focus:border-ring',
@@ -891,15 +936,16 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 </option>
               ))}
             </select>
-            {transferError && (
-              <p className="text-xs text-destructive mb-3">{transferError}</p>
-            )}
+            <WorkflowActionErrorView
+              error={transferError}
+              hint="This workflow uses private elements that the target workspace can't reach. To transfer it, make the elements below public, then try again."
+            />
             <div className="flex items-center justify-end gap-2 mt-3">
               <button
                 onClick={() => {
                   setTransferOpen(false);
                   setTransferTarget('');
-                  setTransferError('');
+                  setTransferError(NO_ACTION_ERROR);
                 }}
                 className="rounded-md px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
               >
@@ -909,7 +955,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                 onClick={async () => {
                   if (!transferTarget) return;
                   setTransferring(true);
-                  setTransferError('');
+                  setTransferError(NO_ACTION_ERROR);
                   try {
                     await mediforce.workflows.transferNamespace({
                       name: decodedName,
@@ -919,9 +965,7 @@ function ProcessDefinitionPageMember({ name, handle }: { name: string; handle: s
                     setTransferOpen(false);
                     router.push(`/${transferTarget}/workflows/${encodeURIComponent(decodedName)}`);
                   } catch (err) {
-                    const message = err instanceof ApiError ? err.message
-                      : err instanceof Error ? err.message : 'Unknown error';
-                    setTransferError(message);
+                    setTransferError(parseWorkflowActionError(err, 'Unknown error'));
                   } finally {
                     setTransferring(false);
                   }
@@ -979,7 +1023,7 @@ function CopyWorkflowDialog({
   setCopyTarget: (v: string) => void;
   copyName: string;
   setCopyName: (v: string) => void;
-  copyError: string;
+  copyError: WorkflowActionError;
   copying: boolean;
   versions?: { version: number; title?: string }[];
   copyVersion?: number | null;
@@ -1018,12 +1062,13 @@ function CopyWorkflowDialog({
           className={cn(
             'w-full rounded-md border bg-background px-3 py-1.5 text-sm outline-none mb-3',
             'focus:ring-1 focus:ring-ring focus:border-ring',
-            copyError && 'border-destructive',
+            (copyError.message !== '' || copyError.issues.length > 0) && 'border-destructive',
           )}
         />
-        {copyError && (
-          <p className="text-xs text-destructive mb-3">{copyError}</p>
-        )}
+        <WorkflowActionErrorView
+          error={copyError}
+          hint="This workflow uses private elements that the target workspace can't reach. To copy it, make the elements below public, then try again."
+        />
         {versions && versions.length > 0 && setCopyVersion && (
           <>
             <label className="block text-sm font-medium mb-1">Version</label>

@@ -64,6 +64,23 @@ export const ImportSkillsOutputSchema = z.object({
 export const DeleteSkillInputSchema = SkillRef;
 export const DeleteSkillOutputSchema = z.object({ success: z.literal(true) });
 
+/** One Skill or Agent reference a Workflow or Agent may not reach (ADR-0025
+ *  decision 3). Carried as `ValidationError.details` so a client can name the
+ *  blocking element and link to it instead of just showing `message`. */
+export const ReferenceIssueSchema = z.object({
+  code: z.literal('custom'),
+  path: z.array(z.union([z.string(), z.number()])),
+  message: z.string(),
+  kind: z.enum(['skill', 'agent']),
+  reason: z.enum(['missing', 'private']),
+  id: z.string(),
+  namespace: z.string().optional(),
+  name: z.string().optional(),
+  stepId: z.string().optional(),
+  stepName: z.string().optional(),
+});
+export type ReferenceIssue = z.infer<typeof ReferenceIssueSchema>;
+
 export type ListSkillsInput = z.infer<typeof ListSkillsInputSchema>;
 export type ListSkillsOutput = z.infer<typeof ListSkillsOutputSchema>;
 export type GetSkillInput = z.infer<typeof GetSkillInputSchema>;
