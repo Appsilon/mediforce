@@ -87,6 +87,22 @@ export class InMemoryProcessInstanceRepository
     this.instances.set(instanceId, { ...existing, ...updates });
   }
 
+  async incrementCost(
+    instanceId: string,
+    deltaUsd: number,
+    options: { ownCost: boolean },
+  ): Promise<void> {
+    const existing = this.instances.get(instanceId);
+    if (!existing) {
+      throw new Error(`ProcessInstance not found: ${instanceId}`);
+    }
+    this.instances.set(instanceId, {
+      ...existing,
+      treeCostUsd: (existing.treeCostUsd ?? 0) + deltaUsd,
+      ...(options.ownCost ? { totalCostUsd: (existing.totalCostUsd ?? 0) + deltaUsd } : {}),
+    });
+  }
+
   async updateIfPaused(
     instanceId: string,
     pauseReason: string,

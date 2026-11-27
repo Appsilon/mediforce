@@ -270,11 +270,14 @@ export function ProcessDetail({
 
   // Children this run spawned — for the orchestrator's aggregate cost and for
   // attributing cost to the spawn/run_workflow step that started each one.
+  // `treeCostUsd` (own + every descendant, server-maintained) rather than
+  // `totalCostUsd` (own only), so a grandchild's cost isn't dropped.
   const childrenQuery = useChildRuns(instance, true);
   const childRunCostByInstanceId = React.useMemo(() => {
     const byId = new Map<string, number>();
     for (const child of childrenQuery.data ?? []) {
-      if (child.totalCostUsd != null) byId.set(child.id, child.totalCostUsd);
+      const cost = child.treeCostUsd ?? child.totalCostUsd;
+      if (cost != null) byId.set(child.id, cost);
     }
     return byId;
   }, [childrenQuery.data]);

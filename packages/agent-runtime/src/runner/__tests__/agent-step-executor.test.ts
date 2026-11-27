@@ -16,6 +16,7 @@ const mockInstanceRepo = {
   update: vi.fn(),
   updateStepExecution: vi.fn(),
   getStepExecutions: vi.fn().mockResolvedValue([]),
+  incrementCost: vi.fn(),
 };
 const mockEngine = {
   advanceStep: vi.fn(),
@@ -506,6 +507,34 @@ describe('AgentStepExecutor', () => {
     expect(mockInstanceRepo.update).toHaveBeenCalledWith('inst-001', expect.objectContaining({
       variables: { 'analyze-data': { summary: 'analysis complete' } },
     }));
+  });
+
+  it('propagates a step cost to its own run and up the whole ancestor chain', async () => {
+    const instancesById: Record<string, { status: string; currentStepId: string; definitionVersion: string; variables: Record<string, unknown>; parentInstanceId?: string }> = {
+      'inst-001': { status: 'running', currentStepId: 'analyze-data', definitionVersion: '1', variables: {}, parentInstanceId: 'parent-1' },
+      'parent-1': { status: 'running', currentStepId: 'wait', definitionVersion: '1', variables: {}, parentInstanceId: 'parent-2' },
+      'parent-2': { status: 'running', currentStepId: 'wait', definitionVersion: '1', variables: {} },
+    };
+    mockInstanceRepo.getById.mockImplementation(async (id: string) => instancesById[id] ?? null);
+    mockModelRegistryRepo.getById.mockResolvedValueOnce({
+      pricing: { input: 0.000001, output: 0.000002 },
+      contextLength: 100_000,
+    });
+    mockAgentRunner.runWithWorkflowStep.mockResolvedValue({
+      status: 'completed',
+      envelope: buildAgentOutputEnvelope({
+        model: 'anthropic/claude-sonnet-4',
+        tokenUsage: { inputTokens: 1000, outputTokens: 500 },
+      }),
+      appliedToWorkflow: false,
+      fallbackReason: null,
+    });
+
+    await executor.execute(mockPlugin, makeContext(), services, meta);
+
+    expect(mockInstanceRepo.incrementCost).toHaveBeenCalledWith('inst-001', 0.002, { ownCost: true });
+    expect(mockInstanceRepo.incrementCost).toHaveBeenCalledWith('parent-1', 0.002, { ownCost: false });
+    expect(mockInstanceRepo.incrementCost).toHaveBeenCalledWith('parent-2', 0.002, { ownCost: false });
   });
 });
 

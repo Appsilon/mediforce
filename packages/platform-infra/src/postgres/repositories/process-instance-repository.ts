@@ -98,6 +98,9 @@ function toUpdateSet(updates: Partial<ProcessInstance>): Record<string, unknown>
   if (updates.totalCostUsd !== undefined) {
     set.totalCostUsd = String(updates.totalCostUsd);
   }
+  if (updates.treeCostUsd !== undefined) {
+    set.treeCostUsd = String(updates.treeCostUsd);
+  }
   if (updates.archived !== undefined) {
     set.archivedAt = updates.archived ? new Date() : null;
   }
@@ -566,6 +569,20 @@ export class PostgresProcessInstanceRepository
       .where(eq(processInstances.id, instanceId));
   }
 
+  async incrementCost(
+    instanceId: string,
+    deltaUsd: number,
+    options: { ownCost: boolean },
+  ): Promise<void> {
+    const set: Record<string, unknown> = {
+      treeCostUsd: sql`coalesce(${processInstances.treeCostUsd}, 0) + ${deltaUsd}`,
+    };
+    if (options.ownCost) {
+      set.totalCostUsd = sql`coalesce(${processInstances.totalCostUsd}, 0) + ${deltaUsd}`;
+    }
+    await this.db.update(processInstances).set(set).where(eq(processInstances.id, instanceId));
+  }
+
   async updateIfPaused(
     instanceId: string,
     pauseReason: string,
@@ -867,6 +884,7 @@ function toInstance(row: typeof processInstances.$inferSelect): ProcessInstance 
         : undefined,
     previousRunSourceId: row.previousRunSourceId ?? undefined,
     totalCostUsd: row.totalCostUsd !== null ? Number(row.totalCostUsd) : undefined,
+    treeCostUsd: row.treeCostUsd !== null ? Number(row.treeCostUsd) : undefined,
     dryRun: row.dryRun === true,
     ...(row.evalRunId === null ? {} : { evalRunId: row.evalRunId }),
     ...(row.evalDefinition === null ? {} : { evalDefinition: row.evalDefinition }),

@@ -57,8 +57,9 @@ interface StepStatusPanelProps {
   stepDetailBaseHref?: string;
   /** Active human task for the current step — provides createdAt and assignedUserId for virtual rows. */
   currentTask?: HumanTask | null;
-  /** Child runs' totalCostUsd by instanceId, so a spawn/run_workflow step (no
-   *  agentOutput of its own) can show what the child(ren) it started cost. */
+  /** Child runs' whole-subtree cost by instanceId, so a spawn/run_workflow
+   *  step (no agentOutput of its own) can show what the child(ren) it
+   *  started cost, descendants included. */
   childRunCostByInstanceId?: ReadonlyMap<string, number>;
 }
 

@@ -25,9 +25,10 @@ export const runGetCommand = defineCommand({
     const url = hasDefinition
       ? `${config.baseUrl}/${result.definitionNamespace ?? ''}/workflows/${encodeURIComponent(result.definitionName ?? '')}/runs/${result.runId}`
       : undefined;
+    const displayCostUsd = result.treeCostUsd ?? result.totalCostUsd;
     const cost =
-      result.totalCostUsd != null
-        ? `$${result.totalCostUsd.toFixed(4)}${result.status === 'completed' || result.status === 'failed' ? '' : '+'}`
+      displayCostUsd != null
+        ? `$${displayCostUsd.toFixed(4)}${result.status === 'completed' || result.status === 'failed' ? '' : '+'}`
         : undefined;
     const finalOutput =
       result.finalOutput !== null && result.finalOutput !== undefined

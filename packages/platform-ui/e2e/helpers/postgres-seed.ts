@@ -218,7 +218,7 @@ export async function seedPostgresNamespace(
         INSERT INTO process_instances (
           id, workspace, definition_name, definition_version, status,
           current_step_id, variables, trigger_type, trigger_payload,
-          pause_reason, error, assigned_roles, total_cost_usd, created_by, created_at, updated_at,
+          pause_reason, error, assigned_roles, total_cost_usd, tree_cost_usd, created_by, created_at, updated_at,
           deleted_at, dry_run, parent_instance_id, parent_definition_name
         ) VALUES (
           ${proc.id as string},
@@ -234,6 +234,7 @@ export async function seedPostgresNamespace(
           ${(proc.error as string | null) ?? null},
           ${(proc.assignedRoles as string[] | undefined) ?? null},
           ${(proc.totalCostUsd as number | undefined) ?? null},
+          ${(proc.treeCostUsd as number | undefined) ?? null},
           ${(proc.createdBy as string | null) ?? null},
           ${proc.createdAt as string},
           ${proc.updatedAt as string},

@@ -33,10 +33,12 @@ export interface StepExecutorAuditRepo {
 }
 
 export interface StepExecutorInstanceRepo {
-  getById(id: string): Promise<{ status: string; currentStepId: string | null; definitionVersion: string; variables: Record<string, unknown>; triggerPayload?: unknown; triggerContext?: unknown; totalCostUsd?: number; evalRunId?: string } | null>;
+  getById(id: string): Promise<{ status: string; currentStepId: string | null; definitionVersion: string; variables: Record<string, unknown>; triggerPayload?: unknown; triggerContext?: unknown; totalCostUsd?: number; evalRunId?: string; parentInstanceId?: string } | null>;
   update(id: string, data: Record<string, unknown>): Promise<unknown>;
   updateStepExecution(instanceId: string, executionId: string, data: Record<string, unknown>): Promise<unknown>;
   getStepExecutions(instanceId: string): Promise<Array<{ stepId: string; output: unknown }>>;
+  /** See `ProcessInstanceRepository.incrementCost` (platform-core). */
+  incrementCost(instanceId: string, deltaUsd: number, options: { ownCost: boolean }): Promise<void>;
 }
 
 export interface StepExecutorEngine {

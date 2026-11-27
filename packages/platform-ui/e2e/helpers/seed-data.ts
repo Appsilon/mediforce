@@ -1020,6 +1020,72 @@ export function buildSeedData(testUserId: string, options: SeedOptions = {}) {
     };
   }
 
+  // 3-level spawn/run-workflow chain (PR #1711 review): treeCostUsd is own +
+  // every descendant's. A straight chain is the minimal case that catches a
+  // rollup which only reaches the immediate parent and stops short of the root.
+  const COST_ROLLUP_ROOT_ID = 'proc-cost-rollup-root';
+  const COST_ROLLUP_MID_ID = 'proc-cost-rollup-mid';
+  const COST_ROLLUP_LEAF_ID = 'proc-cost-rollup-leaf';
+  processInstances[COST_ROLLUP_LEAF_ID] = {
+    id: COST_ROLLUP_LEAF_ID,
+    namespace: 'test',
+    definitionName: 'Cost Rollup Journey Workflow',
+    definitionVersion: '1',
+    status: 'completed',
+    currentStepId: null,
+    variables: {},
+    triggerType: 'manual',
+    triggerPayload: {},
+    totalCostUsd: 0.3,
+    treeCostUsd: 0.3,
+    parentInstanceId: COST_ROLLUP_MID_ID,
+    createdAt: minutesAgo(70_002),
+    updatedAt: minutesAgo(70_002),
+    createdBy: 'system',
+    pauseReason: null,
+    error: null,
+    assignedRoles: [],
+  };
+  processInstances[COST_ROLLUP_MID_ID] = {
+    id: COST_ROLLUP_MID_ID,
+    namespace: 'test',
+    definitionName: 'Cost Rollup Journey Workflow',
+    definitionVersion: '1',
+    status: 'completed',
+    currentStepId: null,
+    variables: {},
+    triggerType: 'manual',
+    triggerPayload: {},
+    totalCostUsd: 0.2,
+    treeCostUsd: 0.5,
+    parentInstanceId: COST_ROLLUP_ROOT_ID,
+    createdAt: minutesAgo(70_001),
+    updatedAt: minutesAgo(70_001),
+    createdBy: 'system',
+    pauseReason: null,
+    error: null,
+    assignedRoles: [],
+  };
+  processInstances[COST_ROLLUP_ROOT_ID] = {
+    id: COST_ROLLUP_ROOT_ID,
+    namespace: 'test',
+    definitionName: 'Cost Rollup Journey Workflow',
+    definitionVersion: '1',
+    status: 'completed',
+    currentStepId: null,
+    variables: {},
+    triggerType: 'manual',
+    triggerPayload: {},
+    totalCostUsd: 0.1,
+    treeCostUsd: 0.6,
+    createdAt: minutesAgo(70_000),
+    updatedAt: minutesAgo(70_000),
+    createdBy: 'system',
+    pauseReason: null,
+    error: null,
+    assignedRoles: [],
+  };
+
   const MONITORING_LOADMORE_AGENT_RUN_COUNT = 21;
   // 21 agent runs, all `running` with `fallbackReason: null` — avoids the
   // running/error double-count landmine noted below (`error` bucket keys

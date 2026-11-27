@@ -200,6 +200,13 @@ export interface ProcessInstanceRepository {
   update(instanceId: string, updates: Partial<ProcessInstance>): Promise<void>;
 
   /**
+   * Atomically adds `deltaUsd` to this instance's `treeCostUsd`, and — when
+   * `ownCost` is true — to its `totalCostUsd` too. Avoids a read-modify-write
+   * race when several steps (e.g. sibling children) finish at once.
+   */
+  incrementCost(instanceId: string, deltaUsd: number, options: { ownCost: boolean }): Promise<void>;
+
+  /**
    * Compare-and-set: applies `updates` only while the run is still paused for
    * `pauseReason`, and returns whether this call was the one that did. Lets
    * several callers race to resume the same run (a child finishing, the
