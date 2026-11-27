@@ -324,6 +324,9 @@ services:
     # cAdvisor reads every container's cgroup, which a private cgroup
     # namespace would hide.
     cgroup: host
+    # The host's own hostname as nodename, not the container ID, which changes
+    # on every recreate and fills the dashboards' Nodename list.
+    uts: host
     environment:
       - GRAFANA_CLOUD_PROM_URL=${GRAFANA_CLOUD_PROM_URL:-}
       - GRAFANA_CLOUD_PROM_USER=${GRAFANA_CLOUD_PROM_USER:-}
