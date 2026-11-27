@@ -313,7 +313,7 @@ import {
   type DeleteDockerImageOutput,
   PruneDockerImagesInputSchema,
   PruneDockerImagesOutputSchema,
-  type PruneDockerImagesInputApi,
+  type PruneDockerImagesBody,
   type PruneDockerImagesOutput,
   type ListOAuthProvidersInput,
   type ListOAuthProvidersOutput,
@@ -1069,7 +1069,7 @@ export class Mediforce {
 
   readonly dockerImages: {
     delete: (input: DeleteDockerImageInput) => Promise<DeleteDockerImageOutput>;
-    prune: (input: PruneDockerImagesInputApi) => Promise<PruneDockerImagesOutput>;
+    prune: (input: PruneDockerImagesBody) => Promise<PruneDockerImagesOutput>;
   };
 
   readonly toolCatalog: {

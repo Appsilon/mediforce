@@ -504,7 +504,7 @@ export {
   PruneDockerImagesOutputSchema,
   type ImagePruneKeepReason,
   type PruneDockerImagesInput,
-  type PruneDockerImagesInputApi,
+  type PruneDockerImagesBody,
   type PruneDockerImagesOutput,
 } from './docker-images';
 

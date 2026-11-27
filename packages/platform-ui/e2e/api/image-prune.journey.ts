@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import type { APIRequestContext } from '@playwright/test';
+import type { PruneDockerImagesOutput } from '@mediforce/platform-api/contract';
 import { test, expect } from '../helpers/test-fixtures';
 import {
   apiKeyHeaders,
@@ -9,7 +10,7 @@ import {
 } from '../helpers/multi-namespace';
 
 /**
- * L3 API journey for the image prune sweep (#1698): route adapter →
+ * L3 API journey for the image prune sweep: route adapter →
  * `pruneDockerImages` → workflow definitions in Postgres + the real Docker
  * daemon.
  *
@@ -22,14 +23,6 @@ import {
  */
 
 const OLD_BASE_IMAGE = 'alpine:3.22';
-
-interface PruneResult {
-  available: boolean;
-  dryRun: boolean;
-  pruned: { image: string }[];
-  kept: { image: string; reason: string }[];
-  failed: { image: string; error: string }[];
-}
 
 function docker(...args: string[]): void {
   execFileSync('docker', args, { stdio: 'pipe' });
@@ -93,13 +86,13 @@ async function registerVersion(
 async function prune(
   request: APIRequestContext,
   body: { dryRun: boolean; images: string[]; minAgeDays?: number },
-): Promise<PruneResult> {
+): Promise<PruneDockerImagesOutput> {
   const response = await request.post('/api/admin/docker-images/prune', {
     headers: apiKeyHeaders(),
     data: body,
   });
   expect(response.ok(), await response.text()).toBe(true);
-  return (await response.json()) as PruneResult;
+  return (await response.json()) as PruneDockerImagesOutput;
 }
 
 test.describe('image prune API journey', () => {

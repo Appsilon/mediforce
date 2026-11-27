@@ -2,6 +2,7 @@ import {
   normalizeImageRef,
   pickRunnableVersion,
   type AgentDefinition,
+  type ImageCatalogEntry,
   type ProcessInstance,
   type WorkflowDefinitionGroup,
 } from '@mediforce/platform-core';
@@ -14,8 +15,9 @@ import type {
 import type { DockerImageInfo } from '../../contract/system';
 import { ForbiddenError, PreconditionFailedError } from '../../errors';
 import type { CallerScope } from '../../repositories/index';
+import { resolveEntryVersions } from '../image-catalog/_versions';
 import { fetchDaemonImages } from '../system/_docker';
-import { stepImages } from '../workflows/_image-pins';
+import { findAgentImagePins, stepImages } from '../workflows/_image-pins';
 
 /**
  * The only repositories the sweep deletes from. Both hold images the runtime
@@ -38,12 +40,18 @@ const TARGETED_IMAGE_PRUNE_AUDIT_ENTITY = { entityType: 'docker_image_prune', en
  *  recent: a failed run is resumed from its current step. */
 const UNFINISHED_RUN_STATUSES = ['created', 'running', 'paused'] as const;
 
+/** How long a failed run keeps its images for a resume. Fixed rather than
+ *  `minAgeDays`, so clearing young images now does not also strand a resume. */
+const RESUMABLE_FAILED_RUN_DAYS = 14;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface ImagePruneFacts {
   images: readonly DockerImageInfo[];
   groups: readonly WorkflowDefinitionGroup[];
   agents: readonly AgentDefinition[];
+  /** Every workspace's Image Catalog entries. */
+  catalog: readonly { namespace: string; entry: ImageCatalogEntry }[];
   /** Runs that may still start a step: unfinished, or failed within the window. */
   runs: readonly ProcessInstance[];
   minAgeDays: number;
@@ -107,6 +115,21 @@ function runReferences(
   return referenced;
 }
 
+/** The newest version of every catalog entry — what a user picking the entry
+ *  gets. Older versions are history the catalog can build again. The daemon
+ *  lists newest first, and `resolveEntryVersions` keeps its order. */
+function catalogReferences(
+  catalog: ImagePruneFacts['catalog'],
+  images: readonly DockerImageInfo[],
+): Set<string> {
+  const referenced = new Set<string>();
+  for (const { namespace, entry } of catalog) {
+    const newest = resolveEntryVersions(namespace, entry.source, images)[0];
+    if (newest !== undefined) referenced.add(normalizeImageRef(newest.imageTag));
+  }
+  return referenced;
+}
+
 /** Whether the runtime's own builder made the image: it labels a repo build
  *  with its commit and a carried-files build with their hash. */
 function isRuntimeBuilt(row: DockerImageInfo): boolean {
@@ -123,9 +146,7 @@ export function planImagePrune(facts: ImagePruneFacts): {
   kept: (PruneRow & { reason: ImagePruneKeepReason })[];
 } {
   const byWorkflow = workflowReferences(facts.groups);
-  const byAgent = new Set(
-    facts.agents.flatMap((agent) => (agent.image === undefined ? [] : [normalizeImageRef(agent.image)])),
-  );
+  const byCatalog = catalogReferences(facts.catalog, facts.images);
   const byRun = runReferences(facts.runs, facts.groups);
   const only = facts.only === undefined ? null : new Set(facts.only.map(normalizeImageRef));
   const cutoff = facts.now.getTime() - facts.minAgeDays * DAY_MS;
@@ -146,17 +167,19 @@ export function planImagePrune(facts: ImagePruneFacts): {
     const createdMs = row.createdAt === undefined ? Number.NaN : new Date(row.createdAt).getTime();
     const reason: ImagePruneKeepReason | null = byWorkflow.has(needle)
       ? 'workflow'
-      : byAgent.has(needle)
+      : findAgentImagePins(facts.agents, [image]).length > 0
         ? 'agent'
-        : byRun.has(needle)
-          ? 'run'
-          : isRuntimeBuilt(row) === false
-            ? 'provenance-unknown'
-            : Number.isNaN(createdMs)
-            ? 'age-unknown'
-            : createdMs > cutoff
-              ? 'recent'
-              : null;
+        : byCatalog.has(needle)
+          ? 'catalog'
+          : byRun.has(needle)
+            ? 'run'
+            : isRuntimeBuilt(row) === false
+              ? 'provenance-unknown'
+              : Number.isNaN(createdMs)
+                ? 'age-unknown'
+                : createdMs > cutoff
+                  ? 'recent'
+                  : null;
     if (reason === null) pruned.push(entry);
     else kept.push({ ...entry, reason });
   }
@@ -165,18 +188,18 @@ export function planImagePrune(facts: ImagePruneFacts): {
 }
 
 /** Runs that may still start a step, across every workspace. */
-async function liveRuns(scope: CallerScope, minAgeDays: number, now: Date): Promise<ProcessInstance[]> {
+async function liveRuns(scope: CallerScope, now: Date): Promise<ProcessInstance[]> {
   const unfinished = await Promise.all(UNFINISHED_RUN_STATUSES.map((status) => scope.runs.getByStatus(status)));
-  const cutoff = now.getTime() - minAgeDays * DAY_MS;
+  const cutoff = now.getTime() - RESUMABLE_FAILED_RUN_DAYS * DAY_MS;
   const recentlyFailed = await scope.runs.getByStatus('failed', { updatedSince: new Date(cutoff) });
   return [...unfinished.flat(), ...recentlyFailed];
 }
 
 /**
  * Delete the `mediforce-artifacts:*` and `mediforce-built:*` images nothing
- * needs any more (#1698): no workflow, agent or live run names them, and they
- * are older than `minAgeDays`. Run daily by the cron heartbeat, and on demand
- * by `mediforce system prune-images`.
+ * needs any more: no workflow, agent, catalog entry or live run names them, and
+ * they are older than `minAgeDays`. Run daily by the cron heartbeat, and on
+ * demand by `mediforce system prune-images`.
  *
  * System actor only. The answer depends on every workspace's workflows and
  * runs, and a caller who sees fewer of them would delete what the rest need.
@@ -205,7 +228,8 @@ export async function pruneDockerImages(
     images: daemon.images,
     groups: await scope.workflowDefinitions.listGroupsForImageAudit(),
     agents: await scope.agentDefinitions.listAllForImageAudit(),
-    runs: await liveRuns(scope, input.minAgeDays, now),
+    catalog: await scope.system.imageCatalog.listAllForImageAudit(),
+    runs: await liveRuns(scope, now),
     minAgeDays: input.minAgeDays,
     now,
     ...(input.images === undefined ? {} : { only: input.images }),
@@ -231,7 +255,7 @@ export async function pruneDockerImages(
     namespace: '_system',
     description: `Image prune sweep deleted ${String(pruned.length)} image(s), kept ${String(plan.kept.length)}, failed on ${String(failed.length)}`,
     ...(input.images === undefined ? IMAGE_PRUNE_AUDIT_ENTITY : TARGETED_IMAGE_PRUNE_AUDIT_ENTITY),
-    basis: 'Image prune sweep: images no workflow, agent or live run names',
+    basis: 'Image prune sweep: images no workflow, agent, catalog entry or live run names',
     inputSnapshot: { minAgeDays: input.minAgeDays, ...(input.images === undefined ? {} : { images: input.images }) },
     outputSnapshot: { pruned: pruned.map((row) => row.image), failed },
   });

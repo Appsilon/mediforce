@@ -1,4 +1,4 @@
-import type { DockerInfoResponse } from '@mediforce/platform-api/contract';
+import { DEFAULT_IMAGE_PRUNE_MIN_AGE_DAYS, type DockerInfoResponse } from '@mediforce/platform-api/contract';
 import { defineCommand } from '../define-command';
 import { printJson, type OutputSink } from '../output';
 
@@ -114,10 +114,10 @@ export const systemDiskCommand = defineCommand({
 export const systemPruneImagesCommand = defineCommand({
   name: 'mediforce system prune-images',
   description:
-    'Delete the mediforce-artifacts:* and mediforce-built:* images nothing needs any more: no workflow, agent or live run names them and they are older than --min-age-days. The runtime rebuilds either kind when a step needs it again. The cron heartbeat runs this daily; requires an API key.',
+    'Delete the mediforce-artifacts:* and mediforce-built:* images nothing needs any more: no workflow, agent, catalog entry or live run names them and they are older than --min-age-days. The runtime rebuilds either kind when a step needs it again. The cron heartbeat runs this daily; requires an API key.',
   args: {
     'dry-run': { type: 'boolean', description: 'List what would be deleted and delete nothing' },
-    'min-age-days': { type: 'string', description: 'Minimum image age in days (default: 14)' },
+    'min-age-days': { type: 'string', description: `Minimum image age in days (default: ${String(DEFAULT_IMAGE_PRUNE_MIN_AGE_DAYS)})` },
     images: { type: 'string', description: 'Comma-separated repository:tag list to narrow the sweep to' },
   },
   async run({ args, output, mediforce, jsonMode }) {

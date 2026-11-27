@@ -5,7 +5,7 @@ import {
   buildProcessInstance,
   buildWorkflowDefinition,
 } from '@mediforce/platform-core/testing';
-import type { AgentDefinition, WorkflowDefinitionGroup } from '@mediforce/platform-core';
+import { normalizeRepoUrls, type AgentDefinition, type WorkflowDefinitionGroup } from '@mediforce/platform-core';
 import { resolveStepImage } from '@mediforce/agent-runtime';
 import type { DockerImageInfo } from '../../../contract/system';
 import { createTestScope } from '../../../repositories/__tests__/create-test-scope';
@@ -66,7 +66,7 @@ function workflow(versions: StepSource[], defaultVersion: number | null = null):
 }
 
 function plan(overrides: Partial<ImagePruneFacts>) {
-  return planImagePrune({ images: [], groups: [], agents: [], runs: [], minAgeDays: 14, now: NOW, ...overrides });
+  return planImagePrune({ images: [], groups: [], agents: [], catalog: [], runs: [], minAgeDays: 14, now: NOW, ...overrides });
 }
 
 function reasons(result: ReturnType<typeof plan>): Record<string, string> {
@@ -171,6 +171,28 @@ describe('planImagePrune', () => {
     const agent = { image: 'mediforce-built:agent' } as AgentDefinition;
     const result = plan({ images: [image('mediforce-built:agent')], agents: [agent] });
     expect(reasons(result)).toEqual({ 'mediforce-built:agent': 'agent' });
+  });
+
+  it('keeps the newest version of a catalog entry and prunes its older ones', () => {
+    // The daemon lists newest first; both are builds of the entry's repo and Dockerfile.
+    const build = (tag: string, commit: string) => ({ ...image(tag), buildCommit: commit, buildRepo: REPO, buildDockerfile: 'Dockerfile' });
+    const result = plan({
+      images: [build(BUILT_V2, 'bbb222'), build(BUILT_V1, 'aaa111')],
+      catalog: [
+        {
+          namespace: 'acme',
+          entry: {
+            id: 'tools',
+            name: 'Tools',
+            intent: 'Acme tooling',
+            source: { kind: 'built', repo: normalizeRepoUrls(REPO).gitUrl, dockerfile: 'Dockerfile' },
+            capabilities: {},
+          },
+        },
+      ],
+    });
+    expect(reasons(result)).toEqual({ [BUILT_V2]: 'catalog' });
+    expect(result.pruned.map((row) => row.image)).toEqual([BUILT_V1]);
   });
 
   it('keeps a recent image, and one whose age the daemon did not report', () => {

@@ -26,6 +26,13 @@ export class InMemoryImageCatalogRepository implements ImageCatalogRepository {
       .map(([, entry]) => ({ ...entry }));
   }
 
+  async listAllForImageAudit(): Promise<{ namespace: string; entry: ImageCatalogEntry }[]> {
+    return [...this.entries.entries()].map(([key, entry]) => ({
+      namespace: key.slice(0, key.length - entry.id.length - 1),
+      entry: { ...entry },
+    }));
+  }
+
   async upsert(namespace: string, entry: ImageCatalogEntry): Promise<ImageCatalogEntry> {
     const parsed = ImageCatalogEntrySchema.parse(entry);
     this.entries.set(this.key(namespace, parsed.id), { ...parsed });

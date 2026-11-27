@@ -322,7 +322,7 @@ export class InMemoryProcessInstanceRepository
     options: RunStatusQueryOptions = {},
   ): Promise<ProcessInstance[]> {
     return [...this.instances.values()].filter(
-      (i) => i.status === status && updatedAfter(i, options.updatedSince),
+      (instance) => instance.status === status && updatedAfter(instance, options.updatedSince),
     );
   }
 
@@ -332,10 +332,10 @@ export class InMemoryProcessInstanceRepository
     options: RunStatusQueryOptions = {},
   ): Promise<ProcessInstance[]> {
     return [...this.instances.values()].filter(
-      (i) =>
-        i.status === status &&
-        allowed.includes(i.namespace ?? '') &&
-        updatedAfter(i, options.updatedSince),
+      (instance) =>
+        instance.status === status &&
+        allowed.includes(instance.namespace ?? '') &&
+        updatedAfter(instance, options.updatedSince),
     );
   }
 

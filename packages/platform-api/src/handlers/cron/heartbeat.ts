@@ -29,7 +29,7 @@ type Evaluation = { fire: true } | { fire: false; reason: string };
 const IMAGE_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Prune unneeded workflow images once a day (#1698). The last sweep's audit
+ * Prune unneeded workflow images once a day. The last sweep's audit
  * event is the clock, so a redeploy neither skips a day nor runs two. On unless
  * `ENABLE_IMAGE_PRUNE=false`, and skipped where nothing can delete an image.
  */
@@ -39,9 +39,15 @@ async function pruneImagesIfDue(scope: CallerScope, now: Date): Promise<void> {
     IMAGE_PRUNE_AUDIT_ENTITY.entityType,
     IMAGE_PRUNE_AUDIT_ENTITY.entityId,
   );
-  const lastSweepMs = Math.max(0, ...sweeps.map((event) => new Date(event.timestamp).getTime()));
-  if (now.getTime() - lastSweepMs < IMAGE_PRUNE_INTERVAL_MS) return;
+  const lastSweep = sweeps[0];
+  if (lastSweep !== undefined && now.getTime() - new Date(lastSweep.timestamp).getTime() < IMAGE_PRUNE_INTERVAL_MS) {
+    return;
+  }
   const result = await pruneDockerImages({ dryRun: false, minAgeDays: DEFAULT_IMAGE_PRUNE_MIN_AGE_DAYS }, scope);
+  if (result.available === false) {
+    console.warn('[cron-heartbeat] Image prune skipped: Docker daemon unavailable, retrying next tick');
+    return;
+  }
   console.log(
     `[cron-heartbeat] Image prune: ${String(result.pruned.length)} deleted, ${String(result.kept.length)} kept, ${String(result.failed.length)} failed`,
   );

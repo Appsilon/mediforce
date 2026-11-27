@@ -35,6 +35,7 @@ export const PruneDockerImagesInputSchema = z.object({
  * - `workflow`: the version runs start from names it, or some version names
  *   it with nothing to rebuild it from.
  * - `agent`: an agent definition names it.
+ * - `catalog`: it is the newest version of an Image Catalog entry.
  * - `run`: a run that is not finished — or failed recently enough to be
  *   resumed — is on a version that names it.
  * - `provenance-unknown`: it lacks the labels the runtime's builder writes, so
@@ -46,6 +47,7 @@ export const PruneDockerImagesInputSchema = z.object({
 export const ImagePruneKeepReasonSchema = z.enum([
   'workflow',
   'agent',
+  'catalog',
   'run',
   'provenance-unknown',
   'age-unknown',
@@ -71,6 +73,6 @@ export const PruneDockerImagesOutputSchema = z.object({
 
 export type PruneDockerImagesInput = z.infer<typeof PruneDockerImagesInputSchema>;
 /** What a client sends: the defaults are filled in on parse. */
-export type PruneDockerImagesInputApi = z.input<typeof PruneDockerImagesInputSchema>;
+export type PruneDockerImagesBody = z.input<typeof PruneDockerImagesInputSchema>;
 export type ImagePruneKeepReason = z.infer<typeof ImagePruneKeepReasonSchema>;
 export type PruneDockerImagesOutput = z.infer<typeof PruneDockerImagesOutputSchema>;

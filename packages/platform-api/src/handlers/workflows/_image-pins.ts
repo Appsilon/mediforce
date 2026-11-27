@@ -82,7 +82,9 @@ export function stepImages(
  * One place, because the callers ask the same question for opposite reasons:
  * `GET /api/workflow-definitions/by-image` renders "used by", and
  * `assertNoLiveImagePins` below refuses to destroy an image a live version
- * needs. They must not be allowed to disagree about what counts as a pin.
+ * needs. They must not be allowed to disagree about what counts as a pin —
+ * nor may the prune sweep (`docker-images/prune-images.ts`), which asks the
+ * reverse question through the same `stepImages` and `pickRunnableVersion`.
  *
  * **Every version, not just the latest.** The read this replaced looked at
  * `latestVersion` alone and skipped archived workflows entirely, so "what
