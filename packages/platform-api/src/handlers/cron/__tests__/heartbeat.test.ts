@@ -771,7 +771,11 @@ describe('heartbeat handler', () => {
     const NOW = Date.now();
     const hoursAgo = (hours: number): string => new Date(NOW - hours * 60 * 60 * 1000).toISOString();
 
-    function fakeRunWorktrees(runIds: readonly string[], failingRunIds: readonly string[] = []) {
+    function fakeRunWorktrees(
+      runIds: readonly string[],
+      failingRunIds: readonly string[] = [],
+      beforeDispose: (runId: string) => Promise<void> = async () => {},
+    ) {
       const onDisk = new Set(runIds);
       const worktreePath = (runId: string): string => `/data/worktrees/team-alpha/wd/${runId}`;
       return {
@@ -787,6 +791,7 @@ describe('heartbeat handler', () => {
         disposeRunWorkspace: async (worktree: { path: string; bareRepoPath: string }) => {
           const runId = [...onDisk].find((candidate) => worktreePath(candidate) === worktree.path);
           if (runId === undefined) return;
+          await beforeDispose(runId);
           if (failingRunIds.includes(runId)) throw new Error(`git worktree remove failed for ${runId}`);
           onDisk.delete(runId);
         },
@@ -854,6 +859,20 @@ describe('heartbeat handler', () => {
 
       await heartbeat({}, scope);
       expect(runWorktrees.onDisk.size).toBe(0);
+    });
+
+    it('keeps a worktree whose run was retried after the sweep read its status', async () => {
+      await seedRun('run-done', 'completed', hoursAgo(0));
+      await seedRun('run-retried', 'failed', hoursAgo(48));
+      const runWorktrees = fakeRunWorktrees(['run-done', 'run-retried'], [], async (runId) => {
+        if (runId === 'run-done') {
+          await instanceRepo.update('run-retried', { status: 'running', updatedAt: new Date().toISOString() });
+        }
+      });
+
+      await heartbeat({}, scopeWith(runWorktrees));
+
+      expect([...runWorktrees.onDisk]).toEqual(['run-retried']);
     });
 
     it('completes the beat and removes the others when one removal fails', async () => {

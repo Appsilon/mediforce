@@ -72,7 +72,7 @@ export const FAILED_RUN_WORKTREE_GRACE_MS = 24 * 60 * 60 * 1000;
 // on the next beats.
 export const RUN_WORKTREE_DISPOSALS_PER_BEAT = 25;
 
-function isWorktreeDisposable(run: ProcessInstance, now: Date): boolean {
+function isWorktreeDisposable(run: Pick<ProcessInstance, 'status' | 'updatedAt'>, now: Date): boolean {
   if (run.status === 'completed') return true;
   if (run.status !== 'failed') return false;
   return now.getTime() - new Date(run.updatedAt).getTime() >= FAILED_RUN_WORKTREE_GRACE_MS;
@@ -81,14 +81,25 @@ function isWorktreeDisposable(run: ProcessInstance, now: Date): boolean {
 // Remove the worktrees of finished runs. Output Files, step history and
 // Eval Cases read the run branch in the bare repo, which stays. A worktree whose
 // run is not in the database is kept: nothing says that run is finished.
+//
+// One query reads the status of every run with a worktree, so a beat costs the
+// same however many paused or rowless worktrees are kept. Each candidate is read
+// again just before its removal: a retry may have restarted the run since.
 async function sweepRunWorktrees(scope: CallerScope, now: Date): Promise<void> {
   const worktrees = await scope.system.runWorktrees.listRunWorktrees();
+  if (worktrees.length === 0) return;
+  const lifecycles = await scope.runs.getLifecycles(worktrees.map((worktree) => worktree.runId));
+  const runsById = new Map(lifecycles.map((run) => [run.id, run]));
+  const candidates = worktrees.filter((worktree) => {
+    const run = runsById.get(worktree.runId);
+    return run !== undefined && isWorktreeDisposable(run, now);
+  });
+  if (candidates.length > RUN_WORKTREE_DISPOSALS_PER_BEAT) {
+    console.log(`[cron-heartbeat] ${String(candidates.length)} worktrees of finished runs; removing ${String(RUN_WORKTREE_DISPOSALS_PER_BEAT)}, the rest wait for the next beats`);
+  }
+
   let disposed = 0;
-  for (const worktree of worktrees) {
-    if (disposed === RUN_WORKTREE_DISPOSALS_PER_BEAT) {
-      console.log(`[cron-heartbeat] Worktree sweep reached ${String(RUN_WORKTREE_DISPOSALS_PER_BEAT)} removals; the rest wait for the next beat`);
-      return;
-    }
+  for (const worktree of candidates.slice(0, RUN_WORKTREE_DISPOSALS_PER_BEAT)) {
     try {
       const run = await scope.runs.getById(worktree.runId);
       if (run === null || isWorktreeDisposable(run, now) === false) continue;

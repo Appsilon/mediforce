@@ -2,6 +2,7 @@ import type {
   ProcessInstance,
   ProcessInstanceRepository,
   RunDefinitionPin,
+  RunLifecycle,
   RunNameEntry,
   StepExecution,
   InstanceStatus,
@@ -86,6 +87,12 @@ export class AuthorizedWorkflowRunRepository extends AuthorizedScope {
     this.caller.isSystemActor
       ? this.raw.getDefinitionPinsAll(instanceIds)
       : this.raw.getDefinitionPinsInNamespaces(instanceIds, [...this.caller.namespaces]);
+
+  /** Batched `RunLifecycle` read for the heartbeat's worktree sweep. System actor only. */
+  getLifecycles = async (instanceIds: readonly string[]): Promise<RunLifecycle[]> => {
+    if (this.caller.isSystemActor === false) throw new ForbiddenError();
+    return this.raw.getLifecyclesAll(instanceIds);
+  };
 
   getByStatus = async (status: InstanceStatus): Promise<ProcessInstance[]> =>
     this.caller.isSystemActor

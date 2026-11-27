@@ -142,3 +142,16 @@ export const RunDefinitionPinSchema = ProcessInstanceSchema.pick({
 });
 
 export type RunDefinitionPin = z.infer<typeof RunDefinitionPinSchema>;
+
+/**
+ * Where a run is in its lifecycle, without the rest of the row. Backs the
+ * heartbeat's worktree sweep, which needs the status of every run with a
+ * worktree on disk in one read.
+ */
+export const RunLifecycleSchema = ProcessInstanceSchema.pick({
+  id: true,
+  status: true,
+  updatedAt: true,
+});
+
+export type RunLifecycle = z.infer<typeof RunLifecycleSchema>;
